@@ -1,4 +1,7 @@
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
+
+// Let Node deliver completed case results between the synchronous journal work.
+afterEach(() => new Promise(resolve => setImmediate(resolve)))
 
 {
 const { default: assert } = await import('node:assert/strict')
@@ -10,6 +13,11 @@ const blog = await import('../../../dist/Enforcer/BlogSurface.js')
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
 const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const runtime = await import('../../../dist/Context/Companion/RuntimeSurface.js')
+const turns = await import('../../../dist/Interaction/Repair/CompletedTurnSurface.js')
+const resources = await import('../../../dist/Resources/PromptSurface.js')
+const ownership = await import('../../verification-system/tests/support/blogger-ownership.mjs')
+
+resources.runtimeInstallFromPackage()
 
 const NUDGE_KIND = 'blogger-missing-tool'
 const AABB_KIND = 'blogger-aabb'
@@ -64,6 +72,7 @@ const setupOwner = async (t) => {
     main: `ses-main-repair-${n}`,
     blogger: `ses-blogger-repair-${n}`,
     request: `req-blog-${n}`,
+    root: `msg-root-blog-${n}`,
     physical: `msg-phys-blog-${n}`,
   }
   const dir = mkdtempSync(join(tmpdir(), 'wxs-blogger-repair-'))
@@ -75,8 +84,9 @@ const setupOwner = async (t) => {
     '2026-01-01T00:00:00Z',
   )
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const accepted = await dispatch.acceptHumanRoot(opened.journal, ids.blogger, ids.physical, 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
+  const durable = opened.journal.journal
+  await ownership.linkBlogger(opened.journal, ids.main, ids.blogger)
+  const profile = await ownership.rootBlogger(opened.journal, ids.blogger, ids.root)
   // Real process-local owner scope (also isolates the shared flight registry)
   // and the exact live flight for this request.
   const scope = runtime.createScope()
@@ -87,6 +97,15 @@ const setupOwner = async (t) => {
     toml: 'repair-toml',
   })
   assert.equal(runtime.claimCurrentRequest(scope, ids.blogger, request), 'Claimed')
+  await ownership.ownRequest({
+    handle: opened.journal,
+    durable,
+    scope,
+    bloggerSession: ids.blogger,
+    profile,
+    request,
+    physical: ids.physical,
+  })
   t.after(() => {
     try {
       runtime.dispose(scope)
@@ -102,9 +121,6 @@ const setupOwner = async (t) => {
     root: rootPort(calls),
     events: eventPort(calls),
   }
-  // BlogSurface.journalOf reads a structural `Journal` member or the raw
-  // AgentJournal; the boot handle wraps the live AgentJournal in `.journal`.
-  const durable = opened.journal.journal
   return {
     ids,
     durable,
@@ -122,13 +138,17 @@ const idleObservation = (ports, ids, run, { quiescent = true } = {}) => ({
   context: {
     sessionId: ids.blogger,
     physicalUserMessageId: ids.physical,
-    authorityRoot: ids.physical,
+    authorityRoot: ids.root,
     providerRun: run,
   },
   sessionPort: ports.session,
   rootWorkspace: ports.root,
   eventPort: ports.events,
 })
+const ownedTerminal = (ids, run, parts = []) => [
+  ownership.userMessage(ids.physical),
+  ownership.assistantMessage(run, ids.physical, parts),
+]
 const captureFatal = async (work) => {
   const previousExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
   const previousError = console.error
@@ -233,10 +253,10 @@ test('WHAT[behavior-diagnosis-017] exhausted repair stops its real continuation 
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
-  const messages = [{ info: { id: 'run-3', role: 'assistant', time: { completed: 1 } }, parts: [] }]
+  const messages = ownedTerminal(ids, 'run-3')
 
   const { value, records } = await captureFatal(() =>
-    blog.continueTerminal(scope, durable, request, 'run-3', 0, messages),
+    blog.continueTransform(scope, durable, ids.blogger, messages),
   )
 
   assert.equal(value.kind, 'StopPhysicalRun')
@@ -248,10 +268,10 @@ test('WHAT[behavior-diagnosis-017] exhausted repair stops its real continuation 
 })
 
 test('WHAT[behavior-diagnosis-017] terminal without provider identity stops only the exact request', async (t) => {
-  const { durable, scope, request, ids } = await setupOwner(t)
-  const messages = [{ info: { role: 'assistant', time: { completed: 1 } }, parts: [] }]
+  const { durable, scope, ids } = await setupOwner(t)
+  const messages = ownedTerminal(ids, undefined)
   const { value, records } = await captureFatal(() =>
-    blog.continueTerminal(scope, durable, request, '', 0, messages),
+    blog.continueTransform(scope, durable, ids.blogger, messages),
   )
   assert.equal(value.kind, 'StopPhysicalRun')
   assert.deepEqual(records, [])
@@ -259,10 +279,11 @@ test('WHAT[behavior-diagnosis-017] terminal without provider identity stops only
 })
 
 test('WHAT[behavior-diagnosis-017] failed durable abandon retains its flight and never reports settlement', async (t) => {
-  const { durable, handle, scope, request, ids } = await setupOwner(t)
+  const { durable, handle, scope, ids } = await setupOwner(t)
   journal.JournalSurface_dispose(handle)
+  const messages = ownedTerminal(ids, undefined)
   const { records } = await captureFatal(async () => {
-    await assert.rejects(() => blog.continueTerminal(scope, durable, request, '', 0, []))
+    await assert.rejects(() => blog.continueTransform(scope, durable, ids.blogger, messages))
   })
   assert.deepEqual(records, [])
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
@@ -274,8 +295,8 @@ test('WHAT[behavior-diagnosis-017] repair settlement failure rejects every waiti
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
   journal.JournalSurface_dispose(handle)
   const { value, records } = await captureFatal(() => Promise.allSettled([
-    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
-    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-3', ownedTerminal(ids, 'run-3')),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', ownedTerminal(ids, 'run-4')),
   ]))
   assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
   assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
@@ -292,8 +313,8 @@ test('WHAT[behavior-diagnosis-017] unknown abandon commit still rejects every ob
   // NotAttempted — the abandon may or may not be recorded.
   chmodSync(writerFile, 0o400)
   const { value, records } = await captureFatal(() => Promise.allSettled([
-    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
-    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-3', ownedTerminal(ids, 'run-3')),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', ownedTerminal(ids, 'run-4')),
   ]))
   assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
   assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
@@ -309,13 +330,13 @@ test('WHAT[behavior-diagnosis-017] late observers after settlement failure get t
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
   journal.JournalSurface_dispose(handle)
   const { value: first, records } = await captureFatal(() => Promise.allSettled([
-    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-3', ownedTerminal(ids, 'run-3')),
   ]))
   assert.equal(first[0].status, 'rejected')
   const failure = first[0].reason
 
   const late = await Promise.allSettled([
-    blog.observeTransformRepair(scope, durable, request, 'run-5', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-5', ownedTerminal(ids, 'run-5')),
     blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-5')),
   ])
   assert.deepEqual(late.map(result => result.status), ['rejected', 'rejected'])
@@ -331,35 +352,43 @@ test('WHAT[behavior-diagnosis-017] late observers after settlement failure get t
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair observations preserve bounded effects', async (t) => {
+  let traceNumber = 0
   await fc.assert(fc.asyncProperty(
     fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
     async (trace) => {
-      const cleanups = []
-      const owner = await setupOwner({ after: fn => cleanups.push(fn) })
-      const { durable, scope, request, ids, ports, calls } = owner
-      try {
-        const { records } = await captureFatal(async () => {
-          let run = 0
-          for (const observation of trace) {
-            if (!observation.duplicate) run += 1
-            const providerRun = `generated-run-${run}`
-            if (observation.idle) {
-              await blog.observeIdleRepair(scope, durable, request,
-                idleObservation(ports, ids, providerRun, observation))
-            } else {
-              const messages = [{ info: { id: providerRun, role: 'assistant', time: { completed: 1 } }, parts: [] }]
-              await blog.continueTerminal(scope, durable, request, providerRun, 0, messages)
+      const proof = (async () => {
+        const cleanups = []
+        const owner = await setupOwner({ after: fn => cleanups.push(fn) })
+        const { durable, scope, request, ids, ports, calls } = owner
+        try {
+          const { records } = await captureFatal(async () => {
+            let run = 0
+            for (const observation of trace) {
+              if (!observation.duplicate) run += 1
+              const providerRun = `generated-run-${run}`
+              if (observation.idle) {
+                await blog.observeIdleRepair(scope, durable, request,
+                  idleObservation(ports, ids, providerRun, observation))
+              } else {
+                await blog.continueTransform(scope, durable, ids.blogger, ownedTerminal(ids, providerRun))
+              }
+              assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
+              assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
+              if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
             }
-            assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
-            assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
-            if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
-          }
-        })
-        assert.deepEqual(records, [])
-      } finally {
-        for (const cleanup of cleanups.reverse()) await cleanup()
-      }
+          })
+          assert.deepEqual(records, [])
+        } finally {
+          for (const cleanup of cleanups.reverse()) await cleanup()
+        }
+      })()
+      await t.test(`WHAT[behavior-diagnosis-017] generated repair trace ${++traceNumber}`, () => proof)
+      // Deliver the completed verdict before starting the next real trace.
+      await new Promise(resolve => setImmediate(resolve))
+      // node:test records child failure without rejecting t.test; FastCheck must
+      // receive the original proof rejection so counterexamples still shrink.
+      await proof
     },
   ), { seed: 20260914, numRuns: 60 })
 })
@@ -367,7 +396,7 @@ test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair ob
 test('WHAT[behavior-diagnosis-017] transform_and_idle_interleave_resolves_to_single_owner', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
-  const before = await blog.observeTransformRepair(scope, durable, request, 'run-1', [])
+  const before = await blog.observeTransformRepair(scope, durable, request, 'run-1', ownedTerminal(ids, 'run-1'))
   assert.equal(before.outcome, 'PendingRepairWait')
   assert.equal(calls.sendPrompt.length, 0)
 
@@ -380,13 +409,15 @@ test('WHAT[behavior-diagnosis-017] transform_and_idle_interleave_resolves_to_sin
   assert.equal(nudge.outcome, 'NudgeSent')
   assert.equal(calls.sendPrompt.length, 1)
 
-  const sameRun = await blog.observeTransformRepair(scope, durable, request, 'run-1', [])
+  const sameRun = await blog.observeTransformRepair(scope, durable, request, 'run-1', ownedTerminal(ids, 'run-1'))
   assert.equal(sameRun.outcome, 'PendingRepairWait')
   assert.equal(calls.sendPrompt.length, 1)
 
-  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', [])
+  const secondTerminal = ownedTerminal(ids, 'run-2')
+  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', secondTerminal)
   assert.equal(injected.outcome, 'RepairInjected')
-  assert.equal(injected.messages.length, 1)
+  assert.equal(injected.messages.length, secondTerminal.length + 1)
+  assert.equal(injected.messages.at(-1).info.source, 'interaction-repair')
   assert.equal(calls.sendPrompt.length, 1)
 
   const settled = await blog.observeIdleRepair(
@@ -398,7 +429,7 @@ test('WHAT[behavior-diagnosis-017] transform_and_idle_interleave_resolves_to_sin
   assert.equal(settled.outcome, 'PendingRepairWait')
   assert.equal(calls.sendPrompt.length, 1)
 
-  const exhausted = await blog.observeTransformRepair(scope, durable, request, 'run-3', [])
+  const exhausted = await blog.observeTransformRepair(scope, durable, request, 'run-3', ownedTerminal(ids, 'run-3'))
   assert.equal(exhausted.outcome, 'AbandonedExhausted')
   assert.equal(calls.sendPrompt.length, 1)
   assert.equal(calls.eventNotify.length, 1)
@@ -415,15 +446,22 @@ test('WHAT[behavior-diagnosis-017] transform_on_aabb_claimed_terminal_waits_with
   )
   assert.equal(nudge.outcome, 'NudgeSent')
 
-  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', [])
+  const secondTerminal = ownedTerminal(ids, 'run-2')
+  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', secondTerminal)
   assert.equal(injected.outcome, 'RepairInjected')
-  assert.equal(injected.messages.length, 1)
+  assert.equal(injected.messages.length, secondTerminal.length + 1)
 
   const pending = await blog.observeTransformRepair(scope, durable, request, 'run-2', injected.messages)
   assert.equal(pending.outcome, 'PendingRepairWait')
   assert.equal(calls.sendPrompt.length, 1)
 
-  const exhausted = await blog.observeTransformRepair(scope, durable, request, 'run-3', injected.messages)
+  const exhausted = await blog.observeTransformRepair(
+    scope,
+    durable,
+    request,
+    'run-3',
+    [...injected.messages, ownership.assistantMessage('run-3', ids.physical)],
+  )
   assert.equal(exhausted.outcome, 'AbandonedExhausted')
   assert.equal(calls.sendPrompt.length, 1)
 })
@@ -439,10 +477,39 @@ test('WHAT[behavior-diagnosis-017] repair_without_journal_abandons_without_physi
   )
   assert.equal(idle.outcome, 'AbandonedExhausted')
 
-  const transform = await blog.observeTransformRepair(scope, null, request, 'run-1', [])
+  const transform = await blog.observeTransformRepair(scope, null, request, 'run-1', ownedTerminal(ids, 'run-1'))
   assert.equal(transform.outcome, 'AbandonedExhausted')
 
   assert.equal(calls.sendPrompt.length, 0)
+})
+
+test('WHAT[behavior-diagnosis-017] a transform or idle terminal without ownership proof spends no budget', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+  const unlanded = { ...ids, physical: 'msg-never-landed' }
+
+  const transform = await blog.observeTransformRepair(scope, durable, request, 'run-1', ownedTerminal(unlanded, 'run-1'))
+  assert.equal(transform.outcome, 'UnprovenIgnored')
+  const idle = await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, unlanded, 'run-1'))
+  assert.equal(idle.outcome, 'UnprovenIgnored')
+  const unparented = await blog.observeTransformRepair(scope, durable, request, 'run-2', [])
+  assert.equal(unparented.outcome, 'UnprovenIgnored')
+
+  assert.equal(calls.sendPrompt.length, 0)
+  assert.equal(blog.repairClaimedForKind(durable, ids.blogger, ids.request, 'run-1', NUDGE_KIND), false)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[behavior-diagnosis-017] an aborted Blogger turn still reaches the repair owner at idle', () => {
+  const prose = [{ type: 'text', text: 'prose instead of a chronicle call' }]
+  const chronicle = [{ type: 'tool', tool: 'chronicle', callID: 'c1', state: { status: 'completed', input: {} } }]
+
+  assert.equal(turns.bloggerIdleRoute(true, false, 'TurnAborted', []), 'RepairThenObserve')
+  assert.equal(turns.bloggerIdleRoute(true, false, 'TurnAborted', chronicle), 'RepairThenObserve')
+  assert.equal(turns.bloggerIdleRoute(true, true, 'TurnAborted', []), 'Observe')
+  assert.equal(turns.bloggerIdleRoute(true, false, 'TurnCompleted', prose), 'Repair')
+  assert.equal(turns.bloggerIdleRoute(true, false, 'TurnCompleted', chronicle), 'Observe')
+  assert.equal(turns.bloggerIdleRoute(true, false, 'TurnFailed', prose), 'Observe')
+  assert.equal(turns.bloggerIdleRoute(false, false, 'TurnAborted', []), 'Observe')
 })
 
 test('WHAT[behavior-diagnosis-017] shutdown_rejects_new_repair_episode_before_drain', async (t) => {
@@ -591,8 +658,11 @@ const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 const { call, decode, message } = await import('./support/cycle.mjs')
 
 test('WHAT[behavior-diagnosis-017] actual decoder ignores malformed messages and selects the last assistant', () => {
-  const malformed = [null, {}, { info: { role: 'user', id: 'user' } }, { info: { role: 'assistant' } }]
+  const malformed = [null, {}, { info: { role: 'user', id: 'user' } }]
   assert.equal(blog.decodeCycle(malformed), null)
+  const unidentified = blog.decodeCycle([...malformed, { info: { role: 'assistant' } }])
+  assert.equal(unidentified.messageId, '', 'missing identity remains visible to the production validator')
+  assert.equal(unidentified.decision.ok, false)
   const result = blog.decodeCycle([message([call()], 'first'), ...malformed, message([], 'last')])
   assert.equal(result.messageId, 'last')
   assert.equal(result.decodedCalls, 0)

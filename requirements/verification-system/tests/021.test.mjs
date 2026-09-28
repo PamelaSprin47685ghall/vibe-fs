@@ -156,9 +156,21 @@ process.send({type:'inner:drained'})
 })
 
 test('WHAT[verification-system-021] a clean child exit without authoritative summary is inconclusive', async () => {
-  await assert.rejects(superviseNodeTest({
-    files: [fixture], inner: fixture, env: childEnv, label: 'no-summary-fixture', silenceMs: 10000, throwOnFailure: true,
-  }), /supervised suite failed/)
+  const messages = []
+  const originalError = console.error
+  console.error = (...args) => {
+    messages.push(args.join(' '))
+    originalError(...args)
+  }
+  try {
+    await assert.rejects(superviseNodeTest({
+      files: [fixture], inner: fixture, env: childEnv, label: 'no-summary-fixture', silenceMs: 10000, throwOnFailure: true,
+    }), /supervised suite failed/)
+  } finally {
+    console.error = originalError
+  }
+  assert.match(messages.join('\n'), /verdict counts unavailable; no authoritative summary/)
+  assert.doesNotMatch(messages.join('\n'), /\b0 passed, 0 failed\b/)
 })
 
 test('WHAT[verification-system-021] a tier exclusion identifies the missing execution tier', async () => {

@@ -7,6 +7,17 @@
 import { resolve } from 'node:path'
 
 /**
+ * 事件所属测试文件（入口或注册辅助），无则空串。
+ * @param {any} event
+ * @returns {string}
+ */
+export function testEntryFile(event) {
+  const data = event?.data
+  return typeof data?.entryFile === 'string' ? data.entryFile
+    : typeof data?.file === 'string' ? data.file : ''
+}
+
+/**
  * 判定事件是否为文件完成事件（file wrapper test:complete）。
  *
  * 语义：event.type === 'test:complete' 且 data.file 是 string 且

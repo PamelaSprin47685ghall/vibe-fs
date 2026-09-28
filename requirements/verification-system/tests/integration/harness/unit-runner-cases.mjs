@@ -18,8 +18,11 @@
  * cause would be far from the symptom.
  */
 
-import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './lib.mjs';
@@ -30,6 +33,8 @@ import {
   UNIT_RUNNER_PROBE_PER_TEST_MS,
   UNIT_RUNNER_PROBE_SILENCE_MS,
   UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS,
+  PROCESS_TREE_TIMEOUT_MS,
+  SIGKILL_GRACE_MS,
 } from '../../e2e/support/time-budget.js';
 import { harnessProgress } from './progress.mjs';
 
@@ -89,6 +94,31 @@ const PARKED_IF_SLOWER_THAN_MS = UNIT_RUNNER_PROBE_SILENCE_MS * 3;
 
 const fixtureNames = () => readdirSync(`${REPO_ROOT}${FIXTURE_DIR}`);
 
+const liveFixtureProcess = (pid) => {
+  const output = execFileSync('ps', ['-eo', 'pid=,pgid=,stat='], {
+    encoding: 'utf8',
+    timeout: PROCESS_TREE_TIMEOUT_MS,
+  });
+  if (!output.trim()) throw new Error('fixture process inspection returned no records');
+  const rows = output.trim().split('\n').map((line) => {
+    const fields = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
+    if (!fields) throw new Error(`unparseable fixture process record: ${line}`);
+    return fields.slice(1);
+  });
+  const row = rows.find(([candidate, , state]) => Number(candidate) === pid && !/^[ZX]/.test(state));
+  return row ? { pid: Number(row[0]), pgid: Number(row[1]) } : null;
+};
+
+const reclaimFixtureOrphan = async ({ orphanPid, pgid }) => {
+  const alive = liveFixtureProcess(orphanPid);
+  if (!alive) return;
+  assertEq(alive.pgid, pgid, 'refuse to signal a PID outside the fixture-owned group');
+  process.kill(orphanPid, 'SIGKILL');
+  const deadline = Date.now() + SIGKILL_GRACE_MS;
+  while (liveFixtureProcess(orphanPid) && Date.now() < deadline) await delay(20);
+  assertEq(liveFixtureProcess(orphanPid), null, 'the fixture orphan must be reclaimed even when the regression fails');
+};
+
 export const unitRunnerCases = [
   {
     name: 'verification-system-006 a hung test that keeps printing is ended by the verdict-silence window',
@@ -109,6 +139,8 @@ export const unitRunnerCases = [
       const run = await runFixture('hangs-with-handle-and-chatter.fixture.mjs', scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS));
 
       assertTrue(run.code !== 0 || run.signal !== null, `a hung run must not succeed: code=${run.code}`);
+      assertTrue(run.stderr.includes('verdict counts unavailable; no authoritative summary'), 'a silence failure without summary must identify missing counts');
+      assertTrue(!/\b0 passed, 0 failed\b/.test(run.stderr), 'missing counts must not be reported as zero verdicts');
       assertTrue(
         run.elapsedMs < PARKED_IF_SLOWER_THAN_MS,
         `the run took ${run.elapsedMs}ms; the injected window is ${UNIT_RUNNER_PROBE_SILENCE_MS}ms and the backstop ` +
@@ -117,7 +149,7 @@ export const unitRunnerCases = [
       const silenceNamed =
         run.stderr.includes("WATCHDOG: 'tests/unit' silent for") ||
         run.stderr.includes('had not reported completion') ||
-        run.stderr.includes('every verdict passed but the child would not exit') ||
+        run.stderr.includes('all planned files completed but the child would not exit') ||
         run.stderr.includes('failed before the silence') ||
         // Piped stderr can lose the WATCHDOG prefix under process.exit; the
         // authoritative summary still proves the hang was judged a failure.
@@ -173,6 +205,10 @@ export const unitRunnerCases = [
         run.stderr.includes('runner: 1 passed, 0 failed'),
         `the authoritative summary must be printed: ${run.stderr.slice(-300)}`,
       );
+      assertTrue(
+        /^runner: post-exit group verification\/reclamation: pid=\d+; elapsedMs=\d+\.\d+; accepted=true$/m.test(run.stderr),
+        `a clean group must report its actual verification result: ${run.stderr}`,
+      );
     },
   },
 
@@ -189,7 +225,7 @@ export const unitRunnerCases = [
 
       assertEq(run.code, 1, `a leaked handle must fail the run even with every verdict green: ${run.stderr.slice(-300)}`);
       assertTrue(
-        run.stderr.includes('every verdict passed but the child would not exit') ||
+        run.stderr.includes('all planned files completed but the child would not exit') ||
           run.stderr.includes("WATCHDOG: 'tests/unit' silent for") ||
           run.stderr.includes('failed before the silence') ||
           /runner:\s*1 passed,\s*[1-9]\d* failed/.test(run.stderr),
@@ -199,6 +235,56 @@ export const unitRunnerCases = [
         run.elapsedMs < PARKED_IF_SLOWER_THAN_MS,
         `the run took ${run.elapsedMs}ms; a leak must be caught by the window, not the backstop`,
       );
+    },
+  },
+
+  {
+    name: 'verification-system-005 a late orphan after child stop is reclaimed and fails the otherwise green run',
+    fn: async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'unit-runner-late-orphan-'));
+      const evidencePath = join(directory, 'evidence.json');
+      const errors = [];
+      try {
+        const run = await runFixture('late-orphan-after-stop.fixture.mjs', {
+          LATE_ORPHAN_EVIDENCE: evidencePath,
+        });
+        const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+        const survivor = liveFixtureProcess(evidence.orphanPid);
+        assertEq(evidence.stopReturned, true, 'the actual detached=false stop must complete before runner exit');
+        assertEq(evidence.orphanPgid, evidence.pgid, 'the late orphan must belong to the runner group');
+        assertTrue(run.stderr.includes('runner: 1 passed, 0 failed'), 'the fixture verdict itself must pass');
+        assertEq(run.code, 1, `residual processes must fail the green run; evidence=${JSON.stringify(evidence)}, survivor=${JSON.stringify(survivor)}; ${run.stderr}`);
+        assertTrue(run.stderr.includes('residual process group'), `the failure must identify remaining processes: ${run.stderr}`);
+        assertEq(survivor, null, 'the supervisor must reclaim the late orphan before returning failure');
+        assertTrue(!run.stderr.includes('WATCHDOG'), 'normal-exit cleanup must not wait for silence');
+        const checks = [...run.stderr.matchAll(/^runner: post-exit group verification\/reclamation: pid=(\d+); elapsedMs=(\d+\.\d+); accepted=(true|false)$/gm)];
+        assertEq(checks.length, 1, 'the actual post-exit group check must report exactly once');
+        assertEq(Number(checks[0][1]), evidence.pgid, 'the timed group check must own the fixture group');
+        assertEq(checks[0][3], 'false', 'reclaiming a residual group must not report a clean run');
+        const cleanupMs = Number(checks[0][2]);
+        assertTrue(cleanupMs > 0 && cleanupMs < run.elapsedMs, 'cleanup timing must measure a real phase inside the full run');
+        assertTrue(
+          cleanupMs < PROCESS_TREE_TIMEOUT_MS + SIGKILL_GRACE_MS,
+          `post-exit group verification/reclamation took ${cleanupMs}ms, beyond the existing inspection and SIGKILL budgets`,
+        );
+      } catch (error) {
+        errors.push(error);
+      } finally {
+        try {
+          if (existsSync(evidencePath)) {
+            await reclaimFixtureOrphan(JSON.parse(readFileSync(evidencePath, 'utf8')));
+          }
+        } catch (error) {
+          errors.push(error);
+        }
+        try {
+          rmSync(directory, { recursive: true, force: true });
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) throw new AggregateError(errors, 'late-orphan regression and cleanup failed');
     },
   },
 

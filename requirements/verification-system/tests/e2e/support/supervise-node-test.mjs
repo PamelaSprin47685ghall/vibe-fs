@@ -5,16 +5,62 @@
  * test verdicts; stdout/stderr/diagnostics are background and never renew.
  */
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { relative, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
+import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import { Watchdog } from './watchdog.js'
-import { SUITE_BACKSTOP_MS } from './time-budget.js'
+import { PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, SUITE_BACKSTOP_MS } from './time-budget.js'
 import { classifyVerdict } from '../../support/verdict-feed.mjs'
-import { isFileCompletionEvent } from '../../support/test-run-state.mjs'
+import { isFileCompletionEvent, testEntryFile } from '../../support/test-run-state.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
+
+function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
+  if (process.platform !== 'linux' && process.platform !== 'darwin') {
+    throw new Error(`process-group verification is unsupported on ${process.platform}`)
+  }
+  const output = execFileSync('ps', ['-eo', 'pid=,pgid=,stat='], { encoding: 'utf8', timeout })
+  if (!output.trim()) throw new Error('process inspection returned no records')
+  return output.trim().split('\n').flatMap((line) => {
+    const fields = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
+    if (!fields) throw new Error(`unparseable process record: ${line}`)
+    return Number(fields[2]) === pgid && !/^[ZX]/.test(fields[3]) ? [Number(fields[1])] : []
+  })
+}
+
+async function verifyExitedGroup(pgid, logPrefix) {
+  try {
+    const members = liveGroupMembers(pgid)
+    if (members.length === 0) return true
+    console.error(`${logPrefix}: residual process group ${pgid} after inner exit; surviving pids: ${members.join(', ')}`)
+  } catch (error) {
+    console.error(`${logPrefix}: could not verify process group ${pgid} after inner exit: ${error.message}`)
+  }
+
+  // Only this supervisor owns the detached runner group. A clean verdict ledger
+  // cannot excuse a descendant left behind, even when reclamation succeeds.
+  try {
+    try {
+      process.kill(-pgid, 'SIGKILL')
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error
+    }
+    const deadline = Date.now() + SIGKILL_GRACE_MS
+    let members = liveGroupMembers(pgid, SIGKILL_GRACE_MS)
+    while (members.length > 0 && Date.now() < deadline) {
+      await delay(20)
+      members = liveGroupMembers(pgid, Math.max(1, Math.min(PROCESS_TREE_TIMEOUT_MS, deadline - Date.now())))
+    }
+    if (members.length > 0) throw new Error(`surviving pids: ${members.join(', ')}`)
+    console.error(`${logPrefix}: process group ${pgid} reclaimed; the run still fails`)
+  } catch (error) {
+    console.error(`${logPrefix}: process group ${pgid} reclamation failed: ${error.message}`)
+  }
+  return false
+}
 
 /**
  * @param {{
@@ -67,12 +113,10 @@ export async function superviseNodeTest({
     timeoutMs: silenceMs,
     label,
     onTimeout: () => {
-      const passedCount = runnerSummary?.passed ?? 0
-      const failedCount = runnerSummary?.failed ?? 0
-      if (failedCount === 0 && outstanding.size === 0) {
+      if (outstanding.size === 0) {
         console.error(
-          `${logPrefix}: every verdict passed but the child would not exit — ` +
-            'a handle the suite created is still open',
+          `${logPrefix}: all planned files completed but the child would not exit — ` +
+            'the runner lifecycle is still open',
         )
       } else {
         console.error(
@@ -80,7 +124,9 @@ export async function superviseNodeTest({
             `${[...outstanding].map((file) => relative(process.cwd(), file)).join(', ')}`,
         )
       }
-      console.error(`${logPrefix}: ${passedCount} passed, ${failedCount} failed before the silence`)
+      console.error(runnerSummary
+        ? `${logPrefix}: ${runnerSummary.passed} passed, ${runnerSummary.failed} failed before the silence`
+        : `${logPrefix}: verdict counts unavailable; no authoritative summary before the silence`)
       try {
         process.stderr.write('')
       } catch {}
@@ -120,7 +166,7 @@ export async function superviseNodeTest({
       return
     }
     if (isFileCompletionEvent(event)) {
-      outstanding.delete(resolve(event.data.file))
+      outstanding.delete(resolve(testEntryFile(event)))
     }
 
     const progress = classifyVerdict(event)
@@ -137,6 +183,12 @@ export async function superviseNodeTest({
 
   watchdog.stop()
   clearTimeout(backstop)
+  const groupVerificationStarted = performance.now()
+  const processGroupClean = child.pid ? await verifyExitedGroup(child.pid, logPrefix) : false
+  console.error(
+    `${logPrefix}: post-exit group verification/reclamation: pid=${child.pid ?? 'none'}; ` +
+      `elapsedMs=${(performance.now() - groupVerificationStarted).toFixed(3)}; accepted=${processGroupClean}`,
+  )
 
   if (!runnerSummary && exit.signal === null) {
     console.error(`${logPrefix}: inner runner failed to provide authoritative summary`)
@@ -149,9 +201,9 @@ export async function superviseNodeTest({
   reportDurationDistribution(logPrefix, leafDurations)
 
   console.error(
-    `\n${logPrefix}: ${passed} passed, ${failed} failed; ` +
-      `${files.length - outstanding.size}/${files.length} planned file(s) completed` +
-      (runnerSummary ? '' : '; no authoritative summary'),
+    `\n${logPrefix}: ` +
+      (runnerSummary ? `${passed} passed, ${failed} failed` : 'verdict counts unavailable; no authoritative summary') +
+      `; ${files.length - outstanding.size}/${files.length} planned file(s) completed`,
   )
 
   if (failed > 0) fail(1)
@@ -204,6 +256,8 @@ export async function superviseNodeTest({
     console.error(`${logPrefix}: pending proof prevents complete acceptance`)
     fail(1)
   }
+
+  if (!processGroupClean) fail(1)
 
   return { passed, failed }
 }
