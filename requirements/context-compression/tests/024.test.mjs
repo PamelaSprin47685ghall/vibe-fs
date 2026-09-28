@@ -1,4 +1,6 @@
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
+
+afterEach(() => new Promise(resolve => setImmediate(resolve)))
 
 {
 const { default: test } = await import("node:test");
@@ -87,7 +89,7 @@ const withOwner = async (work) => {
   }
 }
 
-test('WHAT[context-compression-024] every valid flight interleave keeps B unaffected by late A', async () => {
+test('WHAT[context-compression-024] every valid flight interleave keeps B unaffected by late A', async (t) => {
   assert.deepEqual(operations, [
     'A claims flight',
     'A repair in flight',
@@ -102,8 +104,11 @@ test('WHAT[context-compression-024] every valid flight interleave keeps B unaffe
 
   const observations = []
   for (const schedule of validPermutations) {
-    const owner = await withOwner((resources) => runFlightInterleaving(schedule, resources))
-    observations.push(owner)
+    await t.test(`WHAT[context-compression-024] flight interleave ${schedule.join(' → ')}`, async () => {
+      const owner = await withOwner((resources) => runFlightInterleaving(schedule, resources))
+      observations.push(owner)
+    })
+    await new Promise(resolve => setImmediate(resolve))
   }
 
   assert.equal(observations.length, 12)
@@ -507,12 +512,13 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
   assert.equal((await blog.observeIdleRepair(scope, durable, requestB, idle(PHYS_B, 'run-b2'))).outcome, 'NudgeSent')
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req-b')
 })
-test('WHAT[context-compression-024] scheduled promise order cannot move B terminal or capacity', async () => {
+test('WHAT[context-compression-024] scheduled promise order cannot move B terminal or capacity', async (t) => {
+  let traceNumber = 0
   await fc.assert(
     fc.asyncProperty(
       fc.array(fc.constantFrom('release', 'idle', 'transform', 'terminal'), { minLength: 4, maxLength: 8 }),
       async (order) => {
-        await withOwner(async ({ opened, durable }) => {
+        const proof = withOwner(async ({ opened, durable }) => {
           const key = 'ses-blog'
           const scope = runtime.createScope()
           try {
@@ -608,6 +614,10 @@ test('WHAT[context-compression-024] scheduled promise order cannot move B termin
             } catch {}
           }
         })
+        await t.test(`WHAT[context-compression-024] generated promise order ${++traceNumber}`, () => proof)
+        await new Promise(resolve => setImmediate(resolve))
+        // Preserve FastCheck failure propagation and shrinking after node:test records the child verdict.
+        await proof
       },
     ),
     { seed: 20260914, numRuns: 100 },
