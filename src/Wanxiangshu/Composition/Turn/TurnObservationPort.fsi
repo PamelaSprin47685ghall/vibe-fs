@@ -10,6 +10,11 @@ open Wanxiangshu.Interaction.Authority
 /// `PromptContinuationKind` is the type aliased as
 /// `PromptAuthority.ContinuationKind`.
 type TurnObservationJournalPort =
-    { TryBloggerReceiptKind: SessionId -> ProviderRunIdentity -> BlogFrameKind option
-      TryContinuationKind: SessionId -> PhysicalUserMessageId -> PromptContinuationKind option
-      IsFissionActive: SessionId -> bool }
+    {
+        TryBloggerReceiptKind: SessionId -> ProviderRunIdentity -> BlogFrameKind option
+        TryContinuationKind: SessionId -> PhysicalUserMessageId -> PromptContinuationKind option
+        /// interaction-authority-023: exact durable settlement of the attempt owning
+        /// this physical user message — a `ChatExecution` Terminal fact exists.
+        HasExecutionTerminal: SessionId -> PhysicalUserMessageId -> bool
+        IsFissionActive: SessionId -> bool
+    }

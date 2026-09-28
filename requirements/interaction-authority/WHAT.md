@@ -98,3 +98,11 @@ Authority 的 durable terminal interpreter 校验 source witness 与 accepted ro
 
 DevOps 的固定绑定由道路初始化确立，其模型配置与 Persona 在生命周期内不可变。
 后续所有的 resume 与 continuation 必须严格沿用既有绑定，严禁借 resume 动态切换模型或切换到非绑定模型；多次物理尝试或崩溃恢复均必须收束为同一逻辑执行权威，严禁形成多个并行生效的 DevOps 权威。
+
+## [023] ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效
+
+`missing-final-report` 与 `interaction-repair` 对 `ProviderRetryAttempt` continuation 的抑制，只在该 continuation 自身的 attempt 尚未终结时成立：观测仍为 `TurnUnknown`（finish=None）或 `TurnInProgress`（tool-calls）且没有已落地的 exact terminal 时，idle/reconcile 必须保持等待，禁止并发 nudge 抢夺该 attempt 正在生成的响应。
+
+该 attempt 一旦终结，抑制立即失效：稳定 terminal 观测（`TurnCompleted`、`TurnFailed`、`TurnAborted`，以及 `TurnNeedsContinuation` 的全部来源——`length`、空/XML-only `stop`、completed-with-error）或 exact durable `ChatExecution` Terminal 任一成立，本次 `ProviderRunIdentity` 就按 [019] 重新获得 nudge 资格；gate 未满足时，此后每个新的合法 terminal occasion 都必须重新获得资格。两类终结证据相互独立，先到者即解除抑制，不等待另一侧追平。
+
+抑制判据只能是 attempt 的在途/终结状态，严禁使用 durable physical 身份、continuation kind、Session/LogicalRun 或 ledger 条目本身的存在作为永久压制条件：凡凭“该 physical 曾被接受为 ProviderRetryAttempt”压掉后续 fresh terminal 的实现均为 RED。同一 exact terminal occasion 的重复观测仍由既有 publish/dedupe 幂等吸收，不因解除抑制而重复发送。

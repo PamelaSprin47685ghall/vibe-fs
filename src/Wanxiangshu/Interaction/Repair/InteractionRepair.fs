@@ -243,19 +243,38 @@ module InteractionRepairWorkflow =
         | Some durable, Some request ->
             forwardOwnedBloggerRepair host durable request quiescence context sessionPort rootWorkspace eventPort
 
-    /// CTX-010 recovery continue owns the physical run until its own terminal is
-    /// published. Missing-final-report / interaction-repair on that run hijacks the
-    /// exact retry: the interleaved idle reads finish=None (Unknown) or a
-    /// provisional NeedsContinuation while the retry response is still on the wire,
-    /// and a fresh SessionIdle of the *same* provider attempt mints a valid
-    /// quiescence permit (BeginProviderAttempt already ran for the probe itself).
-    /// Stale-permit gating cannot suppress that race — the permit is not stale.
+    /// interaction-authority-023: a retry continuation suppresses idle repair only
+    /// while its own attempt is unsettled. The race this guards is the interleaved
+    /// idle of the retry attempt itself — finish=None (Unknown) or tool-calls
+    /// while the retry response is still on the wire, where a fresh SessionIdle
+    /// mints a valid quiescence permit and a repair nudge would hijack the
+    /// response.
     ///
-    /// The durable fact is the authority ledger: this PhysicalUserMessageId was
-    /// accepted as `ProviderRetryAttempt`. That is the recovery continue's identity,
-    /// not a runtime whitelist and not a substitute for HOST-004 on ordinary mains.
-    let private isRecoveryContinue (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
-        continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
+    /// Settlement is exact on both sides: the durable `ChatExecution` terminal or
+    /// the stable observation terminal of the same turn. Either one releases the
+    /// suppression, so a fresh unsatisfied terminal (length, unusable stop)
+    /// regains its nudge qualification per interaction-authority-019.
+    let private retryAttemptSuppressesRepair
+        (journal: AgentJournal option)
+        (observation: TurnObservationJournalPort option)
+        (turn: ReconciledTurn)
+        : bool =
+        let isRetryContinuation =
+            match observation with
+            | Some port ->
+                port.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
+                                                                                         PromptContinuationKind.ProviderRetryAttempt
+            | None -> continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
+
+        let hasDurableTerminal =
+            observation
+            |> Option.exists (fun port -> port.HasExecutionTerminal turn.SessionId turn.PhysicalUserMessageId)
+
+        CompletedTurnClassifier.retryContinuationSuppressesRepair
+            isRetryContinuation
+            turn.Observation
+            turn.Outcome
+            hasDurableTerminal
 
     let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
         FissionRuntime.isSilentInterrupt sessionId
@@ -268,9 +287,9 @@ module InteractionRepairWorkflow =
     /// report is reminded once per exact terminal occasion, and only when the
     /// pass carried idle evidence. If the reminder itself reaches another invalid
     /// terminal, that fresh occasion may remind again until the closing-report
-    /// gate is satisfied. ProviderRetryAttempt continuations own their exact
-    /// physical request — suppress missing-final-report so that request's terminal
-    /// can promote its frozen prefix choice.
+    /// gate is satisfied. An unsettled ProviderRetryAttempt owns its own request
+    /// until it settles; once settled, its unsatisfied terminal earns this
+    /// reminder like any other (interaction-authority-023).
     let repairMissingFinalReport
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
@@ -280,17 +299,14 @@ module InteractionRepairWorkflow =
         (journal: AgentJournal option)
         (observation: TurnObservationJournalPort option)
         : Task =
-        if
-            (match observation with
-             | Some obs ->
-                 FissionRuntime.isSilentInterrupt context.Turn.SessionId
-                 || obs.IsFissionActive context.Turn.SessionId
-                 || obs.TryContinuationKind context.Turn.SessionId context.Turn.PhysicalUserMessageId = Some
-                                                                                                            PromptContinuationKind.ProviderRetryAttempt
-             | None ->
-                 isFissionReplaced journal context.Turn.SessionId
-                 || isRecoveryContinue journal context.Turn)
-        then
+        let fissionReplaced =
+            match observation with
+            | Some obs ->
+                FissionRuntime.isSilentInterrupt context.Turn.SessionId
+                || obs.IsFissionActive context.Turn.SessionId
+            | None -> isFissionReplaced journal context.Turn.SessionId
+
+        if fissionReplaced || retryAttemptSuppressesRepair journal observation context.Turn then
             AsyncSupport.completedTask ()
         else
             repairDefect
@@ -304,7 +320,7 @@ module InteractionRepairWorkflow =
                 "missing-final-report"
 
     /// Incomplete in-progress interaction: classify then idle-repair, unless the
-    /// exact request is a ProviderRetryAttempt continuation.
+    /// exact request is still owned by an unsettled ProviderRetryAttempt.
     let repairIncompleteInteraction
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
@@ -316,16 +332,14 @@ module InteractionRepairWorkflow =
         : Task =
         let turn = context.Turn
 
-        let isSuppressed =
+        let fissionReplaced =
             match observation with
             | Some obs ->
                 FissionRuntime.isSilentInterrupt turn.SessionId
                 || obs.IsFissionActive turn.SessionId
-                || obs.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
-                                                                                           PromptContinuationKind.ProviderRetryAttempt
-            | None -> isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn
+            | None -> isFissionReplaced journal turn.SessionId
 
-        if isSuppressed then
+        if fissionReplaced || retryAttemptSuppressesRepair journal observation turn then
             AsyncSupport.completedTask ()
         elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
             repairDefect

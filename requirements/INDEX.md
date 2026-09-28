@@ -154,7 +154,7 @@
 | 19 | `provider-language` | 12 | provider-language-001 ~ 011、provider-language-012（核心角色双语 Prompt 语义一致与同源认知） |
 | 20 | `provider-projection` | 16 | provider-projection-001 ~ 014、provider-projection-015（认知结果投影退休不改 canonical history）、provider-projection-016（完整 JSON 画板无损表示与单次 render） |
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
-| 22 | `interaction-authority` | 22 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威） |
+| 22 | `interaction-authority` | 23 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威）、interaction-authority-023（ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效） |
 | 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
 | 24 | `dispatch-protocol` | 15 | dispatch-protocol-001 ~ 015 |
 | 25 | `durable-events` | 25 | durable-events-001 ~ 025 |

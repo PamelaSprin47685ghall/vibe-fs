@@ -9,6 +9,10 @@ module CompletedTurnSurface =
     val classifyOutcome: completed: bool -> finish: string -> errorName: string -> parts: obj -> obj
     val needsInteractionRepair: role: string -> completed: bool -> finish: string -> parts: obj -> bool
     val repairDefectDecision: currentAttemptIsRepair: bool -> completed: bool -> finish: string -> parts: obj -> string
+
+    val repairSuppressionHolds:
+        isRetryContinuation: bool -> hasDurableTerminal: bool -> completed: bool -> finish: string -> parts: obj -> bool
+
     val roleOfAgent: agent: string -> fallback: string -> string
 
     val buildTurn:

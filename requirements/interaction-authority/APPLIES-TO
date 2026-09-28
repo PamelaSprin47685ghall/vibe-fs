@@ -14,6 +14,9 @@
 /src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs
 /src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
 /src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
+/src/Wanxiangshu/Composition/Turn/TurnObservationPort.fs
+/src/Wanxiangshu/Composition/Turn/TurnObservationPort.fsi
+/src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
 /src/Wanxiangshu/Interaction/Authority/Child.fs

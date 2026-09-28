@@ -110,6 +110,34 @@ module CompletedTurnSurface =
         | _ -> CompletedTurnClassifier.RepairDefectDecision.NoRepair
         |> repairDecisionName
 
+    /// interaction-authority-023: retry-continuation suppression holds only while
+    /// the attempt is unsettled — either settlement (stable observation terminal
+    /// or durable execution terminal) releases it.
+    let repairSuppressionHolds
+        (isRetryContinuation: bool)
+        (hasDurableTerminal: bool)
+        (completed: bool)
+        (finish: string)
+        (parts: obj)
+        : bool =
+        let classified =
+            CompletedTurnClassifier.classifyOutcome completed (optionalText (box finish)) None (partsOf parts)
+
+        match classified with
+        | :? ReconcileProgram.SnapshotObservation as observation ->
+            CompletedTurnClassifier.retryContinuationSuppressesRepair
+                isRetryContinuation
+                (Some observation)
+                (ReconcileProgram.TurnNeedsContinuation "private-snapshot-observation")
+                hasDurableTerminal
+        | :? ReconcileProgram.TurnOutcome as outcome ->
+            CompletedTurnClassifier.retryContinuationSuppressesRepair
+                isRetryContinuation
+                None
+                outcome
+                hasDurableTerminal
+        | _ -> false
+
     let roleOfAgent (agent: string) (fallback: string) : string =
         let result =
             CompletedTurnClassifier.roleOfAgent (optionalText (box agent)) (optionalRole fallback)

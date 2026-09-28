@@ -78,6 +78,19 @@ module AgentJournalPortAdapter =
                 |> Map.tryFind sessionId
                 |> Option.bind (fun session -> session.PromptAuthority)
                 |> Option.bind (fun authority -> Map.tryFind physicalUserMessageId authority.AcceptedContinuationIds)
+          HasExecutionTerminal =
+            fun sessionId physicalUserMessageId ->
+                let key: Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionKey =
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = physicalUserMessageId }
+
+                (projections ()).ChatExecutions
+                |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
+                |> Option.exists (fun execution ->
+                    match execution.Lifecycle with
+                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.Terminal _ -> true
+                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.Accepted
+                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.ProviderStarted -> false)
           IsFissionActive =
             fun sessionId ->
                 FissionProjection.tryActiveForOwner sessionId (projections ()).Fission

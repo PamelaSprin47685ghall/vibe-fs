@@ -183,6 +183,35 @@ module CompletedTurnClassifier =
                 | ReconcileProgram.TurnFailed _ -> false
             | _ -> false)
 
+    /// interaction-authority-023: an attempt is unsettled while the observation
+    /// carries no stable terminal — finish=None (Unknown) or tool-calls
+    /// (InProgress). Every other observation is a settled terminal, including
+    /// the unsatisfied ones (length, unusable stop, completed-with-error).
+    let private observationUnsettled
+        (observation: ReconcileProgram.SnapshotObservation option)
+        (outcome: ReconcileProgram.TurnOutcome)
+        =
+        match observation, outcome with
+        | Some ReconcileProgram.TurnUnknown, _ -> true
+        | None, ReconcileProgram.TurnInProgress -> true
+        | None, _ -> false
+
+    /// interaction-authority-023: a `ProviderRetryAttempt` continuation
+    /// suppresses idle repair only while its own attempt is unsettled. A stable
+    /// observation terminal or a durable `ChatExecution` terminal settles it,
+    /// and either settlement restores the gate-nudge qualification that
+    /// interaction-authority-019 grants to a fresh terminal. Keying suppression on the
+    /// durable physical identity instead parks every later silent stop forever.
+    let retryContinuationSuppressesRepair
+        (isRetryContinuation: bool)
+        (observation: ReconcileProgram.SnapshotObservation option)
+        (outcome: ReconcileProgram.TurnOutcome)
+        (hasDurableTerminal: bool)
+        : bool =
+        isRetryContinuation
+        && not hasDurableTerminal
+        && observationUnsettled observation outcome
+
     let decideRepairDefect
         (currentAttemptIsRepair: bool)
         (observation: ReconcileProgram.SnapshotObservation option)

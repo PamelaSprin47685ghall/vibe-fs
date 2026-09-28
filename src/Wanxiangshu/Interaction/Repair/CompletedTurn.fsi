@@ -24,6 +24,13 @@ module CompletedTurnClassifier =
 
     val needsInteractionRepair: role: Role option -> classified: obj -> parts: MessagePart array -> bool
 
+    val retryContinuationSuppressesRepair:
+        isRetryContinuation: bool ->
+        observation: ReconcileProgram.SnapshotObservation option ->
+        outcome: ReconcileProgram.TurnOutcome ->
+        hasDurableTerminal: bool ->
+            bool
+
     val decideRepairDefect:
         currentAttemptIsRepair: bool ->
         observation: ReconcileProgram.SnapshotObservation option ->
