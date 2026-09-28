@@ -436,7 +436,7 @@ const {
   tryLease,
   releasePhysicalExecution,
   cancelPendingExecution,
-  enterProviderStep,
+  enterProviderStep: rawEnterProviderStep,
   endProviderStep,
   takeProviderRunTarget,
   suppressProviderStep,
@@ -444,6 +444,8 @@ const {
   capacitySnapshot,
   pendingCount,
 } = routing
+const enterProviderStep = (runtime, sessionId, physicalUserMessageId, visibleProviderRuns, requestKey = null) =>
+  rawEnterProviderStep(runtime, sessionId, physicalUserMessageId, visibleProviderRuns, requestKey)
 const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
 const key = (value) => `${value.model}|${value.reasoning}`
 const acquireManaged = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) => {
@@ -918,5 +920,50 @@ test('WHAT[execution-model-routing-010] EMR_010_two_owners_never_crosstalk_capac
   releasePhysicalExecution(runtime, 'owner-b', 'msg-b')
   assert.equal(snapshotOccupied(runtime).length, 0)
   assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 0)
+})
+
+test('WHAT[execution-model-routing-010] EMR_010_provider_step_reentry_with_same_request_key_is_idempotent_and_shares_task', async () => {
+  const single = target('provider/shared')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [single] }))
+
+  // 1. Session A enters step with key-1
+  await acquireTarget(runtime, 'owner', 'msg-owner', 'engineer', 'alice')
+  const stepPromise1 = enterProviderStep(runtime, 'owner', 'msg-owner', [], 'req-key-1')
+  await stepPromise1
+
+  // 同 key 重复进入已持有的 step：返回已完成 Task，waiters 队列不增长、不死锁
+  const stepPromise2 = enterProviderStep(runtime, 'owner', 'msg-owner', [], 'req-key-1')
+  assert.equal(capacitySnapshot(runtime).waiters.length, 0, 'waiters does not grow on idempotent re-entry of in-flight step')
+  await stepPromise2
+
+  // 2. 另一个 session 排队等待
+  await acquireTarget(runtime, 'waiter-1', 'msg-w1', 'engineer', 'bob', 'owner')
+  const waiterPromise1 = enterProviderStep(runtime, 'waiter-1', 'msg-w1', [], 'req-key-w1')
+  assert.equal(capacitySnapshot(runtime).waiters.length, 1)
+
+  // 3. waiter-1 同 key 重复进入：返回与第一次完全相同的同一个 Task/Promise 对象，waiters 快照不增长
+  const waiterPromise1Dup = enterProviderStep(runtime, 'waiter-1', 'msg-w1', [], 'req-key-w1')
+  assert.strictEqual(waiterPromise1Dup, waiterPromise1, 'duplicate entry with same requestKey returns identical Task promise')
+  assert.equal(capacitySnapshot(runtime).waiters.length, 1, 'waiters snapshot does not grow on duplicate waiter requestKey')
+
+  // 4. 不同 key 进入排队：正常排队，waiters 顺序保持
+  await acquireTarget(runtime, 'waiter-2', 'msg-w2', 'engineer', 'charlie', 'owner')
+  const waiterPromise2 = enterProviderStep(runtime, 'waiter-2', 'msg-w2', [], 'req-key-w2')
+  assert.equal(capacitySnapshot(runtime).waiters.length, 2, 'different requestKey enqueues normally')
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((w) => w.sessionId),
+    ['waiter-1', 'waiter-2'],
+    'waiters preserve FIFO sequence for different requestKeys'
+  )
+
+  // 清理
+  endProviderStep(runtime, 'owner', 'msg-owner', 'run-owner')
+  await waiterPromise1
+  endProviderStep(runtime, 'waiter-1', 'msg-w1', 'run-w1')
+  await waiterPromise2
+  endProviderStep(runtime, 'waiter-2', 'msg-w2', 'run-w2')
+  releasePhysicalExecution(runtime, 'owner', 'msg-owner')
+  releasePhysicalExecution(runtime, 'waiter-1', 'msg-w1')
+  releasePhysicalExecution(runtime, 'waiter-2', 'msg-w2')
 })
 }

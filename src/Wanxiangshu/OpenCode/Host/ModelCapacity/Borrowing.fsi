@@ -28,7 +28,8 @@ type internal BorrowingCapacity<'target> =
         physicalUserMessageId: string *
         target: 'target *
         fence: Set<string> *
-        tryOrdinary: ('target array -> bool) ->
+        tryOrdinary: ('target array -> bool) *
+        ?requestKey: string ->
             Task
 
     member EndStep: sessionId: string * physicalUserMessageId: string * providerRun: string -> unit

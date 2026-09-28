@@ -59,7 +59,9 @@ module ChatParamsHook =
             false
         else
             let trimmed = agent.Trim()
-            ManagedAgent.requiredNames |> List.exists (fun name -> String.Equals(name, trimmed, StringComparison.OrdinalIgnoreCase))
+
+            ManagedAgent.requiredNames
+            |> List.exists (fun name -> String.Equals(name, trimmed, StringComparison.OrdinalIgnoreCase))
             || String.Equals(trimmed, "coder", StringComparison.OrdinalIgnoreCase)
             || String.Equals(trimmed, "inspector", StringComparison.OrdinalIgnoreCase)
 

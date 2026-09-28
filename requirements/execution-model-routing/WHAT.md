@@ -60,6 +60,8 @@ ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 
 同一 token 同时面对多个可执行 provider-step demand 时，必须按 demand 的单调序号选择最早者；owned、borrowed、ordinary 只决定该 demand 可使用哪枚 token，不构成调度优先级。较晚到达的 lender owned step 不得越过已等待且可借用该 token 的 child step。
 Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实仍在执行的 token 伪造并发容量。
 
+同一物理执行通知重复进入相同 fence 的 provider step 时，opt-in 携带 `requestKey`（由 SessionExecutionBinding 从 `(sessionId, physicalUserMessageId, fence)` 派生）以实现精确幂等：若当前持有 token 的 step 匹配相同三元组且 fence 不超前，立即返回已完成 Task 复用已持有 step；若 waiters 队列中已存在相同 `(SessionId, PhysicalUserMessageId, RequestKey=Some k)` 的 demand，直接返回该 demand 既有的 Task（同一 Task 对象且 waiters 不增长）。不同 requestKey 或无 requestKey（None）的调用则保持正常的 FIFO 排队与因果辈分。此设计遵循 DELEGATE.md 5.3 的 `admit(exactRequestKey)` 精确幂等原则，杜绝无幂等重入 transform 造成的容量死锁。
+
 ## [011] 物理 admission 顺序固定为 accept → acquire → bind → project
 
 Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` durable 写入 `Accepted`（携带 IdentitySeed 确立的不可变 canonical participant 证据），路由器随后才可排队或获取容量。

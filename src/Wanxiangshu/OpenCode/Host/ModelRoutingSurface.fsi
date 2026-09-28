@@ -79,7 +79,12 @@ module ModelRoutingSurface =
     val cancelPendingExecution: runtime: obj -> sessionId: string -> obj
 
     val enterProviderStep:
-        runtime: obj -> sessionId: string -> physicalUserMessageId: string -> visibleProviderRuns: string array -> Task
+        runtime: obj ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        visibleProviderRuns: string array ->
+        requestKey: string option ->
+            Task
 
     val endProviderStep:
         runtime: obj -> sessionId: string -> physicalUserMessageId: string -> providerRun: string -> unit

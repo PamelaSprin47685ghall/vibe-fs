@@ -374,6 +374,7 @@ module ModelRouting =
             BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
+        let activeProviderStepTasks = Dictionary<string, Task>()
         // DSL-MUTABLE: resource — one exact provider-run witness per live session
         let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
         let latestProviderRunBySession = Dictionary<string, string>()
@@ -1191,7 +1192,7 @@ module ModelRouting =
             | false, (false, _) ->
                 acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant purpose lenderSessionId
 
-        let enterProviderStepLocked sessionId physicalUserMessageId fence =
+        let enterProviderStepLocked sessionId physicalUserMessageId fence (requestKey: string option) =
             ensureHealthy ()
 
             match activeBySession.TryGetValue sessionId with
@@ -1201,7 +1202,8 @@ module ModelRouting =
                     physicalUserMessageId,
                     lease.Target,
                     fence,
-                    fun running -> exactTargetAvailable lease.RoutingRole lease.Target running lease.Purpose
+                    (fun running -> exactTargetAvailable lease.RoutingRole lease.Target running lease.Purpose),
+                    ?requestKey = requestKey
                 )
             | _ ->
                 failedTask<unit> (
@@ -1323,6 +1325,40 @@ module ModelRouting =
               RetiringCount = physical.RetiringCount
               ActiveCount = physical.InFlightCount + physical.RetiringCount
               Counters = transitionCounters.Snapshot() }
+
+        let makeStepCacheKey normSessionId normPhysicalUserMessageId (requestKey: string option) =
+            requestKey
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.map (fun key -> sprintf "%s:%s:%s" normSessionId normPhysicalUserMessageId key)
+
+        let enterProviderStepInternal
+            normSessionId
+            normPhysicalUserMessageId
+            visibleProviderRuns
+            requestKey
+            cacheKeyOpt
+            =
+            lock gate (fun () ->
+                let existing =
+                    match cacheKeyOpt with
+                    | Some k when activeProviderStepTasks.ContainsKey k -> Some activeProviderStepTasks.[k]
+                    | _ -> None
+
+                match existing with
+                | Some task -> task
+                | None ->
+                    let admission =
+                        enterProviderStepLocked normSessionId normPhysicalUserMessageId visibleProviderRuns requestKey
+
+                    let t =
+                        task {
+                            do! admission
+                            lock gate drainIfHealthy
+                        }
+                        :> Task
+
+                    cacheKeyOpt |> Option.iter (fun k -> activeProviderStepTasks.[k] <- t)
+                    t)
 
         member _.AcquireExecutionAdmission
             (
@@ -1474,20 +1510,20 @@ module ModelRouting =
         member _.CapacitySnapshot() = lock gate capacitySnapshotLocked
 
         member _.EnterProviderStep
-            (sessionId: string, physicalUserMessageId: string, visibleProviderRuns: Set<string>)
+            (sessionId: string, physicalUserMessageId: string, visibleProviderRuns: Set<string>, ?requestKey: string)
             : Task =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
             | None -> failedTask<unit> (ArgumentException("provider step identity must be non-empty")) :> Task
             | Some(normSessionId, normPhysicalUserMessageId) ->
-                let admission =
-                    lock gate (fun () ->
-                        enterProviderStepLocked normSessionId normPhysicalUserMessageId visibleProviderRuns)
+                let cacheKeyOpt =
+                    makeStepCacheKey normSessionId normPhysicalUserMessageId requestKey
 
-                task {
-                    do! admission
-                    lock gate drainIfHealthy
-                }
-                :> Task
+                enterProviderStepInternal
+                    normSessionId
+                    normPhysicalUserMessageId
+                    visibleProviderRuns
+                    requestKey
+                    cacheKeyOpt
 
         member _.EndProviderStep(sessionId: string, physicalUserMessageId: string, providerRun: string) =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
@@ -1498,6 +1534,13 @@ module ModelRouting =
                     let normalizedProviderRun = providerRun.Trim()
                     rememberProviderRunTarget normSessionId normPhysicalUserMessageId normalizedProviderRun
                     capacity.EndStep(normSessionId, normPhysicalUserMessageId, normalizedProviderRun)
+                    let prefix = sprintf "%s:%s:" normSessionId normPhysicalUserMessageId
+
+                    activeProviderStepTasks.Keys
+                    |> Seq.filter (fun k -> k.StartsWith prefix)
+                    |> Seq.toArray
+                    |> Array.iter (fun k -> activeProviderStepTasks.Remove k |> ignore)
+
                     drainIfHealthy ())
 
         member _.SuppressProviderStep(sessionId: string, physicalUserMessageId: string) =
@@ -1506,6 +1549,13 @@ module ModelRouting =
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () ->
                     capacity.SuppressStep(normSessionId, normPhysicalUserMessageId)
+                    let prefix = sprintf "%s:%s:" normSessionId normPhysicalUserMessageId
+
+                    activeProviderStepTasks.Keys
+                    |> Seq.filter (fun k -> k.StartsWith prefix)
+                    |> Seq.toArray
+                    |> Array.iter (fun k -> activeProviderStepTasks.Remove k |> ignore)
+
                     drainIfHealthy ())
 
         member _.SnapshotOccupied() = lock gate (fun () -> running ())
@@ -1724,12 +1774,14 @@ module ModelRouting =
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (visibleProviderRuns: Set<ProviderRunIdentity>)
+        (requestKey: string option)
         =
         current()
             .EnterProviderStep(
                 SessionId.value sessionId,
                 PhysicalUserMessageId.value physicalUserMessageId,
-                visibleProviderRuns |> Set.map ProviderRunIdentity.value
+                visibleProviderRuns |> Set.map ProviderRunIdentity.value,
+                ?requestKey = requestKey
             )
 
     let endProviderStep

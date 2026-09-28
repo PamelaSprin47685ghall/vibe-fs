@@ -11,6 +11,7 @@ type internal CapacityStepDemand<'target> =
       PhysicalUserMessageId: string
       Target: 'target
       Fence: Set<string>
+      RequestKey: string option
       TryOrdinary: 'target array -> bool
       Completion: TaskCompletionSource<unit> }
 

@@ -8,7 +8,8 @@ open Wanxiangshu.Foundation
 type private CapacityStep =
     { SessionId: string
       PhysicalUserMessageId: string
-      Fence: Set<string> }
+      Fence: Set<string>
+      RequestKey: string option }
 
 [<RequireQualifiedAccess>]
 type private CapacityCreditState =
@@ -312,7 +313,8 @@ type internal BorrowingCapacity<'target>
                 CapacityCreditState.InFlight
                     { SessionId = demand.SessionId
                       PhysicalUserMessageId = demand.PhysicalUserMessageId
-                      Fence = demand.Fence }
+                      Fence = demand.Fence
+                      RequestKey = demand.RequestKey }
 
             waiters.Remove demand |> ignore
             AsyncSupport.trySetResult demand.Completion () |> ignore
@@ -457,6 +459,67 @@ type internal BorrowingCapacity<'target>
         | true, token -> moveOwnedToken oldKey newKey target token
         | false, _ -> ownedTokenByExecution.Remove oldKey |> ignore
 
+    let tryFindExistingWaiter sessionId physicalUserMessageId fence key =
+        waiters.Snapshot()
+        |> Array.tryFind (fun d ->
+            d.SessionId = sessionId
+            && d.PhysicalUserMessageId = physicalUserMessageId
+            && d.RequestKey = Some key
+            && d.Fence = fence)
+        |> Option.map (fun d -> d.Completion.Task :> Task)
+
+    let isMatchingStepInFlight sessionId physicalUserMessageId fence key =
+        tokens.Values
+        |> Seq.exists (fun token ->
+            match token.State with
+            | CapacityCreditState.InFlight step
+            | CapacityCreditState.Retiring step ->
+                step.SessionId = sessionId
+                && step.PhysicalUserMessageId = physicalUserMessageId
+                && step.RequestKey = Some key
+                && step.Fence = fence
+            | CapacityCreditState.Idle -> false)
+
+    let tryReuseExistingStep sessionId physicalUserMessageId fence (requestKey: string option) =
+        let validKey = requestKey |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+        let tryFindStep key =
+            let waiterTask = tryFindExistingWaiter sessionId physicalUserMessageId fence key
+
+            let inFlightTask =
+                if isMatchingStepInFlight sessionId physicalUserMessageId fence key then
+                    Some(Task.FromResult(()) :> Task)
+                else
+                    None
+
+            waiterTask |> Option.orElse inFlightTask
+
+        validKey |> Option.bind tryFindStep
+
+    let enqueueProviderStepDemand sessionId physicalUserMessageId target fence requestKey tryOrdinary =
+        let completion =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let demand =
+            { Sequence = waiters.NextSequence()
+              SessionId = sessionId
+              PhysicalUserMessageId = physicalUserMessageId
+              Target = target
+              Fence = fence
+              RequestKey = requestKey
+              TryOrdinary = tryOrdinary
+              Completion = completion }
+
+        if waiters.TryAdd demand then
+            drain ()
+            completion.Task :> Task
+        else
+            completion.SetException(
+                InvalidOperationException "execution-model-routing: provider-step capacity queue full"
+            )
+
+            completion.Task :> Task
+
     member _.RouteFresh
         (
             sessionId: string,
@@ -558,32 +621,15 @@ type internal BorrowingCapacity<'target>
             physicalUserMessageId: string,
             target: 'target,
             fence: Set<string>,
-            tryOrdinary: 'target array -> bool
+            tryOrdinary: 'target array -> bool,
+            ?requestKey: string
         ) : Task =
         lock gate (fun () ->
             reconcileFence sessionId physicalUserMessageId fence
 
-            let completion =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let demand =
-                { Sequence = waiters.NextSequence()
-                  SessionId = sessionId
-                  PhysicalUserMessageId = physicalUserMessageId
-                  Target = target
-                  Fence = fence
-                  TryOrdinary = tryOrdinary
-                  Completion = completion }
-
-            if waiters.TryAdd demand then
-                drain ()
-                completion.Task :> Task
-            else
-                completion.SetException(
-                    InvalidOperationException "execution-model-routing: provider-step capacity queue full"
-                )
-
-                completion.Task :> Task)
+            match tryReuseExistingStep sessionId physicalUserMessageId fence requestKey with
+            | Some task -> task
+            | None -> enqueueProviderStepDemand sessionId physicalUserMessageId target fence requestKey tryOrdinary)
 
     member _.EndStep(sessionId: string, physicalUserMessageId: string, providerRun: string) =
         lock gate (fun () ->

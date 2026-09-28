@@ -90,7 +90,8 @@ module ModelRouting =
         member CapacitySnapshot: unit -> CapacityInvariantEvidence
 
         member EnterProviderStep:
-            sessionId: string * physicalUserMessageId: string * visibleProviderRuns: Set<string> -> Task
+            sessionId: string * physicalUserMessageId: string * visibleProviderRuns: Set<string> * ?requestKey: string ->
+                Task
 
         member EndProviderStep: sessionId: string * physicalUserMessageId: string * providerRun: string -> unit
         member TakeProviderRunTarget: providerRun: string -> ModelRoutingTarget option
@@ -169,6 +170,7 @@ module ModelRouting =
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         visibleProviderRuns: Set<ProviderRunIdentity> ->
+        requestKey: string option ->
             Task
 
     val endProviderStep:

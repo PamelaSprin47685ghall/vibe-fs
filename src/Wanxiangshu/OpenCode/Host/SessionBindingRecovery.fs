@@ -58,8 +58,10 @@ module SessionBindingRecovery =
                 // Fallback: child record exists in durable projection, resolve agent even if parent handle set is compacting
                 "", agentNameOf record))
         |> Option.bind (fun (parentKey, agent) ->
-            if System.String.IsNullOrWhiteSpace agent then None
-            else Some (parentKey, agent))
+            if System.String.IsNullOrWhiteSpace agent then
+                None
+            else
+                Some(parentKey, agent))
         |> Option.orElseWith (fun () ->
             // 2. Check durable Companion session associations
             SessionAssociationProjection.tryMainSessionOf childSessionId projections.Associations

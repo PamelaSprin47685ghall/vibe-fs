@@ -88,7 +88,11 @@ module SessionExecutionBinding =
     let private durableParentOf (sessionKey: string) : string option =
         durableChildEvidence
         |> Option.bind (fun resolve -> resolve sessionKey)
-        |> Option.map (fun (parent, _) -> if String.IsNullOrWhiteSpace parent then None else Some parent)
+        |> Option.map (fun (parent, _) ->
+            if String.IsNullOrWhiteSpace parent then
+                None
+            else
+                Some parent)
         |> Option.flatten
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
@@ -469,14 +473,29 @@ module SessionExecutionBinding =
             ModelRouting.endProviderStep sessionId current.PhysicalUserMessageId providerRun
             Ok()
 
+    let private deriveTransformRequestKey
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        (visibleRuns: Set<ProviderRunIdentity>)
+        =
+        let sortedRuns =
+            visibleRuns
+            |> Seq.map ProviderRunIdentity.value
+            |> Seq.sort
+            |> String.concat ","
+
+        sprintf "%s:%s:%s" (SessionId.value sessionId) (PhysicalUserMessageId.value physical) sortedRuns
+
     let private enterBoundProviderStep
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId option)
         (rawMessages: obj list)
+        (requestKey: string option)
         : Task =
         match currentProviderModel sessionId, physicalUserMessageId with
         | Some _, Some physical ->
-            ModelRouting.enterProviderStep sessionId physical (ProviderWireCapture.visibleProviderRuns rawMessages)
+            let visibleRuns = ProviderWireCapture.visibleProviderRuns rawMessages
+            ModelRouting.enterProviderStep sessionId physical visibleRuns requestKey
         | Some _, None ->
             raise (InvalidOperationException "EMR-010: managed provider step has no physical user message id")
         | None, _ -> Task.FromResult(())
@@ -493,11 +512,18 @@ module SessionExecutionBinding =
             let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
             beginQuiescence sessionId
 
+            let requestKey =
+                match physicalUserMessageId with
+                | Some physical ->
+                    let visibleRuns = ProviderWireCapture.visibleProviderRuns rawMessages
+                    Some(deriveTransformRequestKey sessionId physical visibleRuns)
+                | None -> None
+
             match
                 beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages)
             with
             | Error error -> invalidOp error
-            | Ok() -> do! enterBoundProviderStep sessionId physicalUserMessageId rawMessages
+            | Ok() -> do! enterBoundProviderStep sessionId physicalUserMessageId rawMessages requestKey
         }
 
     /// HOST-004: Begin a physical provider attempt for the transform boundary.

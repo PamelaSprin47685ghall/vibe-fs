@@ -496,6 +496,7 @@ module ModelRoutingSurface =
             (SessionId.create sessionId)
             (PhysicalUserMessageId.create physicalUserMessageId)
             (visibleProviderRuns |> Set.ofArray |> Set.map ProviderRunIdentity.create)
+            None
 
     let commitSharedExecutionAdmission (token: obj) (observed: obj) : obj =
         match leaseOf token with
@@ -753,9 +754,15 @@ module ModelRoutingSurface =
         (sessionId: string)
         (physicalUserMessageId: string)
         (visibleProviderRuns: string array)
+        (requestKey: string option)
         : Task =
         (runtimeOf runtime)
-            .EnterProviderStep(sessionId, physicalUserMessageId, visibleProviderRuns |> Set.ofArray)
+            .EnterProviderStep(
+                sessionId,
+                physicalUserMessageId,
+                visibleProviderRuns |> Set.ofArray,
+                ?requestKey = requestKey
+            )
 
     let endProviderStep
         (runtime: obj)
