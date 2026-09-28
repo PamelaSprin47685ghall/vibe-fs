@@ -451,14 +451,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'OpenCode/Host/ExplicitResumeSurface.js',
-    owner: 'crash-reconciliation',
-    laws: ['CRASH-018', 'CRASH-020'],
-    source: 'src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'OpenCode/Host/SessionRecoveryHostSurface.js',
     owner: 'crash-reconciliation',
     laws: ['CRASH-018', 'CHATEXEC-012'],

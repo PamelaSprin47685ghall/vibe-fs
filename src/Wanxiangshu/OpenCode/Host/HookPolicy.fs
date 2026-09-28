@@ -15,7 +15,6 @@ type HookKey =
     | ToolAfter
     | Event
     | Dispose
-    | CommandExecution
 
 [<RequireQualifiedAccess>]
 type HookCriticality =
@@ -37,7 +36,6 @@ type HookContext =
     | ToolExecution
     | HostEvent
     | PluginLifecycle
-    | CommandExecution
 
 [<RequireQualifiedAccess>]
 /// DSL-class: Vocabulary
@@ -57,7 +55,6 @@ type HookEffect =
     | ObserveCasebook
     | ObserveHostEvent
     | DisposeOwnedResources
-    | AdmitExplicitResume
 
 [<RequireQualifiedAccess>]
 type HookRetryPermission = | RetryForbidden
@@ -241,18 +238,6 @@ module HookPolicy =
               Failure = HookFailureDisposition.TypedPolicyFailClosed
               Identity = IdentityPermission.NoIdentityAccess
               Admission = AdmissionPermission.NoAdmissionAccess }
-        | HookKey.CommandExecution ->
-            { HostKey = "command.execute.before"
-              DiagnosticOperation = "plugin-hook-command-before-failed"
-              Criticality = HookCriticality.Security
-              Context = HookContext.CommandExecution
-              Effects = [ HookEffect.AdmitExplicitResume ]
-              Retry = HookRetryPermission.RetryForbidden
-              Capacity = HookCapacityOwner.NoCapacity
-              Failure = HookFailureDisposition.TypedPolicyFailClosed
-              Identity = IdentityPermission.NoIdentityAccess
-              Admission = AdmissionPermission.NoAdmissionAccess }
-
     let accepts criticality disposition =
         match criticality, disposition with
         | HookCriticality.Security, HookFailureDisposition.BestEffortDiagnostic

@@ -2,7 +2,9 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
-- **重启后 reuse 子会话被答 person-unavailable：Load Phase 重建 fork runtime 的子会话登记（crash-reconciliation-020）**：`fork` 的 reuse 门禁 (`Execution/Delegation/Fork/OpenCode/Tool.fs` 的 `reuseResolvedAgent`) 依赖进程本地的 `runtime.TryFindAgent`；重启后登记为空，于是对任何 durable 子会话（固定 DevOps、forked Engineer 子会话如 `frame-integrity`）都回 “此人目前无法再接下另一项托付”——只有 `/continue` 会重新登记，而普通重启没有。
+- **移除 `/continue` 命令：重启归位改由系统在加载阶段自行完成（crash-reconciliation-018）**：显式续传命令及其全部痕迹删除——`ExplicitSessionResume`、`ExplicitResumeSurface`、`ExplicitResumeSuppression`、`SessionResumePort` 四个模块，`HookKey.CommandExecution` / `HookEffect.AdmitExplicitResume` 策略项，`PluginHooks` 的命令注册与 `command.execute.before` 钩子，以及 `HostSignalBootstrap`/`ChatParamsHook`/`HostTurnObserver`/`PluginTransforms`/`HostSessionDeletion`/`Companion/Transform` 中的 disclosure-only 分支与 `ExplicitResumeDisclosure` 变换模式。规范 [018] 改写为：重启后由系统自行归位（结算遗留子 run、重建执行绑定、重新登记子会话），只做持久记账、不重放命令；被中断的工具保持失败并留在可见历史。测试同步改写：`018.test.mjs` 改为断言“加载不注册任何命令 + 源码树无显式续传残骸”，`019/020` 与 host-boundary `014/019` 去掉命令与分支探针，`context-compression/018` 删除两条披露材料用例。
+
+- **重启后 reuse 子会话被答 person-unavailable：Load Phase 重建 fork runtime 的子会话登记（crash-reconciliation-020）**：`fork` 的 reuse 门禁 (`Execution/Delegation/Fork/OpenCode/Tool.fs` 的 `reuseResolvedAgent`) 依赖进程本地的 `runtime.TryFindAgent`；重启后登记为空，于是对任何 durable 子会话（固定 DevOps、forked Engineer 子会话如 `frame-integrity`）都回 “此人目前无法再接下另一项托付”——（此前只有已移除的 `/continue` 会重新登记，普通重启没有。）
   修复：新增 `OpenCode/Host/DurableChildAdoption.fs(i)`（纯计划）并在 `PluginHooks` 的 Load Phase 调用既有的 `ToolRuntimeScope.AdoptExistingChild` 重新登记：只登记 `Active` / `CompletedAwaitingJoin` 且 `DurableParentHandle` 的 handle；`Abandoned`/`Retired` 墓碑与 Host-owned hidden 叶子不入列。登记只是记账，不发任何 prompt、不重放命令，复用仍是 manager 的显式动作。
   验证：新增回归 `CRASH_020_durable_children_are_addressable_after_a_plain_restart`（普通重启后现存 durable 子会话可被 reuse）与 `CRASH_020_tombstones_and_hidden_leaves_are_not_addressable`（retired / host-hidden 不可用，awaiting-join 仍可用）；crash-reconciliation + managed-session-lifecycle + delegation 共 412 项 411 pass。
 

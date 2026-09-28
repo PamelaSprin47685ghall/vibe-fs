@@ -542,8 +542,6 @@ Enforcer/Guidance/DeliverySurface.fsi
 Enforcer/Guidance/DeliverySurface.fs
 Execution/Fission/Projection.fsi
 Execution/Fission/Projection.fs
-Execution/Fission/SessionResumePort.fsi
-Execution/Fission/SessionResumePort.fs
 Execution/Delegation/DelegatedToolEstimateProjection.fsi
 Execution/Delegation/DelegatedToolEstimateProjection.fs
 Execution/Delegation/DelegatedToolEstimatePort.fsi
@@ -1200,10 +1198,6 @@ Execution/Fission/Surface.fsi
 Execution/Fission/Surface.fs
 OpenCode/Host/FissionHostSurface.fsi
 OpenCode/Host/FissionHostSurface.fs
-OpenCode/Host/ExplicitResumeSuppression.fsi
-OpenCode/Host/ExplicitResumeSuppression.fs
-OpenCode/Host/ExplicitSessionResume.fsi
-OpenCode/Host/ExplicitSessionResume.fs
 OpenCode/Host/HostTurnObserver.fsi
 OpenCode/Host/HostTurnObserver.fs
 OpenCode/Host/HostCompactionObserver.fsi
@@ -1248,8 +1242,6 @@ Mission/Relay/OpenCode/SuicideTool.fsi
 Mission/Relay/OpenCode/SuicideTool.fs
 Mission/Relay/OpenCode/NarrativeTransform.fsi
 Mission/Relay/OpenCode/NarrativeTransform.fs
-OpenCode/Host/ExplicitResumeSurface.fsi
-OpenCode/Host/ExplicitResumeSurface.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi
 Execution/Delegation/Fork/OpenCode/Tool.fs
 OpenCode/Tools/PtyTool.fsi

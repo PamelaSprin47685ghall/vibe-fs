@@ -604,78 +604,11 @@ const { default: assert } = await import("node:assert/strict");
 const { existsSync, readFileSync } = await import("node:fs");
 const { resolve } = await import("node:path");
 const { default: test } = await import("node:test");
-const resume = await import("../../../dist/OpenCode/Host/ExplicitResumeSurface.js");
 const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[context-compression-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability', () => {
-  const companion = read('src/Wanxiangshu/Context/Companion/Transform.fs')
-  const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  assert.match(companion, /let\s+applyCompanionForOrdinaryMaterial/)
-  assert.equal(existsSync(resolve(root, 'src/Wanxiangshu/Context/Companion/Program.fs')), false)
-  assert.equal(existsSync(resolve(root, 'src/Wanxiangshu/Context/Companion/Errors.fs')), false)
-  assert.doesNotMatch(companion, /\b(?:CompanionProgram|CompanionContext|CompanionError|TransformRaw)\b/)
-  assert.match(companion, /replaceMessagesInPlace\s+rawOutObj\s+rawMessages/)
-  assert.match(companion, /\(isExplicitResume:\s*string option -> obj -> bool\)/)
-  assert.match(companion, /if isExplicitResume projectionSessionIdOpt outObj then/)
-  assert.doesNotMatch(companion, /ExplicitResumeSuppression/)
-  assert.match(pt, /CompanionTransform\.applyCompanionForOrdinaryMaterial/)
-  assert.match(pt, /TransformBranchCapabilities[\s\S]*IsExplicitResume/)
-  // Explicit TransformMode shape — same as plugin-transforms-invariant gate, strongest public contract for composition topology
-  assert.match(pt, /type\s+private\s+TransformMode/)
-  assert.match(pt, /\|\s*ExplicitResumeDisclosure/)
-  assert.match(pt, /\|\s*StrengthReplica\s+of\s+StrengthReplicaRuntime/)
-  assert.match(pt, /\|\s*Ordinary/)
-  assert.match(pt, /let\s+private\s+determineTransformMode/)
-  assert.match(pt, /match\s+determineTransformMode/)
-  assert.doesNotMatch(pt, /let\s+private\s+isExplicitResumeProviderMaterial/)
-})
-test('WHAT[context-compression-018] explicit-resume nudge path with marked suppression prevents companion double-send', async () => {
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    const sessionID = 'ses_explicit_resume_nudge_suppression'
-    const continueID = 'msg-continue-nudge-1'
-
-    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
-
-    const commandOutput = { parts: [] }
-    await hooks['command.execute.before'](
-      { command: 'continue', sessionID, arguments: '' },
-      commandOutput,
-    )
-
-    const config = {}
-    resume.registerCommand(config)
-    const physicalOutput = {
-      message: { id: continueID, sessionID, role: 'user' },
-      parts: [{ type: 'text', text: config.command.continue.template }],
-    }
-
-    await hooks['chat.message'](
-      { sessionID, messageID: continueID },
-      physicalOutput,
-    )
-
-    const providerOutput = {
-      messages: [
-        {
-          info: { id: continueID, sessionID, role: 'user' },
-          parts: physicalOutput.parts,
-        },
-      ],
-    }
-
-    await hooks['experimental.chat.messages.transform'](
-      { sessionID },
-      providerOutput,
-    )
-
-    assert.equal(createdIds.length, 0, 'suppression path must not create companion child sessions')
-    assert.equal(runtime.prompts.length, 0, 'suppression path must not double-send prompts')
-  })
-})
 test('WHAT[context-compression-018] fresh binding without suppression history admits ordinary material', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_fresh_ordinary_binding'

@@ -90,12 +90,6 @@ module ChatParamsHook =
         else
             None
 
-    let private isDisclosureOnlyMaterial input =
-        match trySessionId input, tryPhysicalUserMessageId input with
-        | Some sessionId, Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
-        | Some sessionId, None -> ExplicitResumeSuppression.hasMarkedPhysicalMaterial sessionId
-        | None, _ -> false
-
     let private checkObservedProvider sessionId agent model =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
         | Ok true -> ()
@@ -187,11 +181,7 @@ module ChatParamsHook =
             applyManagedTemperature input output
         | None -> ()
 
-    let private handleInput (input: obj) (output: obj) =
-        if isDisclosureOnlyMaterial input then
-            ()
-        else
-            applyManagedPolicy input output
+    let private handleInput (input: obj) (output: obj) = applyManagedPolicy input output
 
     let create () : obj =
         box (fun (input: obj) (output: obj) -> handleInput input output)

@@ -27,7 +27,6 @@ const REGISTERED_HOOK_NAMES = [
   'tool.execute.after',
   'event',
   'dispose',
-  'command.execute.before',
 ]
 
 test('WHAT[host-boundary-019] STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
@@ -165,6 +164,8 @@ const EXPECTED_ORDER = [
   'SettleAndReplaceDeferredInspections',
   'ApplyRelayProjection',
   'ApplyStrengthReplay',
+  'RestoreProtocolArguments',
+  'CaptureReadonlyDelegation',
   'CaptureXTraceMessages',
   'CommitStrengthTrace',
   'RefreshCompanionXTrace',
@@ -172,7 +173,7 @@ const EXPECTED_ORDER = [
   'ApplyXWire',
   'FreezeProviderAttemptPlan',
   'ApplyEnforcerContinuation',
-  'ApplyStrengthSpeculate',
+  'ApplyReadonlyDelegation',
   'InjectPairGuideline',
   'ProjectRequirementGrounding',
   'InjectBloggerChronicle',
@@ -184,6 +185,7 @@ const makeRecordingCaps = (opts = {}) => {
   const fnBegin = (sid, out) => { trace.push('BeginPhysicalProviderAttempt'); return Promise.resolve() }
   const fnStarted = (sid) => { trace.push('BindSessionStartedAt'); return Promise.resolve(null) }
   const fnReplay = (sid, out) => { trace.push('ApplyStrengthReplay'); return Promise.resolve([]) }
+  const fnRestore = (out) => { trace.push('RestoreProtocolArguments'); return Promise.resolve() }
   const fnRelay = (sid, out) => { trace.push('ApplyRelayProjection'); return Promise.resolve({ tag: 0 }) }
   const fnCapture = (sid, out) => { trace.push('CaptureXTraceMessages'); return Promise.resolve(new TraceTransformCapture([], null)) }
   const fnCommit = (sid, cur, plans) => { trace.push('CommitStrengthTrace'); return Promise.resolve() }
@@ -192,7 +194,8 @@ const makeRecordingCaps = (opts = {}) => {
   const fnXWire = (relay, outO) => { trace.push('ApplyXWire'); return Promise.resolve(opts.horizon ?? PrefixPresentationHorizon.Current) }
   const fnFreeze = (sid, outO) => { trace.push('FreezeProviderAttemptPlan'); return Promise.resolve() }
   const fnEnforcer = (sid, outO) => { trace.push('ApplyEnforcerContinuation'); return Promise.resolve() }
-  const fnSpeculate = (outO) => { trace.push('ApplyStrengthSpeculate'); return Promise.resolve() }
+  const fnCaptureDelegation = (outO) => { trace.push('CaptureReadonlyDelegation'); return Promise.resolve() }
+  const fnApplyDelegation = (outO) => { trace.push('ApplyReadonlyDelegation'); return Promise.resolve() }
   const fnPair = (sid, started, outO) => { trace.push('InjectPairGuideline'); return Promise.resolve() }
   const fnGrounding = (sid, outO) => { trace.push('ProjectRequirementGrounding'); return Promise.resolve() }
   const fnDeferred = (sid, outO) => { trace.push('SettleAndReplaceDeferredInspections'); return Promise.resolve() }
@@ -203,6 +206,7 @@ const makeRecordingCaps = (opts = {}) => {
     fnBegin,
     fnStarted,
     opts.swap3and4 ? fnRelay : fnReplay,
+    fnRestore,
     opts.swap3and4 ? fnReplay : fnRelay,
     fnCapture,
     fnCommit,
@@ -211,7 +215,8 @@ const makeRecordingCaps = (opts = {}) => {
     fnXWire,
     fnFreeze,
     fnEnforcer,
-    fnSpeculate,
+    fnCaptureDelegation,
+    fnApplyDelegation,
     fnPair,
     fnGrounding,
     fnBlogger,
@@ -221,32 +226,28 @@ const makeRecordingCaps = (opts = {}) => {
   return { caps, trace }
 }
 
-test('WHAT[host-boundary-019] normalTransform executes exact 16-step canonical sequence on production createWithCaps', async () => {
+test('WHAT[host-boundary-019] normalTransform executes exact canonical sequence on production createWithCaps', async () => {
   const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current })
   const branches = new TransformBranchCapabilities(
-    () => false,
     () => {},
     () => null,
     () => Promise.resolve(),
-    () => {},
     () => {},
   )
   const transform = createWithCaps(caps, branches)
   await transform({ sessionID: 's-1' })({ messages: [] })
 
   assert.deepEqual(trace, EXPECTED_ORDER)
-  assert.equal(trace.length, 18)
+  assert.equal(trace.length, EXPECTED_ORDER.length)
 })
 test('WHAT[host-boundary-019] counterexample: swapping two stub functions causes trace to differ', async () => {
   const normal = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: false })
   const swapped = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: true })
 
   const branches = new TransformBranchCapabilities(
-    () => false,
     () => {},
     () => null,
     () => Promise.resolve(),
-    () => {},
     () => {},
   )
 
@@ -259,34 +260,42 @@ test('WHAT[host-boundary-019] counterexample: swapping two stub functions causes
 test('WHAT[host-boundary-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', async () => {
   const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.TentativeCold })
   const branches = new TransformBranchCapabilities(
-    () => false,
     () => {},
     () => null,
     () => Promise.resolve(),
-    () => {},
     () => {},
   )
   const transform = createWithCaps(caps, branches)
   await transform({ sessionID: 's-tentative' })({ messages: [] })
 
-  // Under TentativeCold, steps 12-14 (ApplyStrengthSpeculate, InjectPairGuideline, ProjectRequirementGrounding)
-  // are suppressed, while InjectBloggerChronicle and SanitizeMessages still run.
-  assert.equal(trace.includes('ApplyStrengthSpeculate'), false)
+  // Under TentativeCold the start phase (step 12) is suppressed together with the
+  // two auxiliaries that follow it in the same horizon branch, while the capture
+  // phase (step 4.5) still runs: DELEGATE-7.1 freezes the explicit authorization
+  // before any horizon decision so a selected prefix probe cannot lose batch
+  // metadata. InjectBloggerChronicle and SanitizeMessages still run.
+  assert.equal(trace.includes('CaptureReadonlyDelegation'), true, 'capture runs before the horizon gate')
+  assert.equal(trace.includes('ApplyReadonlyDelegation'), false)
   assert.equal(trace.includes('InjectPairGuideline'), false)
   assert.equal(trace.includes('ProjectRequirementGrounding'), false)
   assert.equal(trace.includes('InjectBloggerChronicle'), true)
   assert.equal(trace.includes('SanitizeMessages'), true)
-  assert.equal(trace.length, 15)
+  assert.equal(
+    trace.length,
+    EXPECTED_ORDER.filter((step) => !['ApplyReadonlyDelegation', 'InjectPairGuideline', 'ProjectRequirementGrounding'].includes(step)).length,
+    'only the horizon-gated start phase and its two auxiliaries are suppressed',
+  )
 })
 test('WHAT[host-boundary-019] branch probe: ReplicaRuntime runs only replica steps', async () => {
   const replicaTrace = []
   const caps = new NormalTransformCapabilities(
-    ...Array.from({ length: 16 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
+    ...Array.from({ length: 19 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
   )
   caps.FreezeProviderAttemptPlan = (sid, outO) => { replicaTrace.push('FreezeProviderAttemptPlan'); return Promise.resolve() }
+  // RestoreProtocolArguments belongs to the shared prologue: both paths run it.
+  caps.RestoreProtocolArguments = () => Promise.resolve()
 
   const runtime = new StrengthReplicaRuntime(
-    null, null, null, null, '/tmp', 65536, null, null,
+    null, null, null, null, '/tmp',
   )
   runtime.byReplica.set('s-replica', {
     Replica: 's-replica',
@@ -294,12 +303,10 @@ test('WHAT[host-boundary-019] branch probe: ReplicaRuntime runs only replica ste
   })
 
   const branches = new TransformBranchCapabilities(
-    () => false,
     (sid) => { replicaTrace.push('RegisterOwned:' + sid) },
     () => runtime,
     () => { replicaTrace.push('ReplicaXWire'); return Promise.resolve() },
     () => { replicaTrace.push('ReplicaSanitize') },
-    () => { replicaTrace.push('ExplicitResumeSanitize') },
   )
 
   const transform = createWithCaps(caps, branches)
@@ -312,24 +319,5 @@ test('WHAT[host-boundary-019] branch probe: ReplicaRuntime runs only replica ste
     'ReplicaSanitize',
   ])
   assert.equal(replicaTrace.includes('unwantedNormalStep'), false)
-})
-test('WHAT[host-boundary-019] branch probe: IsExplicitResume runs only ExplicitResumeSanitize and exits', async () => {
-  const resumeTrace = []
-  const caps = new NormalTransformCapabilities(
-    ...Array.from({ length: 16 }, () => () => { resumeTrace.push('unwantedNormalStep'); return Promise.resolve() }),
-  )
-  const branches = new TransformBranchCapabilities(
-    () => true,
-    () => { resumeTrace.push('RegisterOwned') },
-    () => null,
-    () => { resumeTrace.push('ReplicaXWire'); return Promise.resolve() },
-    () => { resumeTrace.push('ReplicaSanitize') },
-    () => { resumeTrace.push('ExplicitResumeSanitize') },
-  )
-
-  const transform = createWithCaps(caps, branches)
-  await transform({ sessionID: 's-resume' })({ messages: [] })
-
-  assert.deepEqual(resumeTrace, ['ExplicitResumeSanitize'])
 })
 }

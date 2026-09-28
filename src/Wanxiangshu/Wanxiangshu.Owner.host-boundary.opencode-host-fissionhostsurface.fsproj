@@ -30,11 +30,5 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <Compile Include="OpenCode/Host/FissionHostSurface.fsi"/>
     <Compile Include="OpenCode/Host/FissionHostSurface.fs"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fsi"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
-    <Compile Include="OpenCode/Host/ExplicitSessionResume.fsi"/>
-    <Compile Include="OpenCode/Host/ExplicitSessionResume.fs"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -15,7 +15,7 @@
 ## [004] 恢复复用普通 workflow 入口，不发明程序计数器
 
 恢复过程遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 `RecoveryStage` 等第二状态机。
-所有工具与执行中断均由 crash-reconciliation-017 / crash-reconciliation-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；用户显式 `/continue` 是唯一的会话续传入口。
+所有工具与执行中断均由 crash-reconciliation-017 / crash-reconciliation-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；系统在加载阶段自行归位（结算遗留子 run、重建执行绑定、重新登记子会话），不存在显式续传命令。
 ## [005] ambiguous / multiple / missing 证据 fail closed
 
 恢复证据不足、冲突或缺失时，系统必须显式停留在 `Waiting`、`Blocked` 或 `RecoveryIncomplete` 分支，严禁猜测继续。
@@ -68,9 +68,15 @@ Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前�
 
 工具执行本身不设隐式的崩溃恢复 owner。进程死亡时正在运行的工具调用均按中断处理，严禁在新进程启动时自动重放、补写完成态或隐式修复。
 
-## [018] `/continue` 是唯一显式 session resume；重启断点必须暴露给 LLM
+## [018] 重启后由系统自行归位，不再有显式 resume 命令
 
-用户显式执行 `/continue` 是唯一的会话续传入口。系统仅重新登记物理可访问的子会话，并将进程重启、中断工具状态与可复用会话清单作为公开 briefing 放入 provider-visible 消息中，由 LLM 根据公开历史决定后续工具调用。续传材料保持 disclosure-only，不触发自动业务转换。
+进程重启后不存在任何显式续传命令（`/continue` 已移除）。系统在加载阶段自行完成归位，且只做持久记账，不重放任何命令：
+
+- 上一个 runtime 遗留的活跃子 run 被结算（`HandleCompleted(Cancelled)`），关闭其逻辑 run 并让父会话的 join 得到明确结果；
+- 进程本地的父子会话执行绑定按 durable handle 重建（取 handle 的 `TargetAgent`，不取逻辑 `Byname`）；
+- durable 子会话在进程内重新登记，使后续 `fork` 复用可以寻址；复用仍由 manager 显式发起。
+
+被中断的工具调用保持失败并原样留在可见历史中，不得推断其完成、隐藏它或伪造终态。没有独立的续传材料通道，也没有 disclosure-only 的 provider 轮次。
 
 ## [019] 外部 effect 必须逐项闭合 crash reconciliation 合同
 

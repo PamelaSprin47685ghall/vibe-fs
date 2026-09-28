@@ -144,23 +144,6 @@ module AgentJournalPortAdapter =
     let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort =
         RequirementGroundingJournalAdapter.forRequirementGrounding journal
 
-    let forSessionResume (journal: AgentJournal) : SessionResumeJournalPort =
-        { TryResumeProfile =
-            fun sessionId ->
-                let projections = (AgentJournal.snapshot journal).AgentProjections
-
-                PromptAuthorityProjectionQueries.activeProfile sessionId projections
-                |> Option.orElseWith (fun () ->
-                    PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
-          CandidateRecords =
-            fun parentId ->
-                AgentJournal.handleProjection journal parentId
-                |> HandleProjection.linkedChildren
-                |> List.filter (fun record ->
-                    match record.Ownership with
-                    | HandleOwnership.DurableParentHandle -> true
-                    | HandleOwnership.HostOwnedHidden -> false) }
-
     let forWire (journal: AgentJournal) : WireJournalPort =
         let failurePort = forProviderFailure journal
 

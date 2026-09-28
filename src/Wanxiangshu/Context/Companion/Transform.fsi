@@ -45,7 +45,6 @@ module CompanionTransform =
         journal: AgentJournal option ->
         onBloggerCreated: (SessionId -> unit) option ->
         workspaceDirectory: string option ->
-        isExplicitResume: (string option -> obj -> bool) ->
         projectionSessionIdOpt: string option ->
         inObj: obj ->
         outObj: obj ->

@@ -544,8 +544,7 @@ module HostSignalBootstrap =
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
 
-                if ExplicitResumeSuppression.requiresPhysicalBinding sessionId physicalId output then
-                    reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
+                reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
 
             let ensurePhysicalParentDiscovered (sessionId: SessionId) =
                 task {
@@ -807,17 +806,6 @@ module HostSignalBootstrap =
                         // provider turn even though it deliberately skips managed admission.
                         FissionHostRequestProjection.projectExternalManaged hasPhysicalParent intent output
 
-                        // crash-reconciliation-018: command.execute.before has no physical message id.
-                        // Carry its dynamic restart disclosure across that one Host seam,
-                        // then materialize it on the real chat.message before any owner
-                        // policy can observe the turn. Hosts that already forwarded the
-                        // marked part only consume the pending handoff here.
-                        let explicitResume = ExplicitResumeSuppression.classifyChatMessage decoded output
-
-                        // crash-reconciliation-018: bind the disclosure marker to this exact
-                        // physical user material before any routing/reconcile wake
-                        // can interpret the turn. A later unmarked physical user
-                        // message on the same reusable SessionId clears it here.
                         match decoded.SessionId, decoded.PhysicalUserMessageId with
                         | Some sessionId, Some physicalId ->
                             // HOST-004 / crash-reconciliation-006: physical admission itself closes
@@ -829,19 +817,7 @@ module HostSignalBootstrap =
                             JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
                         | _ -> ()
 
-                        if explicitResume then
-                            // Disclosure is transport/reconciliation context, not a new
-                            // business root. The Host still performs the provider turn;
-                            // Wanxiangshu does not mint PromptIngress/AuthorityRoot,
-                            // acquire a managed business lease, wake joins, or commit a
-                            // continuation capability for this physical material.
-                            ExplicitSessionResume.observeChatMessage
-                                (fun sessionId ->
-                                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore)
-                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
-                                decoded
-                        else
-                            do! continueClassifiedChatMessage intent output
+                        do! continueClassifiedChatMessage intent output
                     }
 
             let cancelSignals (ids: SessionId seq) =

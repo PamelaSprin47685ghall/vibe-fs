@@ -14,7 +14,6 @@ type HookKey =
     | ToolAfter
     | Event
     | Dispose
-    | CommandExecution
 
 [<RequireQualifiedAccess>]
 type HookCriticality =
@@ -35,7 +34,6 @@ type HookContext =
     | ToolExecution
     | HostEvent
     | PluginLifecycle
-    | CommandExecution
 
 [<RequireQualifiedAccess>]
 type HookEffect =
@@ -54,7 +52,6 @@ type HookEffect =
     | ObserveCasebook
     | ObserveHostEvent
     | DisposeOwnedResources
-    | AdmitExplicitResume
 
 [<RequireQualifiedAccess>]
 type HookRetryPermission = | RetryForbidden

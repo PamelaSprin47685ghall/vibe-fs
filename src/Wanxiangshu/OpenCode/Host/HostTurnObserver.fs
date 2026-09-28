@@ -235,22 +235,13 @@ module HostTurnObserver =
         (scope: PluginRuntimeScope)
         (context: ReconciledTurnContext)
         : Task =
-        let turn = context.Turn
-
-        if ExplicitResumeSuppression.isPhysicalMaterial turn.SessionId turn.PhysicalUserMessageId then
-            // crash-reconciliation-018: the /continue provider turn is disclosure-only. Reconcile
-            // may observe it for transport bookkeeping, but Wanxiangshu must not
-            // derive Strength, recovery, fallback, Companion, review, manager-idle
-            // or interaction-repair effects from this physical material.
-            Task.FromResult(()) :> Task
-        else
-            observeBusinessTurn
-                observeTurnWorkflow
-                sessionPort
-                rootWorkspace
-                eventPort
-                journal
-                handlePreTurn
-                observePrimaryTurn
-                scope
-                context
+        observeBusinessTurn
+            observeTurnWorkflow
+            sessionPort
+            rootWorkspace
+            eventPort
+            journal
+            handlePreTurn
+            observePrimaryTurn
+            scope
+            context

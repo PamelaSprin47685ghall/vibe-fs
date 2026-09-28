@@ -320,25 +320,21 @@ module CompanionTransform =
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
         (workspaceDirectory: string option)
-        (isExplicitResume: string option -> obj -> bool)
         (projectionSessionIdOpt: string option)
         (inObj: obj)
         (outObj: obj)
         : Task<unit> =
         task {
-            if isExplicitResume projectionSessionIdOpt outObj then
-                return ()
-            else
-                do!
-                    handleCompanionTransform
-                        companions
-                        gate
-                        satellites
-                        bloggerHost
-                        sessionPort
-                        journal
-                        onBloggerCreated
-                        workspaceDirectory
-                        inObj
-                        outObj
+            do!
+                handleCompanionTransform
+                    companions
+                    gate
+                    satellites
+                    bloggerHost
+                    sessionPort
+                    journal
+                    onBloggerCreated
+                    workspaceDirectory
+                    inObj
+                    outObj
         }

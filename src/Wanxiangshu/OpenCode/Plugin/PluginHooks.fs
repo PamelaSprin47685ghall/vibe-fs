@@ -441,7 +441,6 @@ module PluginHooks =
                     syncHostLanguagePreference config
                     ManagerConfig.configureManager config |> ignore
                     scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                    ExplicitSessionResume.registerCommand config
 
             let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
@@ -470,42 +469,6 @@ module PluginHooks =
 
                 registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
 
-            // crash-reconciliation-018: the explicit `/continue` command runs before
-            // any physical message exists, so it re-enlists surviving child sessions
-            // process-locally and stages the restart disclosure the real chat.message
-            // will materialize. Registered after the tool runtime exists because it
-            // adopts that runtime's children.
-            let commandExecution =
-                let adoptExisting parent record =
-                    match toolRegistration with
-                    | Some registration -> registration.Runtime.AdoptExistingChild(parent, record)
-                    | None -> Error "tool runtime is unavailable"
-
-                registeredHook
-                    HookKey.CommandExecution
-                    (pairedHook (
-                        box (
-                            ExplicitSessionResume.before
-                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
-                                snapshotOpt
-                                adoptExisting
-                        )
-                    ))
-
-            // crash-reconciliation-020: a plain restart has no `/continue`, so the
-            // fork runtime's child registry starts empty and a manager reuse of an
-            // existing byname answered "person-unavailable" for every durable child
-            // (the fixed DevOps and any forked Engineer child). Re-enlist them here:
-            // bookkeeping only — nothing is sent, nothing is replayed, and reuse
-            // itself stays the manager's explicit action.
-            match journal, toolRegistration with
-            | Some durable, Some registration ->
-                (AgentJournal.snapshot durable).AgentProjections
-                |> DurableChildAdoption.adoptableChildren
-                |> List.iter (fun (parent, record) ->
-                    registration.Runtime.AdoptExistingChild(parent, record) |> ignore)
-            | _ -> ()
-
             let hooks =
                 createObj (
                     [ chatMessage
@@ -519,7 +482,6 @@ module PluginHooks =
                       toolBeforeRegistration
                       toolAfterRegistration
                       event
-                      commandExecution
                       dispose ]
                     @ (toolRegistration
                        |> Option.map (fun registration -> [ "tool", registration.Tools ])

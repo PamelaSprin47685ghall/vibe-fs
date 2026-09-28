@@ -23,7 +23,6 @@ module AgentJournalPortAdapter =
     val forSessionStartedAt: journal: AgentJournal -> SessionStartedAtPort
     val forProviderFailure: journal: AgentJournal -> ProviderFailureJournalPort
     val forRequirementGrounding: journal: AgentJournal -> RequirementGroundingPort
-    val forSessionResume: journal: AgentJournal -> SessionResumeJournalPort
     val forWire: journal: AgentJournal -> WireJournalPort
     val forTurnObservation: journal: AgentJournal -> TurnObservationJournalPort
     val forTerminalPolicy: journal: AgentJournal -> TerminalPolicyPort

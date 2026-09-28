@@ -194,7 +194,6 @@ module HostSessionDeletion =
                 do! cleanupRuntime scope scope.SyncDelegateRuntime cleanupDelegateDraft sessionId
 
             scope.Sessions.Quiescence.DropSession sessionId
-            ExplicitResumeSuppression.dropSession sessionId
 
             do! scope.DisposeSession(SessionId.value sessionId)
 
