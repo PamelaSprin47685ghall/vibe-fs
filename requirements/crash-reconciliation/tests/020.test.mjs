@@ -171,6 +171,8 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const Roles = await import(`${root}/Foundation/Roles.js`)
   const Fact = await import(`${root}/Composition/Durable/Fact.js`)
   const Identity = await import(`${root}/Foundation/Identity.js`)
+  const Projection = await import(`${root}/Composition/Durable/Projection.js`)
+  const AssociationFacts = await import(`${root}/Execution/Session/Association.js`)
 
   const parentSessionId = 'ses-road-root'
   const childSessionId = 'ses-devops-fixed'
@@ -266,6 +268,34 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     Recovery.installFrom(() => projections)
 
     assert.equal(BindingSurface.tryAgent(childSessionId), '', 'and it never becomes a dispatchable binding')
+  })
+
+    test('WHAT[crash-reconciliation-020] CRASH_020_companion_session_resolves_to_parent_and_blogger_agent', () => {
+      const companionSessionId = 'ses-blogger-companion'
+      BindingSurface.drop(companionSessionId)
+
+      const linked = AssociationFacts.SessionAssociationProjection_linkSatellite(
+        new AssociationFacts.SatelliteKind(0, []), // Companion
+        sessionId(parentSessionId),
+        sessionId(companionSessionId),
+        undefined,
+        Fold.empty.AgentProjections.Associations,
+    )
+      assert.equal(linked.tag, 0, 'link must succeed')
+
+      const projectionsWithBlogger = {
+          ...Fold.empty.AgentProjections,
+        Associations: linked.fields[0],
+}
+
+      const evidence = Recovery.evidenceFor(projectionsWithBlogger, sessionId(companionSessionId))
+      assert.ok(evidence, 'companion session must resolve from durable associations')
+      assert.equal(evidence[0], parentSessionId, 'parent must be the main session')
+      assert.equal(evidence[1], 'blogger', 'execution agent must be blogger')
+
+      Recovery.installFrom(() => projectionsWithBlogger)
+      assert.equal(BindingSurface.tryParent(companionSessionId), parentSessionId)
+      assert.equal(BindingSurface.tryAgent(companionSessionId), 'blogger')
   })
 }
 
