@@ -10,10 +10,10 @@ module EnforcerRepair =
         Wanxiangshu.Foundation.Identity.SessionId ->
             Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest option
 
-    val chronicleCallCount: obj list -> int
-    val hasIncompleteBlogTool: obj list -> bool
-    val hasCompletedBlogTool: obj list -> bool
-    val hasAnyBlogToolPart: obj list -> bool
-    val hasAbortedBlogAttempt: obj list -> bool
-    val hasErroredBlogAttempt: obj list -> bool
+    val chronicleCallCount: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> int
+    val hasIncompleteBlogTool: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> bool
+    val hasCompletedBlogTool: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> bool
+    val hasAnyBlogToolPart: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> bool
+    val hasAbortedBlogAttempt: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> bool
+    val hasErroredBlogAttempt: Wanxiangshu.Enforcer.Cycle.EnforcerCycleDecode.AssistantStep -> bool
     val withRepairInstruction: obj list -> string -> Wanxiangshu.Foundation.Identity.ProviderRunIdentity -> obj list

@@ -103,3 +103,25 @@ test('WHAT[dispatch-protocol-006] DP_006_claim_sequence_advances_on_registration
   projection = authority.registerClaim(claimAt(2), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 3)
 })
+
+test('WHAT[dispatch-protocol-006] DP_006_same_payload_landings_stay_exact_per_physical_message', () => {
+  // Blogger Main dispatches all carry one fixed instruction text: two
+  // independent acts, one payload digest. The payload view keeps only the
+  // latest landing, and abandoning a later same-payload claim clears that
+  // occasion slot; the exact landing of every physical message survives both.
+  const root = profileOf()
+  const claimAt = (key) => authority.claimContinuation(key, SESSION, 'ManagedDelegationAssignment', root, 'pd-same')
+
+  let projection = authority.registerAuthority(root, authority.empty)
+  projection = authority.registerClaim(claimAt('pk_1'), projection)
+  projection = authority.acceptClaim('pk_1', 'msg_1', projection)
+  projection = authority.registerClaim(claimAt('pk_2'), projection)
+  projection = authority.acceptClaim('pk_2', 'msg_2', projection)
+  projection = authority.registerClaim(claimAt('pk_3'), projection)
+  projection = authority.abandonClaim('pk_3', projection)
+
+  const landedAs = (physical) => projection.physicalLandings.find((landing) => landing.physical === physical)
+  assert.equal(landedAs('msg_1')?.promptKey, 'pk_1')
+  assert.equal(landedAs('msg_2')?.promptKey, 'pk_2')
+  assert.equal(landedAs('msg_3'), undefined, 'an abandoned claim never lands')
+})

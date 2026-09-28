@@ -92,6 +92,8 @@ type BloggerRepairOutcome =
     | PendingRepairWait
     | UnownedIdleIgnored
     | SupersededIgnored
+    /// The terminal's durable evidence proves no ownership either way.
+    | UnprovenIgnored
     | AbandonedExhausted
     | Completed
 

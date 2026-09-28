@@ -90,6 +90,7 @@ module PromptAuthority =
           ActiveLogicalRun: AuthorityExecutionProfile option
           PendingClaims: Map<PromptKey, PromptClaim>
           AcceptedDispatches: Map<string, AcceptedDispatch>
+          PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
           AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
           ClaimSequences: Map<string, int> }
 

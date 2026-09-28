@@ -207,7 +207,15 @@ module PromptAuthority =
             /// session + payload digest. `Pending` on a claim means the outcome
             /// is undetermined; an entry here means the payload physically
             /// landed. Keyed — never a session scan (PERSIST-008).
+            ///
+            /// This is the occasion view: it answers "has this payload landed",
+            /// so a later landing of the same payload replaces the earlier one.
             AcceptedDispatches: Map<string, AcceptedDispatch>
+            /// dispatch-protocol-006: the exact landing of every physical user
+            /// message. Two acts with the same payload land on two physical
+            /// messages and stay two entries; neither a later same-payload
+            /// landing nor an abandoned claim can erase an earlier landing.
+            PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
             /// Physical message id -> the continuation kind it was accepted as.
             ///
             /// PROMPT-003 and PROMPT-009 only: this answers "was this message a
@@ -233,6 +241,7 @@ module PromptAuthority =
           ActiveLogicalRun = None
           PendingClaims = Map.empty
           AcceptedDispatches = Map.empty
+          PhysicalLandings = Map.empty
           AcceptedContinuationIds = Map.empty
           ClaimSequences = Map.empty }
 

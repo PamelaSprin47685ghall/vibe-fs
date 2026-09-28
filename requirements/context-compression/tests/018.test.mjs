@@ -222,27 +222,27 @@ test('WHAT[context-compression-018] C0_material_mailbox_and_flight_lease_are_sep
   )
 })
 test('WHAT[context-compression-018] C0_commit_uses_live_InFlight_only_not_open_heal', () => {
-  // Host transform msgs end on the historical last assistant (new outbound shell
-  // is not in the list). Commit must peek InFlight only — healing open here
-  // rebinds a new RequestId onto an old provider run (stale-cycle race).
-  // Durable open reload stays for rebuild / crash recovery, not cycle commit.
+  // The transform never holds the step being built, and a step only answers
+  // the latest physical message. Commit authority is the live InFlight
+  // request proven by the step's landed physical message; the continuation
+  // never reloads or heals authority from a durable open request, which would
+  // rebind a new RequestId onto an old provider run (stale-cycle race).
+  // Durable open reload stays in Recovery for crash recovery, not cycle commit.
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const recovery = prodText('src/Wanxiangshu/Enforcer/Cycle/Recovery.fs')
   assert.match(host, /tryLiveCycleContext/, 'commit authority is live InFlight peek')
   assert.match(
     host,
     /let liveCtx =\s*EnforcerFrameRecovery\.tryLiveCycleContext/,
-    'completed-blog arm peeks live only',
+    'the step dispatcher peeks live only',
   )
-  assert.match(host, /resolveCycleContext/, 'rebuild/empty-calls still resolve typed context')
+  assert.doesNotMatch(
+    host,
+    /tryReloadRequestContext|resolveCycleContext/,
+    'the continuation never reloads durable open request authority',
+  )
   assert.match(recovery, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
-  assert.equal(
-    /SetCurrentRequest\(key, ctx\)[\s\S]{0,80}Some ctx[\s\S]{0,40}resolveCycleContext|resolveCycleContext[\s\S]{0,200}SetCurrentRequest\(key, ctx\)/.test(
-      host,
-    ),
-    false,
-    'resolveCycleContext must not heal InFlight via SetCurrentRequest',
-  )
+  assert.doesNotMatch(host, /SetCurrentRequest/, 'the continuation never heals InFlight')
 })
 test('WHAT[context-compression-018] C0_single_main_material_coordinator_entry', () => {
   const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainContext\b/).map(rel)
@@ -858,7 +858,7 @@ test('WHAT[context-compression-018] ENFORCER_host_completed_blog_second_window_a
   assert.equal(frames.coverage(state).ingestedThroughSequence, 2)
   assert.equal(frames.coverage(state).cutoff, 2)
 })
-test('WHAT[context-compression-018] ENFORCER_resolveCycleContext_prefers_live_inflight_request', () => {
+test('WHAT[context-compression-018] ENFORCER_live_inflight_request_is_the_cycle_context', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', request('live'))
   const live = runtime.currentRequest(scope, 'ses-blog')

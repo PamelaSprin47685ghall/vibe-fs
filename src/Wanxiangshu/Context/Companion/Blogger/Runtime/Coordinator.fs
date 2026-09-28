@@ -575,8 +575,8 @@ module BloggerCoordinator =
                     rawMessages
             with
             | BloggerTerminalRequestOwnership.Superseded -> return BloggerRepairOutcome.SupersededIgnored
-            | BloggerTerminalRequestOwnership.Current
-            | BloggerTerminalRequestOwnership.Unproven ->
+            | BloggerTerminalRequestOwnership.Unproven -> return BloggerRepairOutcome.UnprovenIgnored
+            | BloggerTerminalRequestOwnership.Current ->
                 return! claimAndPostTransform scope durable identity request terminalRun rawMessages
         }
 
@@ -629,7 +629,8 @@ module BloggerCoordinator =
 
     /// Idle repair entry: posts the exact quiescence + terminal observation to the
     /// same request-scoped owner episode. Verification mirrors the transform entry;
-    /// a missing live flight yields UnownedIdleIgnored with no budget spent. The
+    /// a missing live flight yields UnownedIdleIgnored and a terminal without
+    /// durable ownership proof yields UnprovenIgnored, both with no budget spent. The
     /// interface root workspace crosses into the episode as its typed TryRead port.
     let private claimAndPostIdle
         (scope: IBloggerRuntimeHost)
@@ -682,8 +683,8 @@ module BloggerCoordinator =
                     context.Turn.PhysicalUserMessageId
             with
             | BloggerTerminalRequestOwnership.Superseded -> return BloggerRepairOutcome.SupersededIgnored
-            | BloggerTerminalRequestOwnership.Current
-            | BloggerTerminalRequestOwnership.Unproven ->
+            | BloggerTerminalRequestOwnership.Unproven -> return BloggerRepairOutcome.UnprovenIgnored
+            | BloggerTerminalRequestOwnership.Current ->
                 return!
                     claimAndPostIdle
                         scope

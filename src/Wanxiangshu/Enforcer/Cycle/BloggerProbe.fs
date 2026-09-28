@@ -20,6 +20,25 @@ module BloggerRecoveryProbe =
     [<Literal>]
     let BloggerAabbRepairKind = "blogger-aabb"
 
+    /// Exact durable landing of one physical Blogger prompt, read against the
+    /// request it must prove.
+    let private landingEvidence
+        (projections: AgentProjectionSet)
+        (bloggerSessionId: SessionId)
+        (request: BloggerRequestContext)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : BloggerTerminalParentEvidence option =
+        let requestId = BloggerRequestContext.requestId request
+
+        PromptAuthorityProjectionQueries.physicalLanding bloggerSessionId physicalUserMessageId projections
+        |> Option.map (fun landing ->
+            { PromptKey = landing.PromptKey
+              IsRequestScopedRepair =
+                match landing.Origin with
+                | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.InteractionRepair ->
+                    PromptAuthority.repairPayloadBelongsToRequest requestId landing.PayloadDigest
+                | _ -> false })
+
     let terminalRequestOwnershipForPhysicalMessage
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
@@ -28,7 +47,6 @@ module BloggerRecoveryProbe =
         : BloggerTerminalRequestOwnership =
         let projections = (AgentJournal.snapshot journal).AgentProjections
         let mainSessionId = BloggerRequestContext.mainSessionId request
-        let requestId = BloggerRequestContext.requestId request
 
         let openRequest =
             projections.Sessions
@@ -36,24 +54,21 @@ module BloggerRecoveryProbe =
             |> Option.bind (fun session -> session.BloggerCycles)
             |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
 
-        let parent =
-            PromptAuthorityProjectionQueries.acceptedDispatchForPhysicalMessage
-                bloggerSessionId
-                physicalUserMessageId
-                projections
-            |> Option.map (fun dispatch ->
-                { PromptKey = dispatch.PromptKey
-                  IsRequestScopedRepair =
-                    match dispatch.Origin with
-                    | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.InteractionRepair ->
-                        PromptAuthority.repairPayloadBelongsToRequest requestId dispatch.PayloadDigest
-                    | _ -> false })
-
         BloggerRequestOwnership.decide
-            requestId
+            (BloggerRequestContext.requestId request)
             (openRequest |> Option.map (fun current -> current.RequestId))
             (openRequest |> Option.bind (fun current -> current.PromptKey))
-            parent
+            (landingEvidence projections bloggerSessionId request physicalUserMessageId)
+
+    /// The physical message landed as a protocol repair scoped to this request.
+    let isRequestScopedRepairPrompt
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (request: BloggerRequestContext)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : bool =
+        landingEvidence (AgentJournal.snapshot journal).AgentProjections bloggerSessionId request physicalUserMessageId
+        |> Option.exists (fun evidence -> evidence.IsRequestScopedRepair)
 
     let terminalRequestOwnershipForProviderRun
         (tryPhysicalParent: ProviderRunIdentity -> obj list -> PhysicalUserMessageId option)

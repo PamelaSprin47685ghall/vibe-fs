@@ -249,7 +249,7 @@ export function scanFatalInventory(files, entries, testsExist = () => true, root
       return
     }
     // One operation string may legitimately name several rows: distinct call
-    // sites sharing the string (F19/F20/F21, F23/F24, F28-adjacent F18/F29,
+    // sites sharing the string (F23/F24, F28-adjacent F18/F29,
     // F33/F34, F09/F10), or one call site covered by both a branch row and
     // the F12 funnel row (F15/T01-T11). Every row whose file+operation match
     // a site marks that site covered; the (b) stale check below keeps each

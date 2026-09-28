@@ -59,10 +59,3 @@ module EnforcerFrameRecovery =
         Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost ->
         Wanxiangshu.Foundation.Identity.SessionId ->
             Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext option
-
-    val resolveCycleContext:
-        Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost ->
-        Wanxiangshu.Persistence.Journal.AgentJournal ->
-        Wanxiangshu.Foundation.Identity.SessionId ->
-        Wanxiangshu.Foundation.Identity.SessionId ->
-            System.Threading.Tasks.Task<Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext option>

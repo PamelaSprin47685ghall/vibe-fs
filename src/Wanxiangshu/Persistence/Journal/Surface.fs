@@ -98,6 +98,11 @@ module JournalSurface =
         let payload = unbox<obj> (value?payload)
 
         match family, case with
+        | "Companion", "CompanionBloggerLinked" ->
+            CompanionFact.CompanionBloggerLinked
+                {| SessionId = sessionIdOf (payload?SessionId)
+                   BloggerSessionId = sessionIdOf (payload?BloggerSessionId)
+                   BloggerAgent = str payload?BloggerAgent |}
         | "Companion", "CompanionBloggerClosed" ->
             CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
         | "Companion", "TerminalOutputCaptured" ->

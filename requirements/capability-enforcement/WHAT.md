@@ -84,6 +84,8 @@ Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列�
 
 Blogger 缺失工具修复的认领与物理发送只能由 `BloggerCoordinator.observeTransformRepair / observeIdleRepair` 这一唯一 compiled owner 发行。同一 repair episode 内重复观察必须幂等等待、不重复认领亦不重复发送；非 quiescent 观察不产生认领、不消耗发送预算；nudge 与 aabb 各至多发送一次，耗尽后一次性 abandon 并释放 flight；journal 缺失时直接 abandon 且零物理发送。runtime shutdown 必须与 episode admission 原子关闸，关闸后新认领被拒，已认领 episode 被取消并可 drain。
 
+没有 Host 工具循环跟随的 Blogger turn——只有散文的完成，或被 continuation 自身停止、被外部中止的 run——其 live request 只剩 idle 这一个唤醒点。idle 必须把这类 turn 交给同一 repair owner（由 owner 证明它属于 live request）；忽略被中止的 turn 会让该 request 的 flight 永久占用、后续材料永远跳过。provider 失败归 provider-attempt recovery；degeneration guard 触发的中止已由 guard 自己拥有后继。
+
 ## [022] Fission 仅准入已证明的 CanonicalRole 为 Engineer，其他角色与内部身份一律在运行入口与门禁 fail-closed 拒绝
 
 Fission 能力在运行入口（Admission Gate）的准入逻辑严格限定为：

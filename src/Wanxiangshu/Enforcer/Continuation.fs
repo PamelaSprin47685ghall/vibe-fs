@@ -20,29 +20,31 @@ open Wanxiangshu.Persistence.Journal
 /// Session termination capability — same signature as PluginTransforms.fs private type.
 type SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
-/// The three continuation branches of EnforcerHost.handleContinuation (the
-/// Blogger continuation-transform host), extracted so EnforcerHost stays a thin
-/// dispatcher (ENFORCER-044).
+/// The Blogger continuation transform (ENFORCER-044).
 ///
-/// Branch 1 (emptyCallsBranch): pending/running blog, abort cleanup, pure prose
-/// terminal — nothing is committed here. Invalid terminals route through
-/// BloggerCoordinator.observeTransformRepair (the single repair owner); transform
-/// must never queue a physical protocol nudge behind a live Host tool loop.
-/// Branch 2 (commitBranch): ENFORCER-044 merge/commit on completed blog tool
-/// parts, then park / inject-repair disposition.
-/// Branch 3 (firstRequestBranch): COMPANION-005 first request / non-tool step —
-/// rebuild only from durable frames + typed CurrentRequest.
+/// A provider step answers the latest physical user message (Host
+/// `MessageV2.latest`), and the transform input never holds the step being
+/// built. The step position decides what the continuation may do.
+///
+/// First step of a physical message: nothing answers it yet, and the history
+/// tail answers an older physical message, so nothing is judged. The step only
+/// receives the live request's canonical view (COMPANION-005), followed by the
+/// physical repair prompt when that prompt is a repair scoped to the request.
+///
+/// Later step of the same Host loop: the previous step answers this physical
+/// message. Only when its durable landing proves the physical message belongs
+/// to the live request (context-compression-024) may the continuation commit,
+/// hand the step to the single repair owner, or stop the physical run.
+/// Superseded and unproven steps pass through untouched.
 module EnforcerContinuation =
 
-    /// Local outcome of one continuation cycle body (no program-counter bools).
+    /// Local outcome of one owned commit (no program-counter bools).
     [<RequireQualifiedAccess>]
     type CycleDisposition =
         | Working
         | Committed of afterSquashMain: BloggerRequestContext option
-        | InjectRepair of BloggerRequestContext
         | CommitUnknown
         | AbandonThenCatchUp
-        | Stop of string
 
     /// Continuation transform result. Empty message lists are forbidden: Host
     /// forwards them as provider `messages` and rejects with 400.
@@ -52,28 +54,25 @@ module EnforcerContinuation =
         | ProjectMessages of obj list
         | StopPhysicalRun of messages: obj list * reason: string
 
-    /// Closed context shared by the branches: EnforcerHost (the thin dispatcher)
-    /// injects every dependency the branch bodies touch, so the branches are pure
-    /// transforms with no ambient module state.
+    /// One owned step: the live request its physical message is proven to
+    /// belong to, and the previous step of that Host loop.
     type Context =
         { Scope: IBloggerRuntimeHost
-          Journal: AgentJournal option
           Durable: AgentJournal
           Owner: SessionId
           BloggerSessionId: SessionId
+          Live: BloggerRequestContext
+          Previous: EnforcerCycleDecode.AssistantStep
           RawMessages: obj list
           Project: obj list -> ContinuationOutcome
           Stop: string -> ContinuationOutcome
           RefreshMainContext: SessionId -> SessionId -> Task<BloggerRequestContext option>
           IsEmptyTextCycleFailure: string -> bool }
 
-    let key (ctx: Context) = SessionId.value ctx.BloggerSessionId
+    let private key (ctx: Context) = SessionId.value ctx.BloggerSessionId
 
-    /// Evidence → Decision: last assistant messageId → provider run identity.
-    let private providerRunFromLastAssistant (rawMessages: obj list) (fallbackId: string) =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) -> ProviderRunIdentity.create messageId
-        | _ -> ProviderRunIdentity.create fallbackId
+    let private previousRun (ctx: Context) =
+        ProviderRunIdentity.create ctx.Previous.MessageId
 
     /// Durable seal fact only: sealing cancels the physical parked waiter and
     /// relies on the durable handle seal. There is no reopenable drain latch.
@@ -90,7 +89,7 @@ module EnforcerContinuation =
             // request between our claim and this release — the same race a
             // superseded repair episode produces. Killing the process here
             // would turn a routine supersedure into a crash; the released slot
-            // is never touched, so decline and keep the evidence path retraced.
+            // is never touched, so decline and keep the evidence path retraced.
             Diagnostic.emit "blogger-flight-release-conflict" [ "session_id", sessionKey; "result", reason ]
 
     /// Release whatever exact request is currently observed, if any. Only
@@ -101,226 +100,113 @@ module EnforcerContinuation =
         | Some exact -> releaseExact ctx sessionKey exact
         | None -> ()
 
-    let private rebuildFromOption (ctx: Context) (currentCtx: BloggerRequestContext option) : Task<obj list> =
+    /// Canonical provider view of a request: durable frames + typed request
+    /// context. A rebuild miss keeps the Host transcript.
+    let private resumeWithContext (ctx: Context) (live: BloggerRequestContext) =
         task {
-            match currentCtx with
-            | Some c ->
-                let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId c
-                return rebuilt |> Option.defaultValue ctx.RawMessages
-            | None -> return ctx.RawMessages
+            let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
+            return rebuilt |> Option.defaultValue ctx.RawMessages
         }
-
-    let private peekOrResolveCycleContext (ctx: Context) (sessionKey: string) =
-        match ctx.Scope.TryPeekCurrentRequest sessionKey with
-        | Some c -> Task.FromResult(Some c)
-        | None -> EnforcerFrameRecovery.resolveCycleContext ctx.Scope ctx.Durable ctx.Owner ctx.BloggerSessionId
 
     let private abandonThenStop
         (ctx: Context)
         (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
+        (request: BloggerRequestContext)
         (reason: string)
         : Task<ContinuationOutcome> =
         task {
-            do! BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId currentCtx reason
-            currentCtx |> Option.iter (releaseExact ctx sessionKey)
+            do! BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId (Some request) reason
+            releaseExact ctx sessionKey request
             return ctx.Stop reason
         }
 
-    /// Evidence → Decision: live cycle for interrupted blog → recovery or stop.
-    let private decideInterruptedBlog
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (liveCtx: BloggerRequestContext option)
-        : Task<ContinuationOutcome> =
-        match liveCtx with
-        | Some live ->
-            let terminalRun =
-                providerRunFromLastAssistant ctx.RawMessages "unknown-interrupted-run"
-
-            task {
-                match!
-                    BloggerCoordinator.observeTransformRepair
-                        ctx.Scope
-                        (Some ctx.Durable)
-                        live
-                        terminalRun
-                        ctx.RawMessages
-                with
-                | BloggerRepairOutcome.RepairInjected msgs -> return ctx.Project msgs
-                | BloggerRepairOutcome.PendingRepairWait -> return ctx.Stop "enforcer-cycle-nudge-deferred-to-idle"
-                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Stop "blogger-repair-superseded-ignored"
-                | BloggerRepairOutcome.UnownedIdleIgnored ->
-                    return ctx.Stop "unowned-interrupted-blog-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
-                | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _ -> return ctx.Stop "blogger-repair-sent"
-                | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
-            }
-        | None -> Task.FromResult(ctx.Stop "unowned-interrupted-blog-without-CurrentRequest")
-
-    let private decideInvalidTerminal
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (liveCtx: BloggerRequestContext option)
-        (reason: string)
-        : Task<ContinuationOutcome> =
-        let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-prose-run"
-
-        match liveCtx with
-        | None -> Task.FromResult(ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest")
-        | Some live ->
-            task {
-                match!
-                    BloggerCoordinator.observeTransformRepair
-                        ctx.Scope
-                        (Some ctx.Durable)
-                        live
-                        terminalRun
-                        ctx.RawMessages
-                with
-                | BloggerRepairOutcome.RepairInjected msgs -> return ctx.Project msgs
-                | BloggerRepairOutcome.PendingRepairWait ->
-                    Diagnostic.emit
-                        "enforcer-cycle-nudge-deferred-to-idle"
-                        [ "session_id", sessionKey; "result", reason ]
-
-                    return ctx.Stop "enforcer-cycle-nudge-deferred-to-idle"
-                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Stop "blogger-repair-superseded-ignored"
-                | BloggerRepairOutcome.UnownedIdleIgnored ->
-                    return ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
-                | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _ -> return ctx.Stop "blogger-repair-sent"
-                | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
-            }
-
-    let private terminalWasSuperseded
-        (ctx: Context)
-        (providerRun: ProviderRunIdentity)
-        (liveCtx: BloggerRequestContext option)
-        =
-        liveCtx
-        |> Option.exists (fun live ->
-            let ownership =
-                BloggerRecoveryProbe.terminalRequestOwnershipForProviderRun
-                    ProviderWireCapture.tryPhysicalParentOfProviderRun
-                    ctx.Durable
-                    ctx.BloggerSessionId
-                    live
-                    providerRun
-                    ctx.RawMessages
-
-            ownership = BloggerTerminalRequestOwnership.Superseded)
-
-    let private projectSupersededTerminal (ctx: Context) (sessionKey: string) (providerRun: ProviderRunIdentity) =
-        Diagnostic.emit
-            "enforcer-cycle-superseded"
-            [ "session_id", sessionKey
-              "result",
-              "terminal belongs to an older Blogger request: "
-              + ProviderRunIdentity.value providerRun ]
-
-        Task.FromResult(ctx.Project ctx.RawMessages)
-
-    let private decideCompletedInvalidCardinality
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (providerRun: ProviderRunIdentity)
-        (callCount: int)
-        : Task<ContinuationOutcome> =
-        let liveCtx =
-            EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
-
-        if terminalWasSuperseded ctx providerRun liveCtx then
-            projectSupersededTerminal ctx sessionKey providerRun
-        else
-            decideInvalidTerminal
-                ctx
-                sessionKey
-                currentCtx
-                liveCtx
-                (sprintf "chronicle call count = %d; expected exactly one (ENFORCER-042)" callCount)
-
-    let invalidCardinalityBranch
-        (ctx: Context)
-        (messageId: string)
-        (callCount: int)
-        (assistantCompleted: bool)
-        : Task<ContinuationOutcome> =
+    /// Coordinator-admitted in-loop repair: the live canonical view followed by
+    /// the request-scoped repair instruction for the previous step.
+    let private finishInjectRepair (ctx: Context) : Task<ContinuationOutcome> =
         task {
-            let sessionKey = key ctx
-            let! currentCtx = peekOrResolveCycleContext ctx sessionKey
-
-            if not assistantCompleted then
-                let! rebuilt = rebuildFromOption ctx currentCtx
-                return ctx.Project rebuilt
-            elif String.IsNullOrWhiteSpace messageId then
-                return!
-                    abandonThenStop ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
-            else
-                let providerRun = ProviderRunIdentity.create messageId
-                return! decideCompletedInvalidCardinality ctx sessionKey currentCtx providerRun callCount
+            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx.Live)
+            let! view = resumeWithContext ctx ctx.Live
+            return ctx.Project(EnforcerRepair.withRepairInstruction view requestKey (previousRun ctx))
         }
 
-    /// Branch 1 — empty completed-blog list. Host transform msgs do NOT include
-    /// the newly created outbound assistant (prompt.ts: updateMessage then
-    /// trigger transform on prior msgs). lastAssistant = historical tail. An
-    /// empty completed-blog list means:
-    /// 1) pending/running blog — Host re-enters after tool completion
-    /// 2) abort cleanup: blog status=error+interrupted, assistant completed
-    ///    → NOT pure prose; fail closed if still InFlight
-    /// 3) outbound after prior success is non-empty EnforcerCycleDecode.extractCalls (other arm)
-    /// 4) pure prose terminal (no blog parts at all) — ENFORCER-060 once when live
-    /// 5) no live request + interrupted/prose terminal → stop, never invent repair
-    let emptyCallsBranch (ctx: Context) (assistantCompleted: bool) : Task<ContinuationOutcome> =
+    /// Evidence → Decision: an owned invalid step goes to the single repair
+    /// owner (BloggerCoordinator.observeTransformRepair). Transform never sends
+    /// a physical protocol nudge behind a live Host tool loop: a nudge that
+    /// must come from idle stops this owned run so idle can deliver it. A
+    /// verdict that the coordinator does not own this step means ownership
+    /// moved underneath; the Host loop is then left untouched.
+    let private repairStep (ctx: Context) (sessionKey: string) (reason: string) : Task<ContinuationOutcome> =
         task {
-            let sessionKey = key ctx
-            let! currentCtx = peekOrResolveCycleContext ctx sessionKey
-
-            let liveCtx =
-                EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
-
-            let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-prose-run"
-
-            if terminalWasSuperseded ctx terminalRun liveCtx then
-                return! projectSupersededTerminal ctx sessionKey terminalRun
-            elif EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages then
+            match!
+                BloggerCoordinator.observeTransformRepair
+                    ctx.Scope
+                    (Some ctx.Durable)
+                    ctx.Live
+                    (previousRun ctx)
+                    ctx.RawMessages
+            with
+            | BloggerRepairOutcome.RepairInjected _ -> return! finishInjectRepair ctx
+            | BloggerRepairOutcome.PendingRepairWait ->
+                Diagnostic.emit "enforcer-cycle-nudge-deferred-to-idle" [ "session_id", sessionKey; "result", reason ]
+                return ctx.Stop "enforcer-cycle-nudge-deferred-to-idle"
+            | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
+            | BloggerRepairOutcome.NudgeSent _
+            | BloggerRepairOutcome.AabbSent _
+            | BloggerRepairOutcome.Completed ->
+                // A transform observation is a read-only rendezvous post: only
+                // idle may be answered with a send, and nothing answers with
+                // completion. This reply breaches the rendezvous contract.
+                Diagnostic.fatal "enforcer-repair-outcome-mismatch" [ "session_id", sessionKey; "result", reason ]
+                return ctx.Stop "enforcer-repair-outcome-mismatch"
+            | BloggerRepairOutcome.SupersededIgnored
+            | BloggerRepairOutcome.UnprovenIgnored
+            | BloggerRepairOutcome.UnownedIdleIgnored ->
+                Diagnostic.emit "enforcer-cycle-not-owned" [ "session_id", sessionKey; "result", reason ]
                 return ctx.Project ctx.RawMessages
-            elif EnforcerRepair.hasAbortedBlogAttempt ctx.RawMessages then
-                return! decideInterruptedBlog ctx sessionKey currentCtx liveCtx
-            elif EnforcerRepair.hasErroredBlogAttempt ctx.RawMessages then
+        }
+
+    /// More than one chronicle call on the owned previous step (ENFORCER-042).
+    let private invalidCardinalityStep (ctx: Context) (sessionKey: string) (callCount: int) =
+        task {
+            if ctx.Previous.Completed then
+                return!
+                    repairStep
+                        ctx
+                        sessionKey
+                        (sprintf "chronicle call count = %d; expected exactly one (ENFORCER-042)" callCount)
+            else
+                let! view = resumeWithContext ctx ctx.Live
+                return ctx.Project view
+        }
+
+    /// The owned previous step carries no valid chronicle call.
+    /// 1) pending/running blog — Host re-enters after tool completion
+    /// 2) interrupted blog (status=error + interrupted) — the run was cut
+    /// 3) chronicle tool error — Host-owned tool-result continuation
+    /// 4) completed chronicle that decodes to no valid cycle — protocol repair
+    /// 5) no chronicle part on a completed step — ENFORCER-060 protocol repair
+    let private emptyCallsStep (ctx: Context) (sessionKey: string) : Task<ContinuationOutcome> =
+        task {
+            let previous = ctx.Previous
+
+            if EnforcerRepair.hasIncompleteBlogTool previous then
+                return ctx.Project ctx.RawMessages
+            elif EnforcerRepair.hasAbortedBlogAttempt previous then
+                return! repairStep ctx sessionKey "chronicle call was interrupted"
+            elif EnforcerRepair.hasErroredBlogAttempt previous then
                 // A real chronicle call that failed schema/tool execution still
                 // has a Host-owned tool-result continuation. The Blogger gets the
                 // error and may correct its own hint on the next provider step.
                 // Repair here would race that continuation and surface as queued.
                 return ctx.Project ctx.RawMessages
-            elif EnforcerRepair.hasCompletedBlogTool ctx.RawMessages then
+            elif EnforcerRepair.hasCompletedBlogTool previous then
                 return!
-                    decideInvalidTerminal
-                        ctx
-                        sessionKey
-                        currentCtx
-                        liveCtx
-                        "completed chronicle call did not produce one valid cycle (ENFORCER-060)"
-            elif EnforcerRepair.hasAnyBlogToolPart ctx.RawMessages then
-                let! rebuilt = rebuildFromOption ctx currentCtx
-                return ctx.Project rebuilt
-            elif not assistantCompleted then
-                let! rebuilt = rebuildFromOption ctx currentCtx
-                return ctx.Project rebuilt
+                    repairStep ctx sessionKey "completed chronicle call did not produce one valid cycle (ENFORCER-060)"
+            elif EnforcerRepair.hasAnyBlogToolPart previous || not previous.Completed then
+                let! view = resumeWithContext ctx ctx.Live
+                return ctx.Project view
             else
-                return!
-                    decideInvalidTerminal ctx sessionKey currentCtx liveCtx "no completed chronicle call (ENFORCER-060)"
-        }
-
-    let private resumeWithContext (ctx: Context) (live: BloggerRequestContext) =
-        task {
-            let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId live
-            return rebuilt |> Option.defaultValue ctx.RawMessages
+                return! repairStep ctx sessionKey "no completed chronicle call (ENFORCER-060)"
         }
 
     let private materializeCatchUp (ctx: Context) (live: BloggerRequestContext) : Task<Result<unit, string>> =
@@ -354,7 +240,7 @@ module EnforcerContinuation =
         : Task<ContinuationOutcome> =
         task {
             match! materializeCatchUp ctx live with
-            | Error reason -> return! abandonThenStop ctx sessionKey (Some live) reason
+            | Error reason -> return! abandonThenStop ctx sessionKey live reason
             | Ok() ->
                 let! rebuilt = resumeWithContext ctx live
                 return ctx.Project rebuilt
@@ -493,48 +379,10 @@ module EnforcerContinuation =
                 return! resumeCatchUpAfterUnblocked ctx mainSessionId sessionKey caughtUpReason
         }
 
-    /// Evidence → Decision: open-by-blogger presence → missing-request vs no-authority fatal.
-    let private projectUnownedLiveAuthority
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        : ContinuationOutcome =
-        match EnforcerRepair.tryOpenByBlogger ctx.Durable mainSessionId ctx.BloggerSessionId with
-        | Some _ ->
-            // A durable open-by-blogger exists but the live cycle context is
-            // gone — request was superseded mid-flight. Keeping the process
-            // alive and projecting the unmodified raw messages is the honest
-            // response: the still-owned frame simply stays uncommitted until
-            // the owner revives it.
-            Diagnostic.emit "enforcer-cycle-failed" [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
-            ctx.Project ctx.RawMessages
-        | None ->
-            // Same rule for the no-authority branch: absence of the durable
-            // open cycle means nothing this process owns, so a completed
-            // foreign blog part must be left untouched.
-            Diagnostic.emit
-                "enforcer-cycle-failed"
-                [ "session_id", sessionKey; "result", "live blog without cycle authority" ]
-
-            ctx.Project ctx.RawMessages
-
-    /// Evidence → Decision: assistant completed → stop; else unowned live fatal project.
-    let private unownedLiveBlogOutcome
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        (assistantCompleted: bool)
-        : ContinuationOutcome =
-        if assistantCompleted then
-            ctx.Stop "unowned-completed-blog-without-CurrentRequest"
-        else
-            projectUnownedLiveAuthority ctx mainSessionId sessionKey
-
     let private fatalClearWorking
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (reason: string)
         : Task<CycleDisposition> =
         task {
@@ -543,80 +391,28 @@ module EnforcerContinuation =
             // either way, so abandonment evidence is attempted and reported before
             // the fatal record, never scheduled after it.
             try
-                do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
+                do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId (Some ctx.Live) reason
             with ex ->
                 Diagnostic.emit
                     "enforcer-cycle-settlement-failed"
                     [ "session_id", sessionKey
                       "result", "abandonment evidence failed: " + ex.Message ]
 
-            liveCtx |> Option.iter (releaseExact ctx sessionKey)
+            releaseExact ctx sessionKey ctx.Live
             Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
             return CycleDisposition.Working
-        }
-
-    /// Evidence → Decision: empty-text validation failure → coordinator-owned repair.
-    /// Transform never spends the repair budget itself: RepairInjected becomes
-    /// an inject disposition, PendingRepairWait stays working, anything else
-    /// fails closed through the fatal path (the coordinator already abandoned).
-    let private dispositionForEmptyTextFailure
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
-        (reason: string)
-        : Task<CycleDisposition> =
-        task {
-            let! refreshed = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
-            let fresh = refreshed |> Option.orElse liveCtx
-
-            match fresh with
-            | None -> return! fatalClearWorking ctx mainSessionId sessionKey liveCtx (reason + "; repair-refresh-empty")
-            | Some freshCtx ->
-                let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-repair-run"
-
-                match!
-                    BloggerCoordinator.observeTransformRepair
-                        ctx.Scope
-                        (Some ctx.Durable)
-                        freshCtx
-                        terminalRun
-                        ctx.RawMessages
-                with
-                | BloggerRepairOutcome.RepairInjected _ -> return CycleDisposition.InjectRepair freshCtx
-                | BloggerRepairOutcome.PendingRepairWait ->
-                    return CycleDisposition.Stop "enforcer-empty-cycle-nudge-deferred-to-idle"
-                | BloggerRepairOutcome.SupersededIgnored ->
-                    return CycleDisposition.Stop "enforcer-empty-cycle-repair-superseded-ignored"
-                | BloggerRepairOutcome.UnownedIdleIgnored ->
-                    return CycleDisposition.Stop "enforcer-empty-cycle-unowned-idle-ignored"
-                | BloggerRepairOutcome.AbandonedExhausted ->
-                    // The coordinator already settled this exact request:
-                    // abandonment is durable and the flight was released inside
-                    // the episode. The transform joins the catch-up lane for
-                    // the next material rather than fusing the process.
-                    return CycleDisposition.AbandonThenCatchUp
-                | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _ -> return CycleDisposition.Stop "enforcer-empty-cycle-repair-sent"
-                | BloggerRepairOutcome.Completed ->
-                    // A transform observation can never yield a send-kind reply;
-                    // a mismatched outcome violates the rendezvous contract.
-                    Diagnostic.fatal "enforcer-repair-outcome-mismatch" [ "session_id", sessionKey; "result", reason ]
-
-                    return CycleDisposition.Stop "enforcer-repair-outcome-mismatch"
         }
 
     let private abandonStaleDisposition
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (reason: string)
         : Task<CycleDisposition> =
         task {
             Diagnostic.emit "enforcer-cycle-stale" [ "session_id", sessionKey; "result", reason ]
-            do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
-            liveCtx |> Option.iter (releaseExact ctx sessionKey)
+            do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId (Some ctx.Live) reason
+            releaseExact ctx sessionKey ctx.Live
             return CycleDisposition.AbandonThenCatchUp
         }
 
@@ -625,7 +421,6 @@ module EnforcerContinuation =
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (squash: BloggerSquashRequestContext)
         (mergedText: string)
@@ -641,10 +436,10 @@ module EnforcerContinuation =
                     mergedText
             with
             | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
-                liveCtx |> Option.iter (releaseExact ctx sessionKey)
+                releaseExact ctx sessionKey ctx.Live
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
-                return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
+                return! abandonStaleDisposition ctx mainSessionId sessionKey reason
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                 // The durable commit evidence is indeterminate — keep the exact
                 // request in-flight. The caller keeps the pending marker and
@@ -665,7 +460,6 @@ module EnforcerContinuation =
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.CanonicalCycle)
@@ -684,10 +478,10 @@ module EnforcerContinuation =
             with
             | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                 sealIfMainSealedAfterCommit ctx mainSessionId sessionKey
-                liveCtx |> Option.iter (releaseExact ctx sessionKey)
+                releaseExact ctx sessionKey ctx.Live
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
-                return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
+                return! abandonStaleDisposition ctx mainSessionId sessionKey reason
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                 Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown
@@ -698,7 +492,6 @@ module EnforcerContinuation =
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.CanonicalCycle)
@@ -711,75 +504,33 @@ module EnforcerContinuation =
             |> Option.exists (fun openReq -> openReq.RequestId = main.RequestId && openReq.PromptKey.IsNone)
 
         if tomlDigest <> main.DeltaDigest then
-            fatalClearWorking ctx mainSessionId sessionKey liveCtx "delta digest mismatch"
+            fatalClearWorking ctx mainSessionId sessionKey "delta digest mismatch"
         elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
-            fatalClearWorking ctx mainSessionId sessionKey liveCtx "coverage did not advance"
+            fatalClearWorking ctx mainSessionId sessionKey "coverage did not advance"
         elif openUnbound then
-            fatalClearWorking ctx mainSessionId sessionKey liveCtx "open request has no PromptKey binding"
+            fatalClearWorking ctx mainSessionId sessionKey "open request has no PromptKey binding"
         else
-            dispositionAfterMainCommit ctx mainSessionId sessionKey liveCtx providerRun toolCallIds merged main
+            dispositionAfterMainCommit ctx mainSessionId sessionKey providerRun toolCallIds merged main
 
     /// Evidence → Decision: live request context kind → squash/main commit path.
     let private dispositionForValidatedCycle
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (merged: EnforcerCycle.CanonicalCycle)
         (toolCallIds: ToolCallId list)
         : Task<CycleDisposition> =
-        match liveCtx with
-        | Some(BloggerRequestContext.Squash squash) ->
-            dispositionAfterSquashCommit ctx mainSessionId sessionKey liveCtx providerRun squash merged.MergedText
-        | Some(BloggerRequestContext.Main main) ->
-            dispositionForMainCycle ctx mainSessionId sessionKey liveCtx providerRun toolCallIds merged main
-        | None -> fatalClearWorking ctx mainSessionId sessionKey liveCtx "missing CurrentRequest"
+        match ctx.Live with
+        | BloggerRequestContext.Squash squash ->
+            dispositionAfterSquashCommit ctx mainSessionId sessionKey providerRun squash merged.MergedText
+        | BloggerRequestContext.Main main ->
+            dispositionForMainCycle ctx mainSessionId sessionKey providerRun toolCallIds merged main
 
-    /// Evidence → Decision: validateCycle Error/Ok → coordinator repair / fatal / commit disposition.
-    let private runOwnedCycleBody
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        (messageId: string)
-        (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        (liveCtx: BloggerRequestContext option)
-        (providerRun: ProviderRunIdentity)
-        : Task<CycleDisposition> =
+    let private finishWorking (ctx: Context) : Task<ContinuationOutcome> =
         task {
-            let validation = EnforcerCycleDecode.validateCycle messageId calls
-
-            match validation with
-            | Error reason when
-                ctx.IsEmptyTextCycleFailure reason
-                && not (EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages)
-                ->
-                return! dispositionForEmptyTextFailure ctx mainSessionId sessionKey liveCtx reason
-            | Error reason -> return! fatalClearWorking ctx mainSessionId sessionKey liveCtx reason
-            | Ok(merged, toolCallIds) ->
-                return! dispositionForValidatedCycle ctx mainSessionId sessionKey liveCtx providerRun merged toolCallIds
-        }
-
-    /// Evidence → Decision: coordinator-admitted repair → project the request-scoped repair instruction.
-    let private finishInjectRepair
-        (ctx: Context)
-        (messageId: string)
-        (live: BloggerRequestContext)
-        : Task<ContinuationOutcome> =
-        task {
-            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
-            let terminalRun = ProviderRunIdentity.create messageId
-            let! rebuilt = resumeWithContext ctx live
-            return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey terminalRun)
-        }
-
-    let private finishWorking (ctx: Context) (liveCtx: BloggerRequestContext option) : Task<ContinuationOutcome> =
-        task {
-            match liveCtx with
-            | Some live ->
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project rebuilt
-            | None -> return ctx.Project ctx.RawMessages
+            let! rebuilt = resumeWithContext ctx ctx.Live
+            return ctx.Project rebuilt
         }
 
     /// Evidence → Decision: durable seal after catch-up → cancel waiter and stop; else park wait.
@@ -832,99 +583,138 @@ module EnforcerContinuation =
                 return! catchUpAfterCommitMaterial ctx mainSessionId sessionKey refreshed afterSquashMain
         }
 
-    /// Evidence → Decision: cycle disposition → inject / catch-up / project / park.
+    /// Evidence → Decision: commit disposition → catch-up / project / park.
     let private finishOwnedDisposition
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (messageId: string)
-        (liveCtx: BloggerRequestContext option)
         (disposition: CycleDisposition)
         : Task<ContinuationOutcome> =
         match disposition with
-        | CycleDisposition.InjectRepair live -> finishInjectRepair ctx messageId live
         | CycleDisposition.CommitUnknown -> Task.FromResult(ctx.Project ctx.RawMessages)
         | CycleDisposition.AbandonThenCatchUp ->
             resumeCatchUp ctx mainSessionId sessionKey "stale-cycle-catch-up-complete"
-        | CycleDisposition.Working -> finishWorking ctx liveCtx
+        | CycleDisposition.Working -> finishWorking ctx
         | CycleDisposition.Committed afterSquashMain -> finishCommitted ctx mainSessionId sessionKey afterSquashMain
-        | CycleDisposition.Stop reason -> Task.FromResult(ctx.Stop reason)
 
-    /// Branch 2 — ENFORCER-044: merge/commit on completed blog tool parts when
-    /// this plugin owns the cycle (live CurrentRequest).
+    /// Evidence → Decision: cycle validation → coordinator repair / fatal / commit.
+    let private commitValidated
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        (providerRun: ProviderRunIdentity)
+        (validation: Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string>)
+        : Task<ContinuationOutcome> =
+        match validation with
+        | Error reason when
+            ctx.IsEmptyTextCycleFailure reason
+            && not (EnforcerRepair.hasIncompleteBlogTool ctx.Previous)
+            ->
+            repairStep ctx sessionKey reason
+        | Error reason ->
+            task {
+                let! disposition = fatalClearWorking ctx mainSessionId sessionKey reason
+                return! finishOwnedDisposition ctx mainSessionId sessionKey disposition
+            }
+        | Ok(merged, toolCallIds) ->
+            task {
+                let! disposition =
+                    dispositionForValidatedCycle ctx mainSessionId sessionKey providerRun merged toolCallIds
+
+                return! finishOwnedDisposition ctx mainSessionId sessionKey disposition
+            }
+
+    /// ENFORCER-044: commit the owned previous step's chronicle call.
     ///
-    /// Host prompt.ts: transform msgs do NOT include the newly created
-    /// outbound assistant — lastAssistant is always the previous one.
-    /// processor.cleanup sets time.completed AFTER tools finish and BEFORE
-    /// the next loop iteration reloads msgs and re-triggers transform.
-    /// So the only Host trajectory that shows blog tool status=completed
-    /// also has assistant.time.completed. Skipping commit on that flag
-    /// freezes RecordCoverage: every later delta restarts at the origin
-    /// 200 KiB window with no fatal (silent stall).
-    ///
+    /// Host prompt.ts: processor.cleanup sets time.completed AFTER tools finish
+    /// and BEFORE the next loop iteration reloads msgs and re-triggers
+    /// transform, so a completed chronicle part always comes with a completed
+    /// assistant. Skipping commit on that flag would freeze RecordCoverage.
     /// ENFORCER-154 alreadyEntry/alreadyReceipt still refuse re-commit.
-    /// liveCtx=None means we do not own this step — never invent authority.
     let commitBranch
         (ctx: Context)
-        (messageId: string)
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        (assistantCompleted: bool)
         : Task<ContinuationOutcome> =
-        task {
-            let mainSessionId = ctx.Owner
-            let providerRun = ProviderRunIdentity.create messageId
-            let sessionKey = key ctx
+        let mainSessionId = ctx.Owner
+        let providerRun = previousRun ctx
+        let sessionKey = key ctx
+        let snapshot = AgentJournal.snapshot ctx.Durable
 
-            let liveCtx =
-                EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+        let alreadyEntry =
+            snapshot.AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun session -> session.Enforcement)
+            |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
+            |> Option.flatten
+            |> Option.isSome
 
-            let snapshot = AgentJournal.snapshot ctx.Durable
+        let alreadyReceipt =
+            snapshot.AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun session -> session.BloggerCycles)
+            |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
+            |> Option.isSome
 
-            let alreadyEntry =
-                snapshot.AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-                |> Option.bind (fun session -> session.Enforcement)
-                |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
-                |> Option.flatten
-                |> Option.isSome
+        if alreadyEntry || alreadyReceipt then
+            resumeCatchUp ctx mainSessionId sessionKey "idempotent-receipt-catch-up-complete"
+        else
+            EnforcerCycleDecode.validateCycle ctx.Previous.MessageId calls
+            |> commitValidated ctx mainSessionId sessionKey providerRun
 
-            let alreadyReceipt =
-                snapshot.AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-                |> Option.bind (fun session -> session.BloggerCycles)
-                |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
-                |> Option.isSome
+    /// An owned later step: judge the previous step of the live Host loop. A
+    /// completed step without provider identity only closes the exact request
+    /// (context-compression-025); no provider run is invented for it.
+    let private ownedStep (ctx: Context) : Task<ContinuationOutcome> =
+        let calls = EnforcerCycleDecode.callsOf Diagnostic.emit ctx.Previous
+        let callCount = EnforcerRepair.chronicleCallCount ctx.Previous
 
-            if alreadyEntry || alreadyReceipt then
-                return! resumeCatchUp ctx mainSessionId sessionKey "idempotent-receipt-catch-up-complete"
-            elif liveCtx.IsNone then
-                return unownedLiveBlogOutcome ctx mainSessionId sessionKey assistantCompleted
-            elif terminalWasSuperseded ctx providerRun liveCtx then
-                return! projectSupersededTerminal ctx sessionKey providerRun
-            else
-                let! disposition = runOwnedCycleBody ctx mainSessionId sessionKey messageId calls liveCtx providerRun
+        if ctx.Previous.Completed && String.IsNullOrWhiteSpace ctx.Previous.MessageId then
+            abandonThenStop ctx (key ctx) ctx.Live "blog cycle has no provable provider run (ENFORCER-043)"
+        elif callCount > 1 then
+            invalidCardinalityStep ctx (key ctx) callCount
+        elif List.isEmpty calls then
+            emptyCallsStep ctx (key ctx)
+        else
+            commitBranch ctx calls
 
-                return! finishOwnedDisposition ctx mainSessionId sessionKey messageId liveCtx disposition
-        }
+    let private ownershipLabel (ownership: BloggerTerminalRequestOwnership) =
+        match ownership with
+        | BloggerTerminalRequestOwnership.Current -> "current"
+        | BloggerTerminalRequestOwnership.Superseded -> "superseded"
+        | BloggerTerminalRequestOwnership.Unproven -> "unproven"
 
-    /// Branch 3 — COMPANION-005 first request / non-tool step: rebuild only from
-    /// durable frames + typed CurrentRequest. Never extract TOML from raw user
-    /// messages (C2).
-    let firstRequestBranch
-        (scope: IBloggerRuntimeHost)
-        (journal: AgentJournal option)
+    /// A later step whose physical message is not proven to belong to the live
+    /// request: no commit, no repair budget, no stop. The Host loop keeps its
+    /// own transcript.
+    let private notOwnedStep (bloggerSessionId: SessionId) (physical: PhysicalUserMessageId) (why: string) =
+        Diagnostic.emit
+            "enforcer-cycle-not-owned"
+            [ "session_id", SessionId.value bloggerSessionId
+              "result", why + " step of " + PhysicalUserMessageId.value physical ]
+
+    /// The physical user message itself, as the Host transcript carries it.
+    let private physicalMessage (physical: PhysicalUserMessageId) (rawMessages: obj list) : obj list =
+        rawMessages
+        |> List.tryFind (fun raw -> ProviderWireDecode.hostMessageId raw = Some(PhysicalUserMessageId.value physical))
+        |> Option.toList
+
+    /// First step of a physical message: nothing is judged. The step gets the
+    /// live request's canonical view; a physical repair prompt scoped to that
+    /// request stays visible after it, since that prompt is what the step answers.
+    let private firstStepView
+        (durable: AgentJournal)
         (bloggerSessionId: SessionId)
+        (live: BloggerRequestContext)
+        (physical: PhysicalUserMessageId)
         (rawMessages: obj list)
-        (project: obj list -> ContinuationOutcome)
-        : Task<ContinuationOutcome> =
+        : Task<obj list> =
         task {
-            match journal, scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId) with
-            | Some durable, Some ctx ->
-                let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId ctx
-                return project (rebuilt |> Option.defaultValue rawMessages)
-            | _ -> return project rawMessages
+            match! EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId live with
+            | None -> return rawMessages
+            | Some view when BloggerRecoveryProbe.isRequestScopedRepairPrompt durable bloggerSessionId live physical ->
+                return view @ physicalMessage physical rawMessages
+            | Some view -> return view
         }
-
 
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(if List.isEmpty messages then fallback else messages)
@@ -935,11 +725,17 @@ module EnforcerContinuation =
     let private isEmptyTextCycleFailure (reason: string) : bool =
         reason = EnforcerCycleDecode.EmptyTextError
 
-    /// The Blogger continuation-transform handler (moved from EnforcerHost to
-    /// break the Host.fs ↔ Continuation.fs compile-order cycle).
-    ///
-    /// Thin dispatcher over the three branches (emptyCallsBranch / commitBranch /
-    /// firstRequestBranch): it only derives the closed branch context and forwards.
+    let private linkedMain (journal: AgentJournal option) (bloggerSessionId: SessionId) =
+        journal
+        |> Option.bind (fun durable ->
+            SessionAssociationProjection.tryMainSessionOf
+                bloggerSessionId
+                (AgentJournal.snapshot durable).AgentProjections.Associations
+            |> Option.map (fun owner -> durable, owner))
+
+    /// The Blogger continuation-transform handler: decode the step position,
+    /// prove ownership, then dispatch. It only derives the closed step context
+    /// and forwards; the branches own the decisions.
     let handleContinuation
         (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
@@ -951,38 +747,40 @@ module EnforcerContinuation =
 
             let stop (reason: string) = stopPhysicalRun rawMessages reason
 
-            let mainSessionId =
-                journal
-                |> Option.bind (fun j ->
-                    SessionAssociationProjection.tryMainSessionOf
-                        bloggerSessionId
-                        (AgentJournal.snapshot j).AgentProjections.Associations)
+            let liveCtx = EnforcerFrameRecovery.tryLiveCycleContext scope bloggerSessionId
 
-            let mkCtx (durable: AgentJournal) (owner: SessionId) : Context =
+            let ownedContext durable owner live previous : Context =
                 { Scope = scope
-                  Journal = journal
                   Durable = durable
                   Owner = owner
                   BloggerSessionId = bloggerSessionId
+                  Live = live
+                  Previous = previous
                   RawMessages = rawMessages
                   Project = project
                   Stop = stop
                   RefreshMainContext = BloggerMainContext.fromJournal scope durable
                   IsEmptyTextCycleFailure = isEmptyTextCycleFailure }
 
-            let chronicleCallCount = EnforcerRepair.chronicleCallCount rawMessages
+            let ownership durable live physical =
+                BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage durable bloggerSessionId live physical
 
-            match journal, mainSessionId, EnforcerCycleDecode.extractCalls Diagnostic.emit rawMessages with
-            | Some durable, Some owner, Some(messageId, _, assistantCompleted) when chronicleCallCount > 1 ->
-                return! invalidCardinalityBranch (mkCtx durable owner) messageId chronicleCallCount assistantCompleted
-            | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
-                return! emptyCallsBranch (mkCtx durable owner) assistantCompleted
-            | Some durable, Some owner, Some(messageId, calls, assistantCompleted) ->
-                return! commitBranch (mkCtx durable owner) messageId calls assistantCompleted
-            | _ -> return! firstRequestBranch scope journal bloggerSessionId rawMessages project
+            match linkedMain journal bloggerSessionId, liveCtx, EnforcerCycleDecode.stepPosition rawMessages with
+            | Some(durable, _), Some live, EnforcerCycleDecode.StepPosition.First physical ->
+                let! view = firstStepView durable bloggerSessionId live physical rawMessages
+                return project view
+            | Some(durable, owner), Some live, EnforcerCycleDecode.StepPosition.After(physical, previous) when
+                ownership durable live physical = BloggerTerminalRequestOwnership.Current
+                ->
+                return! ownedStep (ownedContext durable owner live previous)
+            | Some(durable, _), Some live, EnforcerCycleDecode.StepPosition.After(physical, _) ->
+                notOwnedStep bloggerSessionId physical (ownershipLabel (ownership durable live physical))
+                return project rawMessages
+            | Some _, None, EnforcerCycleDecode.StepPosition.After(physical, _) ->
+                notOwnedStep bloggerSessionId physical "no live request"
+                return project rawMessages
+            | _ -> return project rawMessages
         }
-
-
 
     let private projectOrKeepRaw (sessionId: string) (bloggerMessages: obj list) (messages: obj list) : obj list =
         if List.isEmpty messages then

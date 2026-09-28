@@ -25,23 +25,13 @@ module HostTurnObserver =
         FissionRuntime.isSilentInterrupt sessionId
         || isDurableFissionOwner journal sessionId
 
-    let private hasBloggerToolEvidence (parts: MessagePart array) =
-        parts
-        |> Array.exists (function
-            | MessagePart.ToolCall _
-            | MessagePart.ToolResult _ -> true
-            | _ -> false)
-
-    let private needsBloggerIdleProtocolRepair (context: ReconciledTurnContext) =
-        context.Quiescence.IsSome
-        && context.Turn.Role = Some Role.Blogger
-        && not (hasBloggerToolEvidence context.Turn.Parts)
-        && match context.Turn.Outcome with
-           | ReconcileProgram.TurnFailed _
-           | ReconcileProgram.TurnAborted _ -> false
-           | ReconcileProgram.TurnCompleted
-           | ReconcileProgram.TurnInProgress
-           | ReconcileProgram.TurnNeedsContinuation _ -> true
+    /// capability-enforcement-021: which owner an idle Blogger turn reaches.
+    let private bloggerIdleRoute (abortCause: AbortCause) (context: ReconciledTurnContext) =
+        CompletedTurnClassifier.bloggerIdleRoute
+            (context.Quiescence.IsSome && context.Turn.Role = Some Role.Blogger)
+            (abortCause <> AbortCause.External)
+            context.Turn.Outcome
+            context.Turn.Parts
 
     /// Host boundary consumes the guard's one-shot armed anomaly. Consumption
     /// also schedules the guard-owned continuation at this existing reconcile point.
@@ -82,11 +72,13 @@ module HostTurnObserver =
         (context: ReconciledTurnContext)
         : Task =
         task {
-            if needsBloggerIdleProtocolRepair context then
-                // A prose-only Blogger terminal has no tool-loop request after it,
-                // so provider transform cannot own recovery. The idle wake is the
+            let route = bloggerIdleRoute abortCause context
+
+            if route <> CompletedTurnClassifier.BloggerIdleRoute.Observe then
+                // No tool-loop request follows this Blogger terminal, so
+                // provider transform cannot own recovery. The idle wake is the
                 // causal boundary that can still send exact-one nudge / AABB.
-                return!
+                do!
                     InteractionRepairWorkflow.repairBloggerProtocol
                         scope.BloggerRuntimeHost
                         scope.Sessions.Quiescence
@@ -95,7 +87,8 @@ module HostTurnObserver =
                         rootWorkspace
                         eventPort
                         journal
-            else
+
+            if route <> CompletedTurnClassifier.BloggerIdleRoute.Repair then
                 // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
                 // multiplexes SyncDelegate / Manager handled-bools.
                 do! observeTurnWorkflow abortCause context

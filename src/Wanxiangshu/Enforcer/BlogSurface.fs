@@ -223,32 +223,22 @@ module BlogSurface =
             else
                 Some(unbox<AgentJournal> nested)
 
-    let continueTerminal
+    /// Drive the real Blogger continuation transform over a Host-shaped
+    /// transcript: step position, ownership proof and the owned branches are
+    /// the production ones.
+    let continueTransform
         (scope: obj)
         (journal: obj)
-        (request: obj)
-        (messageId: string)
-        (callCount: int)
+        (bloggerSessionId: string)
         (rawMessages: obj)
         : System.Threading.Tasks.Task<obj> =
         task {
-            let exact = requestOf request
-            let durable = journalOf journal |> Option.get
-            let messages = arrayOf rawMessages |> Array.toList
-
-            let context: EnforcerContinuation.Context =
-                { Scope = hostOf scope
-                  Journal = Some durable
-                  Durable = durable
-                  Owner = BloggerRequestContext.mainSessionId exact
-                  BloggerSessionId = BloggerRequestContext.bloggerSessionId exact
-                  RawMessages = messages
-                  Project = EnforcerContinuation.ContinuationOutcome.ProjectMessages
-                  Stop = fun reason -> EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason)
-                  RefreshMainContext = fun _ _ -> System.Threading.Tasks.Task.FromResult(Some exact)
-                  IsEmptyTextCycleFailure = fun reason -> reason = ChronicleExecution.EmptyTextError }
-
-            let! outcome = EnforcerContinuation.invalidCardinalityBranch context messageId callCount true
+            let! outcome =
+                EnforcerContinuation.handleContinuation
+                    (hostOf scope)
+                    (journalOf journal)
+                    (SessionId.create bloggerSessionId)
+                    (arrayOf rawMessages |> Array.toList)
 
             return
                 match outcome with
@@ -261,6 +251,33 @@ module BlogSurface =
                         {| kind = "StopPhysicalRun"
                            messages = List.toArray projected
                            reason = reason |}
+        }
+
+    /// The owner binds its landed physical dispatch to the request through the
+    /// production binder: exact flight claim plus the durable open request
+    /// carrying the dispatch PromptKey.
+    let bindRequestDispatch
+        (scope: obj)
+        (journal: obj)
+        (request: obj)
+        (promptKey: string)
+        : System.Threading.Tasks.Task<obj> =
+        task {
+            match journalOf journal with
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "journal required" |}
+            | Some durable ->
+                let! bound =
+                    BloggerCoordinator.bindContinuationContext
+                        (hostOf scope)
+                        durable
+                        (requestOf request)
+                        (PromptKey.create promptKey)
+
+                return resultToJs (fun () -> box true) box bound
         }
 
     /// Drive the real stop boundary: the admission barrier lands before the
@@ -484,6 +501,7 @@ module BlogSurface =
         | BloggerRepairOutcome.PendingRepairWait -> box {| outcome = "PendingRepairWait" |}
         | BloggerRepairOutcome.UnownedIdleIgnored -> box {| outcome = "UnownedIdleIgnored" |}
         | BloggerRepairOutcome.SupersededIgnored -> box {| outcome = "SupersededIgnored" |}
+        | BloggerRepairOutcome.UnprovenIgnored -> box {| outcome = "UnprovenIgnored" |}
         | BloggerRepairOutcome.AbandonedExhausted -> box {| outcome = "AbandonedExhausted" |}
         | BloggerRepairOutcome.Completed -> box {| outcome = "Completed" |}
 

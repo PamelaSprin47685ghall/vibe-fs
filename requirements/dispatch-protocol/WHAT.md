@@ -24,6 +24,8 @@
 
 `ClaimSequence` 在 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 作用域内单调递增，且在 Claim 注册时立即消费。即使相同载荷的消息在放弃后再次发送，也会获得新的序号与新的 `PromptKey`，确保同载荷的多次独立调用能够被精确区分。
 
+落地证据同样按 act 区分：每个 physical message 的 `PhysicalAccepted` 以该 physical message 为键精确保留它落地的 claim。按 payload 汇总的 occasion 视图只回答“这个载荷是否已落地”，后一次同载荷落地会覆盖它、放弃同载荷的待决 claim 会清空它；二者都不得抹去更早 physical message 的精确落地证据。凡是要回答“这条 physical message 是哪个 claim 落地”的判断，只能读精确落地证据。
+
 ## [007] uncertain physical outcome 不自动重发
 
 在崩溃恢复或证据核对中若未能检索到物理落地证据，Claim 必须保持 `StillPending` 状态，绝对禁止系统自动重发，亦不得因进程重启次数累积而静默判定放弃。反之，Host 若在物理 acceptance 之前给出确定的 `Retryable/Fatal` 拒绝，则该 attempt 可显式 `Abandoned(SendFailed)`；对 idle-derived gate nudge，只有这种“确定未发送”结果允许把 exact quiescence permit 归还为可重试，任何 acceptance-unknown / 持久化不确定性都不得 re-arm。业务层判断 exact occasion 是否已经提醒，只能依赖仍 Pending 或已 Accepted 的 dispatch evidence；历史 ClaimSequence 只区分重试 PromptKey，不是 effect/admission witness。

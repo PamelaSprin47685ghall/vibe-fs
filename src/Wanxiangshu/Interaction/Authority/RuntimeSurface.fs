@@ -310,6 +310,14 @@ module RuntimeSurface =
                             current)
                     Map.empty
 
+            let physicalLandings =
+                Array.append (arrayOf value?acceptedDispatches) (arrayOf value?physicalLandings)
+                |> Array.fold
+                    (fun current item ->
+                        let dispatch = acceptedDispatchOf item
+                        Map.add dispatch.PhysicalUserMessageId dispatch current)
+                    Map.empty
+
             let sequences =
                 arrayOf value?claimSequences
                 |> Array.fold (fun current item -> Map.add (text item?scope) (int (text item?count)) current) Map.empty
@@ -318,6 +326,7 @@ module RuntimeSurface =
               ActiveLogicalRun = profileOption value?activeLogicalRun
               PendingClaims = pending
               AcceptedDispatches = acceptedDispatches
+              PhysicalLandings = physicalLandings
               AcceptedContinuationIds = accepted
               ClaimSequences = sequences }
 
@@ -338,6 +347,11 @@ module RuntimeSurface =
                 |> List.toArray
                acceptedDispatches =
                 projection.AcceptedDispatches
+                |> Map.toList
+                |> List.map (snd >> acceptedDispatchToJs)
+                |> List.toArray
+               physicalLandings =
+                projection.PhysicalLandings
                 |> Map.toList
                 |> List.map (snd >> acceptedDispatchToJs)
                 |> List.toArray

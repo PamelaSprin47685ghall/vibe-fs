@@ -73,10 +73,8 @@ module EnforcerCycleDecode =
         else
             source?time?completed
 
-    /// The last assistant message of a transform snapshot and its parts.
-    /// Host sets `time.completed` only when the run ends or is interrupted
-    /// (SessionSnapshotPort). Outbound `messages.transform` creates the assistant
-    /// shell first — completed is unset. ENFORCER-060 must not fire on that shell.
+    /// Host sets `time.completed` only when a step ends or is interrupted
+    /// (SessionSnapshotPort).
     let private assistantIsCompleted (message: obj) : bool =
         if isNull message then
             false
@@ -92,29 +90,81 @@ module EnforcerCycleDecode =
         elif isNull info?id then None
         else Some(unbox<string> info?id)
 
+    let private parentIdOf (info: obj) : string option =
+        if isNull info then None else optUnboxString info?parentID
+
     let private messageParts (message: obj) : obj list =
         if isNull message?parts then
             []
         else
             unbox<obj array> message?parts |> Array.toList
 
-    let private assistantStepFromMessage (message: obj) : (string * obj list * bool) option =
-        let info = messageInfo message
+    /// One Host assistant message: the provider step it recorded.
+    type AssistantStep =
+        { MessageId: string
+          Parts: obj list
+          Completed: bool }
 
-        match messageRole info, messageIdOf info with
-        | Some "assistant", Some messageId -> Some(messageId, messageParts message, assistantIsCompleted message)
-        | _ -> None
+    /// Where the provider step being built stands relative to the physical
+    /// user message it answers. Host `prompt.ts` answers the latest user
+    /// message (`MessageV2.latest`), stamps every assistant of that loop with
+    /// `parentID = user.id`, and runs the transform before the outbound
+    /// assistant exists, so the transform input never holds the step being built.
+    [<RequireQualifiedAccess>]
+    type StepPosition =
+        /// The transform input has no physical user message.
+        | NoRequest
+        /// First step of the physical message: nothing answers it yet. An
+        /// assistant at the history tail answers an older physical message.
+        | First of physical: PhysicalUserMessageId
+        /// A later step of the same Host loop: `previous` is the latest
+        /// assistant whose parentID is this physical message.
+        | After of physical: PhysicalUserMessageId * previous: AssistantStep
 
-    /// Last assistant terminal as (messageId, calls, completed); public so the
-    /// Application-layer recovery probe can bind a claim to the same terminal.
-    let lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
-        rawMessages
-        |> List.choose (fun message ->
-            if isNull message then
-                None
-            else
-                assistantStepFromMessage message)
+    let private roleOf (message: obj) : string option = messageRole (messageInfo message)
+
+    let private present (rawMessages: obj list) : obj list =
+        rawMessages |> List.filter (fun message -> not (isNull message))
+
+    let private assistantStepOf (message: obj) : AssistantStep =
+        { MessageId = messageIdOf (messageInfo message) |> Option.defaultValue ""
+          Parts = messageParts message
+          Completed = assistantIsCompleted message }
+
+    let private positionAfter (messages: obj list) (userId: string) : StepPosition =
+        let physical = PhysicalUserMessageId.create userId
+
+        let previous =
+            messages
+            |> List.filter (fun message ->
+                roleOf message = Some "assistant"
+                && parentIdOf (messageInfo message) = Some userId)
+            |> List.tryLast
+
+        match previous with
+        | Some message -> StepPosition.After(physical, assistantStepOf message)
+        | None -> StepPosition.First physical
+
+    let stepPosition (rawMessages: obj list) : StepPosition =
+        let messages = present rawMessages
+
+        let latestUser =
+            messages
+            |> List.filter (fun message -> roleOf message = Some "user")
+            |> List.tryLast
+            |> Option.bind (messageInfo >> messageIdOf)
+
+        match latestUser with
+        | None -> StepPosition.NoRequest
+        | Some userId -> positionAfter messages userId
+
+    /// The history-tail assistant, whatever physical message it answers. Only
+    /// for classifying one given assistant message, never for step position.
+    let latestAssistant (rawMessages: obj list) : AssistantStep option =
+        present rawMessages
+        |> List.filter (fun message -> roleOf message = Some "assistant")
         |> List.tryLast
+        |> Option.map assistantStepOf
 
     /// Decode a raw JS object into a string-keyed map (the codec's input shape).
     let private decodeObject (value: obj) : Map<string, obj> =
@@ -160,21 +210,15 @@ module EnforcerCycleDecode =
     /// ENFORCER-023: only calls that pass tip re-validation enter the list.
     /// Failed tip decode is a protocol skip (execute should already have
     /// rejected; defense in depth at transform).
-    let extractCalls
+    let callsOf
         (emitDiagnostic: string -> (string * string) list -> unit)
-        (rawMessages: obj list)
-        : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list * bool) option =
-        match lastAssistantStep rawMessages with
-        | None -> None
-        | Some(messageId, parts, completed) ->
-            let rules = RuntimeResources.current().EnforcerRules
+        (step: AssistantStep)
+        : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list =
+        let rules = RuntimeResources.current().EnforcerRules
 
-            let calls =
-                parts
-                |> List.mapi (fun ordinal part -> ordinal, part)
-                |> List.choose (tryCanonicalCall emitDiagnostic rules)
-
-            Some(messageId, calls, completed)
+        step.Parts
+        |> List.mapi (fun ordinal part -> ordinal, part)
+        |> List.choose (tryCanonicalCall emitDiagnostic rules)
 
     let private validateBounds
         (cycle: EnforcerCycle.CanonicalCycle)

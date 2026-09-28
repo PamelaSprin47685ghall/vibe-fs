@@ -433,10 +433,8 @@ module EnforcerFrameRecovery =
 
     /// C5: inverse of BloggerCoordinator.materializeRequest blob.
     /// Full typed context — never leave cutoff/digest at zero defaults.
-    /// Rebuild/empty-calls shape: a typed rejection fails closed to None so
-    /// the caller keeps its rawMessages fallback (Continuation.fs reads this
-    /// contract; the detailed rejection is available from
-    /// `tryReloadRequestContextDetailed`).
+    /// Fail-closed shape: a typed rejection becomes None; the detailed
+    /// rejection is available from `tryReloadRequestContextDetailed`.
     let tryReloadRequestContext
         (journal: AgentJournal)
         (openReq: OpenBloggerRequest)
@@ -448,39 +446,9 @@ module EnforcerFrameRecovery =
         }
 
     /// Live commit authority: InFlight payload only.
-    /// Completed-blog transform must NEVER heal InFlight from durable open —
-    /// Host msgs end on the historical last assistant (new outbound shell is
-    /// not in the list). Healing open here re-binds a new RequestId to an old
-    /// provider run (stale-cycle race). Crash recovery re-arms InFlight before
-    /// handleContinuation when the open request is still live.
+    /// A transform must NEVER heal InFlight from durable open: healing would
+    /// re-bind a new RequestId to an old provider run (stale-cycle race).
+    /// Crash recovery re-arms InFlight before handleContinuation when the open
+    /// request is still live.
     let tryLiveCycleContext (scope: IBloggerRuntimeHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
         scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId)
-
-    let private tryOpenBloggerRequest (journal: AgentJournal) mainSessionId bloggerSessionId =
-        (AgentJournal.snapshot journal).AgentProjections.Sessions
-        |> Map.tryFind mainSessionId
-        |> Option.bind (fun session -> session.BloggerCycles)
-        |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
-
-    let private reloadOpenCycleContext journal mainSessionId bloggerSessionId =
-        task {
-            match tryOpenBloggerRequest journal mainSessionId bloggerSessionId with
-            | None -> return None
-            | Some req -> return! tryReloadRequestContext journal req
-        }
-
-    /// Rebuild / empty-calls only: live InFlight, else reload open without
-    /// committing. Does not claim physical flight (no side effect on authority).
-    let resolveCycleContext
-        (scope: IBloggerRuntimeHost)
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        : Task<BloggerRequestContext option> =
-        task {
-            let key = SessionId.value bloggerSessionId
-
-            match scope.TryPeekCurrentRequest key with
-            | Some ctx -> return Some ctx
-            | None -> return! reloadOpenCycleContext journal mainSessionId bloggerSessionId
-        }

@@ -45,10 +45,8 @@ module EnforcerRepair =
 
         kind = "tool" && name = "chronicle"
 
-    let chronicleCallCount (rawMessages: obj list) : int =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> 0
-        | Some(_, parts, _) -> parts |> List.filter isBlogToolPart |> List.length
+    let chronicleCallCount (step: EnforcerCycleDecode.AssistantStep) : int =
+        step.Parts |> List.filter isBlogToolPart |> List.length
 
     let private blogPartStatus (part: obj) : string option =
         if isNull part || isNull part?state || isNull part?state?status then
@@ -57,32 +55,24 @@ module EnforcerRepair =
             Some(unbox<string> part?state?status)
 
     /// pending/running blog: Host will re-enter after tool completion — not pure prose.
-    let hasIncompleteBlogTool (rawMessages: obj list) : bool =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && match blogPartStatus part with
-                   | Some "pending"
-                   | Some "running" -> true
-                   | _ -> false)
+    let hasIncompleteBlogTool (step: EnforcerCycleDecode.AssistantStep) : bool =
+        step.Parts
+        |> List.exists (fun part ->
+            isBlogToolPart part
+            && match blogPartStatus part with
+               | Some "pending"
+               | Some "running" -> true
+               | _ -> false)
 
-    let hasCompletedBlogTool (rawMessages: obj list) : bool =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part -> isBlogToolPart part && blogPartStatus part = Some "completed")
+    let hasCompletedBlogTool (step: EnforcerCycleDecode.AssistantStep) : bool =
+        step.Parts
+        |> List.exists (fun part -> isBlogToolPart part && blogPartStatus part = Some "completed")
 
-    /// Any blog tool part on the last assistant (completed/error/pending/running/statusless).
+    /// Any blog tool part on the step (completed/error/pending/running/statusless).
     /// Host cleanup after abort marks hanging tools status=error + interrupted=true
     /// and sets assistant time.completed — that is NOT ENFORCER-060 pure prose.
-    let hasAnyBlogToolPart (rawMessages: obj list) : bool =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) -> parts |> List.exists isBlogToolPart
+    let hasAnyBlogToolPart (step: EnforcerCycleDecode.AssistantStep) : bool =
+        step.Parts |> List.exists isBlogToolPart
 
     let private blogPartInterrupted (part: obj) : bool =
         if
@@ -100,32 +90,26 @@ module EnforcerRepair =
     /// (`../opencode/packages/opencode/src/session/processor.ts:589`). That is the
     /// owner turn being killed, not the Blogger producing a bad cycle, so LOOP-006
     /// forbids it from spending the provider failure budget.
-    let hasAbortedBlogAttempt (rawMessages: obj list) : bool =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && match blogPartStatus part with
-                   | Some "completed" -> false
-                   | Some "pending"
-                   | Some "running" -> false
-                   | _ -> blogPartInterrupted part)
+    let hasAbortedBlogAttempt (step: EnforcerCycleDecode.AssistantStep) : bool =
+        step.Parts
+        |> List.exists (fun part ->
+            isBlogToolPart part
+            && match blogPartStatus part with
+               | Some "completed" -> false
+               | Some "pending"
+               | Some "running" -> false
+               | _ -> blogPartInterrupted part)
 
     /// ENFORCER-065 `ToolExecutionError`: the blog call itself failed without an
     /// abort — a real invalid cycle, which skips the nudge and goes to Fallback.
-    let hasErroredBlogAttempt (rawMessages: obj list) : bool =
-        match EnforcerCycleDecode.lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && not (blogPartInterrupted part)
-                && match blogPartStatus part with
-                   | Some "error" -> true
-                   | _ -> false)
+    let hasErroredBlogAttempt (step: EnforcerCycleDecode.AssistantStep) : bool =
+        step.Parts
+        |> List.exists (fun part ->
+            isBlogToolPart part
+            && not (blogPartInterrupted part)
+            && match blogPartStatus part with
+               | Some "error" -> true
+               | _ -> false)
 
     /// ENFORCER-060/061: append the stable InteractionRepair instruction.
     ///

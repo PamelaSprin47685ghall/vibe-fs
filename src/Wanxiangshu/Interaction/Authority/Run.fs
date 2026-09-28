@@ -264,16 +264,16 @@ module PromptAuthorityRun =
                         Map.add
                             (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
                             landed
-                            projection.AcceptedDispatches }
+                            projection.AcceptedDispatches
+                    PhysicalLandings = Map.add physicalMessageId landed projection.PhysicalLandings }
 
             acceptedContinuationEvidence physicalMessageId claim.Origin withEvidence
 
     /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
     ///
     /// An explicit abandon of a still-pending claim also drops that payload's
-    /// landing evidence slot, so a later reentry may claim the same logical
-    /// dispatch again. An already-accepted claim is not in `PendingClaims`, so
-    /// its evidence survives — abandonment never erases a physical landing.
+    /// occasion slot, so a later reentry may claim the same logical dispatch
+    /// again. The exact physical landings are facts and stay untouched.
     let abandonClaim (key: PromptKey) (projection: PromptAuthority.PromptAuthorityProjection) =
         match Map.tryFind key projection.PendingClaims with
         | None -> projection

@@ -69,12 +69,10 @@ module ChildPromptAuthority =
                 let activeProfile = owner.ActiveLogicalRun
 
                 let accepted =
-                    owner.AcceptedDispatches
-                    |> Seq.map (fun (KeyValue(_, dispatch)) -> dispatch)
-                    |> Seq.tryFind (fun dispatch ->
-                        dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId
-                        && dispatch.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                    Map.tryFind turn.PhysicalUserMessageId owner.PhysicalLandings
+                    |> Option.filter (fun dispatch ->
+                        dispatch.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                                              PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forPrompts prompts
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted
