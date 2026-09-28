@@ -87,6 +87,7 @@ Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前�
 同一道路绑定的固定 DevOps 在崩溃恢复后必须且仅能映射到唯一的当前活跃物理会话，严禁生成两个并行生效的可执行物理权威。
 崩溃前未决的物理命令（`run`、PTY 输入）一律按中断处理，系统严禁在重启后自动重放、补写或隐式续发命令，杜绝物理副作用重复发生。
 恢复流程必须严格沿用道路初始化时持久化的绑定模型（ModelTarget）与 Persona，严禁在恢复或 resume 时切换模型；新会话与恢复只接纳合法新角色集合，历史旧状态不隐式跨边界恢复。
+Load Phase 必须一次性结算上一 runtime 遗留、本进程无法继续持有的 durable 未决工作：仍活跃的子工作 run 与仍开着的 Blogger `BloggerRequestMaterialized`（置 `BloggerRequestAbandoned`，reason `stale-open-at-load`；本进程仍有同 RequestId live flight 的不结算）。遗留的 open request 会让 coordinator 只为已死的 producer 暂存材料、永不物化新请求，Blogger 从此不再消费 raw 尾巴。
 
 ## [021] 进程本地表是缓存，durable 投影是存在性真源
 

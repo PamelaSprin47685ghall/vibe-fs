@@ -600,3 +600,107 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     assert.equal(FissionRuntime.FissionRuntime_tryLane(sid('ses-unknown-lane')) ?? null, null)
   })
 }
+
+// WHAT[crash-reconciliation-020]: a Blog materialization the previous runtime left
+// open is invisible to every live path — the coordinator only stages material for the
+// producer that died with that runtime and never materializes a fresh request — so the
+// Blogger would never ingest the raw tail again. Load Phase settles it: every open
+// request this process no longer holds a live flight for is abandoned once.
+{
+  const { default: assert } = await import('node:assert/strict')
+  const { default: test } = await import('node:test')
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+  const root = '../../../dist'
+  const Fold = await import(`${root}/Composition/Durable/Fold.js`)
+  const Abandon = await import(`${root}/Context/Companion/Blogger/Runtime/Abandon.js`)
+  const ContextFacts = await import(`${root}/Context/Companion/Facts.js`)
+  const BlogRuntime = await import(`${root}/Context/Companion/Blogger/Runtime/CycleProjection.js`)
+  const Fact = await import(`${root}/Composition/Durable/Fact.js`)
+  const Identity = await import(`${root}/Foundation/Identity.js`)
+
+  const mainSessionId = 'ses-road-root'
+  const bloggerSessionId = 'ses-blogger-restart'
+  const requestId = 'req-left-open'
+  const sid = (value) => Identity.SessionIdModule_create(value)
+  const rid = (value) => Identity.BloggerRequestIdModule_create(value)
+  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+
+  const contextFact = (caseName, payload) =>
+    new Fact.AgentFact(
+      new Fact.AgentFact(0, []).cases().indexOf('Context'),
+      [new ContextFacts.ContextFactCases(new ContextFacts.ContextFactCases(0, []).cases().indexOf(caseName), [payload])],
+    )
+
+  const materialized = () =>
+    contextFact('BloggerRequestMaterialized', {
+      RequestId: rid(requestId),
+      MainSessionId: sid(mainSessionId),
+      BloggerSessionId: sid(bloggerSessionId),
+      RequestKind: 'main',
+      ContextRef: Identity.BlobRefModule_create('blobs/left-open'),
+      ContextDigest: Identity.BlobDigestModule_create('digest-left-open'),
+      ObservedPrefixEpochId: Identity.PrefixEpochIdModule_create(0),
+      PreviousIngestedThroughSequence: 699n,
+      NextIngestedThroughSequence: 706n,
+      FrameEpochId: Identity.FrameEpochIdModule_create(0),
+      SelectedFrameDigests: [],
+      PromptKey: undefined,
+    })
+
+  const abandoned = () =>
+    contextFact('BloggerRequestAbandoned', {
+      RequestId: rid(requestId),
+      MainSessionId: sid(mainSessionId),
+      BloggerSessionId: sid(bloggerSessionId),
+      Reason: 'stale-open-at-load',
+    })
+
+  const foldedWith = (fact) => {
+    const folded = Fold.foldFact(Fold.empty, new Fact.Fact(1, [fact]))
+    assert.equal(folded.tag, 0, folded.tag === 0 ? '' : folded.fields[0].Reason)
+    return folded.fields[0].AgentProjections
+  }
+
+  const openRequestOf = (projections) =>
+    BlogRuntime.BloggerCycleProjection_tryOpenByBlogger(sid(bloggerSessionId), projections.Sessions.get(sid(mainSessionId)).BloggerCycles)
+
+  const staleOf = (projections, liveFlight) => Array.from(Abandon.staleOpenRequests(liveFlight, projections))
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_open_blog_request_owned_by_no_live_flight_is_settled_at_load', () => {
+    const projections = foldedWith(materialized())
+
+    assert.ok(openRequestOf(projections), 'precondition: the materialized request is open')
+
+    const stale = staleOf(projections, () => false)
+
+    assert.equal(stale.length, 1, 'the request left open by the dead runtime is stale')
+    assert.equal(raw(stale[0][0]), mainSessionId)
+    assert.equal(raw(stale[0][1].RequestId), requestId)
+    assert.equal(raw(stale[0][1].BloggerSessionId), bloggerSessionId)
+
+    assert.equal(
+      staleOf(projections, (blogger, request) => raw(blogger) === bloggerSessionId && raw(request) === requestId).length,
+      0,
+      'a request this process still holds a live flight for must stay open',
+    )
+
+    const settled = foldedWith(abandoned())
+
+    assert.equal(openRequestOf(settled) ?? null, null, 'the settlement clears the open slot the catch-up blocks on')
+    assert.equal(staleOf(settled, () => false).length, 0, 'and it settles exactly once')
+  })
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_load_phase_settles_open_blog_requests_before_any_session_runs', () => {
+    const wiring = readFileSync(
+      resolve(import.meta.dirname, '../../../src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'),
+      'utf8',
+    )
+
+    assert.match(wiring, /BloggerAbandon\.settleStaleOpenAtLoad liveFlight journal/)
+    assert.ok(
+      wiring.indexOf('settleStaleOpenAtLoad') < wiring.indexOf('PluginRuntimeReloaded'),
+      'the settlement belongs to the load phase, before sessions resume',
+    )
+  })
+}

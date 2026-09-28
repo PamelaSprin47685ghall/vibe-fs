@@ -22,3 +22,10 @@ module BloggerAbandon =
         preferred: BloggerRequestContext option ->
         reason: string ->
             Task
+
+    val staleOpenRequests:
+        liveFlight: (SessionId -> BloggerRequestId -> bool) ->
+        projections: Wanxiangshu.Composition.Durable.AgentProjectionSet ->
+            (SessionId * OpenBloggerRequest) list
+
+    val settleStaleOpenAtLoad: liveFlight: (SessionId -> BloggerRequestId -> bool) -> journal: AgentJournal -> Task

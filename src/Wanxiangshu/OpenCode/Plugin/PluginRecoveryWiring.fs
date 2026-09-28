@@ -1,6 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host
 
 module PluginRecoveryWiring =
@@ -23,7 +26,22 @@ module PluginRecoveryWiring =
                     // previous runtime left active, so the next handoff to that
                     // child is a fresh root instead of a refused identity.
                     match boot.Journal with
-                    | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns journal
+                    | Some journal ->
+                        do! ChildWorkRecovery.settleOrphanedChildRuns journal
+
+                        // ... and the Blog materializations it left open. No live
+                        // execution can own one, and while it stays open the
+                        // coordinator never materializes a fresh request — the
+                        // Blogger would never ingest the raw tail again
+                        // (crash-reconciliation-020 / context-compression-024).
+                        let bloggerHost = scope.BloggerRuntimeHost
+
+                        let liveFlight bloggerSessionId requestId =
+                            match bloggerHost.TryGetFlight(SessionId.value bloggerSessionId) with
+                            | Some flight -> BloggerRequestContext.requestId flight = requestId
+                            | None -> false
+
+                        do! BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
                     | None -> ()
 
                     do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PluginRuntimeReloaded)

@@ -77,3 +77,41 @@ module BloggerAbandon =
         match requestId with
         | None -> Task.FromResult(()) :> Task
         | Some rid -> byRequestId journal rid mainSessionId bloggerSessionId reason
+
+    /// crash-reconciliation-020 / context-compression-024: the Blog materializations a
+    /// dead runtime left open.
+    ///
+    /// Every request still open at load belongs to a runtime that is gone: no live
+    /// execution can own it, and its producer (the parked Blogger transform) died with
+    /// it. Left open it blocks the catch-up forever — the coordinator only stages new
+    /// material for a producer that no longer exists and never materializes a fresh
+    /// request, so the Blogger never ingests the raw tail again (observed live: coverage
+    /// frozen at the last fold while the main loop kept growing).
+    ///
+    /// `liveFlight` answers "does this process still own that exact request". Another
+    /// plugin instance in this process shares the journal and the flight registry, so a
+    /// request it is actively producing is not stale and must stay open.
+    let staleOpenRequests
+        (liveFlight: SessionId -> BloggerRequestId -> bool)
+        (projections: AgentProjectionSet)
+        : (SessionId * OpenBloggerRequest) list =
+        projections.Sessions
+        |> Map.toList
+        |> List.collect (fun (mainSessionId, session) ->
+            session.BloggerCycles
+            |> Option.map (fun cycles ->
+                cycles.OpenByRequestId
+                |> Map.toList
+                |> List.map (fun (_, openReq) -> mainSessionId, openReq))
+            |> Option.defaultValue [])
+        |> List.filter (fun (_, openReq) -> not (liveFlight openReq.BloggerSessionId openReq.RequestId))
+
+    /// Settle those requests once, at load, before any session runs. Abandoning is the
+    /// whole settlement: the interrupted cycle produced nothing, so it owes nothing.
+    let settleStaleOpenAtLoad (liveFlight: SessionId -> BloggerRequestId -> bool) (journal: AgentJournal) : Task =
+        task {
+            let projections = (AgentJournal.snapshot journal).AgentProjections
+
+            for mainSessionId, openReq in staleOpenRequests liveFlight projections do
+                do! byRequestId journal openReq.RequestId mainSessionId openReq.BloggerSessionId "stale-open-at-load"
+        }
