@@ -4,7 +4,7 @@
 
 ## 当前证据
 
-- 001/005 调用真实 AttachedSessionRuntime：同 owner 重用、保持绑定的 agent、显式移除后重新创建。传入 Engineer 确实按 Engineer 执行；`retainBinding=false` 表示主动 Remove，不能证明系统检测到永久丢失。2026-09-28用户确认同 scope 每 Role 至多一个；同scope不同合法角色并存的可区分用例仍TODO，不为证明键隔离而恢复旧角色的活跃准入。
+- 001/005 调用真实 AttachedSessionRuntime：同 owner 重用、保持绑定的 agent、显式移除后重新创建。005 还用同一个实际 owner 验证不同 scope 隔离、同键并发仅创建一次，以及不同 typed Role 的绑定可分别重用和移除。后者证明准入后的资源键，不授予 Coder/Inspector 活跃身份；[delegation 007](../../delegation/tests/007.test.mjs) 和 [participant-identity 010](../../participant-identity/tests/010.test.mjs) 另证旧角色活跃准入被拒。`retainBinding=false` 表示主动 Remove，不能证明系统检测到永久丢失。
 - 002/003/011 调用真实 satellite owner，端口提供 association 与 Host 观察，验证单次创建、确切复用、拒绝冲突和替换结果。端口数组不是一个共同的顺序日志；没有真实 journal 重启或首 prompt 悬置证明。
 - 004/009/014 运行同步委托与部分真实 journal。006—010/015 的 fold、codec、视图和属性测试证明局部状态转换，不是实际父取消、Join 交付或进程恢复。
 - 016/017 调用实际 Session adapter/termination，悬置清理与 Host abort，观察终态不得提前发生、完整 Authority Root 和根会话拒绝。016 删除了只改变测试变量的“虚拟时钟”断言。017 尚未接真实父等待与全部 successor 入口。
