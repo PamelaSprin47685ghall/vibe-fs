@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **重启后仍被拒绝的托付：上一个 runtime 遗留的活跃子 run 在 Load Phase 结算（crash-reconciliation-020）**：硬杀进程时子 run 可能既无 terminal 也无后续事实（实机：devops run 01:57:46 登记、01:58:01 `ProviderStarted`，02:07 重启时无任何 terminal），`ChatExecutionRecovery` 把上一个 runtime 的物理证据判为 stale 而 `Ignore`，于是 `ActiveLogicalRun` 永远开着，下一次交接继续被 `ActiveRunIdentityConflict` 拒绝、join 无对象。
+  修复：新增 `OpenCode/Host/ChildWorkRecovery.fs(i)`，在 durability 激活前的 Load Phase 为每个「子工作 run 仍 Active 且能解析到 Activity 父 handle」的会话追加一条 `HandleCompleted(Cancelled)`；已有的 delegation fold 从该事实导出 `TerminatedChildHandle`，关闭子会话权威并让父 handle 进入 `CompletedAwaitingJoin`。Manager/HumanRoot 自身道路与无 handle 的 session 不入列；transcript 保留，不重发任何命令。
+  验证：新增回归 `CRASH_020_run_without_terminal_is_settled_at_load`（无 terminal 的子 run → 计划出 orphan → 结算事实 fold 后权威关闭且 handle 得 `Cancelled`）与 `CRASH_020_human_root_and_unlinked_sessions_are_never_settled`；crash-reconciliation + managed-session-lifecycle + delegation 共 410 项 409 pass。
+
 - **重启后固定 DevOps 无法接手：进程本地执行绑定在恢复时重建（crash-reconciliation-020 / managed-session-lifecycle-024）**：重启丢掉 `SessionExecutionBinding` 的进程本地绑定（父边 + 冻结 agent），于是下一次交接走 `prepareManagedPrompt` 时被拒 —— 实机事实 `Prompt.PluginPromptAbandoned { Reason = ["SendFailed", "PROMPT-006: parented session has no frozen agent binding"] }`，manager 看到“尚不能再接下另一项托付”，改去 join 那个永无结果的 handle。
   修复：新增 `OpenCode/Host/SessionBindingRecovery.fs(i)`，在 `PluginRecoveryWiring` 启动阶段用 durable handle 投影重建每个父会话→子会话的绑定（只恢复 `Active` / `CompletedAwaitingJoin`；`Abandoned`/`Retired` 墓碑不复活），模型与 Persona 仍按既定验收路径冻结，不重发任何旧命令。恢复的是 handle 的 `TargetAgent`（Host 执行 agent），不是逻辑复用地址 `Byname`：forked Engineer 子会话正是 `engineer` 与 `decision-record-readonly` 两个名字，绑错会在下一次派发时以 participant drift fail closed。
   验证：新增回归测试（同文件）`CRASH_020_restart_rebinds_the_durable_parented_child`（重启后能重新派发到固定 DevOps）、`CRASH_020_engineer_child_rebinds_its_execution_agent_not_its_byname`（Engineer 子会话按执行 agent 重建）与 `CRASH_020_abandoned_handle_tombstone_is_never_rebound`；crash-reconciliation + managed-session-lifecycle + delegation 共 408 项全绿。

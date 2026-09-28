@@ -19,6 +19,13 @@ module PluginRecoveryWiring =
         scope.AttachDurabilityActivation(fun () ->
             scope.RunBackground(fun () ->
                 task {
+                    // crash-reconciliation-020: settle the child work runs the
+                    // previous runtime left active, so the next handoff to that
+                    // child is a fresh root instead of a refused identity.
+                    match boot.Journal with
+                    | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns journal
+                    | None -> ()
+
                     do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PluginRuntimeReloaded)
 
                     do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.CapacityProjectionReplayed)

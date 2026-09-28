@@ -1478,6 +1478,8 @@ OpenCode/Plugin/PluginSessionWiring.fsi
 OpenCode/Plugin/PluginSessionWiring.fs
 OpenCode/Host/SessionBindingRecovery.fsi
 OpenCode/Host/SessionBindingRecovery.fs
+OpenCode/Host/ChildWorkRecovery.fsi
+OpenCode/Host/ChildWorkRecovery.fs
 OpenCode/Plugin/PluginRecoveryWiring.fsi
 OpenCode/Plugin/PluginRecoveryWiring.fs
 OpenCode/Host/BloggerChronicleText.fsi
