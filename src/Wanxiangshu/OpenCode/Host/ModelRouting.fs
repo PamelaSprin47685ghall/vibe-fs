@@ -306,6 +306,15 @@ module ModelRouting =
         | Some actual -> actual = expected
         | None -> false
 
+    [<RequireQualifiedAccess>]
+    type PredictorConfiguration =
+        | Configured
+        | NotConfigured
+        | ConfigurationInvalid of reason: string
+
+    let sharedPredictorConfiguration () : PredictorConfiguration =
+        PredictorConfiguration.NotConfigured
+
     /// A SessionId is a reusable container. Model occupancy belongs to the exact
     /// physical user material that caused the provider execution, never to the
     /// session lifecycle or to a cursor-selected identity. Strength may reserve one

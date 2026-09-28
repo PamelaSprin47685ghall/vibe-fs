@@ -25,8 +25,7 @@ module PluginBoot =
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
-          FamilyParent: SessionId -> SessionId option
-          ProtocolArgumentVault: ProtocolArgumentVault.Vault }
+          FamilyParent: SessionId -> SessionId option }
 
     let create (input: obj) : Task<Boot> =
         task {
@@ -57,14 +56,6 @@ module PluginBoot =
             scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
             scope.AttachScopeDispose(fun () -> strengthScope.Dispose())
 
-            // host-boundary-032 / DELEGATE.md 4.3: the protocol argument vault
-            // records tool.execute.before originals so the provider transform
-            // can restore them into persisted history. Process-local only;
-            // dropped with the scope.
-            let protocolArgumentVault = ProtocolArgumentVault.create ()
-
-            scope.AttachScopeDispose(fun () -> ProtocolArgumentVault.clear protocolArgumentVault)
-
             let clock = NodeTiming.nodeClockPort ()
 
             let strengthFailClosed (reason: string) : unit =
@@ -92,6 +83,5 @@ module PluginBoot =
                   Clock = clock
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory
-                  FamilyParent = familyParent
-                  ProtocolArgumentVault = protocolArgumentVault }
+                  FamilyParent = familyParent }
         }

@@ -148,6 +148,7 @@ module HostEventCodec =
             match errName with
             | "MessageAbortedError"
             | "AbortError" -> ExecutionFailure.UserCancelled
+            | "TimeoutError" when reason.Contains("The operation timed out") -> ExecutionFailure.UserCancelled
             | "SupersededError" -> ExecutionFailure.Superseded
             | _ -> ExecutionFailure.ProviderTransient
 

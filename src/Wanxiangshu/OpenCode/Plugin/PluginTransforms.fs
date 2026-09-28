@@ -305,129 +305,14 @@ module PluginTransforms =
                     )
                 )
 
-        // host-boundary-032 / DELEGATE.md 4.3: provider-facing wire-layer
-        // restore of the protocol fields. The Host persists tool-call input
-        // after the before hook stripped the protocol fields, so every later
-        // provider request is built from stripped history. The before hook
-        // recorded the wire originals in the process-local vault; this step
-        // merges them back into the request's assistant tool-call parts before
-        // delegation capture (4.5) or the replica batch collector reads the
-        // same history. Pure per part: business arguments verbatim, protocol
-        // keys appended when missing or different, results untouched, no vault
-        // entry means fail-open.
-        let restorePart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) : obj =
-            if isNull part then
-                part
-            else
-                let kind =
-                    ProviderWireDecode.firstString part [ "type" ]
-                    |> Option.defaultValue ""
-                    |> fun value -> value.ToLowerInvariant()
+        let restoreProtocolArguments (_outObj: obj) : Task<unit> =
+            Task.FromResult()
 
-                let isToolCallPart = kind = "tool" || kind = "tool-call" || kind = "tool_call"
+        let captureReadonlyDelegation (_outObj: obj) : Task<unit> =
+            Task.FromResult()
 
-                if not isToolCallPart then
-                    part
-                else
-                    match ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ] with
-                    | None -> part
-                    | Some callId ->
-                        match ProtocolArgumentVault.tryFind vault sessionId callId with
-                        | None -> part
-                        | Some snapshot ->
-                            let state = ProviderWireDecode.readField part "state"
-
-                            let hasStateInput = not (isNull state) && not (isNull state?input)
-
-                            let hasTopLevelArgs = not (isNull part?args)
-
-                            if not hasStateInput && not hasTopLevelArgs then
-                                part
-                            else
-                                let current = if hasStateInput then state?input else part?args
-
-                                let merged = ProtocolArgumentVault.restoreArguments snapshot current
-
-                                if obj.ReferenceEquals(merged, current) then
-                                    part
-                                elif hasStateInput then
-                                    let stateCopy = shallowCopyObj state
-                                    stateCopy?input <- merged
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?state <- stateCopy
-                                    partCopy
-                                else
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?args <- merged
-                                    partCopy
-
-        let restoreProtocolArguments (outObj: obj) : Task<unit> =
-            task {
-                if not (isNull outObj) && not (isNull outObj?messages) then
-                    match ProviderWireDecode.projectionSessionIdFromMessages outObj with
-                    | Some sessionId ->
-                        let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
-
-                        let restoreMessage (raw: obj) : obj =
-                            if isNull raw then
-                                raw
-                            else
-                                let parts = ProviderWireDecode.rawPartsOf raw
-
-                                let restoredParts =
-                                    parts |> List.map (restorePart boot.ProtocolArgumentVault sessionId)
-
-                                if List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) parts restoredParts then
-                                    raw
-                                else
-                                    let copy = shallowCopyObj raw
-                                    copy?parts <- box (List.toArray restoredParts)
-                                    copy
-
-                        let rewritten = rawMessages |> List.map restoreMessage
-
-                        if not (List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) rawMessages rewritten) then
-                            HostMessageProjection.replaceMessagesInPlace outObj rewritten
-                    | None -> ()
-            }
-
-        let captureReadonlyDelegation outObj =
-            task {
-                match!
-                    StrengthDelegate.tryCapture
-                        snapshotOpt
-                        journal
-                        strengthDurability
-                        boot.StrengthScope
-                        scope.TryAttemptPlan
-                        scope.SyncDelegateRuntime
-                        (predictorConfigured ())
-                        outObj
-                with
-                | StrengthDelegate.CaptureOutcome.Captured request ->
-                    Diagnostic.emit
-                        "strength-delegation-requested"
-                        [ "session_id", SessionId.value request.OwnerSessionId
-                          "decision_id", StrengthDecisionId.value request.DecisionId
-                          "requested_rounds", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
-                | StrengthDelegate.CaptureOutcome.Skipped reason ->
-                    let sessionId =
-                        ProviderWireDecode.projectionSessionIdFromMessages outObj
-                        |> Option.defaultValue ""
-
-                    Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
-            }
-
-        let applyReadonlyDelegation outObj =
-            StrengthDelegate.tryApply
-                snapshotOpt
-                journal
-                strengthDurability
-                boot.StrengthScope
-                scope.TryAttemptPlan
-                scope.SyncDelegateRuntime
-                (predictorConfigured ())
-                outObj
+        let applyReadonlyDelegation (_outObj: obj) : Task<unit> =
+            Task.FromResult()
 
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
