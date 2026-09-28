@@ -73,6 +73,14 @@ test('WHAT[host-boundary-030] Host session observations and session.get agents r
   assert.equal(toolHost.sessionAgent({ agent: { toString: () => 'agent-a' } }), null)
   assert.equal(toolHost.sessionAgent({ agent: ' agent-a ' }), ' agent-a ')
   assert.equal(toolHost.sessionAgent({ data: { agent: 'wrapped-agent' } }), 'wrapped-agent')
+  class HostSessionInstance {
+    constructor(id, agent) {
+      this.id = id
+      this.agent = agent
+    }
+  }
+  assert.equal(toolHost.sessionAgent(new HostSessionInstance('ses_1', 'engineer')), 'engineer')
+  assert.equal(toolHost.sessionAgent({ data: new HostSessionInstance('ses_1', 'engineer') }), 'engineer')
 })
 }
 

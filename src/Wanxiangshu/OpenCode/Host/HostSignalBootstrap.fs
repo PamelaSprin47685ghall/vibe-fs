@@ -737,7 +737,22 @@ module HostSignalBootstrap =
                     SessionExecutionBinding.observeUserFacingAgent sid agent
                     Some agent
                 | None when not (hasPhysicalParent sid) ->
-                    let defaultAgent = "manager"
+                    let activeFallback =
+                        journal
+                        |> Option.bind (fun durable ->
+                            let snapshot = AgentJournal.snapshot durable
+
+                            snapshot.AgentProjections.Sessions
+                            |> Map.values
+                            |> Seq.tryPick (fun s ->
+                                s.PromptAuthority
+                                |> Option.bind (fun pa ->
+                                    pa.ActiveLogicalRun
+                                    |> Option.map (fun run -> run.SelectedAgent)
+                                    |> Option.orElseWith (fun () ->
+                                        pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent)))))
+
+                    let defaultAgent = activeFallback |> Option.defaultValue "manager"
                     SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
                     Some defaultAgent
                 | None -> None

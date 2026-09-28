@@ -18,6 +18,11 @@ test('WHAT[execution-failure-policy-001] Host adapter returns closed typed failu
     assert.equal(signals.tryDecode(sessionError({ name })).failure, 'ProviderTransient', String(name))
   }
   assert.equal(signals.tryDecode(sessionError({ name: 'MessageAbortedError' })).failure, 'UserCancelled')
+  assert.equal(signals.tryDecode(sessionError({ message: 'Aborted' })).failure, 'UserCancelled')
+  assert.equal(signals.tryDecode(sessionError('Aborted')).failure, 'UserCancelled')
+  const timeoutDecoded = signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'The operation timed out.' }))
+  assert.equal(timeoutDecoded.failure, 'UserCancelled')
+  assert.match(timeoutDecoded.diagnostic, /The operation timed out while awaiting provider response; execution lease safely released\./)
   assert.equal(signals.tryDecode(sessionError({ name: 'SupersededError' })).failure, 'Superseded')
 })
 }

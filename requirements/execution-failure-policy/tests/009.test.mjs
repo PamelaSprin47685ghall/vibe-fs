@@ -26,6 +26,11 @@ test('WHAT[execution-failure-policy-009] host error boundary normalizes raw unty
   }
 
   // 2. Explicit typed control signals are preserved and not classified as ordinary provider errors
+  const timeoutAbort = signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'The operation timed out.' }))
+  assert.ok(timeoutAbort != null)
+  assert.equal(timeoutAbort.kind, 'AttemptAborted')
+  assert.equal(timeoutAbort.failure, 'UserCancelled')
+
   const userAbort = signals.tryDecode(sessionError({ name: 'AbortError', message: 'user aborted run' }, { aborted: true }))
   // Operator / user cancellations decode distinctly
   if (userAbort != null && userAbort.failure !== 'ProviderTransient') {
