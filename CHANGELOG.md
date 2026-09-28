@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **取消的归位结果必须能被 join 收取：无主体的 `Cancelled` 完成改为报告一次后退休（crash-reconciliation-020）**：重启归位会把遗留子 run 结算成 `HandleCompleted(Cancelled)`，该完成没有 body；`JoinDrain.missingBodyOutcome` 对 `CompletedAwaitingJoin{Cancelled}` 返回 `None`（静默跳过），于是 join 报“没有在外可接收的工作”，而 fork 的 reuse 门禁又认定该子会话有未清交付——实机表现是 manager 对 domain-core / replica-runtime / spec-author / schema-contract / frame-integrity / recon 六个既有 Engineer 子会话逐一 resume 全被答“此人目前无法再接下另一项托付”，只能不断 fork 新名字。
+  修复：`JoinDrain` 新增 `tryConsumeCancelledCompletion`，对无 body 的 `Cancelled` 完成按既有单次报告语义消费（`afterConsumeCas` 参数化 runId 前缀为 `cancelled-`），报告后退休该 handle，等价于 Abandoned 的单报墓碑；有 body 的完成路径不变。
+  验证：新增 `CRASH_020_cancelled_completion_is_reported_and_retired_by_join`（真实 `drainFromJournalWhere` + 假 journal port：一次报告、durable append、handle 退休、不重复投递）；crash-reconciliation + delegation + managed-session-lifecycle 共 400 项全绿。
+
 - **移除 `/continue` 命令：重启归位改由系统在加载阶段自行完成（crash-reconciliation-018）**：显式续传命令及其全部痕迹删除——`ExplicitSessionResume`、`ExplicitResumeSurface`、`ExplicitResumeSuppression`、`SessionResumePort` 四个模块，`HookKey.CommandExecution` / `HookEffect.AdmitExplicitResume` 策略项，`PluginHooks` 的命令注册与 `command.execute.before` 钩子，以及 `HostSignalBootstrap`/`ChatParamsHook`/`HostTurnObserver`/`PluginTransforms`/`HostSessionDeletion`/`Companion/Transform` 中的 disclosure-only 分支与 `ExplicitResumeDisclosure` 变换模式。规范 [018] 改写为：重启后由系统自行归位（结算遗留子 run、重建执行绑定、重新登记子会话），只做持久记账、不重放命令；被中断的工具保持失败并留在可见历史。测试同步改写：`018.test.mjs` 改为断言“加载不注册任何命令 + 源码树无显式续传残骸”，`019/020` 与 host-boundary `014/019` 去掉命令与分支探针，`context-compression/018` 删除两条披露材料用例。
 
 - **重启后 reuse 子会话被答 person-unavailable：Load Phase 重建 fork runtime 的子会话登记（crash-reconciliation-020）**：`fork` 的 reuse 门禁 (`Execution/Delegation/Fork/OpenCode/Tool.fs` 的 `reuseResolvedAgent`) 依赖进程本地的 `runtime.TryFindAgent`；重启后登记为空，于是对任何 durable 子会话（固定 DevOps、forked Engineer 子会话如 `frame-integrity`）都回 “此人目前无法再接下另一项托付”——（此前只有已移除的 `/continue` 会重新登记，普通重启没有。）

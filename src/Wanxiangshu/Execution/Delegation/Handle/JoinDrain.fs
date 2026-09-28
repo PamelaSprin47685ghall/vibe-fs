@@ -40,6 +40,7 @@ module JoinDrain =
         | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
 
     let private afterConsumeCas
+        (runIdPrefix: string)
         (agentId: string)
         (record: HandleRecord)
         (reasonText: string)
@@ -50,7 +51,7 @@ module JoinDrain =
         | Ok _ ->
             Some(
                 Ok
-                    { RunId = "abandoned-" + agentId
+                    { RunId = runIdPrefix + agentId
                       AgentName = record.TargetAgent
                       Role = record.CanonicalRole
                       Outcome = AgentCompletion.abandoned agentId reasonText
@@ -59,6 +60,27 @@ module JoinDrain =
         | Error AlreadyRetired
         | Error(NotJoinable _) -> None
         | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+
+    /// A `Cancelled` completion carries no body: the run ended without producing a
+    /// result (process restart, cancelled turn). The parent is still owed a report,
+    /// and a child with an unreported completion counts as having unfinished
+    /// delivery — reuse is refused while join used to skip it silently, which left
+    /// the child unusable. Report it once and retire, exactly like an abandoned
+    /// handle.
+    let private tryConsumeCancelledCompletion
+        (durable: AgentJournalPort)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (completedAt: DateTimeOffset)
+        : Task<Result<RunCompletion, ForkError> option> =
+        task {
+            match record.Lifecycle, HandleId.tryAgent record.Handle with
+            | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled }, Some agentHandleId ->
+                let agentId = AgentHandleId.value agentHandleId
+                let! outcome = HandleController.consume durable parentId record.Handle
+                return afterConsumeCas "cancelled-" agentId record "Cancelled" completedAt outcome
+            | _ -> return None
+        }
 
     /// Materialise Abandoned as a batch item and CAS-retire (single report).
     /// `completedAt` is caller-minted (IClockPort at composition).
@@ -73,7 +95,7 @@ module JoinDrain =
             | HandleLifecycle.Abandoned reason, Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
                 let! outcome = HandleController.consume durable parentId record.Handle
-                return afterConsumeCas agentId record (abandonReasonText reason) completedAt outcome
+                return afterConsumeCas "abandoned-" agentId record (abandonReasonText reason) completedAt outcome
             | _ -> return None
         }
 
@@ -196,7 +218,11 @@ module JoinDrain =
         : Task<Result<RunCompletion, ForkError> option> =
         match readResult with
         | Error err -> Task.FromResult(Some(Error(ForkError.NotFound err)))
-        | Ok(None, _, _) -> Task.FromResult(missingBodyOutcome agentId record.Lifecycle)
+        | Ok(None, _, _) ->
+            match record.Lifecycle with
+            | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled } ->
+                tryConsumeCancelledCompletion durable parentId record completedAt
+            | _ -> Task.FromResult(missingBodyOutcome agentId record.Lifecycle)
         | Ok(Some body, Some blobRef, Some blobDigest) ->
             afterDecodeBody durable parentId record agentId blobRef blobDigest body completedAt
         | Ok(Some _, _, _) ->
