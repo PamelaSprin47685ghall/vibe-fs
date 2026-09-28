@@ -99,9 +99,11 @@ const { readFileSync } = await import("node:fs");
 const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs', import.meta.url), 'utf8')
 
 test('WHAT[delegation-013] EXEC_fork_runtime_await_agent_timeout', () => {
+  // crash-reconciliation-020: the targeted await is routed through the host's
+  // durable-aware await (a restarted process may know the child only from its
+  // handle); the timeout keeps flowing to the runtime-level await.
   assert.match(source, /let awaitAgent/)
   assert.match(source, /timeoutMs/)
-  assert.match(source, /AwaitAgent\(agentId/)
-  assert.match(source, /runtime\.Runtime\.AwaitAgent\(agentId|timeoutMs = timeoutMs/)
+  assert.match(source, /AwaitChild\(agentId, timeoutMs\)/)
 })
 }

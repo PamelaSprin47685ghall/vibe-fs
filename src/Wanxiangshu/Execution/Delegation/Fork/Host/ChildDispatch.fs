@@ -104,12 +104,15 @@ module HostForkChildDispatch =
         (gate: obj)
         (children: Dictionary<string, SessionId>)
         (pendingRuns: Dictionary<string, PendingHostRun>)
+        (durableDevOpsChild: SessionId option)
         =
         lock gate (fun () ->
+            // The fixed DevOps binding survives a teardown. After a restart the map
+            // is empty, so the durable handle answers instead of losing the binding.
             let devopsChildOpt =
                 match children.TryGetValue "devops" with
                 | true, cid -> Some cid
-                | false, _ -> None
+                | false, _ -> durableDevOpsChild
 
             children.Clear()
 
@@ -422,5 +425,10 @@ module HostForkChildDispatch =
 
             let! teardown = teardownChildren sessions (childIdsToCancel |> List.distinct)
             requireOk "Parent teardown failed" teardown
-            clearChildrenAndRuns gate children pendingRuns
+            let durableDevOpsChild =
+                durableHandles
+                |> Option.bind (fun handles -> DurableChildLookup.byByname handles "devops")
+                |> Option.map (fun (childId, _, _) -> childId)
+
+            clearChildrenAndRuns gate children pendingRuns durableDevOpsChild
         }

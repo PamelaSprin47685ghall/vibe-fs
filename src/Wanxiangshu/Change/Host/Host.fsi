@@ -32,3 +32,7 @@ type OrchestratorHost =
     member CancelAndDrain: unit -> Task
     member DetachAndDrain: unit -> Task
     member Cancel: unit -> unit
+
+    /// A child exists when this process drives it or when its durable handle says
+    /// so; the process tables alone would answer "no" after every restart.
+    member HasChild: agentId: string -> bool

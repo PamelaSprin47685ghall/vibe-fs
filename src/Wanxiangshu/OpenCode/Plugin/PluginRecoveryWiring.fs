@@ -13,7 +13,7 @@ module PluginRecoveryWiring =
         // still owns, so its fixed DevOps can be dispatched to again
         // (crash-reconciliation-020).
         match boot.Journal with
-        | Some journal -> SessionBindingRecovery.restoreFromDurable journal
+        | Some journal -> SessionBindingRecovery.install journal
         | None -> ()
 
         scope.AttachDurabilityActivation(fun () ->

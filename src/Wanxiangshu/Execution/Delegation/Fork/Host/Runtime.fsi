@@ -123,6 +123,12 @@ type HostForkRuntime =
     member internal TryChildFromDurable: agentId: string -> (SessionId * Role * string) option
 
     member internal ReusableChildOrAdopt: agentId: string -> (SessionId * bool) option
+
+    member internal TryFindAgentOrAdopt: agentId: string -> (SessionId * Role * string) option
+
+    member internal AwaitChild: agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, string>>
+
+    member HasChild: agentId: string -> bool
     member internal ActivateDormantChild: agentId: string * childId: SessionId * role: Role -> unit
 
     member internal ActivateDormantChildIfNeeded:

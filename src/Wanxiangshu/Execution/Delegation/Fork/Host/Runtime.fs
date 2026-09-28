@@ -562,7 +562,7 @@ type HostForkRuntime
 
     member internal this.AwaitCurrentWorkRecord(agentId: string) : Task<Result<string, string>> =
         taskResult {
-            let! completion = runtime.AwaitAgent agentId
+            let! completion = this.AwaitChild agentId
             return! this.WorkRecordFromCompletion completion
         }
 
@@ -658,10 +658,7 @@ type HostForkRuntime
     /// this process currently drives.
     member internal _.TryChildFromDurable(agentId: string) : (SessionId * Role * string) option =
         journal
-        |> Option.bind (fun durable ->
-            let projection = AgentJournal.handleProjection durable this.ParentId
-            HandleProjection.tryFind (HandleController.agentHandle agentId) projection)
-        |> Option.map (fun record -> record.ChildSessionId, record.CanonicalRole, record.TargetAgent)
+        |> Option.bind (fun durable -> DurableChildLookup.byHandleId (AgentJournal.handleProjection durable this.ParentId) agentId)
 
     /// Resolve a child for reuse: process-local registration first, then the
     /// durable handle, which is adopted on demand so placement/await see it.
@@ -674,6 +671,40 @@ type HostForkRuntime
             | Some(childId, role, agent) ->
                 this.AdoptExisting(agentId, childId, role, agent)
                 Some(childId, true)
+
+    /// Resolve a child through durable evidence when this process has not met it
+    /// yet (restart). The handle is the existence evidence; the in-process maps
+    /// are only a cache of what this process currently drives.
+    member this.TryFindAgentOrAdopt(agentId: string) : (SessionId * Role * string) option =
+        match this.TryReusableChild agentId, this.TryChildFromDurable agentId with
+        | Some(childId, _), Some(_, role, agent) -> Some(childId, role, agent)
+        | Some _, None -> None
+        | None, None -> None
+        | None, Some(childId, role, agent) ->
+            this.AdoptExisting(agentId, childId, role, agent)
+            Some(childId, role, agent)
+
+    /// A parent-visible child exists when this process drives it or when the
+    /// durable handle says so — the process tables alone would answer "no" after
+    /// every restart.
+    member this.HasChild(agentId: string) : bool =
+        match this.TryReusableChild agentId, this.TryChildFromDurable agentId with
+        | Some _, _ -> true
+        | None, Some _ -> true
+        | None, None -> false
+
+    /// Await one child's completion. A restarted process has nothing in flight for
+    /// a child it only knows from the journal: that answers explicitly instead of
+    /// the bare "Unknown agent id" the process tables produced.
+    member this.AwaitChild(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
+        task {
+            match this.TryReusableChild agentId with
+            | Some _ -> return! this.Runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+            | None ->
+                match this.TryFindAgentOrAdopt agentId with
+                | None -> return Error(sprintf "Unknown agent id: %s" agentId)
+                | Some _ -> return Error(sprintf "No work in flight for %s" agentId)
+        }
 
     member internal _.TryReusableChild(agentId: string) : (SessionId * bool) option =
         lock gate (fun () ->
@@ -702,11 +733,16 @@ type HostForkRuntime
     /// the same one restart recovery repopulates from `HandleLinked.ChildSessionId`, so
     /// a resumed job reads the session the Host actually issued rather than one derived
     /// from the agent id.
-    member _.TryChildSession(agentId: string) : SessionId option =
-        lock gate (fun () ->
-            match children.TryGetValue agentId with
-            | true, childId -> Some childId
-            | false, _ -> None)
+    member this.TryChildSession(agentId: string) : SessionId option =
+        let local =
+            lock gate (fun () ->
+                match children.TryGetValue agentId with
+                | true, childId -> Some childId
+                | false, _ -> None)
+
+        match local with
+        | Some childId -> Some childId
+        | None -> this.TryChildFromDurable agentId |> Option.map (fun (childId, _, _) -> childId)
 
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount

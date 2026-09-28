@@ -11,6 +11,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <Compile Include="Execution/Delegation/DurableChildLookup.fsi"/>
+    <Compile Include="Execution/Delegation/DurableChildLookup.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>

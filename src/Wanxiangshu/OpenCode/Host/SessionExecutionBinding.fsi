@@ -32,6 +32,10 @@ module SessionExecutionBinding =
     val verifyDevOpsModel: sessionId: SessionId -> model: OpencodeModel -> unit
     val bindInternalRoot: sessionId: SessionId -> agent: string option -> unit
     val isInternalRoot: sessionId: SessionId -> bool
+    /// Load Phase: install the durable child evidence resolver (sessionId ->
+    /// (parentSessionId, agent)). In-process maps stay a cache in front of it.
+    val installDurableChildEvidence: resolve: (string -> (string * string) option) -> unit
+
     val tryParent: sessionId: SessionId -> SessionId option
     val tryAgent: sessionId: SessionId -> string option
     val isUnboundHostAuxiliaryChild: sessionId: SessionId -> bool

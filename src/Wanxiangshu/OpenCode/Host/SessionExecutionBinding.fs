@@ -75,6 +75,20 @@ module SessionExecutionBinding =
     let private providerAttemptBindings = Dictionary<string, ExpectedBinding>()
     // DSL-MUTABLE: resource — session persistent model binding for fixed roles (DevOps)
     let private persistentDevOpsModels = Dictionary<string, OpencodeModel>()
+    // DSL-MUTABLE: single-flight — durable child evidence installed at Load Phase.
+    // The in-process maps above are a cache of what this process currently drives;
+    // the durable handle projection is the existence truth across a restart.
+    let mutable private durableChildEvidence: (string -> (string * string) option) option = None
+
+    /// Install the durable resolver: sessionId -> (parentSessionId, agent). Called
+    /// once at plugin load; reads fall through to it and cache the answer locally.
+    let installDurableChildEvidence (resolve: string -> (string * string) option) =
+        durableChildEvidence <- Some resolve
+
+    let private durableParentOf (sessionKey: string) : string option =
+        durableChildEvidence
+        |> Option.bind (fun resolve -> resolve sessionKey)
+        |> Option.map fst
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID
@@ -217,15 +231,29 @@ module SessionExecutionBinding =
 
     let tryParent (sessionId: SessionId) =
         lock gate (fun () ->
-            match parents.TryGetValue(SessionId.value sessionId) with
+            let key = SessionId.value sessionId
+
+            match parents.TryGetValue key with
             | true, value -> Some(SessionId.create value)
-            | false, _ -> None)
+            | false, _ ->
+                match durableParentOf key with
+                | Some parent ->
+                    parents.[key] <- parent
+                    Some(SessionId.create parent)
+                | None -> None)
 
     let tryAgent (sessionId: SessionId) =
         lock gate (fun () ->
-            match agents.TryGetValue(SessionId.value sessionId) with
+            let key = SessionId.value sessionId
+
+            match agents.TryGetValue key with
             | true, value -> Some value
-            | false, _ -> None)
+            | false, _ ->
+                match durableChildEvidence |> Option.bind (fun resolve -> resolve key) with
+                | Some(_, agent) when not (String.IsNullOrWhiteSpace agent) ->
+                    agents.[key] <- agent
+                    Some agent
+                | _ -> None)
 
     /// A Host-owned auxiliary child (for example title generation) is observed from
     /// a public session.created parent edge but has no Wanxiangshu execution agent.
@@ -376,7 +404,7 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role -> ModelRouting.tryLease sessionId physical role agent None
+            | Some role -> ModelRouting.tryLease sessionId physical role agent ModelExecutionPurpose.Normal None
             | None -> None
 
         match leaseOpt with
@@ -825,7 +853,8 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role -> ModelRouting.tryLease sessionId physicalUserMessageId role agent None
+            | Some role ->
+                ModelRouting.tryLease sessionId physicalUserMessageId role agent ModelExecutionPurpose.Normal None
             | None -> None
 
         match leaseOpt with

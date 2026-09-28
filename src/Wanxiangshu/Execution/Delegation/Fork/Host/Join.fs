@@ -567,7 +567,7 @@ module HostForkJoin =
         (agentId: string)
         (timeoutMs: int option)
         : Task<Result<RunCompletion, string>> =
-        runtime.Runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+        runtime.AwaitChild(agentId, timeoutMs)
 
     /// Permit-gated targeted agent await. validatePermit then AwaitAgent;
     /// string errors map to ForkError.NotFound. No second RunCompletion truth source.

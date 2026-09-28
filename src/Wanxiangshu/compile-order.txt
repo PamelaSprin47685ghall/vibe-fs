@@ -512,6 +512,8 @@ Participant/Provider/Attempt/Fallback/Ledger.fsi
 Participant/Provider/Attempt/Fallback/Ledger.fs
 Execution/Delegation/LinkageProjection.fsi
 Execution/Delegation/LinkageProjection.fs
+Execution/Delegation/DurableChildLookup.fsi
+Execution/Delegation/DurableChildLookup.fs
 Execution/Delegation/JournalPort.fsi
 Execution/Delegation/JournalPort.fs
 Execution/Delegation/Handle/Surface.fsi
@@ -1472,8 +1474,6 @@ OpenCode/Host/SessionBindingRecovery.fsi
 OpenCode/Host/SessionBindingRecovery.fs
 OpenCode/Host/ChildWorkRecovery.fsi
 OpenCode/Host/ChildWorkRecovery.fs
-OpenCode/Host/DurableChildAdoption.fsi
-OpenCode/Host/DurableChildAdoption.fs
 OpenCode/Plugin/PluginRecoveryWiring.fsi
 OpenCode/Plugin/PluginRecoveryWiring.fs
 OpenCode/Host/BloggerChronicleText.fsi

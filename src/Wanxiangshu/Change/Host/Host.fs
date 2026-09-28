@@ -579,6 +579,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 leaveAuthorityUpdate jobId
         }
 
+    member _.HasChild(agentId: string) : bool = runtime.HasChild agentId
+
     member _.ForkManagerJob
         (jobId: ManagerJobId, managerAgent: string, prompt: string, ?byname: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =

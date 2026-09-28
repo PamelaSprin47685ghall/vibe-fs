@@ -1,22 +1,20 @@
 namespace Wanxiangshu.OpenCode.Host
 
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 
-/// Restart drops the process-local execution bindings
-/// (`SessionExecutionBinding`), while the road's parented children survive as
-/// durable handle records. Without restoring that evidence a recovered road can
-/// never dispatch to its fixed DevOps again: the managed prompt is refused with
-/// `PROMPT-006: parented session has no frozen agent binding`
-/// (crash-reconciliation-020, managed-session-lifecycle-024).
+/// Restart drops every process-local execution binding; the durable handle
+/// projection is the evidence that outlives it. This module installs that
+/// evidence behind the binding cache so resolution happens on demand instead of
+/// relying on a load-order pre-population step.
 module SessionBindingRecovery =
 
-    /// Rebind every durable parented child to the agent its handle was linked
-    /// with. Only live handle lifecycles are restored; Abandoned and Retired
-    /// tombstones stay tombstones.
-    val restoreFromProjection: projections: AgentProjectionSet -> unit
+    /// Durable evidence for one child session: (parentSessionId, executionAgent).
+    val evidenceFor: projections: AgentProjectionSet -> childSessionId: SessionId -> (string * string) option
 
-    /// Rebind every durable parented child to the agent its handle was linked
-    /// with. Only live handle lifecycles are restored; Abandoned and Retired
-    /// tombstones stay tombstones.
-    val restoreFromDurable: journal: AgentJournal -> unit
+    /// Install the resolver over a projection source.
+    val installFrom: projections: (unit -> AgentProjectionSet) -> unit
+
+    /// Load Phase: install the durable resolver behind the binding cache.
+    val install: journal: AgentJournal -> unit

@@ -114,9 +114,11 @@ module JoinTool =
             HostForkJoin.joinAvailableForFissionLane runtime groupId laneIndex JoinBatch.Max waitTask
         | None -> HostForkJoin.joinAvailableWithPermit runtime permit JoinBatch.Max waitTask
 
+    /// A restarted process may only know the child from its durable handle; the
+    /// handle's target agent is the same evidence the process tables carry.
     let private liveAgentName (runtime: HostForkRuntime) (agentId: string) =
-        match runtime.TryFindAgent agentId with
-        | Some record -> record.Agent
+        match runtime.TryFindAgentOrAdopt agentId with
+        | Some(_, _, agent) -> agent
         | None -> ""
 
     let private resolveAgentName

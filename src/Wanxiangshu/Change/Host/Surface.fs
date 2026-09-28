@@ -46,9 +46,6 @@ module OrchestratorHostSurface =
     [<Emit("$0.gitPort = $1")>]
     let private replaceGitPort (host: OrchestratorHost) (port: GitPort) : unit = jsNative
 
-    [<Emit("$0.runtime.children.has($1)")>]
-    let private hasChildInRuntime (host: OrchestratorHost) (agentId: string) : bool = jsNative
-
     let private stringOf (value: obj) =
         if isNullish value then "" else string value
 
@@ -376,7 +373,7 @@ module OrchestratorHostSurface =
         (handle :?> HostHandle).Host.DetachAndDrain()
 
     let hasChild (handle: obj) (agentId: string) : bool =
-        hasChildInRuntime (handle :?> HostHandle).Host agentId
+        (handle :?> HostHandle).Host.HasChild agentId
 
     /// Exercise the production candidate-finalization sequence through a plain
     /// JavaScript command port without exposing Command or Result internals.

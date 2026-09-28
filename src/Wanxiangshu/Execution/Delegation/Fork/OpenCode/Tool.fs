@@ -325,8 +325,8 @@ module ForkTool =
         | _ -> None
 
     let private announceChild (runtime: HostForkRuntime) (context: HostToolContext) agentKey =
-        runtime.TryFindAgent agentKey
-        |> Option.bind (fun created -> created.ChildSessionId)
+        runtime.TryFindAgentOrAdopt agentKey
+        |> Option.map (fun (childId, _, _) -> childId)
         |> Option.iter (fun childId ->
             FissionRuntime.notifyChildCreated (SessionId.create context.SessionId) agentKey childId)
 
@@ -538,10 +538,10 @@ module ForkTool =
         let activeRun =
             lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
-        match activeRun, runtime.TryFindAgent agentId, handle.CanonicalRole with
+        match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
         | true, _, Role.DevOps -> Task.FromResult(consequence (prose language Path.Fork.PersonCannotTakeCharge))
         | true, _, _ -> reuseWhileActive language
-        | false, Some record, _ -> reuseWhileAllowed scope runtime context request language handles record.Role agentId
+        | false, Some(_, role, _), _ -> reuseWhileAllowed scope runtime context request language handles role agentId
         | false, None, Role.DevOps ->
             reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
         | false, None, _ ->
