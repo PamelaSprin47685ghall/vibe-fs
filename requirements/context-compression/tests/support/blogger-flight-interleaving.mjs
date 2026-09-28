@@ -6,6 +6,7 @@ import * as routing from '../../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as chat from '../../../../dist/Execution/Session/ChatExecution/Surface.js'
 import * as persona from '../../../../dist/Participant/Persona/Surface.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as ownership from '../../../verification-system/tests/support/blogger-ownership.mjs'
 
 export const operations = Object.freeze([
   'A claims flight',
@@ -58,6 +59,9 @@ export const validPermutations = Object.freeze(
 const K = 'ses-blog'
 const PHYS = 'msg-phys-flight'
 const ROOT = PHYS
+// A's repair is spent only on a terminal whose physical message is A's own
+// landed dispatch (context-compression-024).
+const PHYS_A = 'msg-dispatch-a'
 const MAIN = 'ses-main-flight'
 
 const flightRequest = (requestId, toml) =>
@@ -117,7 +121,7 @@ const idleObservation = (ports, run) => ({
   quiescent: true,
   context: {
     sessionId: K,
-    physicalUserMessageId: PHYS,
+    physicalUserMessageId: PHYS_A,
     authorityRoot: ROOT,
     providerRun: run,
   },
@@ -230,8 +234,7 @@ export const runFlightInterleaving = async (schedule, { dir, opened, durable }) 
   const requestA = flightRequest('req-a', 'content-a')
   const requestB = flightRequest('req-b', 'content-b')
 
-  const accepted = await dispatch.acceptHumanRoot(opened.journal, K, PHYS, 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  const profile = await ownership.rootBlogger(opened.journal, K, PHYS)
 
   const flightOf = () => {
     const flight = runtime.tryGetFlight(scope, K)
@@ -253,6 +256,15 @@ export const runFlightInterleaving = async (schedule, { dir, opened, durable }) 
       switch (operation) {
         case 'A claims flight': {
           assert.equal(runtime.claimCurrentRequest(scope, K, requestA), 'Claimed')
+          await ownership.ownRequest({
+            handle: opened.journal,
+            durable,
+            scope,
+            bloggerSession: K,
+            profile,
+            request: requestA,
+            physical: PHYS_A,
+          })
           assert.equal(flightOf(), 'req-a')
           record(operation, { claim: 'Claimed' })
           break

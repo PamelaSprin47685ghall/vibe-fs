@@ -72,6 +72,8 @@ Nudge 后新的 ProviderRun 再次无效，记录 confirmed failure 并首发 AA
 
 同 episode 重复观察不重复认领/发送，非 quiescent 不认领、不花预算；Nudge、AABB 各至多一次，耗尽后一次 abandon、exact release。无 journal 直接 abandon、零发送。Shutdown 与准入原子关闸，拒绝新 episode，取消并 drain 已认领者。
 
+纯文本完成、自身停止或外部中止的 Blogger turn，须在 quiescent idle 交给同一 repair owner，先证明 live request 归属再推进。Provider 失败归 provider-attempt recovery；degeneration guard 已拥有后继的中止不再次修复。
+
 ## [018] RulebookRevision 按 life 冻结
 
 Blogger life 创建时绑定同一 RulebookRevision 的 system prompt、tip 枚举、解码映射和 Main 索引，存活期间四者冻结。新规则不打断 in-flight cycle，只在下一 cycle 创建 fresh life 时生效。

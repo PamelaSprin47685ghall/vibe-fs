@@ -51,9 +51,14 @@ const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 const runtime = await import("../../../dist/Context/Companion/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
+const ownership = await import("../../verification-system/tests/support/blogger-ownership.mjs");
 const { operations, permutations, prerequisites, runFlightInterleaving, validPermutations } = await import("./support/blogger-flight-interleaving.mjs");
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+// Each request owns its own landed dispatch (context-compression-024): repair
+// is only spent on a terminal whose physical message proves the request.
+const PHYS_A = 'msg-dispatch-a'
+const PHYS_B = 'msg-dispatch-b'
 const deferred = () => {
   let resolve
   const promise = new Promise((done) => {
@@ -139,8 +144,7 @@ test('WHAT[context-compression-024] superseded A callbacks are idempotent, never
       runtime.dispose(scope)
     } catch {}
   })
-  const accepted = await dispatch.acceptHumanRoot(opened, key, 'msg-phys-flight', 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  const profile = await ownership.rootBlogger(opened, key, 'msg-phys-flight')
 
   const requestA = runtime.main({
     requestId: 'req-a',
@@ -171,7 +175,7 @@ test('WHAT[context-compression-024] superseded A callbacks are idempotent, never
     quiescent: true,
     context: {
       sessionId: key,
-      physicalUserMessageId: 'msg-phys-flight',
+      physicalUserMessageId: PHYS_A,
       authorityRoot: 'msg-phys-flight',
       providerRun: run,
     },
@@ -189,6 +193,7 @@ test('WHAT[context-compression-024] superseded A callbacks are idempotent, never
   }
   try {
     assert.equal(runtime.claimCurrentRequest(scope, key, requestA), 'Claimed')
+    await ownership.ownRequest({ handle: opened, durable, scope, bloggerSession: key, profile, request: requestA, physical: PHYS_A })
     assert.equal((await blog.observeIdleRepair(scope, durable, requestA, idle('run-a1'))).outcome, 'NudgeSent')
     assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Released')
     assert.equal(runtime.claimCurrentRequest(scope, key, requestB), 'Claimed')
@@ -239,8 +244,7 @@ test('WHAT[context-compression-024] stale release of A never releases B; new B p
       runtime.dispose(scope)
     } catch {}
   })
-  const accepted = await dispatch.acceptHumanRoot(boot.journal, key, 'msg-phys-flight', 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  const profile = await ownership.rootBlogger(boot.journal, key, 'msg-phys-flight')
 
   const requestA = runtime.main({
     requestId: 'req-a',
@@ -267,11 +271,11 @@ test('WHAT[context-compression-024] stale release of A never releases B; new B p
       NotifyTerminal: () => false,
     },
   }
-  const idle = (request, run) => ({
+  const idle = (physical, run) => ({
     quiescent: true,
     context: {
       sessionId: key,
-      physicalUserMessageId: 'msg-phys-flight',
+      physicalUserMessageId: physical,
       authorityRoot: 'msg-phys-flight',
       providerRun: run,
     },
@@ -282,7 +286,8 @@ test('WHAT[context-compression-024] stale release of A never releases B; new B p
 
   // A holds the committed slot with a live repair episode.
   assert.equal(runtime.claimCurrentRequest(scope, key, requestA), 'Claimed')
-  assert.equal((await blog.observeIdleRepair(scope, durable, requestA, idle(requestA, 'run-a1'))).outcome, 'NudgeSent')
+  await ownership.ownRequest({ handle: boot.journal, durable, scope, bloggerSession: key, profile, request: requestA, physical: PHYS_A })
+  assert.equal((await blog.observeIdleRepair(scope, durable, requestA, idle(PHYS_A, 'run-a1'))).outcome, 'NudgeSent')
 
   // A new open producer for B is not claimed into the committed slot of A:
   // claim, repair-episode claim, and both repair entries fail closed on A.
@@ -292,7 +297,7 @@ test('WHAT[context-compression-024] stale release of A never releases B; new B p
     /^Error:Claimed request req-b does not match active flight req-a/,
   )
   assert.equal(
-    (await blog.observeIdleRepair(scope, durable, requestB, idle(requestB, 'run-b1'))).outcome,
+    (await blog.observeIdleRepair(scope, durable, requestB, idle(PHYS_B, 'run-b1'))).outcome,
     'UnownedIdleIgnored',
   )
   assert.equal(
@@ -333,8 +338,7 @@ test('WHAT[context-compression-024] same-request epoch refresh keeps ownership; 
       runtime.dispose(scope)
     } catch {}
   })
-  const accepted = await dispatch.acceptHumanRoot(boot.journal, key, 'msg-phys-flight', 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  const profile = await ownership.rootBlogger(boot.journal, key, 'msg-phys-flight')
 
   const ports = {
     sessionPort: {
@@ -353,7 +357,7 @@ test('WHAT[context-compression-024] same-request epoch refresh keeps ownership; 
     quiescent: true,
     context: {
       sessionId: key,
-      physicalUserMessageId: 'msg-phys-flight',
+      physicalUserMessageId: PHYS_A,
       authorityRoot: 'msg-phys-flight',
       providerRun: run,
     },
@@ -370,6 +374,7 @@ test('WHAT[context-compression-024] same-request epoch refresh keeps ownership; 
     observedEpoch: 0,
   })
   assert.equal(runtime.claimCurrentRequest(scope, key, first), 'Claimed')
+  await ownership.ownRequest({ handle: boot.journal, durable, scope, bloggerSession: key, profile, request: first, physical: PHYS_A })
   assert.equal((await blog.observeIdleRepair(scope, durable, first, idle('run-1'))).outcome, 'NudgeSent')
 
   // Same-request epoch change creates a refreshed owner, not a new owner:
@@ -435,8 +440,7 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
       runtime.dispose(scope)
     } catch {}
   })
-  const accepted = await dispatch.acceptHumanRoot(boot.journal, key, 'msg-phys-flight', 'blogger')
-  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  const profile = await ownership.rootBlogger(boot.journal, key, 'msg-phys-flight')
 
   const requestA = runtime.main({
     requestId: 'req-a',
@@ -463,11 +467,11 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
       NotifyTerminal: () => false,
     },
   }
-  const idle = (run) => ({
+  const idle = (physical, run) => ({
     quiescent: true,
     context: {
       sessionId: key,
-      physicalUserMessageId: 'msg-phys-flight',
+      physicalUserMessageId: physical,
       authorityRoot: 'msg-phys-flight',
       providerRun: run,
     },
@@ -475,11 +479,15 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
     rootWorkspace: ports.rootWorkspace,
     eventPort: ports.eventPort,
   })
+  const own = (request, physical) =>
+    ownership.ownRequest({ handle: boot.journal, durable, scope, bloggerSession: key, profile, request, physical })
 
   assert.equal(runtime.claimCurrentRequest(scope, key, requestA), 'Claimed')
-  assert.equal((await blog.observeIdleRepair(scope, durable, requestA, idle('run-a1'))).outcome, 'NudgeSent')
+  await own(requestA, PHYS_A)
+  assert.equal((await blog.observeIdleRepair(scope, durable, requestA, idle(PHYS_A, 'run-a1'))).outcome, 'NudgeSent')
   assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Released')
   assert.equal(runtime.claimCurrentRequest(scope, key, requestB), 'Claimed')
+  await own(requestB, PHYS_B)
 
   // The cancelled episode slot is reclaimed synchronously once its flight is
   // gone: B's own claim succeeds and its repair proceeds on a fresh episode,
@@ -487,7 +495,7 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
   // failure (settlement-failed episode) would still fail closed.
   assert.equal(runtime.claimRepairEpisode(scope, 'req-b', 'msg-phys-flight', 'ses-main-flight', key), 'Claimed')
   assert.equal(
-    (await blog.observeIdleRepair(scope, durable, requestB, idle('run-b1'))).outcome,
+    (await blog.observeIdleRepair(scope, durable, requestB, idle(PHYS_B, 'run-b1'))).outcome,
     'NudgeSent',
   )
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req-b')
@@ -496,7 +504,7 @@ test('WHAT[context-compression-024] B repair after supersede waits for the dead 
   // Once the drain settles, B's repair half proceeds on its own episode.
   await runtime.drainRepairEpisodes(scope)
   assert.equal(runtime.claimRepairEpisode(scope, 'req-b', 'msg-phys-flight', 'ses-main-flight', key), 'Claimed')
-  assert.equal((await blog.observeIdleRepair(scope, durable, requestB, idle('run-b2'))).outcome, 'NudgeSent')
+  assert.equal((await blog.observeIdleRepair(scope, durable, requestB, idle(PHYS_B, 'run-b2'))).outcome, 'NudgeSent')
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req-b')
 })
 test('WHAT[context-compression-024] scheduled promise order cannot move B terminal or capacity', async () => {
@@ -508,8 +516,7 @@ test('WHAT[context-compression-024] scheduled promise order cannot move B termin
           const key = 'ses-blog'
           const scope = runtime.createScope()
           try {
-            const accepted = await dispatch.acceptHumanRoot(opened.journal, key, 'msg-phys-flight', 'blogger')
-            assert.equal(accepted.ok, true)
+            const profile = await ownership.rootBlogger(opened.journal, key, 'msg-phys-flight')
             const requestA = runtime.main({
               requestId: 'req-a',
               mainSession: 'ses-main-flight',
@@ -535,11 +542,11 @@ test('WHAT[context-compression-024] scheduled promise order cannot move B termin
                 NotifyTerminal: () => false,
               },
             }
-            const idle = (run) => ({
+            const idle = (physical, run) => ({
               quiescent: true,
               context: {
                 sessionId: key,
-                physicalUserMessageId: 'msg-phys-flight',
+                physicalUserMessageId: physical,
                 authorityRoot: 'msg-phys-flight',
                 providerRun: run,
               },
@@ -547,14 +554,18 @@ test('WHAT[context-compression-024] scheduled promise order cannot move B termin
               rootWorkspace: ports.rootWorkspace,
               eventPort: ports.eventPort,
             })
+            const own = (request, physical) =>
+              ownership.ownRequest({ handle: opened.journal, durable, scope, bloggerSession: key, profile, request, physical })
 
             assert.equal(runtime.claimCurrentRequest(scope, key, requestA), 'Claimed')
+            await own(requestA, PHYS_A)
             assert.equal(
-              (await blog.observeIdleRepair(scope, durable, requestA, idle('run-a1'))).outcome,
+              (await blog.observeIdleRepair(scope, durable, requestA, idle(PHYS_A, 'run-a1'))).outcome,
               'NudgeSent',
             )
             assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Released')
             assert.equal(runtime.claimCurrentRequest(scope, key, requestB), 'Claimed')
+            await own(requestB, PHYS_B)
 
             // Hand-rolled controllable scheduler: each late-A callback waits
             // on a deferred gate; gates release in the fast-check order, so
@@ -565,12 +576,12 @@ test('WHAT[context-compression-024] scheduled promise order cannot move B termin
               await gate.promise
               if (kind === 'release') return runtime.releaseCurrentRequest(scope, key, 'req-a')
               if (kind === 'idle') {
-                return (await blog.observeIdleRepair(scope, durable, requestA, idle('run-a-late'))).outcome
+                return (await blog.observeIdleRepair(scope, durable, requestA, idle(PHYS_A, 'run-a-late'))).outcome
               }
               if (kind === 'transform') {
                 return (await blog.observeTransformRepair(scope, durable, requestA, 'run-a-late', [])).outcome
               }
-              return (await blog.observeIdleRepair(scope, durable, requestB, idle('run-b1'))).outcome
+              return (await blog.observeIdleRepair(scope, durable, requestB, idle(PHYS_B, 'run-b1'))).outcome
             }
             const pending = order.map((kind, index) => runLate(kind, gates[index]))
             for (const gate of gates) {
@@ -808,5 +819,244 @@ test('WHAT[context-compression-024] CTX_024_blogger_runtime_surface_claim_and_re
   assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, replacement), 'Claimed')
   assert.equal(parkedTransform.releaseCurrentRequest(scope, KEY, 'request-failed'), 'Conflict:request-replacement')
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY)?.toml, 'replacement')
+})
+}
+
+// Incident 2026-09-28 07:27:19 (and 00:58:03): the Blogger history ended on an
+// assistant that answered the previous request's physical message. The new
+// request's dispatch landed with the same fixed instruction payload, which
+// overwrote the payload-keyed landing of the old physical message. The first
+// provider step of the new message then judged that old tail as its own
+// prose terminal, could not prove it stale, and stopped its own run before
+// the provider was called — the flight stayed claimed, no BlogObservation was
+// ever committed, and the main session's cutoff never advanced.
+{
+const { default: test } = await import("node:test");
+const { default: assert } = await import("node:assert/strict");
+const { mkdtempSync, rmSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const blog = await import("../../../dist/Enforcer/BlogSurface.js");
+const runtime = await import("../../../dist/Context/Companion/RuntimeSurface.js");
+const compression = await import("../../../dist/Context/Companion/CompressionSurface.js");
+const journal = await import("../../../dist/Persistence/Journal/Surface.js");
+const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+const resources = await import("../../../dist/Resources/PromptSurface.js");
+const enforcer = await import("../../../dist/Enforcer/Surface.js");
+const ownership = await import("../../verification-system/tests/support/blogger-ownership.mjs");
+
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+// Match plugin initialization: the continuation decodes chronicle calls
+// against the installed enforcer catalog.
+resources.runtimeInstallFromPackage()
+
+const MAIN = 'ses-main-first-step'
+const BLOG = 'ses-blog-first-step'
+const ROOT = 'msg-blog-root'
+
+const blogRequest = (requestId, toml) =>
+  runtime.main({ requestId, mainSession: MAIN, bloggerSession: BLOG, toml })
+
+const ownedWorld = async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-blogger-first-step-'))
+  const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`
+  const boot = await journal.JournalSurface_bootWithWriterId(
+    dir,
+    `writer-first-step-${stamp}`,
+    `rt-first-step-${stamp}`,
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
+  assert.equal(boot.ok, true, boot.ok ? '' : JSON.stringify(boot.error))
+  const scope = runtime.createScope()
+  t.after(() => {
+    try {
+      runtime.dispose(scope)
+    } catch {}
+    try {
+      journal.JournalSurface_dispose(boot.journal)
+    } catch {}
+    rmSync(dir, { recursive: true, force: true })
+  })
+  const handle = boot.journal
+  const durable = boot.journal.journal
+  await ownership.linkBlogger(handle, MAIN, BLOG)
+  const profile = await ownership.rootBlogger(handle, BLOG, ROOT)
+  const own = (request, physical) =>
+    ownership.ownRequest({ handle, durable, scope, bloggerSession: BLOG, profile, request, physical })
+  return { handle, durable, scope, profile, own }
+}
+
+// Request A landed as msg-p0 and was superseded; request B landed as msg-p1
+// with the identical instruction payload and now holds the flight.
+const supersededThenCurrent = async (t) => {
+  const world = await ownedWorld(t)
+  const previous = blogRequest('req-old', 'old work')
+  assert.equal(runtime.claimCurrentRequest(world.scope, BLOG, previous), 'Claimed')
+  await world.own(previous, 'msg-p0')
+  assert.equal(runtime.releaseCurrentRequest(world.scope, BLOG, 'req-old'), 'Released')
+  const current = blogRequest('req-new', 'new work')
+  assert.equal(runtime.claimCurrentRequest(world.scope, BLOG, current), 'Claimed')
+  await world.own(current, 'msg-p1')
+  return { ...world, current }
+}
+
+const ids = (messages) => messages.map((message) => message?.info?.id)
+
+test('WHAT[context-compression-024] first step of a new physical message never judges the history tail', async (t) => {
+  const { scope, durable } = await supersededThenCurrent(t)
+  const transcript = [
+    ownership.userMessage('msg-p0'),
+    ownership.assistantMessage('msg-a0', 'msg-p0', [], { error: 'MessageAbortedError' }),
+    ownership.userMessage('msg-p1'),
+  ]
+
+  const outcome = await blog.continueTransform(scope, durable, BLOG, transcript)
+
+  assert.equal(outcome.kind, 'ProjectMessages', 'the first step of msg-p1 must reach the provider')
+  assert.equal(ids(outcome.messages).includes('msg-a0'), false, 'the old tail is not this step\'s history')
+  assert.equal(runtime.tryGetFlight(scope, BLOG)?.requestId, 'req-new')
+})
+
+test('WHAT[context-compression-024] a later step answering a superseded physical message never commits or stops', async (t) => {
+  const { scope, durable } = await supersededThenCurrent(t)
+  const stale = [
+    ownership.userMessage('msg-p0'),
+    ownership.assistantMessage('msg-a0', 'msg-p0', [
+      ownership.chroniclePart('call-old', enforcer.fieldNames()[0], 'old request entry'),
+    ]),
+  ]
+
+  const outcome = await blog.continueTransform(scope, durable, BLOG, stale)
+
+  assert.equal(outcome.kind, 'ProjectMessages', 'a superseded step is never stopped')
+  assert.deepEqual(ids(outcome.messages), ids(stale), 'a superseded step keeps the Host transcript')
+  assert.equal(
+    runtime.tryGetFlight(scope, BLOG)?.requestId,
+    'req-new',
+    'the old request\'s chronicle call is never committed as the new request\'s cycle',
+  )
+})
+
+test('WHAT[context-compression-024] first step of a request-scoped repair prompt sees the request and that prompt', async (t) => {
+  const { handle, scope, durable, current } = await supersededThenCurrent(t)
+  const sent = []
+  const nudge = await blog.observeIdleRepair(scope, durable, current, {
+    quiescent: true,
+    context: { sessionId: BLOG, physicalUserMessageId: 'msg-p1', authorityRoot: ROOT, providerRun: 'msg-t0' },
+    sessionPort: {
+      SubscribeTerminal: () => ({ Dispose: () => {} }),
+      SubscribeFutureTerminal: () => ({ Dispose: () => {} }),
+      SendPrompt: async (sessionId, text) => {
+        sent.push(text)
+        return dispatch.admittedWithReceipt('accepted-nudge')
+      },
+    },
+    rootWorkspace: { TryRead: () => undefined },
+    eventPort: {
+      SubscribeTerminalListener: () => ({ Dispose: () => {} }),
+      SubscribeFutureTerminalListener: () => ({ Dispose: () => {} }),
+      NotifyTerminal: () => false,
+    },
+  })
+  assert.equal(nudge.outcome, 'NudgeSent')
+  await ownership.landClaim(handle, BLOG, nudge.promptKey, 'msg-nudge')
+
+  const transcript = [
+    ownership.userMessage('msg-p1'),
+    ownership.assistantMessage('msg-t0', 'msg-p1', [{ type: 'text', text: 'prose instead of a chronicle call' }]),
+    ownership.userMessage('msg-nudge', sent[0]),
+  ]
+  const outcome = await blog.continueTransform(scope, durable, BLOG, transcript)
+
+  assert.equal(outcome.kind, 'ProjectMessages', 'the nudge must reach the provider instead of killing itself')
+  assert.equal(ids(outcome.messages).at(-1), 'msg-nudge', 'the physical repair prompt is what the step answers')
+  assert.equal(ids(outcome.messages).includes('msg-t0'), false)
+})
+
+test('WHAT[context-compression-024] an unproven idle terminal spends no repair budget', async (t) => {
+  const { scope, durable, current } = await supersededThenCurrent(t)
+  const sent = []
+  const idle = await blog.observeIdleRepair(scope, durable, current, {
+    quiescent: true,
+    context: { sessionId: BLOG, physicalUserMessageId: 'msg-without-landing', authorityRoot: ROOT, providerRun: 'msg-x' },
+    sessionPort: {
+      SubscribeTerminal: () => ({ Dispose: () => {} }),
+      SubscribeFutureTerminal: () => ({ Dispose: () => {} }),
+      SendPrompt: async (sessionId, text) => {
+        sent.push(text)
+        return dispatch.admittedWithReceipt('accepted')
+      },
+    },
+    rootWorkspace: { TryRead: () => undefined },
+    eventPort: {
+      SubscribeTerminalListener: () => ({ Dispose: () => {} }),
+      SubscribeFutureTerminalListener: () => ({ Dispose: () => {} }),
+      NotifyTerminal: () => false,
+    },
+  })
+
+  assert.equal(idle.outcome, 'UnprovenIgnored')
+  assert.deepEqual(sent, [])
+  assert.equal(runtime.tryGetFlight(scope, BLOG)?.requestId, 'req-new')
+})
+
+test('WHAT[context-compression-024] an abandoned same-payload claim never erases the landing the open request relies on', async (t) => {
+  // Journal 2026-09-28 07:02:41: a Blogger dispatch claim with the fixed
+  // instruction payload was abandoned (SendFailed). With landings keyed by
+  // payload, that abandon erased the earlier physical landing of the same
+  // payload, and the still-open request lost its only ownership proof.
+  const { handle, scope, durable, profile, own } = await ownedWorld(t)
+  const live = blogRequest('req-live', 'live work')
+  assert.equal(runtime.claimCurrentRequest(scope, BLOG, live), 'Claimed')
+  await own(live, 'msg-live')
+  const refused = await dispatch.sendContinuation(
+    {
+      SubscribeTerminal: () => ({ Dispose: () => {} }),
+      SendPrompt: async () => dispatch.retryable('host refused before accept'),
+    },
+    handle,
+    BLOG,
+    ownership.BLOGGER_INSTRUCTION,
+    'ManagedDelegationAssignment',
+    profile,
+    'Await',
+  )
+  assert.equal(refused.ok, false)
+
+  const transcript = [
+    ownership.userMessage('msg-live'),
+    ownership.assistantMessage('msg-prose', 'msg-live', [{ type: 'text', text: 'prose instead of a chronicle call' }]),
+  ]
+  const outcome = await blog.continueTransform(scope, durable, BLOG, transcript)
+
+  assert.equal(outcome.kind, 'StopPhysicalRun', 'the owned invalid step still reaches its repair owner')
+  assert.equal(outcome.reason, 'enforcer-cycle-nudge-deferred-to-idle')
+})
+
+test('WHAT[context-compression-024] an open request not yet bound to its dispatch proves nothing', () => {
+  assert.equal(
+    compression.terminalRequestOwnership({
+      requestId: 'req-new',
+      openRequestId: 'req-new',
+      parentPromptKey: 'prompt-landed',
+      parentOrigin: 'ManagedDelegationAssignment',
+      parentPayloadDigest: 'instruction-digest',
+    }),
+    'Unproven',
+  )
+})
+
+test('WHAT[context-compression-024] a request-scoped repair cannot grant ownership before the open request is bound', () => {
+  const repair = {
+    requestId: 'req-new',
+    openRequestId: 'req-new',
+    parentPromptKey: 'prompt-repair',
+    parentOrigin: 'InteractionRepair',
+    parentPayloadDigest: 'req-new\u001fmsg-old\u001fblogger-missing-tool',
+  }
+  assert.equal(compression.terminalRequestOwnership(repair), 'Unproven')
+  assert.equal(compression.terminalRequestOwnership({ ...repair, openPromptKey: 'prompt-dispatch' }), 'Current')
+  assert.equal(compression.terminalRequestOwnership({ ...repair, openRequestId: 'req-other' }), 'Superseded')
 })
 }

@@ -15,14 +15,15 @@ module BlogSurface =
     /// Read a real durable blob and use the production recovery decoder.
     val reloadRequest: journal: obj -> value: obj -> System.Threading.Tasks.Task<obj>
 
-    val continueTerminal:
-        scope: obj ->
-        journal: obj ->
-        request: obj ->
-        messageId: string ->
-        callCount: int ->
-        rawMessages: obj ->
-            System.Threading.Tasks.Task<obj>
+    /// Drive the real Blogger continuation transform over a Host-shaped
+    /// transcript (`{ info: { id, role, parentID, time }, parts }`).
+    val continueTransform:
+        scope: obj -> journal: obj -> bloggerSessionId: string -> rawMessages: obj -> System.Threading.Tasks.Task<obj>
+
+    /// Bind a landed physical dispatch to the request through the production
+    /// binder: exact flight claim plus durable open request with PromptKey.
+    val bindRequestDispatch:
+        scope: obj -> journal: obj -> request: obj -> promptKey: string -> System.Threading.Tasks.Task<obj>
 
     /// Drive the real stop boundary: the admission barrier lands before the
     /// detached physical abort is requested. `terminate` is the Host
@@ -96,4 +97,6 @@ module BlogSurface =
     /// first durable frame; no synthetic zero/zero coverage is accepted.
     val coverageBirth: value: obj -> obj
 
+    /// Decode the actual last assistant, including an absent provider identity;
+    /// this does not establish its ownership of the current provider step.
     val decodeCycle: messages: obj array -> obj

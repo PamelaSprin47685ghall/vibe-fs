@@ -269,11 +269,11 @@ module PromptDispatcher =
                 }
 
         member private this.PromptAlreadyAccepted(evidence: ChatAdmissionIntent.PendingPromptEvidence) =
-            (this.ProjectionFor evidence.Key.SessionId).AcceptedDispatches
-            |> Map.exists (fun _ accepted ->
+            (this.ProjectionFor evidence.Key.SessionId).PhysicalLandings
+            |> Map.tryFind evidence.Key.PhysicalUserMessageId
+            |> Option.exists (fun accepted ->
                 accepted.PromptKey = evidence.PromptKey
                 && accepted.SessionId = evidence.Key.SessionId
-                && accepted.PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId
                 && accepted.IdentitySeed = evidence.IdentitySeed)
 
         // Receipt is transport progress (Submitted), not intent identity.
@@ -556,19 +556,13 @@ module PromptDispatcher =
                     Task.FromResult(Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key)))
 
             let acceptedClaim =
-                projection.AcceptedDispatches
-                |> Map.tryPick (fun _ accepted ->
-                    if
-                        accepted.PromptKey = key
-                        && accepted.SessionId = sessionId
-                        && accepted.PhysicalUserMessageId = physicalMessageId
-                    then
-                        match accepted.Origin with
-                        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
-                            Some accepted
-                        | _ -> None
-                    else
-                        None)
+                projection.PhysicalLandings
+                |> Map.tryFind physicalMessageId
+                |> Option.filter (fun accepted ->
+                    accepted.PromptKey = key
+                    && accepted.SessionId = sessionId
+                    && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
             let acceptExisting
                 (accepted: PromptAuthority.AcceptedDispatch)

@@ -114,6 +114,10 @@ load 时，上一 runtime 遗留且本进程无同 RequestId live flight 的 ope
 
 terminal/idle callback 在 commit、repair 或 refresh 前，须以 assistant parentID 对应的 physical prompt durable evidence 证明自己属于当前 open RequestId。已被接替的回调只能 no-op，不消耗新请求预算、不 abandon/release 新 owner，也不借 Main refresh 重新认领 flight。
 
+归属只可为 Current、Superseded 或 Unproven。缺 durable open request、exact physical 落地证据或 open 已绑定的 dispatch PromptKey 时为 Unproven。Superseded 与 Unproven 均不得 commit、消费 repair 预算或停止 Host run。
+
+continuation 先判最新 physical user message 的 step 位置。尚无 parentID 指向它的 assistant 时为首 step：不评判历史 assistant，不 commit、repair 或 stop，只投影 live request 的 canonical 视图，并在视图后保留属于本请求的 repair 原文。后续只评判 parentID 指向该 physical message 的上一 step；仅 Current 可 commit、交给 repair owner 或 StopPhysicalRun，Superseded 与 Unproven 原样投影。
+
 ## [025] fatal 保留 exact settlement，经注入执行
 
 flight 冲突、semantic cut 与压缩不变量故障须携带确切 BloggerSession、RequestId 和 durable settlement 形成 typed incident；被接替的回调无权 fatal。runtime 使用构造时必需注入的 fatal capability，不直接引用物理实现。同一 incident 只报告、终止一次，fatal 不改 flight 或 durable projection。

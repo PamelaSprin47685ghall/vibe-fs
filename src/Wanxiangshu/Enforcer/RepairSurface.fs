@@ -2,6 +2,7 @@ namespace Wanxiangshu.Enforcer
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Enforcer.Cycle
 
 /// JSON-only owner boundary for Host abort/cleanup evidence. The repair
 /// predicates remain private to EnforcerRepair; semantic callers observe only
@@ -18,11 +19,12 @@ module RepairSurface =
         else
             unbox<obj array> value |> Array.toList
 
-    /// Classify the final Host assistant step. `interrupted=true` wins over the
+    /// Classify the given Host assistant step. `interrupted=true` wins over the
     /// generic error status, so one abort residue cannot be counted twice.
     let classifyBlogAttempt (rawMessages: obj array) : obj =
-        let messages = messagesOf (box rawMessages)
-
-        box
-            {| aborted = EnforcerRepair.hasAbortedBlogAttempt messages
-               errored = EnforcerRepair.hasErroredBlogAttempt messages |}
+        match EnforcerCycleDecode.latestAssistant (messagesOf (box rawMessages)) with
+        | None -> box {| aborted = false; errored = false |}
+        | Some step ->
+            box
+                {| aborted = EnforcerRepair.hasAbortedBlogAttempt step
+                   errored = EnforcerRepair.hasErroredBlogAttempt step |}

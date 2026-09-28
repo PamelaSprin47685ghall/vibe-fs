@@ -176,6 +176,7 @@ module InteractionRepairWorkflow =
         | BloggerRepairOutcome.PendingRepairWait
         | BloggerRepairOutcome.UnownedIdleIgnored
         | BloggerRepairOutcome.SupersededIgnored
+        | BloggerRepairOutcome.UnprovenIgnored
         | BloggerRepairOutcome.AbandonedExhausted
         | BloggerRepairOutcome.Completed -> ()
 
@@ -263,7 +264,7 @@ module InteractionRepairWorkflow =
             match observation with
             | Some port ->
                 port.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
-                    PromptContinuationKind.ProviderRetryAttempt
+                                                                                         PromptContinuationKind.ProviderRetryAttempt
             | None -> continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
 
         let hasDurableTerminal =

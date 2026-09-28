@@ -57,19 +57,16 @@ module PromptAuthorityProjectionQueries =
                 else
                     None))
 
-    let acceptedDispatchForPhysicalMessage
+    /// dispatch-protocol-006: the exact dispatch that landed as this physical
+    /// message. A same-payload landing on another physical message never
+    /// shadows it.
+    let physicalLanding
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (agentProjections: AgentProjectionSet)
         : PromptAuthority.AcceptedDispatch option =
         projectionFor sessionId agentProjections
-        |> Option.bind (fun authority ->
-            authority.AcceptedDispatches
-            |> Seq.tryPick (fun (KeyValue(_, dispatch)) ->
-                if dispatch.PhysicalUserMessageId = physicalUserMessageId then
-                    Some dispatch
-                else
-                    None))
+        |> Option.bind (fun authority -> Map.tryFind physicalUserMessageId authority.PhysicalLandings)
 
     let dispatchStatusFor
         (sessionId: SessionId)

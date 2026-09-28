@@ -46,6 +46,14 @@ module BloggerRecoveryProbe =
         Wanxiangshu.Foundation.Identity.PhysicalUserMessageId ->
             Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership
 
+    /// The physical message landed as a protocol repair scoped to this request.
+    val isRequestScopedRepairPrompt:
+        Wanxiangshu.Persistence.Journal.AgentJournal ->
+        Wanxiangshu.Foundation.Identity.SessionId ->
+        Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext ->
+        Wanxiangshu.Foundation.Identity.PhysicalUserMessageId ->
+            bool
+
     val terminalRequestOwnershipForProviderRun:
         tryPhysicalParent:
             (Wanxiangshu.Foundation.Identity.ProviderRunIdentity

@@ -1,5 +1,7 @@
 # capability-enforcement — WHAT
 
+Blogger 协议修复遵循 behavior-diagnosis-017；Fission 的 Engineer 限定与运行入口、门禁拒绝边界遵循 intra-participant-parallelism-017。
+
 ## [001] 每次请求的唯一能力集
 
 每次 provider attempt 的 `ToolCapabilitySet` 由 CanonicalRole 与 RequestKind 唯一确定，随执行 profile 单点组装，不另设权限来源或旁路字段。

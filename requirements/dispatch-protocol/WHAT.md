@@ -26,6 +26,8 @@ PromptKey 由 `(SessionId, LogicalRunId, AuthorityRootId, Origin, PayloadDigest,
 
 ClaimSequence 在 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 内单调递增，注册 claim 即消费。相同 payload 的独立调用，包括放弃后的新调用，获得不同 sequence 与 PromptKey。
 
+每条 physical message 精确保留其 PhysicalAccepted claim。按 payload 的 occasion 视图覆盖或清空，不得抹去既有精确落地证据；physical message 归属只读精确证据。
+
 ## [007] 结果未知不重发
 
 恢复或核对找不到物理证据时保持 StillPending，不自动重发，也不因重启次数判放弃。物理 acceptance 前的确定 Retryable/Fatal 拒绝可记 `Abandoned(SendFailed)`；只有这种确定未发送的结果可归还 idle nudge 的 exact quiescence permit。acceptance unknown 或持久化不确定均不可 re-arm。

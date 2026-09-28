@@ -41,8 +41,8 @@ module PromptAuthorityProjectionQueries =
         agentProjections: AgentProjectionSet ->
             PromptAuthority.PromptClaim option
 
-    /// Finds the accepted dispatch for the physical message.
-    val acceptedDispatchForPhysicalMessage:
+    /// The exact dispatch that landed as this physical message.
+    val physicalLanding:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         agentProjections: AgentProjectionSet ->

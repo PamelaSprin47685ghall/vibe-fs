@@ -129,20 +129,25 @@ type BloggerTerminalParentEvidence =
 [<RequireQualifiedAccess>]
 module BloggerRequestOwnership =
 
+    /// context-compression-024: a terminal belongs to the current request only
+    /// when durable evidence proves it. `Unproven` is not a weaker `Current`:
+    /// no durable open request, no exact landing for the physical message, or
+    /// an open request not yet bound to its dispatch prove nothing either way.
     let decide
         (currentRequestId: BloggerRequestId)
         (durableOpenRequestId: BloggerRequestId option)
         (durableOpenPromptKey: PromptKey option)
         (parent: BloggerTerminalParentEvidence option)
         : BloggerTerminalRequestOwnership =
-        match durableOpenRequestId, parent with
-        | Some openRequestId, _ when openRequestId <> currentRequestId -> BloggerTerminalRequestOwnership.Superseded
-        | None, _
-        | Some _, None -> BloggerTerminalRequestOwnership.Unproven
-        | Some _, Some evidence when durableOpenPromptKey = Some evidence.PromptKey ->
+        match durableOpenRequestId, durableOpenPromptKey, parent with
+        | Some openRequestId, _, _ when openRequestId <> currentRequestId -> BloggerTerminalRequestOwnership.Superseded
+        | None, _, _
+        | Some _, None, _
+        | Some _, _, None -> BloggerTerminalRequestOwnership.Unproven
+        | Some _, _, Some evidence when evidence.IsRequestScopedRepair -> BloggerTerminalRequestOwnership.Current
+        | Some _, Some openPromptKey, Some evidence when openPromptKey = evidence.PromptKey ->
             BloggerTerminalRequestOwnership.Current
-        | Some _, Some evidence when evidence.IsRequestScopedRepair -> BloggerTerminalRequestOwnership.Current
-        | Some _, Some _ -> BloggerTerminalRequestOwnership.Superseded
+        | Some _, Some _, Some _ -> BloggerTerminalRequestOwnership.Superseded
 
 [<RequireQualifiedAccess>]
 module BloggerRequestContext =

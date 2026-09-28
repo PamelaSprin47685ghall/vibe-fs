@@ -4,6 +4,7 @@ import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as ownership from '../../verification-system/tests/support/blogger-ownership.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -57,15 +58,25 @@ test('WHAT[context-compression-026] actual closed-writer settlement fails all ob
     rmSync(directory, { recursive: true, force: true })
   })
   const key = 'ses-blog-failed-abandon'
-  const physical = 'msg-repair-root'
-  assert.equal((await dispatch.acceptHumanRoot(opened.journal, key, physical, 'blogger')).ok, true)
+  const root = 'msg-repair-root'
+  const physical = 'msg-repair-dispatch'
+  const profile = await ownership.rootBlogger(opened.journal, key, root)
   const request = runtime.main({ requestId: 'req-failed-abandon', mainSession: 'ses-main', bloggerSession: key, toml: 'work' })
   assert.equal(runtime.claimCurrentRequest(scope, key, request), 'Claimed')
+  await ownership.ownRequest({
+    handle: opened.journal,
+    durable: opened.journal.journal,
+    scope,
+    bloggerSession: key,
+    profile,
+    request,
+    physical,
+  })
   let sends = 0
   let terminals = 0
   const idle = (run) => ({
     quiescent: true,
-    context: { sessionId: key, physicalUserMessageId: physical, authorityRoot: physical, providerRun: run },
+    context: { sessionId: key, physicalUserMessageId: physical, authorityRoot: root, providerRun: run },
     sessionPort: {
       SubscribeTerminal: () => ({ Dispose() {} }),
       SubscribeFutureTerminal: () => ({ Dispose() {} }),
@@ -81,7 +92,10 @@ test('WHAT[context-compression-026] actual closed-writer settlement fails all ob
   journal.JournalSurface_dispose(opened.journal)
   const failed = await Promise.allSettled([
     blog.observeIdleRepair(scope, opened.journal.journal, request, idle('run-1')),
-    blog.observeTransformRepair(scope, opened.journal.journal, request, 'run-1', []),
+    blog.observeTransformRepair(scope, opened.journal.journal, request, 'run-1', [
+      ownership.userMessage(physical),
+      ownership.assistantMessage('run-1', physical),
+    ]),
   ])
   assert.equal(failed[0].status, 'rejected')
   assert.equal(failed[1].status, 'rejected')
