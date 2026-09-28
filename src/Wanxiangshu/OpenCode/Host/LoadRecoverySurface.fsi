@@ -2,11 +2,12 @@ namespace Wanxiangshu.OpenCode.Host
 
 open System.Threading.Tasks
 
-/// Pure production fold and load-decision observations; no process restart or append is simulated.
+/// Production fold and load decisions, with controlled external ports for failure cases.
 module LoadRecoverySurface =
     val create: unit -> obj
     val foldCanonical: state: obj -> factJson: string -> obj
     val childSettlements: state: obj -> string array
+    val rejectChildSettlementAppends: state: obj -> unknown: bool -> Task<obj>
     val childView: state: obj -> parent: string -> child: string -> obj
     val settleChatTerminal: state: obj -> factJson: string -> obj
     val lookupChild: state: obj -> parent: string -> key: string -> byName: bool -> obj

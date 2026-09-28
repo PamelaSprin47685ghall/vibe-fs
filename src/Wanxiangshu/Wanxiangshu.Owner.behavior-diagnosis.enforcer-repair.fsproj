@@ -14,6 +14,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj" />
     <Compile Include="Enforcer/Codec.fsi" />
     <Compile Include="Enforcer/Codec.fs" />
     <Compile Include="Enforcer/Cycle/Model.fsi" />

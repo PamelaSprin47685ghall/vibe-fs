@@ -3,6 +3,7 @@ import test from 'node:test'
 import * as roles from '../../../dist/Foundation/RolesSurface.js'
 import * as recovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
 import { fold, link, acceptRun, terminal, materialized, abandoned } from './support/load-projection.mjs'
+import './support/child-settlement.mjs'
 
 test('WHAT[crash-reconciliation-020] current role vocabulary includes DevOps and Engineer but excludes legacy Coder', () => {
   assert.ok(roles.allRoleLabels.includes('devops'))
@@ -65,9 +66,9 @@ test('WHAT[crash-reconciliation-020] human roots and child runs without a durabl
 test('WHAT[crash-reconciliation-020] a cancelled completion is reportable and production JoinDrain retires it once through the fold port', async () => {
   const state = recovery.create()
   link(state)
-  fold(state, { family: 'Execution', case: 'HandleCompleted', payload: {
-    ParentSessionId: 'parent', Handle: 'work', Kind: 'Cancelled', CompletionRef: null, CompletionDigest: null,
-  } })
+  const child = acceptRun(state)
+  const cancelled = recovery.settleChatTerminal(state, terminal('Cancelled', child))
+  assert.equal(cancelled.ok, true, cancelled.error)
   assert.equal(recovery.childView(state, 'parent', 'child').joinable, 1)
   const drained = await recovery.drainCompletions(state, 'parent', 8, '2026-09-28T04:00:00Z')
   assert.equal(drained.ok, true, drained.error)

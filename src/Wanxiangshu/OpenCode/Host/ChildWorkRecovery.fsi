@@ -27,5 +27,5 @@ module ChildWorkRecovery =
     val settlementFact: orphaned: OrphanedChildRun -> ExecutionFactCases
 
     /// Append one settlement per orphaned child run. Load Phase; no dispatch, no
-    /// provider call, no command replay.
+    /// provider call, no command replay. A failed append aborts with JournalAppendException.
     val settleOrphanedChildRuns: journal: AgentJournal -> Task<unit>

@@ -18,4 +18,4 @@
 | 019 的 Life 隔离、021 的 lag-1 | 已被 session 画板跨Life保留与新阶段窗口替代；历史事件只读见007，不能激活旧规则。 |
 | 028 的真实 fatal 结算 | execution-failure-policy 与 cognitive-workspace 的故障边界；不沿用旧MagicTodo切点或伪造fatal描述符。 |
 
-局部命令：`node --test requirements/obligation-ledger/tests/*.test.mjs`。本轮已过语法检查；尚无对应 dist 新产物，未执行行为验收。TODO 不算通过。
+局部命令：`node --test requirements/obligation-ledger/tests/*.test.mjs`。generation3统一构建及正式选集已执行本包parser/sink，UI生产交付仍TODO。003文字补回后的最终复验见[兼容验收记录](../../../proposals/20模块兼容修复与验收-2026-09-28.md)，TODO不算通过。

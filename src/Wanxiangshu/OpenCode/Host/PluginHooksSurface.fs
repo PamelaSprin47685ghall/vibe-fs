@@ -39,6 +39,12 @@ module PluginHooksSurface =
     let decorateReviewToolDefinition (toolID: string) (definition: obj) : unit =
         ManagerReviewContract.decorateDefinition (box {| toolID = toolID |}) definition
 
+    let hideReviewContract (args: obj) : unit = ManagerReviewContract.hide args
+
+    let restoreReviewContract (args: obj) : unit = ManagerReviewContract.restore args
+
+    let wrapReviewExecutors (tools: obj) : unit = ManagerReviewContract.wrapReviewExecutors tools
+
     let hookFailurePolicy failure settlement : string =
         let typedFailure =
             match failure with

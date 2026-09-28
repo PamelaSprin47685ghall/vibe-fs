@@ -106,3 +106,5 @@ test('WHAT[relay-retirement-007] cleanup-blocked fold accepts a subsequent exact
 test('WHAT[relay-retirement-007] real durable retirement is atomic across crash points and cleanup retry', {todo: 'GAP-197: pure fold transition does not persist a transaction or clear actual resource blockers'})
 
 test.todo('WHAT[relay-retirement-007] retirement ends incumbent obligations without clearing the same-session cognitive canvas')
+
+test.todo('WHAT[relay-retirement-007] the actual suicide owner selects and durably commits Accepted whenever the retiring incumbent holds a valid matching certificate (GAP-197)')

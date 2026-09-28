@@ -194,9 +194,9 @@ test('WHAT[prefix-stability-009] actual candidate pipeline rejects changed cover
   const written = []
   const input = {
     sessionId: 'ses-prefix-proof', prefixEpoch: 4, frameEpoch: 2,
-    currentProjection, coverableCutoff: 2, requestCutoff: 2,
+    currentProjection, ingestedThrough: 2, coverableCutoff: 2, requestCutoff: 2,
     coveredDigest: xwire.coveredPrefixDigest(currentProjection, 2),
-    frames: [{ kind: 'Entry', ref: 'frame-ref', digest: sha256(frame), coveredFrom: 0, coveredThrough: 2 }],
+    frames: [{ kind: 'Entry', ref: 'frame-ref', digest: sha256(frame), coveredFrom: 0, coveredThrough: 2, cutoff: 2 }],
     port: {
       readBlob: async (ref) => {
         assert.equal(ref, 'frame-ref')
@@ -208,6 +208,13 @@ test('WHAT[prefix-stability-009] actual candidate pipeline rejects changed cover
       },
     },
   }
+  const { cutoff, ...unboundedFrame } = input.frames[0]
+  const missingBoundary = await xwire.candidateFromJournal({ ...input, frames: [unboundedFrame] })
+  assert.equal(missingBoundary.ok, false)
+  assert.equal(missingBoundary.probe, null)
+  assert.equal(missingBoundary.error, 'no coverage')
+  assert.equal(written.length, 0, 'a frame without an explicit semantic cutoff cannot materialize a prefix')
+
   const accepted = await xwire.candidateFromJournal(input)
   assert.equal(accepted.ok, true, accepted.error)
   assert.equal(accepted.probe.candidate.cutoff, 2)

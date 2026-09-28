@@ -33,7 +33,8 @@ module ChildWorkRecovery =
           ChildSessionId: SessionId }
 
     let private isChildWorkRun (run: PromptAuthority.AuthorityExecutionProfile) : bool =
-        run.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot && run.CanonicalRole <> Role.Manager
+        run.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        && run.CanonicalRole <> Role.Manager
 
     let private activeChildRuns (projections: AgentProjectionSet) : SessionId list =
         projections.Sessions
@@ -83,14 +84,15 @@ module ChildWorkRecovery =
             let projections = (AgentJournal.snapshot journal).AgentProjections
 
             for orphaned in orphanedChildRuns projections do
-                let! _ =
+                match!
                     AgentJournal.appendAgent
                         (StreamId.Session orphaned.ParentSessionId)
                         None
                         (AgentFact.Execution(settlementFact orphaned))
                         journal
-
-                ()
+                with
+                | Ok _ -> ()
+                | Error failure -> raise (JournalAppendException failure)
 
             return ()
         }

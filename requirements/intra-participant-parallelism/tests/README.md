@@ -13,7 +13,7 @@ WHAT 是合同；本文记录当前证据，不增加产品义务。先用 `node
 | 011 | 真实 admission pending/active 拒绝重复，release 后可再准入 | lane 到 logical owner 映射与递归拒绝 |
 | 012—013 | 角色 predicate；实际 Engineer 根/子 chat.message 权限；强制根调用在解析前拒绝且无 Host 副作用 | 所有入口权限同源；单个根拒绝不证明所有身份组合 |
 | 014—015 | 真实 settlement 纯裁决；不同记录到达顺序的有序 bundle 和 ring 终点 | 实际控制面接续、乱序完成下唯一 N−1 takeover |
-| 017 | 配置投影；真实 Manager/DevOps 工具拒绝，伪称 Engineer 无效且无副作用 | 完整公式、只读 Sphinx Engineer、所有 Manager 生命周期及历史 Fission 只读重放 |
+| 017 | 配置投影；真实 Manager/DevOps 工具拒绝，伪称 Engineer 无效且无副作用 | 完整公式、Sphinx 内标准 Engineer 的普通准入、所有 Manager 生命周期及历史 Fission 只读重放 |
 
 `support/admission.mjs` 仅给生产 admission 注入 Host 端口并记录实际调用，不自行复制准入算法。插件用例运行生产工具与 journal，但 Host 是受控端口，未运行真实模型。`missingIdleTerminalBridgeScenario` 直接给 scheduler 发布投影并 kick；名称不能证明 Host terminal 回调已接通 Fission。
 

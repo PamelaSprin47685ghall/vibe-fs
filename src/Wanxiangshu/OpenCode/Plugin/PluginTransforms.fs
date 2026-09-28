@@ -103,7 +103,6 @@ module PluginTransforms =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-          RestoreProtocolArguments: obj -> Task<unit>
           ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
@@ -112,8 +111,7 @@ module PluginTransforms =
           ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          CaptureReadonlyDelegation: obj -> Task<unit>
-          ApplyReadonlyDelegation: obj -> Task<unit>
+          ApplyStrengthSpeculation: obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
@@ -142,9 +140,6 @@ module PluginTransforms =
     let private failIfReplicaDecisionLost (handled: bool) : unit =
         if not handled then
             raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
-
-    [<Emit("{ ...$0 }")>]
-    let private shallowCopyObj (source: obj) : obj = jsNative
 
     let private raiseFailClosed (fuse: string -> unit) (reason: string) : 'a =
         fuse reason
@@ -276,157 +271,14 @@ module PluginTransforms =
                         )
             }
 
-        // DELEGATE.md 9.1/9.2 / speculative-investigation-014: the only
-        // enablement condition for explicit read-only delegation is that a
-        // Predictor model is configured. The read-only configuration
-        // existence query is the process-shared
-        // ModelRouting.sharedPredictorConfiguration, loaded once together
-        // with the sole MJS model configuration during the PluginBoot Load
-        // Phase (PluginBoot.create runs ModelRouting.initialize before any
-        // transform or hook is constructed), and is shared by tool
-        // decoration (PluginHooks) and delegation admission here, so this
-        // seam consumes that one query instead of holding a second enabled
-        // truth. Configured enables admission; NotConfigured authorizes
-        // nothing. ConfigurationInvalid is a malformed model configuration
-        // and fails closed here, the same choice as the PluginHooks
-        // tool-decoration seam and ModelRouting.requireRoutingProtocol: it
-        // is never silently degraded to "not configured". The transform
-        // hook's registered disposition (HookPolicy MessagesTransform:
-        // Workflow / TypedPolicyFailClosed, diagnostic operation
-        // plugin-hook-messages-transform-failed) carries the report.
-        let predictorConfigured () : bool =
-            match ModelRouting.sharedPredictorConfiguration () with
-            | ModelRouting.PredictorConfiguration.Configured -> true
-            | ModelRouting.PredictorConfiguration.NotConfigured -> false
-            | ModelRouting.PredictorConfiguration.ConfigurationInvalid reason ->
-                raise (
-                    InvalidOperationException(
-                        sprintf "execution-model-routing: Predictor model configuration is invalid: %s" reason
-                    )
-                )
-
-        // host-boundary-032 / DELEGATE.md 4.3: provider-facing wire-layer
-        // restore of the protocol fields. The Host persists tool-call input
-        // after the before hook stripped the protocol fields, so every later
-        // provider request is built from stripped history. The before hook
-        // recorded the wire originals in the process-local vault; this step
-        // merges them back into the request's assistant tool-call parts before
-        // delegation capture (4.5) or the replica batch collector reads the
-        // same history. Pure per part: business arguments verbatim, protocol
-        // keys appended when missing or different, results untouched, no vault
-        // entry means fail-open.
-        let restorePart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) : obj =
-            if isNull part then
-                part
-            else
-                let kind =
-                    ProviderWireDecode.firstString part [ "type" ]
-                    |> Option.defaultValue ""
-                    |> fun value -> value.ToLowerInvariant()
-
-                let isToolCallPart = kind = "tool" || kind = "tool-call" || kind = "tool_call"
-
-                if not isToolCallPart then
-                    part
-                else
-                    match ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ] with
-                    | None -> part
-                    | Some callId ->
-                        match ProtocolArgumentVault.tryFind vault sessionId callId with
-                        | None -> part
-                        | Some snapshot ->
-                            let state = ProviderWireDecode.readField part "state"
-
-                            let hasStateInput = not (isNull state) && not (isNull state?input)
-
-                            let hasTopLevelArgs = not (isNull part?args)
-
-                            if not hasStateInput && not hasTopLevelArgs then
-                                part
-                            else
-                                let current = if hasStateInput then state?input else part?args
-
-                                let merged = ProtocolArgumentVault.restoreArguments snapshot current
-
-                                if obj.ReferenceEquals(merged, current) then
-                                    part
-                                elif hasStateInput then
-                                    let stateCopy = shallowCopyObj state
-                                    stateCopy?input <- merged
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?state <- stateCopy
-                                    partCopy
-                                else
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?args <- merged
-                                    partCopy
-
-        let restoreProtocolArguments (outObj: obj) : Task<unit> =
-            task {
-                if not (isNull outObj) && not (isNull outObj?messages) then
-                    match ProviderWireDecode.projectionSessionIdFromMessages outObj with
-                    | Some sessionId ->
-                        let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
-
-                        let restoreMessage (raw: obj) : obj =
-                            if isNull raw then
-                                raw
-                            else
-                                let parts = ProviderWireDecode.rawPartsOf raw
-
-                                let restoredParts =
-                                    parts |> List.map (restorePart boot.ProtocolArgumentVault sessionId)
-
-                                if List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) parts restoredParts then
-                                    raw
-                                else
-                                    let copy = shallowCopyObj raw
-                                    copy?parts <- box (List.toArray restoredParts)
-                                    copy
-
-                        let rewritten = rawMessages |> List.map restoreMessage
-
-                        if not (List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) rawMessages rewritten) then
-                            HostMessageProjection.replaceMessagesInPlace outObj rewritten
-                    | None -> ()
-            }
-
-        let captureReadonlyDelegation outObj =
-            task {
-                match!
-                    StrengthDelegate.tryCapture
-                        snapshotOpt
-                        journal
-                        strengthDurability
-                        boot.StrengthScope
-                        scope.TryAttemptPlan
-                        scope.SyncDelegateRuntime
-                        (predictorConfigured ())
-                        outObj
-                with
-                | StrengthDelegate.CaptureOutcome.Captured request ->
-                    Diagnostic.emit
-                        "strength-delegation-requested"
-                        [ "session_id", SessionId.value request.OwnerSessionId
-                          "decision_id", StrengthDecisionId.value request.DecisionId
-                          "requested_rounds", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
-                | StrengthDelegate.CaptureOutcome.Skipped reason ->
-                    let sessionId =
-                        ProviderWireDecode.projectionSessionIdFromMessages outObj
-                        |> Option.defaultValue ""
-
-                    Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
-            }
-
-        let applyReadonlyDelegation outObj =
-            StrengthDelegate.tryApply
+        let applyStrengthSpeculation outObj =
+            StrengthSpeculate.tryApply
                 snapshotOpt
                 journal
                 strengthDurability
                 boot.StrengthScope
                 scope.TryAttemptPlan
                 scope.SyncDelegateRuntime
-                (predictorConfigured ())
                 outObj
 
         { BeginPhysicalProviderAttempt =
@@ -436,7 +288,6 @@ module PluginTransforms =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
             SessionStartedAtLedger.bindSessionStartedAt port clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
-          RestoreProtocolArguments = restoreProtocolArguments
           ApplyRelayProjection =
             fun sidOpt outObj ->
                 task {
@@ -612,8 +463,7 @@ module PluginTransforms =
                             outObj
                 }
 
-          CaptureReadonlyDelegation = captureReadonlyDelegation
-          ApplyReadonlyDelegation = applyReadonlyDelegation
+          ApplyStrengthSpeculation = applyStrengthSpeculation
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -679,8 +529,7 @@ module PluginTransforms =
                     let! _ = XWire.applyTransform isReplica snapshotOpt wirePort attempts outObj
                     return ()
                 }
-          ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
-          }
+          ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages }
 
     let normalTransform
         (caps: NormalTransformCapabilities)
@@ -706,19 +555,6 @@ module PluginTransforms =
 
             // 4. StrengthReplay.applyBeforeXTrace
             let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
-
-            // 4.4 host-boundary-032 / DELEGATE.md 4.3: restore the protocol
-            // fields the Host persisted away into the provider-facing request
-            // BEFORE delegation capture (4.5) reads the same history; without
-            // this the capture never sees the budget the model signed.
-            do! caps.RestoreProtocolArguments outObj
-
-            // 4.5 StrengthDelegate.tryCapture — freeze the explicit authorization
-            // from the real completed owner batch and persist DelegationRequested
-            // here, before any compaction or message replacement downstream can
-            // lose batch metadata (DELEGATE-6/7.1). The start phase runs at step
-            // 12 and reads the pending request back from canonical Current.
-            do! caps.CaptureReadonlyDelegation outObj
 
             // 5. XTraceCapture.captureObservedMessagesWithReceipt
             let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
@@ -747,9 +583,8 @@ module PluginTransforms =
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
             if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 12. StrengthDelegate.tryApply — start and consume the pending
-                // explicit authorization on a legal ordinary continuation only.
-                do! caps.ApplyReadonlyDelegation outObj
+                // 12. StrengthSpeculate.tryApply
+                do! caps.ApplyStrengthSpeculation outObj
 
                 // 13. PairProgrammingThoughtTransform.maybeInjectGuideline
                 do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
@@ -795,9 +630,6 @@ module PluginTransforms =
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! branches.ReplicaXWire outObj
                     do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
-                    // host-boundary-032 / DELEGATE.md 4.3: same restore on the
-                    // Replica branch, before the runtime reads this request.
-                    do! caps.RestoreProtocolArguments outObj
                     let! handled = runtime.HandleTransform outObj
                     do failIfReplicaDecisionLost handled
                     branches.ReplicaSanitize outObj

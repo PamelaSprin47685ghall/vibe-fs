@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Runtime
@@ -67,29 +66,6 @@ type OpenCodeHostPort(sessions: ISessionHostPort) =
         | Outcome.SendOutcome.Retryable reason -> Error(sprintf "host prompt retryable: %s" reason)
         | Outcome.SendOutcome.AcceptanceUnknown reason -> Error(sprintf "host prompt acceptance unknown: %s" reason)
         | Outcome.SendOutcome.Fatal reason -> Error(sprintf "host prompt fatal: %s" reason)
-
-    /// The prompt options this adapter uses. The Work spec carries its own constraints;
-    /// the adapter adds none.
-    let promptOptions: OpenCodePromptOptions =
-        { Model = None
-          Agent = None
-          Directory = None
-          Metadata = None
-          Tools = None
-          BindingIntent = Unchecked.defaultof<SessionBindingIntent>
-          DetachedListener = None }
-
-    let createSession (ownerSessionId: SessionId) (label: string) : Task<Result<SessionId, string>> =
-        task {
-            let options =
-                { Title = Some label
-                  Agent = None
-                  Directory = None }
-
-            match! sessions.CreateSiblingSession(ownerSessionId, None, options) with
-            | Ok child -> return Ok child
-            | Error reason -> return Error(sprintf "host session creation failed: %s" reason)
-        }
 
     member _.Capabilities() : string list =
         [ "dispatch"; "read-status"; "read-result"; "request-cancel"; "reconcile" ]

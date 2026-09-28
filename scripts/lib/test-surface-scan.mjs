@@ -552,14 +552,6 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'Sphinx/V2/Persistence/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-020'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'Sphinx/V2/Plugins/Bayes/Surface.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-021', 'SPHINX-V2-025', 'SPHINX-V2-026'],
@@ -643,10 +635,12 @@ export const SURFACE_MANIFEST = [
       'PREFIX-STABILITY-003',
       'PREFIX-STABILITY-005',
       'PREFIX-STABILITY-009',
+      'CONTEXT-COMPRESSION-028',
     ],
+    lawOwners: { 'CONTEXT-COMPRESSION-028': 'context-compression' },
     source: 'src/Wanxiangshu/Context/Prefix/XWireSurface.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/Host/PluginRecoveryScopeSurface.js',
@@ -1457,7 +1451,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/PluginHooksSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-014', 'EFFECT-ACCOUNTING-008'],
+    laws: ['HOST-BOUNDARY-014', 'HOST-BOUNDARY-032', 'EFFECT-ACCOUNTING-008'],
     lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs',
     representation: 'opaque-capability',

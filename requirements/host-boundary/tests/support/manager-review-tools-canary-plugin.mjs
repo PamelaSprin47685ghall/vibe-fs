@@ -11,7 +11,8 @@
  *   - schema decoration with contract (type, enum, required)
  *   - before: args reference identity and unchanged business arguments
  *   - after: original argument values, object identity and key order
- *   - 3 terminal states: normal, executor throw (missing file), cancellation (long task + abort)
+ *   - production JS file read, controlled registered-executor throw, and public AbortSignal rejection
+ *   - controlled-executor settlement observes the real wrapper; it does not prove production JS cancellation
  *   - durable ToolPart in Host message store preserving contract input
  */
 
@@ -108,6 +109,7 @@ const inflightCalls = new Map();
 if (!productionPluginPath) throw new Error('Production plugin path is unavailable');
 const { default: productionPlugin } = await import(pathToFileURL(productionPluginPath).href);
 if (typeof productionPlugin?.server !== 'function') throw new Error('Production plugin server is unavailable');
+const { wrapReviewExecutors } = await import(pathToFileURL(path.resolve(path.dirname(productionPluginPath), '../Host/PluginHooksSurface.js')).href);
 
 export default {
   id: 'wanxiangshu-manager-review-tools-canary',
@@ -123,6 +125,62 @@ export default {
       if (typeof hook !== 'function') throw new Error('A required production tool hook is unavailable');
     }
 
+    const manager = hooks.tool?.['js-manager'];
+    if (typeof manager?.execute !== 'function') throw new Error('The real registered manager executor is unavailable');
+    const productionExecute = manager.execute;
+    const controlledFailure = new Error('controlled registered executor failure');
+    const controlledAbort = new Error('controlled registered executor abort');
+    const executions = new WeakMap();
+    const controlled = {
+      ...manager,
+      execute(args, context) {
+        const stored = [...inflightCalls.values()].find((call) => call.argsPreRef === args && call.sessionID === context.sessionID);
+        if (!stored) throw new Error('Controlled executor did not receive the original same-call arguments');
+        const entered = {
+          sessionID: stored.sessionID,
+          callID: stored.callID,
+          sameArguments: args === stored.argsPreRef,
+          contractHidden: !Object.hasOwn(args, 'contract'),
+          businessArguments: structuredClone(args),
+          kind: args.program === 'CANARY_CONTROLLED_THROW' ? 'throw' : 'abort',
+        };
+        executions.set(args, entered);
+        if (args.program === 'CANARY_CONTROLLED_THROW') throw controlledFailure;
+        if (args.program !== 'CANARY_CONTROLLED_ABORT') throw new Error('Unexpected controlled executor program');
+        if (!context.abort || context.abort.aborted) throw new Error('Cancellation fixture requires a live public AbortSignal');
+        return new Promise((_resolve, reject) => {
+          context.abort.addEventListener('abort', () => {
+            entered.abortObserved = true;
+            reject(controlledAbort);
+          }, { once: true });
+          void emit('tool.executor.entered', entered);
+        });
+      },
+    };
+    wrapReviewExecutors({ 'js-manager': controlled });
+    manager.execute = async (args, context) => {
+      if (!['CANARY_CONTROLLED_THROW', 'CANARY_CONTROLLED_ABORT'].includes(args.program)) {
+        return productionExecute.call(manager, args, context);
+      }
+      try {
+        return await controlled.execute(args, context);
+      } catch (error) {
+        const stored = [...inflightCalls.values()].find((call) => call.argsPreRef === args && call.sessionID === context.sessionID);
+        const entered = executions.get(args);
+        await emit('tool.executor.settled', {
+          sessionID: stored?.sessionID,
+          callID: stored?.callID,
+          entered,
+          originalError: error === (entered?.kind === 'throw' ? controlledFailure : controlledAbort),
+          identityWithBefore: stored ? args === stored.argsPreRef : false,
+          contractRestored: Object.hasOwn(args, 'contract'),
+          originalOrder: stored ? isDeepStrictEqual(Object.keys(args), stored.preKeys) : false,
+          originalValues: stored ? isDeepStrictEqual(args, stored.preArgsSnapshot) : false,
+        });
+        throw error;
+      }
+    };
+
     return {
       ...hooks,
 
@@ -133,6 +191,7 @@ export default {
         const properties = event.properties ?? {};
         const sessionID = properties.sessionID ?? properties.info?.sessionID ?? properties.part?.sessionID;
         if (!sessionID) return;
+        if (event.type === 'session.idle') await emit('session.idle.observed', { sessionID });
         const messages = await fetchMessages(client, sessionID);
         for (const stored of inflightCalls.values()) {
           if (stored.sessionID !== sessionID) continue;

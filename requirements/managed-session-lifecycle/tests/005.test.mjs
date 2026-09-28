@@ -24,3 +24,5 @@ test('WHAT[managed-session-lifecycle-005] explicit removal permits a new binding
 })
 
 test.todo('WHAT[managed-session-lifecycle-005] different live scopes share no child while concurrent same-scope requests share one, through the actual scope owner (GAP-133)')
+
+test.todo('WHAT[managed-session-lifecycle-005] two independently authorized roles in one live scope retain separate reusable sessions, with at most one per role (GAP-133)')

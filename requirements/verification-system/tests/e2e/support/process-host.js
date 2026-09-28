@@ -79,7 +79,7 @@ export class ProcessHost {
       onStdoutChunk: this._onStdout.bind(this),
       onStderrChunk: this._onStderr.bind(this),
       onExit: this._onChildExit.bind(this),
-    });
+    }, { detached: opts.detached ?? true });
     const startTimeout = opts.startTimeoutMs || HOST_START_TIMEOUT_MS;
     const listenLine = await this._waitForListening(startTimeout, () => {
       if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
@@ -192,7 +192,9 @@ export class ProcessHost {
     const port = this._port;
     const pid = this._pid;
     try {
-      await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
+      await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS, {
+        detached: this._startOpts.detached ?? true,
+      });
       try { this._child.stdout.destroy(); } catch {}
       try { this._child.stderr.destroy(); } catch {}
       try { this._child.stdin.destroy(); } catch {}
@@ -204,14 +206,14 @@ export class ProcessHost {
         if (port && !(await checkSocketClosed(port, SOCKET_CHECK_TIMEOUT_MS))) {
           if (pid) {
             try {
-              if (process.platform !== 'win32') process.kill(-pid, 'SIGKILL');
+              if (process.platform !== 'win32' && (this._startOpts.detached ?? true)) process.kill(-pid, 'SIGKILL');
             } catch {}
             try {
               process.kill(pid, 'SIGKILL');
             } catch {}
           }
           // Last-resort reclaim of the listen socket owner (harness-only).
-          if (process.platform === 'linux') {
+          if (process.platform === 'linux' && (this._startOpts.detached ?? true)) {
             try {
               const { execSync } = await import('node:child_process');
               execSync(`fuser -k ${port}/tcp`, {

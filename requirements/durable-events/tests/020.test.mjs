@@ -32,8 +32,33 @@ test('WHAT[durable-events-020] Journal boot creates no writer until the first bu
       const lines = readFileSync(writer, 'utf8').trimEnd().split('\n').map(JSON.parse)
       assert.ok(lines.length >= 2, 'activation persists the runtime watermark and the business fact')
       assert.equal(journal.JournalSurface_hasSession(booted.journal, 'session-proof'), true)
+      const bytes = readFileSync(writer, 'utf8')
+      const store = workspaceStore.acquire(commonDir)
+      try {
+        assert.deepEqual(workspaceStore.journalCurrent(store), { available: true, sessions: ['session-proof'] })
+        assert.equal(readFileSync(writer, 'utf8'), bytes, 'semantic consumption must not rewrite retained facts')
+        assert.deepEqual(readdirSync(join(commonDir, 'wanxiang/events')), ['boot-proof.ndjson'])
+      } finally {
+        workspaceStore.release(commonDir)
+      }
     } finally {
       journal.JournalSurface_dispose(booted.journal)
+    }
+  })
+})
+
+test('WHAT[durable-events-020] first workspace consumption initializes an empty Journal Current without a writer', async () => {
+  await withStoreDirectory(async (commonDir) => {
+    const events = join(commonDir, 'wanxiang/events')
+    const store = workspaceStore.acquire(commonDir)
+    try {
+      assert.equal(existsSync(events), false, 'acquisition must not activate the store')
+      const expected = { available: true, sessions: [] }
+      assert.deepEqual(workspaceStore.journalCurrent(store), expected)
+      assert.deepEqual(workspaceStore.journalCurrent(store), expected)
+      assert.deepEqual(existsSync(events) ? readdirSync(events) : [], [])
+    } finally {
+      workspaceStore.release(commonDir)
     }
   })
 })
@@ -49,7 +74,7 @@ test('WHAT[durable-events-020] workspace capability acquisition defers malformed
     try {
       assert.deepEqual(readdirSync(events), ['invalid.ndjson'])
       assert.equal(readFileSync(writer, 'utf8'), bytes)
-      assert.throws(() => workspaceStore.allHeadsCount(store), /MalformedEnvelope/)
+      assert.throws(() => workspaceStore.journalCurrent(store), /MalformedEnvelope/)
       assert.equal(readFileSync(writer, 'utf8'), bytes, 'failed activation must not repair the historical file')
       assert.deepEqual(readdirSync(events), ['invalid.ndjson'])
     } finally {

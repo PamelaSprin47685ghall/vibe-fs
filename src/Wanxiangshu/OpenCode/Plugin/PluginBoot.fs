@@ -25,8 +25,7 @@ module PluginBoot =
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
-          FamilyParent: SessionId -> SessionId option
-          ProtocolArgumentVault: ProtocolArgumentVault.Vault }
+          FamilyParent: SessionId -> SessionId option }
 
     let create (input: obj) : Task<Boot> =
         task {
@@ -36,12 +35,6 @@ module PluginBoot =
             // execution-model-routing-001: bootstrap/load the sole model scheduler during Load Phase.
             // This may create the missing user config atomically, but performs no Host call.
             do! ModelRouting.initialize ()
-
-            // opencode hands a built-in tool its Effect argument schema and no
-            // JSON schema (1.18.32 `src/tool/json-schema.ts`); the readonly
-            // delegation protocol renders the provider-visible schema with the
-            // same conversion, so resolve that renderer once here.
-            do! ToolSchemaJson.initialize ()
 
             let portOpt = OpenCodePortAdapter.create input
 
@@ -56,14 +49,6 @@ module PluginBoot =
             let strengthScope = new PluginStrengthScope()
             scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
             scope.AttachScopeDispose(fun () -> strengthScope.Dispose())
-
-            // host-boundary-032 / DELEGATE.md 4.3: the protocol argument vault
-            // records tool.execute.before originals so the provider transform
-            // can restore them into persisted history. Process-local only;
-            // dropped with the scope.
-            let protocolArgumentVault = ProtocolArgumentVault.create ()
-
-            scope.AttachScopeDispose(fun () -> ProtocolArgumentVault.clear protocolArgumentVault)
 
             let clock = NodeTiming.nodeClockPort ()
 
@@ -92,6 +77,5 @@ module PluginBoot =
                   Clock = clock
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory
-                  FamilyParent = familyParent
-                  ProtocolArgumentVault = protocolArgumentVault }
+                  FamilyParent = familyParent }
         }

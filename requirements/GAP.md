@@ -185,8 +185,8 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP | 范围 | 状态 | 当前边界与后续工作 |
 |---|---|---|---|
 | GAP-063 | host-boundary-019/021/026/027/029 | PARTIAL | 真实transform受控端口、截断和子进程退出用例保留。026/027已去除具体模块清单，Host诊断独立编译修复缺失依赖后通过；全能力Host、正常路径退出及架构语义仍待证。 |
-| GAP-064 | host-boundary-013 | OPEN | 旧基线曾断言完成但进程不退出；本次受构建阻断尚未复验，不增加超时或强制退出。 |
-| GAP-069 | managed-session-lifecycle-004/009/014 | OPEN | 旧fixture文件完成问题待本次产物复验；不能用旧断言pass关闭资源生命周期问题。 |
+| GAP-064 | host-boundary-013 | PARTIAL | generation3正式63文件选集完成，013原场景正常返回；未扩大时限。全Host及异常物理退出仍缺证。 |
+| GAP-069 | managed-session-lifecycle-004/009/014 | PARTIAL | generation3正式124文件全部完成且无失败，旧fixture挂起未再发生；局部端口完成不等于全部真实子资源已收束。 |
 | GAP-070 | provider-language-002/003/010/012 | PARTIAL | 新来源优先级已按上游对齐；跨进程绑定、锚点表示及完整双语语义仍缺证。 |
 | GAP-071 | provider-language-005/006/008/009/013 | PARTIAL | 实际提示投影、资源反例保留；同一真实请求的system/tool/consequence语言交付和Class A所有权仍待证。 |
 | GAP-072 | office-capability-003/005/011 | PARTIAL | 上游已区分稳定权能与当前准入，旧歧义不再待决；跨投影语义同源及完整执行证明仍缺。 |
@@ -206,14 +206,14 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-126 | managed-chat-execution | PARTIAL | 保留真实journal/准入；Host请求链、物理承接和失败后果仍缺。显式/continue已退役，恢复归加载阶段。 |
 | GAP-127 | managed-chat-execution恢复 | PARTIAL | 新接缝驱动实际admission序列，撤去只传restart标签的证明；受控调用仍不是OS进程死亡与重开。 |
 | GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | handle重放可能复活Completed/Retired；一次工作墓碑与固定道路执行者延续的身份边界仍待裁决，保留反例。 |
-| GAP-134 | managed-session-lifecycle测试接缝 | PARTIAL | 首批关联源码已迁入真实端口观察；实际生命周期用例待新产物执行，自写时间整数不算Temporal。 |
-| GAP-135 | managed-session-lifecycle终止 | PARTIAL | Host abort明确拒绝的传播需本次产物复验；不能把端口调用完成当成退出成功。 |
-| GAP-148 | crash-reconciliation测试资源 | PARTIAL | 旧接缝主动结束自身请求的修正保留；本基线仍需验证文件完成，不扩大业务超时。 |
+| GAP-134 | managed-session-lifecycle测试接缝 | PARTIAL | generation3正式用例已驱动实际恢复许可及termination，悬置drain/abort检验先后。全部生产接线与OS退出仍缺证。 |
+| GAP-135 | managed-session-lifecycle终止 | PARTIAL | Sessions保留实际Host AbortSession的Error，generation3正式受控端口拒绝回归通过；不将端口完成当物理退出。 |
+| GAP-148 | crash-reconciliation测试资源 | PARTIAL | generation3正式124文件全部完成，旧接缝主动结束自身请求的修正获执行；未扩大业务超时。真实崩溃切点另见GAP-149。 |
 | GAP-149 | crash-reconciliation | PARTIAL | 新codec→fold→resolver用例不构成进程重启。完整load顺序、未知effect、physical receipt、PTY不重放及所有崩溃切点仍待证。 |
 | GAP-150 | crash-reconciliation-019 | OPEN | 独立effect proof registry的权威与维护关系仍需裁决；保留四阶段、歧义与物理证明要求，不以新增平行清单强行闭合。 |
 | GAP-151 | durable-convergence | PARTIAL | 真实Git、双remote配置保留与幂等用例存在；跨机器Current、受控CAS竞争、崩溃原子替换和增量成本仍待证。 |
 | GAP-152 | durable-convergence-011 | PARTIAL | 过期parent与从未存在的parent在当前窗口查询中不可区分；需决定开放边界或提供过期证据，不能由测试暗定。 |
-| GAP-154 | delegation-007/024 | PARTIAL | 活跃旧角色在创建child前拒绝的回归保留；本基线尚未重新编译执行，不将历史通过误报为当前通过。 |
+| GAP-154 | delegation-007/024 | PARTIAL | 生产共用admission在store准入前拒绝Coder/Inspector；generation3正式007验证零child/零prompt且Engineer正例成功。未直接计数全部durable append，历史解码和完整024窗口证明另保留。 |
 | GAP-170 | epistemic-reasoning旧内核 | RETIRED | 旧内核已由sphinx-v2取代，旧测试归档保留hash；新运行链见GAP-219。 |
 | GAP-171 | 旧Sphinx兼容协议 | RETIRED | 不恢复旧原生工具内核。新独立MCP入口与OpenCode不注入MCP的合同可以共存。 |
 | GAP-172 | 旧Sphinx submit准入 | RETIRED | 旧接口不再是现行所有者；新入口准入必须在v2真实runtime证明。 |
@@ -225,12 +225,12 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
 | GAP-194 | relay-assessment精确重放 | PARTIAL | 精确相同评审重放与新评审冲突须区分，不能只改标题或调用两次即认幂等。 |
-| GAP-195 | relay-context-projection | PARTIAL | 新接缝调用真实NarrativeTransform；旧projectMessages透传API保留兼容但不计证据。完整历史、真实物理发送和stale中断尚需执行。 |
+| GAP-195 | relay-context-projection | PARTIAL | generation3正式用例验证真实NarrativeTransform保留历史及选择stale中断；旧透传API不计证据。规范补回可见面不得含秘密，真实发送、秘密过滤和中断完成仍待证。 |
 | GAP-196 | 旧ProjectionCut删owner请求 | RETIRED | 上游改为完整历史，不再要求旧裁剪；新实现保全历史的真实证据仍归GAP-195。 |
-| GAP-197 | relay-retirement | PARTIAL | 真实工具scope与受控资源收束用例保留；跨进程终止、递归live资源与完整退休不等于纯分类结果。 |
-| GAP-216 | 全局构建 | OPEN | 上游plugin-composition仍引用已删除Vault及StrengthDelegate等；当前不能生成全局新鲜产物。部分认知/Relay独立闭包另缺CanvasCodec、AssumeFactCases、AgentFact等依赖，已实际编译确认失败。 |
-| GAP-217 | host-boundary-032 | PARTIAL | 现在精确断言值、对象身份、原键序和真实Host终态；现源码删除contract后尾部defineProperty，静态分析预示中间/首位键序反例，尚未执行。异常路径TODO保留，canary不再默认成功。 |
-| GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 上游load结算忽略append Error，TargetAgent空值又回退Byname；新接缝不补造成功事实。需在真实加载入口保留失败并验证合法历史材料边界。 |
+| GAP-197 | relay-retirement | PARTIAL | generation3正式资源blocker与Continue/Accepted后继用例通过。有效匹配证书必须Accepted已补回规范；真实owner选择及durable闭合记录另TODO。跨进程终止、递归资源与完整退休仍缺证。 |
+| GAP-216 | 全局构建 | PARTIAL | 新鲜Fable构建已恢复，1560解析源、1522生产项、171 Surface及832模块门禁通过；按现行合同清理退役调用并补真实依赖。未声明每个owner逐个独立编译或全产品实现达标。 |
+| GAP-217 | host-boundary-032 | PARTIAL | 参数顺序及恢复前预检已有回归；真实公开SDK又复现before删除字段污染持久input。已改到实际executor同源清理及finally，受控异常/真实AbortSignal只证明同一包装与Host适配，待统一新构建。生产Js未消费AttachAbort及下游Hook异常整链仍TODO，详见Host032参数保真记录。 |
+| GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 真实首笔ChildRunVoided追加拒绝现抛JournalAppendException，同任务停止后续结算，generation3正式故障回归通过。Companion durable查询保留；TargetAgent空值及加载返回前后台屏障仍待证，不宣称整链fail-closed。 |
 | GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。 |
 | GAP-220 | obligation-ledger-001/002/006 | PARTIAL | TodoSink序列化有真实接缝，但当前找不到生产调用；pending重放与desired/applied对账、同次提交实际UI交付尚无证据。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | PARTIAL | Assume返回经过LlmFacing结构化渲染，null会省略；对象正例不能证明全部JSON值保真。保留null、混合数组、特殊键和UI同次提交缺口，不私定新格式。 |

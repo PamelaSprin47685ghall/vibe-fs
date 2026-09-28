@@ -24,7 +24,6 @@ module PluginTransformSurface =
                     fun _ _ ->
                         record "replay"
                         Task.FromResult []
-                  RestoreProtocolArguments = fun _ -> complete "restore-arguments"
                   ApplyRelayProjection =
                     fun _ _ ->
                         record "relay"
@@ -48,8 +47,7 @@ module PluginTransformSurface =
                         )
                   FreezeProviderAttemptPlan = fun _ _ -> complete "freeze-plan"
                   ApplyEnforcerContinuation = fun _ _ -> complete "continuation"
-                  CaptureReadonlyDelegation = fun _ -> complete "capture-delegation"
-                  ApplyReadonlyDelegation = fun _ -> complete "delegation"
+                  ApplyStrengthSpeculation = fun _ -> complete "speculation"
                   InjectPairGuideline = fun _ _ _ -> complete "pair"
                   ProjectRequirementGrounding = fun _ _ -> complete "grounding"
                   InjectBloggerChronicle = fun _ _ -> record "chronicle"

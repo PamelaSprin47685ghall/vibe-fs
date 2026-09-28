@@ -1,12 +1,14 @@
 namespace Wanxiangshu.Context.Prefix
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
@@ -17,18 +19,8 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Participant.Provider.Attempt
 
-/// host-boundary-020/021: X-wire transform decision surface.
-///
-/// The production `XWire.applyTransform` is async and coupled to `AgentJournal`,
-/// `PluginRuntimeScope`, and `ISessionSnapshotPort` — it orchestrates blob reads,
-/// session-snapshot awaits, and in-place message replacement. The *decisions* it
-/// makes are pure: `PrefixProbeSelection.select`, and
-/// `XPrefixProjection.forChoice` / `XPrefixProjection.render`. This surface exposes that decision pipeline
-/// as a single JS-callable function with JS-native input/output, so the
-/// fail-closed and no-op laws can be proven without a live runtime.
-///
-/// The surface IS the production algorithm: every branch delegates to the same
-/// pure functions `applyTransform` calls. No support-model copy.
+/// JS-native adapters for production prefix decisions and XWire orchestration.
+/// Controlled material ports do not prove disk persistence or live Host delivery.
 [<RequireQualifiedAccess>]
 module XWireSurface =
 
@@ -707,6 +699,151 @@ module XWireSurface =
         box
             {| view = boundPlanView bound
                handle = wrapBoundPlan bound |}
+
+    let applyPhaseWindow (input: obj) : Task<obj> =
+        task {
+            let requireOk context =
+                function
+                | Ok value -> value
+                | Error error -> failwithf "%s: %A" context error
+
+            let session = SessionId.create (text input?session)
+            let physical = PhysicalUserMessageId.create (text input?openingMessageId)
+
+            let authority =
+                ParticipantIdentity.resolveAtRoot (text input?agent)
+                |> requireOk "identity must resolve"
+                |> PromptAuthority.createAuthorityExecutionProfile
+                    session
+                    (LogicalRunId.create (text input?logicalRun))
+                    (AuthorityRootUserMessageId.create (text input?openingMessageId))
+                    PromptAuthority.RootAuthorityKind.HumanRoot
+                |> requireOk "authority must build"
+
+            let opening =
+                XTraceProjection.applyOpening (text input?openingText) [] XTraceProjection.empty
+                |> requireOk "opening must fold"
+
+            let xTrace =
+                input?traceParts
+                |> unbox<obj array>
+                |> Array.fold
+                    (fun state part ->
+                        XTraceProjection.applyPart
+                            (int64 part?sequence)
+                            (text part?role)
+                            (text part?provenance)
+                            (intValue part?turn)
+                            (intValue part?partIndex)
+                            (text part?kind)
+                            None
+                            None
+                            (if isNullish part?toolCallId then
+                                 None
+                             else
+                                 Some(ToolCallId.create (text part?toolCallId)))
+                            None
+                            (BlobRef.create (text part?ref))
+                            (BlobDigest.create (text part?digest))
+                            state
+                        |> requireOk "part must fold")
+                    opening
+
+            let frames =
+                input?frames
+                |> unbox<obj array>
+                |> Array.map (fun frame ->
+                    { Kind = BlogFrameKind.Entry
+                      Digest = BlobDigest.create (text frame?digest)
+                      TextRef = BlobRef.create (text frame?ref)
+                      CoveredFromSequence = int64 frame?coveredFrom
+                      CoveredThroughSequence = int64 frame?coveredThrough
+                      CutoffExclusive = intValue frame?cutoff })
+                |> Array.toList
+
+            let blog =
+                { FrameEpochId = BlogProjection.empty.FrameEpochId
+                  Frames = frames
+                  Coverage =
+                    { IngestedThroughSequence = int64 input?coverage?ingestedThrough
+                      CoverableTurnCutoffExclusive = intValue input?coverage?cutoff
+                      CoveredPrefixDigest = text input?coverage?digest
+                      CoverableFrameCount = intValue input?coverage?frameCount } }
+
+            let state: WireSessionState =
+                { XTrace = Some xTrace
+                  Blog = Some blog
+                  PrefixEpoch = None
+                  PhaseCommits =
+                    input?phaseCallIds
+                    |> unbox<string array>
+                    |> Array.fold
+                        (fun window callId ->
+                            PhaseWindow.appendPhase PhaseWindow.defaultK (ToolCallId.create callId) window)
+                        PhaseWindow.emptyWindow }
+
+            let view: WireSnapshotView =
+                { State = Some state
+                  IsCompanion = false
+                  ActiveAuthorityProfile = Some authority
+                  ProviderFailureState = None
+                  AcceptedOrigin =
+                    fun messageId ->
+                        if messageId = physical then
+                            Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
+                        else
+                            None }
+
+            let blobs = Dictionary<string, string>()
+
+            for blob in unbox<obj array> input?blobs do
+                blobs.Add(text blob?ref, text blob?body)
+
+            let writes = ResizeArray<obj>()
+
+            let port: WireJournalPort =
+                { ReadView = fun _ -> view
+                  ReadBlob =
+                    fun blobRef ->
+                        match blobs.TryGetValue(BlobRef.value blobRef) with
+                        | true, body -> Task.FromResult(Ok body)
+                        | false, _ -> Task.FromResult(Error(sprintf "missing blob: %s" (BlobRef.value blobRef)))
+                  WriteBlob =
+                    fun body ->
+                        let blobRef = sprintf "blobs/frozen-%d" writes.Count
+                        blobs.Add(blobRef, body)
+                        writes.Add(box {| ``ref`` = blobRef; body = body |})
+
+                        Task.FromResult(
+                            Ok
+                                { BlobRef = BlobRef.create blobRef
+                                  BlobDigest = BlobDigest.create (sha256Hex body) }
+                        )
+                  CurrentProjection = fun _ -> Task.FromResult(Ok(semanticProjectionOfJs input?projection))
+                  RecordConfirmedSuccess = fun _ _ -> failwith "transform must not confirm an attempt"
+                  CommitPrefixRebase = fun _ _ _ -> failwith "transform must not commit a prefix rebase" }
+
+            let scope = PluginRecoveryScope(None)
+
+            let attempts: AttemptPlanCapability =
+                { TryAttemptPlan = scope.TryAttemptPlan
+                  TryBindAttemptPlan = scope.TryBindAttemptPlan
+                  ConsumeAttemptPlan = scope.ConsumeAttemptPlan
+                  FreezePendingAttemptPlan = scope.FreezePendingAttemptPlan
+                  TryPendingAttemptPlan = scope.TryPendingAttemptPlan }
+
+            let output = createObj [ "messages" ==> input?messages ]
+            let! _ = XWire.applyTransform (fun _ -> false) None (Some port) attempts output
+
+            return
+                box
+                    {| plan =
+                        scope.TryPendingAttemptPlan session physical
+                        |> Option.map pendingPlanView
+                        |> Option.defaultValue null
+                       writes = writes.ToArray()
+                       messages = output?messages |}
+        }
 
     /// Materialize candidate probe through the full production pipeline from a journal port.
     /// Drives: readFrameBodies -> materializeFrozenRecordPrefix -> port.WriteBlob -> PrefixProbeSelection.select

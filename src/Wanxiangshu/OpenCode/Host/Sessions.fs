@@ -280,12 +280,8 @@ type InjectedSessionPort
             do! abortChildren sessionId
 
             match underlyingPort with
-            | Some port ->
-                let! _ = port.AbortSession(sessionId)
-                ()
-            | None -> ()
-
-            return Ok()
+            | Some port -> return! port.AbortSession sessionId
+            | None -> return Error "No Host transport: cannot abort session"
         }
 
     interface ISessionHostPort with

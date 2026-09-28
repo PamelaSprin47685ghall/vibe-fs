@@ -7,6 +7,6 @@
 
 GAP-193 为尚缺的完整 binding/实际权限降级、所有评审前可见面隔离、独立调查与实际快照变化触发链。GAP-194 保留旧基线的真实反例：一次成功之后，同 ToolCallId/provider-run/input 的精确 replay 被 tool gate 拒绝，不能返回原 accepted 结果。原反例仍为可执行 TODO，须在新基线重验，不计入通过；新调用应被拒与旧调用重放须幂等是不同边界。
 
-本轮64个相关活动mjs语法通过；当前工作区没有Relay新dist，尚未执行行为测试。
+generation3统一构建及正式Manager/认知49文件选集88通过、0失败、33 TODO，包含本包实际parser/fold/插件。001/010文字边界补回后的最终复验见[兼容验收记录](../../../proposals/20模块兼容修复与验收-2026-09-28.md)，独立调查及快照触发链仍缺证。
 
 局部：`node --test requirements/relay-assessment/tests/*.test.mjs`。正式交付需新构建和 verification-system 入口。

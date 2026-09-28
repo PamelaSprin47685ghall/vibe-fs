@@ -112,7 +112,7 @@ schema 不接收 prompt、content、token、credential、cookie 或 path；允�
 
 ## [026] Host Contract/Runtime 编译分界与单向依赖
 
-公开合同、运行时和物理适配器必须编译隔离。会话快照与静止能力、终端事件、消息词汇、SDK 数据类型分别形成窄合同；相互不夹带无关词汇、摘要实现、可变状态或物理能力。业务合同只能依赖所需纯数据、decision 和 capability 声明，不得传递引入 Host 运行时、诊断、进程控制、消息修改、工具注册、信号订阅或 Sphinx。
+公开合同、运行时和物理适配器必须编译隔离。会话快照与静止能力、终端事件、消息词汇、SDK 数据类型分别形成窄合同。终端、消息与 SDK 数据合同互不夹带彼此词汇；会话合同不依赖 SDK/HTTP 投影。合同不夹带摘要实现、可变状态或物理能力；业务合同只能依赖所需纯数据、decision 和 capability 声明，不得传递引入 Host 运行时、诊断、进程控制、消息修改、工具注册、信号订阅或 Sphinx。
 
 事件外壳与消息解码无状态且不修改输入；解码边界遵守 [027]。信号适配器拥有订阅和路由，工具适配器拥有参数解码、身份配对、schema、注册、中止监听和输出限界；两侧不得相互夹带实现，同时使用时由 composition 显式装配。诊断单向依赖合同；fatal 效果及其注入遵守 [029]。
 
@@ -130,7 +130,7 @@ schema 不接收 prompt、content、token、credential、cookie 或 path；允�
 
 primitive、数组、boxed scalar、Date 和损坏的 events 均为 `InvalidInput`；坏 direct events 不能借合法 client 绕过。顶层或 client 的 getter/Proxy 抛错归 `InvalidInput`，读取或调用 listen 抛错归 `EventsListenFailed`；Promise 返回类型化错误，不直接拒绝。listen 和 disposer 缺失或非函数时立即返回相应错误。
 
-`EventsListen` 恰有一个不透明 disposable owner，合法 disposer 自身异常原样交给该 owner。JS 解码错误在入口收敛，不污染领域类型。订阅适配器只报告类型化失败，不获得诊断或时间实现；仅 Host composition 将订阅失败解释为 fatal。Loop 诊断经必填窄 capability 注入，失败只产生非权威诊断，不改变 arm、interrupt、consume 或 continuation。
+`EventsListen` 恰有一个不透明 disposable owner，合法 disposer 自身异常原样交给该 owner。JS 解码错误在入口收敛，不污染领域类型。订阅适配器只报告类型化失败，不获得诊断或时间实现；Host composition 中的唯一订阅所有者将订阅失败解释为 fatal。Loop 诊断经必填窄 capability 注入，失败只产生非权威诊断，不改变 arm、interrupt、consume 或 continuation。
 
 ## [029] fatal process 是唯一注入的physical adapter
 

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import './support/manager-review-contract.mjs'
 
 const context = (sessionID, callID) => ({ tool: 'js-manager', sessionID, callID })
 const complete = (hooks, input, args, output = {}) =>
@@ -27,8 +28,8 @@ test('WHAT[host-boundary-032] missing and malformed hints do not reject a permit
       const output = { args }
       await hooks['tool.execute.before'](input, output)
       assert.equal(output.args, args)
-      assert.equal(Object.hasOwn(args, 'contract'), false)
-      assert.deepEqual(Object.fromEntries(Object.entries(args)), Object.fromEntries(Object.entries(expected).filter(([key]) => key !== 'contract')))
+      assert.deepEqual(args, expected)
+      assert.deepEqual(Object.keys(args), keys)
       await complete(hooks, input, output.args)
       assert.equal(output.args, args)
       assert.deepEqual(args, expected)
@@ -46,7 +47,7 @@ test('WHAT[host-boundary-032] repeated callbacks preserve the first original val
     const output = { args }
     await hooks['tool.execute.before'](input, output)
     await hooks['tool.execute.before'](input, output)
-    assert.equal(Object.hasOwn(args, 'contract'), false)
+    assert.deepEqual(args, expected)
     await complete(hooks, input, args)
     await complete(hooks, input, args)
     assert.deepEqual(args, expected)
@@ -54,7 +55,7 @@ test('WHAT[host-boundary-032] repeated callbacks preserve the first original val
   })
 })
 
-test('WHAT[host-boundary-032] concurrent calls restore their own values even with a shared call ID across sessions', async () => {
+test('WHAT[host-boundary-032] admission hooks preserve each call input even with a shared call ID across sessions', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const calls = [
       { input: context('hint-a', 'same-call'), args: { contract: 'first', path: 'a.txt' } },
@@ -63,14 +64,14 @@ test('WHAT[host-boundary-032] concurrent calls restore their own values even wit
     const expected = calls.map(({ args }) => ({ ...args }))
     await Promise.all(calls.map(({ input }) => openIncumbency(runtime, input.sessionID)))
     await Promise.all(calls.map(({ input, args }) => hooks['tool.execute.before'](input, { args })))
-    for (const { args } of calls) assert.equal(Object.hasOwn(args, 'contract'), false)
+    assert.deepEqual(calls.map(({ args }) => args), expected)
     for (const { input, args } of [...calls].reverse()) await complete(hooks, input, args)
     assert.deepEqual(calls.map(({ args }) => args), expected)
     assert.deepEqual(calls.map(({ args }) => Object.keys(args)), expected.map(Object.keys))
   })
 })
 
-test('WHAT[host-boundary-032] an after callback with a reported failure restores the same arguments', async () => {
+test('WHAT[host-boundary-032] an after callback with a reported failure preserves the original public arguments', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await openIncumbency(runtime, 'hint-failure')
     const input = context('hint-failure', 'failed-call')
@@ -85,16 +86,86 @@ test('WHAT[host-boundary-032] an after callback with a reported failure restores
 
 test.todo('WHAT[host-boundary-032] actual execution and downstream-hook exceptions must reach same-call restoration; manually calling after does not prove that route')
 
-integrationTest('WHAT[host-boundary-032] a real Host preserves argument identity, order and durable input across success, failure and cancellation', () => {
-  const runner = fileURLToPath(new URL('./support/run-manager-review-tools-canary.mjs', import.meta.url))
-  const root = fileURLToPath(new URL('../../..', import.meta.url))
-  const result = spawnSync(process.execPath, [runner], { cwd: root, encoding: 'utf8', timeout: 120000 })
-  assert.equal(result.error, undefined)
-  assert.equal(result.signal, null)
-  assert.equal(result.status, 0, result.stderr + '\n' + result.stdout)
-  const evidence = JSON.parse(result.stdout)
+test.todo('WHAT[host-boundary-032] actual production JS cancellation must settle its executor and restore inputs; a controlled AbortSignal rejection does not prove this')
+
+integrationTest('WHAT[host-boundary-032] one real Host preserves arguments and durable history for production JS and controlled executor failure/cancellation', async (t) => {
+  const { runManagerReviewToolsCanary } = await import('./support/run-manager-review-tools-canary.mjs')
+  const stage = (name, verify) => async (value) => {
+    let failure
+    await t.test(`WHAT[host-boundary-032] ${name}`, async () => {
+      try { await verify(value) } catch (error) { failure = error; throw error }
+    })
+    if (failure) throw failure
+  }
+  const verifyCall = (call, status) => {
+    assert.deepEqual(call, {
+      sameArguments: true,
+      originalOrder: true,
+      originalValues: true,
+      durableInputRetainsContract: true,
+      originalDurableInput: true,
+      status,
+    })
+  }
+  const evidence = await runManagerReviewToolsCanary({
+    versions: stage('installed binary and plugin have the supported version', (versions) => {
+      assert.deepEqual(versions, { opencode: '1.18.29', plugin: '1.18.29' })
+    }),
+    ready: stage('one real Host is healthy and remains in its supervising process group', async ({ sessionID, pid, health }) => {
+      assert.equal(typeof sessionID, 'string')
+      assert.ok(sessionID.length > 0)
+      assert.equal(health.status, 200)
+      assert.equal(health.data.healthy, true)
+      assert.ok(Number.isInteger(pid) && pid > 0)
+      const execute = promisify(execFile)
+      const group = async (target) => Number((await execute('ps', ['-o', 'pgid=', '-p', String(target)])).stdout.trim())
+      const hostGroup = await group(pid)
+      assert.ok(hostGroup > 0)
+      assert.equal(hostGroup, await group(process.pid))
+      assert.notEqual(hostGroup, pid, 'Host must not escape into a detached group')
+    }),
+    normal: stage('normal execution restores the original arguments and durable input', ({ before, after, call }) => {
+      assert.equal(before.argsIdentityPreserved, true)
+      assert.equal(before.preContractInArgs, true)
+      assert.equal(before.postContractInArgs, true)
+      assert.equal(before.businessKeysPreserved, true)
+      assert.equal(after.postAfterContractInArgs, true)
+      assert.equal(after.postAfterContractValue, 'do-not-use-except-for-review')
+      assert.equal(after.output, "# ok\n\ndata = '''\nHello Wanxiangshu Manager Review Tools Canary\nLine 2: sample text\n\n'''\n")
+      verifyCall(call, 'completed')
+    }),
+    history: stage('the next provider request preserves the original historical tool call', ({ historicalToolCallPreservesContract }) => {
+      assert.equal(historicalToolCallPreservesContract, true)
+    }),
+    executorError: stage('controlled registered executor throw restores the original arguments and durable input', ({ before, settled, call }) => {
+      assert.equal(before.postContractInArgs, true)
+      assert.equal(settled.entered.sameArguments, true)
+      assert.equal(settled.entered.contractHidden, true)
+      assert.deepEqual(settled.entered.businessArguments, { program: 'CANARY_CONTROLLED_THROW' })
+      assert.equal(settled.originalError, true)
+      assert.equal(settled.contractRestored, true)
+      verifyCall(call, 'error')
+    }),
+    cancelRunning: stage('controlled cancellation targets an entered executor and actual running Host call', ({ before, executing, running, observations }) => {
+      assert.equal(before.postContractInArgs, true)
+      assert.equal(executing.sameArguments, true)
+      assert.equal(executing.contractHidden, true)
+      assert.deepEqual(executing.businessArguments, { program: 'CANARY_CONTROLLED_ABORT' })
+      assert.equal(running.value.callID, 'call_js_cancel_1')
+      assert.equal(observations.some(({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === running.value.callID), false)
+    }),
+    cancellation: stage('public Host abort rejects the controlled executor and restores original arguments and durable input', ({ settled, call }) => {
+      assert.equal(settled.entered.abortObserved, true)
+      assert.equal(settled.originalError, true)
+      assert.equal(settled.contractRestored, true)
+      verifyCall(call, 'error')
+    }),
+  })
   assert.ok(evidence.versions.opencode)
   assert.ok(evidence.versions.plugin)
+  assert.deepEqual(evidence.executionKinds, {
+    normal: 'production-js', executorError: 'controlled-throw', cancellation: 'controlled-abort-rejection',
+  })
   for (const name of ['normal', 'executorError', 'cancellation']) {
     const observed = evidence.calls[name]
     assert.equal(observed.sameArguments, true, name)

@@ -12,7 +12,7 @@
 
 ## [003] 投影幂等
 
-最新 committed snapshot 的 todos 是 desired，已确认写入 Host 的 snapshot identity 是 applied；不一致时只重投最新值。写入前确认 owner 仍占用该 session；上一任的迟到写入或 ack 不得覆盖下一任清单或回退 applied。
+最新 committed snapshot 的 todos 是 desired，已确认写入 Host 的 snapshot identity 是 applied；不一致时只重投最新值。写入前确认 owner 仍是该 session 的当前逻辑占用者；上一任的迟到写入或 ack 不得覆盖下一任清单或回退 applied。
 
 ## [004] 单向真相
 

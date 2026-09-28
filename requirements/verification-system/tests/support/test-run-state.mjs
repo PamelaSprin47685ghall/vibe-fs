@@ -6,21 +6,22 @@
 
 import { resolve } from 'node:path'
 
+export function testEntryFile(event) {
+  const data = event?.data
+  return typeof data?.entryFile === 'string' ? data.entryFile
+    : typeof data?.file === 'string' ? data.file : ''
+}
+
 /**
  * 判定事件是否为文件完成事件（file wrapper test:complete）。
  *
- * 语义：event.type === 'test:complete' 且 data.file 是 string 且
- * （data.name === data.file 或 resolve(data.name) === resolve(data.file)）。
+ * 文件包装器完成才证明入口文件完成，注册辅助文件里的叶子完成不算。
  *
  * @param {any} event
  * @returns {boolean}
  */
 export function isFileCompletionEvent(event) {
-  if (event?.type !== 'test:complete') return false
-  const file = event?.data?.file
-  const name = event?.data?.name
-  if (typeof file !== 'string' || typeof name !== 'string') return false
-  return name === file || resolve(name) === resolve(file)
+  return event?.type === 'test:complete' && isFileWrapper(event)
 }
 
 /**
@@ -30,10 +31,10 @@ export function isFileCompletionEvent(event) {
  * @returns {boolean}
  */
 export function isFileWrapper(event) {
-  const file = event?.data?.file
   const name = event?.data?.name
-  if (typeof file !== 'string' || typeof name !== 'string') return false
-  return name === file || resolve(name) === resolve(file)
+  if (typeof name !== 'string') return false
+  return [testEntryFile(event), event?.data?.file].some((file) =>
+    typeof file === 'string' && file.length > 0 && (name === file || resolve(name) === resolve(file)))
 }
 
 /**
@@ -53,7 +54,9 @@ export class TestRunState {
     this._fileSet = new Set()
     this._byFile = new Map() // filePath -> { file, testCount, passed, failed, durationMs }
     this._leaves = new Map() // key -> { file, name, nesting, status, durationMs, details, error }
-    this._containerFailures = [] // { name, file, nesting, durationMs, error }
+    this._containerFailures = new Map()
+    this._legacyVerdicts = new WeakMap()
+    this._nextLegacyVerdict = 1
     this._leafDurations = [] // { name, ms }
     this._failures = [] // { name, file, line, column, durationMs, error }
   }
@@ -76,6 +79,7 @@ export class TestRunState {
 
     const type = event.type
     const data = event.data ?? {}
+    const filePath = testEntryFile(event)
 
     if (type === 'test:summary') {
       if (Number.isFinite(data.duration_ms)) {
@@ -85,31 +89,21 @@ export class TestRunState {
     }
 
     if (isFileCompletionEvent(event)) {
-      if (typeof data.file === 'string') {
-        this._filesCompleted.add(resolve(data.file))
-      }
+      this._filesCompleted.add(resolve(filePath))
       return
     }
 
     // 文件级 wrapper (例如整个文件以 test:complete / test:pass / test:fail 出现)
     if (isFileWrapper(event)) {
-      if (typeof data.file === 'string') {
-        this._fileSet.add(data.file)
-      }
+      this._fileSet.add(filePath)
       if (type === 'test:fail') {
-        this._containerFailures.push({
-          name: data.name,
-          file: data.file,
-          nesting: data.nesting,
-          error: data.details?.error,
-        })
+        this._recordContainerFailure(data, filePath, true)
       }
       return
     }
 
     if (type === 'test:start') {
-      const file = typeof data.file === 'string' ? data.file : ''
-      if (file) this._fileSet.add(file)
+      if (filePath) this._fileSet.add(filePath)
       return
     }
 
@@ -120,18 +114,11 @@ export class TestRunState {
 
       const ms = Number(data.details?.duration_ms ?? data.durationMs)
       const duration = Number.isFinite(ms) && ms >= 0 ? ms : 0
-      const filePath = typeof data.file === 'string' ? data.file : ''
       if (filePath) this._fileSet.add(filePath)
 
       if (isContainer) {
         if (type === 'test:fail') {
-          this._containerFailures.push({
-            name: data.name ?? '<unnamed suite>',
-            file: data.file,
-            nesting: data.nesting,
-            durationMs: duration,
-            error: data.details?.error,
-          })
+          this._recordContainerFailure(data, filePath)
         }
         return
       }
@@ -141,10 +128,8 @@ export class TestRunState {
       const name = data.name ?? '<unnamed>'
       const nesting = Number(data.nesting ?? 0)
 
-      // Key 组合：优先用 testId，否则 file + nesting + name
-      const key = data.testId != null
-        ? `${file}::${data.testId}`
-        : `${file}::${nesting}::${name}`
+      // testId 仅在入口文件内唯一，data.file 可能只是多个入口共用的注册辅助文件。
+      const key = this._resultKey(data, file)
 
       const isSkip = Boolean(data.skip)
       const isTodo = Boolean(data.todo)
@@ -195,7 +180,8 @@ export class TestRunState {
           fileRecord.failed += 1
           this._failures.push({
             name,
-            file: data.file,
+            file: filePath,
+            sourceFile: data.file,
             line: data.line,
             column: data.column,
             durationMs: duration,
@@ -204,6 +190,32 @@ export class TestRunState {
         }
       }
     }
+  }
+
+  _resultKey(data, file) {
+    if (data.testId != null) return `${file}::id:${data.testId}`
+    if (data.testNumber != null) {
+      if (!this._legacyVerdicts.has(data)) {
+        this._legacyVerdicts.set(data, this._nextLegacyVerdict++)
+      }
+      return `${file}::event:${this._legacyVerdicts.get(data)}`
+    }
+    return `${file}::${Number(data.nesting ?? 0)}::${data.name ?? '<unnamed>'}`
+  }
+
+  _recordContainerFailure(data, file, fileWrapper = false) {
+    const key = `${fileWrapper ? 'file' : 'test'}::${this._resultKey(data, file)}`
+    const ms = Number(data.details?.duration_ms ?? data.durationMs)
+    this._containerFailures.set(key, {
+      name: data.name ?? '<unnamed container>',
+      file,
+      sourceFile: data.file,
+      line: data.line,
+      column: data.column,
+      nesting: data.nesting,
+      durationMs: Number.isFinite(ms) && ms >= 0 ? ms : 0,
+      error: data.details?.error,
+    })
   }
 
   /**
@@ -266,7 +278,8 @@ export class TestRunState {
       skipped,
       todo,
       cancelled,
-      containerFailures: this._containerFailures.length,
+      containerFailures: this._containerFailures.size,
+      containerFailureDetails: [...this._containerFailures.values()],
       exclusions: [...this._leaves.values()]
         .filter(({ verdict }) => ['skip', 'todo', 'cancelled'].includes(verdict))
         .map(({ file, name, verdict, reason }) => ({ file, name, status: verdict, reason })),

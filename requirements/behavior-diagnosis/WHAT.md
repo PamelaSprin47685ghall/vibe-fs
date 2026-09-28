@@ -70,7 +70,7 @@ Observation 是 tip 与 frame 的配对视图，按顺序前向 zip，剩余侧 
 
 Nudge 后新的 ProviderRun 再次无效，记录 confirmed failure 并首发 AABB；保持同一 RequestId 与目标 terminal。相同 run 的重复观察只返回 AlreadyAdmitted 并等待，不当成发送失败或提前推进 AABB，不按错误字符串区分。重判只消费 ToolName=chronicle 的 completed 执行证据，不猜测或兼容别名。
 
-同 episode 重复观察不重复认领/发送，非 quiescent 不花预算；Nudge、AABB 各至多一次，耗尽后一次 abandon、exact release。无 journal 直接 abandon、零发送。Shutdown 与准入原子关闸，拒绝新 episode，取消并 drain 已认领者。
+同 episode 重复观察不重复认领/发送，非 quiescent 不认领、不花预算；Nudge、AABB 各至多一次，耗尽后一次 abandon、exact release。无 journal 直接 abandon、零发送。Shutdown 与准入原子关闸，拒绝新 episode，取消并 drain 已认领者。
 
 ## [018] RulebookRevision 按 life 冻结
 

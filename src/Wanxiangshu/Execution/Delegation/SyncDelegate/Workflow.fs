@@ -412,7 +412,16 @@ module internal SyncDelegateWorkflow =
                   Completion = completion
                   StartCursor = None }
 
-            match store.Admit invocation with
+            let admission =
+                match role with
+                | SyncDelegateRole.Engineer -> store.Admit invocation
+                | SyncDelegateRole.Coder
+                | SyncDelegateRole.Inspector ->
+                    SyncDelegateAdmission.Rejected(
+                        sprintf "retired sync delegate role: %s" (SyncDelegate.roleLabel role)
+                    )
+
+            match admission with
             | SyncDelegateAdmission.Rejected error -> AsyncSupport.trySetResult completion (Error error) |> ignore
             | SyncDelegateAdmission.Waiting -> ()
             | SyncDelegateAdmission.Ready invocations -> do! runReadyBatch store deps ownerScope role invocations

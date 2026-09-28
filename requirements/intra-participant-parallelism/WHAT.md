@@ -68,4 +68,4 @@ V1 按 canonical index 从 lane 0 到 N−1 环行，以 keyed union 合并；�
 
 准入须同时满足：已证明 CanonicalRole=Engineer、本次授权含 Fission、subsession 来源、无 active group，以及其余现有准入条件。运行时入口与 ToolRegistry 都须拒绝不满足条件的调用，不能只隐藏 schema。
 
-角色名、Persona 别名、参数、自称身份和附带 Engineer WorkRecord 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane、Sphinx 内部只读 Engineer 均拒绝。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。
+角色名、Persona 别名、参数、自称身份和附带 Engineer WorkRecord 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane 均拒绝。Sphinx 内部标准 Engineer 遵守相同准入，不另设只读身份。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。

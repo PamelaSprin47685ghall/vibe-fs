@@ -8,6 +8,11 @@ open Wanxiangshu.OpenCode.Host
 
 module PluginRecoveryWiring =
 
+    let private hasLiveBloggerFlight (host: IBloggerRuntimeHost) bloggerSessionId requestId =
+        match host.TryGetFlight(SessionId.value bloggerSessionId) with
+        | Some flight -> BloggerRequestContext.requestId flight = requestId
+        | None -> false
+
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
 
@@ -34,13 +39,7 @@ module PluginRecoveryWiring =
                         // coordinator never materializes a fresh request — the
                         // Blogger would never ingest the raw tail again
                         // (crash-reconciliation-020 / context-compression-024).
-                        let bloggerHost = scope.BloggerRuntimeHost
-
-                        let liveFlight bloggerSessionId requestId =
-                            match bloggerHost.TryGetFlight(SessionId.value bloggerSessionId) with
-                            | Some flight -> BloggerRequestContext.requestId flight = requestId
-                            | None -> false
-
+                        let liveFlight = hasLiveBloggerFlight scope.BloggerRuntimeHost
                         do! BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
                     | None -> ()
 

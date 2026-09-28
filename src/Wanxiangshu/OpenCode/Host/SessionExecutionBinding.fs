@@ -78,12 +78,12 @@ module SessionExecutionBinding =
     // DSL-MUTABLE: single-flight — durable child evidence installed at Load Phase.
     // The in-process maps above are a cache of what this process currently drives;
     // the durable handle projection is the existence truth across a restart.
-    let mutable private durableChildEvidence: (string -> (string * string) option) option = None
+    let mutable private durableChildEvidence: (string -> (string * string) option) option =
+        None
 
     /// Install the durable resolver: sessionId -> (parentSessionId, agent). Called
     /// once at plugin load; reads fall through to it and cache the answer locally.
-    let installDurableChildEvidence (resolve: string -> (string * string) option) =
-        durableChildEvidence <- Some resolve
+    let installDurableChildEvidence (resolve: string -> (string * string) option) = durableChildEvidence <- Some resolve
 
     let private durableParentOf (sessionKey: string) : string option =
         durableChildEvidence
@@ -229,18 +229,27 @@ module SessionExecutionBinding =
     let isInternalRoot (sessionId: SessionId) =
         lock gate (fun () -> internalRoots.Contains(SessionId.value sessionId))
 
+    let private restoreParentLocked key =
+        match durableParentOf key with
+        | Some parent ->
+            parents.[key] <- parent
+            Some(SessionId.create parent)
+        | None -> None
+
     let tryParent (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
 
             match parents.TryGetValue key with
             | true, value -> Some(SessionId.create value)
-            | false, _ ->
-                match durableParentOf key with
-                | Some parent ->
-                    parents.[key] <- parent
-                    Some(SessionId.create parent)
-                | None -> None)
+            | false, _ -> restoreParentLocked key)
+
+    let private restoreAgentLocked key =
+        match durableChildEvidence |> Option.bind (fun resolve -> resolve key) with
+        | Some(_, agent) when not (String.IsNullOrWhiteSpace agent) ->
+            agents.[key] <- agent
+            Some agent
+        | _ -> None
 
     let tryAgent (sessionId: SessionId) =
         lock gate (fun () ->
@@ -248,12 +257,7 @@ module SessionExecutionBinding =
 
             match agents.TryGetValue key with
             | true, value -> Some value
-            | false, _ ->
-                match durableChildEvidence |> Option.bind (fun resolve -> resolve key) with
-                | Some(_, agent) when not (String.IsNullOrWhiteSpace agent) ->
-                    agents.[key] <- agent
-                    Some agent
-                | _ -> None)
+            | false, _ -> restoreAgentLocked key)
 
     /// A Host-owned auxiliary child (for example title generation) is observed from
     /// a public session.created parent edge but has no Wanxiangshu execution agent.
@@ -404,7 +408,7 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role -> ModelRouting.tryLease sessionId physical role agent ModelExecutionPurpose.Normal None
+            | Some role -> ModelRouting.tryLease sessionId physical role agent None
             | None -> None
 
         match leaseOpt with
@@ -853,8 +857,7 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role ->
-                ModelRouting.tryLease sessionId physicalUserMessageId role agent ModelExecutionPurpose.Normal None
+            | Some role -> ModelRouting.tryLease sessionId physicalUserMessageId role agent None
             | None -> None
 
         match leaseOpt with

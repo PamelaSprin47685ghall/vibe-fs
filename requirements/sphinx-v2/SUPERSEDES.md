@@ -38,14 +38,14 @@
 | 024 Borda 与 Bradley–Terry 适用域 | 取代 | 024、025 | 补 tie-aware 似然与完整协方差契约 |
 | 025 Proper self-prediction 密封 | 退出默认 | — | SelfPrediction 移出 default profile，后续 Experimental 插件 |
 | 026 固定点存在性与异步收敛 | 取代 | 027 | 收敛声明收窄到可证明条件 |
-| 027 OpenCode Host 复用现有受管执行语义 | 保留 | 034 | 不变；receipt 必须来自实际 adapter |
+| 027 OpenCode Host 复用现有受管执行语义 | 保留 | 034、delegation-007 | 标准 Engineer、同一 family root 与平坦委托由 delegation-007 承接；receipt 必须来自实际 adapter |
 | 028 Research export 区分可识别对象与外部真值 | 取代 | — | 由 `Persistence/Export` 与 full/summary 区分承担 |
 | 029 Stop certificate 只覆盖已检验的决策域 | 取代 | 029、030 | answer.now 参加选择；缺 VOC 是缺失不是通过 |
 | 030 Legacy Adapter 黄金轨迹 | 取代 | — | Legacy Adapter 退出生产构建 |
 | 031 Sphinx 探究流程全程序控制 | 保留 | 009、018 | 不变 |
-| 032 内部 Engineer 使用标准权限 | 保留 | 034 | 不变 |
+| 032 内部 Engineer 使用标准权限 | 保留 | 034、office-capability-018 | 标准 Engineer 及普通资格检查由 office-capability-018 承接，不另造只读 profile |
 | 033 结果接纳按工作身份幂等 | 取代 | 011 | key 增加 logicalFence |
-| 034 取消全链贯穿 | 保留 | — | 由 Runtime/Recovery 承担，语义未变 |
+| 034 取消全链贯穿 | 承接待决 | 034（部分）、GAP-222 | 新034禁止未确认 abort 就声称 cancelled/drained；旧父工具取消后的立即 clean drain、阻断在途结果吸收与持久化尚无完整现行条款承接，不宣称语义未变 |
 | 035 原生调用交付与期望深度契约 | 取代 | — | `expectTurns` 价格模型删除，改为资源账本 |
 | 036 期望回合转为持久化价格预算 | 取代 | 002、004 | `1.44/(expectTurns-1)^2`、`0.72/(1+K)`、`2*lambda` 购买规则整类删除 |
 

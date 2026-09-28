@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open Wanxiangshu.Sphinx
 open Wanxiangshu.Strength
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js

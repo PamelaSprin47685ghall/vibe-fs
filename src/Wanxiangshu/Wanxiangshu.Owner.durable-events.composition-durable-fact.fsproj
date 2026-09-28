@@ -8,9 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
-    <Compile Include="Composition/Durable/ChatExecutionFact.fsi"/>
-    <Compile Include="Composition/Durable/ChatExecutionFact.fs"/>
-
     <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
@@ -30,6 +27,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
+    <Compile Include="Composition/Durable/ChatExecutionFact.fsi"/>
+    <Compile Include="Composition/Durable/ChatExecutionFact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fsi"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
   </ItemGroup>

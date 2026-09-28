@@ -26,7 +26,7 @@ function defaultOpencodeBin() {
 export const OPENCODE_BIN = process.env.OPENCODE_BIN || defaultOpencodeBin();
 
 const STDOUT_RING_MAX = 100;
-const activeChildPids = new Set();
+const activeChildPids = new Map();
 
 /** In-process OpenCode serve spawn counter (G4R §2: exactly one lifetime). */
 let opencodeServeSpawnCount = 0;
@@ -45,9 +45,9 @@ export const READY_POLL_INTERVAL_MS = 100;
 export const READY_POLL_MAX_TRIES = 50;
 
 function cleanupAllActiveChildren() {
-  for (const pid of activeChildPids) {
+  for (const [pid, detached] of activeChildPids) {
     try {
-      if (process.platform !== "win32") {
+      if (process.platform !== "win32" && detached) {
         process.kill(-pid, "SIGKILL");
       }
     } catch {}
@@ -83,20 +83,21 @@ export function ringPush(buffer, s) {
   if (buffer.length > STDOUT_RING_MAX) buffer.shift();
 }
 
-export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = SIGKILL_GRACE_MS) {
+export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = SIGKILL_GRACE_MS, { detached = true } = {}) {
   const pid = child?.pid;
   if (!pid) return;
   activeChildPids.delete(pid);
 
+  let descendants = [];
   try {
-    const descendants = await getDescendantPids(pid);
+    descendants = await getDescendantPids(pid);
     for (const dpid of descendants) {
       try { process.kill(dpid, "SIGKILL"); } catch {}
     }
   } catch {}
 
   try {
-    await terminateTree(child, { termGraceMs: termMs, killGraceMs: killMs });
+    await terminateTree(child, { termGraceMs: termMs, killGraceMs: killMs, detached, descendantPids: descendants });
   } catch (err) {
     // terminateTree already sent SIGTERM then SIGKILL to the whole process group
     // and still found survivors. Under heavy parallel load a descendant can be
@@ -105,8 +106,11 @@ export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = 
     // SIGKILL is unconditional, and the caller's assertNoLeak still verifies the
     // port is actually gone afterwards.
     console.error(`[ProcessHost] terminateTree error: ${err.message}; retrying SIGKILL`);
-    try { process.kill(-pid, "SIGKILL"); } catch {}
+    if (detached) {
+      try { process.kill(-pid, "SIGKILL"); } catch {}
+    }
     try { process.kill(pid, "SIGKILL"); } catch {}
+    if (descendants.some(pidIsAlive)) throw err;
   }
 }
 
@@ -135,7 +139,8 @@ export async function initGitWorkspace(workDir) {
   }
 }
 
-export function spawnOpencodeServe(workDir, env, hooks) {
+export function spawnOpencodeServe(workDir, env, hooks, { detached = true } = {}) {
+  const ownsGroup = process.platform !== "win32" && detached;
   const child = spawn(
     OPENCODE_BIN,
     ["serve", "--port", "0", "--hostname", "127.0.0.1"],
@@ -144,20 +149,20 @@ export function spawnOpencodeServe(workDir, env, hooks) {
       env,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
-      detached: process.platform !== "win32",
+      detached: ownsGroup,
     },
   );
   if (child.pid) {
-    activeChildPids.add(child.pid);
+    activeChildPids.set(child.pid, detached);
     opencodeServeSpawnCount += 1;
-    recordSpawn(child.pid, `opencode serve ${workDir}`);
+    if (ownsGroup) recordSpawn(child.pid, `opencode serve ${workDir}`);
   }
   child.stdout.on("data", (chunk) => hooks.onStdoutChunk(chunk.toString()));
   child.stderr.on("data", (chunk) => hooks.onStderrChunk(chunk.toString()));
   child.on("exit", (code, signal) => {
     if (child.pid) {
       activeChildPids.delete(child.pid);
-      recordExit(child.pid);
+      if (ownsGroup) recordExit(child.pid);
     }
     hooks.onExit(code, signal);
   });

@@ -23,6 +23,12 @@ module PluginHooksSurface =
     /// id. Non-review ids are returned unmodified.
     val decorateReviewToolDefinition: toolID: string -> definition: obj -> unit
 
+    val hideReviewContract: args: obj -> unit
+
+    val restoreReviewContract: args: obj -> unit
+
+    val wrapReviewExecutors: tools: obj -> unit
+
     val hookFailurePolicy: failure: string -> settlement: string -> string
 
     /// Real Coordinator -> CompanionHost -> PromptDispatcher Host adapter. The

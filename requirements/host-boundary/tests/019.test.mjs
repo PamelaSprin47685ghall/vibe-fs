@@ -5,7 +5,7 @@ import { ordinaryEffects } from '../../../dist/OpenCode/Host/PluginTransformSurf
 test('WHAT[host-boundary-019] a tentative prefix suppresses historical auxiliaries within the actual transform', async () => {
   const current = await ordinaryEffects(false)
   const tentative = await ordinaryEffects(true)
-  const historical = ['delegation', 'pair', 'grounding']
+  const historical = ['speculation', 'pair', 'grounding']
   assert.deepEqual(current.filter((effect) => historical.includes(effect)), historical)
   assert.deepEqual(tentative, current.filter((effect) => !historical.includes(effect)))
   assert.ok(tentative.includes('capture'), 'prefix gating must not bypass current trace capture')

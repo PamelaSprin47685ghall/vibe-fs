@@ -18,7 +18,7 @@ It does not establish that the destination has been reached.
 For a new road, pass calling + name + charge.
 To continue a known road, omit calling and use the same name.
 
-calling chooses Coordinator / Lead (persona and reasoning depth, not a different
-office).
+calling is Lead (`lead`), the Manager persona responsible for the road, not a
+different office.
 name is the byname of the road.
 charge is the destination and constraints, not a prescription of hidden tools.

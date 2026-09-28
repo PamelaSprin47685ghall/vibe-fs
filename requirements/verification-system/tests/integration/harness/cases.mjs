@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import {
   assertEq,
@@ -14,6 +15,7 @@ import {
   postJson,
 } from './lib.mjs';
 import { StrictMockProvider } from '../../e2e/support/strict-mock-provider.js';
+import { startHttpServer, stopHttpServer } from '../../e2e/support/strict-mock-server.js';
 import { kindOf } from '../../e2e/support/runtime-key.js';
 import { EventProbe } from '../../e2e/support/event-probe.js';
 import { shapeFromParsed } from '../../e2e/support/event-shape.js';
@@ -125,6 +127,77 @@ async function runProcessHostStderrCapture() {
   host._onStdout('stdout-line\n');
   assertTrue(host.stderrLog.includes('stderr-warning'), 'stderr ring buffer captured');
   assertTrue(host.stdoutLog.includes('stdout-line'), 'stdout ring buffer captured');
+}
+
+async function runHttpServerClose() {
+  const { server, url } = await startHttpServer((_request, response) => response.end('ready'));
+  try {
+    assert.equal(await (await fetch(url)).text(), 'ready');
+    await stopHttpServer(server);
+    assert.equal(server.listening, false);
+    await stopHttpServer(server);
+    assert.equal(server.listening, false);
+  } finally {
+    if (server.listening) await stopHttpServer(server);
+  }
+}
+
+async function runHttpServerConnectionCloseFailure() {
+  const failure = new Error('connection close failed');
+  const calls = [];
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {
+      calls.push('connections');
+      throw failure;
+    },
+    close(done) {
+      calls.push('server');
+      queueMicrotask(() => done());
+    },
+  }), (error) => error === failure);
+  assert.deepEqual(calls, ['connections', 'server']);
+}
+
+async function runHttpServerCloseCallbackFailure() {
+  const failure = new Error('server close callback failed');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {},
+    close(done) { queueMicrotask(() => done(failure)); },
+  }), (error) => error === failure);
+}
+
+async function runHttpServerCloseThrow() {
+  const failure = new Error('server close threw');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {},
+    close() { throw failure; },
+  }), (error) => error === failure);
+}
+
+async function runHttpServerBothCloseFailures() {
+  const connections = new Error('connection close failed');
+  const listener = new Error('server close callback failed');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() { throw connections; },
+    close(done) { queueMicrotask(() => done(listener)); },
+  }), (error) => {
+    assert.ok(error instanceof AggregateError);
+    assert.equal(error.errors.length, 2);
+    assert.equal(error.errors[0], connections);
+    assert.equal(error.errors[1], listener);
+    assert.equal(error.cause, connections);
+    return true;
+  });
+}
+
+async function runHttpServerAlreadyClosed() {
+  const closed = Object.assign(new Error('already stopped'), { code: 'ERR_SERVER_NOT_RUNNING' });
+  await stopHttpServer({ close() { throw closed; } });
+  const failure = new Error('server is not running');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() { throw failure; },
+    close(done) { queueMicrotask(() => done(closed)); },
+  }), (error) => error === failure);
 }
 
 
@@ -379,6 +452,12 @@ export const cases = [
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
   { name: 'ProcessHost health request obeys its deadline', fn: runProcessHostHealthDeadline },
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
+  { name: 'WHAT[verification-system-006] HTTP server closure releases the real listener and is repeatable', fn: runHttpServerClose },
+  { name: 'WHAT[verification-system-005] HTTP connection close failure still invokes listener closure and preserves the error', fn: runHttpServerConnectionCloseFailure },
+  { name: 'WHAT[verification-system-005] HTTP close callback failure rejects unchanged', fn: runHttpServerCloseCallbackFailure },
+  { name: 'WHAT[verification-system-005] HTTP close synchronous failure rejects unchanged', fn: runHttpServerCloseThrow },
+  { name: 'WHAT[verification-system-005] HTTP cleanup preserves both close failures', fn: runHttpServerBothCloseFailures },
+  { name: 'WHAT[verification-system-005] only the explicit already-closed error is idempotent', fn: runHttpServerAlreadyClosed },
   ...laneCases,
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },

@@ -26,6 +26,6 @@ Join 的条数上限、显示窗口和 WorkRecord 本身的有界物化不是同
 
 旧 chooseRoad/evidenceBoundary 的固定答案、serializationDecision 的复制判断、reuseBinding 的单次读取及 batchOrder 的过滤器已移除；无用 deferred-result exports 同步删除。实际受控队列与有效渲染证据保留。源码中有方法名、WHAT 自我匹配、手写 descriptor 都不算实现达标。
 
-旧角色在拒绝前创建 child 的修复及回归保留，待新基线复验（GAP-154）。完整待补范围见 GAP-153；编译额度归属沿用 22-D1，DevOps binding 与 work handle 复用沿用 34/35 待决，不在测试中另设规则。旧发布清单及fatal库存的历史状态不能代替当前真实执行证明。
+本轮真实回归发现已废止角色先创建 child、到发送阶段才拒绝。007 先断言零副作用，再检查拒绝结果，使该反例直接可见。生产同步 workflow 在普通与批次共用的 admission 处拒绝 Coder/Inspector，不进入 child 创建；历史角色解码仍保留。修前 childCount 为1，修后结果由本轮统一新构建复验（GAP-154）。完整待补范围见 GAP-153；编译额度归属沿用 22-D1，DevOps binding 与 work handle 复用沿用 34/35 待决，不在测试中另设规则。旧发布清单及fatal库存的历史状态不能代替当前真实执行证明。
 
 本次结果见[迁移记录](../../../proposals/20模块迁移-恢复与委托-2026-09-28.md)。直接 `node --test` 只用于局部调试；正式结论使用 verification-system runner，TODO 会使它返回未完成。

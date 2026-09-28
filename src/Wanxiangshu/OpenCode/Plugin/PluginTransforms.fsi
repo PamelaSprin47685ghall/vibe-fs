@@ -15,29 +15,23 @@ module PluginTransforms =
           Current: XTraceProjectionState option }
 
     type NormalTransformCapabilities =
-        {
-            BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
-            BindSessionStartedAt: string option -> Task<DateTimeOffset option>
-            ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-            /// host-boundary-032 / DELEGATE.md 4.3: restore the protocol fields
-            /// the Host persisted away into the provider-facing request.
-            RestoreProtocolArguments: obj -> Task<unit>
-            ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
-            CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
-            CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
-            RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-            ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
-            ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
-            FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
-            ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-            CaptureReadonlyDelegation: obj -> Task<unit>
-            ApplyReadonlyDelegation: obj -> Task<unit>
-            InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
-            ProjectRequirementGrounding: string option -> obj -> Task<unit>
-            InjectBloggerChronicle: string option -> obj -> unit
-            SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
-            SanitizeMessages: obj -> unit
-        }
+        { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
+          BindSessionStartedAt: string option -> Task<DateTimeOffset option>
+          ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
+          ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
+          CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
+          CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
+          RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
+          ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
+          ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
+          FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
+          ApplyEnforcerContinuation: string option -> obj -> Task<unit>
+          ApplyStrengthSpeculation: obj -> Task<unit>
+          InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
+          ProjectRequirementGrounding: string option -> obj -> Task<unit>
+          InjectBloggerChronicle: string option -> obj -> unit
+          SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
+          SanitizeMessages: obj -> unit }
 
     type TransformBranchCapabilities =
         { RegisterOwned: string -> unit
@@ -60,7 +54,7 @@ module PluginTransforms =
         caps: NormalTransformCapabilities -> branches: TransformBranchCapabilities -> (obj -> obj -> Task<unit>)
 
     /// Provider-facing transform composition: order only.
-    /// Relay cut → Strength replay/trace → delegation capture → Companion/XWire
-    /// → delegation start → pair/grounding; retired raw history is removed
+    /// Relay cut → Strength replay/trace → Companion/XWire → speculation
+    /// → pair/grounding; retired raw history is removed
     /// before any downstream context owner.
     val create: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> (obj -> obj -> Task<unit>)

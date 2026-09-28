@@ -82,7 +82,7 @@ durable open producer 在两个物理 step 间暂无 flight 时，新材料仍�
 
 ## [019] X→Y 后旧辅助注入不跨 horizon 保留
 
-ContextReanchored 与成功 PrefixRebaseCommitted 都退休旧 horizon 的辅助注入可见性，保留审计历史，只在后续正常触发时重新生成。rebase 的退休与 epoch 提升在同一投影事务内完成，保留的 raw 回合不能夹带旧辅助呈现。
+所有 X→Y 冷边界（包括 ContextReanchored 与成功 PrefixRebaseCommitted）都退休旧 horizon 的辅助注入可见性，保留审计历史，只在后续正常触发时重新生成。rebase 的退休与 epoch 提升在同一投影事务内完成，保留的 raw 回合不能夹带旧辅助呈现。
 
 当前 WorkMain 选择 probe 后，即按 typed tentative cold horizon 处理本次呈现，后续历史辅助投影器跳过注入，避免候选因旧材料膨胀而无法成功。该状态仅作为当前调用的返回值顺序传递，不写跨回调临时标记；成功提交才成为跨请求 durable horizon。
 
@@ -122,7 +122,7 @@ flight 冲突、semantic cut 与压缩不变量故障须携带确切 BloggerSess
 
 ## [026] 修复结算失败共享收束
 
-repair episode 的 durable abandon 失败后，所有已接收未完成、已排队及后续新旧观察者共享同一失败。不通知成功终态、不释放 exact flight、不重开预算；保留失败 episode 注册，防止同请求重新启动。
+repair episode 的 durable abandon 失败后，所有已接收未完成、已排队及后续新旧观察者均以同一异常拒绝。不发送终态通知、不释放 exact flight、不重开预算；保留失败 episode 注册，防止同请求重新启动。
 
 ## [027] owner 构造请求，恢复先解码再验证
 

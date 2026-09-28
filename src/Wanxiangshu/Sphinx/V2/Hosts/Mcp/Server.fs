@@ -37,7 +37,7 @@ module Mcp =
     let private constructEmpty (constructor: obj) : obj = jsNative
 
     [<Emit("$0.string().describe($1)")>]
-    let private zString (description: string) : obj = jsNative
+    let private zString (schema: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
@@ -88,7 +88,7 @@ module Mcp =
                 [ "name" ==> name
                   "description" ==> description
                   "inputSchema"
-                  ==> createObj [ "commandId" ==> zString "Idempotent command identity" ] ]
+                  ==> createObj [ "commandId" ==> zString zod "Idempotent command identity" ] ]
 
         let registerOne (tool) =
             let name = Contract.toolName tool

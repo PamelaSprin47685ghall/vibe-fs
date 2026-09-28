@@ -18,8 +18,11 @@
  * cause would be far from the symptom.
  */
 
-import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './lib.mjs';
@@ -30,6 +33,8 @@ import {
   UNIT_RUNNER_PROBE_PER_TEST_MS,
   UNIT_RUNNER_PROBE_SILENCE_MS,
   UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS,
+  PROCESS_TREE_TIMEOUT_MS,
+  SIGKILL_GRACE_MS,
 } from '../../e2e/support/time-budget.js';
 import { harnessProgress } from './progress.mjs';
 
@@ -88,6 +93,31 @@ const scaledBudget = (silenceMs) => ({
 const PARKED_IF_SLOWER_THAN_MS = UNIT_RUNNER_PROBE_SILENCE_MS * 3;
 
 const fixtureNames = () => readdirSync(`${REPO_ROOT}${FIXTURE_DIR}`);
+
+const liveFixtureProcess = (pid) => {
+  const output = execFileSync('ps', ['-eo', 'pid=,pgid=,stat='], {
+    encoding: 'utf8',
+    timeout: PROCESS_TREE_TIMEOUT_MS,
+  });
+  if (!output.trim()) throw new Error('fixture process inspection returned no records');
+  const rows = output.trim().split('\n').map((line) => {
+    const fields = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
+    if (!fields) throw new Error(`unparseable fixture process record: ${line}`);
+    return fields.slice(1);
+  });
+  const row = rows.find(([candidate, , state]) => Number(candidate) === pid && !/^[ZX]/.test(state));
+  return row ? { pid: Number(row[0]), pgid: Number(row[1]) } : null;
+};
+
+const reclaimFixtureOrphan = async ({ orphanPid, pgid }) => {
+  const alive = liveFixtureProcess(orphanPid);
+  if (!alive) return;
+  assertEq(alive.pgid, pgid, 'refuse to signal a PID outside the fixture-owned group');
+  process.kill(orphanPid, 'SIGKILL');
+  const deadline = Date.now() + SIGKILL_GRACE_MS;
+  while (liveFixtureProcess(orphanPid) && Date.now() < deadline) await delay(20);
+  assertEq(liveFixtureProcess(orphanPid), null, 'the fixture orphan must be reclaimed even when the regression fails');
+};
 
 export const unitRunnerCases = [
   {
@@ -199,6 +229,47 @@ export const unitRunnerCases = [
         run.elapsedMs < PARKED_IF_SLOWER_THAN_MS,
         `the run took ${run.elapsedMs}ms; a leak must be caught by the window, not the backstop`,
       );
+    },
+  },
+
+  {
+    name: 'verification-system-005 a late orphan after child stop is reclaimed and fails the otherwise green run',
+    fn: async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'unit-runner-late-orphan-'));
+      const evidencePath = join(directory, 'evidence.json');
+      const errors = [];
+      try {
+        const run = await runFixture('late-orphan-after-stop.fixture.mjs', {
+          LATE_ORPHAN_EVIDENCE: evidencePath,
+        });
+        const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+        const survivor = liveFixtureProcess(evidence.orphanPid);
+        assertEq(evidence.stopReturned, true, 'the actual detached=false stop must complete before runner exit');
+        assertEq(evidence.orphanPgid, evidence.pgid, 'the late orphan must belong to the runner group');
+        assertTrue(run.stderr.includes('runner: 1 passed, 0 failed'), 'the fixture verdict itself must pass');
+        assertEq(run.code, 1, `residual processes must fail the green run; evidence=${JSON.stringify(evidence)}, survivor=${JSON.stringify(survivor)}; ${run.stderr}`);
+        assertTrue(run.stderr.includes('residual process group'), `the failure must identify remaining processes: ${run.stderr}`);
+        assertEq(survivor, null, 'the supervisor must reclaim the late orphan before returning failure');
+        assertTrue(!run.stderr.includes('WATCHDOG'), 'normal-exit cleanup must not wait for silence');
+        assertTrue(run.elapsedMs < UNIT_VERDICT_SILENCE_MS, 'residual group cleanup must finish within the unchanged silence window');
+      } catch (error) {
+        errors.push(error);
+      } finally {
+        try {
+          if (existsSync(evidencePath)) {
+            await reclaimFixtureOrphan(JSON.parse(readFileSync(evidencePath, 'utf8')));
+          }
+        } catch (error) {
+          errors.push(error);
+        }
+        try {
+          rmSync(directory, { recursive: true, force: true });
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) throw new AggregateError(errors, 'late-orphan regression and cleanup failed');
     },
   },
 

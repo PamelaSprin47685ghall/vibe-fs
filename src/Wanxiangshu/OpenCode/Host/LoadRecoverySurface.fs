@@ -9,7 +9,9 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
@@ -43,6 +45,61 @@ module LoadRecoverySurface =
             >> FactCodec.serializeFact
         )
         |> List.toArray
+
+    let rejectChildSettlementAppends (state: obj) (unknown: bool) : Task<obj> =
+        task {
+            let projection = (stateOf state).Projection
+            let attempted = ResizeArray<string>()
+
+            let writer =
+                { new IJournalWriter with
+                    member _.RuntimeId = RuntimeId.create "load-recovery-test"
+                    member _.LocalSeq = 0L
+                    member _.LastCommittedLocalSeq = 0L
+                    member _.IsPoisoned = false
+                    member _.TryCurrent _ = Some(box projection)
+
+                    member _.BlobWriter =
+                        { new IBlobWriter with
+                            member _.Read _ =
+                                Task.FromResult(Error "unused blob read")
+
+                            member _.Write _ =
+                                Task.FromResult(Error "unused blob write") }
+
+                    member _.Append _ _ fact =
+                        attempted.Add(FactCodec.serializeFact fact)
+                        let eventId = EventId.create "load-settlement-rejected"
+
+                        Task.FromResult(
+                            if unknown then
+                                CommitUnknown(eventId, WriteFailed "injected settlement write failure")
+                            else
+                                NotAttempted(eventId, WriterClosing)
+                        )
+
+                    member _.Release() = ()
+                    member _.ReleaseAsync() = ValueTask() }
+
+            use journal =
+                AgentJournal.createFromProjection writer projection
+                |> Result.defaultWith (fun error -> invalidOp error.Reason)
+
+            try
+                do! ChildWorkRecovery.settleOrphanedChildRuns journal
+
+                return
+                    box
+                        {| settled = true
+                           failure = ""
+                           attempted = attempted.ToArray() |}
+            with :? JournalAppendException as error ->
+                return
+                    box
+                        {| settled = false
+                           failure = JournalAppendFailure.describe error.Failure
+                           attempted = attempted.ToArray() |}
+        }
 
     let private handlesOf state parent =
         (stateOf state).Projection.AgentProjections.Sessions

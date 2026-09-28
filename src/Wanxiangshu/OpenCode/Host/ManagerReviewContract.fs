@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode.Host
 
 open System
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.OpenCode
@@ -24,6 +25,9 @@ module ManagerReviewContract =
 
     [<Emit("Object.getOwnPropertyDescriptor($0, $1)")>]
     let private getOwnPropertyDescriptor (target: obj) (key: obj) : obj = jsNative
+
+    [<Emit("Object.getOwnPropertyNames($0)")>]
+    let private ownPropertyNames (target: obj) : string array = jsNative
 
     [<Emit("Object.defineProperty($0, $1, $2)")>]
     let private defineProperty (target: obj) (key: obj) (descriptor: obj) : unit = jsNative
@@ -57,6 +61,14 @@ module ManagerReviewContract =
             deleteProperty args savedContractKey |> ignore
             raise ex
 
+    let private requireConfigurableProperty (args: obj) (key: string) : unit =
+        if not (isDescriptorConfigurable (getOwnPropertyDescriptor args key)) then
+            throwTypeError "Tool arguments cannot restore the review contract's original key order"
+
+    let private requireConfigurableProperties (args: obj) (keys: string array) : unit =
+        for key in keys do
+            requireConfigurableProperty args key
+
     let private hideContractProperty (args: obj) : unit =
         let descriptor = getOwnPropertyDescriptor args "contract"
         let isConfigurable = isDescriptorConfigurable descriptor
@@ -64,7 +76,16 @@ module ManagerReviewContract =
         if not (isExtensible args) || not isConfigurable then
             throwTypeError "Tool arguments cannot hold or modify the review contract"
 
-        let saved = createObj [ "descriptor", descriptor ]
+        let followingKeys =
+            if isNull descriptor then
+                [||]
+            else
+                ownPropertyNames args |> Array.skipWhile ((<>) "contract") |> Array.skip 1
+
+        requireConfigurableProperties args followingKeys
+
+        let saved =
+            createObj [ "descriptor", descriptor; "followingKeys", box followingKeys ]
 
         let symbolDescriptor =
             createObj [ "value", saved; "enumerable", box false; "configurable", box true ]
@@ -89,9 +110,27 @@ module ManagerReviewContract =
 
         assertPropertyDeleted deleted "Failed to delete contract property during restore"
 
+    let private restoreContractInOriginalOrder (args: obj) (saved: obj) : unit =
+        let followingKeys: string array = saved?followingKeys
+        requireConfigurableProperty args "contract"
+        requireConfigurableProperties args followingKeys
+
+        let following =
+            followingKeys
+            |> Array.map (fun key -> key, getOwnPropertyDescriptor args key)
+            |> Array.filter (fun (_, descriptor) -> not (isNull descriptor))
+
+        for key, _ in following do
+            assertPropertyDeleted (deleteProperty args key) "Failed to restore review argument key order"
+
+        applyRestoredDescriptor args saved?descriptor
+
+        for key, descriptor in following do
+            defineProperty args key descriptor
+
     let private restoreSavedDescriptor (args: obj) (saved: obj) : unit =
         if not (isNull saved) then
-            applyRestoredDescriptor args saved?descriptor
+            restoreContractInOriginalOrder args saved
 
     let private restoreSavedContract (args: obj) : unit =
         let saved = args?(savedContractKey)
@@ -99,13 +138,58 @@ module ManagerReviewContract =
         if not (isExtensible args) then
             throwTypeError "Tool arguments are frozen or not extensible during contract restore"
 
+        restoreSavedDescriptor args saved
         let deletedKey = deleteProperty args savedContractKey
         assertPropertyDeleted deletedKey "Failed to delete saved review contract key"
-        restoreSavedDescriptor args saved
 
     let restore (args: obj) : unit =
         if not (isNull args) && isPlainObject args && hasOwn args savedContractKey then
             restoreSavedContract args
+
+    [<Emit("typeof $0 === 'function'")>]
+    let private isFunction (value: obj) : bool = jsNative
+
+    [<Emit("Promise.resolve($0.call($1, $2, $3))")>]
+    let private invokeExecute (execute: obj) (tool: obj) (args: obj) (context: obj) : Task<obj> = jsNative
+
+    [<Emit("(args, context) => $0(args)(context)")>]
+    let private uncurriedExecute (execute: obj) : obj = jsNative
+
+    [<Emit("new AggregateError([$0, $1], 'Review executor and argument restoration failed', { cause: $0 })")>]
+    let private combinedFailure (execution: exn) (restoration: exn) : exn = jsNative
+
+    let wrapReviewExecutors (tools: obj) : unit =
+        if not (isPlainObject tools) then
+            invalidArg "tools" "Registered tools must be an object"
+
+        let tool = tools?("js-manager")
+
+        if not (isPlainObject tool) || not (isFunction tool?execute) then
+            invalidArg "tools" "Registered js-manager execute must be a function"
+
+        let execute = tool?execute
+
+        let wrapped (args: obj) (context: obj) : Task<obj> =
+            task {
+                hide args
+                let mutable executionFailure = None
+
+                try
+                    try
+                        return! invokeExecute execute tool args context
+                    with error ->
+                        executionFailure <- Some error
+                        return raise error
+                finally
+                    try
+                        restore args
+                    with restoration ->
+                        match executionFailure with
+                        | Some execution -> raise (combinedFailure execution restoration)
+                        | None -> raise restoration
+            }
+
+        tool?execute <- uncurriedExecute (box wrapped)
 
     [<Literal>]
     let private reviewContractDescription =

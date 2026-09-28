@@ -79,7 +79,12 @@ function waitFor(cond, timeoutMs, intervalMs = 20) {
  * Resolves when the leader is dead AND the group is empty.
  * Throws (loud, never silent) listing survivors if anything escapes.
  */
-export async function terminateTree(child, { termGraceMs = TERM_GRACE_MS, killGraceMs = SIGKILL_GRACE_MS } = {}) {
+export async function terminateTree(child, {
+  termGraceMs = TERM_GRACE_MS,
+  killGraceMs = SIGKILL_GRACE_MS,
+  detached = true,
+  descendantPids = [],
+} = {}) {
   const pid = typeof child === "number" ? child : child?.pid;
   if (!pid) return;
 
@@ -91,8 +96,10 @@ export async function terminateTree(child, { termGraceMs = TERM_GRACE_MS, killGr
     try {
       if (process.platform === "win32") {
         execSync(`taskkill /pid ${pid} /T /F`, { stdio: "ignore" });
-      } else {
+      } else if (detached) {
         process.kill(-pid, sig);
+      } else {
+        process.kill(pid, sig);
       }
     } catch {}
     if (typeof child === "object" && typeof child?.kill === "function") {
@@ -103,8 +110,8 @@ export async function terminateTree(child, { termGraceMs = TERM_GRACE_MS, killGr
   const fullyDead = () => {
     const leaderGone = !pidIsAlive(pid);
     if (!leaderGone) return false;
-    const members = process.platform === "win32" ? [] : groupMembers(pid);
-    return members.length === 0;
+    const members = process.platform === "win32" || !detached ? [] : groupMembers(pid);
+    return members.length === 0 && descendantPids.every((descendant) => !pidIsAlive(descendant));
   };
 
   if (fullyDead()) return;
@@ -115,7 +122,8 @@ export async function terminateTree(child, { termGraceMs = TERM_GRACE_MS, killGr
   signal("SIGKILL");
   if (await waitFor(fullyDead, killGraceMs)) return;
 
-  const survivors = process.platform === "win32" ? [pid] : groupMembers(pid);
+  const survivors = process.platform === "win32" || !detached ? [pid].filter(pidIsAlive) : groupMembers(pid);
+  survivors.push(...descendantPids.filter(pidIsAlive));
   throw new Error(
     `Process tree ${pid} failed to terminate within ${termGraceMs + killGraceMs}ms; ` +
     `surviving pids: ${survivors.length ? survivors.join(",") : "leader"}`

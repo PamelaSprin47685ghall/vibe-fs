@@ -55,4 +55,6 @@ TESTS_MJS_FILES="$(rg --files requirements/feature-ablation/tests requirements/r
 
 验证设施的物理协议回归：`node requirements/verification-system/tests/integration/harness/run.mjs`。它运行隔离的辅助进程和协议替身，不是多个真实 E2E 世界。
 
+2026-09-28新增关闭错误与晚生孤儿回归：HTTP关闭继续尝试清理并保留真实错误；正常inner退出后，监督者也检查自己创建的独立进程组，回收残留后仍报告失败。共享组Host不获得终止整个组的权力，原进展判据及静默窗口保留。当前完整执行结果见[兼容验收记录](../../../proposals/20模块兼容修复与验收-2026-09-28.md)，定点红绿不代替新鲜产物验收。
+
 日常入口 `npm run format-build-test`，发布入口 `npm run verify:release`。Long Stroke 的设施见 [e2e/README](e2e/README.md)。

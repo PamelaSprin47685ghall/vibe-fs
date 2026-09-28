@@ -225,6 +225,7 @@ module PluginHooks =
                                 with error ->
                                     Error error.Message)
 
+                    ManagerReviewContract.wrapReviewExecutors toolRegistration.Tools
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
                     return toolRegistration
@@ -255,38 +256,8 @@ module PluginHooks =
                 | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
                 | None -> ToolRuntimeScope.emptyManagerFacts
 
-            // DELEGATE.md 9.1/9.2: the only enablement condition for explicit
-            // read-only delegation is that a Predictor model is configured.
-            // The read-only configuration existence query is owned by
-            // ModelRouting (ModelRouting.sharedPredictorConfiguration, loaded
-            // once together with the sole MJS model configuration during the
-            // PluginBoot Load Phase, before any tool definition is registered
-            // or presented) and is shared by tool decoration and delegation
-            // admission, so this hook consumes the query instead of holding a
-            // second enabled truth. Configured decorates the schema and
-            // appends the collaboration prose; NotConfigured decorates nothing.
-            // ConfigurationInvalid is a malformed model configuration: it fails
-            // closed here rather than silently degrading to "not configured",
-            // the same choice as ModelRouting.requireRoutingProtocol; the
-            // hook's registered disposition (HookPolicy ToolDefinition:
-            // Invariant / TypedPolicyFailClosed, diagnostic operation
-            // plugin-hook-tool-definition-failed) already carries the report.
-            let readonlyDelegationPredictorConfigured () : bool =
-                match ModelRouting.sharedPredictorConfiguration () with
-                | ModelRouting.PredictorConfiguration.Configured -> true
-                | ModelRouting.PredictorConfiguration.NotConfigured -> false
-                | ModelRouting.PredictorConfiguration.ConfigurationInvalid reason ->
-                    raise (
-                        InvalidOperationException(
-                            sprintf "execution-model-routing: Predictor model configuration is invalid: %s" reason
-                        )
-                    )
-
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 ManagerReviewContract.decorateDefinition toolInput toolOutput
-
-                if readonlyDelegationPredictorConfigured () then
-                    ReadonlyDelegationContract.decorateDefinition toolInput toolOutput
 
             let isReviewPermitted toolName facts =
                 match ManagerReviewTools.requiredPermissions toolName with
@@ -315,43 +286,6 @@ module PluginHooks =
                 if ManagerReviewTools.isReviewTool toolName then
                     assertReviewPermitted toolName (toolField toolInput "sessionID")
 
-            // host-boundary-032 / DELEGATE.md 4.3: snapshot the protocol
-            // fields the model actually produced, before either contract family
-            // hides them. The Host persists the stripped arguments, so the
-            // provider transform restores the fields into the request from this
-            // vault. contract only for review tools (the only place review hide
-            // runs); the delegation fields are recorded wherever they appear,
-            // matching the unconditional readonly hide.
-            let recordProtocolArgumentVault (toolInput: obj) (toolOutput: obj) =
-                if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                    let toolName = toolField toolInput "tool"
-                    let context = ToolHostCodec.decodeContext toolInput
-
-                    match context.ToolCallId with
-                    | Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        match ProtocolArgumentVault.snapshotOfArguments toolOutput?args with
-                        | Some snapshot ->
-                            let recorded =
-                                if ManagerReviewTools.isReviewTool toolName then
-                                    snapshot
-                                else
-                                    { snapshot with Contract = None }
-
-                            if
-                                recorded.Contract.IsNone
-                                && recorded.ReadonlyRounds.IsNone
-                                && recorded.SelfNote.IsNone
-                            then
-                                ()
-                            else
-                                ProtocolArgumentVault.record
-                                    boot.ProtocolArgumentVault
-                                    context.SessionId
-                                    (ToolCallId.value toolCallId)
-                                    recorded
-                        | None -> ()
-                    | _ -> ()
-
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
                     do!
@@ -365,8 +299,6 @@ module PluginHooks =
 
                     checkManagerReviewPermissions toolName toolInput
 
-                    recordProtocolArgumentVault toolInput toolOutput
-
                     let context = ToolHostCodec.decodeContext toolInput
 
                     match journal, context.ToolCallId with
@@ -375,33 +307,11 @@ module PluginHooks =
                         do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
                     | _ -> ()
 
-                    if
-                        ManagerReviewTools.isReviewTool toolName
-                        && not (isNull toolOutput)
-                        && not (isNull toolOutput?args)
-                    then
-                        ManagerReviewContract.hide toolOutput?args
-
-                    // host-boundary-032 / DELEGATE.md 4.3: the same cleanup
-                    // mechanism serves both contract families. The protocol
-                    // fields are hidden from the business view whenever the
-                    // provider produced them, independently of protocol
-                    // decoration; absent fields are the same optimistic
-                    // no-op as a missing review contract. ReadonlyDelegationContract
-                    // keeps its own private Symbol, so the review contract's
-                    // saved descriptor is never touched.
-                    if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                        ReadonlyDelegationContract.hide toolOutput?args
                 }
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     if not (isNull toolInput) && not (isNull toolInput?args) then
-                        // host-boundary-032: same-source restore for both
-                        // contract families on exception, repeat and concurrent
-                        // paths. Restore is idempotent and a no-op when the
-                        // after hook receives a different object than before.
-                        ReadonlyDelegationContract.restore toolInput?args
                         ManagerReviewContract.restore toolInput?args
 
                     do!

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { runChatAdmissionCanary } from './support/run-opencode-chat-admission-canary.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -11,7 +13,7 @@ const fixture = JSON.parse(fs.readFileSync(path.join(here, '../fixtures/opencode
 
 const driftFixture = JSON.parse(fs.readFileSync(path.join(here, '../fixtures/opencode-chat-admission-drift.json'), 'utf8'))
 
-const runner = path.join(here, 'support/run-opencode-chat-admission-canary.mjs')
+const execute = promisify(execFile)
 
 const assertPassingVersionEvidence = (versions) => {
   const supported = fixture.supportedVersionRange !== null
@@ -25,16 +27,72 @@ const assertPassingVersionEvidence = (versions) => {
   assert.deepEqual(versions, fixture.observedVersions)
 }
 
-const runInstalledCanary = () => {
-  const launched = spawnSync(process.execPath, [runner], { cwd: path.resolve(here, '../../..'), encoding: 'utf8' })
-  assert.equal(launched.status, 0, launched.stderr || launched.stdout)
-  return JSON.parse(launched.stdout)
-}
-
 const first = (evidence, kind) => evidence.observations.find((observation) => observation.kind === kind)
 
-test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', () => {
-  const evidence = runInstalledCanary()
+test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', async (t) => {
+  const stage = (name, verify) => async (value) => {
+    let failure
+    await t.test(`WHAT[host-boundary-023] ${name}`, async () => {
+      try { await verify(value) } catch (error) { failure = error; throw error }
+    })
+    if (failure) throw failure
+  }
+  const evidence = await runChatAdmissionCanary({
+    versions: stage('installed binary and plugin match the observed version', (versions) => {
+      assert.deepEqual(versions, fixture.observedVersions)
+      assert.throws(() => assertPassingVersionEvidence(driftFixture.versions), /outside the passing observed range/)
+    }),
+    ready: stage('one real Host is healthy and shares its supervising process group', async ({ sessionID, pid, health }) => {
+      assert.equal(typeof sessionID, 'string')
+      assert.ok(sessionID.length > 0)
+      assert.equal(health.status, 200)
+      assert.equal(health.data.healthy, true)
+      assert.ok(Number.isInteger(pid) && pid > 0)
+      if (process.platform !== 'win32') {
+        const group = async (target) => Number((await execute('ps', ['-o', 'pgid=', '-p', String(target)])).stdout.trim())
+        const hostGroup = await group(pid)
+        assert.ok(hostGroup > 0)
+        assert.equal(hostGroup, await group(process.pid))
+        assert.notEqual(hostGroup, pid, 'Host must not escape into a detached group')
+      }
+    }),
+    provider: stage('accepted input crosses the public hooks before the real provider request', (observations) => {
+      const providerIndex = observations.findIndex(({ kind }) => kind === 'provider')
+      assert.ok(providerIndex > 0)
+      assert.deepEqual(observations.slice(0, providerIndex + 1)
+        .map(({ kind }) => kind).filter((kind) => fixture.order.includes(kind)), fixture.order)
+      const message = observations.find(({ kind }) => kind === 'chat.message').value
+      assert.equal(message.input.messageID, '$accepted-message')
+      assert.equal(message.output.sessionID, '$session')
+    }),
+    terminal: stage('the accepted assistant has matching public start and terminal evidence before idle', (observations) => {
+      const assistant = observations.filter(({ kind, value }) => kind === 'message.updated'
+        && value.info.role === 'assistant' && value.info.parentID === '$accepted-message')
+      const started = assistant.find(({ value }) => value.info.id && value.info.created !== null)
+      assert.ok(started)
+      const ended = assistant.find(({ value }) => value.info.id === started.value.info.id && value.info.completed !== null)
+      assert.ok(ended)
+      assert.equal(ended.value.info.sessionID, '$session')
+      assert.ok(observations.find(({ kind }) => kind === 'session.idle').sequence > ended.sequence)
+    }),
+    duplicate: stage('the duplicate input is redelivered with no additional transform or provider call at the observed checkpoint', (observed) => {
+      assert.equal(observed.responseStatus, 204)
+      assert.equal(observed.transformsAfter, observed.transformsBefore)
+      assert.equal(observed.providerDeliveriesAfter, observed.providerDeliveriesBefore)
+      assert.equal(observed.observations.filter(({ kind, value }) => kind === 'chat.message'
+        && value.input.messageID === '$accepted-message').length, 2)
+    }),
+    rejection: stage('an accepted request reports the public hook rejection through session.error', ({ responseStatus, observations }) => {
+      assert.equal(responseStatus, 204)
+      assert.ok(observations.some(({ kind, value }) => kind === 'chat.message.rejection'
+        && value.messageID === '$rejected-message'))
+      const rejected = observations.find(({ kind }) => kind === 'session.error').value
+      assert.deepEqual(rejected.properties, {
+        error: { data: { message: '<string>' }, name: 'UnknownError' },
+        sessionID: '<string>',
+      })
+    }),
+  })
   assert.deepEqual(evidence.versions, fixture.observedVersions)
   assert.deepEqual(evidence.publicApis.hooks, fixture.publicHooks)
 
@@ -109,6 +167,9 @@ test('WHAT[host-boundary-023] installed OpenCode chat admission public contract 
   assert.equal(evidence.duplicate.responseStatus, 204)
   assert.equal(evidence.duplicate.transformsAfter, evidence.duplicate.transformsBefore)
   assert.equal(evidence.duplicate.providerDeliveriesAfter, evidence.duplicate.providerDeliveriesBefore)
+  assert.equal(evidence.providerLifecycle.providerDeliveries, evidence.duplicate.providerDeliveriesBefore)
+  assert.equal(evidence.observations.filter(({ kind }) => kind === 'experimental.chat.messages.transform').length,
+    evidence.duplicate.transformsBefore)
 
   if (fixture.supportedVersionRange === null) {
     assert.throws(
@@ -120,3 +181,5 @@ test('WHAT[host-boundary-023] installed OpenCode chat admission public contract 
   }
   console.log(JSON.stringify({ opencodeChatAdmissionCanary: evidence }))
 })
+
+test.todo('WHAT[host-boundary-023] duplicate redelivery has a public completion witness and cannot cause a later transform or provider request (GAP-063)')

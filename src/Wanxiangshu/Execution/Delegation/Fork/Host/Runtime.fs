@@ -658,19 +658,22 @@ type HostForkRuntime
     /// this process currently drives.
     member internal _.TryChildFromDurable(agentId: string) : (SessionId * Role * string) option =
         journal
-        |> Option.bind (fun durable -> DurableChildLookup.byHandleId (AgentJournal.handleProjection durable this.ParentId) agentId)
+        |> Option.bind (fun durable ->
+            DurableChildLookup.byHandleId (AgentJournal.handleProjection durable this.ParentId) agentId)
+
+    member private this.AdoptDurableChild(agentId: string) : (SessionId * bool) option =
+        match this.TryChildFromDurable agentId with
+        | None -> None
+        | Some(childId, role, agent) ->
+            this.AdoptExisting(agentId, childId, role, agent)
+            Some(childId, true)
 
     /// Resolve a child for reuse: process-local registration first, then the
     /// durable handle, which is adopted on demand so placement/await see it.
     member internal this.ReusableChildOrAdopt(agentId: string) : (SessionId * bool) option =
         match this.TryReusableChild agentId with
         | Some found -> Some found
-        | None ->
-            match this.TryChildFromDurable agentId with
-            | None -> None
-            | Some(childId, role, agent) ->
-                this.AdoptExisting(agentId, childId, role, agent)
-                Some(childId, true)
+        | None -> this.AdoptDurableChild agentId
 
     /// Resolve a child through durable evidence when this process has not met it
     /// yet (restart). The handle is the existence evidence; the in-process maps
@@ -693,6 +696,11 @@ type HostForkRuntime
         | None, Some _ -> true
         | None, None -> false
 
+    member private this.UnregisteredChildAwaitOutcome(agentId: string) : Result<RunCompletion, string> =
+        match this.TryFindAgentOrAdopt agentId with
+        | None -> Error(sprintf "Unknown agent id: %s" agentId)
+        | Some _ -> Error(sprintf "No work in flight for %s" agentId)
+
     /// Await one child's completion. A restarted process has nothing in flight for
     /// a child it only knows from the journal: that answers explicitly instead of
     /// the bare "Unknown agent id" the process tables produced.
@@ -700,10 +708,7 @@ type HostForkRuntime
         task {
             match this.TryReusableChild agentId with
             | Some _ -> return! this.Runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
-            | None ->
-                match this.TryFindAgentOrAdopt agentId with
-                | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                | Some _ -> return Error(sprintf "No work in flight for %s" agentId)
+            | None -> return this.UnregisteredChildAwaitOutcome agentId
         }
 
     member internal _.TryReusableChild(agentId: string) : (SessionId * bool) option =

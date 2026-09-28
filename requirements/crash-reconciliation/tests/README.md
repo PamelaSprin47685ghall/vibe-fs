@@ -26,6 +26,8 @@ WHAT 是合同。这里说明当前证据，不为恢复增加隐含规则。用
 
 020/021 的 LoadRecoverySurface 只转换 canonical fact、调用实际 owner 并投影结果。JoinDrain 的受控 append port 将实际产生的事实交 production Fold；没有写磁盘，不声称 CAS 或 crash 持久性。主动取消产生可收取 completion；加载 ChildRunVoided 不产生 completion，二者不是同一场景。Blogger 在同一已打开请求的投影上追加 abandon，再证明下一请求可物化，不用空投影自证。
 
+020 的追加失败回归把受控 IJournalWriter 接到真实 AgentJournal，再调用 ChildWorkRecovery。分别观察 writer 不可用与提交结果未知：必须传出 JournalAppendException，不能宣称已结算或继续下一条；空投影是无需追加即可成功的对照。这不证明真实磁盘故障或插件加载在普通任务之前完成；后者仍是整链 TODO。
+
 绑定/Fission 测试会在 finally 移除自己的 resolver/cache。canonical journal JSON 是持久协议载体，不是 Fable 内部 tag/fields 对象。018 的旧 `/continue` 材料链随新版合同退役；本轮逐项覆盖迁移表在 `proposals/20模块迁移-恢复与委托-2026-09-28.md`。
 
 完整进程中断、持久事实重开、物理发送/完成提交切点见 GAP-149。33 的真实 OS crash 测试可作为相关机制证据，但不替代本包所有工具、DevOps 与 family 恢复场景。provider failure 的分类和计账归 37，已移去本包重复且不相关的断言。

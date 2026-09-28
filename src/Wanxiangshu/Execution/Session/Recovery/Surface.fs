@@ -62,9 +62,27 @@ module RecoverySurface =
                     | SessionRecovery.RecoveryBlock.RecoveryCycle _ -> "RecoveryCycle"
                     | _ -> "RecoveryBlock" |}
 
-    let missingMembers (permitMembers: string array) (currentMembers: string array) : string array =
-        let permit = Set.ofArray permitMembers
-        Set.difference permit (Set.ofArray currentMembers) |> Set.toArray
+    let missingMembers (permitNodes: obj array) (currentNodes: obj array) : string array =
+        let root = SessionId.create "membership-fixture"
+
+        let closure: SessionRecovery.RecoveryClosure =
+            { Root = root
+              Nodes = permitNodes |> Array.toList |> List.map nodeOf
+              Digest = "membership-fixture"
+              JournalSequence = 1L }
+
+        let recovered: SessionRecovery.RecoveredClosure =
+            { Closure = closure
+              Results = Map.empty }
+
+        match SessionRecovery.authorizeFamilyResume root 1L recovered with
+        | SessionRecovery.FamilyRecovery.FamilyReady permit ->
+            { closure with
+                Nodes = currentNodes |> Array.toList |> List.map nodeOf }
+            |> SessionRecovery.RecoveryClosure.members
+            |> fun current -> SessionRecovery.FamilyRecoveryPermit.missingFrom current permit
+            |> List.toArray
+        | _ -> invalidOp "membership fixture could not create a permit"
 
     let private receipt id sequence =
         SessionRecovery.RecoveryReceipt.create (SessionId.create id) sequence None [] []

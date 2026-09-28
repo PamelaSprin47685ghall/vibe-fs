@@ -12,6 +12,9 @@ module XWireSurface =
 
     val bindProviderRun: pending: obj -> providerRun: string -> obj
 
+    /// Drive the real XWire transform with captured trace and controlled blob ports.
+    val applyPhaseWindow: input: obj -> Task<obj>
+
     /// Typed owner bridges for the OpenCode recovery owner surface: wrap/unwrap
     /// the opaque JS plan handles and project the semantic JSON views. No
     /// admission or binding policy lives here.

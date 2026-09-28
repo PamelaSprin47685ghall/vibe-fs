@@ -23,7 +23,6 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
 
 /// Application ownership of linked-child prompt authority (rabbit §19).
