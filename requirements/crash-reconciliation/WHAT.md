@@ -72,9 +72,9 @@ Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前�
 
 进程重启后不存在任何显式续传命令（`/continue` 已移除）。系统在加载阶段自行完成归位，且只做持久记账，不重放任何命令：
 
-- 上一个 runtime 遗留的活跃子 run 被结算（`HandleCompleted(Cancelled)`），关闭其逻辑 run 并让父会话的 join 得到明确结果；
-- 进程本地的父子会话执行绑定按 durable handle 重建（取 handle 的 `TargetAgent`，不取逻辑 `Byname`）；
-- durable 子会话在进程内重新登记，使后续 `fork` 复用可以寻址；复用仍由 manager 显式发起。
+- 上一个 runtime 遗留的活跃子 run 被**作废**（`ExecutionFactCases.ChildRunVoided`）：只关闭该子会话的逻辑 run，不产生任何“待收交付”；该 run 什么都没产出，就不欠父会话一次 join——`horizon` 与 `join` 对它都为空，直接 `resume` 才是正确时序；
+- 父子会话的执行绑定与 fission lane 归属按 durable 投影**按需解析**（取 handle 的 `TargetAgent`，不取逻辑 `Byname`），进程本地表只是缓存，装载阶段不做任何预登记扫描；
+- 复用仍由 manager 显式发起；复用门禁、placement、await 一律以 durable handle 为存在性依据。
 
 被中断的工具调用保持失败并原样留在可见历史中，不得推断其完成、隐藏它或伪造终态。没有独立的续传材料通道，也没有 disclosure-only 的 provider 轮次。
 
@@ -87,3 +87,11 @@ Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前�
 同一道路绑定的固定 DevOps 在崩溃恢复后必须且仅能映射到唯一的当前活跃物理会话，严禁生成两个并行生效的可执行物理权威。
 崩溃前未决的物理命令（`run`、PTY 输入）一律按中断处理，系统严禁在重启后自动重放、补写或隐式续发命令，杜绝物理副作用重复发生。
 恢复流程必须严格沿用道路初始化时持久化的绑定模型（ModelTarget）与 Persona，严禁在恢复或 resume 时切换模型；新会话与恢复只接纳合法新角色集合，历史旧状态不隐式跨边界恢复。
+
+## [021] 进程本地表是缓存，durable 投影是存在性真源
+
+任何“这个子会话/lane/handle 是否存在、属于谁、由谁执行”的判定都必须能从 durable 投影回答；进程本地注册表（子会话登记、dormant 集、执行绑定、lane 注册表）只记录“本进程当前在驱动什么”，不得作为拒绝、忽略或“未知”的唯一依据。
+
+- 未命中缓存时的正确行为是**按需解析并回填**（`DurableChildLookup` by handle id / byname、`SessionExecutionBinding` 的 durable 证据回退、`FissionRuntime` 的 durable lane 证据），而不是回 `Unknown agent id`、`person-unavailable` 或静默跳过；
+- 装载阶段不再有“预登记/预热”特例通道：同一件事只有一个按需规则，避免重启路径每多一处读取就多一处补丁；
+- 只有进程资源归属（本进程持有的 PTY、pending run、teardown 集合、live companion host）可以只读本地表；它们描述的是进程，而不是世界。
