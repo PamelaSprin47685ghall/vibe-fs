@@ -118,6 +118,12 @@ module Fold =
             |> Result.map (fun updated ->
                 { projection with
                     ChatExecutions = updated })
+            |> Result.map (fun updated ->
+                // A child run that ended without completing is reset here: its
+                // logical run is closed and the parent's handle is settled, so a
+                // restart is an explicit decision again instead of a dead join
+                // (crash-reconciliation-017/020, managed-session-lifecycle-018).
+                DelegationProjectionBridge.settleUncompletedChildRun updated chatExecution)
         | AgentFact.Cognition cognition -> foldCognition projection cognition
         | AgentFact.Orchestrator orchestrator ->
             // The Change family fold consumes the journal-owned `ProjectionSet`,
