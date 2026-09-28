@@ -118,6 +118,11 @@ type HostForkRuntime =
     member internal OwnsAgent: agentId: string -> bool
     member AdoptExisting: agentId: string * childId: SessionId * role: Role * agent: string -> unit
     member internal TryReusableChild: agentId: string -> (SessionId * bool) option
+
+    /// crash-reconciliation-020: durable child resolution for reuse/await.
+    member internal TryChildFromDurable: agentId: string -> (SessionId * Role * string) option
+
+    member internal ReusableChildOrAdopt: agentId: string -> (SessionId * bool) option
     member internal ActivateDormantChild: agentId: string * childId: SessionId * role: Role -> unit
 
     member internal ActivateDormantChildIfNeeded:

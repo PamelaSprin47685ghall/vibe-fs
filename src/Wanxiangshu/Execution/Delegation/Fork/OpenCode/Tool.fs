@@ -485,7 +485,7 @@ module ForkTool =
             match placement with
             | Ok wire -> return wire
             | Error err ->
-                printfn "[COMMIT-REUSE-ERR: %A]" err
+                Diagnostic.emit "fork-reuse-commit-failed" [ "result", err ]
                 return consequence (prose language Path.Fork.PersonCannotTakeCharge)
         }
 

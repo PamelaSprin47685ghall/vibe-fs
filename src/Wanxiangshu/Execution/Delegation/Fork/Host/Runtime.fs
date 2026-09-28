@@ -651,6 +651,30 @@ type HostForkRuntime
         runtime.Restore(agentId, role, agent)
         runtime.BindChildSession(agentId, childId)
 
+    /// crash-reconciliation-020: the durable handle projection is the single
+    /// source of truth for which children this parent still owns. A restarted
+    /// process has empty process tables, so every reuse/await path must be able
+    /// to resolve a child from it — the in-process maps are only a cache of what
+    /// this process currently drives.
+    member internal _.TryChildFromDurable(agentId: string) : (SessionId * Role * string) option =
+        journal
+        |> Option.bind (fun durable ->
+            let projection = AgentJournal.handleProjection durable this.ParentId
+            HandleProjection.tryFind (HandleController.agentHandle agentId) projection)
+        |> Option.map (fun record -> record.ChildSessionId, record.CanonicalRole, record.TargetAgent)
+
+    /// Resolve a child for reuse: process-local registration first, then the
+    /// durable handle, which is adopted on demand so placement/await see it.
+    member internal this.ReusableChildOrAdopt(agentId: string) : (SessionId * bool) option =
+        match this.TryReusableChild agentId with
+        | Some found -> Some found
+        | None ->
+            match this.TryChildFromDurable agentId with
+            | None -> None
+            | Some(childId, role, agent) ->
+                this.AdoptExisting(agentId, childId, role, agent)
+                Some(childId, true)
+
     member internal _.TryReusableChild(agentId: string) : (SessionId * bool) option =
         lock gate (fun () ->
             match children.TryGetValue agentId, dormantChildren.TryGetValue agentId with

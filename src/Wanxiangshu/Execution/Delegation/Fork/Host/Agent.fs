@@ -752,7 +752,7 @@ module HostForkAgent =
                         let handle = HandleController.agentHandle agentId
                         HandleProjection.isAbandoned handle projection)
 
-                let existing = this.TryReusableChild agentId
+                let existing = this.ReusableChildOrAdopt agentId
                 let active = lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
 
                 match active, abandoned, existing with

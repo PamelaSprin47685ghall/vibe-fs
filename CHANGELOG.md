@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **激进重构第一刀：reuse/placement/await 改为以 durable handle 为单一真源（crash-reconciliation-020）**：实机 `[COMMIT-REUSE-ERR: "Unknown agent id: opghu8"]` 追到 `Fork/Host/Agent.fs:761` —— `Reuse` 只用**进程本地**的 `TryReusableChild` 判存在，重启后空表即判「Unknown agent id」，而同一个 handle 在 durable 投影里完好（`opghu8` = `triage-misc`）。这是本会话第四次同类病：进程本地表被当作存在性真源。
+  改动：`HostForkRuntime` 新增 `TryChildFromDurable`（按 handle id 读 durable 投影）与 `ReusableChildOrAdopt`（先查进程登记，未命中则按需收养后返回子会话），`Reuse` 改用它；`.fsi` 同步；`Tool.fs` 的 `printfn "[COMMIT-REUSE-ERR]"` 调试输出替换为 `Diagnostic.emit "fork-reuse-commit-failed"`。
+  验证：构建 generation 36；crash-reconciliation + delegation + managed-session-lifecycle + host-boundary 共 655 项，余 5 项为既有 WIP（host-boundary-032 C34–C38）。运行时级回归（重启后直接 reuse 既有 byname）待补：现有 Fork surface 无运行时入口，需要一个测试缝。
+
 - **重启归位改为“作废中断 run”：horizon / join / reuse 三处状态一致（crash-reconciliation-020）**：上一版归位把遗留子 run 写成 `HandleCompleted(Cancelled)`，留下一个没有 body 的“未收交付”；但 `horizon` 的名单只收本进程持有或 Abandoned 的 handle（收养的子会话故意 dormant），于是 horizon 空空、join 无可收，而 reuse 门禁却认定有未清交付——三处各说各话（实机：六个既有 Engineer 子会话逐一 resume 全被答“此人目前无法再接下另一项托付”）。用户裁决：中断的 run 什么结果都没产出，就不欠任何人交代——horizon 为空、join 为空、直接 resume 才是正确时序。
   修复：新增 durable 事实 `ExecutionFactCases.ChildRunVoided`（fold 只产出 `TerminatedChildHandle`，关闭子 run 权威、**不动 handle 生命周期**；codec 与 `ExecutionFact` 帮手同步），`ChildWorkRecovery` 的 Load Phase 结算改用它——子会话保持可复用，horizon 与 join 都不再出现幽灵交付。另修 `Tool.fs::reuseResolvedAgent` 的 `TryFindAgent = None` 分支：重启后的进程登记可能还没有该子会话，此时以 durable handle 为准走正常 reuse 路径，而不是回 `person-unavailable`。
   验证：`CRASH_020_run_without_terminal_is_settled_at_load` 改为断言“结算后 handle 仍 Active、join 可收集合为空”；`CRASH_020_cancelled_completion_is_reported_and_retired_by_join` 继续覆盖真正带 `Cancelled` 完成时的单次报告；`crash-reconciliation + delegation + managed-session-lifecycle` 共 400 项全绿（durable-events 的 3 红为本会话之前即存在的 WIP：Strength fact 父边/oracle 清单）。
