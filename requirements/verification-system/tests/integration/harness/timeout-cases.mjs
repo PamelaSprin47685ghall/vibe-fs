@@ -19,13 +19,15 @@
  */
 
 import http from 'node:http';
-import { execFile, execFileSync } from 'node:child_process';
+import assert from 'node:assert/strict';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { EventProbe } from '../../e2e/support/event-probe.js';
-import { WAIT_FACT_WINDOW_MS, WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
+import { PROCESS_TREE_TIMEOUT_MS, READINESS_STAGE_MS, SIGKILL_GRACE_MS, WAIT_FACT_WINDOW_MS, WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
 import { journalEventLines } from '../../e2e/support/journal-observer.js';
 
 const execFileAsync = promisify(execFile);
@@ -64,6 +66,160 @@ async function runWatchdogChild(script, killAfterMs, budgetEnv) {
       elapsedMs: Date.now() - startedAt,
     };
   }
+}
+
+async function factChildGroupMembers(pgid, timeoutMs = PROCESS_TREE_TIMEOUT_MS) {
+  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,pgid=,stat='], {
+    encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL',
+  });
+  if (!stdout.trim()) throw new Error('fact child process inspection returned no records');
+  return stdout.trim().split('\n').flatMap((line) => {
+    const fields = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
+    if (!fields) throw new Error(`unparseable fact child process record: ${line}`);
+    return Number(fields[2]) === pgid && !/^[ZX]/.test(fields[3]) ? [Number(fields[1])] : [];
+  });
+}
+
+function killFactChildGroup(pgid) {
+  try { process.kill(-pgid, 'SIGKILL'); }
+  catch (error) { if (error.code !== 'ESRCH') throw error; }
+}
+
+async function reclaimFactChildGroup(pgid, killImmediately) {
+  if (!pgid) return false;
+  const deadline = performance.now() + SIGKILL_GRACE_MS;
+  const inspect = () => factChildGroupMembers(pgid, Math.max(1, Math.floor(Math.min(PROCESS_TREE_TIMEOUT_MS, deadline - performance.now()))));
+  try {
+    if (killImmediately) killFactChildGroup(pgid);
+    let members = await inspect();
+    const hadResidual = members.length > 0;
+    if (hadResidual) killFactChildGroup(pgid);
+    while (members.length > 0 && performance.now() < deadline) {
+      await delay(Math.min(20, Math.max(1, deadline - performance.now())));
+      members = await inspect();
+    }
+    if (members.length > 0) throw new Error(`fact child group survived reclamation: ${members.join(', ')}`);
+    return hadResidual;
+  } catch (error) {
+    try { killFactChildGroup(pgid); }
+    catch (killError) { throw new AggregateError([error, killError], 'fact child inspection and reclamation failed'); }
+    throw error;
+  }
+}
+
+/** Imports have their own startup bound; the observation window starts at real arming. */
+async function runFactBarrierChild(script, killAfterArmedMs, budgetEnv) {
+  if (!['darwin', 'linux'].includes(process.platform)) throw new Error(`fact child group verification is unsupported on ${process.platform}`);
+  const startedAt = performance.now();
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
+    env: { ...process.env, ...budgetEnv },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'], detached: true,
+  });
+  let stdout = '';
+  let stderr = '';
+  let armedAt = null;
+  const protocolErrors = [];
+  const infrastructureErrors = [];
+  let cleanup = null;
+  let finishCleanup;
+  const cleanupFinished = new Promise((resolve) => { finishCleanup = resolve; });
+  const startCleanup = (killImmediately) => {
+    cleanup ??= reclaimFactChildGroup(child.pid, killImmediately)
+      .then((hadResidual) => {
+        if (hadResidual && !killImmediately) infrastructureErrors.push(new Error('fact child left a residual process group'));
+      })
+      .catch((error) => { infrastructureErrors.push(error); })
+      .finally(() => finishCleanup({ code: child.exitCode, signal: child.signalCode }));
+    return cleanup;
+  };
+  let guard;
+  const fail = (error) => {
+    if (typeof error === 'string') protocolErrors.push(new Error(error));
+    else infrastructureErrors.push(error);
+    clearTimeout(guard);
+    startCleanup(true);
+  };
+  const exited = new Promise((resolve) => {
+    child.once('exit', (code, signal) => resolve({ code, signal }));
+    child.once('error', fail);
+  });
+  const closed = new Promise((resolve) => child.once('close', () => resolve(true)));
+  guard = setTimeout(() => fail('fact barrier startup deadline expired'), READINESS_STAGE_MS);
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  child.on('message', (message) => {
+    if (protocolErrors.length > 0 || infrastructureErrors.length > 0) return;
+    if (message?.type !== 'fact-barrier-armed' || armedAt !== null) {
+      fail(`invalid or repeated fact barrier arming: ${JSON.stringify(message)}`);
+      return;
+    }
+    armedAt = performance.now();
+    clearTimeout(guard);
+    guard = setTimeout(() => fail('fact barrier observation deadline expired'), killAfterArmedMs);
+  });
+
+  const { code, signal } = await Promise.race([exited, cleanupFinished]);
+  const endedAt = performance.now();
+  clearTimeout(guard);
+  await startCleanup(false);
+  let drainGuard;
+  try {
+    const drained = await Promise.race([closed, new Promise((resolve) => {
+      drainGuard = setTimeout(() => resolve(false), SIGKILL_GRACE_MS);
+    })]);
+    if (!drained) {
+      infrastructureErrors.push(new Error('fact child output did not drain after termination'));
+      child.stdout.destroy();
+      child.stderr.destroy();
+      if (child.connected) child.disconnect();
+    }
+  } finally { clearTimeout(drainGuard); }
+  if (armedAt === null) protocolErrors.push(new Error('fact barrier exited before arming'));
+  if (signal !== null) protocolErrors.push(new Error(`fact barrier terminated by ${signal}`));
+  const failures = [...protocolErrors, ...infrastructureErrors];
+  if (failures.length > 0) {
+    const error = new Error(`${failures.map((error) => error.message).join('\n')}\nstdout:\n${stdout}\nstderr:\n${stderr}`, {
+      cause: new AggregateError(failures, 'fact barrier or cleanup failed'),
+    });
+    error.protocolErrors = protocolErrors;
+    error.infrastructureErrors = infrastructureErrors;
+    throw error;
+  }
+  return { code, signal, stdout, stderr, startupMs: armedAt - startedAt, afterArmedMs: endedAt - armedAt };
+}
+
+const expectedFactBarrierRejection = (expected) => (error) =>
+  Array.isArray(error.infrastructureErrors) && error.infrastructureErrors.length === 0 &&
+  Array.isArray(error.protocolErrors) && error.protocolErrors.some((cause) => expected.test(cause.message));
+
+async function runFactBarrierReclaimsHeldPipe() {
+  const scenarioDir = tmpScenarioDir();
+  const identityFile = join(scenarioDir, 'held-pipe.json');
+  let identity = null;
+  const failures = [];
+  try {
+    await assert.rejects(runFactBarrierChild(
+      `import { spawn } from 'node:child_process';\n` +
+      `import { writeFileSync } from 'node:fs';\n` +
+      `const held = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: ['ignore', 'inherit', 'inherit'] });\n` +
+      `held.once('spawn', () => {\n` +
+      `  writeFileSync(${JSON.stringify(identityFile)}, JSON.stringify({ pgid: process.pid, pid: held.pid }));\n` +
+      `  process.send({ type: 'invalid-while-pipe-held' });\n` +
+      `});\n` +
+      `setInterval(() => {}, 1000);\n`, 2000), expectedFactBarrierRejection(/invalid or repeated/));
+    identity = JSON.parse(readFileSync(identityFile, 'utf8'));
+    assert.deepEqual(await factChildGroupMembers(identity.pgid), [], 'all members holding the pipe must actually be gone');
+  } catch (error) {
+    failures.push(error);
+  } finally {
+    try {
+      if (!identity && existsSync(identityFile)) identity = JSON.parse(readFileSync(identityFile, 'utf8'));
+      if (identity) await reclaimFactChildGroup(identity.pgid, true);
+    } catch (error) { failures.push(error); }
+    try { rmSync(scenarioDir, { recursive: true, force: true }); }
+    catch (error) { failures.push(error); }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'held-pipe regression or cleanup failed');
 }
 
 async function runWatchdogFiresOnSilence() {
@@ -270,15 +426,12 @@ async function runTimerDoesNotHoldEventLoop() {
  * having exited 1.
  */
 async function runWaitFactRenewsOnlyOnObservation() {
-  // 时间尺度注入。套件狗固定 3s；整 case 必须落在 3s 内。
-  // 约束：FACT_POLL_SLICE_MS(500) < 注入窗口，否则狗在第一次 poll 中途就咬。
-  // 半尺度 1500 满足切片 < 窗口；silent(~1.5s)+appending(~1.1s) 并行槽下可拆，
-  // 但本 case 串行，故用 1000ms 窗口：silent ≤1s + append 6×250ms ≈1.5s < 3s。
+  // The real watchdog still gets 1s; imports do not consume its observation window.
   const scaledWatchdogMs = 1000;
   const budgetEnv = { WATCHDOG_TIMEOUT_MS: String(scaledWatchdogMs) };
   const silentDir = tmpScenarioDir();
   execFileSync('git', ['-C', silentDir, 'init', '-q'], { encoding: 'utf8' });
-  const silent = await runWatchdogChild(
+  const silent = await runFactBarrierChild(
     factBarrierScript(silentDir, 'FactThatNeverAppears', 'gate-wait-fact-silent'),
     scaledWatchdogMs * 2,
     budgetEnv,
@@ -288,11 +441,11 @@ async function runWaitFactRenewsOnlyOnObservation() {
     1,
     `a fact that never advances must be ended by the silence budget, not by the ` +
       `${WAIT_FACT_WINDOW_MS}ms fallback: exited with code ${silent.code} signal ${silent.signal} ` +
-      `after ${silent.elapsedMs}ms`,
+      `after startup ${silent.startupMs}ms and armed ${silent.afterArmedMs}ms; ${silent.stderr}`,
   );
   assertTrue(
-    silent.elapsedMs < scaledWatchdogMs * 2,
-    `barrier survived two injected silence windows (${silent.elapsedMs}ms), so a poll slice renewed it`,
+    silent.afterArmedMs < scaledWatchdogMs * 2,
+    `barrier survived two injected silence windows (${silent.afterArmedMs}ms), so a poll slice renewed it`,
   );
   assertTrue(silent.stderr.includes('WATCHDOG'), `the watchdog must be what ended it: ${silent.stderr}`);
   assertTrue(
@@ -302,24 +455,21 @@ async function runWaitFactRenewsOnlyOnObservation() {
 
   const appendingDir = tmpScenarioDir();
   execFileSync('git', ['-C', appendingDir, 'init', '-q'], { encoding: 'utf8' });
-  const journalDir = join(appendingDir, '.git', 'wanxiangshu-next', 'runtimes');
-  mkdirSync(journalDir, { recursive: true });
-  const journalFile = join(journalDir, 'gate.ndjson');
-  writeFileSync(journalFile, '');
   const appendEvery = Math.floor(scaledWatchdogMs / 4);
   const appendsBeforeFact = 6;
-  const appending = await runWatchdogChild(
-    `import { appendFileSync } from 'node:fs';\n` +
+  const appending = await runFactBarrierChild(
+    `import { openGateFactStore } from ${JSON.stringify(gateFactsUrl)};\n` +
+      `const gate = openGateFactStore(${JSON.stringify(appendingDir)});\n` +
       `let appended = 0;\n` +
-      `const iv = setInterval(() => {\n` +
+      `const iv = setInterval(async () => {\n` +
       `  appended += 1;\n` +
       `  const fact = appended < ${appendsBeforeFact} ? 'UnrelatedProgressFact' : 'AwaitedFact';\n` +
-      `  appendFileSync(${JSON.stringify(journalFile)}, JSON.stringify({ type: fact, n: appended }) + '\\n');\n` +
+      `  await gate.appendNamedFact(fact, appended);\n` +
       `}, ${appendEvery});\n` +
       factBarrierScript(appendingDir, 'AwaitedFact', 'gate-wait-fact-appending') +
       `clearInterval(iv);\n` +
       `console.log('barrier returned after ' + appended + ' appends');\n`,
-    WATCHDOG_TIMEOUT_MS,
+    scaledWatchdogMs * 2,
     budgetEnv,
   );
   assertEq(
@@ -328,9 +478,21 @@ async function runWaitFactRenewsOnlyOnObservation() {
     `background journal appends must not renew the barrier: ${appending.stderr}`,
   );
   assertTrue(
-    appending.elapsedMs > scaledWatchdogMs,
-    `this child must outlive one injected silence window for its survival to mean anything, ran ${appending.elapsedMs}ms`,
+    appending.startupMs + appending.afterArmedMs > scaledWatchdogMs,
+    `this child must outlive one injected silence window, ran ${appending.startupMs + appending.afterArmedMs}ms`,
   );
+  assertTrue(appending.afterArmedMs < scaledWatchdogMs * 2, 'background must not survive two silence windows');
+  assertTrue(appending.stderr.includes('gate-wait-fact-appending'), `diagnostic must name the barrier: ${appending.stderr}`);
+  assertTrue(appending.stderr.includes('0 blocking progress update(s)'), `background must not count as causal: ${appending.stderr}`);
+  assertTrue(appending.stderr.includes('journal-append-while-awaiting:AwaitedFact'), `real background facts must be observed: ${appending.stderr}`);
+  assertTrue(appending.stderr.includes('none of them renewals'), `observed background must not renew: ${appending.stderr}`);
+  const reportedSilence = /silent for (\d+)ms \(limit (\d+)ms\)/.exec(appending.stderr);
+  assertTrue(reportedSilence !== null, `the watchdog must report its actual silence: ${appending.stderr}`);
+  assertEq(Number(reportedSilence[2]), scaledWatchdogMs, 'the real watchdog must keep its original limit');
+  assertTrue(Number(reportedSilence[1]) >= scaledWatchdogMs, 'the real watchdog must observe the complete silence window');
+  const observedTypes = journalEventLines(appendingDir).map((text) => JSON.parse(text).payload?.type);
+  assertTrue(observedTypes.length > 0, 'background facts must reach the current EventStore');
+  assertTrue(observedTypes.every((type) => type === 'UnrelatedProgressFact'), 'the watchdog must stop before the awaited fact');
   assertEq(
     appending.stdout.trim(),
     '',
@@ -396,6 +558,7 @@ function factBarrierScript(workDir, factName, label) {
     `  events: { awaitEvent: (_predicate, ms) => new Promise((resolve) => setTimeout(resolve, ms)) },\n` +
     `  watchdog: new Watchdog({ timeoutMs: WATCHDOG_TIMEOUT_MS, label: ${JSON.stringify(label)} }),\n` +
     `};\n` +
+    `process.send?.({ type: 'fact-barrier-armed' });\n` +
     `await awaitFactBarrier(scenario, { waitFact: { name: ${JSON.stringify(factName)}, eq: 1 }, lane: 'fact-lane' });\n` +
     `scenario.watchdog.stop();\n`
   );
@@ -412,4 +575,32 @@ export const timeoutCases = [
   { name: 'verification-system-006 a clean scenario is not held to the end of the silence window', fn: runTimerDoesNotHoldEventLoop },
   { name: 'verification-system-006 waitFact renews only on an observation', fn: runWaitFactRenewsOnlyOnObservation },
   { name: 'verification-system-006 waitFact renews on declared facts and preserves exact counts', fn: runWaitFactRenewsOnDeclaredFactAndCountsPrecisely },
+  {
+    name: 'verification-system-005 fact barrier rejects exit before arming',
+    fn: () => assert.rejects(runFactBarrierChild('process.exit(0);', 2000), expectedFactBarrierRejection(/exited before arming/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier rejects invalid arming',
+    fn: () => assert.rejects(runFactBarrierChild("process.send({ type: 'noise' }); setInterval(() => {}, 1000);", 2000), expectedFactBarrierRejection(/invalid or repeated/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier rejects repeated arming',
+    fn: () => assert.rejects(runFactBarrierChild("process.send({ type: 'fact-barrier-armed' }); process.send({ type: 'fact-barrier-armed' }); setInterval(() => {}, 1000);", 2000), expectedFactBarrierRejection(/invalid or repeated/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier rejects startup silence',
+    fn: () => assert.rejects(runFactBarrierChild('setInterval(() => {}, 1000);', 2000), expectedFactBarrierRejection(/startup deadline expired/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier rejects armed silence without a watchdog verdict',
+    fn: () => assert.rejects(runFactBarrierChild("process.send({ type: 'fact-barrier-armed' }); setInterval(() => {}, 1000);", 2000), expectedFactBarrierRejection(/observation deadline expired/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier rejects an external kill after arming',
+    fn: () => assert.rejects(runFactBarrierChild("process.send({ type: 'fact-barrier-armed' }, () => process.kill(process.pid, 'SIGKILL'));", 2000), expectedFactBarrierRejection(/terminated by SIGKILL/)),
+  },
+  {
+    name: 'verification-system-005 fact barrier reclaims a same-group descendant holding its pipes',
+    fn: runFactBarrierReclaimsHeldPipe,
+  },
 ];
