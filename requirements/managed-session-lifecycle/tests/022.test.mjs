@@ -28,9 +28,7 @@ test('WHAT[managed-session-lifecycle-022] CASE_SETTLE_uncommitted_finalize_does_
   const { dir, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)
-    // No Bookkeeper runtime installed: the CaseFinalize transaction cannot be
-    // attempted. The finalize is NotCommitted — the identity is retained for
-    // resume and no half-published Case exists.
+    // No Bookkeeper runtime: observe archive refusal, not identity retention.
     const key = 'insp-settle-uncommitted'
     lifecycle.notePrompt(key, 'What owns PromptAuthority?')
     lifecycle.noteAnswer(key, 'Host owns PromptAuthority.')
@@ -53,3 +51,67 @@ test('WHAT[managed-session-lifecycle-022] CASE_SETTLE_uncommitted_finalize_does_
     cleanup()
   }
 })
+
+test('WHAT[managed-session-lifecycle-022] archive commits once and duplicate finalize creates no second Bookkeeper child', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    lifecycle.enable(dir)
+    const { port, createCalls } = scriptedBookkeeperPort()
+    const key = 'insp-settle-finalized'
+    await installBookkeeperRuntime(port, [key])
+    lifecycle.notePrompt(key, 'What owns PromptAuthority?')
+    lifecycle.noteAnswer(key, 'Host owns PromptAuthority.')
+    const first = await lifecycle.tryFinalize(dir, key)
+    assert.equal(first.ok, true)
+    assert.equal(createCalls.length, 1)
+
+    const handle = eventStore.create(join(dir, '.git'), 'insp-settle-read')
+    try {
+      const fetched = await casebook.fetchCase(handle, 10, key)
+      assert.equal(fetched.ok, true)
+      assert.notEqual(fetched.value, null)
+    } finally {
+      eventStore.dispose(handle)
+    }
+
+    lifecycle.notePrompt(key, 'second finalize must not publish')
+    lifecycle.noteAnswer(key, 'should be refused')
+    const second = await lifecycle.tryFinalize(dir, key)
+    assert.equal(second.ok, false)
+    assert.match(String(second.error), /already finalized/)
+    assert.equal(createCalls.length, 1)
+
+    const reread = eventStore.create(join(dir, '.git'), 'insp-settle-reread')
+    try {
+      const still = await casebook.fetchCase(reread, 10, key)
+      assert.equal(still.ok, true)
+      assert.equal(still.value.sessionId, key)
+      assert.equal(still.value.a, CANONICAL_A)
+    } finally {
+      eventStore.dispose(reread)
+    }
+  } finally {
+    bookkeeper.resetRuntime()
+    lifecycle.disable()
+    cleanup()
+  }
+})
+
+test('WHAT[managed-session-lifecycle-022] no draft finalizes successfully without creating a Bookkeeper child', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    lifecycle.enable(dir)
+    const { port, createCalls } = scriptedBookkeeperPort()
+    const key = 'insp-settle-empty'
+    await installBookkeeperRuntime(port, [key])
+    const settled = await lifecycle.tryFinalize(dir, key)
+    assert.equal(settled.ok, true)
+    assert.equal(createCalls.length, 0)
+  } finally {
+    bookkeeper.resetRuntime()
+    lifecycle.disable()
+    cleanup()
+  }
+})
+
+test.todo('WHAT[managed-session-lifecycle-022] real deletion preserves exact Inspector identity for NotCommitted, Unknown and PhaseConflict; only committed or empty finalization releases it (GAP-133)')

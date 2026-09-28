@@ -9,13 +9,14 @@
  * Observes the sole manager review tool (js-manager)
  * and control tools (read, grep, glob, js-engineer, js-devops), recording:
  *   - schema decoration with contract (type, enum, required)
- *   - before: args reference identity (===), 'contract' in args, business args preservation, private Symbol presence
- *   - after: received args vs before args identity (===), contract restore, Symbol disappearance
+ *   - before: args reference identity and unchanged business arguments
+ *   - after: original argument values, object identity and key order
  *   - 3 terminal states: normal, executor throw (missing file), cancellation (long task + abort)
  *   - durable ToolPart in Host message store preserving contract input
  */
 
 import fs from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -52,12 +53,6 @@ const emit = async (kind, value) => {
   } catch (err) {
     // Non-fatal if collector is temporarily closing
   }
-};
-
-const getContractSymbols = (target) => {
-  if (!target || (typeof target !== 'object' && typeof target !== 'function')) return [];
-  return Object.getOwnPropertySymbols(target)
-    .filter((s) => s.description === 'manager-review-contract' || String(s).includes('manager-review-contract'));
 };
 
 const unwrapMessages = (response) => {
@@ -107,31 +102,51 @@ const locateToolPart = (messages, sessionID, callID) => {
   return { found: false, callID, status: null, input: null, output: null, error: null };
 };
 
-// Map of callID -> { preBeforeArgsRef, preBeforeArgsSnapshot, toolName, sessionID }
+// Same call ID in different sessions denotes different observations.
 const inflightCalls = new Map();
 
-let productionPlugin = null;
-if (productionPluginPath && fs.existsSync(productionPluginPath)) {
-  try {
-    const imported = await import(pathToFileURL(productionPluginPath).href);
-    productionPlugin = imported.default;
-  } catch (err) {
-    // If production plugin cannot be imported, productionPlugin remains null
-  }
-}
+if (!productionPluginPath) throw new Error('Production plugin path is unavailable');
+const { default: productionPlugin } = await import(pathToFileURL(productionPluginPath).href);
+if (typeof productionPlugin?.server !== 'function') throw new Error('Production plugin server is unavailable');
 
 export default {
   id: 'wanxiangshu-manager-review-tools-canary',
   async server(input) {
     const client = input?.client ?? null;
-    const hooks = productionPlugin?.server ? await productionPlugin.server(input) : {};
+    const hooks = await productionPlugin.server(input);
 
     const productionDefinition = hooks['tool.definition'];
     const productionBefore = hooks['tool.execute.before'];
     const productionAfter = hooks['tool.execute.after'];
+    const productionEvent = hooks.event;
+    for (const hook of [productionDefinition, productionBefore, productionAfter]) {
+      if (typeof hook !== 'function') throw new Error('A required production tool hook is unavailable');
+    }
 
     return {
       ...hooks,
+
+      event: async (input) => {
+        if (typeof productionEvent === 'function') await productionEvent(input);
+        const event = input?.event;
+        if (!['message.updated', 'message.part.updated', 'session.idle', 'session.error'].includes(event?.type)) return;
+        const properties = event.properties ?? {};
+        const sessionID = properties.sessionID ?? properties.info?.sessionID ?? properties.part?.sessionID;
+        if (!sessionID) return;
+        const messages = await fetchMessages(client, sessionID);
+        for (const stored of inflightCalls.values()) {
+          if (stored.sessionID !== sessionID) continue;
+          const part = locateToolPart(messages, sessionID, stored.callID);
+          if (!['completed', 'error'].includes(part.status)) continue;
+          await emit('tool.terminal.observed', {
+            sessionID,
+            callID: stored.callID,
+            status: part.status,
+            originalInput: isDeepStrictEqual(part.input, stored.preArgsSnapshot),
+            contractRetained: part.input !== null && Object.hasOwn(part.input, 'contract'),
+          });
+        }
+      },
 
       'tool.definition': async (hookInput, hookOutput) => {
         if (typeof productionDefinition === 'function') {
@@ -174,19 +189,20 @@ export default {
 
         const argsPre = hookOutput?.args;
         const argsPreRef = argsPre;
-        const preKeys = argsPre && typeof argsPre === 'object' ? Object.keys(argsPre).sort() : [];
+        const preKeys = argsPre && typeof argsPre === 'object' ? Object.keys(argsPre) : [];
         const preContractInArgs = argsPre && typeof argsPre === 'object' ? ('contract' in argsPre) : false;
         const preContractValue = argsPre?.contract ?? null;
-        const preSymbols = getContractSymbols(argsPre);
+        const preArgsSnapshot = structuredClone(argsPre);
 
         if (callID) {
-          inflightCalls.set(callID, {
+          inflightCalls.set(JSON.stringify([sessionID, callID]), {
             toolName,
             sessionID,
+            callID,
             argsPreRef,
             preContractValue,
             preKeys,
-            preArgsSnapshot: argsPre ? { ...argsPre } : null,
+            preArgsSnapshot,
           });
         }
 
@@ -197,15 +213,14 @@ export default {
         if (isReview || isControl) {
           const argsPost = hookOutput?.args;
           const argsIdentityPreserved = (argsPreRef === argsPost);
-          const postKeys = argsPost && typeof argsPost === 'object' ? Object.keys(argsPost).sort() : [];
+          const postKeys = argsPost && typeof argsPost === 'object' ? Object.keys(argsPost) : [];
           const postContractInArgs = argsPost && typeof argsPost === 'object' ? ('contract' in argsPost) : false;
-          const postSymbols = getContractSymbols(argsPost);
-          const hasSymbolPost = postSymbols.length > 0;
 
           // Check non-contract business arguments preserved
-          const businessKeysPreserved = preKeys
-            .filter((k) => k !== 'contract')
-            .every((k) => postKeys.includes(k) && argsPost?.[k] === argsPreRef?.[k]);
+          const businessKeysPreserved = isDeepStrictEqual(
+            Object.fromEntries(Object.entries(argsPost).filter(([key]) => key !== 'contract')),
+            Object.fromEntries(Object.entries(preArgsSnapshot).filter(([key]) => key !== 'contract')),
+          );
 
           // SDK durable snapshot probe
           let durableToolPart = null;
@@ -225,9 +240,6 @@ export default {
             preContractInArgs,
             preContractValue,
             postContractInArgs,
-            preHasSymbol: preSymbols.length > 0,
-            postHasSymbol: hasSymbolPost,
-            postSymbolCount: postSymbols.length,
             businessKeysPreserved,
             preKeys,
             postKeys,
@@ -248,11 +260,11 @@ export default {
         const isReview = REVIEW_TOOLS.includes(toolName);
         const isControl = CONTROL_TOOLS.includes(toolName);
 
-        const stored = callID ? inflightCalls.get(callID) : null;
+        const key = JSON.stringify([sessionID, callID]);
+        const stored = callID ? inflightCalls.get(key) : null;
         const argsInAfter = hookInput?.args;
         const identityWithBefore = stored ? (stored.argsPreRef === argsInAfter) : null;
 
-        const preAfterSymbols = getContractSymbols(argsInAfter);
         const preAfterContractInArgs = argsInAfter && typeof argsInAfter === 'object' ? ('contract' in argsInAfter) : false;
 
         if (typeof productionAfter === 'function') {
@@ -260,7 +272,6 @@ export default {
         }
 
         if (isReview || isControl) {
-          const postAfterSymbols = getContractSymbols(argsInAfter);
           const postAfterContractInArgs = argsInAfter && typeof argsInAfter === 'object' ? ('contract' in argsInAfter) : false;
           const postAfterContractValue = argsInAfter?.contract ?? null;
 
@@ -279,12 +290,10 @@ export default {
             isControlTool: isControl,
             identityWithBefore,
             preAfterContractInArgs,
-            preAfterHasSymbol: preAfterSymbols.length > 0,
             postAfterContractInArgs,
             postAfterContractValue,
-            postAfterHasSymbol: postAfterSymbols.length > 0,
-            postAfterSymbolCount: postAfterSymbols.length,
-            contractRestored: isReview ? (postAfterContractInArgs && !postAfterSymbols.length) : true,
+            originalOrder: stored ? isDeepStrictEqual(Object.keys(argsInAfter), stored.preKeys) : null,
+            originalValues: stored ? isDeepStrictEqual(argsInAfter, stored.preArgsSnapshot) : null,
             output: typeof hookOutput?.output === 'string' ? hookOutput.output.slice(0, 500) : null,
             durableToolPartStatus: durableToolPart?.status ?? null,
             durableToolPartInputHasContract: durableToolPart?.input

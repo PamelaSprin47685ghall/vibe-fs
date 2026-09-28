@@ -348,7 +348,7 @@ test('WHAT[managed-session-lifecycle-007] THEOREM_handle_completed_causally_awak
   assert.equal(completed.ok, true)
   assert.deepEqual(HandleSurface.views(completed.state).joinable, ['agent:c1'])
 })
-test('WHAT[managed-session-lifecycle-007] THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
+test('WHAT[managed-session-lifecycle-007] folding linked and completed facts exposes a joinable handle', () => {
   const folded = HandleFoldSurface.foldApply(HandleFoldSurface.foldEmpty(), [
     { fact: { case: 'HandleLinked', payload: { ParentSessionId: 'ses_parent', ChildSessionId: 'ses_child', Handle: 'agent:c1', TargetAgent: 'coder', CanonicalRole: 'Coder', Ownership: 'DurableParentHandle' } } },
     { fact: { case: 'HandleCompleted', payload: { ParentSessionId: 'ses_parent', Handle: 'agent:c1', Kind: 'Terminal' } } },
@@ -357,4 +357,22 @@ test('WHAT[managed-session-lifecycle-007] THEOREM_join_wake_path_trace_WorkActiv
   const projection = HandleFoldSurface.foldSession(folded.state, 'ses_parent')
   assert.deepEqual(HandleSurface.views(projection).joinable, ['agent:c1'])
 })
+}
+
+{
+  const { default: assert } = await import('node:assert/strict')
+  const handles = await import('../../../dist/Execution/Delegation/Handle/Surface.js')
+  test('WHAT[managed-session-lifecycle-007] replayed link cannot reopen the completed cell for a different winner', { todo: 'GAP-132: completed link becomes Active again' }, () => {
+    const link = { op: 'link', handle: 'agent:completed', child: 'child', agent: 'engineer', role: 'Engineer' }
+    const active = handles.apply(handles.empty(), link)
+    assert.equal(active.ok, true)
+    const completed = handles.apply(active.state, { op: 'complete', handle: link.handle, kind: 'Terminal' })
+    assert.equal(completed.ok, true)
+    const replay = handles.apply(completed.state, link)
+    if (replay.ok) {
+      const late = handles.apply(replay.state, { op: 'complete', handle: link.handle, kind: 'Cancelled' })
+      assert.equal(late.ok, false)
+      assert.equal(handles.read(replay.state, link.handle).completion, 'Terminal')
+    }
+  })
 }

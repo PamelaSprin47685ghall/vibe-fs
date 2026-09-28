@@ -9,6 +9,8 @@ const activity = (kind) => ({ type: kind })
 // manager 会话 2026-09-28 00:13:01 的静默截断回合：step-start + reasoning，无正文、无工具调用，finish=length
 const truncatedTurn = [activity('step-start'), reasoning('schema-contract 已接下。四个 in-flight…')]
 
+test.todo('WHAT[interaction-authority-023] real retry terminal observations and exact durable terminal independently release nudge suppression for every terminal kind while duplicate occasions remain absorbed (GAP-122)')
+
 test('WHAT[interaction-authority-023] an unsettled retry attempt suppresses idle repair', () => {
   assert.equal(Turns.repairSuppressionHolds(true, false, false, undefined, []), true)
   assert.equal(Turns.repairSuppressionHolds(true, false, false, undefined, [reasoning('on the wire')]), true)

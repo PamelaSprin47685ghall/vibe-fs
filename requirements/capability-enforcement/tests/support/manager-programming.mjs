@@ -2,52 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { rolePredicate, capabilityToolNames } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { generateRole, permissionLabels } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
-import * as runtime from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
-import { run, runObserved, caseName, failureCode, failureReason, rewritten, created, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-import {
-  LEGACY_FORBIDDEN_NAMES,
-  extractKnownToolNames,
-  scanEntries,
-  scanRepo,
-} from '../../../scripts/checks/tool-referential-integrity.mjs'
+import { join } from 'node:path'
+import { rolePredicate, capabilityToolNames } from '../../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { generateRole, permissionLabels } from '../../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { allRoleLabels } from '../../../../dist/Foundation/RolesSurface.js'
+import * as runtime from '../../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { run, runObserved, caseName, failureCode, rewritten, created, render } from '../../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 // 运行时绑定由 owner 面构造：生成器给出角色的权限 label，RuntimeSurface 按 label
 // 组装 api.js 成员，测试从不手写 capability 集合或 Fable Set。
 const roleApi = (role, dir) => runtime.api(runtime.createApiFor(dir, permissionLabels(role)))
 
-const LEGACY_VERDICT = `
-module VerdictTool =
-    let spec factory scope =
-        { Name = "verdict"
-          Description = "legacy"
-          Arguments = []
-          Execute = fun _ _ -> task { return "" } }
-`
-
-const STATIC_TOOLS_SNIPPET = `
-module StaticTools =
-    let knownToolNames =
-        [ "fork"
-          "resume"
-          "commission"
-          "join"
-          "horizon" ]
-`
-
-const REGISTRY_SNIPPET = `
-module ToolRegistry =
-    let rolePredicate specName parkedHost sessionId =
-        match specName with
-        | "fork" -> fun _ -> true
-        | "join" -> fun _ -> true
-        | _ -> fun _ -> false
-`
-
-test('WHAT[capability-enforcement-008] registered_js_tools_match_js_tool_generator_output', () => {
+test('WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output', () => {
   for (const role of allRoleLabels) {
     const generated = generateRole(role, 'en')
     const toolName = `js-${role}`
@@ -63,7 +29,7 @@ test('WHAT[capability-enforcement-008] registered_js_tools_match_js_tool_generat
 
 // ── J01-J12 Manager 只读工具的真实 API 层与边界测试套件 ──────────────────────
 
-test('WHAT[capability-enforcement-008] J01_manager_generated_surface_strictly_read_only', () => {
+test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only', () => {
   const surface = generateRole('manager', 'en')
   assert.ok(surface, 'Manager must generate JS surface')
   assert.equal(surface.toolName, 'js-manager')
@@ -84,7 +50,7 @@ test('WHAT[capability-enforcement-008] J01_manager_generated_surface_strictly_re
   }
 })
 
-test('WHAT[capability-enforcement-008] J02_manager_create_api_omits_mutation_methods', () => {
+test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_methods', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j02-'))
   try {
     const binding = roleApi('manager', dir)
@@ -105,55 +71,51 @@ test('WHAT[capability-enforcement-008] J02_manager_create_api_omits_mutation_met
   }
 })
 
-test('WHAT[capability-enforcement-008] J03_manager_execution_blocks_write_and_edit_without_disk_mutations', async () => {
+test('WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j03-'))
   try {
     const targetFile = join(dir, 'target.txt')
     writeFileSync(targetFile, 'initial pristine content', 'utf8')
 
-    // 尝试直接调用 this.write/this.edit/this.rewrite，或尝试访问内部私有 api 路径
-    const program = `class Js extends JsProgram {
-      async run() {
-        if (typeof this.edit === 'function') await this.edit('target.txt', { find: 'initial', put: 'hacked' });
-        if (typeof this.write === 'function') await this.write('created.txt', 'hacked');
-        if (typeof this.rewrite === 'function') await this.rewrite('target.txt', 'hacked');
-        if (this._api?.js?.write) await this._api.js.write('leaked.txt', 'hacked');
-        return { completed: true };
-      }
-    }`
-
-    const outcome = await run(dir, 'manager', 'en', program, 2000, Date.now() + 60_000, 1 << 20, null)
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(rewritten(outcome), [], 'rewritten set must be empty')
-    assert.deepEqual(created(outcome), [], 'created set must be empty')
-
-    // 验证磁盘零修改
-    assert.equal(readFileSync(targetFile, 'utf8'), 'initial pristine content', 'target file must remain untouched')
-    assert.equal(existsSync(join(dir, 'created.txt')), false, 'created file must not exist')
-    assert.equal(existsSync(join(dir, 'leaked.txt')), false, 'leaked file must not exist')
+    for (const mutation of [
+      "this.edit('target.txt', { find: 'initial', put: 'hacked' })",
+      "this.write('created.txt', 'hacked')",
+      "this.rewrite('target.txt', 'hacked')",
+      "this._api.js.write('leaked.txt', 'hacked')",
+    ]) {
+      const program = `class Js extends JsProgram { async run() { await ${mutation}; return { completed: true }; } }`
+      const outcome = await run(dir, 'manager', 'en', program, 2000, Date.now() + 60_000, 1 << 20, null)
+      assert.equal(caseName(outcome), 'Failed', mutation)
+      assert.deepEqual(rewritten(outcome), [])
+      assert.deepEqual(created(outcome), [])
+      assert.equal(readFileSync(targetFile, 'utf8'), 'initial pristine content')
+      assert.equal(existsSync(join(dir, 'created.txt')), false)
+      assert.equal(existsSync(join(dir, 'leaked.txt')), false)
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('WHAT[capability-enforcement-008] J04_read_only_mutation_rejected_before_preflight_and_commit', async () => {
+test('WHAT[capability-enforcement-025] J04_read_only_execution_returns_success_without_file_effects', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j04-'))
   try {
     const targetFile = join(dir, 'file.txt')
     writeFileSync(targetFile, 'original', 'utf8')
 
-    // 只读角色的真实 workflow 执行：既无 Edit 也无 Write，运行成功且零改写零创建
+    // 正常读取作为拒绝用例的正向控制，不能只证明空程序成功。
     const outcome = await run(
       dir,
       'manager',
       'en',
-      `class Js extends JsProgram { async run() { return { ok: true }; } }`,
+      `class Js extends JsProgram { async run() { const file = await this.file('file.txt'); return { text: file.text('^', '$') }; } }`,
       2000,
       Date.now() + 60_000,
       1 << 20,
       null,
     )
     assert.equal(caseName(outcome), 'Succeeded', 'clean read-only execution succeeds')
+    assert.match(render(outcome), /text = "original"/)
     assert.deepEqual(rewritten(outcome), [], 'read-only workflow rewrites nothing')
     assert.deepEqual(created(outcome), [], 'read-only workflow creates nothing')
     assert.equal(readFileSync(targetFile, 'utf8'), 'original', 'target file stays untouched')
@@ -162,7 +124,7 @@ test('WHAT[capability-enforcement-008] J04_read_only_mutation_rejected_before_pr
   }
 })
 
-test('WHAT[capability-enforcement-008] J05_engineer_and_devops_retain_write_and_edit_capabilities', async () => {
+test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities', async () => {
   const engSurface = generateRole('engineer', 'en')
   const devopsSurface = generateRole('devops', 'en')
   assert.ok(engSurface.capabilities.includes('Edit'))
@@ -180,7 +142,7 @@ test('WHAT[capability-enforcement-008] J05_engineer_and_devops_retain_write_and_
   }
 })
 
-test('WHAT[capability-enforcement-008] J06_internal_leaf_and_replica_admission_not_broadened', () => {
+test('WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened', () => {
   // Bookkeeper / internal leaf 不因 js-manager 出现而放宽
   assert.equal(rolePredicate('js-bookkeeper', 'manager'), false, 'Manager must deny js-bookkeeper')
   assert.equal(rolePredicate('js-manager', 'bookkeeper'), false, 'Bookkeeper must deny js-manager')
@@ -193,7 +155,7 @@ test('WHAT[capability-enforcement-008] J06_internal_leaf_and_replica_admission_n
   assert.equal(replicaTools.includes('js-manager'), false, 'StrengthReplica must not include js-manager')
 })
 
-test('WHAT[capability-enforcement-008] J07_string_literals_and_paths_with_quotes_treated_as_pure_data', async () => {
+test('WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j07-'))
   try {
     const specialName = 'file "quoted" and \'single\'.txt'
@@ -219,7 +181,7 @@ test('WHAT[capability-enforcement-008] J07_string_literals_and_paths_with_quotes
   }
 })
 
-test('WHAT[capability-enforcement-008] J08_path_resolution_enforces_workspace_root_boundaries', async () => {
+test('WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j08-root-'))
   const outsideDir = mkdtempSync(join(tmpdir(), 'wxs-j08-outside-'))
   try {
@@ -265,7 +227,7 @@ test('WHAT[capability-enforcement-008] J08_path_resolution_enforces_workspace_ro
   }
 })
 
-test('WHAT[capability-enforcement-008] J09_utf8_crlf_chinese_and_anchor_slice_contracts', () => {
+test('WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j09-'))
   try {
     writeFileSync(join(dir, 'empty.txt'), '', 'utf8')
@@ -292,7 +254,7 @@ test('WHAT[capability-enforcement-008] J09_utf8_crlf_chinese_and_anchor_slice_co
   }
 })
 
-test('WHAT[capability-enforcement-008] J10_missing_file_invalid_regex_and_output_limits_fail_explicitly', async () => {
+test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j10-'))
   try {
     writeFileSync(join(dir, 'sample.txt'), 'literal [unclosed-bracket and regex text', 'utf8')
@@ -341,7 +303,7 @@ test('WHAT[capability-enforcement-008] J10_missing_file_invalid_regex_and_output
   }
 })
 
-test('WHAT[capability-enforcement-008] J11_observation_records_only_successful_distinct_reads', async () => {
+test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_distinct_reads', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j11-'))
   try {
     writeFileSync(join(dir, 'read1.txt'), 'content1', 'utf8')
@@ -384,7 +346,7 @@ test('WHAT[capability-enforcement-008] J11_observation_records_only_successful_d
   }
 })
 
-test('WHAT[capability-enforcement-008] J12_sandbox_context_strictly_excludes_ambient_os_capabilities', async () => {
+test('WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j12-'))
   try {
     const probeProgram = `class Js extends JsProgram {
@@ -420,4 +382,3 @@ test('WHAT[capability-enforcement-008] J12_sandbox_context_strictly_excludes_amb
     rmSync(dir, { recursive: true, force: true })
   }
 })
-

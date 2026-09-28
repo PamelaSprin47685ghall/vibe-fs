@@ -69,3 +69,10 @@ test('WHAT[sphinx-v2-017] stop reasons stay distinguishable', () => {
   assert.equal(Loop.stopReasonName(Loop.stopNoPlan()), 'no-executable-plan')
   assert.equal(Loop.stopReasonName(Loop.stopCancelled()), 'user-cancelled')
 })
+
+test('WHAT[sphinx-v2-017] a newly created inquiry classifies as having no runnable work', () => {
+  const state = ok(Core.stateOfCreate('iq_loop', '给出更稳妥的发布流程'))
+  assert.deepEqual(Loop.classifyOutcome(state), {Outcome: 'no-runnable-work', Detail: 'no dispatchable work'})
+})
+
+test.todo('WHAT[sphinx-v2-017] runtime completion requires an accepted renderer result and durable AnswerCommitted')

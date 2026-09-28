@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-const live = async (owner) =>
-  sync.create(await mkdtemp(join(tmpdir(), 'wxs-deleg031-')), [{ sessionId: owner, agent: 'manager' }])
+const directories = new Set()
+const live = async (owner) => {
+  const directory = await mkdtemp(join(tmpdir(), 'wxs-deleg031-'))
+  directories.add(directory)
+  return sync.create(directory, [{ sessionId: owner, agent: 'manager' }])
+}
+test.afterEach(async () => {
+  for (const directory of directories) await rm(directory, { recursive: true, force: true })
+  directories.clear()
+})
 
 const waitForPromptCount = async (h, owner, role, count) => {
   await sync.awaitPromptCount(h, owner, role, count)
@@ -43,7 +51,7 @@ test('WHAT[delegation-031] DELEG_031_committed_checkpoint_advances_frontier_and_
   }
 })
 
-test('WHAT[delegation-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_record_without_reexecution', async () => {
+test('WHAT[delegation-031] a separate checkpoint after writer closure reports NotCommitted with the exact parent', async () => {
   const owner = 'owner-deleg031-uncommitted'
   const h = await live(owner)
   try {
@@ -59,11 +67,6 @@ test('WHAT[delegation-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_
     const committedFrontier = sync.handoffFrontier(h, owner, 'Engineer')
     assert.notEqual(committedFrontier, null)
 
-    // THEN release the writer: the same production checkpoint now reports
-    // NotCommitted (never a bare string) with the exact parent+route
-    // identity — the checkpoint stayed pending-evidence for the unsettled
-    // write, while the completed child was neither re-executed nor
-    // forgotten.
     sync.closeJournalWriter(h)
     const unsettled = await sync.checkpointForHarness(h, owner, 'Engineer', committedFrontier + 10)
     assert.equal(unsettled.commitment, 'NotCommitted')
@@ -87,9 +90,6 @@ test('WHAT[delegation-031] DELEG_031_checkpoint_probe_reports_typed_settlement_w
     assert.match(first.route, /engineer/)
     assert.equal(first.reason, null)
 
-    // NotCommitted path: after the writer is released, the same production
-    // checkpoint reports NotCommitted (never a bare string) with the same
-    // exact identity — and the second call does NOT re-emit a duplicate.
     sync.closeJournalWriter(h)
     const second = await sync.checkpointForHarness(h, owner, 'Engineer', 7)
     assert.equal(second.commitment, 'NotCommitted')
@@ -101,7 +101,7 @@ test('WHAT[delegation-031] DELEG_031_checkpoint_probe_reports_typed_settlement_w
   }
 })
 
-test('WHAT[delegation-031] DELEG_031_duplicate_completion_is_idempotent_and_never_reexecutes', async () => {
+test('WHAT[delegation-031] successive completed work reuses the child and never retreats the recorded frontier', async () => {
   const owner = 'owner-deleg031-duplicate'
   const h = await live(owner)
   try {
@@ -112,8 +112,6 @@ test('WHAT[delegation-031] DELEG_031_duplicate_completion_is_idempotent_and_neve
     const frontierAfterFirst = sync.handoffFrontier(h, owner, 'Engineer')
     assert.notEqual(frontierAfterFirst, null)
 
-    // A duplicate completion for the same authority root cannot claim a new
-    // call: the next invocation still reuses the same child exactly once.
     const second = sync.invoke(h, owner, 'Engineer', 'SECOND')
     await waitForPromptCount(h, owner, 'Engineer', 2)
     assert.equal(await settle(h, owner, 'Engineer', 'SECOND-ANSWER', 'run-second'), true)
@@ -131,6 +129,8 @@ test('WHAT[delegation-031] DELEG_031_duplicate_completion_is_idempotent_and_neve
     sync.dispose(h)
   }
 })
+
+test.todo('WHAT[delegation-031] actual sync and fork completion still deliver after NotCommitted or Unknown checkpoint, absorb duplicate terminals, re-read durable evidence without reexecution, and fuse only PhaseConflict (GAP-153)')
 
 test('WHAT[delegation-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_call', async () => {
   const owner = 'owner-deleg031-stale'

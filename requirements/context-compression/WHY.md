@@ -1,32 +1,16 @@
 # context-compression — WHY
 
-Provider 会话历史可能超过模型的可用上下文窗口。如果压缩机制依赖主动预测窗口容量、将未经验证的候选前缀预先提交再回滚、或按照错误文本猜测失败原因，就会将模型容量猜测与未发生的世界状态固化为系统事实，进而破坏 KV-cache 与前缀稳定性。
+模型能容纳多少历史并不可靠可知。围绕真实失败与已有证据恢复，可以避免容量猜测变成新的控制权。200 KiB 限制解决的是单次记录输入有界，不能拿来推断模型还剩多少空间。
 
-**context-compression 保证：何时以及哪些历史有资格被语义替换，严格由真实失败信号与已证明的证据边界决定。**
+压缩改变历史的呈现，不改变发生过的事实。候选在成功前不提交，失败就不必回滚；真实 Opening 保留原话，画板快照与阶段窗口维持当前工作记忆。完整 turn 的覆盖证明防止只记录半段工作就删除整段原始材料；仅按工具名永久保留旧账本则会使历史无界增长。
 
-## 核心不变量与张力
+一条用户消息可以驱动很长的工作循环。因此阶段窗口跟随当前正在回答的语义回合，而非停在最后一条用户消息。窗口表达希望压缩到哪里，已覆盖且能精确物化的材料才证明可以压缩到哪里。
 
-- **失败驱动 vs 预测式压缩**：严禁在请求前主动估算上下文窗口或预测溢出；真实失败是唯一合法的恢复触发信号。
-- **证据证明 vs 投机提交**：候选替换前缀在 probe 成功前绝非事实；失败的 probe 不产生任何持久状态，无需回滚。
-- **覆盖边界 vs 辅助残留**：X→Y 压缩冷边界发生后，旧 horizon 的辅助注入（如 guideline、tip、grounding read）可见性彻底归零，防止历史噪音在重锚后重新膨胀。
-- **宪章 Opening vs 工作历史**：只有真实 Opening 消息是不可替换宪章；Manager 的 pre-T1 规划材料与 post-T1 普通历史遵循同一压缩规则，不能因 planning stage 获得额外 X 常驻权。
-- **语义账本 vs 摘要替换**：承载 `todowrite` 的 Host 回合是 Manager 当前义务账本的原始证据；即使其前后历史已被 Y 覆盖，该回合仍必须以 X 原文留在 provider context。
-- **durable open ownership vs 进程并发**：`BloggerRequestMaterialized` 是 Blogger 当前请求所有权的 durable 事实；同一 Blogger 的 materialize / bind / abandon 命令必须经 process-local admission 串行，但 admission 只拥有物理并发，不得取代 durable open request。live flight 允许同 RequestId 刷新，严禁不同 RequestId 覆盖。
+Blogger 是记录者，不是主工作者的额外负担。持续追平最新事实、共享一个重建规则，避免漏记和恢复时的材料分叉；安静时等新事件，避免时间经过被误认为工作完成。
 
-## 违反边界的失败意义
-
-- 未提交的候选前缀污染真实历史（如预先写入事实后试图回滚）。
-- 压缩覆盖不完整证据（如将半 turn 冒充为完整 prefix 证明，或改写侵吞真实 Opening / `todowrite` 原始回合）。
-- 依据模型窗口大小或上下文比例主动触发改写。
-- 重锚后将已退休的辅助注入重新灌回 provider context。
-- 业务主请求已经成功却不清零连续失败计数，或 squash 成功错误清零，使失败预算耗尽判断偏离真实连续失败次数：该停时不停、该继续时停止。
-- 两个并发 materialize 都从旧 snapshot 推导“可开新 request”，随后第二个 durable fact 被 canonical fold 拒绝并触发 semantic cut；或不同 RequestId 静默覆盖 live flight，使 durable ownership 与物理执行分叉。
+并发、重试与迟到回调会同时看见同一个请求。durable 归属、物理 flight 和命令准入各自解决不同问题；将它们混为一谈，会让旧回调结算甚至终止新的工作。确切结算与共享失败使未知保持未知，也使失败不会重新获得一份预算。
 
 ## DEPENDS ON
 
 - `semantic-trace`
 - `provider-projection`
-
-## Physical fatal boundary
-
-Blogger flight claim/release conflict与compression invariant由context-compression裁决；process fuse是foreign effect。直接fatal会绕开durable claim/settlement次序，并允许旧callback杀死已由新RequestId接管的世界。

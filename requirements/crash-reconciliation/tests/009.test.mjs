@@ -1,127 +1,38 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as child from '../../../dist/Execution/Delegation/Fork/ChildRecoverySurface.js'
+import * as codec from '../../../dist/Execution/Delegation/Fork/CleanBreakSurface.js'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const child = await import("../../../dist/Execution/Delegation/Fork/ChildRecoverySurface.js");
-const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
-const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
+const event = (kind, extra = {}) => ({ kind, ...extra })
+const proof = event('TerminalProofIssued', { agent: 'a' })
+const committed = event('HandleCompletionCommitted', { agent: 'a' })
+const returned = event('JoinReturned', { agent: 'a' })
+const aborted = event('RawAbortObserved', { session: 'child' })
+const started = event('ChildRecoveryStarted', { session: 'child' })
 
+test('WHAT[crash-reconciliation-009] abort-only evidence is incomplete and terminal proof requires a body', () => {
+  assert.equal(child.resolve('active', 'missing', ['aborted:transport', 'restore'], '').result, 'RecoveryIncomplete')
+  assert.equal(child.resolve('active', 'terminal', [], 'work-record').result, 'RecoveredTerminal')
+  assert.deepEqual(child.provenTerminal('work-record'), { ok: true, finality: 'Succeeded', body: 'work-record' })
+  assert.equal(child.provenTerminal('').ok, false)
+})
 
-test('WHAT[crash-reconciliation-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', () => {
-  const waiting = child.resolve('active', 'missing', ['aborted:interrupted tool', 'restore'], '')
-  assert.equal(waiting.result, 'RecoveryIncomplete')
-  assert.equal(handles.crashScenario('active').retired, false)
-  const terminal = child.resolve('active', 'terminal', [], 'real work done')
-  assert.equal(terminal.result, 'RecoveredTerminal')
-  const wire = join.renderBatch('english', [{ kind: 'completed', agentId: 'h1', agentName: 'coder', role: 'Coder', runId: 'run-h1', workRecord: 'real work done' }])
-  assert.ok(!wire.includes('status = "aborted"'))
+test('WHAT[crash-reconciliation-009] actual durable completion decoder rejects legacy aborted material as joinable completion', () => {
+  const legacy = JSON.stringify({ status: 'aborted', run_id: 'run', code: 'CANCELLED', message: 'Host abort', child_session_id: 'child' })
+  assert.deepEqual(codec.decode(legacy), { case: 'LegacyFalseAbort' })
+  assert.equal(codec.tryDecode('handle', legacy).ok, false)
+  assert.deepEqual(codec.decode('{broken'), { case: 'Invalid' })
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
+test('WHAT[crash-reconciliation-009] trace checker distinguishes supplied proof commit return order and identities', () => {
+  for (const legal of [[], [aborted], [proof, committed, returned], [aborted, started, proof, committed, returned]]) {
+    assert.equal(child.trace(legal), true)
+  }
+  for (const illegal of [
+    [started, committed, returned], [proof, returned], [committed, proof, returned],
+    [aborted, committed, proof, returned], [proof, committed, aborted, returned],
+    [event('TerminalProofIssued', { agent: 'other' }), committed, returned],
+  ]) assert.equal(child.trace(illegal), false)
+})
 
-const active = () => handles.crashScenario('active')
-
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_crash_after_aborted_observed_stays_active', () => {
-  const state = active()
-  assert.equal(state.lifecycle, 'Active')
-  assert.equal(state.joinable, 0)
-  assert.equal(state.retired, false)
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_crash_matrix_no_aborted_durable_fact', () => {
-  const state = active()
-  assert.equal(state.lifecycle, 'Active')
-  assert.equal(state.completion, null)
-  assert.equal(state.abandonReason, null)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const childRecovery = await import("../../../dist/Execution/Delegation/Fork/ChildRecoverySurface.js");
-
-const CHILD = 'ses_trace_child'
-const AGENT = 'coder'
-const event = (kind, payload = {}) => ({ kind, ...payload })
-const legal = [
-  event('RawAbortObserved', { session: CHILD }),
-  event('ChildRecoveryStarted', { session: CHILD }),
-  event('TerminalProofIssued', { agent: AGENT }),
-  event('HandleCompletionCommitted', { agent: AGENT }),
-  event('JoinReturned', { agent: AGENT }),
-]
-
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
-  assert.equal(childRecovery.trace(legal), true)
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('ChildRecoveryStarted', { session: CHILD }),
-      event('HandleCompletionCommitted', { agent: AGENT }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('TerminalProofIssued', { agent: AGENT }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('HandleCompletionCommitted', { agent: AGENT }),
-      event('TerminalProofIssued', { agent: AGENT }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('RawAbortObserved', { session: CHILD }),
-      event('HandleCompletionCommitted', { agent: AGENT }),
-      event('TerminalProofIssued', { agent: AGENT }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('TerminalProofIssued', { agent: AGENT }),
-      event('HandleCompletionCommitted', { agent: AGENT }),
-      event('RawAbortObserved', { session: CHILD }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
-  assert.equal(childRecovery.trace([]), true)
-  assert.equal(childRecovery.trace([event('RawAbortObserved', { session: CHILD })]), true)
-})
-test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_wrong_agent_proof_does_not_satisfy_join', () => {
-  assert.equal(
-    childRecovery.trace([
-      event('TerminalProofIssued', { agent: 'other-agent' }),
-      event('HandleCompletionCommitted', { agent: AGENT }),
-      event('JoinReturned', { agent: AGENT }),
-    ]),
-    false,
-  )
-})
-}
+test.todo('WHAT[crash-reconciliation-009] real child recovery and join consume decoded completion while abort alone cannot publish child terminal (GAP-149)')

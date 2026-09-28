@@ -42,7 +42,7 @@ const canonicalize = (wire) => {
   return result.value
 }
 
-test('WHAT[managed-chat-execution-009] durable execution fact round-trip excludes process-local artifacts', () => {
+test('WHAT[managed-chat-execution-009] three canonical fact samples contain no process-local artifact fields', () => {
   const history = [canonicalize(fixture), canonicalize(started), canonicalize(terminal)]
 
   for (const line of history) {

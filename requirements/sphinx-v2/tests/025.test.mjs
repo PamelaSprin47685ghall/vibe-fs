@@ -9,6 +9,14 @@ import * as Bayes from '../../../dist/Sphinx/V2/Plugins/Bayes/Surface.js'
 import * as AStar from '../../../dist/Sphinx/V2/Plugins/AStar/Surface.js'
 import * as Mcts from '../../../dist/Sphinx/V2/Plugins/Mcts/Surface.js'
 
+test('WHAT[sphinx-v2-025] ordinal decoding distinguishes abstention ties and conditional responses', () => {
+  assert.equal(Ordinal.isDirectional(Ordinal.judgmentOf('abstain')), false)
+  assert.equal(Ordinal.isAbstention(Ordinal.judgmentOf('abstain')), true)
+  assert.equal(Ordinal.isTie(Ordinal.judgmentOf('tie')), true)
+  assert.equal(Ordinal.isConditional(Ordinal.judgmentOf('conditional')), true)
+  assert.equal(Ordinal.isDirectional(Ordinal.judgmentOf('conditional')), false)
+})
+
 const ok = (result) => {
   assert.equal(Core.isOk(result), true)
   return Core.okValue(result)

@@ -96,9 +96,4 @@ test('WHAT[context-compression-006] consecutive failures consume the failure bud
   assert.equal(budget.verdict(budget.defaultBudget, cleared), 'MayRetry')
 })
 
-test('WHAT[context-compression-006] compression owner exposes the retry dispatch and planning surface', () => {
-  assert.equal(typeof compression.nextBloggerRequest, 'function')
-  assert.equal(typeof compression.attemptPlanner.plan, 'function')
-  assert.equal(typeof compression.attemptPlanner.promotableProbeId, 'function')
-  assert.equal(typeof compression.terminalRequestOwnership, 'function')
-})
+test.todo('WHAT[context-compression-006] actual repeated dispatch binds a fresh physical identity and consumes each confirmed failure once; GAP-104')

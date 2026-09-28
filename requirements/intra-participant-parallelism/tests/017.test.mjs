@@ -45,4 +45,4 @@ test('WHAT[intra-participant-parallelism-017] actual tool rejects Manager and De
   })
 })
 
-test.todo('WHAT[intra-participant-parallelism-017] GAP-158: actual full admission formula, every Manager lifecycle state, read-only Sphinx Engineer and historical Manager Fission replay')
+test.todo('WHAT[intra-participant-parallelism-017] GAP-158: actual full admission formula, every Manager lifecycle state, standard Engineer eligibility within Sphinx and historical Manager Fission replay')

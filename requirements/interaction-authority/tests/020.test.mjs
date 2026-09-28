@@ -1,6 +1,4 @@
 import test from 'node:test'
-import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
-
-
-test('WHAT[interaction-authority-020] repair fatal preserves exact claim settlement and one injected fuse', () => assertFatalBoundary('interaction-authority'))
+test.todo('WHAT[interaction-authority-020] GAP-122 actual repair incident settles its exact claim and physical outcome before one injected report and kill')
+test.todo('WHAT[interaction-authority-020] GAP-122 actual repair dependency boundary rejects direct optional or global physical fatal capability')

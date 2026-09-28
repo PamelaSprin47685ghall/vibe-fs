@@ -1,64 +1,67 @@
 # office-capability — WHAT
 
-## [001] office 由 entitled consequence 定义，不由 persona 名 / 工具名 / 权限清单定义
+## [001] Office 由后果定义
 
-Office capability 由该职位有权产生的后果（Entitled Consequence）定义，严禁以 persona 名称、工具可达性或权限矩阵清单作为能力事实。调用方必须依据 Office 的承诺与后果进行认知和委托。
+Office 由其有权产生的后果（Entitled Consequence）及禁止的后果定义，不由 Persona 名称、工具可达性或权限清单定义。调用方按这些承诺与边界委托工作。
 
-## [003] 同一 office 的 authority 不变
+## [003] 同一 Office 的权能不变
 
-同一 Office 的权能与权限集合保持完全一致。每个 Role 恰对应一个 Persona，不存在 fast/deep 档位或组合名解析语义。当前执行事实（证书、清理阻塞、已接纳评审、退任冻结）可以按既有门禁收窄一次具体动作的准入，但不扩大 Office entitlement。
+同一 Office 的权能与权限集合一致，不随执行档位改变。Role、Persona 及名字解析由 participant-identity 定义，不另设 fast/deep 职位或组合身份。
 
-## [004] capability 是 consequence model，不是 tool whitelist 的口语转写
+当前证书、清理阻塞、已接纳评审和退任冻结等事实可按既有门禁收窄具体动作的准入，不扩大 Office 权能。
 
-Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投影。严禁从工具清单反向推导 Office 定义，亦不得将后果模型降格为具体工具列表的口语表述。
+## [004] 权限是后果模型的投影
 
-## [005] 单一语义所有权、多处投影：consequence 在所有决策面同 ID 命中，不得漂移
+执行权限由 Office 后果模型投影，不能从工具白名单反向推导职责，或用工具清单替代后果定义。
 
-同一条 Entitled Consequence 会同时投影到 Manager Role Law、fork/resume 工具描述、各 Office 的自我模型以及调用方边界镜像中。各处投影文案可以因语境调整，但语义内核必须同源一致，严禁出现分叉。
+## [005] 多处表达同一职责
 
-角色合并必须重写完整工作链，不能只换名称或在旧说明前追加新规则。共同法、角色自述、派工与接力提示、工具说明、错误提示、案例整理、输出截断、纪律提示和模型配置都必须讲述同一套当前职责。中英文同时生效。
+同一 Entitled Consequence 在管理者认知、派工与续做契约、角色自述及调用方镜像中使用同一语义标识，含义一致；措辞可以随语境调整。
 
-Engineer 的调查不包含任何真实命令执行，即使命令只读；只读调研是本次任务约束，不是另一个角色。DevOps 的普通修复允许既定需求内的工程判断，不以「只有唯一机械操作」或逐次批准为前提。Manager 必须区分 Engineer 完成、DevOps 运行和自修后的重新验证、自己作出的验收判断。
+角色变化必须同步更新完整可分发工作链，包括共同法、角色与协作提示、工具及错误说明、案例与纪律提示、截断说明和模型配置。中英文共同表达当前职责，不能只改名字或在旧说明前追加新规则。
 
-非当前合法活跃角色的可加载提示词、工具建议、别名或模型池不得留在 resources/。普通浏览器测试与一般探究用语不属于此类，不作关键词式误删。资源回归须覆盖实际分发资源及其调用接点，而非只检查角色目录。
+Engineer 的调查不含真实命令执行，即使只读；只读调研是任务约束，不是新角色。DevOps 可在既定需求内作工程判断，无需唯一机械解法或逐次批准。Manager 区分实现完成、执行与自修后的重新验证、自己的验收判断。
 
-## [006] offices 不可互换：禁止把 office 当可互换通用 agent
+资源中不得保留非当前合法活跃角色的可加载提示词、工具建议、别名或模型池。普通浏览器测试及一般探究用语不因此违规；回归覆盖实际分发资源与调用接点，不止角色目录。
 
-各 Office 具备不可替代的领域边界：Engineer 不是真实命令执行器；DevOps 不是架构/产品决策者，亦不负责差遣其他代理；Manager 不承担直接源码实现；仅允许在当前独立评审中使用评审专用只读工具直接取证；Sphinx 是程序工作流而非通用代理。
+## [006] Office 不可互换
 
-## [007] Manager 无普通工具：原生读查与写入拒绝；评审专用只读工具限未接纳评审
+Engineer 不是真实命令执行器；DevOps 不代作架构或产品决定、不差遣其他代理；Manager 不直接实现源码，其直接调查限于 007 的评审取证；Sphinx 是程序工作流，不是通用代理。
 
-Manager 的核心权能是统筹、委托、评估与集成；原生 read/grep/glob 与一切写入/终端对 Manager 始终拒绝；评审接纳前仅可使用评审专用只读工具 js-manager，接纳后该工具同样拒绝；禁止 Fission；不提供评审专用只读工具的副本语义。
+## [007] Manager 的直接操作边界
 
-resume 的同道路续做语义归 delegation-003、delegation-024 所有。「DevOps 只能通过 resume 调用」不等于「resume 只能用于 DevOps」；续做不能改变已有角色、已绑定配置或控制权，也不能创建替代 DevOps。
+Manager 不修改工作树、不执行命令、不使用 Fission；原生 read/grep/glob 始终拒绝。评审接纳前可通过专用只读工具 `js-manager` 直接取证，接纳后关闭；该工具不提供副本语义，当前事实门禁见 capability-enforcement-025。
 
-## [011] Manager consequence = 完整管理与编排权能；non-consequence = 亲自修改工作树与使用 Fission
+Manager 只能新建 Engineer，续做既有 Engineer 或调用固定 DevOps；续做不得改变已有身份、绑定、控制权或创建替代 DevOps，具体语义见 delegation-003/024。
 
-Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Resume, Join, Horizon, TodoWrite, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁亲自修改工作树、使用 Fission；评审未接纳前的只读取证是唯一合法直接调查窗口，评审接纳后即关闭；完整管理权不等于任何时刻都可以向固定 DevOps 派工——Review 接纳前不得向 DevOps 派工，已有只读 Engineer 的合法 resume 不受影响。
+## [011] Manager 的管理权能
 
-## [012] Orchestrator consequence = commission manager；不 commission 其它 office
+Manager 在任何活跃任期阶段，包括评审前与接责后，均具备完整的委托、续做、汇合、视界、记账、评审与完成权能。拥有权能不代表已承担具体任务。直接操作禁限见 007。
 
-Orchestrator 仅负责为顶层道路委任或接续 Manager，不直接委任其它子级 Office，亦不直接介入具体的微观执行，不使用 Fission。
+Review 接纳前不得向固定 DevOps 派工，已有只读 Engineer 的合法 resume 不受影响；具体准入见 capability-enforcement-026。
 
-## [015] Predictor 是内部机制专用角色，不参与普通调度与工具门禁
+## [012] Orchestrator
 
-Predictor 仅为 Strength 降级指定廉价 provider/model，不进入 Manager 公开 fork 候选、不参与普通 participant 调度、不拥有工具门禁规则、不暴露给用户可见接口。Predictor 只在内部强度机制中使用。
+Orchestrator 只委任或接续顶层道路的 Manager，不直接委任其他 Office，不介入具体执行，不使用 Fission。
 
-## [016] Engineer consequence = 本地事实调查与源码工作；non-consequence = 真实命令执行 / 差遣 DevOps / 外部网络浏览；独享 Fission
+## [015] Predictor
 
-Engineer 专注于本地事实调查与源码工作：
-- **Entitled consequence**：读取、创建、修改、移动、删除仓库文件；完成业务与架构实现、重构；编写测试源码。
-- **Non-consequence**：不执行真实构建与测试命令，不调用或差遣 DevOps，不承担外部网络浏览职责。完成本次工作或到达需要 Manager 决策的边界时立即返回。
-- **Fission 独享**：Engineer 是全系统**唯一具备 Fission 角色能力**的 Office。Fission 仅代表同一 Engineer 的多个 execution lane，必须收敛为一次返回。
+Predictor 只为 Strength 降级选择廉价 provider/model，不进入普通调度、Manager 的公开 fork 候选、工具门禁或用户可见接口。
 
-## [017] DevOps consequence = Engineer 全部本地工程能力 + 真实执行/终端/进程管理 + 角色固有非架构级修复授权；non-consequence = 发明架构/产品含义 / 削弱验证 / fork 或差遣其他代理 / Fission
+## [016] Engineer
 
-DevOps 拥有完整的运维执行与直接工程修复权能：
-- **Entitled consequence**：拥有 Engineer 的全部本地工程能力（文件读、写、改、移、删）；拥有真实命令执行（Exec）、终端与进程管理（Pty）；拥有**角色固有的非架构级修复授权**——在执行中观察到非架构级缺陷或测试失败时，应自行调查、直接修改源码、补充必要回归测试并重新验证，无需 Manager 逐次授权，亦不受任何 `allowRepair` 式开关限制。
-- **Non-consequence**：不发明架构、产品含义、兼容性或安全政策；不通过削弱断言或绕过门禁制造成功；到达架构与产品边界时交回 Manager；自身不 fork、不 resume 其他代理，不使用 Fission。
+Engineer 负责本地事实调查与源码工作，包括仓库文件的读、建、改、移、删，以及实现、重构和测试源码。它不执行真实命令、不调用或差遣 DevOps、不承担外部网络浏览；工作完成或遇到需 Manager 决定的边界即返回。
 
-## [018] Sphinx consequence = 程序控制探究流程、工作项、预算、续行和收束；同步调用标准 Engineer；non-consequence = 充当独立 Role/Persona / 拥有独立 Fission 身份 / 保留 Inquiry 驾驶层
+Engineer 是唯一具有 Fission 角色能力的 Office；Fission 是同一 Engineer 的多个执行分支，必须收敛为一次返回。
 
-Sphinx 是完全由程序控制的探究流程（epistemic workflow）：
-- **Entitled consequence**：程序驱动探究步骤推进、工作项决策、预算控制、续行与收束；通过唯一 `sphinx(question, expectTurns?)` 工具及直接 `/sphinx question` 命令调用，同步使用标准 Engineer 获取事实与完成工作项。内部 Engineer 的文件修改、工具及 Fission 能力直接来自标准 Engineer 权限，受相同的资格与 authority 检查。
-- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份，不占用额外 session 层级；不额外授予 Engineer 真实执行或 DevOps 调度权；不设立中间模型驾驶层，不另造只读 Engineer profile。
+## [017] DevOps
+
+DevOps 具有全部本地工程能力以及真实命令、终端和进程管理能力。执行中遇到非架构级缺陷或测试失败，应自行调查、修改源码、补回归并重新验证；该修复权是角色固有权能，不受逐次授权或 `allowRepair` 开关控制。
+
+DevOps 不发明架构、产品含义、兼容性或安全政策，不削弱断言或绕过门禁，不 fork/resume 其他代理，不使用 Fission。到达架构或产品边界时交回 Manager。
+
+## [018] Sphinx
+
+Sphinx 由程序控制探究步骤、工作项、预算、续行与收束，通过 `sphinx(question, expectTurns?)` 或 `/sphinx question` 同步调用标准 Engineer 获取事实与完成工作项。内部 Engineer 的文件修改、工具及 Fission 能力遵循标准 Engineer 权限和相同的资格、authority 检查，不另设只读 profile，不增加真实执行或 DevOps 调度权。
+
+Sphinx 不是 Role、Persona 或普通 subagent，不拥有独立 Fission 身份、不增加 session 层级，不设 Inquiry 或其他中间模型驾驶层。

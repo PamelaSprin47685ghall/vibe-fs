@@ -27,6 +27,15 @@ test('WHAT[relay-assessment-001] review schema is eight required PERFECT/REVISE/
 })
 
 test('WHAT[relay-assessment-001] malformed scores are rejected without coercion', () => {
+  for (const field of Object.keys(perfect)) {
+    for (const value of [10, 9.5, 'perfect', 'GOOD', null, undefined, false, [], {}]) {
+      assert.equal(assessment.parse({...perfect, [field]: value}).ok, false, field)
+    }
+    assert.equal(assessment.parse(Object.fromEntries(Object.entries(perfect).filter(([key]) => key !== field))).ok, false, field)
+    const parsed = assessment.parse({...perfect, [field]: 'REVISE'})
+    assert.deepEqual(parsed.lowDimensions, [field])
+  }
+  for (const payload of [null, 10, 'PERFECT', [], false]) assert.equal(assessment.parse(payload).ok, false)
   for (const payload of [
     { ...perfect, simplicity: 10 },
     { ...perfect, simplicity: 9.5 },

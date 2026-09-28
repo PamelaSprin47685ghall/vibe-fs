@@ -7,7 +7,7 @@ const scores = ['PERFECT', 'REVISE', 'PERFECT', 'REVISE', 'PERFECT', 'PERFECT', 
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
 
-test('WHAT[relay-assessment-003] assessment binds exact execution identity and rejects mismatched authority or iteration', () => {
+test('WHAT[relay-assessment-003] assessment fold rejects mismatched authority or incumbent', () => {
   const opened = open(relay.empty())
   assert.deepEqual(
     relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-X', ...scores),
@@ -18,3 +18,5 @@ test('WHAT[relay-assessment-003] assessment binds exact execution identity and r
     { ok: false, error: 'IncumbencyNotActive' },
   )
 })
+
+test('WHAT[relay-assessment-003] actual assessment evidence digest includes only public text before the exact call', {todo: 'GAP-193: relay Surface supplies constant binding digests; actual narrative extraction and every identity axis require independent observations'})

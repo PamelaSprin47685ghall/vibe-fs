@@ -1,0 +1,6 @@
+# Repository-root relative paths; this requirement package is implicit.
+/src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.*
+/src/Wanxiangshu/Mission/Relay/ProjectionSurface.*
+/src/Wanxiangshu/Mission/Manager/**
+/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.*
+/resources/provider/runtime/manager-assess/**

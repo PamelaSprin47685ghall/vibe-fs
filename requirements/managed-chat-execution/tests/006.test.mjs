@@ -250,17 +250,9 @@ test('WHAT[managed-chat-execution-006] each uncertain Terminal append leaves pro
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
 const { default: test } = await import("node:test");
 const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.js");
 
-const codecSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs', import.meta.url), 'utf8')
-const adapterSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs', import.meta.url), 'utf8')
-const bindingSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs', import.meta.url), 'utf8')
-const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
-const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
-const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')
-const recoverySource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs', import.meta.url), 'utf8')
 const terminal = ({
   sessionId = 'ses-terminal',
   physicalUserMessageId = 'msg-terminal',
@@ -283,20 +275,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[managed-chat-execution-006] production Host terminal owner persists before exact capacity settlement', () => {
-  assert.match(adapterSource, /onExactAssistantObservation[\s\S]*?tryDecodeExactProviderStart[\s\S]*?tryDecodeExactProviderTerminal/)
-  assert.match(bootstrapSource, /let\s+startedEvidenceForTerminal[\s\S]*?exactStarted key/)
-  assert.match(bootstrapSource, /let\s+applyObservedTerminal[\s\S]*?ExactAssistantTerminal[\s\S]*?NotifyProjectionChanged/)
-  assert.match(bootstrapSource, /let\s+settleExactTerminal[\s\S]*?match observation\.Outcome, observation\.Disposition, startedEvidenceForTerminal observation with[\s\S]*?HostProviderTerminalOutcome\.ProviderFailure failure, None, _[\s\S]*?ReconcileWake\.FailureWake\([\s\S]*?Some observation\.PhysicalUserMessageId/)
-  assert.match(bootstrapSource, /onExactAssistantObservation\s*=\s*\(fun[\s\S]*?\(started: ExactProviderStartObservation\)[\s\S]*?\(terminal: ExactProviderTerminalObservation option\)[\s\S]*?persistProviderStartedFromObservation[\s\S]*?continueProviderStart started providerStepEnded terminal providerStarted/)
-
-  assert.match(recoveryRuntimeSource, /let recover[\s\S]*?ChatExecutionRecovery\.decide evidence[\s\S]*?interpret ports decision/)
-  assert.match(recoveryHostSource, /ExactAssistantTerminal\(started, disposition\)[\s\S]*?ProviderPhysicalObservation\.ProviderTerminal\(started, disposition\)/)
-  assert.match(recoveryHostSource, /let finalize[\s\S]*?persistTerminal request\.ExecutionKey request\.TerminalEvidence request\.TerminalDisposition/)
-  assert.match(recoveryHostSource, /let persistTerminal[\s\S]*?ManagedChatProviderLifecycle\.terminal journal key started disposition[\s\S]*?requirePersistence "terminal" result[\s\S]*?do! release key/)
-  assert.match(recoveryHostSource, /let release[\s\S]*?ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
-  assert.match(codecSource, /ProviderRunIdentity/)
-})
+test.todo('WHAT[managed-chat-execution-006] public Host terminal event waits for durable commit before exact capacity release under held and uncertain append (GAP-126)')
 test('WHAT[managed-chat-execution-006] exact successful Host terminals retain typed finish outcomes', () => {
   for (const [finish, outcome] of [
     ['stop', 'Stop'],
@@ -345,8 +324,5 @@ test('WHAT[managed-chat-execution-006] exact provider failure remains typed but 
 test('WHAT[managed-chat-execution-006] ambiguous and deleted evidence fail closed', () => {
   assert.equal(hostSignals.tryDecodeExactProviderTerminal(terminal({ providerRun: '' })), null)
   assert.equal(hostSignals.tryDecodeExactProviderTerminal({ type: 'session.deleted', properties: { sessionID: 'ses-terminal' } }), null)
-  assert.match(bootstrapSource, /match observation\.Outcome, observation\.Disposition, startedEvidenceForTerminal observation with/)
-  assert.match(bootstrapSource, /\| _ ->[\s\S]*?rejectProviderTerminal observation/)
-  assert.match(recoveryHostSource, /eventKey[\s\S]*?ExactAssistantTerminal\(started, _\)[\s\S]*?keyOfStarted started/)
 })
 }

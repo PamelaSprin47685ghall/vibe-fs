@@ -4,6 +4,8 @@
 
 /src/Wanxiangshu/Context/Companion/**
 /src/Wanxiangshu/Context/Prefix/**
+/src/Wanxiangshu/Enforcer/Cycle/**
+/src/Wanxiangshu/Enforcer/Continuation.fs
 /src/Wanxiangshu/Host/CompactionPolicy.fs
 /src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs
@@ -17,6 +19,3 @@
 /src/Wanxiangshu/Enforcer/Guidance/**
 /src/Wanxiangshu/Participant/Provider/Projection/Intent.fs
 /src/Wanxiangshu/Participant/Provider/Projection/Planner.fs
-/requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs
-/requirements/prefix-stability/tests/prefix-epoch.test.mjs
-/requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs

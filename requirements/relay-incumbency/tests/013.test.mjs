@@ -7,12 +7,6 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const ROOT = new URL('../../..', import.meta.url).pathname
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-/// A regex matching `<head>{{ordinal}}<tail>`. Built from strings because a
-/// literal `{{` inside a regex literal is not valid JavaScript.
-const ordinalSentence = (head, tail) => new RegExp(escapeRegExp(head) + '\\{\\{ordinal\\}\\}' + escapeRegExp(tail))
-
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')
-
 const open = (state, road = 'road-1', incumbent = 'inc-1') =>
   relay.openIncumbency(state, road, incumbent, 'snapshot-1', 'authority-1')
 
@@ -38,7 +32,7 @@ const assessAndContinue = (state, incumbent, snapshot = 'snapshot-1') => {
   )
 }
 
-test('WHAT[relay-incumbency-013] every iteration is told which successor number it is', () => {
+test('WHAT[relay-incumbency-013] each successful opening advances the projected ordinal once', () => {
   const first = open(relay.empty())
   assert.equal(relay.view(first.state, 'road-1').iterationOrdinal, 1)
 
@@ -68,36 +62,14 @@ test('WHAT[relay-incumbency-013] the ordinal counts durable openings, not provid
   assert.equal(relay.view(relay.empty(), 'road-missing'), null)
 })
 
-test('WHAT[relay-incumbency-013] the assessment resource states the successor ordinal in both languages', () => {
+test('WHAT[relay-incumbency-013] both assessment resource templates expose the ordinal substitution', () => {
   for (const locale of ['en.md', 'zh-CN.md']) {
     const rel = `resources/provider/runtime/manager-assess/${locale}`
     assert.ok(existsSync(join(ROOT, rel)), `${rel} must exist`)
     const text = read(rel)
     assert.match(text, /\{\{ordinal\}\}/, `${rel} must carry the {{ordinal}} placeholder`)
-    // The placeholder is the only substitution: the prose must fail closed if
-    // the ordinal is missing rather than shipping an unsubstituted token.
-    const placeholders = [...text.matchAll(/\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g)].map((m) => m[1])
-    assert.deepEqual([...new Set(placeholders)], ['ordinal'], `${rel} must substitute only the ordinal`)
   }
 
-  assert.match(
-    read('resources/provider/runtime/manager-assess/en.md'),
-    ordinalSentence('You are the ', ' Manager taking over this mission\\.'),
-    'en assessment resource must state the successor ordinal',
-  )
-  assert.match(
-    read('resources/provider/runtime/manager-assess/en.md'),
-    /A predecessor may already have done\s+part of the work, or may already have finished it; investigate the actual workspace/,
-    'en assessment resource must defer to the successor own investigation',
-  )
-  assert.match(
-    read('resources/provider/runtime/manager-assess/zh-CN.md'),
-    ordinalSentence('你是接手此任务的第 ', ' 个 Manager。'),
-    'zh-CN assessment resource must state the successor ordinal',
-  )
-  assert.match(
-    read('resources/provider/runtime/manager-assess/zh-CN.md'),
-    /前任可能已经做了一些工作，也可能已经完成，以你的实际调查为准。/,
-    'zh-CN assessment resource must defer to the successor own investigation',
-  )
 })
+
+test('WHAT[relay-incumbency-013] actual provider requests receive the committed ordinal and equivalent bilingual guidance', {todo: 'GAP-192: template placeholders and Road fold counts do not prove delivery or translation meaning'})

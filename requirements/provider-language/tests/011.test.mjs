@@ -1,35 +1,14 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import test from 'node:test'
 import {
-  LOCALE_FILES,
   PROVIDER_ROOT,
   extractCodeSpans,
-  extractPlaceholders,
   extractProtocolIdentifiers,
   scanIdentifierParity,
-  scanParity,
-  scanPlaceholderParity,
-  scanProviderLanguageBinding,
-  scanRepo,
 } from '../../../scripts/checks/language-parity-gate.mjs'
-
-const GOOD_HOOK = `
-module ProviderResources =
-    let requireLanguagePair semanticPath =
-        for lang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
-            if not (exists lang semanticPath) then failwith "missing"
-    let resourceFileName lang = "en.md"
-`
-
-const THIN_HOST_BINDING = `
-module ProviderLanguageBinding =
-    let readGlobalPreference () =
-        Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
-        |> ProviderLanguage.fromPreferenceObservation
-`
 
 const makeProviderFixture = () => {
   const dir = mkdtempSync(join(tmpdir(), 'lang-parity-'))

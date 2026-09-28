@@ -1,72 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as intent from '../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { rootFor, withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
-const hash = (value) => `H(${value})`
-
-const personas = {
-  engineer: 'Engineer',
-  coder: 'Coder',
-  manager: 'Lead',
-  reviewer: 'Auditor',
-  inspector: 'Investigator',
-}
-
-const rootSelection = (agent) => {
-  const role = agent === 'predictor' ? 'inspector' : agent
-  return {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      participant: agent,
-      role,
-      selectedTier: 'deep',
-      persona: personas[agent] ?? 'Unknown',
-      personaCatalogVersion: 1,
-      origin: 'ResolvedAtRoot',
-    },
-  }
-}
-
-const inheritedSelection = (agent, physical) => {
-  const owner = authority.createAuthorityRoot(
-    hash,
-    'rt_owner',
-    'ses_owner',
-    'HumanRoot',
-    `owner_${physical}`,
-    rootSelection('manager'),
-  )
-  assert.equal(owner.ok, true, owner.error)
-  const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
-  assert.equal(inherited.ok, true, inherited.error)
-  return inherited.value
-}
-
-const rootFor = (agent = 'engineer', physical = 'msg_u1', kind = 'HumanRoot') => {
-  const seed = kind === 'AgentOwnerRoot' ? inheritedSelection(agent, physical) : rootSelection(agent)
-  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, seed)
-  assert.equal(result.ok, true, result.error)
-  return result.value
-}
-
-const profile = (value) => ({
-  session: value.session,
-  logicalRun: value.logicalRun,
-  authorityRoot: value.authorityRoot,
-  authorityKind: value.authorityKind,
-  participant: value.participantIdentity.participant,
-  role: value.participantIdentity.role,
+test('WHAT[interaction-authority-017] real pure close removes previously accepted continuation lookup', () => {
+  const root = rootFor()
+  let state = authority.registerAuthority(root, authority.empty)
+  state = authority.registerClaim(authority.claimContinuation('claimed', root.session, 'ManagerGuard', root, 'digest'), state)
+  state = authority.acceptClaim('claimed', 'accepted-continuation', state)
+  assert.equal(authority.resolveKnownOrigin('accepted-continuation', '', false, state), 'Continuation')
+  const closed = authority.closeAuthority(root.logicalRun, root.authorityRoot, state)
+  assert.equal(closed.ok, true)
+  assert.equal(closed.value.lastAuthorityProfile.logicalRun, root.logicalRun)
+  assert.equal(authority.resolveKnownOrigin('accepted-continuation', 'claimed', false, closed.value), 'UnknownOrigin')
 })
 
-const register = (root) => authority.registerAuthority(root, authority.empty)
-
-test('WHAT[interaction-authority-017] IA_017_claimed_key_without_active_run_stays_unknown', () => {
-  const root = rootFor()
-  const state = authority.registerAuthority(root, authority.empty)
-  const closed = { ...state, activeLogicalRun: null }
-  assert.equal(authority.resolveKnownOrigin('msg_x', 'pk_never_claimed', false, closed), 'UnknownOrigin')
+test('WHAT[interaction-authority-017] dispatcher rejects a continuation with no active run at its target', { todo: 'GAP-125 actual sender accepts an externally supplied profile without active target validation' }, async () => {
+  await withJournal('no-active-target', async (handle) => {
+    const owner = await acceptOwner(handle)
+    let sends = 0
+    const result = await dispatch.sendContinuation(hostPort(async () => {
+      sends += 1
+      return dispatch.admittedWithReceipt('receipt')
+    }), handle, 'never-active-target', 'continue', 'ManagerGuard', owner, 'Await')
+    assert.equal(result.ok, false)
+    assert.equal(sends, 0)
+    assert.equal(dispatch.projectionObservation(handle, 'never-active-target').pendingClaims.length, 0)
+  })
 })

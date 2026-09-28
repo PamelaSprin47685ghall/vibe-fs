@@ -1,68 +1,80 @@
 # managed-chat-execution — WHAT
 
-## [001] 唯一 owner 与 exact execution key
+## [001] Exact execution key
 
-`managed-chat-execution` 是 durable managed chat execution 的唯一 owner。每个执行仅由 exact `(SessionId, PhysicalUserMessageId)` 标识；`SessionId` 可依次承载多个执行，不拥有 session-scoped current execution 终态、租约或替代身份。
+本包独占 durable managed chat execution，唯一标识为 `(SessionId, PhysicalUserMessageId)`。SessionId 只依次承载执行，不拥有 session-scoped 的当前终态、租约或替代身份。
 
-## [002] Versioned durable fact vocabulary
+## [002] Versioned durable facts
 
-`Accepted` 携带 pre-provider `AcceptedChatExecutionEvidence`：exact key、由 IdentitySeed 派生且在 logical run 内不可变的固定 participant+role（含 persona、personaCatalogVersion 与 provenance evidence）、PromptOrigin 与 authority evidence，禁止包含尚未存在的 ProviderRun。系统中不存在 PeerAgent，亦无可变的 EffectiveAgent 身份字段；provider retry 只由单一连续失败预算拥有，managed-chat 恢复不重试。`ProviderStarted` 携带 `ProviderStartedExecutionEvidence`：完整 accepted evidence 加 Host 实际观察到的 ProviderRunIdentity、ProviderRequestKind 与 projection choice。terminal evidence 是 closed DU：`PreProvider` 携带 accepted evidence，或 `AfterProviderStart` 携带 started evidence；不得用 option/bool 拼接阶段。旧版本必须经纯、确定、逐级升级后再折叠；进程状态、日志文字与 Host mutable projection 均不得冒充 durable fact。
+`Accepted` 携带 exact key、固定 participant/role、完整版本化 identity evidence（含 Persona、catalog version 与 provenance）、PromptOrigin 与 authority evidence，不含尚未存在的 ProviderRun，也无 PeerAgent 或可变 EffectiveAgent。managed-chat 恢复不重试 provider，连续失败预算由 provider recovery 独占。
 
-## [003] 固定 transaction order
+`ProviderStarted` 携带完整 accepted evidence、Host 实际观测的 ProviderRunIdentity、ProviderRequestKind 与 projection choice。terminal evidence 闭合为 `PreProvider(accepted evidence)` 或 `AfterProviderStart(started evidence)`，不以 option/bool 拼接阶段。旧事实经纯、确定、逐级升级后折叠；进程状态、日志与 Host mutable projection 不充当事实。
 
-每个 managed chat 必须遵循 `resolve pre-provider identity → durable Accepted → acquire exact capacity → bind exact execution key → project into Host → settle admission → provider effect`。Host 实际暴露 ProviderRun 后才可建立 started evidence 并持久 `ProviderStarted`。`Accepted` 落盘确认前禁止获取容量、建立 binding、修改 Host message 或调用 provider；任一步失败不得越过其后继边界，任何边界不得预测或伪造 ProviderRunIdentity。
+## [003] 准入顺序
 
-## [004] Accepted 单次建立且 replay 幂等
+执行顺序固定为：解析 pre-provider identity → durable Accepted → 获取 exact capacity → 绑定 exact key → 投影 Host → 结算 admission → provider effect。Accepted 确认前不越过任一下游边界；任何步骤失败即停在其后继之前。ProviderRunIdentity 只取自 Host 实际观测，不预测、不伪造。
 
-同一 key 的等值 pre-provider `Accepted` evidence 重放是幂等 no-op；与既有 identity 或 acceptance 内容冲突必须 fail closed。supplied state 的 key 不匹配时必须先拒绝，不能借其 terminal 绕过 exact key；exact terminal 重放则不得因新提交的 malformed attempt payload 改写既有结论。新物理消息即使复用同一 `SessionId` 也必须建立新 key，不得继承前一 execution 的事实。ProviderStarted 只能在 accepted evidence 完全相等后增加 Host-observed run evidence。
+## [004] Accepted 幂等
 
-## [005] ProviderStarted 是 provider effect 的 durable 前置
+同一 key 的等值 accepted evidence 重放不产生新事实，identity 或内容冲突拒绝。supplied state 的 key 不匹配先拒绝，不借其 terminal 绕过检查；exact terminal 重放也不被新提交的 malformed attempt 改写。复用 SessionId 的新物理消息建立独立 key，不继承前次事实。ProviderStarted 只能在 accepted evidence 完全相等后添加实际 run evidence。
 
-首次 provider body 只能在 exact execution 已 durable `Accepted`、已取得并绑定 exact capacity，Host 已建立 exact ProviderRunIdentity，且对应 `ProviderStarted` 落盘确认后发生。每个 exact provider-start observation 必须在任何 failure/idle wake 前把 reconciler physical cursor 推到自身 `PhysicalUserMessageId`，但不得因此铸造 authority。该事实把整个 physical user-message execution 推入 provider phase；同一 physical execution 内 tool result 触发的后续 Host assistant ProviderRun 复用这一已持久化 phase，不得要求第二份 frozen admission plan，也不得追加第二个 `ProviderStarted`。等值 public `message.updated` 重放幂等；terminal 后到达的首次启动事实必须拒绝。
+## [005] ProviderStarted 先于执行
 
-## [006] Terminal 单赋值且只接受 typed disposition
+首次 provider body 之前必须已有 exact Accepted、已获取并绑定的 capacity、Host 确立的 ProviderRunIdentity 及对应 ProviderStarted 的提交确认。exact start observation 在任何 failure/idle wake 前推进 reconciler 的物理 cursor，不因此创建 authority。
 
-每个 exact execution 最多持有一个 terminal disposition。`PreProvider` 只允许 `Cancelled | Rejected | Failed`，禁止 `Completed`；`AfterProviderStart` 绑定 exact started evidence并允许四种 disposition。相同 evidence+terminal 重放幂等，任何不同 evidence 或 terminal 竞争均 fail closed 且不得覆盖首个事实。terminal 决策只接受 `execution-failure-policy` 发布的 closed typed disposition 或明确的 Host success/cancel/delete evidence；free-form text 仅供诊断，不承载 retry、fallback、breaker、capacity、message 或 fatal 语义。
+ProviderStarted 标记整个 physical user-message execution 的 provider phase；同一执行内，工具结果触发的后续 Host assistant run 复用该 phase，不要求第二份 frozen admission plan，不追加第二个 ProviderStarted。等值 public message.updated 重放幂等；terminal 后首次启动事实拒绝。
 
-## [007] Pre-provider failure 精确 settlement
+## [006] Terminal 单赋值
 
-`Accepted` 后、`ProviderStarted` 前发生的拒绝、取消、删除、binding 或 Host projection 失败，必须针对 exact key 写入 typed terminal disposition；若已取得容量则在该 terminal 持久化确认后精确归还。该路径不得调用 provider，不得释放或终结同一 session 的其他 execution。
+每个 exact execution 至多一个 terminal。PreProvider 仅允许 `Cancelled | Rejected | Failed`；AfterProviderStart 绑定 exact started evidence，另可 `Completed`。相同 evidence 与 disposition 重放幂等，其他竞争拒绝并保留首个事实。
 
-## [008] Recovery 只在 durability activation 后事件驱动
+终态只来自 `execution-failure-policy` 的 typed disposition 或明确 Host success/cancel/delete evidence。自由文本只作诊断，不授权 retry、fallback、breaker、容量、消息处置或 fatal。
 
-插件构造必须是纯 wiring：不得读取 durable execution、启动恢复、获取容量或注册会推进状态的后台工作。durable substrate 激活成功后，recovery 才可折叠非终态 execution，并由 projection activation、capacity change、Host evidence 或 typed failure 事件驱动重入普通准入/settlement 流程；禁止 timer、sleep、deadline、轮询或重启次数参与正确性。
+## [007] Pre-provider settlement
 
-## [009] Process-local artifact 永不持久化
+Accepted 后、ProviderStarted 前的拒绝、取消、删除、binding 或 Host projection 失败，针对 exact key 写入 typed terminal；已获取的容量在 terminal 提交确认后精确归还。不得调用 provider，也不得影响同一 session 的其他 execution。
 
-capacity lease handle、waiter、callback、queue node、cancellation token 与 subscription 均属 process-local artifact，不得写入 execution facts、快照或恢复 token。恢复只能从 durable semantic facts 重建新的本地 artifact；旧 artifact 的缺失不能被解释为 terminal disposition。
+## [008] 激活后才恢复
 
-OS process crash/restart 不等于 graceful teardown/reconstruction：同一 durable workspace 重启后，已落盘的 `Accepted` 必须保留；旧进程的 exact binding、capacity ownership、token、custody、execution 与 waiter 必须全部消失，除非新进程从 durable facts 经正常业务路径重新建立。process-local artifact 不得跨进程身份继承。
+插件构造只作 wiring，不读取 durable execution、启动 recovery、获取容量或注册会推进状态的后台工作。durable substrate 激活成功后才折叠非终态执行，依 projection activation、capacity change、Host evidence 或 typed failure 重入普通准入/结算。timer、sleep、deadline、轮询和重启次数不参与正确性。
 
-## [010] Cancel/Delete 精确终结并排空
+## [009] 本地资源不持久化
 
-logical cancel 与 session delete 必须枚举 durable projection 中该作用域内尚未 terminal 的 exact execution key，逐个请求 typed settlement，并等待每个已准入 execution 完成 durable terminal 与 exact capacity 归还后再宣告生命周期排空。禁止 session-wide blind release、timer grace period 或 polling 判断完成。
+lease handle、waiter、callback、queue node、cancellation token、subscription 不写入事实、快照或恢复 token。恢复只从 durable semantic facts 重建新的本地资源；旧资源缺失不等于 terminal。
 
-## [011] Acceptance 原子消费 pre-provider authority evidence
+真实 OS crash/restart 后保留已提交 Accepted，旧进程的 binding、capacity ownership、token、custody、execution 与 waiter 全部消失；新进程只经正常业务路径重建，不继承进程身份。同进程 dispose/reconstruction 不算崩溃重启证明。
 
-`Accepted` 必须原子消费 Task14 frozen managed intent 与 `interaction-authority` 发布的 current authority evidence，建立 exact `AcceptedChatExecutionEvidence`，包括完整版本化 `ParticipantIdentityEvidence`，但不包含 ProviderRunIdentity。Provider-start owner 随后只能把 Host-observed ProviderRunIdentity 与 accepted evidence 组合成 `ProviderStartedExecutionEvidence`。
-两阶段均只逐字段投影 owner-issued evidence；不得从显式 agent 文本、Session cache、Host parent、model 或旧 execution 推导、补全、改写或独立缓存 participant、Role、initial Tier、Persona、provenance/version 或物理 run。显式外部 agent 仍作为输入保留并与 participant 做一致性校验；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。
+## [010] Cancel/Delete 排空
 
-## [012] Recovery decision 只由 durable execution 与显式 physical evidence 决定
+logical cancel 与 session delete 枚举作用域内所有非终态 exact key，逐个 typed settlement；等待每个已准入执行的 durable terminal 与 exact capacity 归还后，才宣告 lifecycle 排空。不用 session-wide blind release、宽限 timer 或 polling 判断完成。
 
-`managed-chat-execution` 独占纯 `Evidence → Decision` 公式。Evidence 只包含 canonical `ChatExecutionState`、exact public provider receipt observation（missing、ambiguous、absent、alive、terminal）、exact physical resource observation、typed persistence commitment，以及 `execution-failure-policy` 已发布的 terminal decision 与失败决议。Decision 是封闭代数：`Ignore | ReconcilePhysical | ResumePreProvider | Finalize | MarkManualIntervention`；不存在 `RequeueEligible` 门面——managed-chat 崩溃与资源恢复不拥有 provider retry/fallback 解释权，严禁启动 provider 工作或发布惰性的 requeue 请求。所有 provider-started retry 与 fallback 唯一由 `Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderRecoveryWorkflow` 解释。每个 effectful case 携带所需的 exact execution evidence，但本公式不执行 effect。
+## [011] 原子消费身份依据
 
-`Accepted` 且 exact provider absent 才可恢复 pre-provider admission；跨进程崩溃恢复与普通会话续传必须服从 crash-reconciliation-017 与 crash-reconciliation-018：新进程不得自动重放中断的工具或无边界自发推进执行，重启后的归位由系统在加载阶段自行完成，不存在显式续传命令。若宿主提供 `ExactAcceptedMessageRecoveryPort`，仅且仅在此 port 明确接受（返回 true）时才代表 exact 准入被接管，且 failure policy 绝不重算；若未提供 port（production `None` 构造）或 port 拒绝接管，恢复决策绝不产生后台隐式消费的假象，而是生成明确、可观察的 manual/blocked 处置事实并记录 briefing。observed provider 必须先 reconcile durable started/terminal facts。`ProviderStarted` 且 provider alive 只观察，exact terminal 才 finalize，exact absent 只由 failure policy 发布 terminal 并进行终态结算，不通过 managed-chat 重试；typed supersession 因而只能使用 policy 发布的 exact cancelled terminal。durable terminal 若 physical resource 仍 held 则请求 exact reconciliation，否则幂等忽略。missing/ambiguous receipt、unknown persistence/resource、无 policy authorization 均 fail closed 为 manual intervention；stale external evidence 不得改写当前 execution。禁止 Role、error text、terminal prose、idle、timer、process age、cursor、registry presence 或 process-local capacity state参与判断。同一 Evidence 必须永远产生同一 Decision。
+Accepted 原子消费 frozen managed intent 与 `interaction-authority` 的 current evidence，保留完整版本化 ParticipantIdentityEvidence，不含 ProviderRunIdentity。provider-start 仅将其与 Host-observed run 组合。
 
-排列、重复事件与 crash cut proof 必须调用已注册 production Surface。测试内重建 decision、terminal、release 或 dispatch 公式并 mutation 该副本，不构成本命题的 executable proof。
+两阶段只精确投影 owner-issued evidence，不从 agent 文本、Session cache、Host parent、model 或旧 execution 推导、补齐、改写或独立缓存 participant、Role、initial Tier、Persona、provenance/version 或物理 run。显式外部 agent 保留并与 participant 核对；continuation 和 fresh target 路由不改变 participant。
 
-Recovery Surface 的 port observation 必须逐次追加每个真实 invocation，不得在 observer 内去重。process restart 两侧必须创建独立 observer；跨重启幂等只能由 durable owner 实现，测试观察器不得代替 owner 吞掉重复请求。
+## [012] Recovery 的证据与权限
 
-## [013] Execution reliability query 与 diagnostic 表生命周期
+唯一纯 recovery 策略由 canonical execution state、exact public provider observation（missing/ambiguous/absent/alive/terminal）、exact physical resource observation、typed persistence commitment 与 failure-policy decision，确定 `Ignore | ReconcilePhysical | ResumePreProvider | Finalize | MarkManualIntervention`。有副作用的决策携带 exact evidence，公式本身不执行副作用；相同证据必得相同决策。Role、错误或终态文字、idle、时间、进程年龄、cursor、registry 与进程内容量状态不参与裁决。
 
-`Accepted without Terminal`、`ProviderStarted without Terminal` 与每个 `LogicalRunId` 的 physical attempt 数只能从 canonical `ChatExecutionProjection` 只读导出。查询返回不可变 process-local snapshot，不写 durable fact，不 terminalize execution，不授权 retry/fallback，不读取 diagnostic counter 作为恢复 evidence。Recovery pending/manual intervention 只投影 `PluginRecoveryScope.PendingChatRecoveryOwnership()` 的 typed ownership，不复制或清理其状态；且 manual intervention DTO 是纯报告与处置事实，绝不是进程间恢复命令。当 exact execution 达到真实终态时，其对应的 pending 与 manual 诊断登记必须立即被撤销，禁止已失效的请求永久驻留诊断快照中。
+- Accepted 且 exact provider absent 才可恢复 pre-provider 准入；已观察 provider 先 reconciliation。
+- ProviderStarted 且 provider alive 只观察；exact terminal 才 finalize；exact absent 仅按 failure policy 的授权终态结算，不重试。supersession 仅采用 policy 发布的 exact cancelled terminal。
+- durable terminal 仍持有物理资源时请求 exact reconciliation，否则幂等忽略。
+- missing/ambiguous receipt、unknown persistence/resource 或缺少 policy 授权转 manual intervention；过期证据不改当前 execution。
 
-## [014] Incident evidence capture 与 replay 无 correctness authority
+managed-chat 不拥有 provider retry/fallback，不启动 provider 工作或发布延迟 requeue。跨进程恢复遵守 `crash-reconciliation`：加载阶段自行归位，不自动重放中断工具，不设显式续传命令。exact accepted-message recovery port 仅在明确返回 true 时接管准入，且不重算 failure policy；port 缺失或拒绝时，发布可观察的 manual/blocked 处置与 briefing，不假装后台已接管。
 
-Incident envelope 必须 versioned、确定序列化且只包含 canonical serialized ChatExecution facts/status、immutable capacity snapshot 与 reconciliation decision、causal diagnostics、exact public Host version/contract evidence、typed recovery observation/decision。capture 必须复用 owner projection 并拒绝未知字段；diagnostic owner 负责清除 credential、path、stack、prompt/content/payload。replay 必须重新折叠 canonical projection、重跑 capacity reconciliation 与同一 `ChatExecutionRecoveryRuntime` representation，tamper、未知 schema/字段、缺证据、Host contract 不受支持或 observation 不匹配时 fail closed。
+排列、重复事件与 crash-cut 证明调用生产实现，不复写公式自证。观察器逐次记录实际调用，不去重；真实重启两侧使用独立观察器，幂等由 durable owner 实现。
 
-Replay 只返回 typed owner effect request；不得写 fact、清 counter、释放 fence、改变 queue/capacity、执行 retry/fallback 或把 operator 变成 recovery authority。相同 envelope 重放必须幂等。若 exact accepted-message public replay capability 没有 Host canary evidence，operator 必须升级处理，禁止重发或手工补状态。
+## [013] 诊断只读与及时撤销
+
+Accepted/ProviderStarted without Terminal 及每个 LogicalRunId 的 physical attempt 数，只从 canonical projection 只读导出为不可变本地快照，不写事实、不终结、不授权 retry/fallback、不把诊断计数用作 recovery evidence。
+
+pending/manual intervention 只投影 recovery owner 的 typed ownership，不复制或自行清理其状态；DTO 是报告，不是进程间恢复命令。exact execution 达到真实终态时，撤销对应 pending/manual 诊断，不让失效请求永久残留。
+
+## [014] Incident capture 与 replay
+
+incident envelope 使用 versioned、确定序列化，只包含 canonical execution facts/status、不可变容量快照与 reconciliation decision、因果诊断、exact public Host version/contract evidence、typed recovery observation/decision。capture 复用 owner projection，拒绝未知字段；diagnostic owner 清除 credential、path、stack、prompt/content/payload。
+
+replay 重新折叠 canonical projection、重跑容量 reconciliation 和同一 recovery 表达；篡改、未知 schema/字段、缺证据、Host contract 不支持或 observation 不匹配均拒绝。只返回 typed owner effect request，不写事实、清计数、释放 fence、改 queue/capacity、执行 retry/fallback 或提升 operator 权限。相同 envelope 重放幂等；缺 exact accepted-message public replay 的 Host canary evidence 时交人处理，不重发、不手工补状态。

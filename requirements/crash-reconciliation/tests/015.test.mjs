@@ -1,31 +1,51 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import * as child from '../../../dist/Execution/Delegation/Fork/ChildRecoverySurface.js'
-import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
+import * as attachment from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
+import * as delegate from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-const ROOT = new URL('../../../', import.meta.url).pathname
+const scenario = async mode => {
+  const directory = await mkdtemp(join(tmpdir(), `wanxiangshu-managed-child-${mode}-`))
+  try { return await delegate.managedChildReconciliationScenario(directory, mode) }
+  finally { await rm(directory, { recursive: true, force: true }) }
+}
 
-test('WHAT[crash-reconciliation-015] HFR_restart_multiple_children_recovered_in_link_order', () => {
-  assert.deepEqual([
-    child.resolve('active', 'active', ['active'], '').result,
-    child.resolve('completed', 'missing', [], 'done').result,
-    child.resolve('abandoned', 'missing', [], '').result,
-  ], ['RecoveredActive', 'RecoveredTerminal', 'RecoveredAbandoned'])
+test('WHAT[crash-reconciliation-015] attachment classifier distinguishes missing matching and conflicting physical evidence', () => {
+  assert.deepEqual(attachment.classifyObservation('missing'), { observation: 'missing', decision: 'Create', children: [] })
+  assert.deepEqual(attachment.classifyObservation('matching'), { observation: 'matching', decision: 'Adopt', children: ['host-child-existing'] })
+  assert.deepEqual(attachment.classifyObservation('conflicting'), { observation: 'conflicting', decision: 'RejectConflict', children: ['host-child-existing', 'host-child-conflict'] })
 })
 
-test('WHAT[crash-reconciliation-015] HFR_restart_legacy_false_abort_waits_with_rejection_fact', () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs', import.meta.url), 'utf8')
-  assert.match(source, /legacy false abort rejected/)
-  assert.equal(child.resolve('active', 'missing', ['aborted:legacy'], '').result, 'RecoveryIncomplete')
+test('WHAT[crash-reconciliation-015] actual delegate adapter reuses unique exact children creates missing ones and refuses ambiguous or failed queries', async () => {
+  const adopted = await scenario('matching')
+  assert.deepEqual(adopted.listedFamilies, ['host-family-root'])
+  assert.equal(adopted.createCount, 0)
+  assert.equal(adopted.child, 'host-child-existing')
+  assert.equal(adopted.error, '')
+  for (const mode of ['missing', 'other-scope']) {
+    const created = await scenario(mode)
+    assert.deepEqual(created.listedFamilies, ['host-family-root'])
+    assert.equal(created.createCount, 1)
+    assert.equal(created.createTitle, `wanxiangshu:sync-delegate:v1:scope=${encodeURIComponent(created.ownerScope)}:role=engineer:agent=engineer`)
+    assert.equal(created.createAgent, 'engineer')
+    assert.equal(created.child, mode === 'missing' ? 'host-child-created' : 'host-child-created-exact-scope')
+    assert.equal(created.error, '')
+  }
+  for (const mode of ['conflicting', 'query-error']) {
+    const refused = await scenario(mode)
+    assert.deepEqual(refused.listedFamilies, ['host-family-root'])
+    assert.equal(refused.createCount, 0)
+    assert.equal(refused.child, '')
+    assert.match(refused.error, mode === 'conflicting' ? /conflicted.*host-child-existing-a.*host-child-existing-b/ : /controlled ListChildren rejection/)
+  }
 })
 
-test('WHAT[crash-reconciliation-015] HFR_restart_retired_legacy_false_abort_refuses_without_replacement', () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /tryMigrateRetiredFalseAbort/)
-  assert.equal(handles.crashScenario('replayed-retired').retired, true)
+test('WHAT[crash-reconciliation-015] simultaneous callers share one actual attachment observation and creation', async () => {
+  assert.deepEqual(await delegate.concurrentAttachedGetOrCreateScenario(), {
+    observeCount: 1, createCount: 1, children: ['concurrent-child', 'concurrent-child'],
+  })
 })
 
-test('WHAT[crash-reconciliation-015] HFR_restart_invalid_completion_blob_waits', () => {
-  assert.equal(child.resolve('active', 'unreadable', [], '').result, 'RecoveryIncomplete')
-})
+test.todo('WHAT[crash-reconciliation-015] actual restart replacement requires proven old-session loss and Close before Link after explicit authorization (GAP-149)')

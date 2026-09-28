@@ -1,49 +1,51 @@
 # relay-incumbency — WHAT
 
-## [001] 一条 open Road 至多一个 active 迭代
+## [001] 唯一活跃任期
 
-Road 是根用户需求的持续执行道路，Incumbency 是一次 Manager 迭代的逻辑任期。任何 durable projection 中，同一 open Road 的 active incumbency 数量必须小于等于一；并发 opening 使用前任 RetirementId 派生同一 deterministic IncumbencyId。相同 exact fact 的重复提交按 event-store 至少一次语义幂等折叠，只能产生一个 active incumbency 与一个 manager-loop physical prompt；不同 identity 或 payload 的冲突创建必须 fail closed。不得用 journal envelope 数冒充逻辑迭代数。
+Road 承载根用户需求，Incumbency 是一次 Manager 逻辑任期。同一 open Road 至多一个 active 任期。并发 opening 从前任 RetirementId 派生同一确定身份；精确事实重放只产生一个逻辑任期和一次 manager-loop prompt，身份或载荷冲突须拒绝。
 
-## [002] 每一次迭代使用同一 opening 代数与同一状态机
+## [002] 统一 Opening
 
-所有迭代均从初始任期事实（AuditPending）开始。首次 opening 与每次后续 opening 是同一代数：相同的 `IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId` 事件形状，相同的 AuditPending 起始事实（尚未记录评审事实），相同的 authority 绑定检查。Opening 代数不按 Planning Table、T1、Entrusted Road 或迭代序号分支：这些是 Role Law 下有效的当前任务纪律，不是 opening 的分支条件；亦不存在“第一任先实现、后检查”的流程特判。`Facts.IncumbencyOpening.initial` 与 `Facts.IncumbencyOpening.next` 只是同一 opening 在不同时刻的调用入口：前者同时产出 RoadOpened 与 IncumbencyOpened，后者只产出 IncumbencyOpened；两者产出的 IncumbencyOpened 在事件结构与 fold 语义上完全一致。跨包裁定依据 structured-workflow-003/004：Relay state 与 RoadView 仅表达不可变领域事实（任期身份、评审记录、质量证书、退休纪要），`ActivePhase` 仅保留为只读诊断投影，严禁作为跨模块执行位置（PC）或效果选择 API；业务执行时序与决策权能由 Structured Workflow 与 Manager owner CE 独占。
+首任与后继都以同一 `IncumbencyOpened(IncumbencyId, WorkspaceSnapshotId)`、authority 校验和 AuditPending 起点开启，不按规划、T1 或序号另设状态机；首任同时建立 Road。Relay 只表达领域事实，phase 仅作诊断，不作为跨模块程序计数器或效果选择接口；执行次序由 structured-workflow-003/004 的 owner 工作流掌握。
 
-## [003] 每任起步全权就绪，评审前有能力无任务
+## [003] 能力与任务分开
 
-所有迭代自积极建立起即具备 Manager 角色的全部管理权能。当前迭代在提交评审前已经具备完整权限（包括维护任务账本、规划与委派），只是尚未承接具体执行任务（有能力无任务完全合法）。迭代开始时不预知评审后路由；评审前可见的 Manager 内容不得泄露低分承接修复、满分结束工作或还存在下一次迭代。
+任期开启即具备完整 Manager 管理能力，包括工作记忆、规划和委派；评审前尚未承接实现任务。信息隔离遵循 relay-assessment-008。
 
-## [004] 非满分 assessor 原位取得实现责任
+## [004] 评估者原位接责
 
-任一 assessment 维度低于 10 时，单次 AssessmentCommitted 在同一 fold transition 中同时记录 ScoreVector、从其派生对应 quality obligations 并确立工作归属事实（WorkOwned），只派生一次。发现问题的当前迭代成为实现负责人，不创建返工链，不开启新迭代。该状态由评审事实与未决义务的客观存在所约束（无有效满分质量证书），而非由外部调度器读取阶段枚举推动下一步执行。
+含任一 REVISE 的 AssessmentCommitted 在同一事实转换中记录评分、确定对应修复义务并确立 WorkOwned，精确重放不重复派生。当前评估者负责修复，不创建返工链或新任期，也不由外部 phase 调度器推进执行。
 
-## [005] retired 迭代永不恢复
+## [005] 退休不可逆
 
-IncumbencyRetired 一旦 committed，�何 replay、provider recovery、rebase、冲突、CAS miss 或 Host crash 都不得把该 IncumbencyId 重新变为 active。每次 retirement cut 宣告的 stale provider-run identity 必须在 Road fold 中累积；这些 run 的迟到 tool/terminal 观测即使跨过一次或多次后续迭代仍只能被吸收，不得进入 ordinary interaction repair 或再发 continuation。后续迭代只为自己的新 provider run 恢复 Manager 路由资格，绝不能把前任 stale run 重新解释成当前迭代。需要继续工作时只能创建新的 IncumbencyId。
+已退休任期不得因重放、恢复、rebase、冲突或 Host crash 复活；继续工作只能开启新 IncumbencyId。每次 retirement cut 的 stale provider-run 身份永久累积，跨后续任期的迟到观测也不得触发 ordinary repair 或 continuation。
 
-## [006] 退休产出闭合 outcome，Continue 与 Accepted 决定 Road 去向
+## [006] 退休结果
 
-每次成功 retirement 在同一 durable transaction 中提交闭合的 `RetirementSummary = { Id; IncumbencyId; SnapshotId; AuthorityRevision; ProjectionCut = { ProviderRunId; ToolCallId }; Outcome }`，其中快照与 authority 修订是 load-bearing retirement binding，`Outcome = Continue | Accepted of QualityCertificateId`。`Continue` 表示工作尚未完成：承载 Road 的 ActiveLogicalRun 保持开放，projection 在下一次 active 迭代就位后保留完整物理消息历史（前任 epoch 全部消息、suicide tool call 与其 result、迟到 parts 与内部 loop wake，ProjectionCut 不做消息过滤）；`Accepted` 表示质量证书已被接受：当前迭代关闭，证书有效期间不得开启新的迭代。后续显式 `QualityCertificateInvalidated`（snapshot、rebase 或 CAS admission 驱动）使该证书失效后，允许以普通 opening 开启下一个 AuditPending 迭代；该新迭代同样以上一次 LatestRetirement cut 判定请求身份并拦截已退休 attempt 的 stale 请求，携带的快照即退休时当前快照。只有自动中断/激活是 Continue 专属，失效后重开走 Change ContinueLoop 普通派发。Continue 退休的快照允许与 assessment 时不同，Accepted 退休的快照必须等于 assessment 快照，两者 authority 都必须等于当前。ManagerLoopSignal 由对 Outcome 的匹配派生（Accepted 证书→Candidate，Continue→Continue），不得在 Outcome 之外另立请求或接受布尔。物理 SessionId 可以复用，但逻辑 IncumbencyId 与 provider context 必须重开。跨包约束：退休与续发循环属于领域事实流转，composition root（如 `PluginTransforms`）严禁拥有或内联循环决策与提示词派发，自动评审/工作/收尾时序由 Manager owner CE 自主驱动。
+每次退休原子提交任期、快照、authority revision、精确 provider-run/tool-call cut 与唯一结果 `Continue | Accepted certificateId`。Continue 保持 Road 的 LogicalRun 开放并自动续发；Accepted 关闭本任，证书有效时禁止新任，显式失效后由普通 ContinueLoop 开启新任。两类后继均保留完整物理历史；LatestRetirement cut 只识别 stale 请求，不过滤历史。
 
-## [008] authority 或证书绑定域变化显式失效证书
+Continue 携带退休时快照，可不同于评审快照；Accepted 必须匹配评审和证书快照，两者 authority revision 均须等于当前 revision。循环信号只从 outcome 派生。物理 SessionId 可复用，逻辑任期和 provider context 必须重开；循环决策与派发由 Manager owner 掌握，不得内联在 composition root。
 
-AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horizon 任一变化都使旧 QualityCertificate 显式失效。失效不会恢复 assessor，只会驱动普通下一迭代。
+## [008] 证书失效
 
-## [009] active authority update 是 durable revision，不是普通 prompt
+AuthorityRevision、WorkspaceSnapshotId、requirement digest 或 target/base horizon 变化须显式使旧证书失效；失效不恢复评估者的工作权，只允许普通后继任期。
 
-已有 active 迭代接纳追加要求时，必须以 expected previous `AuthorityRevision`、精确 `IncumbencyId`、新 `AuthorityRevision`、物理 accepted authority message 与 fresh `WorkspaceSnapshotId` 写入同一 Relay authority update。fold 原子推进 Road 与 active 迭代的 revision/snapshot，并使旧有效 QualityCertificate 失效；同一精确 update 重放幂等，stale previous revision、错误 incumbent 或冲突 replay 必须 fail closed。单独发送 continuation 不构成 authority change，retired 迭代也永远不能成为 authority update 目标。
+## [009] 权威修订
 
-## [010] 道路唯一逻辑 DevOps 与有效 Manager 控制权交接
+活跃任期接纳追加需求，须在同一 durable update 中绑定 expected previous revision、精确任期、新 revision、实际 accepted authority message 和新快照，原子推进 Road/任期并使旧证书失效。精确重放幂等，旧 revision、错误任期、冲突重放或退休目标均拒绝；普通 continuation 不构成修订。
 
-同一 open Road 拥有唯一的逻辑 DevOps 执行实体，当前有效 Incumbency（活跃 Manager）持有该 DevOps 的调用与控制权（通过 resume 调用与 join/horizon 观测）。新 Manager 迭代就位时自动获得该固定 DevOps 的调用权，旧任 Manager 退休（Continue）或失效后立即失去新派工与调用权。
+## [010] 固定 DevOps 控制权
 
-## [011] 已接收工作与进程的任期连续性与归属明确
+每条 open Road 只有一个逻辑 DevOps，当前有效 Manager 持有其 resume、join、horizon 控制权。交接时新任取得调用权，退休或失效的旧任立即失去新派工权。
 
-固定 DevOps 跨 Manager 迭代保留执行事实、终端状态、环境连续性与未决后台进程。已接收的 assignment 与运行中进程具有明确的 owner；旧任 Manager 退出不得导致执行完成记录丢失，新任 Manager 亦不得将前任未决工作的完成误认为新派任务的结果。DevOps 的物理会话可以因故障恢复而替换，但同一个逻辑 DevOps 不得同时对应两个可执行权威。
+## [011] 跨任期执行连续性
 
-## [012] 固定 DevOps 初始绑定与恢复的唯一性及幂等性
+固定 DevOps 的执行事实、终端状态、环境和未决后台进程跨任期保留；assignment 与进程始终有明确 owner，完成记录不得丢失或误归新任务。故障可替换物理会话，但同一逻辑 DevOps 不得同时拥有两个可执行权威。
 
-固定 DevOps 绑定的初始化、晚到创建结果、接收状态不明与崩溃恢复必须满足唯一性与幂等性：同一道路在运行时初次绑定一个逻辑 DevOps 并持久化，之后仅允许 resume，禁止通过 fork 创建第二名 DevOps；接收结果不明时保留原 PromptKey 与恢复权，不盲目重发亦不新建操作员；系统基于单一 Manager 拓扑设计，不支持并发共享 DevOps。
+## [012] DevOps 绑定幂等
 
-## [013] 每任 Manager 都知道自己是第几任
+Road 首次绑定一个逻辑 DevOps 后持久化，之后只可 resume，不可 fork 第二个。初始化、晚到结果、接收未知和崩溃恢复均保持唯一性与幂等；接收未知保留原 PromptKey 和恢复权，不盲目重发或重建。不支持并发 Manager 共享 DevOps。
 
-每一条 open Road 必须能从 durable opening 事实确定当前迭代序号：首个 active 迭代为 1，之后每发生一次 `IncumbencyOpened` 加一。序号只由已 committed 的 opening 折叠得出，同一 opening 的重复提交幂等，不得因 provider 请求次数、nudge 次数或 crash 恢复而改变；无 active 迭代时不存在可读序号。`runtime/manager-assess` 评估请求文档必须把该序号 substitution 进去，中英双语的语义一致：明确告知这是接手此任务的第几任 Manager，前任可能已做了一些工作、也可能已完成，一切以本任对共享工作区的实际调查为准。序号只用于自我介绍，不得用于选择分支、恢复状态或替代任何 durable 事实。
+## [013] 任期序号
+
+序号只按 committed opening 计数：首任为 1，精确重放不增加，provider 请求、nudge 和恢复不改变，无 active 任期时不可读。中英文评估请求须告知序号及“前任可能做过或完成工作，以本任调查为准”。序号只作介绍，不决定执行分支或恢复。

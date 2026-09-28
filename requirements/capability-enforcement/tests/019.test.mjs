@@ -22,20 +22,22 @@ const freshPermit = (gate, session = SESSION) => {
   return permit
 }
 
-test('WHAT[capability-enforcement-019] provider-attempt composition requires fresh current-process admission without codec or event recovery', () => {
-  const priorProcess = quiescence.create()
-  const priorPermit = freshPermit(priorProcess)
-  const currentProcess = quiescence.create()
+test('WHAT[capability-enforcement-019] a different gate requires its own current-attempt admission', () => {
+  const priorGate = quiescence.create()
+  const priorPermit = freshPermit(priorGate)
+  const currentGate = quiescence.create()
 
-  assertResult(quiescence.tryConsume(currentProcess, priorPermit), rejected('WrongOwner'))
+  assertResult(quiescence.tryConsume(currentGate, priorPermit), rejected('WrongOwner'))
 
-  const unownedIdle = quiescence.observeIdle(currentProcess, SESSION)
+  const unownedIdle = quiescence.observeIdle(currentGate, SESSION)
   assertOpaque(unownedIdle, 'unowned idle permit')
-  assertResult(quiescence.tryConsume(currentProcess, unownedIdle), rejected('NoFreshIdle'))
+  assertResult(quiescence.tryConsume(currentGate, unownedIdle), rejected('NoFreshIdle'))
 
-  const currentPermit = freshPermit(currentProcess)
-  assertResult(quiescence.tryConsume(currentProcess, currentPermit), accepted)
+  const currentPermit = freshPermit(currentGate)
+  assertResult(quiescence.tryConsume(currentGate, currentPermit), accepted)
 })
+
+test.todo('WHAT[capability-enforcement-019] actual serialization boundaries and process restart must reject restored process authority; two gates in one process do not prove non-durability')
 
 test('WHAT[capability-enforcement-019] live opaque permit resources stay bounded to the current session attempt', () => {
   const gate = quiescence.create()

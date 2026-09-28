@@ -3,8 +3,11 @@ import test from 'node:test'
 import fc from 'fast-check'
 import { createHash, randomUUID } from 'node:crypto'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
-import * as recovery from '../../../dist/Enforcer/Cycle/Recovery.js'
-import * as bloggerRequest from '../../../dist/Context/Companion/Blogger/Request.js'
+import * as blog from '../../../dist/Enforcer/BlogSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const sha256Hex = (input) => {
   const hash = createHash('sha256')
@@ -83,7 +86,7 @@ const arbitrarySquashPick = fc.record({
   digests: fc.array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 4 }),
 })
 
-test('WHAT[context-compression-027] every successful Main construction satisfies the §4.2 invariants', () => {
+test('WHAT[context-compression-027] Main construction derives its digest and preserves validated coverage and epochs', () => {
   fc.assert(
     fc.property(arbitraryMainPick, (pick) => {
       const descriptor = honestMain(pick)
@@ -166,16 +169,8 @@ test('WHAT[context-compression-027] non-advancing coverage is rejected, never co
 })
 
 test('WHAT[context-compression-027] different content yields different digests; same content is stable', () => {
-  // The JS descriptor carries no trusted digest: it is production-derived
-  // inside the owner boundary, so a saboteur cannot even express "honest
-  // content, foreign digest" through `runtime.main`. Tamper-resistance is
-  // proved one layer down: the compiled recovery decoder maps a stored blob
-  // whose digest disagrees with its TOML to
-  // `InvariantViolated(DeltaDigestMismatch)` instead of constructing —
-  // covered by the rejection-union test above (InvariantViolated is its own
-  // case with its own label). What this boundary proves: different content
-  // yields different digests (no aliasing), and the same descriptor is
-  // digest-stable across repeated construction.
+  // Live construction derives the digest; stored-digest tampering is covered
+  // separately through the actual recovery decoder below.
   fc.assert(
     fc.property(arbitraryMainPick, arbitraryToml, (pick, otherToml) => {
       fc.pre(otherToml !== pick.toml)
@@ -282,36 +277,66 @@ test('WHAT[context-compression-027] squash count/digest disagreement is rejected
   }
 })
 
-test('WHAT[context-compression-027] recovery rejection cases are distinct and labeled', () => {
-  // The compiled production recovery exports one typed rejection union with
-  // five distinct cases plus a label renderer. Each corruption class maps to
-  // its own case: unreadable I/O (BlobUnreadable), unparseable bytes
-  // (BlobCorrupt), unknown durable kind (UnsupportedRequestKind),
-  // undecodable items (ItemsUndecodable), invariant breach
-  // (InvariantViolated). The rebuild/empty-calls `tryReloadRequestContext`
-  // keeps its fail-closed None contract for the rawMessages fallback, while
-  // `tryReloadRequestContextDetailed` carries the typed rejection — so a
-  // corrupt blob can never be mistaken for "no open request".
-  assert.equal(typeof recovery.tryReloadRequestContext, 'function')
-  assert.equal(typeof recovery.tryReloadRequestContextDetailed, 'function')
-  assert.equal(typeof recovery.reloadRejectionLabel, 'function')
+const withJournal = async (run) => {
+  const directory = mkdtempSync(join(tmpdir(), 'blogger-reload-'))
+  const opened = await journal.JournalSurface_boot(directory, 'reload-runtime', 4242, '9999-01-01T00:00:00Z')
+  assert.equal(opened.ok, true)
+  try { return await run(opened.journal) }
+  finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+const validStoredMain = {
+  toml: 'raw work', delta_digest: sha256Hex('raw work'), items: [],
+  prev_ingest: 1, next_ingest: 3, prev_cutoff: 1, next_cutoff: 2, next_prefix_digest: 'prefix',
+}
+const storedRequest = {
+  requestId: 'frozen-request-id', mainSession: 'ses-main', bloggerSession: 'ses-blog',
+  requestKind: 'main', observedEpoch: 2, frameEpoch: 3,
+  previousIngested: 1, nextIngested: 3, digests: [],
+}
+const reloadBlob = async (handle, raw, overrides = {}) => {
+  const written = await journal.JournalSurface_writePayload(handle, typeof raw === 'string' ? raw : JSON.stringify(raw))
+  assert.equal(written.ok, true)
+  return blog.reloadRequest(handle.journal, {
+    ...storedRequest, contextRef: written.blobRef, contextDigest: written.blobDigest, ...overrides,
+  })
+}
 
-  const labelOf = (tag, fields) => recovery.reloadRejectionLabel(new recovery.CycleContextReloadRejection(tag, fields))
-  const labels = new Set([
-    labelOf(0, ['io-down']),
-    labelOf(1, ['{not json']),
-    labelOf(2, ['future-kind']),
-    labelOf(3, ['items wire broken']),
-    labelOf(4, [new bloggerRequest.BloggerRequestRejection(0, [3n, 3n])]),
-  ])
-  assert.equal(labels.size, 5, 'each rejection class must render a distinct label')
-  assert.match(labelOf(0, ['io-down']), /unreadable/)
-  assert.match(labelOf(1, ['{not json']), /corrupt/)
-  assert.match(labelOf(2, ['future-kind']), /unsupported request kind: future-kind/)
-  assert.match(labelOf(3, ['items wire broken']), /undecodable/)
+test('WHAT[context-compression-027] actual stored Main and Squash reload preserve frozen identity and epochs', async () => {
+  await withJournal(async (handle) => {
+    assert.deepEqual(await reloadBlob(handle, validStoredMain), {
+      ok: true, kind: 'Main', requestId: 'frozen-request-id', toml: 'raw work',
+      deltaDigest: sha256Hex('raw work'), previousIngested: 1, nextIngested: 3,
+      frameEpoch: 3, observedEpoch: 2,
+    })
+    assert.deepEqual(await reloadBlob(handle, { covered_frame_count: 2 }, { requestKind: 'squash', digests: ['a', 'b'] }), {
+      ok: true, kind: 'Squash', requestId: 'frozen-request-id', coveredFrameCount: 2,
+      digests: ['a', 'b'], frameEpoch: 3, observedEpoch: 2,
+    })
+  })
 })
 
-test('WHAT[context-compression-027] old-epoch staged requests keep their frozen epoch and never claim current authority', () => {
+test('WHAT[context-compression-027] actual recovery distinguishes unreadable, malformed, unsupported, undecodable and invalid input', async () => {
+  await withJournal(async (handle) => {
+    const outcomes = [
+      [await blog.reloadRequest(handle.journal, { ...storedRequest, contextRef: `blobs/${'0'.repeat(64)}`, contextDigest: 'missing' }), /unreadable/],
+      [await reloadBlob(handle, '{broken'), /corrupt/],
+      [await reloadBlob(handle, validStoredMain, { requestKind: 'future-kind' }), /unsupported request kind/],
+      [await reloadBlob(handle, { ...validStoredMain, items: 'not-an-array' }), /undecodable/],
+      [await reloadBlob(handle, { ...validStoredMain, delta_digest: 'wrong-digest' }), /delta digest mismatch/],
+      [await reloadBlob(handle, { ...validStoredMain, next_ingest: 1 }), /coverage did not advance/],
+      [await reloadBlob(handle, { covered_frame_count: 2 }, { requestKind: 'squash', digests: ['only-one'] }), /squash coverage mismatch/],
+    ]
+    for (const [outcome, expected] of outcomes) {
+      assert.equal(outcome.ok, false)
+      assert.match(outcome.error, expected)
+    }
+  })
+})
+
+test('WHAT[context-compression-027] live request construction preserves its supplied epoch', () => {
   fc.assert(
     fc.property(
       arbitraryMainPick,
@@ -320,8 +345,6 @@ test('WHAT[context-compression-027] old-epoch staged requests keep their frozen 
         const staged = honestMain({ ...pick, observedEpoch: pick.observedEpoch })
         const current = pick.observedEpoch + epochBump
         fc.pre(current > staged.observedEpoch)
-        // Recovery and commit both read the frozen epoch off the staged
-        // context — the live epoch is never substituted in.
         const scope = runtime.scope()
         try {
           assert.equal(
@@ -332,7 +355,7 @@ test('WHAT[context-compression-027] old-epoch staged requests keep their frozen 
           assert.equal(live.observedEpoch, staged.observedEpoch)
           assert.ok(
             live.observedEpoch < current,
-            'a staged old-epoch request stays old-epoch: it cannot claim current commit authority',
+            'construction preserves its supplied epoch rather than the unrelated newer number',
           )
         } finally {
           runtime.dispose(scope)
@@ -342,3 +365,6 @@ test('WHAT[context-compression-027] old-epoch staged requests keep their frozen 
     { seed: 0x27062707, numRuns: 100 },
   )
 })
+
+test.todo('WHAT[context-compression-027] actual commit refuses a restored old-epoch request against a newer live projection; preserving the number alone does not prove authority; GAP-104')
+test.todo('WHAT[context-compression-027] independent consumer cannot construct private Main or Squash records; GAP-104')

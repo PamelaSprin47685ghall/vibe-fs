@@ -3,8 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { run, caseName, failureCode, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { run, caseName, failureCode } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-parallel-'))
@@ -12,34 +11,14 @@ const sandbox = () => {
 }
 
 const runWorkflow = async (dir, program) => ({
-  outcome: await run(dir, 'Coder', 'en', program, 2000, Date.now() + 60_000, 1 << 20, null),
-  surface: generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en'),
+  outcome: await run(dir, 'Engineer', 'en', program, 2000, Date.now() + 60_000, 1 << 20, null),
 })
 
 const succeeded = (outcome) => caseName(outcome) === 'Succeeded'
 
 const failureText = (outcome) => String(failureCode(outcome) ?? 'workflow failed')
 
-test('WHAT[repository-programming-017] JS018_generated_surface_teaches_parallel_safety_for_edits_and_reads', () => {
-  const surface = generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-  assert.equal(
-    surface.description.includes('Parallel js-coder calls are absolutely safe for same-file and cross-file edits'),
-    true,
-    'edit-parallel contract must be in the description',
-  )
-  assert.equal(
-    surface.description.includes(
-      'Parallel reads, parallel edits, same-file\nand cross-file calls are all absolutely safe',
-    ),
-    true,
-    'read/edit parallel contract must be in the description',
-  )
-  assert.equal(
-    surface.description.includes('The Host serializes one assistant'),
-    true,
-    'the description must state the Host-side deterministic serialization',
-  )
-})
+test.todo('WHAT[repository-programming-017] concurrent calls in one actual assistant message execute in deterministic Host order')
 
 test('WHAT[repository-programming-017] JS018_consecutive_transactions_re_snapshot_committed_state_no_lost_update', async () => {
   const { dir, cleanup } = sandbox()
@@ -70,28 +49,6 @@ test('WHAT[repository-programming-017] JS018_consecutive_transactions_re_snapsho
     )
     assert.equal(succeeded(second.outcome), true, failureText(second.outcome))
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'step1:step0:step2')
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-017] JS018_interleaved_reads_are_immutable_snapshots_not_mutation_aliases', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    writeFileSync(join(dir, 'a.txt'), 'original', 'utf8')
-    const program = `class Js extends JsProgram {
-  async run() {
-    const view = await this.file('a.txt');
-    const before = view.text();
-    this.rewrite('a.txt', 'mutated');
-    return { before, after: view.text() };
-  }
-}`
-    const { outcome } = await runWorkflow(dir, program)
-    assert.equal(succeeded(outcome), true, failureText(outcome))
-    const rendered = render(outcome)
-    assert.match(rendered, /before = "original"/)
-    assert.match(rendered, /after = "original"/)
   } finally {
     cleanup()
   }

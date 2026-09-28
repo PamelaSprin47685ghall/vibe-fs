@@ -6,8 +6,6 @@
 
 const named = (trace, ...names) => (trace.toolCalls ?? []).filter((call) => names.includes(call.name))
 
-const chargeOf = (call) => call?.args?.charge ?? ''
-
 export const evaluateEngineerLocalInvestigationAndMutation = (_c, trace) => {
   if (trace.role !== 'engineer') return { ok: false, reason: 'expected Engineer' }
   const executes = named(trace, 'run', 'query-shell', 'open-terminal', 'send-terminal', 'exec')
@@ -20,18 +18,21 @@ export const evaluateEngineerLocalInvestigationAndMutation = (_c, trace) => {
 
 export const evaluateManagerMixedMission = (_c, trace) => {
   if (trace.role !== 'manager') return { ok: false, reason: 'Manager must retain the mission' }
+  if (trace.mutations === true || named(trace, 'read', 'glob', 'grep', 'write', 'edit', 'mv', 'rm', 'run', 'exec', 'open-terminal', 'send-terminal', 'fission').length > 0) {
+    return { ok: false, reason: 'Manager must delegate repository work and execution' }
+  }
   const forks = named(trace, 'fork')
   const resumes = named(trace, 'resume')
 
   // Manager must not fork DevOps (DevOps is resumed, not forked)
   for (const fork of forks) {
     const calling = (fork.args?.calling ?? '').toLowerCase()
-    if (calling === 'devops' || calling === 'operator') {
-      return { ok: false, reason: 'Manager cannot fork DevOps' }
+    if (calling !== 'engineer') {
+      return { ok: false, reason: 'Manager can fork only Engineer' }
     }
   }
 
-  const hasEngineerFork = forks.some((f) => /engineer|coder/.test((f.args?.calling ?? '').toLowerCase()))
+  const hasEngineerFork = forks.some((f) => (f.args?.calling ?? '').toLowerCase() === 'engineer')
   const hasDevOpsResume = resumes.some((r) => r.args?.name !== undefined)
 
   if (hasEngineerFork && hasDevOpsResume) return { ok: true }
@@ -40,10 +41,15 @@ export const evaluateManagerMixedMission = (_c, trace) => {
 
 export const evaluateDevopsInherentRepair = (_c, trace) => {
   if (trace.role !== 'devops') return { ok: false, reason: 'expected DevOps' }
-  const fissions = named(trace, 'fission')
-  if (fissions.length > 0) return { ok: false, reason: 'DevOps must not Fission' }
-  const runs = named(trace, 'run', 'open-terminal', 'send-terminal')
-  if (runs.length === 0) return { ok: false, reason: 'expected execution by DevOps' }
+  if (named(trace, 'fission', 'fork', 'resume').length > 0) {
+    return { ok: false, reason: 'DevOps must repair directly without creating or dispatching agents' }
+  }
+  const calls = trace.toolCalls ?? []
+  const repair = calls.findIndex((call) => ['write', 'edit', 'mv', 'rm'].includes(call.name))
+  const executes = (call) => ['run', 'open-terminal', 'send-terminal'].includes(call.name)
+  if (repair < 0 || !calls.slice(0, repair).some(executes) || !calls.slice(repair + 1).some(executes)) {
+    return { ok: false, reason: 'expected observed failure, local repair and later execution' }
+  }
   return { ok: true }
 }
 

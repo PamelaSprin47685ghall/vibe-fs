@@ -1,29 +1,35 @@
 # relay-retirement — WHAT
 
-## [001] suicide 是唯一正常模型出口
+## [001] 正常退出
 
-正常 assistant stop 不产生 retirement。模型正常离场只有 accepted `suicide`；authority revocation、session deletion、fatal fuse 与 provider capacity exhaustion 属于独立 exceptional terminal，不伪造 suicide。
+正常 assistant stop 不构成退休；模型正常退场只由 accepted suicide 产生。权威撤销、session 删除、fatal 和 provider capacity exhaustion 是独立异常终态，不伪造 suicide。
 
-## [002] 评级不可跳过；进度、测试、义务与 Git 状态不阻塞 retirement
+## [002] 评级前提
 
-Manager 严禁跳过八维质量评级（PERFECT/REVISE/N/A）直接 suicide。若未提交 review assessment 试图 suicide，工具直接在返回值中提示必须先调用 review 完成质量评级。一旦质量评级已提交，则不论评级结果如何（是否含 REVISE）、测试成败、open obligations 多少、worktree 是否 dirty/unmerged，均不得成为 suicide 阻塞项。
+Suicide 前须提交八维 assessment；尚未提交时返回先调用 review 的明确提示。提交后，REVISE、测试失败、未结义务、dirty 或 unmerged 工作区均不得成为退场阻塞项。
 
-## [003] 递归 live resources 是唯一业务 blocker
+## [003] 资源阻塞
 
-suicide 只检查当前 IncumbencyId 直接或递归拥有的 live child、background job、PTY/process、active tool execution、side-effect/execution lease、同步 descendant provider work 与未观察到 terminal 的 cancel/join。
+唯一业务 blocker 是当前任期直接或递归拥有的 live child、background job、PTY/process、active tool、side-effect/execution lease、同步 descendant provider work，以及尚未观察到 terminal 的 cancel/join。跨任期道路资源按 [009] 处理。
 
-## [004] retirement 必须 freeze-before-check
+## [004] Freeze-before-check
 
-admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。freeze fence 绑定精确 `IncumbencyId`，不得只绑定可复用的物理 `SessionId`；前任退休后下一迭代即使复用同一 SessionId，也不得继承前任 fence。若有 blocker，只恢复当前迭代 cleanup capability，不恢复新工作 admission。
+先冻结本任新工作准入，再读取精确递归 ownership。冻结前已接受资源须纳入检查，冻结后创建须被 fence 拒绝。Fence 绑定 IncumbencyId，不随复用 SessionId 传给后继；阻塞时只恢复本任清理能力，不恢复新工作准入。
 
-## [007] retirement 提交闭合 outcome 与 cut
+## [007] 原子退休
 
-成功 retirement 在同一 durable transaction 中记录 `IncumbencyRetired` 与 `RetirementCommitted({ Id; IncumbencyId; SnapshotId; AuthorityRevision; ProjectionCut = { ProviderRunId; ToolCallId }; Outcome })`，其中快照与 authority 修订是 load-bearing retirement binding。`Outcome = Continue` 表示工作待续：同一 LogicalRun 保持开放，下一迭代就位后继续；Continue 的 retirement 快照取退休时当前快照，允许与 assessment 时快照不同并前向携带给下一迭代。`Outcome = Accepted certificateId` 要求快照等于 assessment/证书快照：证书须有效且属于当前迭代并绑定该快照，不同快照的 Accepted 一律拒绝。两者 authority 都必须等于当前。持有合规有效质量证书（PERFECT）提交退休时，直接以 Accepted 完满闭合；当前任期的义务账本随同退休出清，不随 Manager 继任而死板继承；新迭代就位后根据最新物理世界与输入建立属于新任期的独立账本。CleanupBlocked 的 perfect 迭代在 blockers 清除后可重试 Accepted。证书有效期间不激活任何新迭代，后续显式 `QualityCertificateInvalidated` 使该证书失效后允许普通新迭代。崩溃恢复不得看到永久的“已退休但无 outcome/cut”状态；ManagerLoopSignal 由匹配 Outcome 派生（Accepted 证书→Candidate，Continue→Continue）。
+同一 durable transaction 提交不可逆退休事实与闭合记录：任期、快照、authority revision、精确 provider-run/tool-call cut 和 `Continue | Accepted certificateId`。崩溃后不得永久处于已退休但缺 outcome/cut 的状态；循环信号仅从 outcome 派生。
 
-## [008] 退休工具返回与下一迭代派发之间建立物理中断边界
+Continue 保持 Road 的 LogicalRun 开放，并将退休时快照交给后继，可不同于评审快照。Accepted 仅接受属于本任、有效且匹配评审/退休快照的证书；两类 authority revision 均须等于当前 revision。CleanupBlocked 的通过任期可在清理后重试 Accepted。证书有效时禁止后继，显式失效后可普通重开。
 
-suicide 工具体只提交 durable retirement 并返回结果，不调用 session 级 `InterruptAttempt`/`AbortSession`。两种 retirement 后，退休 run 的后续 provider 请求都在 transform 钩子按退休边界与正式 manager-loop gate 身份拦截：清空旧 transform 消息，释放该请求已取得的 exact provider-step admission，再等待旧 attempt 的 Host interrupt 完成。Continue 随后自动派发下一迭代；Accepted 只终止旧 attempt，永不由 Narrative 自动派发。下一迭代复用同一物理 SessionId，因此禁止在其派发后补发针对已退休迭代的 session abort。显式证书失效后，Change ContinueLoop 可派发普通新迭代，该新迭代同样使用 LatestRetirement cut。已退休 attempt 的后续 provider 请求由 durable cut（`RetiredProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial 在请求级隔离；已退休迭代的物理消息作为历史保留，对继任迭代完整可见。新迭代不能复活已退休迭代，也不能结束承载 Road 的 active authority。
+退休出清本任义务，新任按最新物理世界与输入建立自己的义务；同一 session 的认知画板仍按 cognitive-workspace-001 保留，不因保留画板而继承旧任义务。
 
-## [009] 固定 DevOps 与跨任期资源在退休中的交接与收束边界
+## [008] 物理中断边界
 
-Manager 迭代正常退休（`Outcome = Continue`）时，道路绑定的固定 DevOps 及其后台持久进程不因前任离场而隐式孤儿化或被强制销毁；旧任退休仅注销其自身的派工与控制租约，已接收的工作继续由固定 DevOps 运行并保留给后继迭代接管。只有在道路最终关闭、Accepted 证书终结或遇到致命 exceptional terminal 时，才按资源责任规则触发对固定 DevOps 及其衍生进程的物理收束。严禁假定 Manager 分身并发持有或随意遗留无主执行资源。
+Suicide 工具体只提交退休并返回，不执行 session 级 interrupt/abort。两种 outcome 的退休后请求均在 transform 边界按精确 cut 与 manager-loop gate 身份拦截：清空旧请求、释放其 exact provider-step admission，并等待旧 attempt 中断完成。Continue 才自动派发后继；Accepted 不自动派发，显式证书失效后的普通重开仍使用 LatestRetirement cut。
+
+不得在后继派发后补发旧任的 session abort。迟到旧 run 身份由 durable cut 识别，退休者失去工具权；历史完整保留给后继，既不复活旧任，也不结束承载 Road 的 active authority。
+
+## [009] 道路资源交接
+
+Continue 只注销旧 Manager 的派工/控制租约，固定 DevOps、已接收工作及其持久后台进程继续运行，保留给后继接管，不得隐式孤儿化或强制销毁。Road 最终关闭、Accepted 终结或致命异常时，按资源责任规则完成物理收束；不得遗留无主资源或假定并发 Manager 分身。

@@ -1,114 +1,98 @@
 # capability-enforcement — WHAT
 
-## [001] 每次 provider attempt 有一个 canonical ToolCapabilitySet，由 CanonicalRole × RequestKind 唯一决定
+## [001] 每次请求的唯一能力集
 
-每次 provider 请求执行的可用能力集合（ToolCapabilitySet）由 `CanonicalRole` 与 `RequestKind` 唯一确定，并在构建 `AttemptExecutionProfile` 时单点完成组装。禁止在 profile 之外另设独立的权限来源或旁路字段。
+每次 provider attempt 的 `ToolCapabilitySet` 由 CanonicalRole 与 RequestKind 唯一确定，随执行 profile 单点组装，不另设权限来源或旁路字段。
 
-## [002] provider-visible schema 与 runtime execution gate 读同一 capability truth
+## [002] 可见工具与执行门禁同源
 
-Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 capability truth：schema 是固定上限投影，执行门禁是当前事实投影；两者同源，不意味着每轮动态删工具。无权限工具不出现在 Schema 中，异常绕过 Schema 的调用亦在运行时 Gate 被即时阻断。
+模型可见 Schema 与运行时 Gate 从同一权威能力集派生：Schema 表达固定权限上限，Gate 按当前事实收窄准入，不要求逐轮删除工具。超出权限上限的工具不可见，绕过 Schema 或当前准入的调用也须在执行前拒绝。
 
-## [003] capability projection 可按 office + request contract 收窄，但不得扩大 office entitlement
+## [003] 能力投影不得扩大权能
 
-能力投影允许根据特定 `RequestKind`（如投机副本或窄通道）对角色固有权限进行收窄，但任何投影出的能力集合必须是 `Roles.permissions(role)` 的严格子集，严禁发生权能扩大。
+请求合同可以收窄角色固有权限；投影不得包含 Office 未授权的能力。
 
-## [004] execution tier 不改变同 office 的 authority：同一 CanonicalRole 的权限集与 tier 无关
+## [004] 执行档位不改变权能
 
-同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`orchestrator`/`engineer`/`devops`/`blogger`/`bookkeeper`/`predictor`)，不再有 `fast-`/`deep-` 前缀。
+同一 CanonicalRole 的权限与执行档位无关。身份词汇与名字解析由 participant-identity 定义，不因模型档位增加职位。
 
-## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep}
+## [005] StrengthReplica 只读
 
-用于投机调查的 `StrengthReplica` 仅保留 `{Read; Glob; Grep}` 只读能力面。其运行时工具映射在 deny 全部工具后精准放行此三项，其余修改与执行工具在副本内全部 fail-closed。
+StrengthReplica 的能力仅为 Read、Glob、Grep。工具面默认拒绝，仅开放对应只读工具；修改、执行及其他工具均在运行时拒绝。
 
-## [006] internal-only participants/actions 不进无资格 participant 的工具面
+## [006] 内部工具与效用工具隔离
 
-内部专用工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）仅向对应内部角色开放，普通角色不可见亦不可执行。认知与交互效用工具（如 `assume` 等）及 Host 工具（如 `skill`）不属于领域业务权限，不进入 `Roles.permissions`，亦不得借此扩大角色的领域权能；内部伴随角色（Blogger）禁止获得 `skill` 与 `assume` 等效用工具。
+内部专用工具只对相应内部角色可见、可执行，普通角色不得借用。认知、交互及 Host 效用工具不属于领域业务权限，也不能扩大 Office 权能；Blogger 不得获得 skill、assume 等效用工具。
 
-## [007] Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
+## [007] 工具来源不改变授权
 
-无论工具来源于 Host 原生、MCP 外部集成还是插件内部注册，其权限控制均由唯一的领域能力令牌统管。权限控制仅覆盖本地离线能力，任何角色均无外部网络浏览工具；Sphinx MCP 经程控工作流调用，严禁为不同技术来源维护独立的权限映射表。
+Host 原生、MCP 和插件工具服从同一领域能力策略，不各设权限映射。所有角色均无外部网络浏览能力；Sphinx 由程序工作流调用。
 
-## [008] js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
+## [009] 同名工具同一契约
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`js-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层。
+同一工具名只对应一份参数 Schema 及生命周期、动作、返回契约，不因角色不同产生语义分叉。fork 与 resume 属于不同生命周期，必须保持独立。
 
-## [009] 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
+## [010] 身份与配置失败时安全拒绝
 
-全系统内同一工具名必须对应唯一的参数 Schema 定义与唯一确定的生命周期、语义动作及返回契约。禁止不同角色在同一工具名下共享存在语义分歧的契约。`fork` 与 `resume` 属于不同生命周期契约，必须保持严格独立。
+角色或 profile 无法解析时，可见工具集为空，执行调用全部拒绝。Host 配置校验失败时，先写入覆盖 Host 宽松默认的 deny 策略，再触发进程级致命终止。
 
-## [010] 双层 fail-closed：Role 未定 → 工具集空/拒绝执行；Host 配置异常仍写 deny 默认
+## [011] 路径元权限
 
-若角色或 profile 无法解析，模型可见工具集置为空集且运行时拦截一切调用。若 Host 配置校验失败，系统必须先写入全量 deny 默认策略以覆盖 Host 宽松默认，随后触发进程级致命错误终止退出。
+每个 managed agent 的 Host 配置由唯一装配所有者显式写入 `external_directory = "allow"`。它是路径边界元权限，不计入角色业务权限，不授权普通工具。
 
-## [011] external_directory=allow 是 Host 路径边界元权限：每 managed agent 显式写入、唯一生产写点
+## [012] 工具名称从角色能力派生
 
-`external_directory = "allow"` 作为路径边界的元权限，统一由托管配置装配层显式写入各 managed agent 的 Host 配置中，不计入角色业务权限矩阵，亦不得作为普通工具放行。
+角色到工具名称的投影以 CanonicalRole 的能力为唯一来源；Manager 专用别名也在同一入口按角色解析，不引入历史别名兼容表或第二份手写工具子集。
 
-## [012] 工具名投影唯一写入口 = CanonicalRole → permission；禁止第二套旧名表/手写矩阵
+## [013] 权威值的因果职责
 
-所有角色到工具名称的投影均以 `CanonicalRole → permission` 为唯一写入口；允许 Manager 专用别名在同一写入口内按角色解析。系统严禁引入历史别名兼容表或手工硬编码的工具名子集。
+Evidence 是已观察输入；Decision 是纯分类结果；Witness 是带精确对象与版本的证明；Capability 是对下一动作的不可伪造许可；Receipt 是已受理或已应用结果；PhysicalHandle 是当前进程资源。六者不可互换。
 
-## [013] 权威值严格分为 Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle
+只描述工具词汇的值由正向 DSL/manifest 明确归类为 vocabulary，不靠类型名相似或名称白名单猜测权威。
 
-六类值的因果职责不可互换：`Evidence` 是已观察输入，`Decision` 是纯分类结果，`Witness` 是带精确对象与版本的证明，`Capability` 是对下一动作的不可伪造许可，`Receipt` 是已受理/已应用结果，`PhysicalHandle` 是当前进程资源。名称相似但只描述工具词汇的类型（例如 `JsCapability`）必须由正向 DSL/manifest 分类为 vocabulary，不得靠名称 allowlist 猜测。
+## [014] 权威由所有者单点发行
 
-## [014] owner 单点发行；manifest 以 exact file + symbol + source/proof anchor fail closed
+敏感权威由拥有其不变量的 owner 单点发行，并在其公开端口与类型中显式定义。manifest 用 exact file、symbol、source/proof anchor 定位声明；缺失或错配必须拒绝，不以 name-only allowlist、baseline 或 suppression 放行。消费端核验范围与新鲜度见 015/016。
 
-每个敏感权威声明由其真实 owner 单点发行，并在其所属 subsystem 的公开端口与类型系统（Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle）中显式定义。各消费点执行 exact subject、版本与必要 digest 的准入核验；严禁 name-only allowlist、baseline 或 suppression。
+## [015] 精确范围与消费准入
 
-## [015] authority scope 必须精确绑定 current subject + version/sequence + 必要 digest
+Witness、Capability、Receipt 声明精确 subject、版本或序列，以及内容相关边界所需的 digest/hash。Witness 不能直接授权写入、发送或执行；消费端必须基于当前对象、版本及内容重新准入。退休与变更沿用各自规范的当前请求、快照和 Git tree 证明，不另造审查权威。
 
-Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列及能区分内容的 digest/hash（若该边界具有内容身份）。Witness 不得直接驱动 append/write/send/execute 等效果；消费者必须先针对当前 subject、当前 version/sequence 与当前 digest 做 fresh admission。Retirement 继续复用 RETIRE 与 Change 门禁的 current request/snapshot/Git tree proof，不另造第二套审查权威。
+## [016] 历史证据不复活旧能力
 
-## [016] freshness 在消费点重验；stale witness 只能产生新的 admission，不能复活旧能力
+旧 witness/receipt 可供读取，不授权当前效果。对象、版本、序列或内容变化时，旧 witness 必须拒绝；条件再次成立也由 owner 重新观察并准入。恢复不得跳过普通准入或携带隐藏的执行位置。
 
-已记录 witness/receipt 可作为历史证据，但其旧版本不授权当前效果。subject、版本、序列或 digest 变化后，旧 witness 必须被拒绝；若当前事实再次满足条件，owner 从当前观察产生 fresh admission。恢复路径不得隐藏旧 program counter 或以历史能力跳过普通准入。
+## [017] 明示使用次数
 
-## [017] multiplicity 明示且一次性能力不可复制消费
+每个权威合同声明 one-shot、exact-N、set/closure 或 replayable evidence 的 multiplicity。一次性 Capability/permit 成功消费或 release 时原子关闭该次机会；重复读取 Evidence/Receipt 不等于重复执行效果。
 
-每个权威合同必须声明 one-shot、exact-N、set/closure 或 replayable evidence 的 multiplicity。一次性 Capability/permit 的成功消费或 release 原子关闭该次机会；Receipt/Evidence 的可重放读取不等于重复执行效果。
+## [018] QuiescencePermit
 
-## [018] QuiescencePermit 由 ObserveIdle 唯一发行且消费/释放返回 typed failure
+QuiescencePermit 绑定不透明 gate owner、SessionId 与 attempt serial，仅由 ObserveIdle 发行。消费与释放均返回成功或 typed failure：跨 gate 为 WrongOwner，重复消费为 AlreadyConsumed，新 attempt 淘汰旧 permit 为 Superseded，撤销为 Revoked，删除或缺少有效 idle 为 NoFreshIdle。
 
-`QuiescencePermit` 绑定 opaque gate owner identity、`SessionId` 与 attempt serial；只有 `SessionQuiescenceGate.ObserveIdle` 可发行。`TryConsume` 与 `TryRelease` 均返回 `Result<unit, QuiescencePermitFailure>`，其中 `QuiescencePermitFailure = WrongOwner | NoFreshIdle | AlreadyConsumed | Superseded | Revoked`。跨 gate 为 `WrongOwner`，重复消费为 `AlreadyConsumed`，更新 attempt 后旧 permit 为 `Superseded`，revoke 后为 `Revoked`，drop 或无 eligible idle 为 `NoFreshIdle`；每个 `Error` 分支零效果。JS surface 只投影稳定 typed result view，permit 保持 opaque。
+所有拒绝均零效果。JS 边界只投影稳定结果，permit 保持不透明。
 
-## [019] process capability/permit/PhysicalHandle 非耐久；重启后由当前事实 fresh admission
+## [019] 进程能力不可持久化
 
-进程 capability、permit 与 `PhysicalHandle` 禁止进入 Fact/Event、journal codec、JSON 或任何跨进程恢复载荷。崩溃后可恢复 durable Evidence/Receipt，再经普通 owner admission 发行当前进程的新能力；不得持久化 capability、读取 feature history 推断能力、或设置隐藏 recovery PC。Quiescence 恢复必须重新经历当前 physical attempt 的 `ObserveIdle`，不得消费崩溃前 permit。
+进程 capability、permit 和 PhysicalHandle 不进入 Fact/Event、journal、JSON 或其他恢复载荷。重启只能恢复 durable Evidence/Receipt，再由当前事实普通准入，不能从历史状态恢复旧能力或隐藏执行位置。Quiescence 必须重新观察当前 physical attempt 的 idle，不消费崩溃前 permit。
 
-## [020] 配置不变量fatal使用mandatory injected fuse
+## [020] 配置不变量的致命边界
 
-此边界不把普通可预期admission rejection升级为fatal。
+配置不变量破坏通过必需注入的 fatal 能力终止；普通可预期的准入拒绝不升级为 fatal。
 
-## [021] Blogger repair 单一 owner 发行物理效果：同 episode 幂等、quiescence 门控、耗尽一次性 abandon
+## [023] DevOps 修复权不设逐次开关
 
-Blogger 缺失工具修复的认领与物理发送只能由 `BloggerCoordinator.observeTransformRepair / observeIdleRepair` 这一唯一 compiled owner 发行。同一 repair episode 内重复观察必须幂等等待、不重复认领亦不重复发送；非 quiescent 观察不产生认领、不消耗发送预算；nudge 与 aabb 各至多发送一次，耗尽后一次性 abandon 并释放 flight；journal 缺失时直接 abandon 且零物理发送。runtime shutdown 必须与 episode admission 原子关闸，关闸后新认领被拒，已认领 episode 被取消并可 drain。
+DevOps 权能与修复范围由 office-capability-017 定义。不设置 allowRepair 等逐次批准参数，也不保留“只有 Manager 另行允许才能修改源码”的提示词限制。
 
-## [022] Fission 仅准入已证明的 CanonicalRole 为 Engineer，其他角色与内部身份一律在运行入口与门禁 fail-closed 拒绝
+## [024] Fork 与 Resume 的准入
 
-Fission 能力在运行入口（Admission Gate）的准入逻辑严格限定为：
-```text
-允许 Fission = 已证明的 CanonicalRole 为 Engineer
-             ∧ 本次执行授权包含 Fission
-             ∧ 已有 subsession 来源条件成立
-             ∧ 没有活跃 Fission group
-             ∧ 其他现有准入条件成立
-```
-唯一可赋予 Fission 的角色是 Engineer。Manager、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 以及任何未决或内部辅助身份调用 Fission 时，必须在运行时入口与 ToolRegistry 门禁直接拒绝（fail-closed），绝不只从 Schema 隐藏。
+fork 只允许 Manager 新建独立 Engineer，不准入 DevOps 或其他角色。resume 的既有参与者续做语义遵循 delegation-003/024。
 
-## [023] DevOps 角色固有直接源码修改与测试编写权能，禁止 allowRepair 等逐次授权开关
-
-DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec, Pty）。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
-
-## [024] Fork 与 Resume 权能分离：Manager fork 仅准入 Engineer，固定 DevOps 仅允许经 resume 续做且同一道路至多一个活跃工作单元
-
-`fork` 与 `resume` 在模型参数、生命周期与门禁上严格分离：
-- `fork`：仅允许 Manager 创建新的独立 Engineer 子会话；严禁 fork DevOps 或 fork 其他角色。
-- `resume`：用于 Manager 续做既有固定 DevOps 道路；同一道路同时至多允许一个活跃的 DevOps 工作单元。DevOps 忙时明确拒绝新的 assignment，不将新任务伪装为 nudge，亦不得通过新建操作员绕过忙碌状态。
+固定 DevOps 只通过 resume 续做，同一道路至多一个活跃工作单元。忙碌时拒绝新 assignment，不把新任务伪装为 nudge，也不新建替代操作员绕过忙碌状态。
 
 ## [025] Manager 评审专用只读工具固定可见与当前事实收口
 
-Manager 评审专用只读工具（`js-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审、退任冻结、已具备有效证书或存在清理阻塞时一律拒绝执行。原生 `read`/`grep`/`glob` 与 `js-engineer`/`js-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
+Manager 的 `js-manager` 在 Schema 中固定可见，仅提供 Read/Glob/Grep，过滤须到达真实执行 API。已接纳评审、退任冻结、有效证书或清理阻塞均使运行时拒绝。原生 `read`/`grep`/`glob` 及跨角色 `js-engineer`/`js-devops` 始终拒绝。工具名只通过 012 的唯一映射授权，不按后缀或启发式猜测；编程面四层一致性见 repository-programming-002。
 
 ## [026] Review 接纳前禁止向固定 DevOps 派工
 

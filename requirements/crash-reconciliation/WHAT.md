@@ -1,98 +1,103 @@
 # crash-reconciliation — WHAT
 
-## [001] process-local 状态不是恢复权威
+## [001] 进程内状态不是恢复权威
 
-进程重启后，所有 process-local 状态（包括 `armedByFailure`、degeneration-guard armed anomaly、`QuiescencePermit` 与 detector 状态）全部清空，绝不得作为恢复权威。没有 fresh evidence 严禁自动产生任何副作用。
+重启后清空所有 process-local 状态，包括 armed anomaly、permit、waiter 和 detector；不得将其作为恢复权威。没有 fresh evidence 不得自动产生副作用。
 
-## [002] 重启从 durable facts + 可信物理观察重建世界
+## [002] 恢复证据来源
 
-系统恢复仅允许两类输入：EventStore 中已提交的不可变事件及其 fold 投影，以及 Host SDK 快照、Git ref 等可信物理观察。严禁使用缓存、墙钟时间或日志散文推断状态。
+恢复只使用已提交的不可变 EventStore 事件及 fold 投影，以及 Host SDK 快照、Git ref 等可信物理观察；不得从缓存、墙钟或日志散文推断状态。
 
-## [003] 未决外部 effect 先 reconcile 再决定是否可重试
+## [003] 未知 effect 先核对
 
-结局未知的外部 effect 严禁直接视为未发生而盲目重放。Reconcile 观察中 `finish=None` 的快照属于私有观测 `TurnUnknown`，必须等待静止证据后由业务层决定处理策略。
+结局未知的外部 effect 不得当作未发生而重放。`finish=None` 快照属于私有观测 `TurnUnknown`，等待静止证据后才由业务层裁决。
 
-## [004] 恢复复用普通 workflow 入口，不发明程序计数器
+## [004] 复用普通入口
 
-恢复过程遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 `RecoveryStage` 等第二状态机。
-所有工具与执行中断均由 crash-reconciliation-017 / crash-reconciliation-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；系统在加载阶段自行归位（结算遗留子 run、重建执行绑定、重新登记子会话），不存在显式续传命令。
-## [005] ambiguous / multiple / missing 证据 fail closed
+恢复遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`，不恢复程序节点、continuation 或执行步数，不另建恢复状态机。工具与会话中断按 [017]/[018] 处理，不在启动时自动重放、补写或修复。
 
-恢复证据不足、冲突或缺失时，系统必须显式停留在 `Waiting`、`Blocked` 或 `RecoveryIncomplete` 分支，严禁猜测继续。
-Waiting 分支仅代表瞬态等待（例如等待新 turn 或观察稳定），任何消费端在处于 Waiting 状态时严禁执行 Ready 分支的副作用操作（不得发送请求、不得发布完成态、不得虚假声明就绪），只读观察必须与 effectful observe 严格分离。
-## [006] 没有 fresh evidence 就没有自动 effect
+## [005] 证据不足时停止或等待
 
-恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。quiescence 是物理条件的合取：当前 provider attempt 已被 Host 观测为 idle，且该 SessionId 没有仍在执行的 tool body；Host 的 `SessionIdle` 若先于 tool completion 到达，只能建立待静止证据，permit 在最后一个 active tool 结束前不可消费。新的物理用户输入到达时立即幂等撤销旧的静止许可。permit 在物理发送边界被消费；若 Host 明确证明 acceptance 前拒绝、且同一 attempt serial 仍未被更新材料取代，则允许把该 exact permit 从 `IdleConsumed` 原子归还为 `Idle`，使仍未满足的 gate 可重试。任何更新的 provider attempt、物理用户材料或 acceptance-unknown 都使归还失败。
-当前进程 join/admission 凭据仅证明本进程内的准入合法性，跨进程恢复证明已由 crash-reconciliation-017/018 显式续传取代；持有 `FamilyRecoveryPermit` 才能执行 join（保留 exact membership 闭包检查）。
-## [007] TurnUnknown 是 reconciliation 私有观测
+证据冲突、缺失或不足时，明确进入 `Waiting`、`Blocked` 或 `RecoveryIncomplete`，不得猜测继续。Waiting 只表示瞬态等待，不能发送请求、发布完成态或声称 Ready；只读观察与有副作用的处理必须分开。
 
-`TurnUnknown` 仅为 reconciliation 内部观测，严禁作为正式的 `TurnOutcome` 对外发布。
+## [006] Fresh permit 与物理发送
 
-## [008] abort 是 typed 控制面，不是 ProviderFailure
+Join 必须持有效 `FamilyRecoveryPermit`，并按 [011] 核验成员；当前进程凭据不证明跨进程恢复完成。跨进程续传遵循 [017]/[018]。
 
-Host 的 abort 信号解码为类型化的 `AttemptAborted` 控制面事件，撤销当前 attempt 的所有 continuation 能力，并唤醒 Reconciler；严禁改写为 `ProviderFailure`。
+Idle-derived continuation 必须在物理发送边界消费 fresh `QuiescencePermit`。静止要求当前 attempt 已被 Host 观测为 idle，且该 session 无 active tool body；提前到达的 idle 只能在最后一个 tool 结束后变为可消费证据。新物理用户输入立即、幂等撤销旧许可。
 
-## [009] child recovery 没有 Aborted 终态
+只有 Host 明确证明 acceptance 前拒绝，且同一 attempt serial 未被新材料取代时，才可将 exact permit 从 `IdleConsumed` 原子归还为 `Idle`。新 attempt、新物理用户材料或 acceptance unknown 均禁止归还。
 
-Child 终态仅包含 `Succeeded | Failed | Abandoned`，不存在 Aborted 终态。单纯的 abort 观察绝不构成 terminal 证据，JoinableCompletion 必须具有真实解码正文。
+## [007] TurnUnknown 不外发
 
-## [010] 恢复结果分支穷尽，Waiting ≠ Blocked
+`TurnUnknown` 只属于 reconciliation 内部观察，不得作为正式 `TurnOutcome` 发布。
 
-恢复结果分支必须语义互斥且穷尽：`RecoveredActive`（活跃运行中）≠ `RecoveryIncomplete`（缺少终态证据需等待）；`Waiting`（瞬态等待）≠ `Blocked`（硬性失败阻断）。
+## [008] Abort 属于控制面
 
-## [011] 线性序 permit → join，每 join 重新验证
+Host abort 解码为 typed `AttemptAborted`，撤销当前 attempt 的全部 continuation 能力并唤醒 Reconciler，不得改写为 `ProviderFailure`。
 
-每次执行 join 之前必须重新验证 `FamilyRecoveryPermit`。Permit 携带恢复闭包的成员集合；若已恢复成员丢失则拒绝执行，恢复后新增成员允许单调准入。
-跨进程与当前进程 join 的证据接口必须在类型和语义上与真正核对结果一致，禁止伪造全量家族恢复完成凭证。
-## [012] completion 单一 owner
+## [009] Child 无 Aborted 终态
 
-HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采用 blob 先于事实的原则，拒绝重复 claim，并通过 retire 墓碑保证重启后完成态不重复投递。
+Child 终态只有 `Succeeded | Failed | Abandoned`。单独 abort 观察不构成终态；`JoinableCompletion` 必须有真实解码正文。
 
-## [013] combine 优先级 Blocked > Waiting > Recovered，按层序无关
+## [010] 恢复结果互斥且穷尽
 
-多个恢复结果合并时，优先级严格满足 Blocked 优于 Waiting 优于 Recovered；同层级内的合并与输入顺序无关。
+`RecoveredActive` 表示仍在运行，`RecoveryIncomplete` 表示缺少终态证据；`Waiting` 表示瞬态等待，`Blocked` 表示硬性阻断。各分支不得混用。
 
-## [014] closure 校验与 permit 单调准入
+## [011] 每次 Join 重新核验
 
-闭包中若出现重复 session 则判定为 `RecoveryCycle` 并 fail-closed 阻断。Permit 校验要求闭包成员单调不丢失。
+每次 join 前重新验证 `FamilyRecoveryPermit`：它证明的成员不得丢失，后来新增成员可单调准入。跨进程与当前进程凭据的类型和语义必须对应实际核对范围，不得伪称全家族已恢复。
 
-## [015] Attached restore 复用/替换/fail-closed
+## [012] 完成态唯一提交
 
-重启后附加子会话恢复时：匹配唯一关联 ID、agent 与 title 时复用；关联不存在时新建；发生冲突或多重匹配时 fail-closed 阻断。Replacement 必须先证明旧物理会话消失，显式执行 Close 后再 Link 新会话。
+完成态只有一个提交 owner，先写 blob 再写事实，拒绝重复 claim；retire 墓碑保证重启后不重复投递完成态。
 
-## [016] Blogger 修复只属于当前进程的 live owner
+## [013] 恢复结果合并
 
-Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前进程的物理所有权。进程死亡后这些能力消失；durable dispatch/terminal facts 仅供核对与诊断，严禁从其重建修复阶段或自动续发。新进程只能按 crash-reconciliation-017/018 的显式续传规则重新准入。
+优先级为 `Blocked > Waiting > Recovered`；同层级合并与输入顺序无关。
 
-## [017] 工具中断不恢复；未来 session 续传必须显式
+## [014] 闭包与单调准入
 
-工具执行本身不设隐式的崩溃恢复 owner。进程死亡时正在运行的工具调用均按中断处理，严禁在新进程启动时自动重放、补写完成态或隐式修复。
+闭包中 session 重复即 `RecoveryCycle`，必须阻断；permit 证明的闭包成员不得丢失。
 
-## [018] 重启后由系统自行归位，不再有显式 resume 命令
+## [015] 附加会话复用与替换
 
-进程重启后不存在任何显式续传命令（`/continue` 已移除）。系统在加载阶段自行完成归位，且只做持久记账，不重放任何命令：
+附加子会话恢复时，唯一关联 ID、agent、title 均匹配才复用；关联不存在才新建，冲突或多重匹配必须阻断。替换须先证明旧物理会话消失，再显式 Close，最后 Link 新会话。恢复触发仍受 [017]/[018] 约束。
 
-- 上一个 runtime 遗留的活跃子 run 被**作废**（`ExecutionFactCases.ChildRunVoided`）：只关闭该子会话的逻辑 run，不产生任何“待收交付”；该 run 什么都没产出，就不欠父会话一次 join——`horizon` 与 `join` 对它都为空，直接 `resume` 才是正确时序；
-- 父子会话的执行绑定与 fission lane 归属按 durable 投影**按需解析**（取 handle 的 `TargetAgent`，不取逻辑 `Byname`），进程本地表只是缓存，装载阶段不做任何预登记扫描；
-- 复用仍由 manager 显式发起；复用门禁、placement、await 一律以 durable handle 为存在性依据。
+## [016] Blogger 修复不跨进程继承
 
-被中断的工具调用保持失败并原样留在可见历史中，不得推断其完成、隐藏它或伪造终态。没有独立的续传材料通道，也没有 disclosure-only 的 provider 轮次。
+Blogger 的 nudge/AABB episode、waiter 和 flight lease 只属于当前进程 live owner。进程死亡后能力消失；durable dispatch/terminal facts 只供核对、诊断，不得据此恢复修复阶段或自动续发。新进程按 [017]/[018] 重新准入。
 
-## [019] 外部 effect 必须逐项闭合 crash reconciliation 合同
+## [017] 中断工具不自动恢复
 
-每个高价值外部 effect 必须在唯一 owner 下登记类型化 `intent → process-local admission → physical receipt → durable outcome`；不适用阶段必须给出明确理由。登记项必须锚定物理 effect identity、有限且穷尽的歧义状态、查询或补偿入口、安全重试律（仅 `proven-not-applied` 或 `never`）、以及复用普通 CE 的重入入口。Host、provider、Git 与 process 边界必须同时具有确定性歧义证明和 Adapter 或 Long-Stroke 证据；证据层级由 verification owner 的独立 registry 按精确 `(path, title, WHAT)` 唯一分类，effect 行自报、改标或未登记分类均不得计入证明。Prompt dispatch 必须锚定物理发送前的 process-local `physicalAdmission`；Blogger 的外部 receipt 是 `TransportReceipt`/`PluginPromptSubmitted` 以及随后接受的 `PhysicalUserMessageId`，不是预先可派生的 `PromptKey`。恢复不得持久化 capability、continuation、`ResumeAt`、`RecoveryStage`、`RecoveryStep` 或 `NextAction` 程序计数器；未知、冲突、缺失证据一律 fail closed。登记的 owner、WHAT、source symbol 与 executable proof title 均为精确锚点，重复 WHAT ID、过期锚点或未闭合 effect 必须使 gate 失败。
+进程死亡时的在途工具按中断处理；新进程不得自动重放、补写完成态或隐式修复，不为工具另设崩溃恢复 owner。
 
-## [020] 固定 DevOps 崩溃恢复的单一逻辑执行权威与命令去重
+## [018] 加载归位与按需复用
 
-同一道路绑定的固定 DevOps 在崩溃恢复后必须且仅能映射到唯一的当前活跃物理会话，严禁生成两个并行生效的可执行物理权威。
-崩溃前未决的物理命令（`run`、PTY 输入）一律按中断处理，系统严禁在重启后自动重放、补写或隐式续发命令，杜绝物理副作用重复发生。
-恢复流程必须严格沿用道路初始化时持久化的绑定模型（ModelTarget）与 Persona，严禁在恢复或 resume 时切换模型；新会话与恢复只接纳合法新角色集合，历史旧状态不隐式跨边界恢复。
-Load Phase 必须一次性结算上一 runtime 遗留、本进程无法继续持有的 durable 未决工作：仍活跃的子工作 run 与仍开着的 Blogger `BloggerRequestMaterialized`（置 `BloggerRequestAbandoned`，reason `stale-open-at-load`；本进程仍有同 RequestId live flight 的不结算）。遗留的 open request 会让 coordinator 只为已死的 producer 暂存材料、永不物化新请求，Blogger 从此不再消费 raw 尾巴。
+重启后系统在加载阶段自行归位，只做持久记账，不重放命令；不设显式续传命令、独立续传材料通道或 disclosure-only provider 轮次。
 
-## [021] 进程本地表是缓存，durable 投影是存在性真源
+上个 runtime 遗留的活跃子 run 以 `ChildRunVoided` 关闭，不产生 completion 或待收交付，join/horizon 对该 run 为空；Manager 可显式 resume。父子执行绑定与 fission lane 按 durable 投影按需解析，以 handle 的 TargetAgent 而非 Byname 确定执行者，不作启动预登记扫描。复用门禁、placement 与 await 均以 durable handle 判断存在性。
 
-任何“这个子会话/lane/handle 是否存在、属于谁、由谁执行”的判定都必须能从 durable 投影回答；进程本地注册表（子会话登记、dormant 集、执行绑定、lane 注册表）只记录“本进程当前在驱动什么”，不得作为拒绝、忽略或“未知”的唯一依据。
+中断工具保持失败且原样留在可见历史，不推断完成、不隐藏、不伪造终态。
 
-- 未命中缓存时的正确行为是**按需解析并回填**（`DurableChildLookup` by handle id / byname、`SessionExecutionBinding` 的 durable 证据回退、`FissionRuntime` 的 durable lane 证据），而不是回 `Unknown agent id`、`person-unavailable` 或静默跳过；
-- 装载阶段不再有“预登记/预热”特例通道：同一件事只有一个按需规则，避免重启路径每多一处读取就多一处补丁；
-- 只有进程资源归属（本进程持有的 PTY、pending run、teardown 集合、live companion host）可以只读本地表；它们描述的是进程，而不是世界。
+## [019] 每项外部 effect 的闭合证据
+
+每个高价值外部 effect 在唯一 owner 下登记 `intent → process-local admission → physical receipt → durable outcome`，不适用阶段须说明理由。登记包括物理 identity、有限且穷尽的歧义状态、查询/补偿入口、安全重试律（仅 `proven-not-applied` 或 `never`）和普通 CE 重入入口；未知、冲突、缺失证据均拒绝继续。
+
+Host、provider、Git、process 边界同时需要确定性歧义证明和 Adapter 或 Long Stroke 证据。层级由 verification owner 的独立 registry 按 exact `(path, title, WHAT)` 唯一分类，不接受 effect 自报、改标或未登记分类。owner、WHAT、source symbol 和 executable proof title 均须精确；重复 WHAT ID、过期锚点或未闭合 effect 使 gate 失败。
+
+Prompt dispatch 的 admission 锚定物理发送前的 `physicalAdmission`；Blogger receipt 是 `TransportReceipt`/`PluginPromptSubmitted` 及随后接受的 `PhysicalUserMessageId`，不是预先派生的 `PromptKey`。恢复不持久化 capability、continuation 或 `ResumeAt`/`RecoveryStage`/`RecoveryStep`/`NextAction` 程序计数器。
+
+## [020] 固定 DevOps 的单一权威
+
+同一道路的固定 DevOps 恢复后只映射一个活跃物理会话，不得并行产生两个执行权威。崩溃前未决的 run/PTY 输入按中断处理，重启后不自动重放、补写或续发。
+
+恢复或 resume 沿用道路初始化时持久绑定的 `ModelTarget` 与 Persona，不得换模型；新建与恢复只接纳当前合法角色，不隐式恢复旧角色状态。
+
+加载归位一次性结算上个 runtime 遗留且本进程不再持有的 durable 工作：活跃子 run 按 [018] 作废；未关闭的 Blogger request 以 `BloggerRequestAbandoned`、reason `stale-open-at-load` 结算。本进程仍持有同 RequestId live flight 的请求不得结算。
+
+## [021] 进程缓存不决定 durable 存在性
+
+子会话、lane、handle 的存在、归属与执行者均以 durable 投影为真源。进程缓存未命中时按需解析并回填，不得仅因本地缺项而报未知、拒绝或忽略，也不另设加载预热通道。
+
+只有当前进程持有的 PTY、pending run、teardown 与 live companion host 等进程资源，其归属可仅由本地记录决定。

@@ -1,178 +1,51 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
+import { withSyncRuntime } from './support/sync-runtime.mjs'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { default: test } = await import("node:test");
-
-
-test('WHAT[delegation-025] reusable fork terminal failure is guarded by the accepted authority root', () => {
-  const lifecycle = readFileSync(
-    new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs', import.meta.url),
-    'utf8',
-  )
-
-  assert.match(lifecycle, /TerminalStop\.belongsTo root stop/)
-  assert.match(lifecycle, /Failed stop when not \(stopBelongsToRun run stop\) -> Task\.FromResult\(\(\)\)/)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { mkdtemp } = await import("node:fs/promises");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
-
-const live = async (owner) => sync.create(
-  await mkdtemp(join(tmpdir(), 'wxs-sync-delegate-')),
-  [{ sessionId: owner, agent: 'manager' }],
-)
-const waitForChild = async (h, owner, role) => {
-  await sync.awaitPromptCount(h, owner, role, 1)
-  return sync.child(h, owner, role)
-}
-const waitForPromptCount = async (h, owner, role, count) => {
-  await sync.awaitPromptCount(h, owner, role, count)
-  assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
-}
-const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
-const remainsPending = async (promise) =>
-  Promise.race([
-    promise.then((value) => ({ kind: 'resolved', value })),
-    new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
-  ])
-const verifyReusableHandoff = async (role) => {
-  const owner = `owner-handoff-${role.toLowerCase()}`
-  const h = await live(owner)
-  try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-
-    const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
-    await waitForPromptCount(h, owner, role, 1)
-    assert.equal(sync.handoffFrontier(h, owner, role), null)
-    assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
-
-    assert.equal(await settle(h, owner, role, 'FIRST-ANSWER', 'run-first'), true)
-    const firstResult = await first
-    assert.equal(firstResult.ok, true)
-    assert.match(firstResult.value, /FIRST-ANSWER/)
-    const firstFrontier = sync.handoffFrontier(h, owner, role)
-    assert.notEqual(firstFrontier, null)
-
-    await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
-
-    const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
-    await waitForPromptCount(h, owner, role, 2)
-    const secondPrompt = sync.prompt(h, owner, role, 1)
-    assert.match(secondPrompt, /SECOND-CHARGE/)
-    assert.match(secondPrompt, /parent_delta_work_record\s*=/)
-    assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
-    assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
-
-    assert.equal(
-      await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
-      false,
-    )
-    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
-
-    assert.equal(await settle(h, owner, role, 'SECOND-ANSWER', 'run-second'), true)
-    const secondResult = await second
-    assert.equal(secondResult.ok, true)
-    assert.match(secondResult.value, /SECOND-ANSWER/)
-    assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
-    assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
-    assert.equal(sync.childCount(h), 1)
-  } finally { sync.dispose(h) }
-}
-
-test('WHAT[delegation-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
-  const h = await live('owner-failure-causality')
-  try {
-    const first = sync.invoke(h, 'owner-failure-causality', 'Engineer', 'FIRST')
-    await waitForPromptCount(h, 'owner-failure-causality', 'Engineer', 1)
-    assert.equal(await settle(h, 'owner-failure-causality', 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
+test('WHAT[delegation-025] late failure from a previous root cannot settle a reused sync call', async () => {
+  const owner = 'owner-failure-causality'
+  await withSyncRuntime(owner, async runtime => {
+    const first = sync.invoke(runtime, owner, 'Engineer', 'FIRST')
+    await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
+    assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
+    assert.equal(await sync.settle(runtime, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
-
-    const second = sync.invoke(h, 'owner-failure-causality', 'Engineer', 'SECOND')
-    await waitForPromptCount(h, 'owner-failure-causality', 'Engineer', 2)
-
-    assert.equal(
-      await sync.failWithAuthorityRoot(
-        h,
-        'owner-failure-causality',
-        'Engineer',
-        'late previous failure',
-        'msg-physical-1',
-      ),
-      'Ignored',
-    )
-    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
-
-    assert.equal(
-      await sync.failWithAuthorityRoot(
-        h,
-        'owner-failure-causality',
-        'Engineer',
-        'coarse current-root failure',
-        'msg-physical-1',
-      ),
-      'Ignored',
-    )
-    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
-
-    assert.equal(
-      await sync.observeTurn(
-        h,
-        'owner-failure-causality',
-        'Engineer',
-        'TurnFailed',
-        'current failure',
-        'run-second',
-      ),
-      true,
-    )
+    const second = sync.invoke(runtime, owner, 'Engineer', 'SECOND')
+    await sync.awaitPromptCount(runtime, owner, 'Engineer', 2)
+    assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 1), true)
+    let resolved = false
+    second.then(() => { resolved = true })
+    for (const message of ['late previous failure', 'repeated stale failure']) {
+      assert.equal(await sync.failWithAuthorityRoot(runtime, owner, 'Engineer', message, 'msg-physical-1'), 'Ignored')
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(resolved, false)
+    }
+    assert.equal(await sync.observeTurn(runtime, owner, 'Engineer', 'TurnFailed', 'current failure', 'run-second'), true)
     assert.deepEqual(await second, { ok: false, error: 'SyncDelegate run failed: current failure' })
-  } finally { sync.dispose(h) }
+  })
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const EventsSurface = await import("../../../dist/OpenCode/Host/EventsSurface.js");
-
-const notify = (port, sessionId, outcome) => EventsSurface.notify(port, sessionId, outcome.kind, outcome.providerRun ?? '', outcome.error ?? outcome.value ?? '')
-const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
-const failed = (error) => ({ kind: 'Failed', error })
-const aborted = (reason) => ({ kind: 'Aborted', error: reason })
-
-test('WHAT[delegation-025] EVT_future_subscriber_does_not_replay_sticky_terminal', () => {
-  const port = EventsSurface.create()
-  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-old', 'old result')
-
+test('WHAT[delegation-025] future Host subscriber excludes old terminal and retains new execution identity', () => {
+  const port = events.create()
+  events.notify(port, 'reused', 'Completed', 'run-old', 'old result')
   const seen = []
-  const subscription = EventsSurface.subscribeFuture(port, (sessionId, outcome) => seen.push({ sessionId, outcome }))
-  assert.deepEqual(seen, [], 'fresh work unit must not inherit the previous terminal')
-
-  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-new', 'new result')
-  assert.equal(seen.length, 1)
-  assert.equal(seen[0].sessionId, 'ses-reused')
-  assert.equal(seen[0].outcome.providerRun, 'run-new')
-  EventsSurface.dispose(subscription)
+  const subscription = events.subscribeFuture(port, (session, outcome) => seen.push({ session, outcome }))
+  try {
+    assert.deepEqual(seen, [])
+    events.notify(port, 'reused', 'Completed', 'run-new', 'new result')
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0].session, 'reused')
+    assert.equal(seen[0].outcome.providerRun, 'run-new')
+    events.notifyForAuthority(port, 'reused', 'Failed', 'root-2', 'provider exhausted')
+    assert.equal(seen.length, 2)
+    assert.equal(seen[1].outcome.kind, 'Failed')
+    assert.equal(seen[1].outcome.text, 'provider exhausted')
+    assert.equal(seen[1].outcome.authorityRoot, 'root-2')
+  } finally {
+    events.dispose(subscription)
+  }
 })
-test('WHAT[delegation-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port', () => {
-  const port = EventsSurface.create()
-  const seen = []
-  EventsSurface.subscribeFuture(port, (_, outcome) => seen.push(outcome))
 
-  EventsSurface.notifyForAuthority(port, 'ses-causal-failure', 'Failed', 'root-2', 'provider exhausted')
-
-  assert.equal(seen.length, 1)
-  assert.equal(seen[0].kind, 'Failed')
-  assert.equal(seen[0].text, 'provider exhausted')
-  assert.equal(seen[0].authorityRoot, 'root-2')
-})
-}
+test.todo('WHAT[delegation-025] actual fork execution rejects late run-scoped success failure and abort while preserving legitimate session-wide failures (GAP-153)')

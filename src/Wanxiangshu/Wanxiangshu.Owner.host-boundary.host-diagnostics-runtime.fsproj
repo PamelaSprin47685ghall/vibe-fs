@@ -11,6 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-decision.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>

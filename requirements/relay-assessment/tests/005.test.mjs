@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[relay-assessment-005] no-revise assessment creates an exact-bound certificate and downgrades the phase', () => {
+test('WHAT[relay-assessment-005] no-revise assessment projects assessment snapshot and authority into a certificate', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
@@ -24,3 +24,5 @@ test('WHAT[relay-assessment-005] no-revise assessment creates an exact-bound cer
     valid: true,
   })
 })
+
+test('WHAT[relay-assessment-005] actual certificate binds every evidence field and immediately blocks workspace mutation', {todo: 'GAP-193: four exposed certificate fields do not prove full binding or actual mutation denial'})

@@ -468,3 +468,21 @@ integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cu
   })
 })
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const managedAgentConfig = await import('../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js')
+
+  test('WHAT[capability-enforcement-006] internal repository search is not installed as a Host MCP tool or role permission', () => {
+    managedAgentConfig.installDefaultResources()
+    const roles = ['Manager', 'Orchestrator', 'Engineer', 'DevOps', 'Blogger', 'Bookkeeper']
+    const config = { agent: Object.fromEntries(roles.map((role) => [role.toLowerCase(), { model: `${role.toLowerCase()}-model` }])) }
+    assert.equal(managedAgentConfig.configure(config).ok, true)
+    assert.equal(config.mcp?.semble, undefined)
+    assert.equal(config.mcp?.['stealth-browser-mcp'], undefined)
+    for (const role of roles) {
+      const permission = config.agent[role.toLowerCase()].permission
+      for (const tool of ['semble', 'semble_*', 'semble_search']) assert.equal(permission[tool], undefined, `${role}.${tool}`)
+    }
+  })
+}

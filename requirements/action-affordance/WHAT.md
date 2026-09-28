@@ -2,32 +2,28 @@
 
 ## [001] 工具描述是局部调用契约而非 tooltip
 
-每个非平凡动词的描述必须在调用边界上使用户能够明确回答五问：
+每个非平凡动作的描述必须让调用方在决策时知道：
 1. 发生什么动作（What act happens）；
 2. 何时适用（When does this act fit）；
 3. 不执行哪些临近的诱惑行为（What tempting nearby act does this NOT perform）；
 4. 成功返回确立了什么事实（What does a successful return establish）；
 5. 各非显然参数的具体含义（What does each non-obvious argument mean）。
 
-描述文本必须包含充分的正向能力（positive affordance）、负向边界（negative affordance）、边界镜像（boundary mirror）、返回后果（returned consequence）与参数语义。
-
 ## [002] 高风险动词具备最低契约与认知锚点约束
 
-所有高风险动词（包括 `fork`、`commission`、`inspect`、`run`、`query-shell`、`establish-behavior`、`repair-behavior`、`fetch`、`join`、`horizon`、`judge`、`suicide`、`fission`、`chronicle`、`js-*` 等）必须具备完备的契约定义。
+高风险动作必须完整满足 [001]；各语言的核心约束须有对等的语义认知锚点。工具是否存在及其授权由动作和权能的所有者定义，本条不通过历史名称清单新增工具。
 
-高风险动作的工具描述必须在多语言下具备对等的语义认知锚点，确保其核心约束在各语言环境中一致成立。
+## [003] 只读调查的负边界
 
-## [003] inspect 显式声明不实现与不修复代码
+只读调查的调用描述必须说明：可以检查源码、历史、配置与已有构建产物，不实现或修复代码，不运行程序制造新的行为证据。
 
-`inspect` 的契约必须明确其“does not implement or repair code”的负边界。因果只读（causal read-only）意味着允许检查源码、历史、配置、构建产物及静态调查，但严禁直接修改文件或运行程序以制造新的行为证据。
+## [004] 修复含义与完成记录
 
-## [004] repair-behavior 明确 mechanical 的语义定义
+修复契约使用 mechanical 时，必须说明它指“行为含义已被决定”，而非“改动规模小”。返回的 WorkRecord 不等于修复已通过验证；修复权与工程判断边界仍由 office-capability 定义。
 
-`repair-behavior` 必须明确声明 mechanical 的语义为“行为含义已被决定”，而非“代码改动物理规模小”。返回的 WorkRecord 仅代表工作完成记录，不作为修复已通过验证的证明。
+## [005] 源码修改与执行证据
 
-## [005] establish-behavior 分离源码修改与执行证据
-
-`establish-behavior` 必须明确声明：写入或修改源码仅代表在授权范围内完成代码落地，不等于行为已获验证的执行证据，也不代表已实际运行测试。
+源码修改的调用描述必须说明：完成授权范围内的代码落地，不等于已经运行测试或取得行为验证的执行证据。
 
 ## [006] run 与 query-shell 是实际动作而非运行时预测
 
@@ -35,7 +31,7 @@
 
 ## [007] 动作名称表达语义动作而非运行拓扑
 
-工具命名必须采用动词，表达语义动作（semantic act），严禁使用名词或与 Role/Persona/Office 共用名称以承载不同语义。不同语义动作必须采用完全不同的工具名称。
+工具名必须是表达语义动作的动词，不使用名词或借 Role/Persona/Office 名称承载其他语义；不同动作使用不同名称。
 
 ## [008] 同一工具名称在全系统中处处代表同一契约
 
@@ -49,30 +45,28 @@
 
 ## [009] 能力选择禁止退化为裸枚举
 
-`calling` 等参数属于能力与责任的显式选择，严禁退化为无说明的裸枚举。不同 calling 选项需清晰标明其在推理深度或 Persona 定位上的差异，而不改变其 Office 权限边界。
+`calling` 等责任选择参数不得只是裸枚举，必须说明当前合法选项的职责及区别；Persona 或推理深度别名不改变 Office 权限，也不产生独立路由权。
 
 ## [010] fork 与 commission 必须明确受托人职能与后果
 
-`fork` 与 `commission` 的契约必须明确回答“工作被委托给具备何种职责的角色”，依据各 Office 的法定后果写明委派边界，并标明网络浏览角色仅从公开网络建立事实、不得用于本地仓库调查。
+`fork` 与 `commission` 必须说明受托职位的职责和委派后果，遵守 office-capability 与 delegation。仅面向公开网络的调查不得被描述为可以承担本地仓库调查。
 
 ## [011] 关键边界镜像在所有改变决策的界面上
 
-关键语义区分必须出现在所有可能影响行为选择的决策边界上。单一语义所有权并不要求单一呈现：被调用方的 Role Law 约束必须在调用方的工具描述中镜像展现，严禁因被调用方已定义而省略调用方的边界说明。
+关键边界必须出现在所有影响动作选择的界面。被调用方 Role Law 中相关的限制也须呈现在调用方工具描述中，不能因规则已有唯一所有者而省略。
 
 ## [012] 调用方边界镜像必须包含易混淆相邻动作与禁止请求
 
-调用方工具描述必须明确指出最易混淆的相邻行为与禁止的请求形态。例如 `inspect` 的调用方严禁在 charge 中包含代码修复指令，`commission` 的调用方严禁将�视同 `fork`。
+调用方描述必须说明易混淆的相邻动作及禁止请求：只读调查不得夹带代码修复，`commission` 不得当作 `fork`。
 
 ## [013] 描述文本覆盖可见纪律并隔离隐藏编排
 
-工具描述必须准确覆盖用户可见的操作纪律，同时严禁向模型泄露专职 Reviewer、隐式会话、终止屏障（barrier）等隐藏编排机制。所有描述资源必须成对完成本地化，并在语义锚点上保持严格一致。
+描述必须准确表达可见操作纪律，不泄露专职 Reviewer、隐式会话、终止 barrier 等隐藏编排。双语资源与语义锚点遵守 provider-language。
 
-## [014] assume 是 session 独享、单 jq 更新与完整待办声明的持久工作空间
+## [014] assume 画板契约
 
-`assume` 保留既有工具名，但 clean break 为一个每个物理 session 独享、跨 Life 更替（含 suicide 与退休）保留的持久 JSON 画板：
-- 两个必填参数：`update: string` 与 `todos: array`。`update` 是标准 jq 程序，当前画板作为其输入 `.`；`todos` 是本会话的完整待办声明，按 `{content, status}` 与可选 `priority` 规范化。
-- 不提供 workspace selector、vars、revision、claim/evidence/draft/node/edge 等预定义字段或领域动作；JSON 根结构完全由调用方自行创造和迁移。
-- 每次调用严格先执行 `update`；它必须产生且只产生一个 JSON value，该 value 原子替换持久画板。零输出、多输出或 jq 失败均不得修改画板，画板、todos、阶段序号与 epoch 均不得变化。
-- `update` 成功落定后，工具返回更新后的完整画板；`todos` 与画板属于同一次提交 envelope，整份替换宿主 UI 清单。
-- 只想声明待办时，使用恒等更新 `update = "."`。因此一个 jq 更新参数加一份完整待办声明覆盖读与写的组合，而无需第二个工具、第二个 jq 参数或额外 mode bit。
-- 工具描述必须完整继承原 `assume` 的“先抽象→钉住→执行→验证；无新信息不反复改判”心理合同，并把“钉住一句工作假设”推广为“钉住可自由重构的认知结构”；同时充分解释非线性编辑、jq 先验复用、推荐用法与常见陷阱。
+`assume` 必填 `update: string` 与 `todos: array`：update 是以当前画板为 `.` 的标准 jq 程序；todos 是含 content、status 及可选 priority 的完整待办声明。只改待办时使用 `update = "."`，不增加 query 或 mode 参数。
+
+画板按物理 session 独享并跨 Life、suicide 与退休保留；更新须恰好输出一个 JSON value，失败不改变画板、todos、阶段或 epoch。成功原子提交画板与 todos，返回完整画板并整份替换宿主待办显示；隔离、幂等与耐久边界遵循 cognitive-workspace，待办呈现遵循 obligation-ledger。
+
+不提供 selector、vars、revision 或预定义领域字段/动作；JSON 根结构由调用方创建和迁移。描述须解释非线性重构、jq 用法、推荐用法与常见陷阱，并保留“先抽象→钉住→执行→验证；无新信息不反复改判”的纪律，适用于工作假设和认知结构。

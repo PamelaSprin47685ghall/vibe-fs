@@ -317,39 +317,7 @@ test('WHAT[managed-session-lifecycle-009] EXEC_009_abandoned_retire_clears_repor
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { readFileSync } = await import("node:fs");
-const { join } = await import("node:path");
-const { fileURLToPath } = await import("node:url");
-
-const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
-
-test('WHAT[managed-session-lifecycle-009] provider transform is admitted into plugin shutdown ownership', () => {
-  const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
-  const hooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
-  const interop = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
-  const policy = read('src/Wanxiangshu/OpenCode/Host/HookPolicy.fs')
-
-  assert.match(scope, /member this\.RunOwnedWork\(start: unit -> Task\) : Task/)
-  assert.match(scope, /let ownedWorkDrain = this\.StopOwnedWorkAndDrain\(\)/)
-  assert.match(hooks, /let ownedTransform[\s\S]{0,220}scope\.RunOwnedWork\(fun \(\) -> transform inObj outObj\)/)
-  assert.match(
-    hooks,
-    /let messagesTransform\s*=\s*registeredHook HookKey\.MessagesTransform \(curriedHook \(box ownedTransform\)\)/,
-  )
-  assert.match(
-    policy,
-    /\| HookKey\.MessagesTransform ->\s*\{ HostKey = "experimental\.chat\.messages\.transform"\s*DiagnosticOperation = "plugin-hook-messages-transform-failed"/,
-  )
-  assert.match(
-    interop,
-    /let registeredHook \(key: HookKey\) \(adaptedHook: obj\) : string \* obj =\s*let metadata = HookPolicy\.metadata key \|> HookPolicy\.validate\s*metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/,
-  )
-})
-}
+test.todo('WHAT[managed-session-lifecycle-009] authorized parent termination awaits every durable abandonment and held physical child cleanup before publishing parent terminal (GAP-133)')
 
 {
 const { default: assert } = await import("node:assert/strict");

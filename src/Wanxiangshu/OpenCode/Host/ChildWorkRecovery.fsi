@@ -22,8 +22,8 @@ module ChildWorkRecovery =
     /// Child work runs still active at startup, resolved to their parent handle.
     val orphanedChildRuns: projections: AgentProjectionSet -> OrphanedChildRun list
 
-    /// The durable settlement: a `Cancelled` completion on the parent handle,
-    /// which closes the child authority and answers a pending join.
+    /// ChildRunVoided closes the child authority without creating a completion;
+    /// the active handle remains reusable and owes no join delivery.
     val settlementFact: orphaned: OrphanedChildRun -> ExecutionFactCases
 
     /// Append one settlement per orphaned child run. Load Phase; no dispatch, no

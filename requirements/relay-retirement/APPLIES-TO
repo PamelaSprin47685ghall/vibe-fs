@@ -1,0 +1,8 @@
+# Repository-root relative paths; this requirement package is implicit.
+/src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.*
+/src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.*
+/src/Wanxiangshu/Mission/Relay/Facts.*
+/src/Wanxiangshu/Mission/Relay/Fold.*
+/src/Wanxiangshu/Mission/Manager/Workflow.*
+/src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.*
+/resources/provider/tool/suicide/**

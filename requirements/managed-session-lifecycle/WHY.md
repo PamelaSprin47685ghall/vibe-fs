@@ -1,36 +1,11 @@
 # managed-session-lifecycle — WHY
 
-## 不可替代的存在理由
+会话是可复用容器，一次执行、一个工作 handle 和一个逻辑参与者各有不同的结束条件。若把这些条件揉成一个“取消”，插件卸载就可能变成任务永远丢失，上一轮迟到的完成也可能终结下一轮工作。
 
-只要系统创建与托管 session，就必须有单一且权威的 lifecycle owner 负责创建、复用、停止、回收与替换。如果各业务特性自行复制 parent 映射、取消机制与恢复规则，生命周期状态机必将四分五裂。
+创建、恢复、复用与清退需要单一 owner 和持久关联。关联确认前发送首条消息，会让拦截器无法确定身份；凭名称收养孤儿会话，会把工作交给错误对象。恢复读取已有事实，不能靠旧内存替历史作决定。
 
-1. **所有权事实的单一写口**。多处并行的生命周期管理器会导致崩溃恢复与级联取消出现分歧，同一子会话在不同路径下会获得相互矛盾的终态。
-2. **终态的不可逆性与 Tombstone 语义**。`Retired` 与 `Abandoned` 是持久化的最终状态。若缺乏严格的墓碑语义，系统重启时可能错误重放已消费的完成结果，或将已终结的子会话重新当作活动人使用。
-3. **安全可证明的复用判据**。重启恢复必须基于 journal 关联（SessionId + agent + title）进行精确匹配；未关联的直接新建，匹配冲突直接安全失败（fail closed），严禁收养无关联的孤儿会话。
-4. **互斥的生命周期形态**。长期复用的 Dedicated 会话（以 ReuseScope 驱动）与即用即弃的 OneShot 会话具有截然不同的生命周期，绝不能混用回收与销毁策略。
-5. **级联取消的物理因果保证**。父会话在对外宣布终止前，必须确保所有子会话（包括 Companion Blogger 等）的物理中断已完全完成，杜绝异步竞争导致的悬挂进程。
-6. **Attempt 中断与 Logical 取消的权限分离**。内部控制收束（如循环终止、求助等）仅能请求中断当前的物理尝试（physical attempt），绝不得篡夺父会话的逻辑取消权限，亦不得擅自中断用户根会话。
-7. **Session 终止不等于 execution settlement**。可复用 `SessionId` 不是当前物理执行身份。取消或删除若按 session 粗放释放，会终结错误消息或泄漏 exact capacity；lifecycle 必须等待 `managed-chat-execution` 的 exact settlement barrier，而非复制其状态机。
-8. **容器可复用不等于 logical run 已关闭**。fresh identity 只能在 `interaction-authority` 的 durable exact prior-run closure 后安装；detach、association removal 或 idle 无法证明旧 run 已不可继续。
+Reusable 会话服务一个作用域，OneShot 服务一次工作；作用域结束和调用返回不可互换。完成结果的竞争必须有唯一胜者，消费必须留下墓碑。父会话只有等子执行和资源确实收束后，才能如实宣布自己的终止。
 
-## 核心不变量
+物理 attempt 中断或进程消失不证明逻辑任务被取消。业务上的不可逆 abandon、旧身份退役和新身份安装，都需要与所处理 run 匹配的授权证据。固定 DevOps 更要分清逻辑权威与可替换的物理会话，避免崩溃后出现两个操作员或重复命令。会话可复用也不表示上次工作启动的终端进程可以继续存活；及时收束才能让下一次工作有明确的资源边界。
 
-- 身份替换后旧活跃会话必须按既有中断/退休机制显式收束，新任务仅接纳合法新身份（Engineer/DevOps），历史事件保持原样且旧身份不静默升权。
-- 同一道路拥有唯一的固定 DevOps 逻辑执行权威；物理会话崩溃恢复后保持单一权威，真实进程随会话生命周期彻底收束，恢复严格沿用原绑定模型/Persona。
-- **DevOps 工作返回时 PTY 彻底收束**：固定 DevOps 会话可复用，但其每次工作返回时必须彻底收束其本次持有的全部 PTY 进程并清理记账，严禁将未决终端进程残留至下一次 resume；该收束独立于道路关闭与 Manager 退休。
-
-- Handle 生命周期遵循严格的四态模型：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
-- Completion cell 实行单赋值竞争，首个到达的完成事实具有唯一权威。
-- 内部尝试中断必须显式闭合后继处理者（successor）或转化为明确的 Failed 终态，防止孤儿尝试挂死父级 join。
-- 系统关闭与资源清理必须等待全部已准入的 durable 操作彻底排空。
-
-## 违反边界的后果（RED）
-
-- 同一 `(ReuseScopeId, role)` 产生两个并行的 live Dedicated 会话。
-- 重启后同一 handle 绑定到错误的子会话，或已 Retired 的完成结果被重复消费。
-- 父会话宣布中断后，后台子会话仍在隐蔽运行并产生副作用。
-- 内部错误将局部 attempt 中断放大为整棵会话树的逻辑取消，导致根会话意外退出。
-- 插件释放持久化存储时仍有未排空的异步写入，引发写入损坏与悬挂异常。
-- session deletion、turn observer与strength cut若直接执行Host fatal effect，可能绕开exact execution/child settlement并让同一lifecycle incident被多个callback重复kill。
-- 身份演进时未显式收束旧活跃会话，导致历史 Inspector/Coder 产生未受权写入或静默升权。
-- DevOps 崩溃恢复产生双重物理执行权威，或在 resume/恢复过程中篡改模型绑定与泄漏孤儿子进程。
+本包拥有会话生命周期，依赖 managed-chat-execution 的消息级结算、interaction-authority 的 durable run closure、participant-identity 的身份边界和 execution-model-routing 的资源归属。失败后果由 execution-failure-policy 裁决；父工作记录、诊断和进程 detach 都无权替它们创造终态。

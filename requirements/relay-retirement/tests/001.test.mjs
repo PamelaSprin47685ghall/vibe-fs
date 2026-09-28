@@ -1,18 +1,3 @@
-import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as retirement from '../../../dist/Mission/Relay/Retirement/Surface.js'
 
-
-
-test('WHAT[relay-retirement-001] suicide retires without any quality progress or test gate', () => {
-  assert.deepEqual(
-    retirement.decide([], {
-      assessed: false,
-      openObligations: 3,
-      testsPassing: false,
-      dirty: false,
-      unmerged: false,
-    }),
-    { decision: 'Retire' },
-  )
-})
+test('WHAT[relay-retirement-001] ordinary assistant stop does not retire Manager and exceptional terminals are not forged suicide', {todo: 'GAP-197: requires actual Manager terminal workflow; removed test merely returned Retire for an empty array'})

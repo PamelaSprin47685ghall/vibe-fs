@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
+
+test('WHAT[obligation-ledger-027] canonical wire preserves mixed planning resolutions without status fields', () => {
+  const obligations = [
+    {name: 'now', horizon: 'near', work: 'Close the directly actionable unit.'},
+    {name: 'next', horizon: 'mid', work: 'Preserve the next meaningful outcome.'},
+    {name: 'later', horizon: 'far', work: 'Cover remaining work without premature steps.'},
+  ]
+  assert.deepEqual(JSON.parse(todo.canonicalObligationListWire(obligations)), obligations)
+})
+
+test('WHAT[obligation-ledger-027] actual planning covers all debt and progressively refines the execution frontier', {todo: 'GAP-190: mixed-horizon encoding cannot prove semantic completeness or planning quality'})

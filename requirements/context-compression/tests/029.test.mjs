@@ -59,7 +59,7 @@ test('WHAT[context-compression-029] coverage behind the window still bounds the 
   assert.equal(result.cutoff, 3)
 })
 
-test('WHAT[context-compression-029] failure recovery may exceed the window', () => {
+test('WHAT[context-compression-029] selection without a normal window remains bounded by proven coverage', () => {
   // No window was spoken for this attempt: after a real WorkMain failure the probe is
   // bounded by proven coverage alone, which is the clause's explicit exception.
   const result = select({
@@ -71,6 +71,8 @@ test('WHAT[context-compression-029] failure recovery may exceed the window', () 
   assert.equal(result.ok, true, result.ok ? '' : result.message)
   assert.equal(result.cutoff, 5)
 })
+
+test.todo('WHAT[context-compression-029] only an actual failed WorkMain may select the emergency path and record its Probe cold boundary; a null phase boundary input does not prove this trigger')
 
 test('WHAT[context-compression-029] material the request may not cover is refused', () => {
   // The request is answering turn 4; material that claims turns up to 5 would replace
@@ -142,4 +144,3 @@ test('WHAT[context-compression-029] a claim that does not match fails closed', (
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CutoffProofFailed')
 })
-

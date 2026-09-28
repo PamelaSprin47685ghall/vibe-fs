@@ -1,5 +1,31 @@
 import test from 'node:test'
 
+test('WHAT[repository-programming-007] an acquired view remains unchanged after rewrite and commit', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { mkdtempSync, readFileSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { parse } = await import('smol-toml')
+  const { run, caseName, render } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-immutable-view-'))
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'original')
+    const outcome = await run(dir, 'Engineer', 'en', `class Js extends JsProgram {
+      async run() {
+        const view = await this.file('a.txt');
+        const before = view.text();
+        this.rewrite('a.txt', 'mutated');
+        return { before, after: view.text() };
+      }
+    }`, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(outcome), 'Succeeded')
+    assert.deepEqual(parse(render(outcome)).data, { before: 'original', after: 'original' })
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'mutated')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");

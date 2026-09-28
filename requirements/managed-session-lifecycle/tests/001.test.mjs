@@ -1,40 +1,18 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as attachment from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const AttachmentSurface = await import("../../../dist/Execution/Session/Attachment/AttachmentSurface.js");
-
-
-test('WHAT[managed-session-lifecycle-001] EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
-  const observed = await AttachmentSurface.scenario('owner', 'Engineer', 'engineer', 'engineer', true)
-  assert.equal(observed.created, 1)
-  assert.equal(observed.firstChild, 'child-1')
-  assert.equal(observed.secondChild, 'child-1')
-  assert.equal(observed.firstAgent, 'engineer')
+test('WHAT[managed-session-lifecycle-001] one attachment owner binds current Engineer requests once', async () => {
+  const observed = await attachment.scenario('owner', 'Engineer', 'engineer', 'engineer', true)
+  assert.deepEqual(observed, {
+    owner: 'owner', role: 'engineer', created: 1,
+    firstChild: 'child-1', secondChild: 'child-1',
+    firstAgent: 'engineer', secondAgent: 'engineer',
+  })
 })
-test('WHAT[managed-session-lifecycle-001] EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths', async () => {
-  const observed = await AttachmentSurface.scenario('owner', 'Coder', 'coder', 'coder', true)
-  assert.equal(observed.created, 1)
-  assert.equal(observed.firstChild, observed.secondChild)
+
+test('WHAT[managed-session-lifecycle-001] unknown role input cannot silently exercise another role', async () => {
+  await assert.rejects(attachment.scenario('owner', 'unknown', 'engineer', 'engineer', true), /Unknown attachment role/)
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const AttachmentSurface = await import("../../../dist/Execution/Session/Attachment/AttachmentSurface.js");
-const RecoverySurface = await import("../../../dist/Execution/Session/Recovery/Surface.js");
-const AssociationSurface = await import("../../../dist/Execution/Session/AssociationSurface.js");
-const SatelliteSurface = await import("../../../dist/OpenCode/Host/SatelliteSurface.js");
-const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
-
-
-test('WHAT[managed-session-lifecycle-001] session_recovery_contract_attached_runtime_single_owner_pure_evidence', async () => {
-  const result = await AttachmentSurface.scenario('owner_1', 'Engineer', 'engineer', 'engineer', true)
-  assert.equal(result.created, 1)
-  assert.equal(result.firstChild, 'child-1')
-  assert.equal(result.secondChild, 'child-1')
-  assert.equal(result.firstAgent, 'engineer')
-})
-}
+test.todo('WHAT[managed-session-lifecycle-001] all AttachmentKinds use the same creation, recovery and cleanup owner through public Host paths (GAP-133)')

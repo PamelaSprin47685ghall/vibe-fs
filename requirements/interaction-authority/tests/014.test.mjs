@@ -16,3 +16,5 @@ test('WHAT[interaction-authority-014] EXEC_016_join_guard_instruction_requires_j
   assert.match(instructions, /Receive arrived consequences before claiming completion/)
   assert.match(instructions, /Use join/)
 })
+
+test.todo('WHAT[interaction-authority-014] GAP-122 actual unresolved background work admits JoinGuard and rejects a new root through the public path')

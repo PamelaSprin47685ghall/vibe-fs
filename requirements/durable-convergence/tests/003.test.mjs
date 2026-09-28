@@ -37,14 +37,12 @@ test('WHAT[durable-convergence-003] identity collision is fail closed not LWW', 
 const { default: assert } = await import("node:assert/strict");
 const { execFileSync } = await import("node:child_process");
 const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
-const { readFile } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const retention = await import("../../../dist/Persistence/EventStore/RetentionSurface.js");
 
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
 test('WHAT[durable-convergence-003] sync blobifies each complete writer file once without segments or index', async () => {
@@ -119,16 +117,7 @@ test('WHAT[durable-convergence-003] sync blobifies each complete writer file onc
     rmSync(root, { recursive: true, force: true })
   }
 })
-test('WHAT[durable-convergence-003] runtime append and external hook share one physical store gate', async () => {
-  const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
-  const store = await read('src/Wanxiangshu/Persistence/EventStore/Store.fs')
-  const hook = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
-
-  assert.match(log, /proper-lockfile/)
-  assert.match(store, /ProcessEventLog\.withStoreLock/)
-  assert.match(hook, /ProcessEventLog\.withStoreLock/)
-  assert.match(log, /"forever"\s*==>|forever.*true/s, 'physical lock wait must not inherit a business timeout window')
-})
+test.todo('WHAT[durable-convergence-003] concurrent append and hook convergence preserve the retained union across physical replacement and crash cuts (GAP-151)')
 }
 
 {

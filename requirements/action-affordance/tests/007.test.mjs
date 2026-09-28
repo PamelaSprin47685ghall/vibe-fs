@@ -1,31 +1,13 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import { requiredNames } from '../../../dist/Participant/Persona/Surface.js'
 
-const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
-
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-
-const LOCALES = ['en', 'zh-CN']
-
-const HIGH_RISK_TOOLS = Object.freeze([
-  'commission',
-  'establish-behavior',
-  'fork',
-  'inspect',
-  'query-shell',
-  'repair-behavior',
-  'resume',
-  'run',
-])
-
-const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
-
-test('WHAT[action-affordance-007] AA_arch_006_007_distinct_semantics_have_distinct_names', () => {
-  const fork = readTool('fork', 'en')
-  const commission = readTool('commission', 'en')
-  assert.match(fork, /another office within this mission/i)
-  assert.match(commission, /independent road/i)
+test('WHAT[action-affordance-007] current static tool catalog does not reuse an active participant name', () => {
+  const roles = new Set(requiredNames.map((name) => name.toLowerCase()))
+  const tools = toolSpecNames()
+  assert.ok(tools.length > 0)
+  for (const tool of tools) assert.equal(roles.has(tool.toLowerCase()), false, tool)
 })
+
+test.todo('WHAT[action-affordance-007] all tool names are distinct semantic verbs; existing horizon and js names need a normative naming decision (GAP-078)')

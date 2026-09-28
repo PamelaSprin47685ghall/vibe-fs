@@ -1,0 +1,8 @@
+# Repository-root relative paths; this requirement package is implicit.
+/src/Wanxiangshu/Mission/Relay/Contract.*
+/src/Wanxiangshu/Mission/Relay/Facts.*
+/src/Wanxiangshu/Mission/Relay/Fold.*
+/src/Wanxiangshu/Mission/Relay/Surface.*
+/src/Wanxiangshu/Mission/Manager/**
+/src/Wanxiangshu/Execution/Delegation/SyncDelegate/**
+/resources/provider/runtime/manager-assess/**

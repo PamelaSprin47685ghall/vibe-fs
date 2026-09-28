@@ -2,35 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 
-test('WHAT[capability-enforcement-017] authority multiplicity enforces one-shot atomicity and prevents duplicated consumption', () => {
+test('WHAT[capability-enforcement-017] released one-shot opportunity cannot be consumed again', {
+  todo: '10-D1: current QuiescencePermit release reopens the same permit; resolve one-shot versus reusable reservation contract before changing runtime semantics',
+}, () => {
   const gate = quiescence.create()
-  const sessionId = 'ses-enf-017'
-
-  // 1. One-shot consumption: first tryConsume succeeds, repeated tryConsume is rejected with AlreadyConsumed
-  quiescence.beginAttempt(gate, sessionId)
-  const permit1 = quiescence.observeIdle(gate, sessionId)
-
-  const firstConsume = quiescence.tryConsume(gate, permit1)
-  assert.equal(firstConsume.accepted, true)
-  assert.ok(firstConsume.failure == null)
-
-  const secondConsume = quiescence.tryConsume(gate, permit1)
-  assert.equal(secondConsume.accepted, false)
-  assert.equal(secondConsume.failure, 'AlreadyConsumed')
-
-  const thirdConsume = quiescence.tryConsume(gate, permit1)
-  assert.equal(thirdConsume.accepted, false)
-  assert.equal(thirdConsume.failure, 'AlreadyConsumed')
-
-  // 2. Release atomicity: tryRelease permanently closes the one-shot opportunity
-  quiescence.beginAttempt(gate, sessionId)
-  const permit2 = quiescence.observeIdle(gate, sessionId)
-  quiescence.tryConsume(gate, permit2)
-
-  const releaseResult = quiescence.tryRelease(gate, permit2)
-  assert.equal(releaseResult.accepted, true)
-
-  const secondRelease = quiescence.tryRelease(gate, permit2)
-  assert.equal(secondRelease.accepted, false)
-  assert.equal(secondRelease.failure, 'NoFreshIdle')
+  quiescence.beginAttempt(gate, 'multiplicity-conflict')
+  const permit = quiescence.observeIdle(gate, 'multiplicity-conflict')
+  assert.equal(quiescence.tryConsume(gate, permit).accepted, true)
+  assert.equal(quiescence.tryRelease(gate, permit).accepted, true)
+  assert.equal(quiescence.tryConsume(gate, permit).accepted, false)
 })

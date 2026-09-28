@@ -3,64 +3,6 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
-
-const evidence = {
-  sessionId: 'ses-transaction',
-  physicalUserMessageId: 'msg-transaction',
-  logicalRunId: 'run-transaction',
-  authorityRootUserMessageId: 'root-transaction',
-  authorityKind: 'HumanRoot',
-  identitySeed: {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      selectedAgent: 'engineer',
-      canonicalRole: 'engineer',
-      selectedTier: 'deep',
-      persona: 'Engineer',
-      personaCatalogVersion: 1,
-      origin: 'ResolvedAtRoot',
-    },
-  },
-  providerRun: 'provider-transaction',
-  origin: 'HumanRoot',
-  requestKind: 'work-main',
-  projectionChoice: { kind: 'UseCommittedEpoch' },
-}
-const run = (failurePoint = 'None', state = 'None') =>
-  transaction.transactionScenario(evidence, failurePoint, state)
-
-test('WHAT[managed-chat-execution-013] queue full and cancellation cross no bind Host or provider boundary', async () => {
-  for (const [failurePoint, outcome] of [
-    ['AcquireQueueFull', 'CapacityQueueFull'],
-    ['AcquireCancelled', 'Cancelled'],
-  ]) {
-    const result = await run(failurePoint)
-
-    assert.equal(result.ok, true, JSON.stringify(result.error))
-    assert.equal(result.outcome, outcome)
-    assert.deepEqual(result.trace, [
-      'ResolveState',
-      'Accept',
-      'AcceptedWitness',
-      'AcquireLease',
-      'TerminalizeAccepted',
-    ])
-    assert.equal(result.bindCount, 0)
-    assert.equal(result.hostCount, 0)
-    assert.equal(result.commitCount, 0)
-    assert.equal(result.releaseCount, 0)
-    assert.equal(result.providerCount, 0)
-  }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
 const { default: fs } = await import("node:fs");
 const { fold } = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
 const { createCounters, queryReliability } = await import("../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js");

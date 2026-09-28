@@ -17,7 +17,7 @@
 | GAP-005 | `requirement-system` | requirement-system-015（直接闭环） | 单次提交原子闭环与 AGENTS.md 豁免约束 | OPEN | 原 `015.test.mjs` 只锁定「普通小型修复…不要求创建 Change」字句，本批删除；未证明实际提交原子闭环 | 保留人工审阅，不能用句子删改即红冒充行为 oracle | requirement-system |
 | GAP-006 | `verification-system` | verification-system-003（「禁止跨级」物理契约论证） | 唯一 Long Stroke 入口未声明不可模拟 physical contract | PARTIAL | 上游曾以 `003.test.mjs` 静态锁定、`014.test.mjs` PHYSICAL CONTRACTS 块和禁止 repeat-until-pass 记闭合；本批保留真实门禁与监督证据，静态声明不证明全部物理合同 | 按 GAP-054—057 补真实范围和反例，不沿用历史完整闭合结论 | verification-system |
 | GAP-007 | `host-boundary` | host-boundary-008（HOST-010 因果读：bindableRun id ≡ ToolContext.messageID encoding） | unit 无 oracle | CLOSED | `requirements/host-boundary/tests/008.test.mjs`（恰好一个 bindableRun.id ≡ decodeContext.providerRunId；0/≥2 无合法 run id） | 已落地独立 unit oracle；共时 Host 穿线属 Long Stroke 物理契约（GAP-006 入口已声明） | host-boundary |
-| GAP-008 | `host-boundary` | host-boundary-019（Magic Todo membrane canaries A..R） | 未落地实现（release gate 清单） | CLOSED | `requirements/host-boundary/tests/019.test.mjs`（A/B/C/E/F/G/H/J/K/L/M/N/O/P/Q/R 生产膜 canaries 与 Host SDK H 子合同；全部 WHAT-tagged） | 已落地生产 semantic surface canaries；F 保留真实 Host physical integration boundary | host-boundary + obligation-ledger |
+| GAP-008 | `host-boundary` | host-boundary-019 | 全部 Host 物理能力缺完整现场证据 | PARTIAL | 旧 MagicTodo 已被上游删除；019 现调用真实 transform 的受控端口，仅证明分支，012 保留快照定位案例 | 新 UI 投影归 obligation-ledger；补当前 Host 全能力 canary，不沿用旧 A..R 闭合结论 | host-boundary |
 | GAP-009 | `prefix-stability` | HOST-013 dynamic elapsed sampling（cutover 丢失；prefix-stability-011 仅保留 historical replay half） | 已恢复 time-capability-007：首次 prompt durable bind-once `SessionStartedAt`；新 occurrence fresh elapsed；历史 `MarkerText` 不重算 | CLOSED | `requirements/time-capability/tests/007.test.mjs` + production `SessionStartedAtBound` / `PairProgrammingCalibration.composeWithElapsed`；相关静态 gates 绿 | closing commit: `dd0c9e4d8`；full build green（Fable 5.13.0，647 source files） | prefix-stability + time-capability + guidance-delivery |
 | GAP-010 | `intra-participant-parallelism` | intra-participant-parallelism-001..013：同一 participant 多个 coequal presents，在 identity/authority 不分裂、work 不丢不重、parent 单次完成下确定性 reunion；Fission 仅允许 physical subsession origin | 上游已实现 subsession-only origin gate、fresh sibling replacement（`parent(lane)=parent(old caller)`）、canonical LWR+exact input 冷启动、all-or-none admission、old-present physical-only silent interrupt、pre-fission completion 单 payload 广播、post-fission durable lane affinity、keyed LWR convergence；takeover 以 durable `PromptKey` claim 解除 terminal-observer 对未来 physical id 的阻塞，并由 AcceptedDispatch 精确回填 parent；本批不把这些局部事实视为全链证明 | PARTIAL | `requirements/intra-participant-parallelism/WHAT.md` + `requirements/intra-participant-parallelism/tests/` + `Execution/Fission/Admission.fs` / `Execution/Fission/Projection.fs` / `Execution/Fission/Runtime.fs` / `Execution/Fission/OpenCode/Host.fs`；旧 focused suite 完整闭合结论已收窄 | 全程身份、恢复和真实终结证据见 GAP-158/159 | intra-participant-parallelism |
 | GAP-011 | `delegation` | delegation-021（fork attachment） | Byname→canonical `LifecycleWorkRecord(includeOpening=true)` 背景 attachment 已进入正式 WHAT.md（唯一 normative 权威，不再有 HOW 层）、frozen oracle 与 production | CLOSED | `requirements/delegation/tests/021.test.mjs` | closing commit: `dd0c9e4d8`；language parity / horizon gates 绿；full build green（Fable 5.13.0，647 source files） | delegation + work-record |
@@ -111,7 +111,7 @@
 | GAP-101 | semantic-trace-005/007—012 | PARTIAL | 已撤下自排序 lane/自增游标模型，保留 capture、exact range 与磁盘重开；真实 Fission/Resume、终结前沿、多 invocation 消费及封装编译仍缺证。 |
 | GAP-102 | semantic-trace-010；SyncDelegate 首次 Opening | PARTIAL | 旧捕获只看“已有”而接受冲突；真实回归与纯裁决已迁入。SyncDelegate 仅初次 assignment 捕获 Opening，续接保留原文；待新基线回归确认。 |
 | GAP-103 | dispatch 物理接受生命周期 | PARTIAL | 旧成功路径未取消 Promise.race 的 timeout，断言后进程滞留；清理与回归属本批必要依赖。既有 ambient timer 不因修复就满足完整时间能力合同。 |
-| GAP-105 | effect-accounting-004 的跨包重放边界 | PARTIAL | 本批仅接入对旧判断的纠正：第二次 receipt 被纯 fold 拒绝不等于实际 commit 不幂等；实际入口可返回 KnownCommitted。确认后重新 materialize 是否可达、完整 payload 冲突仍待证。不迁入暂缓 context-compression 的旧施工或待决结论。 |
+| GAP-105 | context-compression-004、effect-accounting-004 | PARTIAL | 第二次 receipt 被纯 fold 拒绝不等于实际 commit 不幂等；实际入口可返回 KnownCommitted。完整 payload 冲突仍待证。压缩正文“非纯 XML”与当前拒绝任意工具样式标签、允许其它 XML 的实现边界仍待决定。 |
 | GAP-106 | prefix-stability | PARTIAL | 保留真实 candidate 历史拒绝/tail 正例、stable identity 与局部渲染；重建 provider wire、旧字符串或成员缺失不证明真实 seal/重启/冷边界全链。 |
 | GAP-107 | prefix-stability-002/008/013 | PARTIAL | 身份变化不自动产生第四种合法 epoch 来源；low-trust 要在完整请求呈现中成立。保留 NUL+BOM、首轮例外和 occurrence 必要一致性，不用关键词制造隔离证明。 |
 | GAP-108 | prefix-stability-014 | PARTIAL | 将实际 guidance 注入输出送到 capture，重开后仍含后缀的反例保留；尚未贯通 Host 原始输入回流，不能扩大为所有正常请求污染，也不能按文本关键字删除业务正文。 |
@@ -132,7 +132,7 @@
 | GAP-129 | execution-model-routing-019 | PARTIAL | DevOps 现行实现可随策略覆盖旧绑定，与合同永不更换冲突；真实失败TODO保留，需要明确固定作用域与恢复来源。 |
 | GAP-130 | execution-model-routing-004/005 | PARTIAL | optional reservation 可在Host承接前占容量；不能因optional名称默认豁免零前置占用。需删除提前占用或正式裁决受限reservation例外。 |
 | GAP-131 | execution-model-routing-011 | PARTIAL | 合同target解析先于durable accept，实际接受后进入模型调度；null scheduler排队与前置选择如何共存待决，不能为null虚构已解析target。 |
-| GAP-133 | execution-failure-policy 的 lifecycle deletion 交叉证据 | OPEN | 本批仅登记31所需真实session deletion/fatal结算链缺证；暂缓 managed-session-lifecycle 的旧施工与整体完成结论不迁入。应从正式删除入口观察同一执行的结算及外部后果。 |
+| GAP-133 | managed-session-lifecycle | PARTIAL | fold、attachment、journal、受控终止顺序有局部用例；完整替换、取消、跨scope、删除/fatal单次结算、真实DevOps恢复和OS PTY排空仍待证。025受控PTY端口不等于TERM→exit→KILL。 |
 | GAP-136 | dispatch-protocol | PARTIAL | 保留真实claim-before-Host、receipt与journal重开；完整生产者、模糊接受、OS crash、handoff、历史激活和invariant fatal仍缺证。端口返回值不等于SDK/HTTP已接受。 |
 | GAP-137 | dispatch-protocol-007/009 | PARTIAL | 确定Retryable/Fatal未发送可Abandon与晚到Fatal保Pending并熔断的文字边界冲突；需区分外部拒绝和内部typed invariant，当前不暗改任一合同。 |
 | GAP-138 | dispatch-protocol；chat admission | PARTIAL | 非法PromptKey/Agent被当Missing而获得权限的真实反例及封闭错误类型修复已迁入；待新基线验证合法Missing和历史读取兼容。 |
@@ -145,7 +145,7 @@
 | GAP-145 | degeneration-guard | PARTIAL | 保留真实算法、仓库派生和受控sensor；assistant-only、run切换、在途清理、物理重启、全部豁免、continuation权限与唯一恢复仍缺全链证据。 |
 | GAP-146 | degeneration-guard-007 | PARTIAL | interrupt拒绝后同run可再次中断；interrupt仍pending时可启动continuation。真实失败TODO保留，须沿actual任务先后和清理修复，不放宽至多一次合同。 |
 | GAP-147 | degeneration-guard-003/004/005 | PARTIAL | runtime逐delta tokenize与仓库连续流包络可能因分块产生不同度量；需明确传输分块是否影响语义及有界缓冲，有限样本分数不同不等于已证明误杀。 |
-| GAP-153 | execution-failure-policy 的 delegation fatal 交叉证据 | OPEN | 本批仅登记31所需实际委托入口settlement→mandatory fuse缺证，不迁入暂缓delegation整包施工。55转入42的四个真实VerdictMailbox用例仅证明领取顺序和中断，不证明fatal链。 |
+| GAP-153 | delegation | PARTIAL | 实际fork/resume、批次、接收、队列和交接用例保留；Sphinx标准Engineer的完整权限链、全局注册、绑定恢复、重复terminal及fatal settlement→mandatory fuse仍待证。55转入42的四个Mailbox用例仅证明领取顺序和中断；旧只读Sphinx政策已退役。 |
 | GAP-155 | concern-routing | PARTIAL | 真实插件投递、冻结和重放与纯投影已有证据；所有角色、真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
 | GAP-156 | concern-routing-003 | PARTIAL | 同occurrence不同sender/address/message原被当成功重放；已迁入完整材料一致性裁决、双语拒绝资源和真实入口反例，待新构建验证。 |
 | GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留；手工retire纯测试不证明正式终结驱动durable MailboxRetired，需接通完成/放弃/replacement及恢复。 |
@@ -177,3 +177,61 @@
 - GAP-046：PARTIAL。实际fetch/存储/显式lifecycle不等于终结自动归档和单次捕获管道已闭合，见GAP-160/161；旧015“端到端”称谓不再作为证明。
 
 GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言已撤除。GAP-051 仍 PARTIAL，但“缺014.test.mjs”已过时：当前014已运行实际inventory checker的正反输入；剩余是完整fatal入口、真实执行和单次结算证明，见GAP-120/121。以上校正只针对本批模块；暂缓包的原上游记录不在此重判。
+
+## 2026-09-28：其余20模块迁移缺口
+
+本节接续旧施工稿 `1d7098a`，按上游 `1450f49d` 重新核对；不是把旧运行结果当成本次验收。对应文件与逐项迁移见[总记录](../proposals/20模块上游适配记录-2026-09-28.md)。旧缺口编号保留；`RETIRED` 表示其合同已被正式取代，不表示原实现通过。
+
+| GAP | 范围 | 状态 | 当前边界与后续工作 |
+|---|---|---|---|
+| GAP-063 | host-boundary-019/021/026/027/029 | PARTIAL | 真实transform受控端口、截断和子进程退出用例保留。026/027已去除具体模块清单，Host诊断独立编译修复缺失依赖后通过；全能力Host、正常路径退出及架构语义仍待证。 |
+| GAP-064 | host-boundary-013 | OPEN | 旧基线曾断言完成但进程不退出；本次受构建阻断尚未复验，不增加超时或强制退出。 |
+| GAP-069 | managed-session-lifecycle-004/009/014 | OPEN | 旧fixture文件完成问题待本次产物复验；不能用旧断言pass关闭资源生命周期问题。 |
+| GAP-070 | provider-language-002/003/010/012 | PARTIAL | 新来源优先级已按上游对齐；跨进程绑定、锚点表示及完整双语语义仍缺证。 |
+| GAP-071 | provider-language-005/006/008/009/013 | PARTIAL | 实际提示投影、资源反例保留；同一真实请求的system/tool/consequence语言交付和Class A所有权仍待证。 |
+| GAP-072 | office-capability-003/005/011 | PARTIAL | 上游已区分稳定权能与当前准入，旧歧义不再待决；跨投影语义同源及完整执行证明仍缺。 |
+| GAP-073 | office-capability | PARTIAL | 权限函数和有限样例判别器不证明Agent实际职责履行。标准Engineer的Sphinx新权限、Manager只读取证窗口、接力与在途PTY需真实调用链。 |
+| GAP-074 | capability-enforcement-001/013/014/017/018 | PARTIAL | 一次性permit与消费→释放→再消费仍有合同分岔；manifest和全链authority证明未闭合。 |
+| GAP-075 | capability-enforcement | PARTIAL | 配置、门禁、沙箱读写有局部证据；025拒绝后零物理读、评审时仍在途的调用、026零durable append及跨进程能力隔离仍待证。 |
+| GAP-076 | cognitive-environment | PARTIAL | 资源组装不证明认知纪律、职责和完整双语语义；关键词伪证明已撤，有限材料审阅及真实行为仍须补齐。 |
+| GAP-077 | cognitive-environment-015 | OPEN | Blogger临时提示仍内联，白名单、重复注入、历史不变和真实Host路径缺证；不以源码词形计入通过。 |
+| GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |
+| GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
+| GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
+| GAP-104 | context-compression | PARTIAL | 保留真实mailbox、flight、生产解码及XWire局部窗口证明；撤下布尔透传、手算floor、旧续传协议。Opening恢复、持续追平、当前载体、紧急Probe前置失败及端到端退休仍待证。 |
+| GAP-122 | interaction-authority | PARTIAL | 身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
+| GAP-123 | interaction-authority、managed-session-lifecycle | OPEN | 五类durable authority closure尚缺完整生产执行与归还证据；不得用描述字段代替已发生的关闭。 |
+| GAP-124 | interaction-authority历史身份 | PARTIAL | 历史Inspector材料与活跃准入必须分别验证；不靠放宽当前身份恢复旧测试。 |
+| GAP-125 | managed-chat-execution continuation | OPEN | 发送前对目标active run的真实核对仍缺完整证据；持久事实存在不等于当前可发送。 |
+| GAP-126 | managed-chat-execution | PARTIAL | 保留真实journal/准入；Host请求链、物理承接和失败后果仍缺。显式/continue已退役，恢复归加载阶段。 |
+| GAP-127 | managed-chat-execution恢复 | PARTIAL | 新接缝驱动实际admission序列，撤去只传restart标签的证明；受控调用仍不是OS进程死亡与重开。 |
+| GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | handle重放可能复活Completed/Retired；一次工作墓碑与固定道路执行者延续的身份边界仍待裁决，保留反例。 |
+| GAP-134 | managed-session-lifecycle测试接缝 | PARTIAL | 首批关联源码已迁入真实端口观察；实际生命周期用例待新产物执行，自写时间整数不算Temporal。 |
+| GAP-135 | managed-session-lifecycle终止 | PARTIAL | Host abort明确拒绝的传播需本次产物复验；不能把端口调用完成当成退出成功。 |
+| GAP-148 | crash-reconciliation测试资源 | PARTIAL | 旧接缝主动结束自身请求的修正保留；本基线仍需验证文件完成，不扩大业务超时。 |
+| GAP-149 | crash-reconciliation | PARTIAL | 新codec→fold→resolver用例不构成进程重启。完整load顺序、未知effect、physical receipt、PTY不重放及所有崩溃切点仍待证。 |
+| GAP-150 | crash-reconciliation-019 | OPEN | 独立effect proof registry的权威与维护关系仍需裁决；保留四阶段、歧义与物理证明要求，不以新增平行清单强行闭合。 |
+| GAP-151 | durable-convergence | PARTIAL | 真实Git、双remote配置保留与幂等用例存在；跨机器Current、受控CAS竞争、崩溃原子替换和增量成本仍待证。 |
+| GAP-152 | durable-convergence-011 | PARTIAL | 过期parent与从未存在的parent在当前窗口查询中不可区分；需决定开放边界或提供过期证据，不能由测试暗定。 |
+| GAP-154 | delegation-007/024 | PARTIAL | 活跃旧角色在创建child前拒绝的回归保留；本基线尚未重新编译执行，不将历史通过误报为当前通过。 |
+| GAP-170 | epistemic-reasoning旧内核 | RETIRED | 旧内核已由sphinx-v2取代，旧测试归档保留hash；新运行链见GAP-219。 |
+| GAP-171 | 旧Sphinx兼容协议 | RETIRED | 不恢复旧原生工具内核。新独立MCP入口与OpenCode不注入MCP的合同可以共存。 |
+| GAP-172 | 旧Sphinx submit准入 | RETIRED | 旧接口不再是现行所有者；新入口准入必须在v2真实runtime证明。 |
+| GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
+| GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
+| GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条只管理UI单向投影。真实admission/序列化用例保留，旧语义账本测试归档；实际UI送达见GAP-220。 |
+| GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
+| GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
+| GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
+| GAP-194 | relay-assessment精确重放 | PARTIAL | 精确相同评审重放与新评审冲突须区分，不能只改标题或调用两次即认幂等。 |
+| GAP-195 | relay-context-projection | PARTIAL | 新接缝调用真实NarrativeTransform；旧projectMessages透传API保留兼容但不计证据。完整历史、真实物理发送和stale中断尚需执行。 |
+| GAP-196 | 旧ProjectionCut删owner请求 | RETIRED | 上游改为完整历史，不再要求旧裁剪；新实现保全历史的真实证据仍归GAP-195。 |
+| GAP-197 | relay-retirement | PARTIAL | 真实工具scope与受控资源收束用例保留；跨进程终止、递归live资源与完整退休不等于纯分类结果。 |
+| GAP-216 | 全局构建 | OPEN | 上游plugin-composition仍引用已删除Vault及StrengthDelegate等；当前不能生成全局新鲜产物。部分认知/Relay独立闭包另缺CanvasCodec、AssumeFactCases、AgentFact等依赖，已实际编译确认失败。 |
+| GAP-217 | host-boundary-032 | PARTIAL | 现在精确断言值、对象身份、原键序和真实Host终态；现源码删除contract后尾部defineProperty，静态分析预示中间/首位键序反例，尚未执行。异常路径TODO保留，canary不再默认成功。 |
+| GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 上游load结算忽略append Error，TargetAgent空值又回退Byname；新接缝不补造成功事实。需在真实加载入口保留失败并验证合法历史材料边界。 |
+| GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。 |
+| GAP-220 | obligation-ledger-001/002/006 | PARTIAL | TodoSink序列化有真实接缝，但当前找不到生产调用；pending重放与desired/applied对账、同次提交实际UI交付尚无证据。 |
+| GAP-221 | cognitive-workspace、action-affordance-014 | PARTIAL | Assume返回经过LlmFacing结构化渲染，null会省略；对象正例不能证明全部JSON值保真。保留null、混合数组、特殊键和UI同次提交缺口，不私定新格式。 |
+| GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |

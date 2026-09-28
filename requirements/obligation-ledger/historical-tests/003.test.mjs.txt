@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
+
+test('WHAT[obligation-ledger-003] compatibility status is derived without mutating the canonical account', () => {
+  const obligations = [
+    { name: 'implement', horizon: 'near', work: 'Deliver the requested behavior.' },
+    { name: 'verify', horizon: 'far', work: 'Establish evidence.' },
+  ]
+  const wire = todo.canonicalObligationListWire(obligations)
+  const rows = host.projectCompatibilityRows('verify', obligations)
+  assert.deepEqual(rows.map(row => row.status), ['pending', 'in_progress'])
+  rows[0].status = 'completed'
+  rows[0].content = 'Host-only edit'
+  assert.equal(todo.canonicalObligationListWire(obligations), wire)
+  assert.deepEqual(host.projectCompatibilityRows('implement', obligations).map(row => row.status), ['in_progress', 'pending'])
+})

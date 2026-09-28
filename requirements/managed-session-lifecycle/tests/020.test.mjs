@@ -10,7 +10,7 @@ const scenario = fileURLToPath(
   new URL('../../participant-identity/tests/support/session-reuse-plugin-scenario.mjs', import.meta.url),
 )
 
-test('WHAT[managed-session-lifecycle-020] fresh identity waits for exact durable prior-run closure on the public plugin canary', () => {
+test('WHAT[managed-session-lifecycle-020] public plugin rejects an active identity conflict and retains the new identity after Manager life completion and journal reopen', () => {
   const child = spawnSync(process.execPath, [scenario], {
     cwd: process.cwd(),
     encoding: 'utf8',
@@ -56,8 +56,8 @@ const ownerSession = 'ses-manager-owner'
 const ownerPhysical = 'msg-manager-root'
 const propertyOptions = { seed: 0x53554241, numRuns: 200 }
 const subagentAgents = [
-  'inspector',
-  'coder',
+  'engineer',
+  'devops',
   'blogger',
 ]
 const arbitrarySubagentAgent = fc.constantFrom(...subagentAgents)
@@ -110,7 +110,7 @@ const runTurnArbitrary = fc.record({
   token: arbitraryToken,
 })
 
-test('WHAT[managed-session-lifecycle-020] subagent session reuse property verifies prior-run closure across arbitrary agent sequences', () => {
+test('WHAT[managed-session-lifecycle-020] pure authority projection rejects premature roots and permits them after matching child-work closure', () => {
   fc.assert(
     fc.property(
       fc.array(runTurnArbitrary, { minLength: 2, maxLength: 8 }),
@@ -146,7 +146,7 @@ test('WHAT[managed-session-lifecycle-020] subagent session reuse property verifi
           assert.equal(bogusClose.ok, false)
           assert.match(bogusClose.error, /logical-run close mismatch/)
 
-          // 4. Durable child-work completion closes the active logical run for AgentOwnerRoot
+          // Pure closure transition; this does not append a durable closure fact.
           state = authority.closeCompletedAgentOwnerChildWork(profile.logicalRun, profile.authorityRoot, state)
           assert.equal(state.activeLogicalRun, null, `turn ${i} child-work completion must clear activeLogicalRun`)
           assert.equal(state.lastAuthorityProfile.logicalRun, profile.logicalRun)
@@ -157,7 +157,7 @@ test('WHAT[managed-session-lifecycle-020] subagent session reuse property verifi
     propertyOptions,
   )
 })
-test('WHAT[managed-session-lifecycle-020] subagent authority closure cleans claims, continuations, and sequences while retaining history', () => {
+test('WHAT[managed-session-lifecycle-020] pure child closure permits a new profile and retains the last profile', () => {
   fc.assert(
     fc.property(
       runTurnArbitrary,
@@ -172,7 +172,7 @@ test('WHAT[managed-session-lifecycle-020] subagent authority closure cleans clai
         assert.notEqual(state.ok, false)
         assert.equal(state.activeLogicalRun.logicalRun, profileA.logicalRun)
 
-        // Close run A via durable child-work completion
+        // Apply the pure child-work closure transition.
         const closedState = authority.closeCompletedAgentOwnerChildWork(profileA.logicalRun, profileA.authorityRoot, state)
         assert.equal(closedState.activeLogicalRun, null)
         assert.equal(closedState.lastAuthorityProfile.logicalRun, profileA.logicalRun)
@@ -208,7 +208,7 @@ test('WHAT[managed-session-lifecycle-020] Manager AgentOwnerRoot remains active 
   assert.match(refused.error, /non-Manager AgentOwnerRoot/)
   assert.equal(active.activeLogicalRun.logicalRun, profile.logicalRun)
 })
-test('WHAT[managed-session-lifecycle-020] mutant: omitting child-work closure causes fast-check to detect ActiveRunIdentityConflict', () => {
+test('WHAT[managed-session-lifecycle-020] registering a second root without closure returns ActiveRunIdentityConflict', () => {
   const property = fc.property(
     runTurnArbitrary,
     runTurnArbitrary,
@@ -221,7 +221,7 @@ test('WHAT[managed-session-lifecycle-020] mutant: omitting child-work closure ca
       state = authority.registerAuthority(profileA, state)
       assert.notEqual(state.ok, false)
 
-      // MUTANT: omitting child-work closure means run B cannot be registered
+      // A second root is rejected while the first is active.
       const regB = authority.registerAuthority(profileB, state)
       // Assert that omitting closure correctly produces ActiveRunIdentityConflict
       assert.equal(regB.ok, false)
@@ -232,3 +232,5 @@ test('WHAT[managed-session-lifecycle-020] mutant: omitting child-work closure ca
   fc.assert(property, { seed: 0x53554242, numRuns: 100 })
 })
 }
+
+test.todo('WHAT[managed-session-lifecycle-020] each authority kind requires matching durable exact prior-run closure before fresh identity installation (GAP-123)')

@@ -306,22 +306,6 @@ module PrefixSurface =
         |> Option.map BlobRef.value
         |> optionObj
 
-    /// Projection of the caller's own retention decision.
-    ///
-    /// The unbounded `todowrite` exemption is gone (context-compression-020
-    /// revised): the caller keeps the real Opening and the last K phases, and this
-    /// surface only carries that verdict across the JS boundary. It must not grow a
-    /// second rule of its own, or the two would drift and one would silently win.
-    let retainedPrefixMessages (messages: obj array) : bool array =
-        messages
-        |> Array.toList
-        |> List.map (fun message ->
-            let facts: XPrefixProjection.RawPrefixMessageFacts =
-                { Retained = not (isNullish message?retained) && unbox<bool> message?retained }
-
-            facts.Retained)
-        |> List.toArray
-
     /// context-compression-028/029: the K-window decision across the JS boundary.
     ///
     /// The surface translates shapes only. It must not clamp, default or re-derive

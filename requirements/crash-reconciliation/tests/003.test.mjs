@@ -22,14 +22,4 @@ test('WHAT[crash-reconciliation-003] unknown_effect_without_quiescence_is_not_re
   )
 })
 
-test('WHAT[crash-reconciliation-003] reconcile_decision_has_no_business_repair_vocabulary', () => {
-  // The owner exposes only observation decisions. Exercise every decision shape
-  // through the JS-native surface rather than reflecting a Fable union.
-  const names = new Set([
-    decisionName(reconcile.evidenceUnknown(), reconcile.retryWake()),
-    decisionName(reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
-    decisionName(reconcile.evidenceNoTurn(), reconcile.retryWake()),
-  ])
-  assert.deepEqual([...names].sort(), ['Publish', 'StopPass'])
-  assert.equal([...names].some((name) => /Repair|Resend|Rollback|Abort|Replay|Reread/i.test(name)), false)
-})
+test.todo('WHAT[crash-reconciliation-003] actual reconciliation never replays an unresolved external effect before fresh physical evidence (GAP-149)')

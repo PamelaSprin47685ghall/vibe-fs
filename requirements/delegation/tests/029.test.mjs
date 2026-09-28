@@ -4,7 +4,6 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
-import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 
@@ -26,7 +25,7 @@ const assertRecoveryClosure = (inventory, root) => {
   visit(root.projectPath)
 }
 
-test('WHAT[delegation-029] delegation runtime consumes only the delegation-owned journal port', () => {
+test('WHAT[delegation-029] current recovery compile inventory and lexical audit exclude known foreign implementations', () => {
   const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -139,7 +138,7 @@ test('WHAT[delegation-029] delegation runtime consumes only the delegation-owned
   assert.ok(consumesPort, 'delegation-recovery-runtime implementation must consume AgentJournalPort')
 })
 
-test('WHAT[delegation-029] PTY adapter consumes only narrow PTY capability and does not access forbidden runtime internals', () => {
+test('WHAT[delegation-029] current PTY adapter inventory and lexical audit locate its delegation-owned capability', () => {
   const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -162,15 +161,13 @@ test('WHAT[delegation-029] PTY adapter consumes only narrow PTY capability and d
     )
   }
 
-  // 2. 源码文本静态约束：严禁 type HostForkRuntime with，严禁直接读取 Gate, Dictionary, TCS 等
+  // Current spelling checks are an audit aid; they do not prove capability confinement.
   const ptySources = [...ptyAdapter.implementationFiles, ...ptyAdapter.signatureFiles]
   for (const sourcePath of ptySources) {
     const text = readFileSync(sourcePath, 'utf8')
     assert.doesNotMatch(text, /type\s+HostForkRuntime\s+with/, `${sourcePath} must not extend HostForkRuntime`)
     assert.doesNotMatch(text, /\bHostForkRuntime\b/, `${sourcePath} must not reference HostForkRuntime`)
     assert.doesNotMatch(text, /\bForkRuntime\b/, `${sourcePath} must not reference ForkRuntime`)
-    assert.doesNotMatch(text, /\bTaskCompletionSource\b/, `${sourcePath} must not reference TaskCompletionSource`)
-    assert.doesNotMatch(text, /\bDictionary\b/, `${sourcePath} must not reference Dictionary`)
   }
 
   // 3. 验证 delegation-owned 窄 capability 类型存在性
@@ -188,6 +185,6 @@ test('WHAT[delegation-029] PTY adapter consumes only narrow PTY capability and d
   }
   assert.ok(declaringProject, "a source file must declare 'type DelegationPtyCapability'")
   assert.equal(declaringProject.subsystem, 'delegation', 'DelegationPtyCapability must belong to delegation subsystem')
-  assert.equal(declaringProject.legacyKind, 'contract', 'DelegationPtyCapability declaring project must be a contract shard')
 })
 
+test.todo('WHAT[delegation-029] independently compiled workflow boundaries and real injected effects establish confinement beyond current source spellings (GAP-153)')

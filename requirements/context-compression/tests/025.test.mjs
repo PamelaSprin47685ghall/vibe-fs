@@ -86,10 +86,4 @@ test('WHAT[context-compression-025] abort rejection never reopens the stopped ex
 })
 }
 
-{
-const { default: test } = await import("node:test");
-const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
-
-
-test('WHAT[context-compression-025] Blogger fatal binds exact request settlement and one injected fuse', () => assertFatalBoundary('context-compression'))
-}
+test.todo('WHAT[context-compression-025] actual fatal settles exact request before a mandatory injected fuse reports and terminates once; GAP-104')

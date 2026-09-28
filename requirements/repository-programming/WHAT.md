@@ -2,170 +2,132 @@
 
 ## [001] Capability 投影面与单一权限源
 
-对每次 provider request，`js-ROLE` 主工具必须从唯一权威 `AttemptExecutionProfile.ToolCapabilitySet` 机械投影生成；严禁存在第二份 role→JS 权限矩阵，生成器不得在接收 role 后自行重算权限。当文件系统 primitive capability 集为空时，不得生成任何 `js-*` 工具。
+每次请求的 `js-ROLE` 工具只从该 Attempt 的唯一权威能力集生成，不另算 role→JS 权限。没有文件系统 primitive capability 时不生成 `js-*` 工具。
 
 ## [002] 四层同构应用
 
-对当前 Attempt 的每个 JS filesystem capability 所投影出的每个成员，以下四层必须保持严格一致；
-一个 capability 可以投影一个有确定顺序的同权成员族（例如 Edit → `edit` + `rewrite`），但不得
-借此产生第二份权限判定：
-1. 生成的 `JsProgram` 基类中声明对应成员；
-2. `js-*` 工具 description 中包含该成员的说明与规范；
-3. Canonical examples 中包含该成员族的使用范式；
-4. 底层 runtime gate 实施严格门禁（即使调用被伪造，仍 fail closed）。
-能力缺失时四层同步缺失，模型可见的方法集即为运行时真正可执行的完整能力集。
+每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
 ## [003] 确定性生成
 
-同一 Attempt profile（相同 capability set 与相同 role）必须生成字节完全相同的 surface（工具名称、JSON Schema、描述文案、基类定义与示例代码）。Tier（如 fast/deep）不得进入工具名称，不同 tier 下同 role 的 surface 保持完全等价。
+同一角色与能力集生成字节相同的工具名称、Schema、描述、基类及示例。执行档位不进入名称，也不改变同角色的编程面。
 
 ## [004] 生成工具名门禁
 
-工具执行入口仅接受当前 Attempt 的生成 surface 中合法拥有的 `js-*` 主工具名（如 `js-engineer`、`js-devops`）。调用未授权角色对应的工具名或旧 Attempt 残留名字必须 fail closed，工具名合法不可作为脱离当前 Attempt 权限执行的依据。
+只接受当前 Attempt 实际拥有的生成工具名。其他角色或旧 Attempt 的名字须拒绝；名字合法不能代替当前能力授权。
 
 ## [005] 编程面与推荐诚实性
 
-`JsProgram` 基类仅包含当前真正可执行的成员；能力缺失的方法严禁出现在公开基类、描述文案或示例代码中。所有向模型推荐内置工具的说明钩子不得推荐当前 provider 不可见的工具；公开基类严禁包含宿主内部私有接口或注入键。
+公开基类、描述和示例只包含当前可执行成员，不暴露宿主私有接口或注入键；说明钩子不得推荐当前 Provider 不可见的工具。
 
 ## [006] 沙箱隔离与无 Ambient OS 权限
 
-用户 JavaScript 必须在无 ambient OS authority 的沙箱中执行：底层文件系统、网络、进程与环境变量严禁直接暴露；运行上下文仅接收显式注入的纯数据与安全代理原语。程序必须受硬性超时与内存/输出上限约束，超时立即终止并清理资源。标准输出/标准错误不作为编辑产物，执行结果仅由 `run()` 返回的结构化值决定。
+用户程序只获得显式纯数据与受控原语，不直接获得文件系统、网络、进程或环境变量。执行有硬性超时、内存与输出上限，超时终止并清理资源。结果只由 `run()` 的结构化返回值决定，stdout/stderr 不作为编辑产物。
 
 ## [007] 不可变快照与 Anchor 代数
 
-`file(path, matches)` 读取当前事务的不可变 UTF-8 快照（非法 UTF-8 字节立即拒绝为 `INVALID_UTF8`，禁止猜测或静默修复编码），按声明顺序匹配锚点并返回不可变视图；`text(from, to)` 用于截取原文切片。锚点位移 `name±N` 中的 N 严格定义为已解码 JS 字符串的下标偏移（UTF-16 代码单元），严禁解释为行号或 UTF-8 字节数。声明冲突、空模式或按序未命中的锚点必须返回具名失败 `ANCHOR_NOT_FOUND`。同一 program 内部后续发生的修改不影响已获取的文件视图。
+`file(path, matches)` 返回当前事务的不可变 UTF-8 快照，锚点按声明顺序匹配，`text(from, to)` 截取原文；后续修改不改变已取得视图。非法 UTF-8 拒绝为 `INVALID_UTF8`，不猜测或修复编码。
+
+`name±N` 的偏移按解码后 JS 字符串的 UTF-16 代码单元计，不按行或 UTF-8 字节计。声明冲突、空模式或按序未命中返回具名 `ANCHOR_NOT_FOUND`。
 
 ## [008] 确定性路径枚举
 
-`glob(pattern)` 采用确定性 gitignore/wildmatch 路径枚举：`*` 不跨越目录分隔符，`**` 匹配零段或多段目录；严禁进入 `.git` 目录；严格应用各级 `.gitignore` 与 exclude 规则，不跟随符号链接。枚举操作不在工具内部截断，超限由宿主结果留尾机制统一收敛。
+`glob(pattern)` 确定性枚举 gitignore/wildmatch 路径：`*` 不跨目录，`**` 匹配零段或多段目录；遵守各级 `.gitignore` 与 exclude，不进入 `.git`，不跟随符号链接。内部不截断，超限由宿主结果留尾规则处理。
 
 ## [009] Grep Capability 投影
 
-`Grep` capability 投影为宿主环境的 `grep(needle, pattern)` 原语：needle 支持字面字符串或正则表达式，pattern 为必填参数并沿用 glob 规则过滤文件。搜索在选中的严格 UTF-8 文件上执行，不可读或非 UTF-8 文件静默跳过而不中断全局执行；返回包含行列位置与匹配文本的结构化结果。单独拥有 Read+Glob 而无 Grep capability 时不得生成该原语。
+`grep(needle, pattern)` 只由 Grep capability 授权；Read+Glob 不代替它。needle 接受字符串或正则，必填 pattern 按 glob 规则选文件；返回行列位置与匹配文本，不可读或非 UTF-8 文件跳过。
 
 ## [010] Rewrite 与 Write 分离
 
-`rewrite(path, newText)` 仅允许修改已存在的文件（目标不存在返回 `FILE_NOT_FOUND`）；`write(path, text)` 仅允许创建原本不存在的新文件（目标已存在返回 `FILE_ALREADY_EXISTS`）。同一程序在单次事务内对同一路径仅允许声明一次修改意图，重复声明同一路径立即 fail closed 并返回 `DUPLICATE_MUTATION_TARGET`。
+`rewrite` 只替换已有文件，缺失时报 `FILE_NOT_FOUND`；`write` 只创建新文件，已存在时报 `FILE_ALREADY_EXISTS`。同一程序对同一路径只能声明一次修改意图，重复时报 `DUPLICATE_MUTATION_TARGET`。
 
-## [011] JSON 兼容返回值与 Commit 前校验
+## [011] 可表示的返回值与提交前校验
 
-`run()` 的返回值必须为严格兼容 JSON 的结构化数据（允许 `null`、布尔值、有限数字、字符串、普通数组与对象）。包含 `undefined`、BigInt、NaN、Infinity、函数、Symbol、循环引用或数组内含 `null`/异构类型的返回值必须在磁盘提交发生前判定为 `INVALID_RETURN_VALUE` 并终止事务。
+返回值限于 JSON 兼容子集：null、布尔值、有限数字、字符串、普通数组与对象；数组不得含 null 或异构类型。undefined、BigInt、NaN、Infinity、函数、Symbol、循环引用及其他非法值均在提交前以 `INVALID_RETURN_VALUE` 拒绝，终止事务。
 
 ## [012] 事务 Staging 与单一 EventStore 提交
 
-单次 `js-*` 调用对应恰好一个事务上下文。所有写操作必须先进入内存临时暂存区 (ephemeral staging)，真实文件系统在 `run()` 成功结束前保持不变。事务的持久化 Prepare 与 Commit 事实必须且仅能提交至统一 EventStore，严禁引入专有文件或独立存储。
+一次调用只有一个事务。全部修改先暂存于内存，`run()` 成功结束前不改变磁盘；持久化 Prepare 与 Commit 只进入统一 EventStore，不另建专有文件或存储。
 
 ## [013] 多文件 All-or-Nothing 提交
 
-单个程序对多个文件的全部修改必须在单个事务中原子提交：预检全部通过 → 记录持久化 Prepare → 按规范路径顺序应用修改 → 记录持久化 Commit → 向模型暴露成功结果。任一文件写入失败必须触发全量回滚，确保工作区呈现零修改。
+全部文件修改作为一个事务提交，顺序为：全部预检 → 持久化 Prepare → 按规范路径顺序写入 → 持久化 Commit → 返回成功。任一写入失败时全量回滚，第三方已改内容按 [015] 保留。
 
 ## [014] 冲突检测与无隐式重试
 
-事务提交前的预检基于读取时记录的文件快照指纹：若任一读取过的文件或目标写入文件在快照生成后被外部进程修改，事务立即失败并返回 `FILE_CHANGED`。宿主严禁执行自动重读、自动重新解析锚点或自动重跑程序的隐式重试。
+预检比较读取时的快照指纹。读取过的文件或写入目标被外部改变时，以 `FILE_CHANGED` 失败，不自动重读、重定位锚点或重跑程序。
 
-## [015] 进程内正常回滚与崩溃后不自动补提交
+## [015] 正常回滚与崩溃后不自动补提交
 
-单次调用在进程内部发生正常失败时，必须按 CAS 原则将已写盘的临时修改还原为原始状态（若文件内容已被第三方改变则不覆盖）。若进程在持久化 Prepare 后、Commit 完成前意外崩溃，后续启动流程不得自动重放、回滚或补齐该事务，未完成的 Prepare 仅作为工具中断审计证据，保持失败状态。
+进程内正常失败按 CAS 还原已写入的临时修改，不覆盖第三方变化。Prepare 后、Commit 前崩溃，重启不得自动重放、回滚或补交事务；未完成 Prepare 只作为中断审计证据，保持失败。
 
 ## [016] Synthetic TOML 结果面
 
-工具执行结果统一渲染为严格的 Synthetic TOML 格式：
-1. **成功**：首行为 `# ok`，程序返回值位于 `[data]` 节（或 `data = ...` / `[[data]]`），有实际磁盘写操作时在文末追加 `[fs]` 节声明 `rewritten` 与 `created` 路径列表；
-2. **失败**：首行为 `# failed`，根级别输出稳定错误代码 `code` 与可读解释 `reason`，严禁包含 `[data]` 或 `[fs]` 节。
-成败状态由文档顶级结构严格自证，禁止引入 `status = "ok"` 等歧义判别字段。
+成功以 `# ok` 开头，返回值放在 `[data]`、`data = ...` 或 `[[data]]`；有实际写盘时，文末 `[fs]` 声明 rewritten/created 路径。失败以 `# failed` 开头，根级给稳定 code 与可读 reason，不含 data/fs 结果节。
+
+成败由顶级结构区分，不另用 `status = "ok"` 等歧义字段；编码与组合遵守 provider-projection。
 
 ## [017] 并行调用安全与确定性串行提交
 
-模型在单次助理消息中发出的多个工具调用在宿主侧按确定性顺序逐个执行。每个调用构成独立事务，后一个调用基于前一个调用提交后的最新状态重新获取快照，保证同文件并行编辑表现为顺序叠加无更新丢失，异文件并行编辑保持独立原子性。
+同一助理消息的多个工具调用由宿主按确定顺序逐个执行，各为独立事务，后者读取前者提交后的状态。同文件修改顺序叠加，不丢更新；不同文件仍各自原子提交。
 
 ## [018] 稳定失败代数
 
-系统失败使用小而稳定的错误码枚举（如 `INVALID_PROGRAM`, `PROGRAM_TIMEOUT`, `FILE_NOT_FOUND`, `FILE_ALREADY_EXISTS`, `INVALID_UTF8`, `ANCHOR_NOT_FOUND`, `DUPLICATE_MUTATION_TARGET`, `FILE_CHANGED`, `INVALID_RETURN_VALUE` 等）。业务预期内的失败严禁被笼统压缩为 `PROGRAM_FAILED`；错误信息仅回显受控摘要，严禁泄露沙箱内部代码、宿主路径或敏感环境信息。
+预期失败使用稳定具名错误码，不笼统压成 `PROGRAM_FAILED`。原因只给受控摘要，不泄露沙箱内部代码、宿主路径或敏感环境；具体原语的错误码按对应条款。
 
 ## [019] 返回值与 Commit 耦合
 
-包含写操作的程序必须在返回值校验通过且事务 Commit 成功后方可暴露返回值；Commit 失败时严禁向模型返回业务结果。纯查询程序无需提交事务，校验返回值后直接暴露。若 staged 内容与原文件完全一致，跳过无意义写盘，整体判定为成功。
+有修改时，返回值校验与 Commit 均成功后才暴露业务结果；提交失败不返回该结果。纯查询校验后直接返回，无须提交；新旧内容完全相同时成功且不做无意义写盘。
 
 ## [020] 文件变换的 POSIX 语义
 
-文件变换原语必须保持标准 POSIX 语义：`mv` 负责移动或重命名文件与目录（包含覆盖语义，源路径缺失报错）；`rm` 负责删除文件与空目录，且**严格拒绝删除非空目录**。变换工具提供参数验证与稳定可读的操作系统级错误信息。
+`mv` 移动或重命名文件及目录，支持覆盖，源缺失报错；`rm` 删除文件或空目录，拒绝非空目录。参数错误与操作系统失败给稳定可读结果。
 
 ## [021] 禁止手写 per-role 工具变体
 
-生产代码中严禁硬编码特定角色的 `js-*` 工具变体（除静态权限矩阵声明的枚举之外）。所有角色的编程工具必须统一由 `JsToolGenerator` 在运行时动态根据角色名称与权限集合构造生成。
+角色编程工具统一按角色及其已授予能力生成，不手写各角色变体；合法工具名登记中的枚举不承担额外授权。
 
-## [022] 高显著性工具选择与失败经验引导
+## [022] 工具选择与失败经验引导
 
-生成的工具描述文档必须先给出可执行的 canonical shape 与原语选择阶梯，再用高显著性风险提示
-和明确失败经验巩固选择；禁止让较弱模型读完长篇事故叙事后仍不知道下一行代码该写什么：
-1. 已知当前文本与目标文本的普通替换、插入、删除或全匹配修改，默认使用 `edit(path, changes)`；
-2. 同一文件的多个独立局部修改合并为一个 `edit` 数组；当 `Read` 同时可用时，结构切片、重排、计算式变换才使用不可变快照、ordered anchors、`text()` 与 `rewrite()`；否则文档只能教授当前 surface 实际存在的 `rewrite()`；
-3. 严禁在具备高级原语时默认退化为手工 `indexOf`/`substring` 边界计算或大面积盲目替换；Grep 仅发现候选，不承担结构所有权；
-4. 示例必须覆盖 replace / insert / delete / all 的最小 copy-ready 形态，并保留一个责任形状的 Ultra Example 展示多文件事务；
-5. 编辑必须在一个快照上形成完整目标状态后单次 staging，禁止把错误残留留给第二、第三个清理 program；
-6. 程序应在返回前对关键不变量与数据规模进行前置检查，并在异常时主动抛出异常取消事务提交。
+描述先给可执行形态与原语选择，再给显著风险和失败经验：
+
+- 普通替换、插入、删除及全匹配修改默认用 edit，同文件局部修改合并为一个 changes 数组。
+- 有 Read 时，结构切片、重排和计算式变换可用快照、锚点、text 与 rewrite；无 Read 时只教授已有的 rewrite。具备高级原语时，不默认退回手写字符串边界或盲目大替换；grep 只找候选。
+- 示例提供 replace/insert/delete/all 的最小可复制形态，并保留一个展示角色职责与多文件事务的 Ultra Example。
+- 在同一快照上形成完整目标后单次 staging，不留错误给后续程序清理；返回前检查关键不变量与数据规模，异常时抛错取消提交。
 
 ## [023] Edit capability 的渐进式成员族
 
-`Edit` capability 必须按固定顺序同时投影两个同权成员：
+Edit 按固定顺序生成同权的 edit、rewrite；rewrite 保持完整文件替换能力及原事务语义，不新增尺寸限制。
 
-1. `edit(path, changes)` 是普通局部编辑的默认入口。`changes` 接受一个 change object 或非空数组；
-   canonical change 为 `{ find, put, all? }`，其中 `find` 是非空 string 或非零宽 RegExp，`put`
-   是完整目标文本，`all` 缺省为 `false`；
-2. `rewrite(path, newText)` 保留为完整文件替换的无上限逃生舱，不得因新增 `edit` 而削弱、隐藏或
-   改变既有事务语义；
-3. 一个 `edit` 调用的所有 change 都在同一个不可变目标快照上定位。缺省 change 必须恰好匹配
-   一处；`all: true` 必须匹配至少一处并替换全部非重叠命中；
-4. 所有 change 均解析成功且彼此不重叠后，才允许产生恰好一个 `Rewrite` staging intent。
-   任一 change 失败时，该调用产生零 staging；
-5. 字符串模式允许把一致的 CRLF 文件与调用方书写的 LF 视为同一换行语义，最终文件必须保持
-   原有一致换行风格。除换行规范化外，只有精确匹配可获得写权限；
-6. 为降低常见模型格式错误，单个 object 可自动包成数组，并可无歧义接受
-   `oldText/newText` 或 `search/replace` 作为 `find/put` 别名；文档与生成示例只教授一套
-   canonical `find/put` 形态；
-7. change 必须是 plain object，除 canonical 字段与上述恢复别名外的未知字段必须拒绝为
-   `INVALID_EDIT`，避免把 `al: true` 等拼写错误静默解释为默认值；所有纯参数规范化必须先于
-   文件读取，使 malformed change 不被 `FILE_NOT_FOUND` 掩盖，也不污染 ReadSet；
-8. edit 成功返回冻结的 `{ path, changed, operations, replacements }` 摘要。完整结果与原文相同
-   时 `changed: false`、零 staging，仍视为成功；
-9. edit 对目标的内部读取必须进入既有 ReadSet/快照冲突检测；外部修改发生在规划与 commit 之间时，
-   仍按 `FILE_CHANGED` fail closed，绝不覆盖第三方新内容；该内部读取是 Edit 成员族的私有实现细节，
-   不要求公开 `Read` capability，也不得让 `file()` 出现在 Edit-only surface。
+`edit(path, changes)` 接受单个 plain object 或非空数组，canonical 字段为 `{ find, put, all? }`：find 是非空字符串或非零宽正则，put 是完整目标文本，all 默认 false。允许无歧义的 oldText/newText、search/replace 别名，但文档只教授 canonical 形态；未知字段或非法参数在读文件前以 `INVALID_EDIT` 拒绝，不污染 ReadSet。
+
+全部 change 在同一原始快照定位：默认恰好一处，all 至少一处并替换全部非重叠命中。全部成功且相互不重叠后才暂存一个 Rewrite；任一失败零暂存。字符串匹配可将一致 CRLF 与调用方 LF 对应，结果保留原换行风格；除此之外只有精确匹配获得写权限。
+
+成功返回冻结的 `{ path, changed, operations, replacements }`；最终内容不变时 changed 为 false、零暂存。内部读取参与快照冲突检测，提交前外部变化仍报 `FILE_CHANGED`；它不要求公开 Read，也不使 file 出现在 Edit-only 编程面。
 
 ## [024] 编辑失败恢复协议与保守近似
 
-`edit()` 的可预期失败必须进入稳定失败代数，而非压缩为 `PROGRAM_FAILED`：至少包括
-`INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS` 与 `EDIT_OVERLAP`。这些失败必须满足：
+edit 的预期失败至少区分 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP`，不压成 `PROGRAM_FAILED`；均在 staging 前失败。reason 给受控的路径、change 序号、尝试的 find、失败种类与本调用零修改后果。
 
-1. 在任何 staging 发生前返回，reason 明确包含受控长度的 path、change ordinal、尝试的 find、
-   失败种类与“本调用零修改”的原子性后果；
-2. `EDIT_NOT_FOUND` 在 string 模式下返回最接近当前文本的有限带行号窗口；若唯一近似候选达到
-   保守置信阈值且完整建议未超过诊断预算，还应给出只修正 `find`、保留原 `put` 的 copy-ready
-   change。修正后的 `find` 必须是目标文件中真实存在的精确子串，不得以整行近似代替原 span；
-3. `EDIT_AMBIGUOUS` 返回有限个候选行号/窗口，并明确给出两个合法下一步：扩充只有目标位置拥有的
-   上下文，或仅在所有命中都应修改时设置 `all: true`；
-4. 近似、编辑距离或标点容错只用于诊断与建议，严禁自动落盘。没有唯一证据时必须 fail closed；
-5. 多个 change 在原快照上出现重叠时返回 `EDIT_OVERLAP`，要求合并成一个声明最终文本的 change，
-   不得按数组顺序猜测覆盖优先级；
-6. 所有窗口、字段名、候选数与 copy-ready payload 均必须有独立于文件/put 大小的上界；诊断预算
-   不足时宁可省略建议，也不得让失败 reason 退化为超大输出或资源故障；
-7. provider-visible 控制语必须完整本地化；稳定 code、API 字段名和 path 等协议 token 可保持原样，
-   候选、行号、原子性后果与修复动作不得混入另一语言的说明句。
+- 未命中的字符串给有限带行号近似窗口；仅当候选唯一、达到保守置信阈值且完整建议在预算内时，给只修正 find、保留 put 的可复制 change。建议 find 必须是实际精确子串，不用近似整行代替原 span。
+- 多义匹配给有限候选，说明扩充唯一上下文，或仅在全部命中都应修改时用 all。重叠要求合并为声明最终文本的一个 change，不按数组顺序猜优先级。
+- 近似只用于诊断，不自动落盘；所有窗口、字段名、候选数及建议独立于文件/put 大小有界，预算不足省略建议，不制造资源故障。
+- 控制语完整本地化；code、API 字段、路径等协议 token 可不变，其余修复说明不混入另一语言。
 
-## [025] transaction fatal先settle cut-tail再经注入fuse执行
+## [025] 事务致命失败先结算再熔断
 
-JS transaction invariant failure必须先完成CAS-preserving rollback或durable semantic cut-tail并取得committed/unknown settlement evidence，再构造typed incident。TransactionStore只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill；stale snapshot、第三方change与普通edit rejection保持typed nonfatal，fatal不得覆盖working tree。
+事务不变量失败先完成保留第三方变化的 CAS 回滚或 durable semantic cut-tail，取得 committed/unknown 结算证据后才构造 typed incident，并调用由 composition 注入的 mandatory fatal capability。不得直接取得物理适配器或用 optional/default/global 兜底。
 
-## [026] 事务 ReadSnapshots 与案例实质访问严格分离
+同一 incident 只报告、终止一次；旧快照、第三方变化及普通编辑拒绝仍为 typed nonfatal，致命处理不得覆盖工作树。
 
-事务只读快照集合（`ReadSnapshots`，包含 `grep` 扫描为了匹配而在内部读取的文件）专用于保障单次事务的快照隔离与 Preflight 冲突检测，严禁直接作为案例的关联文件集合。��例系统的实质访问（Substantive Access）独立记录：
-1. 仅记录显式 `read`（含 `file()`）的规范路径与成功提交（Committed）的修改/创建/删除/移动路径；
-2. 提交前的 `effectPaths` 仅代表修改意图而非已发生修改；未完成提交、校验失败或回滚的事务严禁向案例追加修改访问；
-3. 程序内部执行 `grep` 触发的文件读取属于搜索引擎实现细节，严禁计入案例实质访问。
+## [026] 事务快照与案例实质访问分离
 
-## [027] Engineer 与 DevOps 统一文件工具与编程面生成
+ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联文件。案例只记录显式 read/file 的规范路径及已提交的修改、创建、删除、移动路径；grep 内部扫描不算实质访问。提交前 effectPaths 是意图，未提交、校验失败或回滚均不追加修改访问。
 
-`JsToolGenerator` 与直接文件工具集为 Engineer 和 DevOps 提供统一的文件系统交互面：
-1. **直接文件工具**：配备 `Read`、`Write`、`Edit`、`Glob`、`Grep`、`Move` (`mv`)、`Remove` (`rm`)；
-2. **编程主工具**：按授予的 `ToolCapabilitySet` 动态生成 `js-engineer` 与 `js-devops`；编程面四层同构原则不变；`js-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层；
-3. **一致的安全沙箱与事务边界**：直接工具与 JS 工具共享相同的路径越界拦截、UTF-8 校验、符号链接防护以及 All-or-Nothing 事务语义。
+## [027] Engineer 与 DevOps 的统一文件面
+
+两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 js-engineer/js-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 All-or-Nothing 事务语义。
+
+Manager 的 `js-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。

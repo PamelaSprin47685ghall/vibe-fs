@@ -161,7 +161,7 @@ const makeActive = () => {
 const complete = (state) => HandleSurface.apply(state, { op: 'complete', handle: 'agent:c1', kind: 'Terminal' })
 const retire = (state) => HandleSurface.apply(state, { op: 'retire', handle: 'agent:c1' })
 
-test('WHAT[managed-session-lifecycle-008] THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
+test('WHAT[managed-session-lifecycle-008] retirement removes completed handle from all parent views', () => {
   const active = makeActive()
   const completed = complete(active)
   const retired = retire(completed.state)
@@ -195,3 +195,5 @@ test('WHAT[managed-session-lifecycle-008] EXEC_009_consume_abandoned_writes_Hand
   assert.deepEqual(HandleSurface.apply(projection, { op: 'retire', handle: 'agent:h1' }).error, { kind: 'TransitionRejected', reason: 'HandleIsRetired' })
 })
 }
+
+test.todo('WHAT[managed-session-lifecycle-008] actual join withholds payload until retirement append confirms and survives each crash cut with one delivery (GAP-133)')

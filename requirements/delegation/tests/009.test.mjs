@@ -1,112 +1,33 @@
+import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { mkdtemp } = await import("node:fs/promises");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
-
-const OWNER = 'owner-ce'
-const descriptor = [{ sessionId: OWNER, agent: 'manager' }]
-
-test('WHAT[delegation-009] SYNC_SERIALIZATION_second_active_call_is_rejected', async () => {
-  const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-')), descriptor)
+test('WHAT[delegation-009] one active call blocks its own scope while another scope independently dispatches and completes', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-sync-scopes-'))
+  const owners = ['owner-left', 'owner-right']
+  const runtime = await sync.create(directory, owners.map(sessionId => ({ sessionId, agent: 'manager' })))
   try {
-    const first = sync.invoke(h, 'owner-ce', 'Engineer', 'first arrival')
-    await sync.awaitPromptCount(h, 'owner-ce', 'Engineer', 1)
-    assert.equal(sync.acceptPrompt(h, 'owner-ce', 'Engineer', 0), true)
-    const second = sync.invoke(h, 'owner-ce', 'Engineer', 'second arrival')
-    assert.deepEqual(await second, {
-      ok: false,
-      error: 'sync delegate rejected: dedicated delegate already has an active batch',
-    })
-    assert.equal(await sync.settle(h, 'owner-ce', 'Engineer', 'first answer', 'run-ce'), true)
-    assert.equal((await first).ok, true)
-    assert.equal(sync.childCount(h), 1)
-  } finally { sync.dispose(h) }
+    const left = sync.invoke(runtime, owners[0], 'Engineer', 'left charge')
+    await sync.awaitPromptCount(runtime, owners[0], 'Engineer', 1)
+    assert.equal(sync.acceptPrompt(runtime, owners[0], 'Engineer', 0), true)
+    const rejected = await sync.invoke(runtime, owners[0], 'Engineer', 'new charge while busy')
+    assert.deepEqual(rejected, { ok: false, error: 'sync delegate rejected: dedicated delegate already has an active batch' })
+    assert.equal(sync.promptCount(runtime, owners[0], 'Engineer'), 1)
+
+    const right = sync.invoke(runtime, owners[1], 'Engineer', 'right charge')
+    await sync.awaitPromptCount(runtime, owners[1], 'Engineer', 1)
+    assert.equal(sync.acceptPrompt(runtime, owners[1], 'Engineer', 0), true)
+    assert.notEqual(sync.child(runtime, owners[0], 'Engineer'), sync.child(runtime, owners[1], 'Engineer'))
+    assert.equal(await sync.settle(runtime, owners[1], 'Engineer', 'right result', 'right-run'), true)
+    assert.equal((await right).ok, true)
+    assert.equal(await sync.settle(runtime, owners[0], 'Engineer', 'left result', 'left-run'), true)
+    assert.equal((await left).ok, true)
+    assert.equal(sync.childCount(runtime), 2)
+  } finally {
+    sync.dispose(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { mkdtemp } = await import("node:fs/promises");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
-
-const live = async (owner) => sync.create(
-  await mkdtemp(join(tmpdir(), 'wxs-sync-delegate-')),
-  [{ sessionId: owner, agent: 'manager' }],
-)
-const waitForChild = async (h, owner, role) => {
-  await sync.awaitPromptCount(h, owner, role, 1)
-  return sync.child(h, owner, role)
-}
-const waitForPromptCount = async (h, owner, role, count) => {
-  await sync.awaitPromptCount(h, owner, role, count)
-  assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
-}
-const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
-const remainsPending = async (promise) =>
-  Promise.race([
-    promise.then((value) => ({ kind: 'resolved', value })),
-    new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
-  ])
-const verifyReusableHandoff = async (role) => {
-  const owner = `owner-handoff-${role.toLowerCase()}`
-  const h = await live(owner)
-  try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-
-    const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
-    await waitForPromptCount(h, owner, role, 1)
-    assert.equal(sync.handoffFrontier(h, owner, role), null)
-    assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
-
-    assert.equal(await settle(h, owner, role, 'FIRST-ANSWER', 'run-first'), true)
-    const firstResult = await first
-    assert.equal(firstResult.ok, true)
-    assert.match(firstResult.value, /FIRST-ANSWER/)
-    const firstFrontier = sync.handoffFrontier(h, owner, role)
-    assert.notEqual(firstFrontier, null)
-
-    await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
-
-    const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
-    await waitForPromptCount(h, owner, role, 2)
-    const secondPrompt = sync.prompt(h, owner, role, 1)
-    assert.match(secondPrompt, /SECOND-CHARGE/)
-    assert.match(secondPrompt, /parent_delta_work_record\s*=/)
-    assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
-    assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
-
-    assert.equal(
-      await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
-      false,
-    )
-    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
-
-    assert.equal(await settle(h, owner, role, 'SECOND-ANSWER', 'run-second'), true)
-    const secondResult = await second
-    assert.equal(secondResult.ok, true)
-    assert.match(secondResult.value, /SECOND-ANSWER/)
-    assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
-    assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
-    assert.equal(sync.childCount(h), 1)
-  } finally { sync.dispose(h) }
-}
-
-test('WHAT[delegation-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent', () => {
-  const blocked = sync.serializationDecision('owner-a', 'owner-a', false)
-  assert.equal(blocked.accepted, false)
-  assert.match(blocked.reason, /same ReuseScope/)
-  const sameRun = sync.serializationDecision('owner-a', 'owner-a', true)
-  assert.equal(sameRun.accepted, true)
-  const independent = sync.serializationDecision('owner-a', 'owner-b', false)
-  assert.equal(independent.accepted, true)
-})
-}

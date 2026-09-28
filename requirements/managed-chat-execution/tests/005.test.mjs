@@ -183,17 +183,9 @@ test('WHAT[managed-chat-execution-005] ProviderStarted before Accepted rejects',
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
 const { default: test } = await import("node:test");
 const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.js");
 
-const codecSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs', import.meta.url), 'utf8')
-const adapterSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs', import.meta.url), 'utf8')
-const bindingSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs', import.meta.url), 'utf8')
-const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
-const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
-const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')
-const recoverySource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs', import.meta.url), 'utf8')
 const terminal = ({
   sessionId = 'ses-terminal',
   physicalUserMessageId = 'msg-terminal',
@@ -216,7 +208,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[managed-chat-execution-005] exact public assistant observation alone establishes provider start', () => {
+test('WHAT[managed-chat-execution-005] public assistant observation decoder requires the complete exact start identity', () => {
   const started = terminal({ completed: undefined })
   delete started.properties.info.time.completed
   assert.deepEqual(hostSignals.tryDecodeExactProviderStart(started), {
@@ -237,15 +229,7 @@ test('WHAT[managed-chat-execution-005] exact public assistant observation alone 
     assert.equal(hostSignals.tryDecodeExactProviderStart(ambiguous), null)
   }
 
-  assert.match(bootstrapSource, /let\s+continueStartedLifecycle[\s\S]*?ModelRouting\.endProviderStep[\s\S]*?settleObservedTerminal/)
-  assert.match(bootstrapSource, /let signalNewProviderStart started providerStarted =[\s\S]*?if providerStarted then[\s\S]*?signalProviderStarted started/)
-  assert.match(bootstrapSource, /let continueProviderStart[\s\S]*?match persistence with[\s\S]*?\| Error \w+ ->[\s\S]*?rejectProviderStart started[\s\S]*?continueStartedLifecycle started providerStepEnded terminal[\s\S]*?\| Ok providerStarted ->[\s\S]*?BindPhysicalUserMaterial\(started\.SessionId, started\.PhysicalUserMessageId\)[\s\S]*?signalNewProviderStart started providerStarted[\s\S]*?continueStartedLifecycle/)
-  assert.match(bootstrapSource, /persistProviderStartedFromObservation[\s\S]*?continueProviderStart started providerStepEnded terminal providerStarted/)
-  assert.match(bindingSource, /persistObservedProviderStart[\s\S]*?ChatExecutionProjection\.byKey key/)
-  assert.match(bindingSource, /match execution \|> Option\.map _\.Lifecycle, execution \|> Option\.bind _\.ProviderStarted with[\s\S]*?ChatExecutionLifecycle\.Terminal[\s\S]*?AcceptedExecutionAlreadyTerminal[\s\S]*?\| _, Some _ -> Task\.FromResult\(Ok false\)[\s\S]*?\| _, None ->[\s\S]*?bindAttemptPlan[\s\S]*?do! persistPreparedProviderStarted[\s\S]*?return true/)
-  assert.match(bindingSource, /persistObservedProviderStart[\s\S]*?bindAttemptPlan observation\.SessionId observation\.PhysicalUserMessageId observation\.ProviderRun/)
-  assert.match(recoverySource, /TryBindAttemptPlan[\s\S]*?established\.Profile\.PhysicalUserMessageId = physicalUserMessageId/)
-  assert.match(recoverySource, /\| Some _ -> None[\s\S]*?\| None -> this\.BindPendingAttemptPlan/)
-  assert.match(bindingSource, /ManagedChatProviderLifecycle\.providerStarted/)
 })
 }
+
+test.todo('WHAT[managed-chat-execution-005] actual Host observation commits start and advances cursor before wake; later assistant runs reuse one physical phase (GAP-126)')

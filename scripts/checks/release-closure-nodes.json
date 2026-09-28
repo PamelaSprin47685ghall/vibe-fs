@@ -1,4 +1,6 @@
 {
+  "status": "historical-unverified",
+  "note": "This legacy inventory has no active release-gate consumer. Its DONE states and paths are historical, not current acceptance evidence. Use requirements/GAP.md and the 2026-09-28 migration records; retired Sphinx and MagicTodo entries do not revive their contracts.",
   "nodes": [
     {
       "id": "canonical-spine",

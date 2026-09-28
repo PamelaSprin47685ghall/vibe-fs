@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
+
+test('WHAT[obligation-ledger-004] Host decoding preserves work prose instead of classifying planning keywords', () => {
+  for (const planComplete of [false, true]) {
+    for (const work of ['Investigate the repository.', 'Deliver an investigation report.', '调查仓库并形成可核验的报告。']) {
+      const result = host.decodeInput({planComplete, workingOn: 'evidence', obligations: [{name: 'evidence', horizon: 'near', work}]})
+      assert.equal(result.ok, true)
+      assert.equal(result.value.obligations[0].work, work)
+      assert.equal(result.value.planComplete, planComplete)
+    }
+  }
+})
+
+test('WHAT[obligation-ledger-004] planning versus mission debt is judged by consequence in actual Manager work', {todo: 'GAP-190: requires independent semantic review of provider guidance and execution evidence'})

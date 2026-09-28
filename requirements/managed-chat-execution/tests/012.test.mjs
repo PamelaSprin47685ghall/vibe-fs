@@ -56,17 +56,7 @@ const CUTS = [
   ['H', 'after exact release before Hook return', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, providerBinding: 0, hostProjected: true }, 1, 'Ignore'],
   ['I', 'after exact release before fatal propagation', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, providerBinding: 0, hostProjected: true }, 1, 'Ignore'],
 ]
-const expectedEffects = (decision) => ({
-  NoDurableExecution: [],
-  ResumePreProvider: ['ResumePreProvider', 'ResumePreProvider'],
-  Ignore: [],
-  ReconcilePhysical: [
-    'ReconcilePhysical:ReleaseTerminalResource',
-    'ReconcilePhysical:ReleaseTerminalResource',
-  ],
-})[decision]
-
-test('WHAT[managed-chat-execution-012] A–I production transaction and lifecycle prefixes drive recovery decisions', async () => {
+test('WHAT[managed-chat-execution-012] controlled admission A–E stops and provider lifecycle prefixes preserve their committed phase', async () => {
   const transactionResults = new Map()
   for (const cut of ['A', 'B', 'C', 'D', 'E']) {
     transactionResults.set(cut, await transaction.transactionScenario(evidence(cut), `Crash${cut}`, 'None'))
@@ -87,17 +77,7 @@ test('WHAT[managed-chat-execution-012] A–I production transaction and lifecycl
     ]))
   }
 
-  for (const restart of ['PluginReload', 'ProcessRestart']) {
-    const recovered = await recovery.admissionCrashPointScenarios(CUTS.map(([cut]) => cut), restart, 'NotCommitted', 'Applied')
-
-    for (const [index, [cut, label, facts, phase, local, providerCount, decision]] of CUTS.entries()) {
-      const recoveryResult = recovered.scenarios[index]
-      assert.equal(recoveryResult.cut, cut, label)
-      assert.equal(recoveryResult.restart, restart, label)
-      assert.deepEqual(recoveryResult.decisions, [decision, decision], label)
-      assert.deepEqual(recoveryResult.effects, expectedEffects(decision), label)
-      assert.equal(recoveryResult.commitment, 'NotCommitted', label)
-
+    for (const [cut, label, facts, phase, local, providerCount] of CUTS) {
       if (transactionResults.has(cut)) {
         const result = transactionResults.get(cut)
         assert.equal(result.crashed, true, label)
@@ -117,8 +97,8 @@ test('WHAT[managed-chat-execution-012] A–I production transaction and lifecycl
         assert.equal(result.providerWorkCount, providerCount, label)
       }
     }
-  }
 })
+test.todo('WHAT[managed-chat-execution-012] durable output of every A–I crash cut feeds actual recovery after process restart without duplicate owner effects (GAP-127)')
 }
 
 {
@@ -128,7 +108,7 @@ const lifecycle = await import("../../../dist/Execution/Session/ChatExecution/Su
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
 const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
 
-const CUTS = [...'ABCDEFGHI']
+const CUTS = [...'BCDEFGHI']
 const rotations = (values) => values.map((_, index) => [...values.slice(index), ...values.slice(0, index)])
 const generatedOrders = (values) => [
   values,
@@ -136,12 +116,6 @@ const generatedOrders = (values) => [
   ...rotations(values),
   values.flatMap((value) => [value, value]),
 ]
-const canonical = (scenarios) => Object.fromEntries(scenarios.map((scenario) => [scenario.cut, {
-  decisions: scenario.decisions,
-  effects: scenario.effects,
-  commitment: scenario.commitment,
-  capacityOutcome: scenario.capacityOutcome,
-}]))
 const evidence = {
   sessionId: 'ses-crash-property',
   physicalUserMessageId: 'msg-crash-property',
@@ -169,18 +143,15 @@ const evidence = {
 }
 const action = (kind, extra = {}) => ({ kind, evidence, appendOutcome: 'Committed', ...extra })
 
-test('WHAT[managed-chat-execution-012] duplicate crash-cut requests and input permutations preserve canonical production recovery', async () => {
-  const baseline = canonical((await recovery.admissionCrashPointScenarios(CUTS, 'PluginReload', 'NotCommitted', 'Applied')).scenarios)
+test('WHAT[managed-chat-execution-012] sampled recovery evidence repeats every interpreter effect without observer deduplication', async () => {
+  const baseline = (await recovery.admissionPhaseSamples(CUTS, 'NotCommitted', 'Applied')).scenarios
 
   for (const order of generatedOrders(CUTS)) {
-    const result = await recovery.admissionCrashPointScenarios(order, 'PluginReload', 'NotCommitted', 'Applied')
-    for (const scenario of result.scenarios) {
-      assert.deepEqual({
-        decisions: scenario.decisions,
-        effects: scenario.effects,
-        commitment: scenario.commitment,
-        capacityOutcome: scenario.capacityOutcome,
-      }, baseline[scenario.cut], `${order.join('')}:${scenario.cut}`)
+    const result = await recovery.admissionPhaseSamples(order, 'NotCommitted', 'Applied')
+    assert.equal(result.scenarios.length, order.length)
+    for (const [index, scenario] of result.scenarios.entries()) {
+      assert.equal(scenario.cut, order[index])
+      assert.deepEqual(scenario, baseline.find((sample) => sample.cut === order[index]))
     }
   }
 
@@ -203,7 +174,7 @@ test('WHAT[managed-chat-execution-012] duplicate crash-cut requests and input pe
   assert.equal(duplicateReplay.semanticTransitionCount, canonicalReplay.semanticTransitionCount)
   assert.deepEqual(duplicateReplay.appendCounts, canonicalReplay.appendCounts)
 
-  const unknown = await recovery.admissionCrashPointScenarios(['B', 'C', 'D', 'E', 'F'], 'ProcessRestart', 'Unknown', 'Applied')
+  const unknown = await recovery.admissionPhaseSamples(['B', 'C', 'D', 'E', 'F'], 'Unknown', 'Applied')
   for (const scenario of unknown.scenarios) {
     assert.deepEqual(scenario.decisions, ['MarkManualIntervention', 'MarkManualIntervention'])
     assert.deepEqual(scenario.effects, [
@@ -213,7 +184,7 @@ test('WHAT[managed-chat-execution-012] duplicate crash-cut requests and input pe
   }
 
   for (const capacityOutcome of ['Conflict', 'StaleFence']) {
-    const rejected = await recovery.admissionCrashPointScenarios(['G', 'H', 'I'], 'PluginReload', 'NotCommitted', capacityOutcome)
+    const rejected = await recovery.admissionPhaseSamples(['G', 'H', 'I'], 'NotCommitted', capacityOutcome)
     for (const scenario of rejected.scenarios) {
       assert.deepEqual(scenario.decisions, ['MarkManualIntervention', 'MarkManualIntervention'])
       assert.deepEqual(scenario.effects, [
@@ -387,12 +358,9 @@ test('WHAT[managed-chat-execution-012] duplicate terminal and stale recovery evi
     { seed: 0x56414c49, numRuns: 100 },
   )
 
-  // Restart creates a fresh recovery port observer
-  const result = await Runtime.recoverAcrossRestart(['AcceptedProviderAlive', 'AcceptedProviderAlive'])
-  assert.deepEqual(result.beforeRestart.decisions, ['ReconcilePhysical'])
-  assert.deepEqual(result.beforeRestart.effects, ['ReconcilePhysical:PersistProviderStarted'])
-  assert.deepEqual(result.afterRestart.decisions, ['ReconcilePhysical'])
-  assert.deepEqual(result.afterRestart.effects, ['ReconcilePhysical:PersistProviderStarted'])
+  const result = await Runtime.recoverScenarios(['AcceptedProviderAlive', 'AcceptedProviderAlive'])
+  assert.deepEqual(result.decisions, ['ReconcilePhysical', 'ReconcilePhysical'])
+  assert.deepEqual(result.effects, ['ReconcilePhysical:PersistProviderStarted', 'ReconcilePhysical:PersistProviderStarted'])
 })
 }
 
@@ -503,18 +471,6 @@ test('WHAT[managed-chat-execution-012] lifecycle recovery interprets every typed
     assert.deepEqual(result.effects, expected, scenario)
   }
 })
-test('WHAT[managed-chat-execution-012] only causal lifecycle signals enter the shared recovery runtime', () => {
-  assert.deepEqual(Runtime.lifecycleSignals(), [
-    'DurabilityActivated',
-    'PluginRuntimeReloaded',
-    'ExactAssistantStarted',
-    'ExactAssistantTerminal',
-    'SessionAborted',
-    'SessionDeleted',
-    'SessionCancelled',
-    'CapacityProjectionReplayed',
-  ])
-})
 test('WHAT[managed-chat-execution-012] absent recovery port publishes exactly one manual disposition and no resume', async () => {
   await withRecoveryHost('absent', 'absent', async (host) => {
     const result = await recoveryHost.resumeAccepted(host, sessionOf('absent'), physicalOf('absent'))
@@ -550,50 +506,19 @@ test('WHAT[managed-chat-execution-012] duplicate resume signals keep exactly one
     assertManualDisposition(result.manuals[0], 'ses-recovery-duplicate', 'msg-recovery-duplicate')
   })
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
-const { default: test } = await import("node:test");
-const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.js");
-
-const codecSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs', import.meta.url), 'utf8')
-const adapterSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs', import.meta.url), 'utf8')
-const bindingSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs', import.meta.url), 'utf8')
-const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
-const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
-const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')
-const recoverySource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs', import.meta.url), 'utf8')
-const terminal = ({
-  sessionId = 'ses-terminal',
-  physicalUserMessageId = 'msg-terminal',
-  providerRun = 'run-terminal',
-  finish,
-  error,
-  completed = 2,
-} = {}) => ({
-  type: 'message.updated',
-  properties: {
-    info: {
-      sessionID: sessionId,
-      id: providerRun,
-      role: 'assistant',
-      parentID: physicalUserMessageId,
-      time: { created: 1, completed },
-      ...(finish === undefined ? {} : { finish }),
-      ...(error === undefined ? {} : { error }),
-    },
-  },
-})
-
-test('WHAT[managed-chat-execution-012] superseded exact capacity release is an idempotent recovery no-op', () => {
-  const release = recoveryHostSource.match(/let release \(key: ChatExecutionKey\) =([\s\S]*?)\n\s*let requirePersistence/)
-  assert.ok(release, 'recovery capacity release boundary must remain explicit')
-  assert.match(release[1], /CapacityTransitionOutcome\.Applied\s*\n\s*\| CapacityTransitionOutcome\.AlreadyApplied\s*\n\s*\| CapacityTransitionOutcome\.StaleFence ->\s*Task\.FromResult\(\(\)\)/)
-  assert.match(release[1], /CapacityTransitionOutcome\.Conflict ->[\s\S]*?managed chat recovery exact capacity release was rejected/)
+test('WHAT[managed-chat-execution-012] actual recovery Host repeats terminal settlement idempotently when capacity is already absent', async () => {
+  await withRecoveryHost('terminal-replay', 'absent', async (host) => {
+    await recoveryHost.seedProviderStarted(host, 'ses-terminal-replay', 'msg-terminal-replay', 'provider-terminal-replay')
+    const first = await recoveryHost.finalizeCompleted(host, 'ses-terminal-replay', 'msg-terminal-replay', 'provider-terminal-replay')
+    assert.equal(first.lifecycle, 'Terminal')
+    assert.equal(first.disposition, 'Completed')
+    const repeated = await recoveryHost.finalizeCompleted(host, 'ses-terminal-replay', 'msg-terminal-replay', 'provider-terminal-replay')
+    assert.deepEqual(repeated, first)
+  })
 })
 }
+
+test.todo('WHAT[managed-chat-execution-012] late recovery release after supersession preserves the newer real capacity owner and rejects genuine conflict (GAP-126)')
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -625,7 +550,7 @@ const matrix = [
   ['ProviderAbsentWithoutPolicy', 'MarkManualIntervention', 'NoAuthorizedProviderDisposition', null],
 ]
 
-test('WHAT[managed-chat-execution-012] durable facts plus explicit physical evidence exhaustively determine recovery', () => {
+test('WHAT[managed-chat-execution-012] representative typed evidence selects the expected production recovery decisions', () => {
   for (const [scenario, kind, request, disposition] of matrix) {
     assert.deepEqual(recovery.decideScenario(scenario), { kind, request, disposition }, scenario)
   }

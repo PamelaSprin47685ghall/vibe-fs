@@ -1,198 +1,88 @@
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import * as hook from '../../../dist/Git/Hook/Surface.js'
+import { createBareWorkspace, readRemoteStoreOid } from '../../verification-system/tests/support/dumb-remote.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { event } from './support/events.mjs'
+import { appendFact, assertFacts, runHook } from './support/hooks.mjs'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
-const { default: test } = await import("node:test");
-
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-
-test('WHAT[durable-convergence-008] reference-transaction and pre-push both call the same full bidirectional converge', async () => {
-  const sync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
-  assert.match(sync, /let runPrePush/)
-  assert.match(sync, /converge remote None/)
-  assert.match(sync, /let runReferenceTransaction/)
-  assert.match(sync, /converge remote observed/)
-  assert.doesNotMatch(sync, /ConvergeObserved|downloadOnly|uploadOnly/i)
+integrationTest('WHAT[durable-convergence-008] reference-transaction imports the observed snapshot and publishes independent local truth in one hook process', async () => {
+  const workspace = createBareWorkspace(['left', 'right'])
+  try {
+    const left = workspace.client('left')
+    const right = workspace.client('right')
+    const a = event('a'.repeat(40), [], { writer: 'left' })
+    const b = event('b'.repeat(40), [], { writer: 'right' })
+    await appendFact(left, 'writer-left', a)
+    await appendFact(right, 'writer-right', b)
+    runHook(left)
+    const before = readRemoteStoreOid(workspace.bare)
+    execFileSync('git', ['-C', right, 'fetch', '-q', 'origin', '+refs/wanxiang/store:refs/wanxiang/remotes/origin/store'])
+    const update = `${'0'.repeat(40)} ${before} refs/wanxiang/remotes/origin/store\n`
+    runHook(right, 'reference-transaction', 'committed', update)
+    const after = readRemoteStoreOid(workspace.bare)
+    assert.notEqual(after, before, 'local independent truth must also be published')
+    assertFacts(right, [a, b])
+    runHook(left)
+    assertFacts(left, [a, b])
+    runHook(right, 'reference-transaction', 'committed', update)
+    assert.equal(readRemoteStoreOid(workspace.bare), after, 'stale observed input cannot replace newer union')
+  } finally {
+    workspace.cleanup()
+  }
 })
-test('WHAT[durable-convergence-008] reference-transaction observed root changes discovery only not sync direction', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-  assert.match(gateway, /let converge/)
-  assert.match(gateway, /match observedRemote with/)
-  assert.match(gateway, /WriterStreamSync\.syncWriterStreams/)
-  assert.match(gateway, /pushSnapshot/)
-  assert.match(gateway, /discoverRemote/)
-  assert.doesNotMatch(gateway, /IEventStore|CanonicalIntegrator|WorkspaceEventStore/)
-})
-test('WHAT[durable-convergence-008] lease race refetches and repeats the same k-way sync boundedly', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-  assert.match(gateway, /--force-with-lease/)
-  assert.match(gateway, /retriesLeft/)
-  assert.match(gateway, /discoverRemote run remote/)
-  assert.match(gateway, /ConvergeRetryExhausted/)
-})
-test('WHAT[durable-convergence-008] product process has no fetch pull push remote API', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-  const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
-  const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  assert.doesNotMatch(gateway, /type IGitGateway|member _\.(Fetch|Pull|Push)\(/)
-  assert.doesNotMatch(boot, /HookDispatcher\.ensure/, 'plugin load must not mutate Git')
-  assert.match(activation, /lazy[\s\S]*HookDispatcher\.ensure/)
-  assert.doesNotMatch(activation, /GitGateway\.converge|\.(Fetch|Pull|Push)\(/i)
-})
-test('WHAT[durable-convergence-008] hook-internal Git commands are recursion guarded and pre-push is not reentered', async () => {
-  const runner = await read('resources/git/wanxiang-hook.mjs')
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-  assert.match(runner, /WANXIANG_GIT_SYNC_ACTIVE/)
-  assert.match(gateway, /--no-verify/)
-  assert.match(gateway, /WANXIANG_GIT_SYNC_ACTIVE|SyncActiveEnv/)
-})
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { execFileSync } = await import("node:child_process");
-const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
-const { readFile } = await import("node:fs/promises");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
-const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
-const retention = await import("../../../dist/Persistence/EventStore/RetentionSurface.js");
+const storeLine = remote => `+refs/wanxiang/store:refs/wanxiang/remotes/${remote}/store`
+const headsLine = remote => `+refs/heads/*:refs/remotes/${remote}/*`
+const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' })
+const fetchSpecs = (repo, remote) => git(repo, 'config', '--get-all', `remote.${remote}.fetch`).trim().split('\n')
 
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
-
-test('WHAT[durable-convergence-008] activation only ensures hooks and user Git process runs full sync', async () => {
-  const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
-  const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const hook = await read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
-  const runner = await read('resources/git/wanxiang-hook.mjs')
-  const hookSync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
-
-  assert.doesNotMatch(boot, /HookDispatcher\.ensure/)
-  assert.match(activation, /lazy[\s\S]*HookDispatcher\.ensure/)
-  assert.match(hook, /ReferenceTransaction/)
-  assert.match(hook, /PrePush/)
-  assert.match(hook, /full.*converge|ConvergeFull/is, 'both hook kinds must run full bidirectional convergence')
-  assert.doesNotMatch(hook, /ConvergeObserved/, 'reference-transaction is not a one-way observed/import path')
-
-  assert.match(runner, /reference-transaction/)
-  assert.match(runner, /pre-push/)
-  assert.match(runner, /HookSync/)
-  assert.match(hookSync, /GitGateway\.converge/)
-  assert.match(await read('src/Wanxiangshu/Git/Gateway.fs'), /WriterStreamSync\.syncWriterStreams/)
-  assert.doesNotMatch(runner, /WorkspaceEventStore|CanonicalIntegrator|PluginHost/,
-    'hook runner must work when Wanxiangshu/OpenCode is not running')
-
-  const productGit = await read('src/Wanxiangshu/Git/Gateway.fs')
-  assert.doesNotMatch(productGit, /member _\.(Fetch|Pull|Push)\(/,
-    'Wanxiangshu product process must not own user fetch/pull/push triggers')
-
-  const persistSources = [
-    await read('src/Wanxiangshu/Persistence/EventStore/Store.fs'),
-    await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs'),
-  ].join('\n')
-  assert.doesNotMatch(persistSources, /Converge\(|Fetch\(|Pull\(|Push\(/, 'ordinary local append/replay must not trigger remote sync')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { spawnSync } = await import("node:child_process");
-const { existsSync, readFileSync } = await import("node:fs");
-const { fileURLToPath } = await import("node:url");
-const { join } = await import("node:path");
-const { createBareWorkspace, readRemoteStoreOid, remoteHasObject } = await import("../../verification-system/tests/support/dumb-remote.mjs");
-const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
-const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
-
-const runner = fileURLToPath(new URL('../../../resources/git/wanxiang-hook.mjs', import.meta.url));
-
-const event = (id, writer) => ({
-  id,
-  stream: 'dumb/remote',
-  type: 'JobRequested',
-  parents: [],
-  payload: { writer },
-  payloadRefs: [],
-});
-
-const open = (repo, writerId) => eventStore.create(join(repo, '.git'), writerId);
-
-const append = async (handle, value) => {
-  const result = await eventStore.append(handle, [value]);
-  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error));
-};
-
-const hook = (repo, kind = 'pre-push', arg = 'origin', input = '') => spawnSync(
-  process.execPath,
-  [runner, kind, arg],
-  { cwd: repo, input, encoding: 'utf8', env: { ...process.env, WANXIANG_GIT_SYNC_ACTIVE: '' } },
-);
-
-const assertHookOk = (result) => {
-  assert.equal(result.status, 0, "hook failed: " + (result.stderr || result.stdout));
-};
-
-integrationTest('WHAT[durable-convergence-008] reference_transaction_is_also_full_bidirectional_convergence', async () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Git/Hook/Sync.fs', import.meta.url), 'utf8');
-  assert.match(source, /runReferenceTransaction/);
-  assert.match(source, /converge remote observed/);
-  assert.doesNotMatch(source, /downloadOnly|importOnly|ConvergeObserved/);
-});
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { execFileSync } = await import("node:child_process");
-const { mkdtempSync, rmSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-
-const Hook = await import("../../../dist/Git/Hook/Surface.js");
-
-const STORE_LINE = '+refs/wanxiang/store:refs/wanxiang/remotes/origin/store'
-const HEADS_LINE = '+refs/heads/*:refs/remotes/origin/*'
-
-const fetchSpecs = (repo) => execFileSync('git', ['-C', repo, 'config', '--get-all', 'remote.origin.fetch'], { encoding: 'utf8' })
-  .split('\n').map(line => line.trim()).filter(line => line.length > 0)
-
-const specRepo = () => {
+test('WHAT[durable-convergence-008] ensure adds both fetch mappings to every remote while preserving custom order and remaining idempotent', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-fetch-baseline-'))
-  execFileSync('git', ['init', '--quiet', repo])
-  execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.com/repo.git'])
-  return repo
-}
-
-test('WHAT[durable-convergence-008] activation ensure keeps both the store and the standard heads fetch refspec on every remote', () => {
-  const repo = specRepo()
   try {
-    assert.equal(Hook.ensure(repo), true)
-    const specs = fetchSpecs(repo)
-    assert.ok(specs.includes(STORE_LINE), 'ensure must keep the store tracking refspec')
-    assert.ok(specs.includes(HEADS_LINE), 'ensure must keep the standard heads fetch refspec')
+    git(repo, 'init', '--quiet')
+    for (const remote of ['origin', 'upstream']) {
+      git(repo, 'remote', 'add', remote, `https://example.com/${remote}.git`)
+      git(repo, 'config', '--replace-all', `remote.${remote}.fetch`, '+refs/tags/*:refs/tags/*')
+      git(repo, 'config', '--add', `remote.${remote}.fetch`, `+refs/review/*:refs/remotes/${remote}/review/*`)
+    }
+    const before = new Map(['origin', 'upstream'].map(remote => [remote, fetchSpecs(repo, remote)]))
+    assert.equal(hook.ensure(repo), true)
+    const after = new Map()
+    for (const remote of ['origin', 'upstream']) {
+      const specs = fetchSpecs(repo, remote)
+      assert.deepEqual(specs.slice(0, 2), before.get(remote))
+      assert.equal(specs.length, 4)
+      assert.ok(specs.includes(storeLine(remote)))
+      assert.ok(specs.includes(headsLine(remote)))
+      after.set(remote, specs)
+    }
+    assert.equal(hook.ensure(repo), true)
+    for (const remote of ['origin', 'upstream']) assert.deepEqual(fetchSpecs(repo, remote), after.get(remote))
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }
 })
 
-test('WHAT[durable-convergence-008] activation ensure repairs a remote whose heads fetch refspec is missing without touching other lines', () => {
-  const repo = specRepo()
+test('WHAT[durable-convergence-008] ensure repairs a store-only remote without replacing its existing line', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-fetch-store-only-'))
   try {
-    execFileSync('git', ['-C', repo, 'config', '--replace-all', 'remote.origin.fetch', STORE_LINE])
-    assert.deepEqual(fetchSpecs(repo), [STORE_LINE], 'precondition: simulate the store-only defect state')
-
-    assert.equal(Hook.ensure(repo), true)
-
-    const specs = fetchSpecs(repo)
-    assert.ok(specs.includes(STORE_LINE), 'the pre-existing store line must survive untouched')
-    assert.ok(specs.includes(HEADS_LINE), 'ensure must add back the missing standard heads fetch refspec')
-
-    assert.equal(Hook.ensure(repo), true)
-    assert.deepEqual(fetchSpecs(repo), specs, 'repeated ensure must not duplicate fetch refspec lines')
+    git(repo, 'init', '--quiet')
+    git(repo, 'remote', 'add', 'origin', 'https://example.com/repo.git')
+    git(repo, 'config', '--replace-all', 'remote.origin.fetch', storeLine('origin'))
+    assert.deepEqual(fetchSpecs(repo, 'origin'), [storeLine('origin')])
+    assert.equal(hook.ensure(repo), true)
+    assert.deepEqual(fetchSpecs(repo, 'origin'), [storeLine('origin'), headsLine('origin')])
+    assert.equal(hook.ensure(repo), true)
+    assert.deepEqual(fetchSpecs(repo, 'origin'), [storeLine('origin'), headsLine('origin')])
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }
 })
-}
+
+test.todo('WHAT[durable-convergence-008] real plugin load leaves Git configuration unchanged and first durability activation installs hooks without starting synchronization (GAP-151)')
+test.todo('WHAT[durable-convergence-008] controlled CAS competition and replacement crash cuts preserve all facts while clean no-op leaves unseen remote progress untouched (GAP-151)')
