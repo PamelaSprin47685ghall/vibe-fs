@@ -35,6 +35,14 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_localizes_
   const media = Strength.frameTryLocalizeMirror(H, 'd3', digest, [{ role: 'user', parts: [{ kind: 'media', mediaType: null, contentDigest: 'digest' }] }])
   assert.equal(media.ok, false)
   assert.equal(media.error, 'MediaCannotCrossSession')
+  // Regression test: completed tool calls in OpenCode native format are folded
+  // into the assistant message as completed tool results. tryLocalizeMirror must
+  // relocate them without rejecting them as orphan results.
+  const assistantFolded = Strength.frameTryLocalizeMirror(H, 'd4', digest, [
+    { role: 'assistant', parts: [result('owner-folded-1', 'alpha')] },
+  ])
+  assert.equal(assistantFolded.ok, true, 'assistant folded tool results must be localized without orphan error')
+  assert.notEqual(assistantFolded.value[0].parts[0].callId, 'owner-folded-1', 'owner call id must be deterministically relocated')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_self_note_rides_the_original_call_record_and_nowhere_else', () => {
   const ownerMessages = [

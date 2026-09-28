@@ -153,6 +153,7 @@ module StrengthFrame =
             |> ToolCallId.create
 
         let rec localizeParts
+            (isAssistant: bool)
             (parts: ProviderProjection.WirePart list)
             (nextOrdinal: int)
             (idMap: Map<string, ToolCallId>)
@@ -161,13 +162,13 @@ module StrengthFrame =
             match parts with
             | [] -> Ok(List.rev localized, nextOrdinal, idMap)
             | ProviderProjection.WireToolCall(ownerId, name, arguments) :: tail ->
-                localizeToolCall ownerId name arguments tail nextOrdinal idMap localized
+                localizeToolCall isAssistant ownerId name arguments tail nextOrdinal idMap localized
             | ProviderProjection.WireToolResult(ownerId, result) :: tail ->
-                localizeToolResult ownerId result tail nextOrdinal idMap localized
+                localizeToolResult isAssistant ownerId result tail nextOrdinal idMap localized
             | ProviderProjection.WireMedia _ :: _ -> Error StrengthMirrorError.MediaCannotCrossSession
-            | part :: tail -> localizeParts tail nextOrdinal idMap (part :: localized)
+            | part :: tail -> localizeParts isAssistant tail nextOrdinal idMap (part :: localized)
 
-        and localizeToolCall ownerId name arguments tail nextOrdinal idMap localized =
+        and localizeToolCall isAssistant ownerId name arguments tail nextOrdinal idMap localized =
             let ownerKey = ToolCallId.value ownerId
 
             if Map.containsKey ownerKey idMap then
@@ -176,16 +177,32 @@ module StrengthFrame =
                 let replicaId = localId nextOrdinal
 
                 localizeParts
+                    isAssistant
                     tail
                     (nextOrdinal + 1)
                     (Map.add ownerKey replicaId idMap)
                     (ProviderProjection.WireToolCall(replicaId, name, arguments) :: localized)
 
-        and localizeToolResult ownerId result tail nextOrdinal idMap localized =
+        and localizeToolResult isAssistant ownerId result tail nextOrdinal idMap localized =
             match Map.tryFind (ToolCallId.value ownerId) idMap with
-            | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
             | Some replicaId ->
-                localizeParts tail nextOrdinal idMap (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+                localizeParts
+                    isAssistant
+                    tail
+                    nextOrdinal
+                    idMap
+                    (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+            | None when isAssistant ->
+                let ownerKey = ToolCallId.value ownerId
+                let replicaId = localId nextOrdinal
+
+                localizeParts
+                    isAssistant
+                    tail
+                    (nextOrdinal + 1)
+                    (Map.add ownerKey replicaId idMap)
+                    (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+            | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
 
         let rec localizeMessages
             (remaining: ProviderProjection.WireMessage list)
@@ -196,7 +213,10 @@ module StrengthFrame =
             match remaining with
             | [] -> Ok(List.rev localized)
             | message :: tail ->
-                localizeParts message.Parts nextOrdinal idMap []
+                let isAssistant =
+                    String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+
+                localizeParts isAssistant message.Parts nextOrdinal idMap []
                 |> Result.bind (fun (parts, next, nextMap) ->
                     localizeMessages tail next nextMap ({ message with Parts = parts } :: localized))
 

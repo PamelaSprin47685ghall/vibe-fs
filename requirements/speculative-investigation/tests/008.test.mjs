@@ -226,7 +226,7 @@ const frame = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
 // The JS frame shape is the Surface shape, not the payload shape; serializing it
 // verbatim makes decodeFrameBundlePayload refuse the load.
-const payloadOf = (bundle) => ({
+const storeWirePayload = (bundle) => ({
   version: 1,
   digest: bundle.digest,
   byte_length: bundle.byteLength,
@@ -257,7 +257,7 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Author
       sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: 1,
     }))
     await append(durability, Strength.eventBound(decision, 'run-1', 'replica-1', 'anchor-1'))
-    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(frame))))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(frame))))
     assert.equal(ref.ok, true)
     await append(durability, Strength.eventPrepared('owner', decision, 'run-1', 'replica-1', 'anchor-1', frame.digest, frame.byteLength, [ref.value]))
 
@@ -271,7 +271,7 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Author
     // The payload written above must be the real material: the production
     // recovery entry decodes it through the same path a restart would use and
     // returns the same batches, byteLength and digest as the frame it was built
-    // from. A payloadOf transcription drift — a renamed or mis-nested key —
+    // from. A storeWirePayload transcription drift — a renamed or mis-nested key —
     // makes this load refuse instead of passing.
     const reloaded = await Strength.durabilityLoadBundleForDecision(durability, projection, decision)
     assert.equal(reloaded.ok, true, reloaded.error)

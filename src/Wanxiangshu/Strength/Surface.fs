@@ -2003,6 +2003,7 @@ module StrengthSurface =
     /// still observes the current state. The domain lifecycle stays a pure
     /// value; only this handle is mutable.
     type private LifecycleHandle(lifecycle: DelegationLifecycle) =
+        // DSL-MUTABLE: resource — 句柄内部可变游标：随 Bound/Prepared/终态推进，承载 JS 可见会话状态而非工作流状态
         let mutable current = lifecycle
 
         member _.Value

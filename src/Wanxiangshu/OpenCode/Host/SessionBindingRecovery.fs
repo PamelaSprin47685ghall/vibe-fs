@@ -51,9 +51,15 @@ module SessionBindingRecovery =
         projections.HandleByChildSession
         |> Map.tryFind childSessionId
         |> Option.filter (fun record -> record.Ownership = HandleOwnership.DurableParentHandle)
-        |> Option.bind (fun record ->
+        |> Option.map (fun record ->
             parentOwningHandle projections record.Handle
-            |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, agentNameOf record))
+            |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, agentNameOf record)
+            |> Option.defaultWith (fun () ->
+                // Fallback: child record exists in durable projection, resolve agent even if parent handle set is compacting
+                "", agentNameOf record))
+        |> Option.bind (fun (parentKey, agent) ->
+            if System.String.IsNullOrWhiteSpace agent then None
+            else Some (parentKey, agent))
         |> Option.orElseWith (fun () ->
             // 2. Check durable Companion session associations
             SessionAssociationProjection.tryMainSessionOf childSessionId projections.Associations

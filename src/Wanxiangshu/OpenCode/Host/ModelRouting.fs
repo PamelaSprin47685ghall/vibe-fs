@@ -777,6 +777,15 @@ module ModelRouting =
 
                 Some(issueAdmission sessionId physicalUserMessageId role participant lease.Target)
             | None ->
+                let effectivePurpose =
+                    if
+                        lease.Purpose = ModelExecutionPurpose.ReadonlyDelegate
+                        && purpose = ModelExecutionPurpose.Normal
+                    then
+                        ModelExecutionPurpose.ReadonlyDelegate
+                    else
+                        purpose
+
                 requireSameIdentity
                     sessionId
                     physicalUserMessageId
@@ -785,7 +794,7 @@ module ModelRouting =
                     lease.Purpose
                     role
                     participant
-                    purpose
+                    effectivePurpose
 
                 capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
 

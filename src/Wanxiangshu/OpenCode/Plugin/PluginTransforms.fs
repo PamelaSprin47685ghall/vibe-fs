@@ -460,7 +460,7 @@ module PluginTransforms =
                             |> ChatExecutionProjection.byKey key
                             |> Option.exists (fun execution ->
                                 execution.Evidence.Origin = PromptAuthority.PromptOrigin.Continuation
-                                    PromptAuthority.ContinuationKind.HumanMessage)
+                                                                PromptAuthority.ContinuationKind.HumanMessage)
                         | _ -> false
 
                     return!

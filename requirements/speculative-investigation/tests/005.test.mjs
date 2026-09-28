@@ -117,7 +117,7 @@ const H = (text) => createHash('sha256').update(text).digest('hex')
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
 // The JS bundle shape (batches/byteLength/requestOrdinal/toolName/...) is the Surface
 // shape, not the payload shape; serializing it verbatim makes decode refuse the load.
-const payloadOf = (bundle, overrides = {}) => ({
+const storeWirePayload = (bundle, overrides = {}) => ({
   version: 1,
   digest: bundle.digest,
   byte_length: bundle.byteLength,
@@ -145,7 +145,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_oversized_complete_exchan
   try {
     const durability = Strength.durabilityCreate(local.store)
     const decision = 'decision-oversize'
-    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle))))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     assert.equal(ref.ok, true)
     for (const event of [
       Strength.eventRequested({
@@ -187,7 +187,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_tampered_digest_or_byte_l
     ]).value
 
     const loadWithPayload = async (decision, run, callId, overrides) => {
-      const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle, overrides))))
+      const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle, overrides))))
       assert.equal(ref.ok, true)
       const requested = await Strength.durabilityAppend(durability, Strength.eventRequested({
         decisionId: decision, ownerSessionId: 'owner',
@@ -236,7 +236,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_natural_tool_truncation_s
     const durability = Strength.durabilityCreate(local.store)
     const decision = 'decision-truncated'
     const run = 'run-9'
-    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle))))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     assert.equal(ref.ok, true)
     const requested = await Strength.durabilityAppend(durability, Strength.eventRequested({
       decisionId: decision, ownerSessionId: 'owner',

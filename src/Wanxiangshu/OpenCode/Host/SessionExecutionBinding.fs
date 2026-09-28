@@ -88,7 +88,8 @@ module SessionExecutionBinding =
     let private durableParentOf (sessionKey: string) : string option =
         durableChildEvidence
         |> Option.bind (fun resolve -> resolve sessionKey)
-        |> Option.map fst
+        |> Option.map (fun (parent, _) -> if String.IsNullOrWhiteSpace parent then None else Some parent)
+        |> Option.flatten
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID

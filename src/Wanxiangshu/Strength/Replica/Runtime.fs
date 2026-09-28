@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Strength.Replica
 
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Change
 
 #nowarn "3511"
 
@@ -10,13 +9,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -30,22 +22,7 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
-open Wanxiangshu.Host
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Composition.Turn
 
 [<RequireQualifiedAccess>]
 type StrengthReplicaTerminal =
@@ -298,7 +275,7 @@ module private StrengthReplicaRuntimeLogic =
                     dispatcher.SendAgentOwnerRootWithTools
                         (DispatchSessionPort.ofSessionPort sessions)
                         replica
-                        (LlmFacing.renderInstruction "Continue.")
+                        "Continue."
                         identitySeed
                         directory
                         PromptDispatcher.AwaitMode.Detached
@@ -952,6 +929,19 @@ type StrengthReplicaRuntime
                     replica
                     replicaAgent
                     state
+
+            let _terminalSub =
+                sessions.SubscribeTerminal(
+                    replica,
+                    fun _ outcome ->
+                        let turnOutcome =
+                            match outcome with
+                            | TerminalOutcome.Completed _ -> ReconcileProgram.TurnCompleted
+                            | TerminalOutcome.Failed stop -> ReconcileProgram.TurnFailed stop.Reason
+                            | TerminalOutcome.Aborted stop -> ReconcileProgram.TurnAborted stop.Reason
+
+                        observeReplicaTurn state turnOutcome
+                )
 
             return
                 { ReplicaSessionId = replica

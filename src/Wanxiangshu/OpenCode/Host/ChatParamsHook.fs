@@ -55,9 +55,13 @@ module ChatParamsHook =
         if isNull input then None else extractModel input
 
     let private isManagedName (agent: string) =
-        ManagedAgent.requiredNames |> List.contains agent
-        || agent = "coder"
-        || agent = "inspector"
+        if String.IsNullOrWhiteSpace agent then
+            false
+        else
+            let trimmed = agent.Trim()
+            ManagedAgent.requiredNames |> List.exists (fun name -> String.Equals(name, trimmed, StringComparison.OrdinalIgnoreCase))
+            || String.Equals(trimmed, "coder", StringComparison.OrdinalIgnoreCase)
+            || String.Equals(trimmed, "inspector", StringComparison.OrdinalIgnoreCase)
 
     let private trySessionId (input: obj) =
         if isNull input then

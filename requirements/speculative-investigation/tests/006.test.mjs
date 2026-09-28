@@ -154,7 +154,7 @@ const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ too
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
 // The JS frame shape is the Surface shape, not the payload shape; serializing it
 // verbatim makes decodeFrameBundlePayload refuse the load.
-const payloadOf = (frame, overrides = {}) => ({
+const storeWirePayload = (frame, overrides = {}) => ({
   version: 1,
   digest: frame.digest,
   byte_length: frame.byteLength,
@@ -170,7 +170,7 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_persists_
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
-    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle))))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     assert.equal(ref.ok, true)
     for (const event of [
       request('d1'),
@@ -199,10 +199,10 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_rejects_c
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
-    const first = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle))))
+    const first = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     assert.equal(first.ok, true)
     const other = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
-    const otherRef = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(other))))
+    const otherRef = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(other))))
     assert.equal((await Strength.durabilityAppend(durability, request('d1'))).ok, true)
     assert.equal((await Strength.durabilityAppend(durability, Strength.eventBound('d1', 'run-1', 'replica-d1', 'anchor-a'))).ok, true)
     assert.equal((await Strength.durabilityAppend(durability, prepared('d1', first.value))).ok, true)
@@ -217,7 +217,7 @@ test('WHAT[speculative-investigation-006] prepared_cut_reopen_observes_only_dura
   const local = createLocalEventStore({ commonDir })
   try {
     const durability = Strength.durabilityCreate(local.store)
-    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(bundle))))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     for (const event of [
       request('cut-d3'),
       Strength.eventBound('cut-d3', 'run-1', 'replica-cut-d3', 'anchor-a'),
