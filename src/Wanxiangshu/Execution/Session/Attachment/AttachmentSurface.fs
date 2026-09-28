@@ -7,6 +7,75 @@ open Wanxiangshu.Foundation.Identity
 /// JS-native boundary for the attached-session owner. The runtime and callback
 /// resources stay opaque; callers receive only binding snapshots.
 module AttachmentSurface =
+    let private roleOf =
+        function
+        | "Engineer" -> SyncDelegateRole.Engineer
+        | "Coder" -> SyncDelegateRole.Coder
+        | "Inspector" -> SyncDelegateRole.Inspector
+        | _ -> invalidArg "role" "Unknown attachment role"
+
+    let createOwner () : obj = box (AttachedSessionRuntime())
+
+    let getOrCreate
+        (runtime: obj)
+        (owner: string)
+        (role: string)
+        (agent: string)
+        (createChild: string -> string -> string -> string -> Task<string>)
+        (bindChild: string -> string -> string -> unit)
+        : Task<obj> =
+        task {
+            let observe (_: SessionId) (_: ReuseScopeId) (_: SyncDelegateRole) (_: string) =
+                Task.FromResult(Ok AttachedChildObservation.Missing)
+
+            let create ownerId scope roleValue agentName (_: string option) =
+                task {
+                    let! child =
+                        createChild
+                            (SessionId.value ownerId)
+                            (ReuseScopeId.value scope)
+                            (SyncDelegate.roleLabel roleValue)
+                            agentName
+
+                    return Ok(SessionId.create child)
+                }
+
+            let bind ownerId childId agentName =
+                bindChild (SessionId.value ownerId) (SessionId.value childId) agentName
+
+            let! result =
+                (runtime :?> AttachedSessionRuntime)
+                    .GetOrCreate(
+                        SessionId.create owner,
+                        roleOf role,
+                        agent,
+                        None,
+                        observe,
+                        create,
+                        bind,
+                        (fun _ _ -> ())
+                    )
+
+            return
+                match result with
+                | Ok(child, boundAgent) ->
+                    box
+                        {| child = SessionId.value child
+                           agent = boundAgent |}
+                | Error detail -> box {| error = detail |}
+        }
+
+    let tryFind (runtime: obj) (owner: string) (role: string) : string option =
+        (runtime :?> AttachedSessionRuntime)
+            .TryFind(SessionId.create owner, roleOf role)
+        |> Option.map SessionId.value
+
+    let remove (runtime: obj) (owner: string) (role: string) : bool =
+        (runtime :?> AttachedSessionRuntime).Remove(SessionId.create owner, roleOf role)
+
+    let clear (runtime: obj) : unit =
+        (runtime :?> AttachedSessionRuntime).Clear()
+
     let classifyObservation (observation: string) : obj =
         let existing = SessionId.create "host-child-existing"
 
@@ -36,12 +105,7 @@ module AttachmentSurface =
         (retainBinding: bool)
         : Task<obj> =
         task {
-            let roleValue =
-                match role with
-                | "Engineer" -> SyncDelegateRole.Engineer
-                | "Coder" -> SyncDelegateRole.Coder
-                | "Inspector" -> SyncDelegateRole.Inspector
-                | _ -> invalidArg "role" "Unknown attachment role"
+            let roleValue = roleOf role
 
             // DSL-MUTABLE: algorithm-scratch — attachment id counter
             let next = ref 0
