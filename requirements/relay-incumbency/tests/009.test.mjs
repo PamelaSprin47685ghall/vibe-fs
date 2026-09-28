@@ -57,4 +57,12 @@ test('WHAT[relay-incumbency-009] active authority update advances revision and s
     'snapshot-3',
   )
   assert.equal(stale.ok, false)
+  for (const [incumbent, previous, next, message, snapshot] of [
+    ['inc-other', 'authority-2', 'authority-3', 'physical-authority-3', 'snapshot-3'],
+    ['inc-1', 'authority-1', 'authority-2', 'conflicting-message', 'snapshot-2'],
+    ['inc-1', 'authority-1', 'authority-2', 'physical-authority-2', 'conflicting-snapshot'],
+  ]) {
+    assert.equal(relay.advanceAuthority(revised.state, 'road-1', incumbent, previous, next, message, snapshot).ok, false)
+  }
+  assert.equal(relay.authority(revised.state, 'road-1').roadRevision, 'authority-2')
 })

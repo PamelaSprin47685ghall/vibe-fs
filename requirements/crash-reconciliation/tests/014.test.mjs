@@ -12,7 +12,7 @@ const companion = (main, session) => ({ kind: 'companion', main, companion: sess
 const blogger = (main, session) => ({ kind: 'blogger', main, blogger: session })
 const managerJob = (job, manager) => ({ kind: 'managerJob', job, manager })
 
-test('WHAT[crash-reconciliation-014] CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
+test('WHAT[crash-reconciliation-014] closure validator accepts unique sessions and returns exact membership', () => {
   const result = recovery.validateClosure(root, [child('p', 'c', 'h1'), companion('m', 'c2'), work('w1')])
   assert.equal(result.ok, true)
   assert.deepEqual([...result.members].sort(), ['A:p>c:h1', 'C:m>c2', 'W:w1'])

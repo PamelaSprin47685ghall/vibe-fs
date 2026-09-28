@@ -1,167 +1,76 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  clearAllForTests,
-  ensureRoot,
-  languageOfSession,
-  nameOf,
-  transformRoleSystem,
-} from '../../../dist/Participant/Provider/LanguageSurface.js'
-import {
-  configure as configureManagedAgents,
-  installDefaultResources,
-} from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
-import * as promptSurface from '../../../dist/Resources/PromptSurface.js'
+import { clearAllForTests, ensureRoot, languageOfSession, transformRoleSystem } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { configure, installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
+import * as prompts from '../../../dist/Resources/PromptSurface.js'
+import { withPreference } from './support/language-fixtures.mjs'
 
-const hasChinese = (text) => /[\u4e00-\u9fff]/.test(text)
-
-const withPreference = async (raw, fn) => {
-  const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-  if (raw === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-  else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = raw
-  try {
-    return await fn()
-  } finally {
-    if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
-  }
+const fields = {
+  manager: 'ManagerSystemPrompt', orchestrator: 'OrchestratorSystemPrompt',
+  engineer: 'EngineerSystemPrompt', devops: 'DevopsSystemPrompt', blogger: 'BloggerSystemPrompt',
 }
-
 const buildConfig = () => ({
-  agent: {
-    manager: { model: 'manager-model' },
-    orchestrator: { model: 'orchestrator-model' },
-    engineer: { model: 'engineer-model' },
-    devops: { model: 'devops-model' },
-    blogger: { model: 'blogger-model' },
-    bookkeeper: { model: 'bookkeeper-model' },
-  },
+  agent: Object.fromEntries([...Object.keys(fields), 'bookkeeper'].map((name) => [name, { model: `${name}-model` }])),
 })
 
-test.beforeEach(() => {
-  clearAllForTests()
+test.beforeEach(clearAllForTests)
+test.afterEach(clearAllForTests)
+
+test('WHAT[provider-language-013] config projection selects the complete catalog for each global language', async () => {
+  for (const [preference, language] of [['zh-CN', 'SimplifiedChinese'], ['en', 'English']]) {
+    await withPreference(preference, () => {
+      installDefaultResources()
+      const config = buildConfig()
+      assert.equal(configure(config).ok, true)
+      const expected = prompts.loadForLanguage(language)
+      for (const [name, field] of Object.entries(fields)) {
+        assert.equal(config.agent[name].prompt, expected[field], `${name}/${language}`)
+      }
+      assert.equal(config.agent.bookkeeper.prompt, prompts.loadBookkeeperSystemFor(language))
+    })
+  }
 })
 
-test('WHAT[provider-language-013] zh-CN preference projects Chinese prompts onto every managed agent', async () => {
-  await withPreference('zh-CN', async () => {
-    installDefaultResources()
-    const config = buildConfig()
-    const outcome = configureManagedAgents(config)
-    assert.equal(outcome.ok, true, `gate must accept the catalog: ${outcome.error}`)
-
-    for (const name of ['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper']) {
-      const prompt = config.agent[name]?.prompt
-      assert.ok(typeof prompt === 'string' && prompt.length > 0, `${name} must carry a prompt`)
-      assert.ok(
-        hasChinese(prompt),
-        `${name} Host-config prompt must be Chinese under a zh-CN preference, got: ${prompt.slice(0, 60)}`,
-      )
-    }
-  })
+test('WHAT[provider-language-013] system repair follows the existing binding despite an opposite preference and installed view', async () => {
+  for (const [initial, language, changed, otherLanguage] of [
+    ['en', 'English', 'zh-CN', 'SimplifiedChinese'],
+    ['zh-CN', 'SimplifiedChinese', 'en', 'English'],
+  ]) {
+    const session = `manager-${language}`
+    await withPreference(initial, () => assert.equal(ensureRoot(session), language))
+    await withPreference(changed, async () => {
+      installDefaultResources()
+      const expected = prompts.loadForLanguage(language).ManagerSystemPrompt
+      const foreign = 'HOST-owned bytes: exit_code 中文'
+      for (const input of [
+        prompts.loadForLanguage(otherLanguage).ManagerSystemPrompt,
+        prompts.loadForLanguage(language).ManagerSystemPrompt,
+      ]) {
+        const output = await transformRoleSystem(session, 'Manager', [input, foreign])
+        assert.deepEqual(output.system, [expected, foreign])
+        const repeated = await transformRoleSystem(session, 'Manager', output.system)
+        assert.deepEqual(repeated.system, output.system)
+      }
+      assert.equal(languageOfSession(session), language)
+    })
+  }
 })
 
-test('WHAT[provider-language-013] English preference still projects English prompts', async () => {
-  await withPreference('en', async () => {
-    installDefaultResources()
-    const config = buildConfig()
-    const outcome = configureManagedAgents(config)
-    assert.equal(outcome.ok, true, `gate must accept the catalog: ${outcome.error}`)
-
-    for (const name of ['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper']) {
-      const prompt = config.agent[name]?.prompt
-      assert.ok(typeof prompt === 'string' && prompt.length > 0, `${name} must carry a prompt`)
-      assert.ok(
-        !hasChinese(prompt),
-        `${name} Host-config prompt must stay English under an en preference, got: ${prompt.slice(0, 60)}`,
-      )
-    }
-  })
-})
-
-test('WHAT[provider-language-013] the Manager system prompt a zh-CN session receives is Chinese', async () => {
-  await withPreference('zh-CN', async () => {
-    installDefaultResources()
-    const config = buildConfig()
-    configureManagedAgents(config)
-
-    const sid = 'ses_provider_language_013_manager'
-    assert.equal(nameOf(ensureRoot(sid)), 'SimplifiedChinese')
-
-    // The Host assembles system[] from the config agent prompt plus its own text.
-    const output = { system: [config.agent.manager.prompt, 'HOST AGENTS TEXT'] }
-    await transformRoleSystem(sid, 'Manager', output.system)
-
-    assert.ok(
-      hasChinese(output.system[0]),
-      `Manager system prompt must be Chinese, got: ${output.system[0].slice(0, 60)}`,
-    )
-    assert.equal(output.system[1], 'HOST AGENTS TEXT', 'Host-owned text must stay untouched')
-
-    // A second pass must stay Chinese (idempotent repair).
-    const second = { system: [output.system[0], 'HOST AGENTS TEXT'] }
-    await transformRoleSystem(sid, 'Manager', second.system)
-    assert.ok(hasChinese(second.system[0]), 'repeated transforms must keep the bound language')
-  })
-})
-
-test('WHAT[provider-language-013] an English-bound session keeps English even when the preference is Chinese', async () => {
-  const sid = 'ses_provider_language_013_bound_en'
-
-  await withPreference('en', async () => {
-    clearAllForTests()
-    installDefaultResources()
-    assert.equal(nameOf(ensureRoot(sid)), 'English')
-  })
-
-  await withPreference('zh-CN', async () => {
-    const config = buildConfig()
-    configureManagedAgents(config)
-
-    const output = { system: [promptSurface.loadForLanguage('English').ManagerSystemPrompt, 'HOST TEXT'] }
-    await transformRoleSystem(sid, 'Manager', output.system)
-
-    assert.equal(
-      nameOf(languageOfSession(sid)),
-      'English',
-      'bind-once must survive a later preference change (provider-language-002/004)',
-    )
-    assert.ok(
-      !hasChinese(output.system[0]),
-      `an English-bound session must never receive Chinese prose, got: ${output.system[0].slice(0, 60)}`,
-    )
-  })
-})
-
-test('WHAT[provider-language-013] companion instruction prose follows the configured language', async () => {
+test('WHAT[provider-language-013] companion instruction exports contain Chinese prose under a Chinese preference', async () => {
   await withPreference('zh-CN', async () => {
     const companion = await import('../../../dist/Context/Companion/ProjectionSurface.js')
-    assert.ok(
-      hasChinese(companion.normalInstruction),
-      `companion normal instruction must be Chinese, got: ${companion.normalInstruction.slice(0, 60)}`,
-    )
-    assert.ok(
-      hasChinese(companion.squashInstruction),
-      `companion squash instruction must be Chinese, got: ${companion.squashInstruction.slice(0, 60)}`,
-    )
-    assert.ok(
-      hasChinese(companion.memoryPreamble),
-      `companion memory preamble must be Chinese, got: ${companion.memoryPreamble.slice(0, 60)}`,
-    )
+    for (const text of [companion.normalInstruction, companion.squashInstruction, companion.memoryPreamble]) {
+      assert.match(text, /[\u4e00-\u9fff]/)
+    }
   })
 })
 
-test('WHAT[provider-language-013] horizon roster prose follows the configured language', async () => {
+test('WHAT[provider-language-013] horizon prose contains Chinese while the technical participant label survives', async () => {
   await withPreference('zh-CN', async () => {
     const horizon = await import('../../../dist/Execution/Session/OpenCode/HorizonSurface.js')
-    assert.ok(
-      hasChinese(horizon.description()),
-      `horizon description must be Chinese, got: ${horizon.description().slice(0, 60)}`,
-    )
-
+    assert.match(horizon.description(), /[\u4e00-\u9fff]/)
     const roster = horizon.render([{ label: 'engineer', status: 'active', work: 'none', record: '' }], [])
-    assert.ok(
-      hasChinese(roster),
-      `horizon roster must be Chinese, got: ${roster.slice(0, 80)}`,
-    )
+    assert.match(roster, /[\u4e00-\u9fff]/)
+    assert.match(roster, /engineer/)
   })
 })

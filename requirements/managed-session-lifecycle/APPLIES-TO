@@ -16,7 +16,9 @@
 /src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
+/src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs
+/src/Wanxiangshu/OpenCode/Host/SessionsSurface.fsi
 /src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/Composition/Turn/Scheduler.fs
-

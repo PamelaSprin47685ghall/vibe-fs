@@ -1,57 +1,30 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
-const hash = (value) => `H(${value})`
-
-const personas = {
-  engineer: 'Engineer',
-  coder: 'Coder',
-  manager: 'Lead',
-  reviewer: 'Auditor',
-  inspector: 'Investigator',
-  devops: 'Operator',
-}
-
-const rootSelection = (agent) => {
-  const role = agent === 'predictor' ? 'inspector' : agent
-  return {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      participant: agent,
-      role,
-      selectedTier: 'deep',
-      persona: personas[agent] ?? 'Unknown',
-      personaCatalogVersion: 1,
-      origin: 'ResolvedAtRoot',
-    },
-  }
-}
-
-const rootFor = (agent = 'engineer', physical = 'msg_u1') => {
-  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', physical, rootSelection(agent))
-  assert.equal(result.ok, true, result.error)
-  return result.value
-}
-
-const profile = (value) => ({
-  session: value.session,
-  logicalRun: value.logicalRun,
-  authorityRoot: value.authorityRoot,
-  authorityKind: value.authorityKind,
-  participant: value.participantIdentity.participant,
-  role: value.participantIdentity.role,
+test('WHAT[interaction-authority-001] receipt stays pending across reopen and only exact physical acceptance creates child authority', async () => {
+  await withJournal('physical-boundary', async (handle, reopen) => {
+    const owner = await acceptOwner(handle)
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner)
+    assert.equal(seed.ok, true)
+    const sent = await dispatch.sendAgentOwnerRootAwait(
+      hostPort(async () => dispatch.admittedWithReceipt('msg-looks-physical')),
+      handle, 'child', 'a bounded assignment', seed.value,
+    )
+    assert.equal(sent.ok, true, sent.error)
+    const pending = dispatch.projectionObservation(handle, 'child')
+    assert.equal(pending.activeLogicalRun, null)
+    assert.equal(pending.pendingClaims.length, 1)
+    handle = await reopen()
+    assert.equal(dispatch.projectionObservation(handle, 'child').activeLogicalRun, null)
+    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'child', sent.key, 'actual-physical-message')
+    assert.equal(accepted.ok, true, accepted.error)
+    assert.equal(accepted.profile.authorityRoot, 'actual-physical-message')
+    assert.deepEqual(accepted.profile.identitySeed, seed.value)
+    assert.deepEqual(dispatch.projectionObservation(handle, 'child').activeLogicalRun, accepted.profile)
+  })
 })
 
-const register = (root) => authority.registerAuthority(root, authority.empty)
-
-const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
-  authority.claimContinuation(key, 'ses_a', kind, root, payload)
-
-test('WHAT[interaction-authority-001] IA_001_physical_message_promotes_to_authority_root', () => {
-  assert.equal(authority.promotePhysical('msg_u1'), 'msg_u1')
-  assert.equal(rootFor().authorityRoot, 'msg_u1')
-})
+test.todo('WHAT[interaction-authority-001] GAP-122 compiler rejects using a TransportReceipt where authority promotion requires proven physical identity')

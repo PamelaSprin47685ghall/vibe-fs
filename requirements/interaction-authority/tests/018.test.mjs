@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[interaction-authority-018] IA_018_exact_closure_releases_run_scoped_authority_before_root_reuse', () => {
+test('WHAT[interaction-authority-018] pure close transition clears exact run resources before root reuse', () => {
   const first = rootFor()
   let state = register(first)
   const claim = continuation('pk_1', first)
@@ -76,3 +76,6 @@ test('WHAT[interaction-authority-018] IA_018_exact_closure_releases_run_scoped_a
   assert.equal(after.claimSequences.length, 0)
   assert.equal(after.acceptedContinuations.length, 0)
 })
+
+test.todo('WHAT[interaction-authority-018] GAP-123 all five accepted lifecycle kinds carry ExpectedClosureKind and exact source witness into a durable AuthorityLogicalRunClosed')
+test.todo('WHAT[interaction-authority-018] GAP-123 committed source plus unknown closure append retains identity and blocks SessionId reuse across restart')

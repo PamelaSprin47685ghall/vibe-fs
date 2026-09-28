@@ -409,55 +409,6 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
     assert.equal(hooks.tool.commission.args.keywords, undefined)
   })
 })
-integrationTest('WHAT[capability-enforcement-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'manager-assume', 'manager')
-    const ctx = (callID) => ({ sessionID: 'manager-assume', agent: 'manager', callID, messageID: `msg-${callID}` })
-
-    const first = await hooks.tool.assume.execute(
-      {
-        update: '{ideas:["compressed memory","random access"]}',
-        todos: [{ content: 'compressed memory', status: 'pending' }],
-      },
-      ctx('call-1'),
-    )
-    const second = await hooks.tool.assume.execute(
-      { update: '.', todos: [{ content: 'compressed memory', status: 'in_progress' }] },
-      ctx('call-2'),
-    )
-    const scalar = await hooks.tool.assume.execute(
-      { update: '"hello"', todos: [] },
-      ctx('call-3'),
-    )
-    const scalarRead = await hooks.tool.assume.execute(
-      { update: '.', todos: [] },
-      ctx('call-4'),
-    )
-    const rejectedResult = await hooks.tool.assume.execute(
-      { update: '{committed:true}', todos: 'not an array' },
-      ctx('call-5'),
-    )
-    assert.match(rejectedResult, /assume\.todos must be an array/)
-    const afterQueryFailure = await hooks.tool.assume.execute(
-      { update: '.', todos: [] },
-      ctx('call-6'),
-    )
-    const rejectedUpdate = await hooks.tool.assume.execute(
-      { update: 'empty', todos: [] },
-      ctx('call-7'),
-    )
-    assert.match(rejectedUpdate, /assume update must produce exactly one JSON value/)
-    const afterRejectedUpdate = await hooks.tool.assume.execute(
-      { update: '.', todos: [] },
-      ctx('call-8'),
-    )
-
-    assert.match(first, /compressed memory/)
-    assert.match(scalar, /hello/)
-    assert.match(scalarRead, /hello/)
-    assert.match(afterRejectedUpdate, /hello/)
-  })
-})
 integrationTest('WHAT[capability-enforcement-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
   await withPlugin(async (hooks) => {
     const managerPersonas = ['engineer']

@@ -4,6 +4,9 @@
 
 /src/Wanxiangshu/Participant/Cognition/TodoSink.fs
 /src/Wanxiangshu/Participant/Cognition/TodoSink.fsi
+/src/Wanxiangshu/Participant/Cognition/TodoSinkSurface.*
+/src/Wanxiangshu/Participant/Cognition/Admission.*
+/src/Wanxiangshu/Participant/Cognition/AdmissionSurface.*
 /src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs
 /src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fsi
 /src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs

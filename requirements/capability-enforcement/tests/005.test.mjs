@@ -1,50 +1,20 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import { capabilities, exactReadonlyHostToolMap, isAllowedTool } from '../../../dist/Strength/Surface.js'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { capabilities, exactReadonlyHostToolMap, isAllowedTool } = await import("../../../dist/Strength/Surface.js");
-
-
-test('WHAT[capability-enforcement-005] STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
-  const allowed = new Set(capabilities('engineer'))
-  const denied = ['Write', 'Edit', 'Exec', 'Fork', 'Join', 'Horizon', 'Network', 'Pty', 'Fission']
-  for (const permission of denied) {
-    assert.equal(allowed.has(permission), false, permission)
-  }
-
-  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission']) {
-    assert.equal(isAllowedTool(tool), false, tool)
-  }
-  assert.equal(isAllowedTool('read'), true)
-  assert.equal(isAllowedTool('glob'), true)
-  assert.equal(isAllowedTool('grep'), true)
-})
-test('WHAT[capability-enforcement-005] STRENGTH_004_006_policy_replica_host_tool_map_denies_unknown_tools_instead_of_asking', () => {
-  const rules = exactReadonlyHostToolMap
-  assert.equal(rules.length, 4)
-  assert.deepEqual(rules[0], { tool: '*', allowed: false })
-  assert.deepEqual(rules[1], { tool: 'glob', allowed: true })
-  assert.deepEqual(rules[2], { tool: 'grep', allowed: true })
-  assert.deepEqual(rules[3], { tool: 'read', allowed: true })
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { capabilities, exactReadonlyHostToolMap } = await import("../../../dist/Strength/Surface.js");
-
-
-test('WHAT[capability-enforcement-005] STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly', () => {
+test('WHAT[capability-enforcement-005] replica projections and tool policy allow only the three read-only operations', () => {
   assert.deepEqual(exactReadonlyHostToolMap, [
     { tool: '*', allowed: false },
     { tool: 'glob', allowed: true },
     { tool: 'grep', allowed: true },
     { tool: 'read', allowed: true },
   ])
-  assert.deepEqual(capabilities('engineer'), ['Glob', 'Grep', 'Read'])
-  assert.deepEqual(capabilities('devops'), ['Glob', 'Grep', 'Read'])
+  for (const role of ['engineer', 'devops']) {
+    assert.deepEqual(capabilities(role), ['Glob', 'Grep', 'Read'])
+  }
   assert.deepEqual(capabilities('manager'), [])
+  for (const tool of ['read', 'glob', 'grep']) assert.equal(isAllowedTool(tool), true, tool)
+  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
+    assert.equal(isAllowedTool(tool), false, tool)
+  }
 })
-}

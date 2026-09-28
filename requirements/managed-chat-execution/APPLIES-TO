@@ -7,6 +7,8 @@
 /src/Wanxiangshu/Interaction/Authority/Surface.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
 /src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs
+/src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fs
+/src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fsi
 /src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
 /src/Wanxiangshu/OpenCode/Host/ModelCapacity/**

@@ -233,19 +233,6 @@ module RecoveryRuntimeSurface =
 
     let recoverScenarios (scenarios: string array) : Task<obj> = run (ResizeArray<string>()) scenarios
 
-    let recoverAcrossRestart (scenarios: string array) : Task<obj> =
-        task {
-            let midpoint = scenarios.Length / 2
-            let beforeScenarios, afterScenarios = Array.splitAt midpoint scenarios
-            let! beforeRestart = run (ResizeArray<string>()) beforeScenarios
-            let! afterRestart = run (ResizeArray<string>()) afterScenarios
-
-            return
-                box
-                    {| beforeRestart = beforeRestart
-                       afterRestart = afterRestart |}
-        }
-
     let interpretFailurePolicy
         (failureLabel: string)
         (retryBudget: string)
@@ -311,12 +298,7 @@ module RecoveryRuntimeSurface =
                        effects = effects.ToArray() |}
         }
 
-    let admissionCrashPointScenarios
-        (cuts: string array)
-        (restartKind: string)
-        (commitment: string)
-        (capacityOutcome: string)
-        : Task<obj> =
+    let admissionPhaseSamples (cuts: string array) (commitment: string) (capacityOutcome: string) : Task<obj> =
         task {
             let persistence =
                 match commitment with
@@ -332,7 +314,6 @@ module RecoveryRuntimeSurface =
                     outcomes.Add(
                         box
                             {| cut = cut
-                               restart = restartKind
                                decisions = [| "NoDurableExecution"; "NoDurableExecution" |]
                                effects = [||]
                                commitment = commitment
@@ -378,7 +359,6 @@ module RecoveryRuntimeSurface =
                     outcomes.Add(
                         box
                             {| cut = cut
-                               restart = restartKind
                                decisions = decisions.ToArray()
                                effects = effects.ToArray()
                                commitment = commitment
@@ -387,13 +367,3 @@ module RecoveryRuntimeSurface =
 
             return box {| scenarios = outcomes.ToArray() |}
         }
-
-    let lifecycleSignals () =
-        [| "DurabilityActivated"
-           "PluginRuntimeReloaded"
-           "ExactAssistantStarted"
-           "ExactAssistantTerminal"
-           "SessionAborted"
-           "SessionDeleted"
-           "SessionCancelled"
-           "CapacityProjectionReplayed" |]

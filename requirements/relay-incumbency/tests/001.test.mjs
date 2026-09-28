@@ -10,4 +10,11 @@ test('WHAT[relay-incumbency-001] one open road admits at most one active iterati
   assert.equal(first.ok, true)
   const second = relay.openIncumbency(first.state, 'road-1', 'inc-2', 'snapshot-1', 'authority-1')
   assert.equal(second.ok, false)
+  const replay = open(first.state)
+  assert.equal(replay.ok, true)
+  assert.deepEqual(relay.view(replay.state, 'road-1'), relay.view(first.state, 'road-1'))
+  assert.equal(relay.openIncumbency(first.state, 'road-1', 'inc-1', 'snapshot-2', 'authority-1').ok, false)
+  assert.equal(relay.openIncumbency(first.state, 'road-1', 'inc-1', 'snapshot-1', 'authority-2').ok, false)
 })
+
+test('WHAT[relay-incumbency-001] concurrent production opening derives one identity and admits one physical loop prompt', {todo: 'GAP-192: sequential Road fold calls do not exercise concurrent opening or prompt dispatch'})

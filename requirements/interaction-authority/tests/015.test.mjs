@@ -60,7 +60,7 @@ const acceptOwner = async (handle, session = 'ses-owner') => {
   return accepted.profile
 }
 
-const inheritedSeed = (owner, child = 'coder') => {
+const inheritedSeed = (owner, child = 'engineer') => {
   const issued = authority.issueInheritedIdentitySeed(child, owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return issued.value

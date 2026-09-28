@@ -347,10 +347,6 @@ test('WHAT[managed-session-lifecycle-006] THEOREM_join_blocked_while_handle_acti
   const projection = makeActive()
   assert.deepEqual(HandleSurface.views(projection), { listable: ['agent:c1'], joinable: [], active: ['agent:c1'] })
 })
-test('WHAT[managed-session-lifecycle-006] THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => {
-  const active = makeActive()
-  assert.deepEqual(HandleSurface.views(active), { listable: ['agent:c1'], joinable: [], active: ['agent:c1'] })
-})
 test('WHAT[managed-session-lifecycle-006] THEOREM_projection_steps_enumerate_blocked_then_awakened_then_clear', () => {
   const active = makeActive()
   const completed = complete(active)
@@ -380,4 +376,22 @@ test('WHAT[managed-session-lifecycle-006] TPOL_outstanding_without_durable_work_
   assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Coder', true, 'ses_coder'), false)
   assert.equal(TerminalPolicySurface.outstandingWithoutJournal('unknown', true, 'ses_unknown'), false)
 })
+}
+
+{
+  const { default: assert } = await import('node:assert/strict')
+  const handles = await import('../../../dist/Execution/Delegation/Handle/Surface.js')
+  for (const role of ['Engineer', 'DevOps']) {
+    test(`WHAT[managed-session-lifecycle-006] replay cannot revive a retired ${role} handle`, { todo: 'GAP-132: replayExistingLink restores Active' }, () => {
+      const link = { op: 'link', handle: 'agent:terminal', child: 'child', agent: role.toLowerCase(), role }
+      const active = handles.apply(handles.empty(), link)
+      assert.equal(active.ok, true)
+      const complete = handles.apply(active.state, { op: 'complete', handle: link.handle, kind: 'Terminal' })
+      assert.equal(complete.ok, true)
+      const retired = handles.apply(complete.state, { op: 'retire', handle: link.handle })
+      assert.equal(retired.ok, true)
+      const replay = handles.apply(retired.state, link)
+      if (replay.ok) assert.equal(handles.read(replay.state, link.handle).lifecycle, 'Retired')
+    })
+  }
 }

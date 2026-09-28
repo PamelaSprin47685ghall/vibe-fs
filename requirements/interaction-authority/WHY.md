@@ -1,39 +1,13 @@
 # interaction-authority — WHY
 
-## 1. 领域动机与核心矛盾
+传输层的 user 消息既可能来自人，也可能是工具、内部续轮或修复提示。若把形态当成授权，系统自己发出的消息就能重置任务、身份或预算，形成自行升权。显式来源证据让新委托与既有任务的继续各有边界。
 
-物理传输层上的 `role=user` 文本极其廉价且极易伪造。如果将物理用户消息形态直接等同于权威交互（Authority Turn），系统会出现以下破坏：
-1. **权限自我抬升**：内部合成的 continuation、repair 提示或诊断重试在经过传输层后被重新误判为真人发起的根指令（HumanRoot）。
-2. **状态与预算被异常重置**：每次伪造的 Root 都会错误地创建新的 Logical Run、重置 Fallback/Repair 预算或修改已锁定的 participant 绑定。
-3. **中断与自恢复破坏恢复流程**：将 degeneration-guard 等自恢复介入误判为主流程崩溃，导致错误地切换物理目标。
+一次授权需要完整且稳定的身份。root 与 identity 分两次提交会在崩溃后留下孤儿状态；从缓存或零散消息拼装又会把旧身份混入新任务。Authority 保管 identity owner 提供的完整证据，让物理目标可以变化而任务权限保持连续。
 
-`interaction-authority` 确立唯一权威来源边界：
-- 严格区分 **Root**（创建 Logical Run 并确立权威）与 **Continuation**（仅延续既有 Run，禁止抬权）；
-- 物理消息形态绝不是 authority 证据，仅有 typed provenance 能建立权限；
-- 未知来源（UnknownOrigin）一律 fail-closed。
+界面省略 participant 不代表授权依据消失。可核对的既有 durable Profile 能保持普通对话连续，而无法确定的来源仍不能靠猜测补齐。
 
-## 2. 核心不变量与破坏后果
+同一物理会话可以承载先后不同的工作，但前一次必须明确关闭。idle、取消请求和底层任务完成不一定意味着授权已结束；特别是 Manager 换任仍可能在执行同一道路。确切关闭证据保护会话复用和重放，也防止历史身份借恢复重新升权。
 
-- **历史事件原样与旧身份不升权**：历史 EventStore 严禁重写；历史事件中的旧身份（Coder/Inspector 等）解码隔离在历史边界，解析历史时不自动升级为可写/可裂变的 Engineer 权限。
-- **DevOps 恢复与续行锁定固定模型与单一权威**：同一道路上的固定 DevOps 拥有唯一的逻辑权威；resume 与崩溃恢复严格沿用原绑定的模型与 Persona，严禁借 resume 换模型。
+提醒已经发出不等于业务 gate 已完成。在途提醒需要等待，新的失败 terminal 需要新的提醒资格；两者混淆会产生并发重复请求，或让未完成工作永久失去提醒。真正的致命不变量则需要先结算，让一次请求的错误不随意扩散到整个进程。
 
-- **PhysicalUserMessage ≠ AuthorityTurn**：物理层消息必须经由显式、受控的提升函数在物理落地证明后才能升级为 AuthorityRoot；若破坏，任意中间件即可劫持会话权限。
-- **Continuation 严格受限**：Continuation 必须继承既有 Root 权威，禁止新建 RunId、修改 participant 或重置 Fallback 预算；若破坏，自动修复会无限死循环。新物理目标的路由绝不改变 participant。
-- **任期退出不等于授权结束**：Manager 的非满分退休只移交 Incumbency，不终结承载整条 Road 的 LogicalRun。提前清空 active authority 会使后继被正式 admission 拒绝；读取历史 profile 不能修复已经关闭的授权。
-- **Admission ≠ Outcome**：repair claim 只证明一次自动修复已获准进入物理执行，不证明该修复已经返回、更不证明它失败。若把“已 claim”直接解释成“已耗尽”，同一 repair 在飞行期间的合法 idle/reconcile 竞态会把仍在生成的有效结果提前判死。
-- **Root acceptance 与 identity installation 是同一 durable fact**：`AuthorityRootAccepted` 必须携带 participant-identity owner 准备的完整 evidence；拆成两个 append 会在 crash cut 留下无 root、无 closure source 的孤儿 identity。
-- **原子 Profile 不可拼装**：执行 profile 必须携带 accepted root 内的版本化 identity evidence，禁止从历史消息、Session cache、物理 parent 或显式 agent 文本动态拼凑 participant 身份。
-- **证据保管不等于身份所有权**：本包持久化并精确暴露 identity evidence，以便重放与审计；固定 participant、Role、Persona 与 provenance/version 的解析、不可变性及替换规则仍只属于 `participant-identity`。当前 per-physical target/lease 只属于 execution binding。
-- **物理 Session 不等于 logical run**：authority profile 与 identity evidence 都以 exact logical run 为作用域；每种 HumanRoot/AgentOwnerRoot lifecycle 必须先收敛为 exact durable closure，SessionId 才可承载新授权。idle/timeout 与物理 topology 不是 closure。
-
-- 破坏历史不可变性，重写 EventStore 或将历史 Inspector 静默升权为可写/可裂变 Engineer。
-- DevOps 续行时允许篡改模型绑定，导致执行身份与容量策略撕裂。
-
-## DEPENDS ON
-
-- `participant-identity`
-- `session-ontology`
-
-## Physical fatal boundary
-
-InteractionRepair owns gate/claim/fresh-terminal policy；process fuse是foreign physical effect。若repair runtime直接fatal，claim与physical acceptance可能未settle，重复idle/reconcile也可能对同一incident重复kill。
+本包依赖 `participant-identity` 的身份定义与 `session-ontology` 的生命周期；不重新定义角色权限、容量或模型路由。

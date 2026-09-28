@@ -58,7 +58,7 @@ const acceptOwner = async (handle, session = 'ses-owner') => {
   assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
   return accepted.profile
 }
-const inheritedSeed = (owner, child = 'coder') => {
+const inheritedSeed = (owner, child = 'engineer') => {
   const issued = authority.issueInheritedIdentitySeed(child, owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return issued.value
@@ -104,7 +104,7 @@ test('WHAT[interaction-authority-003] HumanRoot persists identity before provide
 test('WHAT[interaction-authority-003] physical receipt installs exact AgentOwnerRoot authority after its claim', async () => {
   await withJournal('physical-acceptance', async (handle) => {
     const owner = await acceptOwner(handle)
-    const seed = inheritedSeed(owner, 'coder')
+    const seed = inheritedSeed(owner, 'engineer')
     const order = []
 
     const result = await dispatch.sendAgentOwnerRootAwait(
@@ -142,8 +142,8 @@ test('WHAT[interaction-authority-003] physical receipt installs exact AgentOwner
 test('WHAT[interaction-authority-003] rejected or unknown physical send outcome leaves no authority', async () => {
   await withJournal('unaccepted-send', async (handle) => {
     const owner = await acceptOwner(handle)
-    const rejectedSeed = inheritedSeed(owner, 'coder')
-    const unknownSeed = inheritedSeed(owner, 'inspector')
+    const rejectedSeed = inheritedSeed(owner, 'engineer')
+    const unknownSeed = inheritedSeed(owner, 'devops')
 
     const rejected = await dispatch.sendAgentOwnerRootAwait(
       hostPort(async () => dispatch.fatal('provider rejected')),
@@ -631,3 +631,19 @@ test('WHAT[interaction-authority-003] TPOL_top_level_manager_has_fail_closed_par
   assert.equal(tp.outstandingWithoutJournal('Engineer', true, 'ses-engineer'), false)
 })
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+  const { withJournal, acceptOwner } = await import('./support/authority.mjs')
+  test('WHAT[interaction-authority-003] accepted root and exact identity recover together from the real journal', async () => {
+    await withJournal('atomic-root-reopen', async (handle, reopen) => {
+      const original = await acceptOwner(handle)
+      const recovered = dispatch.projectionObservation(await reopen(), original.session).activeLogicalRun
+      assert.deepEqual(recovered, original)
+      assert.deepEqual(recovered.identitySeed.participantIdentity, recovered.participantIdentity)
+    })
+  })
+}
+
+test.todo('WHAT[interaction-authority-003] GAP-122 crash each root append boundary and prove no orphan identity or root including initial exact target lease')

@@ -1,0 +1,3 @@
+import test from 'node:test'
+
+test('WHAT[obligation-ledger-023] ledger guidance reaches Manager only and preserves its semantic discipline', {todo: 'GAP-190: requires actual role projection and semantic review; resource word matches do not prove either'})

@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
+
+test('WHAT[obligation-ledger-024] production definition updates both schema carriers and the description', () => {
+  const parameters = {properties: {todos: {type: 'array'}}}
+  const jsonSchema = structuredClone(parameters)
+  const output = {description: 'old description', parameters, jsonSchema}
+  host.applyDefinition(output)
+  assert.notEqual(output.description, 'old description')
+  assert.notEqual(output.parameters, parameters)
+  assert.notEqual(output.jsonSchema, jsonSchema)
+  assert.deepEqual(output.parameters, output.jsonSchema)
+  assert.deepEqual(output.parameters.required, ['planComplete', 'workingOn', 'obligations'])
+  assert.equal(output.parameters.properties.planComplete.type, 'boolean')
+  assert.equal(output.parameters.properties.workingOn.type, 'string')
+  const item = output.parameters.properties.obligations.items
+  assert.deepEqual(item.required, ['name', 'horizon', 'work'])
+  assert.deepEqual(Object.keys(item.properties).sort(), ['horizon', 'name', 'work'])
+  assert.deepEqual(item.properties.horizon.enum, ['near', 'mid', 'far'])
+})
+
+test('WHAT[obligation-ledger-024] installed Host advertises only this definition and provider prose fully states visible rules', {todo: 'GAP-190: production definition projection is covered; installed Host consumption and prose semantics need independent evidence'})

@@ -199,10 +199,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[delegation-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
+test('WHAT[delegation-024] Engineer reuse sends parent delta waits for its own root and returns its own child delta', async () => {
   await verifyReusableHandoff('Engineer')
-})
-test('WHAT[delegation-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
-  await verifyReusableHandoff('Coder')
 })
 }

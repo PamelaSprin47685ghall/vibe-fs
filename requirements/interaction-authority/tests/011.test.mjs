@@ -327,3 +327,5 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_agentless_root_does_not_invent
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 }
+
+test.todo('WHAT[interaction-authority-011] GAP-122 actual attempt profile carries exact accepted identity and per-physical target lease atomically across restart')

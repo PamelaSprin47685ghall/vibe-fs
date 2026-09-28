@@ -74,6 +74,7 @@ test('WHAT[repository-programming-011] JS010_array_null_is_invalid_return_value'
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
   } finally {
     cleanup()
   }

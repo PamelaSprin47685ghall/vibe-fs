@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostForkPtySurface.js'
 
-test('WHAT[managed-session-lifecycle-025] PTY physical exit immediately clears HostForkRuntime ptyRuns and terminalByName bookkeeping', async () => {
+test('WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping', async () => {
   // Scenario 1: fork a PTY, bind terminal name, assert outstanding before exit,
-  // deliver physical backend exit (port.Complete), and assert bookkeeping is immediately cleared
+  // Complete the controlled backend port; this fixture starts no OS process.
   const res = await PtySurface.scenario('exit-cleanup', '', '')
   assert.equal(res.ok, true, 'exit-cleanup scenario must succeed')
   assert.equal(res.bindOk, true, 'terminal name must be bound successfully')
@@ -19,6 +19,8 @@ test('WHAT[managed-session-lifecycle-025] PTY physical exit immediately clears H
   assert.equal(res.ownedAfter, false, 'OwnsPty must be false after exit')
   assert.equal(res.byNameAfter, undefined, 'TryPtyByName must be None after exit')
 })
+
+test.todo('WHAT[managed-session-lifecycle-025] actual DevOps return sends TERM, awaits physical exit and escalates to KILL when needed without touching other sessions or waiting for resume (GAP-133)')
 
 test('WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes', async () => {
   // Scenario 2: DevOps session holds an active PTY, another session (engineer) holds an active PTY.

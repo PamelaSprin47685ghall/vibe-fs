@@ -3,7 +3,6 @@
 > **SUPERSEDED by `sphinx-v2` (2026-09-23 clean-break).**
 > Kept as historical rationale for the pre-break kernel. See `sphinx-v2/WHY.md` for
 > the current rationale and `sphinx-v2/SUPERSEDES.md` for the per-proposition mapping.
-# epistemic-reasoning — WHY
 
 ## 不可替代的存在理由
 

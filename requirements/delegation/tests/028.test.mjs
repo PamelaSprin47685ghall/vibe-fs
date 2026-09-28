@@ -128,7 +128,7 @@ test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and re
   }
 })
 
-test('WHAT[delegation-028] Delegation focused localities stay within compile budgets', () => {
+test('WHAT[delegation-028] current compile plans meet declared budgets and source-placement audit', () => {
   // W5 cutover: the aggregate fsproj is gone. Count total .fs from the
   // compile-order manifest — the canonical declaration of what the build
   // actually compiles.
@@ -240,6 +240,8 @@ test('WHAT[delegation-028] Delegation focused localities stay within compile bud
     'composition-durable-fold must transitively compile the aggregate projection',
   )
 })
+
+test.todo('WHAT[delegation-028] each bounded locality actually compiles independently with only its declared transitive inputs (GAP-153)')
 
 test('WHAT[delegation-028] delegation-029 boundary ignores locality kind labels entirely', () => {
   // Positive: erasing every kind label keeps the boundary intact — it is decided by

@@ -1,36 +1,9 @@
 # managed-chat-execution — WHY
 
-## 不可替代的存在理由
+一个会话会先后承载多条物理用户消息。若准入、启动、取消和恢复只认会话或内存租约，前一轮的终态和资源就可能落到后一轮，崩溃后还可能重复调用 provider。因此每条消息需要独立、持久且单一的执行事实。
 
-一个可复用 `SessionId` 会连续承载多个物理用户消息。若模型准入、provider 启动、失败裁决、取消与恢复分别凭 session 状态或进程内租约判断，同一物理消息会在崩溃边界获得互相矛盾的执行结论：重复调用 provider、永久占用容量，或把前一轮的终态误投影到后一轮。
+先确认接收，再获取资源与启动；先确认终态，再归还所属资源。这个次序让中断留下可解释的事实，而不是靠超时猜测“应该完成了”。提交未知时保留未知，恢复决定与实际执行分开，才能避免重做不可逆操作。
 
-`managed-chat-execution` 因而拥有每个 `(SessionId, PhysicalUserMessageId)` 的 durable managed chat execution：从物理消息被接受，到 provider 确实开始，再到唯一终态。`SessionId` 只是可复用物理容器，不能代替消息级执行身份。
+进程重启丢失内存是正常现象，不能因此抹掉已接收任务或继承旧资源身份。恢复从持久化事实和明确外部证据开始；provider 重试仍由原 owner 裁决，整理遗留账目也不授权重放工具。诊断帮助人判断，但不能通过重放报告直接获得执行权。
 
-## 核心不变量
-
-- exact key 是 `(SessionId, PhysicalUserMessageId)`；不存在 session-scoped current execution 真相。
-- durable acceptance 先于容量获取及任何 provider effect。
-- `Accepted`、`ProviderStarted` 与 terminal disposition 是可版本升级、可重放的事实，不是进程回调状态。
-- terminal 单赋值；重复事件重放幂等；冲突终态 fail closed。
-- 崩溃恢复只由 durable projection 与显式容量、Host 或失败事件推进，不读取墙钟，不轮询猜测。
-- lease、waiter、callback、queue node 等 process-local artifact 可重建但不可持久化。
-
-## 违反边界的后果（RED）
-
-- 新物理消息复用旧消息的 binding、容量或终态。
-- provider 已启动但 durable 历史仍停在无法区分“从未启动”的状态。
-- cancel/delete 通过 SessionId 粗放释放另一个执行的容量。
-- 重启通过超时补写终态、重试 provider，或恢复已失效的进程内 waiter。
-- 测试复制 terminal、release 或 dispatch 公式，再 mutation 该副本；production 破坏后伪 oracle 仍保持全绿。
-- admission proof 用与 production 相同的条件优先级计算 expected；两份公式同步出错时仍会互相证明。
-- recovery proof observer 用 set 去重 owner-port invocation，重复调用 production runtime 时仍伪装成单次 effect；跨重启复用该 observer 又把本应丢失的 process-local 状态伪装成 durable 幂等。
-- 同进程内调用 `dispose` 再构造 plugin 会执行正常清理且保留 module-global registry，不能证明 OS crash 后 durable acceptance 留存而旧 binding/capacity artifact 消失。
-
-## DEPENDS ON
-
-- `durable-events`
-- `interaction-authority`
-- `participant-identity`
-- `execution-model-routing`
-- `execution-failure-policy`
-- `host-boundary`
+本包维护消息级事实与恢复决策，依赖 `durable-events` 的提交证据、`interaction-authority` 与 `participant-identity` 的授权身份、`execution-model-routing` 的确切资源、`execution-failure-policy` 的失败处置及 `host-boundary` 的公开观测。

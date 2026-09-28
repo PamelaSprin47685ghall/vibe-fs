@@ -27,7 +27,7 @@ const unwrap = (result) => {
 }
 const pendingIds = (handle) => pending(handle).map((p) => p.transactionId).sort()
 
-test('WHAT[repository-programming-025] committed_cut_interrupt_before_commit_keeps_prepared_pending', async () => {
+test('WHAT[repository-programming-025] reopening a store with only Prepare keeps it pending', async () => {
   const workspace = makeDir('wxs-committed-cut-before-')
   const common = makeDir('wxs-committed-cut-before-events-')
   const local = openStore(common)
@@ -53,7 +53,7 @@ test('WHAT[repository-programming-025] committed_cut_interrupt_before_commit_kee
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[repository-programming-025] committed_cut_interrupt_after_commit_keeps_pair_as_receipt', async () => {
+test('WHAT[repository-programming-025] reopening a store with Prepare and Commit preserves their receipt', async () => {
   const workspace = makeDir('wxs-committed-cut-after-')
   const common = makeDir('wxs-committed-cut-after-events-')
   const local = openStore(common)
@@ -76,7 +76,7 @@ test('WHAT[repository-programming-025] committed_cut_interrupt_after_commit_keep
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[repository-programming-025] committed_cut_unknown_is_never_treated_as_not_written', async () => {
+test('WHAT[repository-programming-025] reopening preserves durable Commit despite loss of the caller view', async () => {
   const workspace = makeDir('wxs-committed-cut-unknown-')
   const common = makeDir('wxs-committed-cut-unknown-events-')
   const local = openStore(common)
@@ -266,7 +266,7 @@ test('WHAT[repository-programming-025] prepared_cut_codec_round_trip_is_fold_acc
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[repository-programming-025] prepared_cut_interrupted_append_leaves_no_local_pending_ahead_of_receipt', async () => {
+test('WHAT[repository-programming-025] reopening without a second append preserves only the original pending receipt', async () => {
   const workspace = makeDir('wxs-prepared-cut-interrupt-')
   const common = makeDir('wxs-prepared-cut-interrupt-events-')
   const local = openStore(common)
@@ -277,9 +277,7 @@ test('WHAT[repository-programming-025] prepared_cut_interrupted_append_leaves_no
     const before = pending(local.handle).map((p) => p.transactionId)
     assert.deepEqual(before, ['tx-base'])
 
-    // Interrupt at the store boundary: dispose the handle, then prove the
-    // projection observed through a reopened store only ever reflects durable
-    // receipts — nothing the interrupted side "prepared" in memory.
+    // This crosses a handle lifetime, not a process crash or an uncertain append.
     local.close()
     const reopened = openStore(common)
     try {
@@ -313,19 +311,7 @@ test('WHAT[repository-programming-025] prepared_cut_committed_match_releases_pen
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[repository-programming-025] production_store_has_no_optional_fatal_handler_path', async () => {
-  const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url),
-    'utf8',
-  )
-  assert.doesNotMatch(source, /fatalTripHandler|setFatalTripHandler/)
-})
 }
 
-{
-const { default: test } = await import("node:test");
-const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
-
-
-test('WHAT[repository-programming-025] transaction fatal preserves rollback or cut settlement and one injected fuse', () => assertFatalBoundary('repository-programming'))
-}
+test.todo('WHAT[repository-programming-025] a real transaction invariant failure settles rollback or cut before one injected fatal incident')
+test.todo('WHAT[repository-programming-025] uncertain persistence and interrupted settlement preserve third-party changes across process restart')

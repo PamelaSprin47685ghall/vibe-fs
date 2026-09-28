@@ -1,29 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as projection from '../../../dist/Mission/Relay/ProjectionSurface.js'
+import {withSuccessor, textMessage, toolMessage} from './support/cut.mjs'
 
-const cutMessages = [
-  { id: 'u1', run: '', role: 'user', text: 'root user request' },
-  { id: 'a1', run: 'old-run', role: 'assistant', text: 'old iteration audit' },
-  {
-    id: 't1',
-    run: 'old-run',
-    role: 'assistant',
-    parts: [{ callID: 'suicide-call', tool: 'suicide' }],
-    text: 'suicide call',
-  },
-  { id: 'r1', run: 'old-run', role: 'tool', text: 'suicide result' },
-  { id: 'a-late', run: 'old-run', role: 'assistant', text: 'late old part' },
-  { id: 'wake-1', run: '', role: 'user', text: 'internal loop wake' },
-  { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
-]
-
-const cutResult = () => projection.projectMessages(cutMessages)
-
-const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
-
-test('WHAT[relay-context-projection-001] audit and provider both retain every physical message across the cut', () => {
-  const result = cutResult()
-  assert.equal(result.audit.length, cutMessages.length)
-  assert.deepEqual(result.provider, cutMessages)
+test('WHAT[relay-context-projection-001] actual retirement owner then NarrativeTransform retain all physical history for its successor', async () => {
+  await withSuccessor(async ({history, gate, runtime, session}) => {
+    const input = [...history, textMessage('late-old', 'assistant', 'Late prior work'), toolMessage('another-old', 'another-call'), textMessage('wake', 'user', 'Internal wake'), gate]
+    const before = structuredClone(input)
+    const result = await projection.apply(runtime.journal, session, false, input)
+    assert.deepEqual(result, {disposition: 'current-iteration', messages: before, interrupted: []})
+    assert.deepEqual(input, before)
+  })
 })
+
+test.todo('WHAT[relay-context-projection-001] Host physical transcript and durable audit survive actual process restart without loss')

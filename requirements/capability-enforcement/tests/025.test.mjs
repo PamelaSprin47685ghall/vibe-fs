@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parse as parseToml } from 'smol-toml'
+import './support/manager-programming.mjs'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import { rolePermissionRules, reviewToolPermissions } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
@@ -170,7 +174,7 @@ test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_
   }
 })
 
-test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evaluates_recovered_incumbency_facts_without_resetting_assessment', async () => {
+test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incumbency_facts_without_resetting_assessment', async () => {
   await withRestartablePlugin(async (start, _directory, { stop, withRuntime }) => {
     const sessionAccepted = 'ses-p11-accepted'
     const sessionUnaccepted = 'ses-p11-unaccepted'
@@ -178,6 +182,8 @@ test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evalua
     const firstPlugin = await start()
 
     await withRuntime(async (runtime) => {
+      await acceptAuthorityRoot(runtime, sessionAccepted, 'manager')
+      await acceptAuthorityRoot(runtime, sessionUnaccepted, 'manager')
       // sessionAccepted: 活跃任期且已接纳评审
       await openIncumbency(runtime, sessionAccepted)
       await injectAcceptedAssessment(runtime, sessionAccepted)
@@ -186,7 +192,7 @@ test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evalua
       await openIncumbency(runtime, sessionUnaccepted)
     })
 
-    // 重启插件实例（模拟 session 重启与崩溃恢复）
+    // 同进程关闭并重开插件，读取同一份持久事实；不声称杀进程或 Host compaction。
     await stop(firstPlugin)
     const restartedPlugin = await start()
 
@@ -223,7 +229,7 @@ test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evalua
   })
 })
 
-test('WHAT[capability-enforcement-025] P12_distinct_incumbencies_do_not_leak_authorization_or_misattribute_assessment', async () => {
+test('WHAT[capability-enforcement-025] P12_current_fact_classifier_distinguishes_accepted_and_unaccepted_assessment', () => {
   // 两个不同任期状态的 facts 独立评估：
   // 任期 1：活跃但已接纳评审
   const incumbency1Facts = managerFacts(true, true, false, undefined)
@@ -243,7 +249,7 @@ test('WHAT[capability-enforcement-025] P12_distinct_incumbencies_do_not_leak_aut
   // 两个任期的调用授权互不借用，也不把旧 assessment 错封新任期
 })
 
-test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_blocks_execution_with_zero_reads', async () => {
+test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_rejected_at_execution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-p13'
     const callID = 'call-p13'
@@ -268,7 +274,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_blo
     // Step 2: 在执行前注入已接纳评审事实（AcceptedAssessment）
     await injectAcceptedAssessment(runtime, sessionID)
 
-    // Step 3: 工具进入运行时 ToolRegistry 执行门禁，门禁读取最新事实再次拒绝，确保零文件读取
+    // Step 3: 真实运行入口重新检查当前事实；文件读取次数还未在此观察。
     const execResult = await hooks.tool['js-manager'].execute(
       beforeOutput.args,
       { sessionID, agent: 'manager' },
@@ -286,17 +292,20 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_blo
   })
 })
 
-test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_acceptance_completes_while_subsequent_calls_are_denied', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_hook_while_subsequent_calls_are_denied', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-p14'
     const call1ID = 'call-p14-1'
     const call2ID = 'call-p14-2'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
+    mkdirSync(join(directory, 'src'), { recursive: true })
+    writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
 
     // Call 1 启动并在 Review 接纳前获得最终准入与执行
     const call1Output = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }",
         contract: 'do-not-use-except-for-review',
       },
     }
@@ -306,13 +315,9 @@ test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_
     )
     const call1ExecResult = await hooks.tool['js-manager'].execute(
       call1Output.args,
-      { sessionID, agent: 'manager' },
+      { sessionID, agent: 'manager', callID: call1ID, messageID: 'msg-p14' },
     )
-    assert.doesNotMatch(
-      String(call1ExecResult),
-      /denied-task-state/i,
-      'Call 1 must be admitted before assessment is accepted',
-    )
+    assert.deepEqual(parseToml(String(call1ExecResult)).data, { text: 'review evidence' })
 
     // 在 Call 1 获准后，系统接纳 Review
     await injectAcceptedAssessment(runtime, sessionID)
@@ -347,3 +352,5 @@ test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_
     )
   })
 })
+
+test.todo('WHAT[capability-enforcement-025] runtime denial performs zero reads and mutations, and an in-flight admitted read finishes across review acceptance; the current sequential case does not prove overlap')

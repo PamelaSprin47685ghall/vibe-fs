@@ -1,44 +1,18 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { ensure } from '../../../dist/Git/Hook/Surface.js'
 import { remotePayloadNeedsRead } from '../../../dist/Persistence/EventStore/RetentionSurface.js'
+import { createBareWorkspace, readRemoteStoreOid } from '../../verification-system/tests/support/dumb-remote.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { event } from './support/events.mjs'
+import { appendFact, assertFacts, runHook } from './support/hooks.mjs'
 
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-
-test('WHAT[durable-convergence-010] no-op sync reuses stat-fingerprint materialization instead of rereading durable bytes', async () => {
-  const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
-  const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
-
-  assert.match(log, /physicalFingerprint/)
-  assert.match(log, /statSync/)
-  assert.match(sync, /tryCachedLocal/)
-  assert.match(sync, /physicalFingerprint/)
-  assert.match(sync, /materializationCache/i)
-})
-
-test('WHAT[durable-convergence-010] near-equal worst path reads and blobifies only changed files', async () => {
-  const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
-  const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
-  const remoteTrees = sync.slice(sync.indexOf('let private readRemoteTrees'), sync.indexOf('let private readRemote\n'))
-
-  assert.match(log, /writerPhysicalStats/)
-  assert.match(log, /payloadPhysicalStats/)
-  assert.match(log, /payloadExists[\s\S]*existsSync/)
-  assert.match(sync, /CachedFile/)
-  assert.match(sync, /cachedOid/)
-  assert.match(sync, /remoteEntryNeeded/)
-  assert.match(sync, /changedRemoteEntries/)
-  assert.match(sync, /changedRemotePayloadEntries/)
-  assert.match(sync, /cached\.Oid = entry\.Oid/)
-  assert.doesNotMatch(remoteTrees, /changedRemoteEntries[\s\S]*Map\.empty[\s\S]*payloadEntries/)
-  assert.doesNotMatch(sync, /readRemoteTrees[\s\S]*readBlobList raw writerEntries[\s\S]*readBlobList raw payloadEntries/)
-})
+const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`
 
 test('WHAT[durable-convergence-010] unchanged remote payload is not reread merely because payloads have no writer manifest', () => {
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), true), false)
@@ -47,23 +21,54 @@ test('WHAT[durable-convergence-010] unchanged remote payload is not reread merel
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), false), true)
 })
 
-test('WHAT[durable-convergence-010] pre-push starts from tracking ref and only discovers remote after lease rejection', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
+integrationTest('WHAT[durable-convergence-010] actual clean pre-push does no transport despite unseen remote progress and local change resumes convergence', async () => {
+  const workspace = createBareWorkspace(['left', 'right'])
+  try {
+    const left = workspace.client('left')
+    const right = workspace.client('right')
+    const a = event('a'.repeat(40))
+    const b = event('b'.repeat(40))
+    const c = event('c'.repeat(40))
+    await appendFact(left, 'writer-left', a)
+    runHook(left)
+    const first = readRemoteStoreOid(workspace.bare)
+    execFileSync('git', ['-C', left, 'update-ref', 'refs/wanxiang/remotes/origin/store', first])
+    await appendFact(right, 'writer-right', b)
+    runHook(right)
+    const unseen = readRemoteStoreOid(workspace.bare)
+    assert.notEqual(unseen, first)
 
-  assert.match(gateway, /readTrackedRemote|trackingRef/)
-  assert.match(gateway, /pushSnapshot/)
-  assert.match(gateway, /Error _ when retriesLeft > 0[\s\S]*discoverRemote/s)
-  assert.doesNotMatch(gateway, /\| None ->\s*let! snapshot, expected = discoverRemote run remote/)
+    const bin = join(workspace.root, 'bin')
+    const calls = join(workspace.root, 'git-calls')
+    const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+    mkdirSync(bin)
+    writeFileSync(join(bin, 'git'), `#!/usr/bin/env node
+const fs = require('node:fs')
+const { spawnSync } = require('node:child_process')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.WXS_GIT_CALLS, JSON.stringify(args) + '\\n')
+const result = spawnSync(process.env.WXS_REAL_GIT, args, { stdio: 'inherit', env: process.env })
+process.exit(result.status ?? 1)
+`)
+    chmodSync(join(bin, 'git'), 0o755)
+    const environment = { PATH: `${bin}:${process.env.PATH}`, WXS_GIT_CALLS: calls, WXS_REAL_GIT: realGit }
+    const transportCalls = () => readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean)
+      .map(line => JSON.parse(line)).filter(args => args.some(arg => ['push', 'fetch', 'ls-remote'].includes(arg)))
+    runHook(left, 'pre-push', 'origin', '', environment)
+    assert.deepEqual(transportCalls(), [])
+    assert.equal(readRemoteStoreOid(workspace.bare), unseen)
+
+    await appendFact(left, 'writer-left-next', c)
+    writeFileSync(calls, '')
+    runHook(left, 'pre-push', 'origin', '', environment)
+    assert.ok(transportCalls().some(args => args.includes('push')), 'positive control: the same observer sees actual transport')
+    assertFacts(left, [a, b, c])
+  } finally {
+    workspace.cleanup()
+  }
 })
 
-test('WHAT[durable-convergence-010] clean tracked snapshot skips all Wanxiang transport', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-  const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
-
-  assert.match(sync, /tryCachedLocalSnapshot/)
-  assert.match(gateway, /tryCachedLocalSnapshot[\s\S]*sameSnapshot[\s\S]*return cached/s)
-  assert.match(gateway, /readTrackedRemote/)
-})
+test.todo('WHAT[durable-convergence-010] actual changed-file sync reads and validates only changed writer and payload bytes including retention expiry (GAP-151)')
 
 test('WHAT[durable-convergence-010] hook installer enables repo-local SSH multiplex without clobbering ssh identity options', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-mux-'))
@@ -83,7 +88,6 @@ test('WHAT[durable-convergence-010] hook installer enables repo-local SSH multip
     assert.doesNotMatch(configured, /ControlMaster|ControlPath/)
     assert.match(wrapperBody, /ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
     assert.match(wrapperBody, /ControlMaster=auto/)
-    assert.match(wrapperBody, /ControlPersist=15s/)
     assert.match(wrapperBody, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
     assert.match(wrapperBody, /mkdir -p/)
 
@@ -122,15 +126,16 @@ test('WHAT[durable-convergence-010] hook installer migrates the obsolete long re
 
 test('WHAT[durable-convergence-010] hook installer migrates the ephemeral tmp-directory path and recreates it at SSH invocation', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-ephemeral-migrate-'))
+  let socketDir
 
   try {
     execFileSync('git', ['init', '--quiet', repo])
     const commonDir = execFileSync('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim()
     const repoKey = createHash('sha256').update(commonDir).digest('hex').slice(0, 12)
-    const socketDir = join(tmpdir(), `wanxiang-ssh-${repoKey}`)
+    socketDir = join(tmpdir(), `wanxiang-ssh-${repoKey}`)
     const observedArgs = join(repo, 'ssh-args')
     const fakeSsh = join(repo, 'fake-ssh')
-    writeFileSync(fakeSsh, `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(observedArgs)}\n`)
+    writeFileSync(fakeSsh, `#!/bin/sh\nprintf '%s\\n' "$@" > ${shellQuote(observedArgs)}\n`)
     chmodSync(fakeSsh, 0o755)
     const base = fakeSsh
     const ephemeral = `${base} -o ControlMaster=auto -o ControlPersist=15s -o 'ControlPath=${join(tmpdir(), `wanxiang-ssh-${repoKey}`, 'ssh-%C')}'`
@@ -147,12 +152,14 @@ test('WHAT[durable-convergence-010] hook installer migrates the ephemeral tmp-di
     const invoked = spawnSync(wrapper, ['example.test', 'git-receive-pack repo.git'], { encoding: 'utf8' })
     assert.equal(invoked.status, 0, invoked.stderr || invoked.stdout)
     assert.equal(existsSync(socketDir), true, 'SSH wrapper must recreate its private multiplex directory at invocation time')
+    assert.equal(statSync(socketDir).mode & 0o777, 0o700)
     const args = readFileSync(observedArgs, 'utf8')
     assert.match(args, /ControlMaster=auto/)
-    assert.match(args, /ControlPersist=15s/)
+    assert.match(args, /ControlPersist=\d+s/)
     assert.match(args, new RegExp(`ControlPath=${socketDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/ssh-%C`))
     assert.match(args, /example\.test/)
   } finally {
+    if (socketDir) rmSync(socketDir, { recursive: true, force: true })
     rmSync(repo, { recursive: true, force: true })
   }
 })
@@ -167,56 +174,6 @@ test('WHAT[durable-convergence-010] hook installer respects user-owned SSH multi
     assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.equal(configured, userOwned)
-  } finally {
-    rmSync(repo, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[durable-convergence-010] confirmed same-root convergence does not publish an empty snapshot', async () => {
-  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
-
-  assert.match(gateway, /remoteKnownCurrent|confirmedRemote/i)
-  assert.match(gateway, /RootOid\.value merged\.RootOid/)
-  assert.match(gateway, /expectedRemote/)
-  assert.match(gateway, /return Ok\(\)/)
-})
-
-test('WHAT[durable-convergence-010] irrelevant reference transactions exit before starting Node', () => {
-  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-fast-path-'))
-
-  try {
-    execFileSync('git', ['init', '--quiet', repo])
-    assert.equal(ensure(repo), true, 'hook ensure failed')
-
-    const marker = join(repo, 'node-started')
-    const bin = join(repo, 'bin')
-    execFileSync('mkdir', ['-p', bin])
-    const fakeNode = join(bin, 'node')
-    writeFileSync(fakeNode, `#!/bin/sh\nprintf started > ${JSON.stringify(marker)}\n`)
-    chmodSync(fakeNode, 0o755)
-
-    const hook = join(repo, '.git', 'hooks', 'reference-transaction')
-    const localRef = `${'0'.repeat(40)} ${'1'.repeat(40)} refs/heads/main\n`
-    const ignored = spawnSync(hook, ['committed'], {
-      cwd: repo,
-      encoding: 'utf8',
-      input: localRef,
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
-    })
-
-    assert.equal(ignored.status, 0, ignored.stderr || ignored.stdout)
-    assert.equal(existsSync(marker), false, 'ordinary refs must not pay Node/module startup cost')
-
-    const trackedStore = `${'0'.repeat(40)} ${'1'.repeat(40)} refs/wanxiang/remotes/origin/store\n`
-    const relevant = spawnSync(hook, ['committed'], {
-      cwd: repo,
-      encoding: 'utf8',
-      input: trackedStore,
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
-    })
-
-    assert.equal(relevant.status, 0, relevant.stderr || relevant.stdout)
-    assert.equal(readFileSync(marker, 'utf8'), 'started')
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }

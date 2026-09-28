@@ -18,13 +18,13 @@ test('WHAT[crash-reconciliation-018] CRASH_018_no_explicit_resume_command_is_reg
   await withExecutablePlugin(async (hooks) => {
     const config = {}
 
-    hooks.config(config)
+    await hooks.config(config)
 
     assert.equal(config.command, undefined, 'plugin load must not register any command, including /continue')
   })
 })
 
-test('WHAT[crash-reconciliation-018] CRASH_018_explicit_resume_traces_are_gone_from_the_source_tree', () => {
+test('WHAT[crash-reconciliation-018] structural audit finds no retired explicit-resume source files', () => {
   const walk = (directory) =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const path = resolve(directory, entry.name)
@@ -42,3 +42,5 @@ test('WHAT[crash-reconciliation-018] CRASH_018_explicit_resume_traces_are_gone_f
   assert.deepEqual(offenders, [], 'no explicit-resume module may remain in the compiled source tree')
 })
 }
+
+test.todo('WHAT[crash-reconciliation-018] a restarted plugin normalizes durable child runs before reuse without replaying tools or hiding their interrupted history (GAP-149)')

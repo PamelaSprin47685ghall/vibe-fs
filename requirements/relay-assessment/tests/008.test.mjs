@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const relay = await import("../../../dist/Mission/Relay/Surface.js");
 
 
-test('WHAT[relay-assessment-008] iteration phase separates assess work and finish before and after review', () => {
+test('WHAT[relay-assessment-008] Road fold distinguishes repair and finish facts for subsequent instruction selection', () => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(opened.ok, true)
   assert.equal(relay.view(opened.state, 'road-1').phase, 'AuditPending')
@@ -72,3 +72,22 @@ test('WHAT[relay-assessment-008] iteration phase separates assess work and finis
   assert.equal(relay.view(reopened.state, 'road-1').phase, 'AuditPending')
 })
 }
+
+const {readFileSync} = await import('node:fs')
+const {default: assert} = await import('node:assert/strict')
+const {withReview, scores} = await import('./support/plugin.mjs')
+const renderedInstruction = name => readFileSync(new URL(`../../../resources/provider/runtime/${name}/en.md`, import.meta.url), 'utf8').trim().split('\n').map(line => '# ' + line).join('\n')
+
+for (const grade of ['REVISE', 'PERFECT', 'N/A']) {
+  test(`WHAT[relay-assessment-008] actual ${grade} assessment selects exactly its current instruction resource`, async () => {
+    await withReview(async ({execute}) => {
+      const result = await execute(scores(grade))
+      const selected = grade === 'REVISE' ? 'manager-work' : 'manager-finish'
+      const other = grade === 'REVISE' ? 'manager-finish' : 'manager-work'
+      assert.equal(result, renderedInstruction(selected) + '\n\nrecorded = true\n')
+      assert.equal(result.includes(renderedInstruction(other)), false)
+    })
+  })
+}
+
+test('WHAT[relay-assessment-008] every pre-assessment role ledger and tool surface conceals later assignments and loop mechanics', {todo: 'GAP-193: actual accepted result selection is tested; all earlier surfaces require projection and semantic audit'})

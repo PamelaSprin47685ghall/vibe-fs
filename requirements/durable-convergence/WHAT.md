@@ -1,45 +1,59 @@
 # durable-convergence — WHAT
 
-## [001] 活跃 writer 集合内 merge 等于 set union
+## [001] 活跃 writer 的合并是集合并集
 
-在同一 writer-retention 截止时刻下，副本之间仍处于活跃窗口内的 writer 必须严格按 append-only 集合并集与 `event_id` 幂等去重合并。retention 只允许整体移除最后活动时间早于固定 TTL 的 writer；禁止在一个被保留的 writer 内按时间戳、版本号或到达顺序裁掉单个事实。
+同一 retention 截止时刻，活跃 writer 的合并必须是 append-only 事实的集合并集，按 `event_id` 幂等去重。retention 只能整体移除最后活动时间早于固定 TTL 的 writer，不得按时间、版本或到达顺序裁掉保留 writer 内的事实。
 
-## [002] k-way merge 是统一 primitive
+## [002] 统一 KWayMerge
 
-多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。`EventId` 字典序不得替代因果序：即使 parent `EventId` 字典序大于 child，规范序列仍必须先输出 parent。
+所有多流合并使用同一 `KWayMerge(writerStreams[])`，满足结合律、交换律、幂等性和确定性。同一组有序 writer 流不因枚举顺序、进程或机器而改变规范事件序列。因果顺序优先于 `EventId` 字典序，parent 必须先于 child。
 
-## [003] 生产 writer-stream k-way merge 等价于 retained-union oracle
+## [003] 完整 writer 流与 retained union 等价
 
-生产环境先对本地与远端完整 writer 流做统一 retention 过滤，再与保留 writer 集合的全量集合并集理论规范等价。本地每个写者文件与远端每个写者 blob 仍作为不可分段的完整有序输入流，通过 k-way merge 进行流式归并；禁止 writer 内部分段、按事件 TTL 或复杂的增量对象协议。
+本地与远端完整 writer 流按同一截止时刻过滤，再以 k-way merge 流式归并；结果必须等价于保留 writer 的全量集合并集。每个本地 writer 文件和远端 writer blob 都是不可分段的有序输入，不按事件 TTL、writer 分段或额外增量对象协议同步。
 
-## [004] 合法并发 fork 表达为 DomainConflict 而非 StorageInvalid
+## [004] 合法并发是 DomainConflict
 
-同一业务流基于相同父事件并发追加所产生的合法分叉，属于物理层并发的正常现象。底层必须完整保留全部竞争分支的头部（Heads），并在业务投影中显式表达为确定的 `DomainConflict` 冲突状态，严禁将其升级判定为底层的 `StorageInvalid` 致命损坏。
+同一业务流从相同父事件合法分叉时，保留全部竞争 Heads，业务投影明确呈现确定的 `DomainConflict`，不得当作 `StorageInvalid`。
 
-## [005] resolution event 以全� heads 为 parents 才收敛
+## [005] 裁决覆盖全部 Heads
 
-业务解决冲突的裁决事件必须显式将所有竞争的 Heads 全部声明为其父事件（`parents`）。只有当裁决事件及其包含的全部竞争父事件均已完成折叠时，业务投影方可离开 `DomainConflict` 状态并收敛为唯一的权威状态。
+解决冲突的事件必须以全部竞争 Heads 为 `parents`；只有裁决事件及这些父事件均已折叠，业务投影才可离开 `DomainConflict` 并收敛为唯一权威状态。
 
-## [006] 禁止用 wall-clock 或 revision 对保留事实做 LWW
+## [006] 不以时间或版本挑选赢家
 
-合并层严禁使用物理时钟、自增版本号或写者到达先后顺序在一个被保留的 writer 内挑选“赢家”或丢弃事件。物理时间只允许用于 durable-convergence-011 定义的整条 writer retention；retention 之外不得改变保留 writer 的事件集合。
+保留 writer 内不得以墙钟、revision 或到达顺序挑选赢家或丢弃事件。物理时间只用于 [011] 的整条 writer retention。
 
-## [007] 相同 retained merged history 导出同一个 Integrator Current
+## [007] 同一历史导出同一 Current
 
-收敛公式严格定义为 `Current(now) = CanonicalIntegrator(KWayMerge(Retain(now, writerStreams)))`，严禁在投影层直接进行状态对象的模糊合并。相同截止时刻与相同 writer 集合输入，经由唯一规范 retention 与 Integrator 后，Structural frontier 与每个已注册业务 oracle 的 production Current 观察必须完全相同；只比较事件集合、源码调用关系或空 projection 不足以证明收敛。
+`Current(now) = CanonicalIntegrator(KWayMerge(Retain(now, writerStreams)))`。相同截止时刻与 writer 集合必须导出相同 Structural frontier 和每个已注册业务 oracle 的 production Current；不得直接合并投影状态。事件集合、源码调用或空投影相同不足以证明业务收敛。
 
-## [008] durability activation ensure hooks 且用户 Git 进程独立触发双向 sync
+## [008] 持久化激活安装 Hook，用户 Git 触发同步
 
-万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。激活持久化能力时的 ensure 在安装 Hook 之后，还必须为仓库内每个 remote 保证 fetch refspec 基线：`remote.<remote>.fetch` 必须同时包含 store tracking 行 `+refs/wanxiang/store:refs/wanxiang/remotes/<remote>/store` 与标准分支跟踪行 `+refs/heads/*:refs/remotes/<remote>/*`；该保证只允许对缺失行执行追加，禁止替换、删除或重排任何既有 fetch 配置，重复 ensure 不得产生重复行，且仅配了 store 行的 remote 必须由 ensure 补回缺失的标准 heads 行。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行。若本地物理 fingerprint、retention expiry 与上次成功 materialization 均未变化，且本地 tracking ref 仍等于该 cached snapshot，则本次 `pre-push` 没有新的 Wanxiang truth 需要发布，必须零网络直接复用该 snapshot。任一 writer/payload 变化、TTL 跨界或已观察 tracking ref 变化时，才通过双向读取本地与远端写者流完成全量 k-way merge，原子替换本地写者集合并 CAS 发布远端快照。未被本机观察到的远端推进不会被 clean no-op `pre-push` 主动拉取，但也绝不会被覆盖；下一次本地 truth 变化或 tracking 更新时必须进入完整 convergence。
+插件加载不修改 Git 配置；首次激活持久化能力才确保安装 `reference-transaction` 与 `pre-push`。同步由用户 Git 操作启动独立 Hook 进程执行，不设后台同步或自动上传服务。
 
-## [009] dumb remote 无 domain 逻辑
+安装 Hook 后，ensure 为每个 remote 补齐 `+refs/wanxiang/store:refs/wanxiang/remotes/<remote>/store` 与 `+refs/heads/*:refs/remotes/<remote>/*` 两条 fetch 映射。只追加缺失行，不替换、删除或重排既有配置；重复 ensure 不重复添加，已有 store 行仍须补缺失的 heads 行。
 
-远程 Git 仓库严格作为通用、无感知的对象存储，仅提供标准的对象读写、引用推进与 CAS 门禁能力。严禁在服务端引入任何领域事件解释、服务端合并或自定义的万象术专有后端逻辑。
+本地 fingerprint、retention expiry 与上次成功快照未变，且 tracking ref 仍指向该快照时，`pre-push` 必须零网络复用。writer/payload、TTL 或已观察 tracking ref 变化时，双向读取、归并完整 writer 流，原子替换本地集合并 CAS 发布远端快照。未被本机观察的远端推进不由 clean no-op 主动拉取，也不得被覆盖；下次本地事实或 tracking 变化时再完整收敛。
 
-## [010] hook 热路径成本只随变化量增长
+## [009] Dumb remote
 
-同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件 fingerprint 未变、cache 未跨 retention expiry 且 tracking ref 等于 cached root 时，`pre-push` 必须在启动任何 Wanxiang Git transport 前直接复用既有快照；不得为 no-op 额外执行 `ls-remote`、`fetch` 或内部 `git push`。Hook 自动安装器还必须仅在当前仓库内为未自定义 SSH multiplex 的 `core.sshCommand` 保留原命令/identity 参数并追加短生命周期 `ControlMaster=auto` 复用，使用户 push 已建立的 SSH transport 可被 Wanxiang 的内部 CAS push 复用；若用户已显式配置 `ControlMaster` 或 `ControlPath`，安装器不得覆盖。安装器写入的永久 `core.sshCommand` 不得直接依赖一次安装时创建的易失 `/tmp` 子目录：Wanxiang 自有 SSH wrapper 必须在每次 SSH invocation 前重建并收紧 repo-scoped multiplex 目录，再执行保留的原 SSH 命令；安装器必须识别并迁移历史上由 Wanxiang 写入的长 repo-local socket path 与易失 tmp-directory socket path。增量变化时仅针对变动文件进行读写与验证，并通过现有 CAS convergence 处理远端竞争，保证同步开销与实际数据增量成比例。writer 的 remote-read 判定仍必须比较 `writer-manifest` activity；payload 没有 writer activity 语义，因此当 cache 中该 payload 的 stat identity 等于当前本地 stat identity、cached OID 等于 remote payload tree OID 且 entry 为 blob 时，必须判定为无需读取 remote blob。禁止把 writer manifest 的存在条件复用于 payload，否则一次无关 writer 变化会把全部历史 payload 重新读取，并在全局 store gate 内形成 O(total payload history) 临界区。
+远端只提供标准 Git 对象读写、引用推进和 CAS，不解释领域事件，不执行合并，不依赖万象术专有后端。
 
-## [011] writer 以最后输出活动时间整体过期且不可被旧快照复活
+## [010] 同步成本随变化量增长
 
-每个 writer 对应一次进程输出流。协议使用固定 24 小时 TTL，并定义 `Retain(now, W) = { w ∈ W | lastActivity(w) >= now - TTL }`。`lastActivity` 优先由 writer durable bytes 自身推出：尾部 `JournalEnvelope.payload.ObservedAt` 是精确 producer activity；尾部若只有连续 `ProjectionCutTail`，反向越过这些 integrator metadata 后读取最近 Journal `ObservedAt`。只有尾部不是 Journal 事实时，才使用 producer-side file activity 作为物理 fallback。Git snapshot `writer-manifest v2` 将 `(writer blob OID, lastActivity)` 原子固化并跨副本传播；远端导入不得使用 fetch 时间或新文件 mtime 刷新活动性。完全缺少 manifest 或使用旧 mtime 语义 `v1` 的远端 snapshot 不具备 v2 可证明 activity，因此其 writer tree 必须直接忽略；一旦 snapshot 声明 v2 manifest，则 manifest 与 `writers/` 必须逐项一一绑定且 OID 完全相等，任何缺项、多项、重复、格式错误或 OID 不匹配均 fail-closed。同步必须在统一截止时刻应用 `Retain(A ∪ B) = Retain(A) ∪ Retain(B)`，过期 writer 从本地文件集合和新发布的远端 snapshot 同时消失。retained writer 中指向已退出 retention window 的 parent 被视为窗口外已满足因果边界；仅 retained 集合内部的缺失/成环依赖继续 fail-closed。snapshot/cache 命中不得跨越下一 writer expiry 时刻。
+物理 fingerprint 缓存不具权威。满足 [008] 的 clean no-op 必须在任何同步 transport 前返回，不另行 `ls-remote`、`fetch` 或内部 `push`。发生变化时只读写、验证变动文件，远端竞争仍走 CAS 收敛。
+
+writer 的 remote-read 判定必须比较 manifest activity。payload 没有该语义：本地 stat identity 未变、cached OID 等于 remote OID 且远端为 blob 时，不得重读 payload；不得因缺少 writer manifest 而重读全部历史 payload。
+
+Hook 安装器只在当前仓库为未自定义 multiplex 的 SSH 命令追加短生命周期 `ControlMaster=auto`，保留原命令和 identity 参数；已有 `ControlMaster` 或 `ControlPath` 不得覆盖。自有 wrapper 每次执行前重建并收紧 repo-scoped socket 目录，永久配置不得依赖安装时的易失目录；须迁移旧版自有的过长 repo-local 和易失 tmp socket 路径。
+
+## [011] Writer 整体过期且不被旧快照复活
+
+每个 writer 是一次进程输出流，固定 TTL 为 24 小时：`Retain(now, W) = {w ∈ W | lastActivity(w) >= now - TTL}`。同次同步按统一截止时刻满足 `Retain(A ∪ B) = Retain(A) ∪ Retain(B)`；过期 writer 同时退出本地集合和新远端快照，缓存不得跨下一 expiry 命中。
+
+活动时间优先取 writer 尾部 Journal 的 `payload.ObservedAt`；连续 `ProjectionCutTail` 须向前越过后再判定。非 Journal 尾部才可回退到 producer-side file activity。导入不得以 fetch 时间或新 mtime 刷新活动性。
+
+`writer-manifest v2` 原子绑定并传播每个 writer blob OID 与 lastActivity。缺 manifest 或旧 mtime 语义 v1 的远端 writer tree 直接忽略；声明 v2 后，manifest 与 writers 必须逐项一一对应且 OID 相等，缺项、多项、重复、格式错或 OID 不符均拒绝。
+
+保留 writer 指向窗口外 parent 时，将其视为已满足的因果边界；保留集合内部的依赖缺失或成环仍须拒绝。

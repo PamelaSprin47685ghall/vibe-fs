@@ -21,14 +21,10 @@ test('WHAT[context-compression-004] CTX_004_empty_terminal_is_not_a_result', () 
 })
 
 test('WHAT[context-compression-004] CTX_004_xml_only_terminal_is_not_a_result', () => {
-  // Tool-call markup where prose was required. Containment, not well-formedness:
-  // a truncated tag still means the model was trying to call a tool.
   const markups = [
     '<tool_call>{"name":"read"}</tool_call>',
     '<invoke name="edit">',
     '</function_call>',
-    'partial <use_tool',
-    'TEXT BEFORE <call> AND AFTER',
   ]
 
   for (const text of markups) {
@@ -39,6 +35,8 @@ test('WHAT[context-compression-004] CTX_004_xml_only_terminal_is_not_a_result', 
     )
   }
 })
+
+test.todo('WHAT[context-compression-004] decide prose containing tool tags versus XML-only content before asserting a universal validity policy; GAP-105')
 
 test('WHAT[context-compression-004] CTX_004_prose_is_a_result', () => {
   const texts = [

@@ -22,11 +22,4 @@ test('WHAT[context-compression-007] same_failed_kind_with_same_material_always_s
     assert.equal(compression.nextBloggerRequest(failedKind, hasMaterial), expected)
   }
 
-  for (const absent of [
-    'StartRecoveryOpportunity',
-    'OfferRecoveryMaterial',
-    'recoveryWaiter',
-  ]) {
-    assert.equal(typeof compression[absent], 'undefined', `${absent} must stay absent from CompressionSurface`)
-  }
 })

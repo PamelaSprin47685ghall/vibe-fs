@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import * as fork from '../../../dist/Execution/Delegation/Fork/Surface.js'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 
 const schemaNode = (kind, extra = {}) => ({
@@ -29,21 +28,6 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
-
-test('WHAT[delegation-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname', () => {
-  const independent = fork.chooseRoad('Manager', 'Ada', 'inspect the retry path')
-  assert.equal(independent.ok, true)
-  assert.equal(independent.road, 'Independent')
-  assert.equal(independent.byname, 'Ada')
-  assert.equal(independent.charge, 'inspect the retry path')
-  assert.equal(independent.authorityTransferred, false)
-
-  const continuation = fork.chooseRoad('', 'Ada', 'continue the retry path')
-  assert.equal(continuation.ok, true)
-  assert.equal(continuation.road, 'Continuation')
-  assert.equal(continuation.byname, 'Ada')
-  assert.equal(continuation.calling, null)
-})
 
 test('WHAT[delegation-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-split-'))
@@ -75,6 +59,7 @@ test('WHAT[delegation-003] FORK_TOOL_requires_calling_and_resume_rejects_calling
     assert.equal(forkTool.childCount(runtime), 0, 'resume must not place any child')
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -85,11 +70,6 @@ test('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_de
 
   try {
     await forkTool.injectAcceptedAssessment(runtime, owner)
-
-    setTimeout(() => {
-      forkTool.acceptPrompt(runtime, 0)
-    }, 50)
-
     const resumed = forkTool.executeManagerResume(
       runtime,
       toolModule,
@@ -98,6 +78,8 @@ test('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_de
       'devops',
       'DEVOPS-FIRST-CHARGE',
     )
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     const result = await resumed
     assert.match(result, /devops/)
     assert.match(result, /carries this charge now|现已接下这项托付/i)
@@ -107,22 +89,19 @@ test('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_de
     assert.match(joined, /DEVOPS-FIRST-ANSWER/)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
-test('WHAT[delegation-003] manager resume preserves companion devops across restart and normalizes state for new charges', async () => {
+test('WHAT[delegation-003] explicit runtime reopen preserves the companion DevOps route for a new charge', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-restart-'))
   const owner = 'manager-devops-restart'
   const runtime1 = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+  let firstDisposed = false
 
   try {
     await forkTool.injectAcceptedAssessment(runtime1, owner)
-
-    setTimeout(() => {
-      forkTool.acceptPrompt(runtime1, 0)
-    }, 50)
-
-    const resumed1 = await forkTool.executeManagerResume(
+    const first = forkTool.executeManagerResume(
       runtime1,
       toolModule,
       owner,
@@ -130,6 +109,9 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
       'devops',
       'DEVOPS-FIRST-CHARGE',
     )
+    await waitForPromptCount(runtime1, 1)
+    assert.equal(forkTool.acceptPrompt(runtime1, 0), true)
+    const resumed1 = await first
     assert.match(resumed1, /devops/)
     assert.match(resumed1, /carries this charge now|现已接下这项托付/i)
 
@@ -137,8 +119,9 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
     const joined1 = await forkTool.executeJoin(runtime1, owner)
     assert.match(joined1, /DEVOPS-FIRST-ANSWER/)
 
-    // Simulate process restart: dispose old runtime, create fresh runtime using the same directory/journal
+    // Explicit same-process reopen of the durable journal, not an OS crash.
     forkTool.disposeRuntime(runtime1)
+    firstDisposed = true
     const runtime2 = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
     try {
@@ -147,11 +130,7 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
       assert.ok(!horizonView.includes('DEVOPS-FIRST-CHARGE'))
 
       // Companion DevOps is NOT cleaned up, and its state is normalized to accept new charges
-      waitForPromptCount(runtime2, 1).then(() => {
-        forkTool.acceptPrompt(runtime2, 0)
-      })
-
-      const resumed2 = await forkTool.executeManagerResume(
+      const second = forkTool.executeManagerResume(
         runtime2,
         toolModule,
         owner,
@@ -159,6 +138,9 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
         'devops',
         'DEVOPS-RESTART-CHARGE',
       )
+      await waitForPromptCount(runtime2, 1)
+      assert.equal(forkTool.acceptPrompt(runtime2, 0), true)
+      const resumed2 = await second
       assert.match(resumed2, /devops/)
       assert.match(resumed2, /carries this charge now|现已接下这项托付/i)
 
@@ -169,7 +151,8 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
       forkTool.disposeRuntime(runtime2)
     }
   } finally {
-    // runtime1 already disposed
+    if (!firstDisposed) forkTool.disposeRuntime(runtime1)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -180,12 +163,7 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
 
   try {
     await forkTool.injectAcceptedAssessment(runtime, owner)
-
-    setTimeout(() => {
-      forkTool.acceptPrompt(runtime, 0)
-    }, 50)
-
-    const resumed = await forkTool.executeManagerResume(
+    const first = forkTool.executeManagerResume(
       runtime,
       toolModule,
       owner,
@@ -193,6 +171,9 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
       'devops',
       'DEVOPS-CHARGE-BEFORE-CANCEL',
     )
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    const resumed = await first
     assert.match(resumed, /devops/)
     assert.match(resumed, /carries this charge now|现已接下这项托付/i)
 
@@ -204,11 +185,7 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
     assert.notEqual(lifecycle, 'Abandoned', 'Companion devops must not be abandoned on parent cancel')
 
     // Verify DevOps is still intact and ready to accept new assignments
-    waitForPromptCount(runtime, 2).then(() => {
-      forkTool.acceptPrompt(runtime, 1)
-    })
-
-    const resumedAfterCancel = await forkTool.executeManagerResume(
+    const second = forkTool.executeManagerResume(
       runtime,
       toolModule,
       owner,
@@ -216,9 +193,13 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
       'devops',
       'DEVOPS-CHARGE-AFTER-CANCEL',
     )
+    await waitForPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    const resumedAfterCancel = await second
     assert.match(resumedAfterCancel, /devops/)
     assert.match(resumedAfterCancel, /carries this charge now|现已接下这项托付/i)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })

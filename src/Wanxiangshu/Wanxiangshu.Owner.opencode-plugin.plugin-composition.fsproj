@@ -118,11 +118,15 @@
     <Compile Include="OpenCode/Host/SessionBindingRecovery.fs"/>
     <Compile Include="OpenCode/Host/ChildWorkRecovery.fsi"/>
     <Compile Include="OpenCode/Host/ChildWorkRecovery.fs"/>
+    <Compile Include="OpenCode/Host/LoadRecoverySurface.fsi"/>
+    <Compile Include="OpenCode/Host/LoadRecoverySurface.fs"/>
 
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
+    <Compile Include="OpenCode/Host/PluginTransformSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PluginTransformSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fsi"/>

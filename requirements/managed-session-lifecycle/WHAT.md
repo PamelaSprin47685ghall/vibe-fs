@@ -1,105 +1,109 @@
 # managed-session-lifecycle — WHAT
 
-## [001] Attached 会话单一生命周期 Owner
+## [001] Attached 生命周期单一 Owner
 
-`AttachedSessionRuntime` 是所有 Attached 会话的唯一创建、恢复、注册、级联取消与回收所有者；各具体 `AttachmentKind` 仅提供参数与终态策略，严禁各自实现生命周期框架。该 session lifecycle owner 不拥有 durable chat execution transition；后者必须委托 `managed-chat-execution`。
+所有 Attached 会话的创建、恢复、注册、级联取消与回收由单一 lifecycle owner 负责。各 AttachmentKind 只提供参数与终态策略，不另建生命周期框架；durable chat execution transition 委托 `managed-chat-execution`。
 
-## [002] 创建协议先写关联后发首 Prompt
+## [002] 关联先于首 Prompt
 
-创建子会话时必须遵循严格的时序：先持久化写入 `SessionAssociation` 关联记录，随后才允许向子会话发送首个 prompt，确保所有拦截器在首轮交互前即能判定其分类属性。
+子会话的 SessionAssociation 必须先持久确认，才可发送首个 prompt，使首次交互即可判定分类。
 
-## [003] 重启恢复判据与 Fail-Closed 原则
+## [003] 恢复只认确切关联
 
-系统重启恢复 Attached 会话时，仅在 journal 关联（SessionId + agent + title）恰好单一匹配时方可复用；关联记录不存在则执行 Replacement 新建并挂载至 family root；无关联记录一律直接新建；若存在属性冲突、多候选或查询失败，必须直接 fail closed 拒绝恢复。
+重启时仅复用与 journal 的 SessionId、agent、title 恰好单一匹配的 Attached 会话。无关联则新建并挂到 family root，不收养无关联会话；属性冲突、多候选或查询失败均 fail closed。
 
-## [004] Reusable 与 OneShot 生命周期互斥
+## [004] Reusable 与 OneShot
 
-专用代理（Dedicated Sync*）实行 Reusable 生命周期，调用完成后不销毁、在同一作用域内跨轮次复用；单次任务（OneShot）则每次新建并在完成后立即终止与释放。两种生命周期模型严格互斥，不得混用。
+Dedicated 会话在同一作用域跨调用复用，调用完成不销毁。OneShot 每次新建，完成即终止并释放；两种生命周期不混用。
 
-## [005] ReuseScope 为 Dedicated 绑定生命周期 Key
+## [005] ReuseScope 绑定
 
-Dedicated 会话的绑定键为 `(OwnerReuseScopeId, Role)`；同一 scope 内至多存在一个活动 Dedicated 会话，同 scope 兼容续问复用，不同 scope 间相互隔离。
+Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`，每个键至多一个活动会话。兼容续问在同 scope 复用，不同 scope 隔离。
 
-## [006] Handle 四态与不可逆 Terminal
+## [006] Handle 四态
 
-Handle 生命周期严格限制于 `Active`、`CompletedAwaitingJoin`、`Retired` 与 `Abandoned` 四态；`Retired` 与 `Abandoned` 是持久化终态，绝对不可逆转为活动状态。
+Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。
 
-## [007] Completion Cell 单赋值与首胜规则
+## [007] Completion 单赋值
 
-成功终态、发送失败与取消信号共同竞争唯一 completion cell，实行先到先得的单赋值语义，后续到达者一律直接拒绝覆盖。
+成功终态、发送失败与取消竞争同一 completion cell，首个事实获胜，后来者不能覆盖。
 
-## [008] Retire 为 Consume 的唯一写口
+## [008] Consume 与 Retire
 
-`join` 消费完成结果时必须原子写入 `HandleRetired` 墓碑事实；写入未确认时绝不返回有效负载，确保每个完成事实在重启视角下仅被投递一次。
+join 消费完成结果时原子写入 HandleRetired 墓碑；提交未确认不返回 payload。完成事实在重启后仍仅投递一次。
 
-## [009] Abandon 为 Durable Terminal 与级联取消顺序
+## [009] 父取消等待子收束
 
-父会话取消时必须对所拥有的所有活动子会话逐一写入 `HandleAbandoned` 事实；父会话发布终止状态前，必须异步等待所有子会话的物理中断与清理彻底完成。
+父会话获授权逻辑取消后，为全部所属活动子会话持久写入 HandleAbandoned，并等待每个子会话物理中断和清理完成，才发布父终止。
 
-## [010] HostOwnedHidden Handle 对父不可见
+## [010] HostOwnedHidden
 
-宿主拥有的隐藏 handle（如 Distiller、隐藏评审员）对父会话的列表、等待、视图及恢复完全不可见，其持久化记录仅供宿主自身审计与恢复。
+HostOwnedHidden handle 对父会话的列表、等待、视图及恢复不可见；持久记录只供宿主审计与恢复，不由历史角色名称决定可见性。
 
-## [011] 永久丢失替换资格与 Durable 关联显式迁移
+## [011] 永久丢失才替换
 
-当且仅当已确认关联子会话永久丢失时，方允许执行替换操作；替换迁移必须遵循原子时序：先建立新子会话，再持久化关闭旧关联，最后建立新关联。
+关联子会话已确认永久丢失才允许替换。替换原子进行，次序为：建立新子会话 → 持久关闭旧关联 → 建立新关联。
 
-## [012] Child Run 物理生命周期与父记录分离
+## [012] Child Run 与父记录分离
 
-子会话运行时的物理状态（忙碌、空闲、中断、关闭）由独立的 ChildRun 机制管理，与父会话的工作记录严格解耦，父工作记录不得冒充子会话的完成事实。
+子会话的忙碌、空闲、中断、关闭由独立物理生命周期管理，与父工作记录解耦；父记录不充当子完成事实。
 
-## [013] 重启按 Durable Handle 投影 Re-enlist
+## [013] Durable re-enlist
 
-重启恢复时完全依据持久化的 HandleLinked 事实与完成数据重建子会话生命周期，过滤隐藏 handle，严禁依据内存残留或猜测恢复状态。
+重启仅依 durable HandleLinked 与完成数据重建生命周期，过滤隐藏 handle，不使用旧内存或猜测补状态。
 
-## [014] Dedicated 会话生��周期与 ReuseScope 绑定
+## [014] Dedicated 生命周期
 
-Dedicated 会话的生命周期严格等同于对应 OwnerReuseScope 的生命周期，仅在 scope 显式关闭时执行清理与释放，不受父会话单轮迭代退出的影响。
+Dedicated 随 OwnerReuseScope 存活，仅在 scope 显式关闭时清理释放，父会话单轮迭代退出不结束它。
 
-## [015] Handle 对应 Agent ID 且重启严格对齐
+## [015] Handle 身份稳定
 
-Agent 子会话的 handle 即为其运行时的 Agent ID，重启后必须保证同一 handle ID 严格绑定至相同的子会话实体。
+Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle 仍绑定同一子会话实体。
 
-## [016] Attempt Interrupt 与 Logical Cancel 权限分离
+## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制机制仅有权请求中断子会话当前的物理尝试（attempt interrupt），无权触发逻辑会话取消或级联销毁。在会话正常生命周期内部，禁止任何自动化机制主动中断用户根会话；但 suicide 属于生命周期终止，当当前任期已 committed 退休时，打断已退役 run 残余尝试受退役事实授权，不受根会话内部中断限制。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；suicide 在任期 committed 退休后，可凭退休事实终止该 run 的残余尝试。
 
-## [017] 内部 Interrupt 必须闭合 Successor 与 Parent Wake
+## [017] 中断必须有后继
 
-任何内部尝试中断在发起物理中止前，必须确保已存在唯一的后继处理机制（如 AABB、DegenerationGuard 等）；若无后继者，必须转为明确的 Failed 终态以唤醒父会话的等待，严禁产生悬挂的孤儿尝试。该 Failed 终态必须携带当前物理用户消息提升得到的 Authority Root；拿不到当前 Authority Root 时必须 fail closed，绝不能退化成 session-scoped/rootless 终态，因为后者无法证明属于当前 reusable work unit。
+内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。
 
-## [018] Abandon 需要不可逆丢失授权，Process/Attempt 生命周期无权宣判
+## [018] Abandon 需要不可逆授权
 
-`HandleAbandoned` 是“该 child 不会再沿当前 handle 返回”的不可逆业务终态，不是 cleanup 标记。生产写入必须具有明确的不可逆丢失授权：仅允许已确认的 logical parent/session 终止（例如 session deletion、显式 successor-less termination）或恢复流程对 child 永久丢失的证明。`AttemptAborted` / `TurnAborted`、provider failure/retry、degeneration-guard、Fission、插件卸载/进程 shutdown、runtime dispose 都不构成该授权；这些路径只能结束当前物理观察者/attempt 或执行 process-local detach，必须保留 durable `Active` handle 供恢复与后续 Join/Horizon 使用。模糊或无法证明的停止信号一律不得升级为 `ParentCancelled`。
+HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认的 logical parent/session 终止或 child 永久丢失证据授权。
 
-## [019] Cancel/Delete 通过 execution owner 精确排空
+Attempt/TurnAborted、provider failure/retry、degeneration-guard、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
 
-logical session cancel 或 delete 获得终止授权后，lifecycle owner 必须调用 `managed-chat-execution` 的 exact settlement barrier，并等待其报告该作用域内所有已准入 execution 均 durable terminal 且 exact capacity 已归还，随后才可发布 session 删除/取消完成。lifecycle 不复制 execution transition law，不执行 session-wide blind release，不以 timer、deadline、sleep 或 polling 推断排空。process/plugin shutdown 仍只执行 detach，不得借该 barrier 升级为 logical cancel。
+## [019] Cancel/Delete 精确排空
 
-## [020] Fresh identity 等待 durable exact prior-run closure
+获授权的 logical cancel/delete 等待 `managed-chat-execution` 确认作用域内全部已准入 execution 均 durable terminal 且 exact capacity 已归还，才发布完成。lifecycle 不复制执行状态机、不 blind release、不用 timer/deadline/sleep/polling 推断排空；process/plugin shutdown 仍只 detach。
 
-同一 `SessionId` 被复用于 fresh logical participant run 前，lifecycle 必须先完成 exact execution settlement 与受权 child drain，再由 `interaction-authority` 持久化 exact prior-run closure 并取得 closure witness，最后才把容器开放给 `participant-identity` 安装新 evidence。association removal、detach、idle、timeout、Host observation 或 process restart 均不能代替该 witness；缺失或 run 不匹配必须 fail closed。
+## [020] Fresh identity 先关闭旧 run
 
-## [021] lifecycle fatal晚于exact drain且只经注入fuse执行
+复用 SessionId 安装新身份前，依次完成 exact execution settlement、受权 child drain、`interaction-authority` 的 durable exact prior-run closure，并取得匹配 witness。association removal、detach、idle、timeout、Host observation、restart 都不能替代；缺证或 run 不匹配则拒绝。
 
-session delete、turn observation或strength semantic-cut incident必须先完成其要求的exact execution settlement、child drain与durable closure evidence；process/plugin detach无权fatal。lifecycle/Host runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill，fatal不得伪造session terminal或child abandon。
+## [021] Lifecycle fatal
 
-## [022] inspector finalize 以 closed settlement 收口；identity 保留由 owner 显式决定
+Session delete、turn observation 或 strength semantic-cut incident 先完成其要求的 exact settlement、child drain 与 durable closure，再使用 composition 注入的 mandatory fatal capability。detach 不授权 fatal，不直接使用 physical adapter 或 optional/default/global fallback；同一 incident 至多一次 report/kill，不伪造 session terminal 或 child abandon。
 
-`tryFinalizeInspector` 返回 `InspectorFinalizeSettlement`（`InspectorFinalizeCommitment`：`Finalized`、`NothingToFinalize`、`NotCommitted`、`Unknown`、`PhaseConflict`），恒带 exact inspector identity。Bookkeeper 不可用归 `NotCommitted`；store 写入失败归 `NotCommitted`；archive 已提交但 index refresh 失败归 `Unknown`（不重 archive）；重复 finalize 命中 knowledge-reuse-010 exactly-one 归 `PhaseConflict`。仅 `Finalized`/`NothingToFinalize`（`releasesIdentity = true`）释放 identity；`NotCommitted`/`Unknown`/`PhaseConflict` 保留 identity 供后续 resume/取证。`HostSessionDeletion.finalizeStagedInspector` 先捕获 exact settlement 再决定 identity 去留：无 unconditional finally 删除 identity。
+## [022] Inspector finalize 的结算边界
 
-## [023] 身份替换后旧活跃会话显式收束与新任务仅接纳新身份
+Finalize 恒带 exact Inspector identity，commitment 闭合为 `Finalized | NothingToFinalize | NotCommitted | Unknown | PhaseConflict`。Bookkeeper 不可用或 store 写失败为 NotCommitted；archive 已提交但 index refresh 失败为 Unknown，不重做 archive；重复 finalize 为 PhaseConflict。
 
-新任务与新建子会话仅接受合法活跃身份集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等），新建会话严格限定在此活跃角色集合内，拒绝任何非活跃集合的身份。
-历史 EventStore 事件原样保留，历史事实解码严格隔离在历史边界；系统严禁在活跃生命周期中将只读历史身份自动升权或解析为具备写入/Fission 权能的 Engineer。
-当系统在运行或重启中观察到残留的旧角色活跃会话时，生命周期管理器必须按既有中断/退休规则（`CancelAndDrain` 或显式 retirement）对其执行显式收束，写入终态并排空资源，严禁将其自动恢复为合法活跃运行链。
+仅 Finalized/NothingToFinalize 释放 identity；其他状态保留以便恢复取证。Session deletion 先取得结算证据再决定 identity 去留，不在 finally 无条件删除。该收尾边界不授权创建新的活跃 Inspector。
 
-## [024] 固定 DevOps 崩溃恢复的单一逻辑执行权威与进程收束
+## [023] 旧身份只收束、不升权
 
-同一道路内固定绑定的 DevOps 具有唯一的逻辑操作员权威。当 DevOps 物理会话发生崩溃或故障恢复时，系统允许替换底层物理 Session，但必须确保逻辑操作员同一时刻至多对应一个可执行物理权威。
-恢复过程严格沿用初始化时已绑定的模型与 Persona 规则，严禁通过 resume 切换或重置模型。
-崩溃恢复严禁重复执行未决的物理命令；底层真实物理进程与 PTY 会话必须随 DevOps 会话及道路的关闭彻底排空与收束，禁止残留任何孤儿进程。
+新任务和新子会话仅接纳当前合法活跃身份。历史事件原样保留，旧身份解码隔离在历史边界，不自动升级为 Engineer 或获得写入/Fission 权限。
 
-## [025] 固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理
+运行或重启发现遗留旧角色活跃会话时，按受权 cancel/drain 或 retirement 显式写终态并排空资源，不自动恢复成合法活跃运行链。
 
-固定 DevOps 每次工作返回（其 run 终态结算）时，系统必须立即收束该 DevOps 会话拥有的全部 PTY 进程（TERM 后等待真实物理退出、必要时升级 KILL），并彻底清理对应的记账，禁止留待下次 resume 回收；该收束仅绑定 DevOps run 终态结算，不因 Manager 退休触发，且不影响其他会话的 PTY 资源与生命周期。
+## [024] 固定 DevOps 恢复
+
+同一道路只有一个 DevOps 逻辑操作员权威；故障恢复可替换物理 Session，但同时至多一个物理权威可执行。沿用初始化绑定的模型和 Persona，不借 resume 重置或切换。
+
+恢复不重复未决物理命令。真实进程及 PTY 随会话、道路关闭彻底排空，不留孤儿进程。
+
+## [025] DevOps 每次工作返回即排空 PTY
+
+固定 DevOps 每次 run 终态结算，立即收束其拥有的全部 PTY：TERM 后等待真实退出，必要时升级 KILL，随后清除记账。不得留到下次 resume，不因 Manager 退休触发，不影响其他会话的资源和生命周期。

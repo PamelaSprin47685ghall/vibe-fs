@@ -122,23 +122,4 @@ test('WHAT[durable-convergence-007] retained rich history rebuilds the exact liv
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { execFileSync } = await import("node:child_process");
-const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
-const { readFile } = await import("node:fs/promises");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
-const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
-const retention = await import("../../../dist/Persistence/EventStore/RetentionSurface.js");
-
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
-
-test('WHAT[durable-convergence-007] sync does not integrate business history', async () => {
-  const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
-  assert.doesNotMatch(source, /StrengthProjection|CasebookProjection|AgentProjection|MagicTodo|JsTransactionPrepared/)
-  assert.doesNotMatch(source, /Fold\.apply|StrengthProjection\.fold|CasebookProjection\.fold/)
-})
-}
+test.todo('WHAT[durable-convergence-007] independently synchronized replicas agree on nonempty production Current for every registered business oracle (GAP-151)')

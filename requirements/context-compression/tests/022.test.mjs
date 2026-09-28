@@ -7,13 +7,13 @@ const budget = failureOwner.budget
 
 const projection = failureOwner.providerFailureProjection
 
-test('WHAT[context-compression-022] CTX_022_retry_sequence_returns_to_main_through_one_formula', () => {
-  // Main with material -> Squash -> Main -> Main: the squash detour always
-  // rejoins the main path instead of following a second retry formula.
+test('WHAT[context-compression-022] retry request-kind selector returns from Squash to Main', () => {
   assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-squash')
   assert.equal(compression.nextBloggerRequest('blogger-squash', true), 'blogger-main')
   assert.equal(compression.nextBloggerRequest('blogger-main', false), 'blogger-main')
 })
+
+test.todo('WHAT[context-compression-022] normal, retry, Squash and crash recovery rebuild the same canonical X context from the same durable facts; GAP-104')
 
 test('WHAT[context-compression-022] CTX_022_durable_projection_keeps_newest_failure_count', () => {
   let state = projection.forAuthority('run-newest-covers', 'root-1')

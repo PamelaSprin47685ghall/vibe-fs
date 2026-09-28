@@ -5,7 +5,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const open = (state, road = 'road-1', incumbent = 'inc-1', snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, road, incumbent, snapshot, 'authority-1')
 
-test('WHAT[relay-incumbency-005] retired iteration never reactivates and stale runs stay absorbed', () => {
+test('WHAT[relay-incumbency-005] Road fold refuses to reopen or revise a retired incumbent', () => {
   const first = open(relay.empty())
   const assessed = relay.assess(
     first.state,
@@ -34,3 +34,5 @@ test('WHAT[relay-incumbency-005] retired iteration never reactivates and stale r
   )
   assert.equal(revised.ok, false)
 })
+
+test('WHAT[relay-incumbency-005] stale provider runs remain absorbed across multiple real handovers and recovery', {todo: 'GAP-192: retired-id rejection alone does not deliver late tool or terminal observations'})

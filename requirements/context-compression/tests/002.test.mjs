@@ -316,34 +316,6 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const compression = await import("../../../dist/Context/Companion/CompressionSurface.js");
 const prefix = await import("../../../dist/Context/Prefix/Surface.js");
-
-const selection = prefix
-const agreeing = (digest) => () => digest
-const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${cutoff}`, seal = `seal-${cutoff}` } = {}) =>
-  prefix.snapshot({
-    ref: `blob-frozen-${cutoff}`,
-    frozenDigest: frozen,
-    cutoff,
-    prefixDigest: digest,
-    sealRoot: seal,
-    syntheticId: `synthetic-${seal}`,
-  })
-
-test('WHAT[context-compression-002] PREFIX_STABILITY_prefix_behavior_is_exported_only_by_PrefixSurface', () => {
-  for (const removed of ['select', 'snapshot', 'empty', 'prefixEmpty', 'prefixSnapshot', 'prefixProbe', 'applyRebase', 'retainTodoWriteRounds', 'requestKind', 'requestKindLabels', 'requestKindLabel', 'requestKindMayCarryProbe']) {
-    assert.equal(typeof compression[removed], 'undefined', `${removed} must not remain on CompressionSurface`)
-  }
-  assert.equal(prefix.requestKind.mayCarryProbe(prefix.requestKind.workMain), true)
-  assert.equal(prefix.requestKind.mayCarryProbe(prefix.requestKind.bloggerMain), false)
-  assert.equal(prefix.requestKindLabel(prefix.requestKind.workMain), 'work-main')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const compression = await import("../../../dist/Context/Companion/CompressionSurface.js");
-const prefix = await import("../../../dist/Context/Prefix/Surface.js");
 const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js");
 
 const requestKind = prefix.requestKind

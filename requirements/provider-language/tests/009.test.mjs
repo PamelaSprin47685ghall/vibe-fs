@@ -1,63 +1,40 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  languageOfSession,
-  substitute,
-  ensureInherited,
-  ensureRoot,
-  clearAllForTests,
-  bindOnce,
-  nameOf,
-  requireLanguagePair,
-} from '../../../dist/Participant/Provider/LanguageSurface.js'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { scanProviderLanguageBinding } from '../../../scripts/checks/language-parity-gate.mjs'
+import * as prompts from '../../../dist/Resources/PromptSurface.js'
 
-const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
+const thinHost = `
+module ProviderLanguageBinding =
+    let readGlobalPreference () =
+        Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
+        |> ProviderLanguage.fromPreferenceObservation
+`
 
-const SRC_ROOT = join(ROOT, 'src/Wanxiangshu')
-
-const walk = (dir) => {
-  const out = []
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...walk(full))
-    else if (entry.name.endsWith('.fs')) out.push(full)
+test('WHAT[provider-language-009] the existing owner-policy scanner accepts observation and detects duplicated language decisions', () => {
+  assert.deepEqual(scanProviderLanguageBinding(thinHost), [])
+  for (const policy of [
+    'let fallback = ProviderLanguage.English',
+    'let parse raw = ProviderLanguage.tryParse raw',
+    'let empty raw = String.IsNullOrWhiteSpace raw',
+    'let alias = "zh-CN"',
+  ]) {
+    const violations = scanProviderLanguageBinding(`${thinHost}\n${policy}`)
+    assert.ok(violations.some((item) => item.code === 'provider-language-policy'), policy)
   }
-  return out
-}
-
-const english = 'English'
-
-const simplifiedChinese = 'SimplifiedChinese'
-
-const withPreference = async (raw, fn) => {
-  const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-  if (raw === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-  else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = raw
-  try {
-    return await fn()
-  } finally {
-    if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
-  }
-}
-
-test.beforeEach(() => {
-  clearAllForTests()
 })
 
-test('WHAT[provider-language-009] render layer never translates or substitutes owning prose', () => {
-  // Render/layout owns substitution only; semantic content passes through
-  // verbatim — the layer never invents, translates, or corrects the prose it
-  // renders. A zh value survives byte-identical; a wrong-locale value is not
-  // machine-corrected. Loading stays centralized: requireLanguagePair owns the
-  // semantic path and fails missing leaves instead of fabricating content.
-  assert.equal(substitute('{{x}}', { x: '会话连接已断开' }), '会话连接已断开')
-  assert.throws(
-    () => requireLanguagePair('role/__does-not-exist__'),
-    /missing/,
-    'a missing semantic path must fail, not fabricate prose or fall back',
-  )
+test.todo('WHAT[provider-language-009] complete Class A loading ownership needs production call-path evidence; a few source patterns cannot establish all prose ownership')
+
+test('WHAT[provider-language-009] package-owned prompt resources load unchanged from another working directory', () => {
+  const before = prompts.load()
+  const runtimeBefore = prompts.runtimeLoad().Prompts
+  assert.ok(Object.values(before).every((text) => typeof text === 'string' && text.trim().length > 0))
+  const previous = process.cwd()
+  try {
+    process.chdir('/')
+    assert.deepEqual(prompts.load(), before)
+    assert.deepEqual(prompts.runtimeLoad().Prompts, runtimeBefore)
+  } finally {
+    process.chdir(previous)
+  }
 })

@@ -37,8 +37,7 @@ test('WHAT[context-compression-003] CTX_003_delta_limit_is_200_KiB', () => {
   // scaled by provider. Exported as a plain value so this test can read it.
   assert.equal(delta.limitBytes, 200 * 1024)
 
-  // Threshold proof: a single part of 200 KiB exactly is within the chunk boundary,
-  // whereas 200 KiB + 1 byte exceeds the limit and triggers deterministic truncation/marking.
+  // Below/above examples include TOML framing; these are not exact ±1 boundaries.
   const limit = 200 * 1024
   const atLimitText = 'a'.repeat(limit - 300) // leaves room for TOML framing within 200 KiB
   const atLimitMessages = delta.messages([{ role: 'user', parts: [delta.text(atLimitText)] }])
@@ -68,6 +67,8 @@ test('WHAT[context-compression-003] CTX_003_no_chunk_exceeds_the_limit', () => {
   const limit = 1500
   for (const chunk of drainAll(limit, messages)) {
     assert.equal(chunk.bytes <= limit, true, `chunk of ${chunk.bytes} bytes exceeds ${limit}`)
-    assert.equal(chunk.bytes, syn.byteCount(chunk.toml), 'reported bytes must be the rendered bytes')
+    assert.equal(chunk.bytes, Buffer.byteLength(chunk.toml, 'utf8'), 'independent measurement of the rendered bytes')
+    assert.doesNotThrow(() => parseToml(chunk.toml))
   }
+  assert.deepEqual(drainAll(limit, messages), drainAll(limit, messages))
 })

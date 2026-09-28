@@ -210,3 +210,5 @@ test('WHAT[managed-session-lifecycle-015] TPOL_linked_child_keeps_exact_handle_a
   assert.equal(HandleSurface.tryFindByChildSession(linked.state, 'ses_missing'), null)
 })
 }
+
+test.todo('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)')

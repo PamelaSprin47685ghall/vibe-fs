@@ -1,4 +1,27 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+
+integrationTest('WHAT[host-boundary-026] real Fable compiles Host diagnostics with only its declared dependencies', async () => {
+  const root = resolve(import.meta.dirname, '../../..')
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-host-diagnostics-compile-'))
+  try {
+    const result = await compileOwnerProject({
+      projectPath: join(root, 'src/Wanxiangshu/Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj'),
+      aggregatePath: null,
+      scratchRoot,
+      rootPropsPath: join(root, 'Directory.Build.props'),
+      stdio: 'pipe',
+    })
+    assert.equal(result.ok, true, `declared Host diagnostics closure must compile\n${result.stdout}\n${result.stderr}`)
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

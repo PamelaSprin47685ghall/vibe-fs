@@ -83,7 +83,7 @@ test('WHAT[relay-retirement-007] Accepted with a stale different snapshot fails'
   assert.deepEqual(stale, { ok: false, error: 'RetirementSnapshotStale' })
 })
 
-test('WHAT[relay-retirement-007] blocked perfect iteration retries Accepted after blockers clear', () => {
+test('WHAT[relay-retirement-007] cleanup-blocked fold accepts a subsequent exact certificate retirement transaction', () => {
   const state = openAssessed(Array(8).fill('PERFECT'))
   const blocked = relay.blockCleanup(state, 'road-1', 'inc-1', 'blocker-digest-1')
   assert.equal(blocked.ok, true)
@@ -103,18 +103,6 @@ test('WHAT[relay-retirement-007] blocked perfect iteration retries Accepted afte
   assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Accepted')
 })
 
-test('WHAT[relay-retirement-007] perfect iteration commits Accepted directly without downgrading obligations', () => {
-  const state = openAssessed(Array(8).fill('PERFECT'))
-  const retired = relay.retireAccepted(
-    state,
-    'road-1',
-    'inc-1',
-    'ret-accepted-1',
-    'run-1',
-    'tool-1',
-    'certificate:assessment-1',
-    'snapshot-1',
-  )
-  assert.equal(retired.ok, true)
-  assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Accepted')
-})
+test('WHAT[relay-retirement-007] real durable retirement is atomic across crash points and cleanup retry', {todo: 'GAP-197: pure fold transition does not persist a transaction or clear actual resource blockers'})
+
+test.todo('WHAT[relay-retirement-007] retirement ends incumbent obligations without clearing the same-session cognitive canvas')

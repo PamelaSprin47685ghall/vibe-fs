@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -9,12 +9,21 @@ const toolModule = await import('@opencode-ai/plugin/tool')
 
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
+const acceptNextPrompt = async (runtime, index, pending) => {
+  await Promise.race([
+    forkTool.awaitPromptCount(runtime, index + 1),
+    pending.then((result) => { throw new Error(`Delegation finished before prompt admission: ${result}`) }),
+  ])
+  assert.equal(forkTool.acceptPrompt(runtime, index), true)
+}
+
 test('WHAT[capability-enforcement-026] D01_resume_fixed_devops_rejected_before_review_accepted', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-d01-'))
   const owner = 'manager-devops-d01'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAuditPendingIncumbency(runtime, owner)
     const resumed = forkTool.executeManagerResume(
       runtime,
       toolModule,
@@ -37,6 +46,7 @@ test('WHAT[capability-enforcement-026] D01_resume_fixed_devops_rejected_before_r
     assert.equal(forkTool.child(runtime), null, 'No child handle may exist when resume is rejected')
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -49,10 +59,6 @@ test('WHAT[capability-enforcement-026] D03_resume_devops_enters_normal_flow_afte
     // 注入已接纳评审事实（AcceptedAssessment）
     await forkTool.injectAcceptedAssessment(runtime, owner)
 
-    setTimeout(() => {
-      forkTool.acceptPrompt(runtime, 0)
-    }, 50)
-
     const resumed = forkTool.executeManagerResume(
       runtime,
       toolModule,
@@ -61,12 +67,14 @@ test('WHAT[capability-enforcement-026] D03_resume_devops_enters_normal_flow_afte
       'devops',
       'DEVOPS-RUN-TESTS-AFTER-REVIEW',
     )
+    await acceptNextPrompt(runtime, 0, resumed)
     const result = await resumed
     // 接纳评审后，Manager 恢复向固定 DevOps 派工的正常流程，交接成功
     assert.match(result, /devops/)
     assert.match(result, /carries this charge now|现已接下这项托付/i)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -76,6 +84,7 @@ test('WHAT[capability-enforcement-026] D02_resume_legitimate_existing_readonly_e
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAuditPendingIncumbency(runtime, owner)
     // 1. Manager 先派出合法 Engineer 子会话进行调查
     const forked = forkTool.executeManagerFork(
       runtime,
@@ -85,7 +94,7 @@ test('WHAT[capability-enforcement-026] D02_resume_legitimate_existing_readonly_e
       'Ada',
       'INVESTIGATE-INITIAL-CODEBASE',
     )
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    await acceptNextPrompt(runtime, 0, forked)
     await forked
 
     // 完成第一轮调查并结算
@@ -101,12 +110,13 @@ test('WHAT[capability-enforcement-026] D02_resume_legitimate_existing_readonly_e
       'Ada',
       'CONTINUE-INVESTIGATION-BEFORE-REVIEW',
     )
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    await acceptNextPrompt(runtime, 1, resumed)
     const result = await resumed
     assert.match(result, /Ada/)
     assert.match(result, /carries this charge now|现已接下这项托付/i)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -128,8 +138,7 @@ test('WHAT[capability-enforcement-026] D04_resume_devops_when_busy_rejected_unde
       'devops',
       'DEVOPS-RUNNING-INITIAL-VERIFICATION',
     )
-    await forkTool.awaitPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true, 'First prompt (index 0) must be accepted cleanly')
+    await acceptNextPrompt(runtime, 0, firstResumePromise)
 
     const firstResume = await firstResumePromise
     assert.match(firstResume, /devops/)
@@ -156,6 +165,7 @@ test('WHAT[capability-enforcement-026] D04_resume_devops_when_busy_rejected_unde
     )
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -165,6 +175,7 @@ test('WHAT[capability-enforcement-026] D05_case_variation_and_unbound_identity_c
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAuditPendingIncumbency(runtime, owner)
     // 评审未接纳状态下，通过大小写变形或带空格尝试绕过 DevOps 门禁
     const variations = ['DEVops', 'DevOps ', ' devops ', 'DEVOPS']
     for (const name of variations) {
@@ -193,6 +204,7 @@ test('WHAT[capability-enforcement-026] D05_case_variation_and_unbound_identity_c
     assert.match(unbound, /没有以该 name|不为人知|unknown|person-unknown|No continuing person is known by that name/i)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -216,10 +228,7 @@ test('WHAT[capability-enforcement-026] D06_fork_devops_or_creating_alternative_d
 
     // 2. 接纳评审并绑定固定 DevOps，使其名字属于当前持续历史
     await forkTool.injectAcceptedAssessment(runtime, owner)
-    forkTool.awaitPromptCount(runtime, 1).then(() => {
-      forkTool.acceptPrompt(runtime, 0)
-    })
-    const bound = await forkTool.executeManagerResume(
+    const pending = forkTool.executeManagerResume(
       runtime,
       toolModule,
       owner,
@@ -227,6 +236,8 @@ test('WHAT[capability-enforcement-026] D06_fork_devops_or_creating_alternative_d
       'devops',
       'BIND-DEVOPS-FIRST',
     )
+    await acceptNextPrompt(runtime, 0, pending)
+    const bound = await pending
     assert.match(bound, /devops/)
 
     // 3. Manager 试图通过 name: 'devops' 创建替代 devops：同步拒绝 name-already-belongs
@@ -245,5 +256,8 @@ test('WHAT[capability-enforcement-026] D06_fork_devops_or_creating_alternative_d
     )
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[capability-enforcement-026] rejecting pre-review DevOps dispatch appends no durable facts; zero child and prompt counts do not establish zero journal effects')

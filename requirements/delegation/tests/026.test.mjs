@@ -2,7 +2,7 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync } = await import("node:fs");
+const { mkdtempSync, rmSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
@@ -68,6 +68,7 @@ test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join
     assert.match(secondJoined, /SECOND-ANSWER/)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
@@ -95,6 +96,7 @@ test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_never_leaves_ghost_run_for_join', async () => {
@@ -126,37 +128,9 @@ test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_
     assert.equal(forkTool.promptCount(runtime), 1)
   } finally {
     forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { default: test } = await import("node:test");
-
-
-test('WHAT[delegation-026] reusable delegation has no durable program-counter/state-machine vocabulary', () => {
-  const handoff = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Handoff.fs', import.meta.url), 'utf8')
-  const ledger = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs', import.meta.url), 'utf8')
-  const facts = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Facts.fs', import.meta.url), 'utf8')
-
-  for (const source of [handoff, ledger, facts]) {
-    assert.doesNotMatch(source, /WorkUnitStarted|WorkUnitFinished|WorkUnitAbandoned|ActiveWorkUnit|CurrentStage|NextAction/)
-  }
-  assert.doesNotMatch(ledger, /advanceHandoff|DelegateSessionId/)
-  assert.match(ledger, /DelegationHandoffCompleted/)
-})
-test('WHAT[delegation-026] fork admission bookkeeping that can fail happens before dispatch', () => {
-  const forkTool = readFileSync(
-    new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs', import.meta.url),
-    'utf8',
-  )
-
-  const newFork = forkTool.slice(forkTool.indexOf('let private commitNewManagerFork'), forkTool.indexOf('let private finishNewManagerFork'))
-  assert.ok(newFork.indexOf('recordFissionAffinity') < newFork.indexOf('runManagerFork'))
-
-  const reuse = forkTool.slice(forkTool.indexOf('let private commitIdleReuse'), forkTool.indexOf('let private reuseWhileIdle'))
-  assert.ok(reuse.indexOf('recordFissionAffinity') < reuse.indexOf('runManagerReuse'))
-})
-}
+test.todo('WHAT[delegation-026] actual admission and checkpoint fault cuts preserve exact durable claim and effect truth without replay or durable program counters (GAP-153)')

@@ -4,11 +4,7 @@ import * as recovery from '../../../dist/Execution/Session/ChatExecution/Recover
 
 
 
-test('WHAT[managed-session-lifecycle-019] cancel and delete lifecycle signals settle exact terminal resources through the execution owner', async () => {
-  const signals = recovery.lifecycleSignals()
-  assert.ok(signals.includes('SessionDeleted'))
-  assert.ok(signals.includes('SessionCancelled'))
-
+test('WHAT[managed-session-lifecycle-019] recovery interpreter requests exact reconciliation for held terminal resources', async () => {
   const result = await recovery.recoverScenarios([
     'TerminalResourceHeld',
     'TerminalResourceReleased',
@@ -17,3 +13,5 @@ test('WHAT[managed-session-lifecycle-019] cancel and delete lifecycle signals se
   assert.deepEqual(result.decisions, ['ReconcilePhysical', 'Ignore'])
   assert.deepEqual(result.effects, ['ReconcilePhysical:ReleaseTerminalResource'])
 })
+
+test.todo('WHAT[managed-session-lifecycle-019] actual cancel and delete await every exact terminal and capacity release (GAP-126)')

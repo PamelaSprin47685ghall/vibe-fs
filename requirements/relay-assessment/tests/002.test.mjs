@@ -66,3 +66,15 @@ test('WHAT[relay-assessment-002] cross-iteration replay of another iteration ass
   )
   assert.deepEqual(replayed, { ok: false, error: 'AssessmentReplayConflict' })
 })
+
+const {withReview, scores: reviewScores} = await import('./support/plugin.mjs')
+
+test('WHAT[relay-assessment-002] actual tool exact replay returns the accepted result', {todo: 'GAP-194: observed actual tool gate denies exact replay after first assessment'}, async () => {
+  await withReview(async ({execute, hooks, session}) => {
+    const input = reviewScores('REVISE')
+    const first = await execute(input)
+    assert.match(first, /recorded = true/)
+    const replay = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.equal(replay, first)
+  })
+})

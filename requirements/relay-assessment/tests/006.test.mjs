@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[relay-assessment-006] assessed iteration cannot submit a second review after work begins', () => {
+test('WHAT[relay-assessment-006] perfect assessment fold rejects a second semantic assessment', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
@@ -42,4 +42,13 @@ test('WHAT[relay-assessment-006] assessed iteration cannot submit a second revie
     ),
     { ok: false, error: 'AssessmentAlreadySubmitted' },
   )
+})
+
+const {withReview, scores} = await import('./support/plugin.mjs')
+
+test('WHAT[relay-assessment-006] actual accepted revise assessment removes permission for a new review call', async () => {
+  await withReview(async ({execute}) => {
+    assert.match(await execute(scores('REVISE')), /recorded = true/)
+    assert.doesNotMatch(await execute(scores('PERFECT'), {call: 'second-review', run: 'second-run'}), /recorded = true/)
+  })
 })

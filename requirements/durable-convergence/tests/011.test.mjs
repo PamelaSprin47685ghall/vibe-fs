@@ -67,6 +67,54 @@ test('WHAT[durable-convergence-011] reverse tail read is exact across block boun
   }
 })
 
+test('WHAT[durable-convergence-011] the exact TTL boundary materializes the complete writer and one millisecond later expires it', async () => {
+  const now = Date.parse('2026-09-26T00:00:00Z')
+  await withRepo(async (repo, commonDir) => {
+    const old = { ...make(A, 'retention/boundary'), type: 'JournalEnvelope', payload: { ObservedAt: new Date(now - 10 * DAY).toISOString() } }
+    const last = { ...make(B, 'retention/boundary', [A]), type: 'JournalEnvelope', payload: { ObservedAt: new Date(now - DAY).toISOString() } }
+    const path = writeCanonicalEvents(commonDir, 'boundary', [old, last])
+    const original = readFileSync(path, 'utf8')
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, now), ['boundary'])
+    const snapshot = await retention.syncAt(repo, commonDir, null, now)
+    assert.equal(snapshot.ok, true, JSON.stringify(snapshot.error))
+    const blob = execFileSync('git', ['-C', repo, 'show', `${snapshot.root}:writers/boundary.ndjson`], { encoding: 'utf8' })
+    assert.equal(blob, original)
+    assert.equal(readFileSync(path, 'utf8'), original, 'the old fact inside the retained writer cannot be trimmed')
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, now + 1), [])
+  })
+})
+
+test('WHAT[durable-convergence-011] manifest v2 rejects duplicate extra malformed and mismatched bindings without changing local writer truth', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const now = Date.now()
+    const path = await writeEvent(commonDir, 'manifest-matrix', make(A, 'retention/manifest-matrix'))
+    const before = readFileSync(path, 'utf8')
+    const current = await retention.syncAt(repo, commonDir, null, now)
+    assert.equal(current.ok, true, JSON.stringify(current.error))
+    const git = (args, input) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', input }).trim()
+    const manifest = git(['show', `${current.root}:writer-manifest`])
+    const line = manifest.split('\n')[1]
+    const [name, oid, activity] = line.split('\t')
+    const cases = [
+      ['missing', 'v2\n', /does not bind/],
+      ['duplicate', `v2\n${line}\n${line}\n`, /duplicate entry/],
+      ['extra', `v2\n${line}\nextra.ndjson\t${oid}\t${activity}\n`, /entries absent/],
+      ['mismatched', `v2\n${name}\t${'0'.repeat(40)}\t${activity}\n`, /does not bind/],
+      ['malformed', `v2\n${name}\t${oid}\tNaN\n`, /malformed entry/],
+    ]
+    for (const [label, text, error] of cases) {
+      const manifestOid = git(['hash-object', '-w', '--stdin'], text)
+      const entries = git(['ls-tree', current.root]).split('\n')
+        .map(entry => entry.endsWith('\twriter-manifest') ? `100644 blob ${manifestOid}\twriter-manifest` : entry)
+      const root = git(['mktree'], entries.join('\n') + '\n')
+      const result = await retention.syncAt(repo, commonDir, root, now)
+      assert.equal(result.ok, false, label)
+      assert.match(String(result.error), error, label)
+      assert.equal(readFileSync(path, 'utf8'), before, label)
+    }
+  })
+})
+
 test('WHAT[durable-convergence-011] durable Journal ObservedAt outranks refreshed writer mtime', () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-observed-at-'))
   const commonDir = join(root, '.git')

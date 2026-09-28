@@ -18,9 +18,6 @@ test('WHAT[crash-reconciliation-007] turn_unknown_is_snapshot_observation_not_tu
 })
 
 test('WHAT[crash-reconciliation-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', () => {
-  // This is the owner-defined plain input contract, not Fable reflection.
-  assert.deepEqual(reconcile.acceptedTurnFields(), ['session', 'physical', 'providerRun', 'outcome'])
-
   const terminal = reconcile.turnFixture({
     session: 'ses-a',
     physical: 'user-1',

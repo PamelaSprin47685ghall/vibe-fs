@@ -255,8 +255,7 @@ module Surface =
         match Fold.view state (RoadId.create road) with
         | None -> null
         | Some roadView ->
-            let defaultDevops = "devops:" + road
-            let devopsId = defaultArg roadView.BoundDevOps defaultDevops
+            let devopsId = roadView.BoundDevOps |> nullableString
 
             let incumbentId =
                 roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString

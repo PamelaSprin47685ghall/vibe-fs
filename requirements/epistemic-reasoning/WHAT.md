@@ -5,7 +5,6 @@
 > clean-break rewrite. They are retained as a historical record and as design
 > provenance; `sphinx-v2/SUPERSEDES.md` maps each one to its replacement. They are
 > not acceptance obligations for the current production tree.
-# epistemic-reasoning — WHAT
 
 ## [001] 认识状态为充分状态而非历史记录
 

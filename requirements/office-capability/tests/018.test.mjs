@@ -1,28 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
+import { isAllowed, managerForkableOffices } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
-test('WHAT[office-capability-018] sphinx is programmatic workflow using standard Engineer without its own role persona or fission identity', () => {
-  // 1. Non-consequence: Sphinx is not a forkable office/persona
-  const forkable = office.managerForkableOffices()
-  assert.equal(forkable.includes('sphinx'), false)
-
-  // 2. Non-consequence: Sphinx does not own independent Fission identity
-  assert.equal(office.isAllowed('sphinx', 'Fission'), false)
-
-  // 3. Non-consequence: Sphinx is not a mutable workspace worker role
-  assert.equal(office.isAllowed('sphinx', 'Write'), false)
-  assert.equal(office.isAllowed('sphinx', 'Exec'), false)
-
-  // 4. Decommissioned Inquiry role: inquiry model driving layer is completely removed
-  assert.equal(office.isAllowed('inquiry', 'Read'), false)
-  assert.equal(office.isAllowed('inquiry', 'Write'), false)
-
-  // 5. Exclusive Fission entitlement: Engineer is the sole office entitled to Fission
-  assert.equal(office.isAllowed('engineer', 'Fission'), true)
-  assert.equal(office.isAllowed('engineer', 'Write'), true)
-  assert.equal(office.isAllowed('engineer', 'Edit'), true)
-  assert.equal(office.isAllowed('engineer', 'Sphinx'), true)
-  assert.equal(office.isAllowed('manager', 'Fission'), false)
-  assert.equal(office.isAllowed('devops', 'Fission'), false)
+test('WHAT[office-capability-018] Sphinx and historical Inquiry have no public office permissions', () => {
+  assert.equal(managerForkableOffices().includes('sphinx'), false)
+  for (const role of ['sphinx', 'inquiry']) {
+    for (const permission of ['Read', 'Write', 'Exec', 'Fission']) {
+      assert.equal(isAllowed(role, permission), false, `${role}/${permission}`)
+    }
+  }
 })
+
+test('WHAT[office-capability-018] the standard Engineer entitlement includes source work and fission but no execution or DevOps dispatch', () => {
+  for (const permission of ['Read', 'Write', 'Edit', 'Fission', 'Sphinx']) {
+    assert.equal(isAllowed('engineer', permission), true, permission)
+  }
+  for (const permission of ['Exec', 'Pty', 'Fork', 'Resume']) {
+    assert.equal(isAllowed('engineer', permission), false, permission)
+  }
+})
+
+test.todo('WHAT[office-capability-018] actual Sphinx workflow must bind standard Engineer authority and retain ordinary worktree and Fission admission; a role matrix does not prove workflow wiring')

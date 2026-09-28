@@ -115,4 +115,20 @@ test('WHAT[repository-programming-006] JS054_2_output_bound_rejects_oversized_re
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'RESULT_TOO_LARGE')
 })
+
+test('WHAT[repository-programming-006] output budget measures UTF-8 bytes and accepts the exact boundary', async () => {
+  const value = { text: '中文🙂' }
+  const bytes = Buffer.byteLength(JSON.stringify(value), 'utf8')
+  const program = `class Js extends JsProgram { async run() { return ${JSON.stringify(value)}; } }`
+  assert.ok(bytes > JSON.stringify(value).length)
+  const exact = await runWrapped(program, { js: {} }, { outputBound: bytes })
+  assert.equal(exact.ok, true)
+  assert.deepEqual(JSON.parse(exact.value), value)
+  const over = await runWrapped(program, { js: {} }, { outputBound: bytes - 1 })
+  assert.equal(over.ok, false)
+  assert.equal(failureCode(over), 'RESULT_TOO_LARGE')
+})
 }
+
+test.todo('WHAT[repository-programming-006] pending async work and post-await computation terminate within the execution budget')
+test.todo('WHAT[repository-programming-006] memory exhaustion is contained without exhausting the Host process')

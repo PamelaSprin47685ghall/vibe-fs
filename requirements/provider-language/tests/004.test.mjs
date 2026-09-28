@@ -1,148 +1,71 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import { clearAllForTests, readGlobalPreference, setHostConfigPreference, ensureRoot, languageOfSession } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { withPreference } from './support/language-fixtures.mjs'
 
-{
-  const { default: assert } = await import('node:assert/strict')
-  const { default: test } = await import('node:test')
-  const {
-    clearAllForTests,
-    readGlobalPreference,
-    setHostConfigPreference,
-  } = await import('../../../dist/Participant/Provider/LanguageSurface.js')
+const localeKeys = ['WANXIANGSHU_PROVIDER_LANGUAGE', 'VSCODE_NLS_CONFIG', 'LC_ALL', 'LC_MESSAGES', 'LANG']
 
-  const english = 'English'
-  const simplifiedChinese = 'SimplifiedChinese'
-
-  const withCleanLocale = (fn) => {
-    const envSnapshot = {
-      WANXIANGSHU_PROVIDER_LANGUAGE: process.env.WANXIANGSHU_PROVIDER_LANGUAGE,
-      VSCODE_NLS_CONFIG: process.env.VSCODE_NLS_CONFIG,
-      LC_ALL: process.env.LC_ALL,
-      LC_MESSAGES: process.env.LC_MESSAGES,
-      LANG: process.env.LANG,
+const withLocale = async (environment, intlLocale, action) => {
+  const saved = Object.fromEntries(localeKeys.map((key) => [key, process.env[key]]))
+  const dateTimeFormat = Intl.DateTimeFormat
+  clearAllForTests()
+  try {
+    for (const key of localeKeys) {
+      if (environment[key] === undefined) delete process.env[key]
+      else process.env[key] = environment[key]
     }
-    delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    delete process.env.VSCODE_NLS_CONFIG
-    delete process.env.LC_ALL
-    delete process.env.LC_MESSAGES
-    delete process.env.LANG
-    try {
-      return fn()
-    } finally {
-      for (const [key, val] of Object.entries(envSnapshot)) {
-        if (val === undefined) delete process.env[key]
-        else process.env[key] = val
-      }
+    Intl.DateTimeFormat = () => ({ resolvedOptions: () => ({ locale: intlLocale }) })
+    await action()
+  } finally {
+    Intl.DateTimeFormat = dateTimeFormat
+    for (const key of localeKeys) {
+      if (saved[key] === undefined) delete process.env[key]
+      else process.env[key] = saved[key]
     }
-  }
-
-  test.beforeEach(() => {
     clearAllForTests()
-  })
-
-  test('WHAT[provider-language-004] global preference defaults to English when env unset and clean locale', () => {
-    withCleanLocale(() => {
-      assert.equal(readGlobalPreference(), english)
-    })
-  })
-
-  test('WHAT[provider-language-004] system/IDE locale detects SimplifiedChinese automatically', () => {
-    withCleanLocale(() => {
-      process.env.VSCODE_NLS_CONFIG = JSON.stringify({ locale: 'zh-cn', osLocale: 'zh-cn' })
-      assert.equal(readGlobalPreference(), simplifiedChinese)
-    })
-
-    withCleanLocale(() => {
-      process.env.LANG = 'zh_CN.UTF-8'
-      assert.equal(readGlobalPreference(), simplifiedChinese)
-    })
-  })
-
-  test('WHAT[provider-language-004] explicit environment variable overrides Chinese system locale', () => {
-    withCleanLocale(() => {
-      process.env.VSCODE_NLS_CONFIG = JSON.stringify({ locale: 'zh-cn' })
-      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'English'
-      assert.equal(readGlobalPreference(), english)
-    })
-  })
-
-  test('WHAT[provider-language-004] host configuration takes precedence over clean locale', () => {
-    withCleanLocale(() => {
-      setHostConfigPreference('zh-CN')
-      assert.equal(readGlobalPreference(), simplifiedChinese)
-    })
-  })
+  }
 }
 
-{
-  const { default: assert } = await import('node:assert/strict')
-  const { default: test } = await import('node:test')
-  const {
-    languageOfSession,
-    ensureRoot,
-    clearAllForTests,
-    nameOf,
-  } = await import('../../../dist/Participant/Provider/LanguageSurface.js')
-
-  const english = 'English'
-  const simplifiedChinese = 'SimplifiedChinese'
-  const withPreference = async (raw, fn) => {
-    const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    if (raw === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = raw
-    try {
-      return await fn()
-    } finally {
-      if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-      else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
-    }
-  }
-
-  const withCleanLocale = async (fn) => {
-    const envSnapshot = {
-      WANXIANGSHU_PROVIDER_LANGUAGE: process.env.WANXIANGSHU_PROVIDER_LANGUAGE,
-      VSCODE_NLS_CONFIG: process.env.VSCODE_NLS_CONFIG,
-      LC_ALL: process.env.LC_ALL,
-      LC_MESSAGES: process.env.LC_MESSAGES,
-      LANG: process.env.LANG,
-    }
-    delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
-    delete process.env.VSCODE_NLS_CONFIG
-    delete process.env.LC_ALL
-    delete process.env.LC_MESSAGES
-    delete process.env.LANG
-    try {
-      return await fn()
-    } finally {
-      for (const [key, val] of Object.entries(envSnapshot)) {
-        if (val === undefined) delete process.env[key]
-        else process.env[key] = val
-      }
-    }
-  }
-
-  test.beforeEach(() => {
-    clearAllForTests()
+test('WHAT[provider-language-004] English is the final fallback after all locale sources are non-Chinese', async () => {
+  await withLocale({}, 'en-US', () => {
+    assert.equal(readGlobalPreference(), 'English')
+    assert.equal(ensureRoot('fallback-root'), 'English')
   })
+})
 
-  test('WHAT[provider-language-004] unbound session language is English in clean locale', async () => {
-    await withCleanLocale(async () => {
-      const sid = 'ses_prose_unbound'
-      assert.equal(nameOf(languageOfSession(sid)), english)
+test('WHAT[provider-language-004] every declared locale source can select SimplifiedChinese', async () => {
+  for (const environment of [
+    { VSCODE_NLS_CONFIG: JSON.stringify({ locale: 'zh-cn' }) },
+    { LC_ALL: 'zh_CN.UTF-8' },
+    { LC_MESSAGES: 'zh_CN.UTF-8' },
+    { LANG: 'zh_CN.UTF-8' },
+  ]) {
+    await withLocale(environment, 'en-US', () => assert.equal(readGlobalPreference(), 'SimplifiedChinese'))
+  }
+  await withLocale({}, 'zh-CN', () => assert.equal(readGlobalPreference(), 'SimplifiedChinese'))
+})
+
+test('WHAT[provider-language-004] explicit environment outranks host configuration which outranks locale detection', async () => {
+  await withLocale({ LANG: 'zh_CN.UTF-8' }, 'zh-CN', async () => {
+    setHostConfigPreference('en')
+    assert.equal(readGlobalPreference(), 'English')
+    await withPreference('zh-CN', () => assert.equal(readGlobalPreference(), 'SimplifiedChinese'))
+    setHostConfigPreference('zh-CN')
+    await withPreference('en', () => assert.equal(readGlobalPreference(), 'English'))
+  })
+})
+
+test('WHAT[provider-language-004] preference changes affect only future roots in either direction', async () => {
+  await withLocale({}, 'en-US', async () => {
+    await withPreference('zh-CN', () => assert.equal(ensureRoot('first'), 'SimplifiedChinese'))
+    await withPreference('en', () => {
+      assert.equal(ensureRoot('first'), 'SimplifiedChinese')
+      assert.equal(ensureRoot('second'), 'English')
+    })
+    await withPreference('zh-CN', () => {
+      assert.equal(ensureRoot('second'), 'English')
+      assert.equal(ensureRoot('third'), 'SimplifiedChinese')
+      assert.equal(languageOfSession('first'), 'SimplifiedChinese')
     })
   })
-
-  test('WHAT[provider-language-004] preference change only affects future sessions', async () => {
-    const existing = 'ses_pref_existing'
-    const fresh = 'ses_pref_fresh'
-
-    await withPreference('zh-CN', async () => {
-      assert.equal(nameOf(ensureRoot(existing)), simplifiedChinese)
-      // 全局切到 en：已绑 session 不重绑（bind-once 拒绝异值）。
-      return withPreference('en', async () => {
-        assert.equal(nameOf(ensureRoot(existing)), simplifiedChinese)
-        // 新 session 首触达 → 取新偏好。
-        assert.equal(nameOf(ensureRoot(fresh)), english)
-      })
-    })
-  })
-}
+})
