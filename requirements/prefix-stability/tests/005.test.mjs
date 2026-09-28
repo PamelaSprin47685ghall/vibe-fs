@@ -37,3 +37,5 @@ test('WHAT[prefix-stability-005] CTX_012_a_replayed_rebase_is_reported_as_stale'
   assert.equal(prefix.epochOf(once), 1n)
   assert.deepEqual(once.snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
+
+test.todo('WHAT[prefix-stability-005] actual next-attempt seal observes a durably committed rebase and refuses progression after append failure; GAP-106')

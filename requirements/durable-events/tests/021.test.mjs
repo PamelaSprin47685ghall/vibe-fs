@@ -34,7 +34,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[durable-events-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
+test('WHAT[durable-events-021] low-level append persists bad fact and cut together; reopening a store replays the scoped reset', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'semantic-cut-proof')
   try {
@@ -71,6 +71,8 @@ test('WHAT[durable-events-021] semantic_failure_writes_cut_tail_reset_and_the_sa
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[durable-events-021] the actual producing process exits after semantic cut and a distinct next process resumes from the reset Current')
 
 test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only its own journal stream', async () => {
   const dir = withTemp((base) => base)

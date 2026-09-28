@@ -6,6 +6,6 @@ module AttachmentSurface =
     val classifyObservation: observation: string -> obj
 
     val scenario:
-        owner: string -> role: string -> firstAgent: string -> secondAgent: string -> usable: bool -> Task<obj>
+        owner: string -> role: string -> firstAgent: string -> secondAgent: string -> retainBinding: bool -> Task<obj>
 
     val reconciliationScenario: observation: string -> Task<obj>

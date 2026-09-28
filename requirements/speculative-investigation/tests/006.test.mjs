@@ -134,7 +134,7 @@ test('WHAT[speculative-investigation-006] prepared_cut_legal_command_is_accepted
     assert.equal(loaded.value.byteLength, bundle.byteLength)
   } finally { local.close() }
 })
-test('WHAT[speculative-investigation-006] prepared_cut_payload_closure_is_complete_before_the_receipt', async () => {
+test('WHAT[speculative-investigation-006] successful Prepared receipt exposes its complete durable metadata', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -176,14 +176,7 @@ test('WHAT[speculative-investigation-006] prepared_cut_reopen_observes_only_dura
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[speculative-investigation-006] prepared_cut_has_no_optional_fatal_handler_path', async () => {
-  const { readFileSync } = await import('node:fs')
-  const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Strength/Persistence/Durability.fs', import.meta.url),
-    'utf8',
-  )
-  assert.doesNotMatch(source, /fatalTripHandler|setFatalTripHandler/)
-})
+test.todo('WHAT[speculative-investigation-006] GAP-183: inject ambiguous Prepared durability and prove the actual Owner request remains blocked until durable evidence resolves it')
 }
 
 {

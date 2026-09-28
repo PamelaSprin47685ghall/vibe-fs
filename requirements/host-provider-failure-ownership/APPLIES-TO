@@ -1,0 +1,8 @@
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fsi
+/src/Wanxiangshu/OpenCode/Host/ProviderFailurePresentation.fs
+/src/Wanxiangshu/OpenCode/Host/ProviderFailurePresentation.fsi
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fsi
+/scripts/checks/retry-owner.mjs
+/package.json

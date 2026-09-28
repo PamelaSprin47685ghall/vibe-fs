@@ -2,8 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
-const H = (text) => `H(${text})`
-
 const message = (role, text) => ({ role, parts: [{ kind: 'text', text }] })
 
 const row = (role, text, hostMessageId = null, hostIsPhysical = false) => ({
@@ -64,18 +62,4 @@ test('WHAT[provider-projection-004] canonical wire rendering freezes the generic
     Projection.renderWire(rendered),
     '{"provider":null,"model":null,"variant":null,"tools":[],"system":[],"messages":[{"role":"user","parts":[{"kind":"text","text":"hello"}]},{"role":"assistant","parts":[{"kind":"text","text":"world"}]}]}',
   )
-})
-
-test('WHAT[provider-projection-004] cutoff digest hashes only the truncated current projection', () => {
-  const current = snapshot([
-    message('user', 'first'),
-    message('assistant', 'second'),
-    message('user', 'third'),
-  ])
-  const expectedProjection = Projection.semanticProjection([
-    message('user', 'first'),
-    message('assistant', 'second'),
-  ])
-
-  assert.equal(Projection.cutoffDigest(H, current, 2), H(Projection.renderSemantic(expectedProjection)))
 })

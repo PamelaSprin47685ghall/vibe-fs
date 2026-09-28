@@ -295,19 +295,6 @@ module FissionSurface =
     let convergenceReady (laneCount: int) (completionIds: string array) (bundle: obj) (delivery: obj) : bool =
         FissionConvergence.ready laneCount (Array.toList completionIds) (bundleOfJs bundle) (deliveryOfJs delivery)
 
-    /// A lane observation carries only semantic lane work. Physical session
-    /// identity remains a Host-owned capability and never crosses this surface.
-    let startedLane (index: int) (_sessionId: string) (prompt: string) : obj =
-        box
-            {| index = index
-               prompt = prompt
-               hasAgentId = false
-               hasHandle = false
-               hasParent = false |}
-
-    let startup (laneCount: int) (laneIndex: int) (prompt: string) (workRecord: string) : string =
-        FissionStartup.render laneCount { Index = laneIndex; Prompt = prompt } workRecord
-
     let private jsResult (value: obj) : Result<unit, string> =
         jsFailure value
         |> Option.map (fun message -> Error message)

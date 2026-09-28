@@ -55,7 +55,7 @@ test('WHAT[knowledge-reuse-007] CASE007_captured_refreshed_round_trip_through_in
   }
 })
 
-test('WHAT[knowledge-reuse-007] CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan', async () => {
+test('WHAT[knowledge-reuse-007] access and eviction are visible through the actual Current projection', async () => {
   const local = createCasebookEventStore()
   try {
     await unwrap(casebook.archive(local.store, caseRec('s1', 'Q', 'A', [])))
@@ -69,9 +69,19 @@ test('WHAT[knowledge-reuse-007] CASE007_accessed_and_evicted_are_integrated_with
   }
 })
 
-test('WHAT[knowledge-reuse-007] CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
-  const { readFileSync } = await import('node:fs')
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /loadEvents|loadEnvelopes|project\s*\(|OpenSnapshot|readStreams/)
-  assert.match(source, /tryDecodeEnvelope/)
+test('WHAT[knowledge-reuse-007] committed captured, refreshed and evicted facts survive reopening the actual store', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-reopen-'))
+  let store = createEventStore(dir, 'writer-before')
+  try {
+    await unwrap(casebook.archive(store, caseRec('retained', 'Q', 'A', [fileRead('a.txt', 'hash')])))
+    await unwrap(casebook.refresh(store, 'retained', 'Q2', 'A2', [fileRead('a.txt', 'hash-2')]))
+    await unwrap(casebook.archive(store, caseRec('removed', 'Q', 'A', [])))
+    await unwrap(casebook.evictCase(store, 'removed'))
+    disposeEventStore(store)
+    store = createEventStore(dir, 'writer-after')
+    assert.equal((await findCase(store, 'retained')).a, 'A2')
+    assert.equal(await findCase(store, 'removed'), null)
+  } finally { disposeEventStore(store); rmSync(dir, { recursive: true, force: true }) }
 })
+
+test.todo('WHAT[knowledge-reuse-007] GAP-160: all production writers and recovery paths retain one EventStore authority')

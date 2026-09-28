@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WHAT[js-semantic-surface-003] / WHAT[verification-system-013] surface manifest gate.
+// WHAT[js-semantic-surface-003] surface manifest gate.
 //
 // Registration grants no authority by itself. Every registered module must be
 // owned by a current requirement, governed by current WHAT laws,
@@ -7,30 +7,16 @@
 // executable contract test.
 
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
 import { parseModule, walkSyntax } from '../lib/js-syntax.mjs'
 import { walk } from '../lib/walk.mjs'
+import { clauseDefinitionHeadings } from '../lib/spec-rules.mjs'
 
-export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b/gm
-
-const normalize = (path) => path.replace(/\\/g, '/')
 const read = (root, path) => readFileSync(join(root, path), 'utf8')
-
-const WHAT_TAG = /WHAT\[([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\]/g
-
-export const whatIds = (text) => {
-  WHAT_ID.lastIndex = 0
-  WHAT_TAG.lastIndex = 0
-  const legacy = [
-    ...[...text.matchAll(WHAT_ID)].map((match) => match[1]),
-    ...[...text.matchAll(WHAT_TAG)].map((match) => match[1]),
-  ]
-  const bracketNums = [...text.matchAll(/^#{1,6}\s+\[(\d{3}[a-z]?)\]/gm)].map((match) => match[1])
-  return [...new Set([...legacy, ...bracketNums])]
-}
+export const whatIds = (text) => [...new Set(clauseDefinitionHeadings(text).map(({ id }) => id))]
 
 const sourceCompileStem = (source) => {
   const prefix = 'src/Wanxiangshu/'
@@ -67,17 +53,19 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
 
   // Pre-collect all dist imports across all test files
   const importedDistPaths = new Set()
-  for (const { syntax } of testSources) {
+  for (const { file, syntax } of testSources) {
     if (!syntax) continue
     walkSyntax(syntax, (node) => {
       if (
         (node.type === 'ImportDeclaration' || node.type === 'ImportExpression') &&
         typeof node.source?.value === 'string'
       ) {
-        const val = node.source.value
-        const idx = val.indexOf('dist/')
-        if (idx !== -1) {
-          importedDistPaths.add(val.slice(idx + 5))
+        const specifier = node.source.value
+        if (!specifier.startsWith('.') && !isAbsolute(specifier)) return
+        const target = resolve(dirname(file), specifier)
+        const emitted = relative(resolve(root, 'dist'), target).replace(/\\/g, '/')
+        if (emitted !== '..' && !emitted.startsWith('../') && !isAbsolute(emitted)) {
+          importedDistPaths.add(emitted)
         }
       }
     })

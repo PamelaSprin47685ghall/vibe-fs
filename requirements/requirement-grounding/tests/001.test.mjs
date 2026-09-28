@@ -23,6 +23,9 @@ test('WHAT[requirement-grounding-001] discovers requirement packages from the cu
     pkg(dir, 'zeta')
     pkg(dir, 'alpha')
     mkdirSync(join(dir, 'requirements', 'not-a-package'), { recursive: true })
+    mkdirSync(join(dir, 'requirements', 'directory-what', 'WHAT.md'), { recursive: true })
+    mkdirSync(join(dir, 'requirements', 'not-a-package', 'nested'), { recursive: true })
+    writeFileSync(join(dir, 'requirements', 'not-a-package', 'nested', 'WHAT.md'), 'nested spec')
     assert.deepEqual(grounding.discoverPackages(dir), ['alpha', 'zeta'])
   } finally { cleanup() }
 })

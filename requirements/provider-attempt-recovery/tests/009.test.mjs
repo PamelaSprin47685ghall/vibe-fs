@@ -66,10 +66,7 @@ const foldFacts = (facts) =>
 
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[provider-attempt-recovery-009] the_domain_count_is_reachable_only_through_a_confirmed_failure', () => {
-  assert.equal(budget.recordFailure.length, 1)
-  assert.equal(budget.recordSuccess.length, 1)
-
+test('WHAT[provider-attempt-recovery-009] duplicate domain failure identity cannot advance the pure projection again', () => {
   let current = providerFailureProjection.forAuthority(RUN, ROOT)
   const first = providerFailureProjection.applyFailure(identityFor('run_same'), 1, current)
   assert.equal(first.ok, true)
@@ -78,6 +75,8 @@ test('WHAT[provider-attempt-recovery-009] the_domain_count_is_reachable_only_thr
     error: 'AlreadyObserved',
   })
 })
+
+test.todo('WHAT[provider-attempt-recovery-009] varying Host transport retry numbers cannot change domain count identity or physical recovery permission (GAP-139)')
 
 test('WHAT[provider-attempt-recovery-009] the_dedupe_identity_names_the_run_the_root_and_the_attempt', () => {
   const identity = identityFor('run_1')

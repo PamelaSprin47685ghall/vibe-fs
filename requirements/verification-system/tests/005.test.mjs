@@ -1,4 +1,36 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import * as fixtureFs from 'node:fs'
+import * as fixturePath from 'node:path'
+import { tmpdir as fixtureTmpdir } from 'node:os'
+
+test('WHAT[verification-system-005] the real CI verification step preserves failure and success exit codes', () => {
+  const workflow = fixtureFs.readFileSync(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  const block = workflow.match(/        run: \|\n((?:          .*\n)+)/)
+  assert.ok(block, 'the CI verification shell step must exist')
+  const script = block[1].split('\n').map((line) => line.slice(10)).join('\n')
+  const directory = fixtureFs.mkdtempSync(fixturePath.join(fixtureTmpdir(), 'ci-exit-'))
+  try {
+    const bin = fixturePath.join(directory, 'bin')
+    fixtureFs.mkdirSync(bin)
+    fixtureFs.mkdirSync(fixturePath.join(directory, '.fable-build/verify-logs'), { recursive: true })
+    fixtureFs.writeFileSync(fixturePath.join(bin, 'node'), '#!/bin/sh\nexit "$VERIFY_FIXTURE_EXIT"\n', { mode: 0o755 })
+    for (const code of [7, 0]) {
+      const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+        cwd: directory,
+        env: { ...process.env, PATH: `${bin}${fixturePath.delimiter}${process.env.PATH}`, VERIFY_FIXTURE_EXIT: String(code) },
+        encoding: 'utf8',
+      })
+      assert.equal(result.error, undefined)
+      assert.equal(result.signal, null)
+      assert.equal(result.status, code, result.stderr)
+      if (code !== 0) assert.match(result.stdout, /verify:release exited with 7/)
+    }
+  } finally {
+    fixtureFs.rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -105,13 +137,23 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[verification-system-005] check.mjs propagates nonzero fail-closed', () => {
-  const checkSource = read('scripts/check.mjs')
-  assert.match(
-    checkSource,
-    /process\.exit\(code\)/,
-    'check.mjs must propagate nonzero exit code (a gate that fails must exit closed)',
-  )
+test('WHAT[verification-system-005] rejected, missing and throwing gates return failure', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'gate-failure-'))
+  try {
+    const { main } = await import('../../../scripts/check.mjs')
+    const gate = join(directory, 'gate.mjs')
+    writeFileSync(gate, 'export function check() { return { issues: [{ code: "fail", message: "controlled violation" }] } }\n')
+    assert.equal(await main([], { checkList: [gate] }), 1)
+    assert.equal(await main([], { checkList: [join(directory, 'missing.mjs')] }), 1)
+    const throwing = join(directory, 'throwing.mjs')
+    writeFileSync(throwing, 'export function check() { throw new Error("controlled failure") }\n')
+    assert.equal(await main([], { checkList: [throwing] }), 1)
+    const passing = join(directory, 'passing.mjs')
+    writeFileSync(passing, 'export function check() { return { issues: [] } }\n')
+    assert.equal(await main([], { checkList: [passing] }), 0)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 }
 

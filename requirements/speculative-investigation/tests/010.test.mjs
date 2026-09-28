@@ -123,7 +123,7 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_feature_key_has_no_replic
   assert.equal('predictorScore' in feature, false)
   assert.deepEqual(feature, { canonicalRole: 'inspector', recentPrimary: ['ReadonlyBatch'], visibleByteBucket: 1 })
 })
-test('WHAT[speculative-investigation-010] STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
+test('WHAT[speculative-investigation-010] predictor consumes supplied labels and bounds the feature key; reads do not add observations', () => {
   const feature = Strength.predictorFeature('Coder', ['ReadonlyBatch', 'TextOnly', 'MutatingOrExecuting', 'Other'], 5000)
   assert.equal(feature.visibleByteBucket, 2)
   assert.equal(feature.recentPrimary.length, 3)
@@ -135,8 +135,6 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_predictor_learns_only_exp
   assert.deepEqual(bucket, { opportunities: 2, readonlyFirst: 1, secondObservations: 1, readonlySecond: 1 })
   assert.deepEqual(Strength.predictorPredict(state, feature), { P1: 0.5, P2: 1, evidenceCount: 1 })
 
-  // Explicit no-op law: identical observation repeats should not artificially inflate bucket counters
-  // Verified through predictor count invariants
   const bucketAfter = Strength.predictorBucket(state, feature)
   assert.equal(bucketAfter.opportunities, 2)
   assert.equal(bucketAfter.secondObservations, 1)
@@ -289,7 +287,7 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_interleaved_sessions_seri
   assert.deepEqual(Strength.scopeBucket(scope, featureB), settledB)
   Strength.scopeDispose(scope)
 })
-test('WHAT[speculative-investigation-010] STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input', () => {
+test('WHAT[speculative-investigation-010] repeated control derivation depends on policy, authority root and target run', () => {
   const first = Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-1')
   assert.equal(first, Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-1'))
   assert.notEqual(first, Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-2'))
@@ -308,3 +306,5 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_rollout_uses_explicit_cos
   assert.equal(Strength.rolloutIsShadow('Off'), false)
 })
 }
+
+test.todo('WHAT[speculative-investigation-010] GAP-183: actual Treatment requests never enter the Shadow/Control training stream and rollout is gated by validated sample evidence')

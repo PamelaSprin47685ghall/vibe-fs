@@ -1,37 +1,35 @@
 # time-capability — WHAT
 
-本文件是 `time-capability` 的**唯一 normative 合同**。WHY 非 normative。
-
----
-
 ## [001] 时钟与定时器是显式注入的 capability
 
-业务代码（Domain / Application / Session 层）严禁依赖隐式全局时间原语。凡需要获取当前时刻或安排异步延迟的组件，必须通过显式注入的能力接口实现：获取当前时刻使用 `IClockPort.UtcNow()`，安排延时使用 `ITimerPort.Delay(milliseconds)`（返回强类型的 `IDeadlineHandle`）。
+业务读取当前时刻或安排延迟，只能消费显式注入的时钟、定时器能力；延迟返回可取消的强类型句柄，不隐式取得全局时间权限。
 
 ## [002] deadline 与 elapsed 有 typed 表达，不散落为裸时刻比较
 
-所有截止时间必须由强类型 `Deadline`（私有构造，仅能通过 `Deadline.ofBudget now budget` 创建）封装表达，并通过 `Deadline.remaining`、`Deadline.isExpired` 与 `Deadline.nextWaitMs` 等纯函数由注入时钟驱动消费。业务代码严禁持有裸 `DateTimeOffset` 进行手工超时比对，防止时间戳溢出与时区错位。
+截止时间只能由当前时刻和预算构造为强类型 Deadline；剩余量、到期与下一段等待由纯计算结合注入时钟得出。业务不自行比较裸时间戳，计算不得因溢出或时区表示而改变结果。
 
 ## [003] 时间可虚拟化；测试用虚拟实现替换物理时钟与 timer
 
-时间系统必须提供确定性的虚拟实现（`createVirtualTimerPort` 与 `createVirtualClockPort`）。虚拟定时器在调用 `Advance` 跨越截止点时精确触发回调，支持取消与清理；虚拟时钟支持从固定时间原点进行确定性的离散时间推进与设置，确保时序证明完全可重放且独立于物理墙钟。
+时钟与定时器可由确定性虚拟实现替换：从固定原点推进或设置时间，推进至截止点才触发到期任务，支持取消与清理。时序证明不依赖物理墙钟等待。
 
 ## [004] Domain / Application / Session 禁止直接读 ambient 时间
 
-`src/Wanxiangshu/` 下属于 Domain、Application 与 Session 层的源码文件中，严禁出现任何未经授权的全局时间符号（包括 `DateTimeOffset.UtcNow`、`DateTime.Now`、`Date.now`、`setTimeout`、`timerTask`），底层物理适配器层的例外必须通过静态门禁白名单进行显式声明。
+Domain、Application 与 Session 不直接读取全局时钟或安排全局定时器。静态门禁覆盖全部业务源码；物理适配器的例外须逐一显式声明，不按目录整体豁免。
 
 ## [005] 时间值本身不是 authority；只有消费它的领域规则 + 注入时钟决定意义
 
-时刻值与截止时间本身不具备业务裁决权。相同的截止时间由不同的领域规则消费时将产生不同的业务决策；判定必须由「领域规则 + 显式注入的时钟」共同计算得出，严禁使时间值自身成为独立驱动状态转移的权威。
+时间值是输入，不是业务权威。状态转移须由领域规则结合注入时钟裁决；时间经过本身不能制造成功、授权或完成事实。
 
 ## [006] deadline 是 causal-wait 的可选 escape
 
-截止时间作为因果等待（`causal-wait`）的可选终止逃逸路径（`WaitEscape.DeadlineAt`）存在。本包独立提供强类型时刻能力，供因果等待机制在需要有界超时时进行消费，两者之间不存在双向硬依赖。
+causal-wait 按需将截止时间作为等待的可选终止路径。时间能力独立提供，不反向依赖等待机制；到期只终止等待，不制造被等待的业务事实。
 
 ## [007] HOST-013 的 SessionStartedAt 绑定首次 prompt，一次采样形成新 marker 的 elapsed
 
-每个面向 Provider 的 Session 的起始时刻 `SessionStartedAt`，严格定义为该 Session 首次开始构建或发送 prompt 时，由显式注入的 `IClockPort.UtcNow()` 采样获得的时刻，并执行持久化单次绑定（bind-once）。后续每次新 occurrence 再从同一时钟采样当前时间计算经过时长并生成人类可读片段，随当前 MarkerText 固化持久化，严禁在重试或重启时重置时间原点。
+面向 Provider 的 Session 在首次开始构建或发送 prompt 时，从注入时钟采样并持久化单次绑定 SessionStartedAt。每个新 occurrence 再从同一时钟采样，计算人类可读的 elapsed，与 MarkerText 一起固化持久化；重试或重启不重置原点，也不重算历史 marker。
 
 ## [008] temporal vocabulary、capability、adapter与projection必须分居
 
-pure clock/timer capability位于`foundation-temporal-contract`，pure `Deadline`位于`process-deadline-contract`，两者都是无physical value/factory的bounded contract。Node timing implementation唯一位于`process-node-timing-adapter`；virtual verification implementation唯一位于`process-virtual-timing`，不得进入ordinary production consumer。production-bound representation Surface独占`foundation-temporal`，只为实际投影行为显式消费所需contract、adapter与verification implementation。`SessionStartedAtProjection`位于独立bounded contract `execution-session-sessionstartedatprojection`，不得与clock implementation同居。每个 consumer 只引用其声明式 ProjectReference 与精确编译闭包实际需要的 slice；consumer 拓扑由已声明 project references/closures 与编译边界证明推导，不做 fresh compiler census、不执行任何自定义 FCS 扫描（见 verification-system-001 全仓 FCS 禁令）；runtime 只消费 composition 注入的 mandatory capability。direct `Date.now`、`setTimeout`、ambient fallback、pure consumer→adapter/verification locality与contract→implementation反向closure一律拒绝。
+时钟/定时器能力类型、Deadline、会话起点投影各有独立纯契约，不携带物理实例或工厂；物理适配器、虚拟验证实现与表示边界各自分离，不借共享编译单元扩大可见能力。
+
+消费者只依赖实际需要的契约，运行时消费组合层注入的必需能力；纯消费者及契约不得反向依赖物理或验证实现，普通生产消费者不得带入虚拟时间。表示边界仅为实际投影显式组合所需依赖，不提供 ambient fallback。边界由声明的依赖闭包及编译证明检查，扫描限制遵守 verification-system-018。

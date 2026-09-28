@@ -1,26 +1,10 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
-# requirements/speculative-investigation/** is covered implicitly and must not be listed here.
-# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+# requirements/speculative-investigation/** is covered implicitly.
 
 /src/Wanxiangshu/Strength/**
 /src/Wanxiangshu/Participant/Provider/Projection/**
 /src/Wanxiangshu/Context/Trace/**
 /src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
-/src/Wanxiangshu/Strength/Frame.fs
-/src/Wanxiangshu/Strength/Lifecycle.fs
-/src/Wanxiangshu/Strength/OpenCode/PluginScope.fs
-/src/Wanxiangshu/Strength/OpenCode/Replay.fs
-/src/Wanxiangshu/Strength/OpenCode/Settings.fs
-/src/Wanxiangshu/Strength/OpenCode/Speculate.fs
-/src/Wanxiangshu/Strength/Prediction/BatchCollector.fs
-/src/Wanxiangshu/Strength/Prediction/CostModel.fs
-/src/Wanxiangshu/Strength/Projection/Model.fs
-/src/Wanxiangshu/Strength/Replica/Commit.fs
-/src/Wanxiangshu/Strength/Replica/Promotion.fs
-/src/Wanxiangshu/Strength/Replica/Runtime.fs
-/src/Wanxiangshu/Strength/Replica/TraceRecovery.fs
-/src/Wanxiangshu/Strength/Rollout.fs
-/src/Wanxiangshu/Strength/Runtime.fs
-/src/Wanxiangshu/Strength/Surface.fs
-/src/Wanxiangshu/Strength/TurnEvidence.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginStrengthPorts.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs

@@ -174,7 +174,7 @@ test('WHAT[prefix-stability-010] H13_03_same_placement_reentry_appends_no_pair',
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[prefix-stability-010] H13_04_restart_replay_is_byte_identical', async () => {
+test('WHAT[prefix-stability-010] same-process journal reopen preserves guidance bytes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1304-'))
   const session = 'h13-04'
   const raw = [
@@ -191,11 +191,10 @@ test('WHAT[prefix-stability-010] H13_04_restart_replay_is_byte_identical', async
     pair.disposeJournal(before.journal)
   }
 
-  // New process: boot the persisted journal, fold it, open a fresh writer.
+  // Reopen the same directory with a fresh writer in this process.
   const after = await openJournal(dir)
   let wireAfter
   try {
-    // The restarting process sees the persisted transcript including synthetics.
     wireAfter = await inject(after.journal, session, [...wireBefore])
     assertWireEqual(wireBefore, wireAfter, 'H13-04 restart replay')
     assert.equal(durablePairCount(after.journal, session), 1, 'restart re-entry must not append a second fact')

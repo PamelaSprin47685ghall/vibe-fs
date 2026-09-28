@@ -38,6 +38,21 @@ test('WHAT[semantic-trace-006] Host message set resolves only to its exact conti
     endExclusive: { sequence: 3 },
   })
   assert.equal(trace.tryContiguousHostRange(['message-a', 'missing'], projection), undefined)
+  assert.equal(trace.tryContiguousHostRange([], projection), undefined)
+  assert.deepEqual(trace.tryContiguousHostRange(['message-b', 'message-a'], projection), {
+    start: { sequence: 1 }, endExclusive: { sequence: 4 },
+  })
+})
+test('WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range', () => {
+  const gap = append(append(trace.emptyProjection(), 1), 3)
+  assert.equal(trace.tryContiguousHostRange(['message-a'], gap), undefined)
+  let interleaved = append(trace.emptyProjection(), 1, { messageId: 'message-a' })
+  interleaved = append(interleaved, 2, { messageId: 'other-message' })
+  interleaved = append(interleaved, 3, { messageId: 'message-a' })
+  assert.equal(trace.tryContiguousHostRange(['message-a'], interleaved), undefined)
+  assert.deepEqual(trace.tryContiguousHostRange(['message-a', 'other-message'], interleaved), {
+    start: { sequence: 1 }, endExclusive: { sequence: 4 },
+  })
 })
 test('WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries', () => {
   const projection = fixture()

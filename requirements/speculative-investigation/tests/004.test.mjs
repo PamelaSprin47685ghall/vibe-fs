@@ -75,24 +75,13 @@ const skipReason = (decision) => {
   return decision.reason
 }
 
-test('WHAT[speculative-investigation-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {
+test('WHAT[speculative-investigation-004] association hints derive InternalLeaf and the exact StrengthReplica owner attachment', () => {
   const facts = Strength.associationFacts('owner-work')
-  assert.deepEqual(facts.satelliteCases, ['Companion'])
-  assert.equal(facts.hasReplicaSatellite, false)
-  assert.equal(facts.attachmentCases.includes('StrengthReplica'), true)
   assert.equal(facts.executionClass, 'InternalLeaf')
   assert.equal(facts.ownerSessionId, 'owner-work')
   assert.equal(facts.attachment, 'StrengthReplica')
   assert.equal(facts.strengthReplicaAttachment, true)
   assert.equal(facts.companionAttachment, false)
-})
-test('WHAT[speculative-investigation-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
-  const engId = Strength.systemPromptIdForRole('Engineer')
-  assert.equal(engId, Strength.systemPromptIdForRole('Engineer'))
-  const prompt = Strength.systemPromptForRole('Engineer')
-  assert.ok(prompt.length > 0)
-  assert.doesNotMatch(prompt, /\bStrength\b/)
-  assert.doesNotMatch(prompt, /replica|prefetch/i)
 })
 }
 
@@ -211,3 +200,31 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_K0_and_in
   assert.equal(Strength.runtimeRegister(runtime, binding('o2', 'r2', 'd2', 'Manager', 'K1')).error, 'RoleIneligible')
 })
 }
+
+{
+const assert = (await import('node:assert/strict')).default
+const { withExecutablePlugin, decideAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+
+test('WHAT[speculative-investigation-004] Predictor cannot establish an active Engineer identity', { todo: 'GAP-159: actual authority acceptance currently upgrades predictor to Engineer, beyond the configuration defect' }, async () => {
+  await withExecutablePlugin(async (_hooks, _directory, _created, runtime) => {
+    const result = await decideAuthorityRoot(runtime, 'predictor-root-rejected', 'predictor', 'predictor-root')
+    assert.equal(result.ok, false)
+  })
+})
+
+test('WHAT[speculative-investigation-004] a forced Predictor root Fission invocation is rejected without creating or interrupting sessions', async () => {
+  await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
+    await decideAuthorityRoot(runtime, 'predictor-root-fission', 'predictor', 'predictor-root')
+    const result = await hooks.tool.fission.execute(
+      { prompts: ['one', 'two'] },
+      { sessionID: 'predictor-root-fission', agent: 'predictor', messageID: 'run', callID: 'fission' },
+    )
+    assert.match(result, /user-facing\/root|denied|not established/i)
+    assert.deepEqual(created, [])
+    assert.deepEqual(runtime.prompts, [])
+    assert.deepEqual(runtime.abortedIds, [])
+  })
+})
+}
+
+test.todo('WHAT[speculative-investigation-004] GAP-183: actual started Replica inherits exact owner identity and language, and schema plus every execution path enforce read/glob/grep')

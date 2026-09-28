@@ -22,7 +22,7 @@ const packageNamesFromIndexTables = () => {
   return [...new Set(names)]
 }
 
-test('WHAT[requirement-system-001] every product truth has exactly one owner package', () => {
+test('WHAT[requirement-system-001] declared clause IDs have one owner in the indexed packages', () => {
   const fromIndex = packageNamesFromIndexTables()
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => !isProposalPath(entry) && statSync(join(REQUIREMENTS, entry)).isDirectory())
@@ -44,4 +44,13 @@ test('WHAT[requirement-system-001] every product truth has exactly one owner pac
 
   const duplicates = duplicateClauseDefinitions(entries)
   assert.deepEqual(duplicates, [], `clause definitions must be globally unique:\n${duplicates.map((d) => d.msg).join('\n')}`)
+})
+
+test('WHAT[requirement-system-001] repeated definitions are rejected while package-local numbers remain distinct', () => {
+  const first = { file: 'requirements/alpha/WHAT.md', pkg: 'alpha', text: '## [001] First\n' }
+  const other = { file: 'requirements/beta/WHAT.md', pkg: 'beta', text: '## [001] Other\n' }
+  assert.deepEqual(duplicateClauseDefinitions([first, other]), [])
+  const findings = duplicateClauseDefinitions([{ ...first, text: first.text + '## [001] Duplicate\n' }, other])
+  assert.equal(findings.length, 1)
+  assert.match(findings[0].msg, /alpha-001/)
 })

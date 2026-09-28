@@ -1,9 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { formatDiagnostics } from '../../verification-system/tests/e2e/support/diagnostics-format.js'
 
 const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
 const flow = (id) => causal.owner('flow', { id })
+
+test('WHAT[causal-wait-007] diagnostic output presents the causal frontier before the event tail', () => {
+  const output = formatDiagnostics({
+    causalWaitSnapshot: { active: [], history: [] },
+    causalFrontier: [{ kind: 'BrokenCausalEdge', detail: 'owner-A waits for missing producer-B', chain: [] }],
+    events: [{ seq: 1, time: 'T0', type: 'event-tail-marker' }],
+  })
+  const frontier = output.indexOf('owner-A waits for missing producer-B')
+  const tail = output.indexOf('event-tail-marker')
+  assert.ok(frontier >= 0, 'the actual frontier must appear')
+  assert.ok(tail > frontier, 'the event tail must follow the causal explanation')
+})
 
 const waitWorkflow = (ownerId, producerOwnerId) =>
   causal.createWait({
@@ -61,10 +74,22 @@ test('WHAT[causal-wait-007] RED_7_cycle_reports_without_hanging', () => {
   assert.ok(frontiers.every((frontier) => frontier.kind === 'CausalWaitCycle'))
   const cycle = frontiers[0]
   assert.match(cycle.detail, /CAUSAL WAIT CYCLE/)
-  assert.ok(cycle.cycle.length >= 1, 'cycle list must be non-empty')
+  assert.deepEqual(cycle.cycle.map(causal.ownerKey), ['flow:id=A', 'flow:id=B', 'flow:id=C', 'flow:id=A'])
   for (const key of ['flow:id=A', 'flow:id=B', 'flow:id=C']) {
     assert.ok(cycle.chain.some((node) => causal.ownerKey(node.owner) === key), `chain should include ${key}`)
   }
+})
+
+test('WHAT[causal-wait-007] a cycle explanation excludes the noncyclic prefix', () => {
+  const [frontier] = causal.frontiers([waitWorkflow('root', 'B'), waitWorkflow('B', 'C'), waitWorkflow('C', 'B')])
+  assert.equal(frontier.kind, 'CausalWaitCycle')
+  assert.deepEqual(frontier.chain.map(node => causal.ownerKey(node.owner)), ['flow:id=root', 'flow:id=B', 'flow:id=C'])
+  assert.deepEqual(frontier.cycle.map(causal.ownerKey), ['flow:id=B', 'flow:id=C', 'flow:id=B'])
+})
+
+test('WHAT[causal-wait-007] all unsatisfied branches of one active owner appear in the frontier', { todo: 'GAP-094: the current walk chooses only the first wait for each owner' }, () => {
+  const frontiers = causal.frontiers([waitExternal('A', 'B'), waitExternal('A', 'C')])
+  assert.deepEqual(frontiers.map(frontier => causal.producerKey(frontier.producer)).sort(), ['external:ext:id=B', 'external:ext:id=C'])
 })
 
 test('WHAT[causal-wait-007] empty_snapshot_yields_empty_frontier', () => {

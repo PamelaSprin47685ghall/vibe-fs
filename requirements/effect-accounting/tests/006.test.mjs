@@ -1,30 +1,33 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import * as store from '../../../dist/Persistence/EventStore/Surface.js'
+import { withDispatch, dispatch, journal } from './support/dispatch.mjs'
+import * as recovery from '../../../dist/Interaction/Dispatch/RecoverySurface.js'
 
-
-
-test('WHAT[effect-accounting-006] write_after_dispose_returns_explicit_unknown_not_pretended_commit', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'wxs-effect-unknown-'))
-  const handle = store.create(directory, 'writer-unknown')
-  const event = {
-    id: 'event-unknown-1',
-    stream: 'session/ses_006',
-    type: 'JobRequested',
-    parents: [],
-    payload: { id: 'event-unknown-1' },
-    payloadRefs: [],
-  }
-
-  const healthy = await store.append(handle, [event])
-  assert.equal(healthy.ok, true, JSON.stringify(healthy.error ?? ''))
-  store.dispose(handle)
-
-  await assert.rejects(
-    () => store.append(handle, [event]),
-    /disposed|writer|unknown|invalid/i,
-  )
+test('WHAT[effect-accounting-006] a performed Host effect with a lost receipt stays unknown after journal reopen', async () => {
+  await withDispatch(async ({ directory, handle, open, send }) => {
+    const effectFile = join(directory, 'physical-effect.txt')
+    let sends = 0
+    const result = await send({ SendPrompt: async () => {
+      sends += 1
+      writeFileSync(effectFile, 'physically performed')
+      return dispatch.acceptanceUnknown('response lost after physical acceptance')
+    } })
+    assert.equal(result.ok, false)
+    assert.match(result.error, /Acceptance unknown/)
+    assert.equal(readFileSync(effectFile, 'utf8'), 'physically performed')
+    const [claim] = dispatch.projectionObservation(handle, 'child').pendingClaims
+    assert.ok(claim)
+    journal.JournalSurface_dispose(handle)
+    const reopened = await open('recovery-writer')
+    assert.equal(dispatch.pendingClaimCount(reopened, 'child'), 1)
+    const outcomes = await recovery.reconcile(reopened, [])
+    assert.equal(outcomes[0].outcome, 'StillPending')
+    assert.equal(outcomes[0].promptKey, claim.promptKey)
+    assert.equal(sends, 1)
+    assert.equal(readFileSync(effectFile, 'utf8'), 'physically performed')
+  })
 })
+
+test.todo('WHAT[effect-accounting-006] interruption in a distinct producing process preserves exact unknown settlement for the next process')

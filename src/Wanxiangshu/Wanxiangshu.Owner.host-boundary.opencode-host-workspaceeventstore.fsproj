@@ -32,6 +32,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
+    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fsi"/>
+    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceSharedJournal.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceSharedJournal.fs"/>
   </ItemGroup>

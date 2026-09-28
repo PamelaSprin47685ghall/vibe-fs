@@ -10,6 +10,7 @@ import test from 'node:test'
 
 const identity = await import('../../../dist/Participant/Persona/Surface.js')
 const officeCap = await import('../../../dist/Participant/Persona/OfficeCapabilitySurface.js')
+const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
 
 test('WHAT[participant-identity-010] active_identity_resolution_accepts_engineer_and_rejects_retired_roles', () => {
   const engineer = identity.resolveParticipantIdentityAtRoot('engineer')
@@ -27,6 +28,38 @@ test('WHAT[participant-identity-010] active_identity_resolution_accepts_engineer
       `retired role '${role}' must not resolve as an active participant identity`,
     )
   }
+})
+
+test('WHAT[participant-identity-010] new owner-derived identities reject legacy names instead of upgrading them to Engineer', () => {
+  for (const name of ['coder', 'inspector', 'browser', 'inquiry', 'distiller']) {
+    assert.deepEqual(identity.inheritParticipantIdentityFromOwner(name, 'manager'), {
+      ok: false,
+      identity: null,
+      error: 'LegacyParticipantName',
+    }, name)
+  }
+  const allowed = identity.inheritParticipantIdentityFromOwner('engineer', 'manager')
+  assert.equal(allowed.ok, true)
+  const { name, role, persona, catalogVersion, origin } = allowed.identity
+  assert.deepEqual({ name, role, persona, catalogVersion, origin }, {
+    name: 'engineer', role: 'engineer', persona: 'Lead', catalogVersion: 1, origin: 'InheritedFromOwner',
+  })
+})
+
+test('WHAT[participant-identity-010] authority admission rejects a legacy participant carrying Engineer authority', () => {
+  const seed = {
+    kind: 'InheritedFromOwner',
+    ownerSession: 'owner-session',
+    ownerLogicalRun: 'owner-run',
+    ownerAuthorityRoot: 'owner-root',
+    participantIdentity: {
+      participant: 'inspector', role: 'engineer', persona: 'Lead', personaCatalogVersion: 1, origin: 'InheritedFromOwner',
+    },
+  }
+  const result = authority.createAuthorityRoot(
+    (value) => `H(${value})`, 'identity-admission', 'child-session', 'AgentOwnerRoot', 'child-root', seed,
+  )
+  assert.equal(result.ok, false)
 })
 
 test('WHAT[participant-identity-010] historical_identity_decoding_does_not_silently_upgrade_inspector_or_devops_to_engineer', () => {

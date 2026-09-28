@@ -1,77 +1,73 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
-import test from 'node:test'
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
-import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
-import {
-  BUILD_VERIFICATION_FILES,
-  SURFACE_MANIFEST,
-  scanAll,
-  semanticImportEdges,
-  semanticTestFiles,
-} from '../../../scripts/lib/test-surface-scan.mjs'
-import { walk } from '../../../scripts/lib/walk.mjs'
+import test from 'node:test'
+import { run, validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
+import { SURFACE_MANIFEST } from '../../../scripts/lib/test-surface-scan.mjs'
+import { createManifestFixture } from './support/manifest-fixture.mjs'
 
-const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
+const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
-
-const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
-
-const distImport = (prefix, module) => `${prefix}dist/${module}`
-
-const wholeScan = scanAll(join(ROOT, 'requirements'))
-
-const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
-
-const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
-
-test('WHAT[js-semantic-surface-003] JS_SURFACE_003_law_owner_surface_registry', () => {
+test('WHAT[js-semantic-surface-003] current registrations have real owners, compiled sources, outputs and imports', () => {
   assert.ok(SURFACE_MANIFEST.length > 0)
-  const failures = validateSurfaceManifest(SURFACE_MANIFEST, ROOT)
-  assert.deepEqual(failures, [], failures.join('\n'))
+  assert.deepEqual(validateSurfaceManifest(SURFACE_MANIFEST, ROOT), [])
 })
 
-test('WHAT[js-semantic-surface-003] JS_SURFACE_003_manifest_rejects_unemitted_or_invalid_evidence', () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-manifest-'))
-  const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
-    const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
-  const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
-  const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
-  const testFile = join(temporaryRoot, 'requirements', 'owner', 'tests', 'surface.test.mjs')
-  mkdirSync(dirname(ownerWhat), { recursive: true })
-  mkdirSync(dirname(source), { recursive: true })
-  mkdirSync(dirname(dist), { recursive: true })
-  mkdirSync(dirname(testFile), { recursive: true })
+test('WHAT[js-semantic-surface-003] registration is static evidence and does not require consumer authorization or callback execution', (t) => {
+  const fixture = createManifestFixture(t)
+  const { root, entry, write, testFile, importPath } = fixture
+  assert.deepEqual(validateSurfaceManifest([entry], root), [])
+  write(testFile, `const unused = () => import(${JSON.stringify(importPath)})\n`)
+  assert.deepEqual(validateSurfaceManifest([entry], root), [])
+  write(testFile, `const prose = ${JSON.stringify('import ' + JSON.stringify(importPath))}\n`)
+  assert.match(validateSurfaceManifest([entry], root).join('\n'), /no .test.mjs imports/)
+})
 
-  try {
-    writeFileSync(ownerWhat, '# OWNER-001\n')
-        writeFileSync(source, 'module Owner.Surface\n')
-    writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
-    writeFileSync(dist, 'export const value = 1\n')
-    writeFileSync(testFile, [
-      "import test from 'node:test'",
-      `import * as surface from '${distImport('../../../', 'Owner/Surface.js')}'`,
-      "test('WHAT[OWNER-001] owner behavior', () => { assert.equal(surface.value, 1) })",
-    ].join('\n'))
-    const entry = {
-      module: 'Owner/Surface.js',
-      owner: 'owner',
-      laws: ['OWNER-001'],
-      source: 'src/Wanxiangshu/Owner/Surface.fs',
-      representation: 'json',
-      kind: 'pure',
-    }
+test('WHAT[js-semantic-surface-003] a body reference cannot resurrect a retired law', (t) => {
+  const { root, entry, write } = createManifestFixture(t)
+  write('requirements/owner/WHAT.md', '# owner\n\n## [002] Another law\nSee WHAT[OWNER-001].\n')
+  assert.match(validateSurfaceManifest([{ ...entry, laws: ['OWNER-001'] }], root).join('\n'), /law OWNER-001 is absent/)
+})
 
-    assert.deepEqual(validateSurfaceManifest([entry], temporaryRoot), [])
+test('WHAT[js-semantic-surface-003] a misleading dist suffix is not an import of the registered module', (t) => {
+  const { root, entry, write, testFile } = createManifestFixture(t)
+  const unrelated = './missing/' + 'dist/' + entry.module
+  write(testFile, `import { value } from ${JSON.stringify(unrelated)}\n`)
+  assert.match(validateSurfaceManifest([entry], root).join('\n'), /no .test.mjs imports/)
+})
 
-    rmSync(dist)
-    assert.match(validateSurfaceManifest([entry], temporaryRoot).join('\n'), /missing emitted surface/)
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
-  }
+test('WHAT[js-semantic-surface-003] malformed metadata and duplicate modules fail the same registration gate', (t) => {
+  const { root, entry } = createManifestFixture(t)
+  for (const [field, invalid, expected] of [
+    ['owner', 'missing-owner', /missing owner/],
+    ['source', 'src/Wanxiangshu/Missing.fs', /missing production source/],
+    ['representation', 'runtime-internals', /invalid representation/],
+    ['kind', 'unclassified', /invalid kind/],
+    ['laws', [], /non-empty list/],
+    ['laws', ['owner-099'], /law owner-099 is absent/],
+  ]) assert.match(validateSurfaceManifest([{ ...entry, [field]: invalid }], root).join('\n'), expected, field)
+  assert.match(validateSurfaceManifest([entry, entry], root).join('\n'), /duplicate manifest module/)
+  assert.deepEqual(validateSurfaceManifest([entry], root), [])
+  assert.equal(run({ root, manifest: [{ ...entry, laws: ['owner-099'] }] }), 1)
+  assert.equal(run({ root, manifest: [entry] }), 0)
+})
+
+test('WHAT[js-semantic-surface-003] uncompiled and un-emitted sources cannot satisfy registration', (t) => {
+  const { root, entry, write } = createManifestFixture(t)
+  write('src/Wanxiangshu/Wanxiangshu.Owner.owner.fsproj', '<Project/>')
+  assert.match(validateSurfaceManifest([entry], root).join('\n'), /not compiled/)
+  write('src/Wanxiangshu/Wanxiangshu.Owner.owner.fsproj', '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
+  rmSync(join(root, 'dist', entry.module))
+  assert.match(validateSurfaceManifest([entry], root).join('\n'), /missing emitted surface/)
+})
+
+test('WHAT[js-semantic-surface-003] explicit law ownership resolves against that owner and its current headings', (t) => {
+  const { root, entry, write } = createManifestFixture(t)
+  const delegated = { ...entry, laws: ['other-007'], lawOwners: { 'other-007': 'other' } }
+  assert.match(validateSurfaceManifest([delegated], root).join('\n'), /owner WHAT is missing/)
+  write('requirements/other/WHAT.md', '# other\n\n## [007] Contract\n')
+  assert.deepEqual(validateSurfaceManifest([delegated], root), [])
+  write('requirements/other/WHAT.md', '# other\n\n## [008] Changed contract\n')
+  assert.match(validateSurfaceManifest([delegated], root).join('\n'), /law other-007 is absent/)
 })

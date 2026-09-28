@@ -1,137 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as policy from '../../../dist/Execution/Failure/Surface.js'
+import { input, executionKey } from './support/policy-input.mjs'
 
-const executionKey = {
-  sessionId: 'ses-failure-policy',
-  physicalUserMessageId: 'msg-failure-policy',
-}
+const decide = (change) => policy.decide(input(change))
 
-const capacityFence = { reference: 'fence-failure-policy' }
-
-const provider = {
-  logicalRun: 'logical-failure-policy',
-  providerRun: 'provider-failure-policy',
-  requestKind: 'WorkMain',
-  retryBudget: 'Available',
-  breaker: 'Closed',
-}
-
-const baseInput = {
-  failure: 'ProtocolRejection',
-  phase: 'ProviderStarted',
-  executionKey,
-  capacityFence,
-  provider,
-}
-
-const decide = (change = {}) => policy.decide({ ...baseInput, ...change })
-
-const failures = [
-  'LocalInvariant',
-  'ProtocolRejection',
-  'AuthorizationDenied',
-  'UserCancelled',
-  'Superseded',
-  'CapacityQueueFull',
-  'ProviderTransient',
-  'ProviderPermanent',
-  'AcceptanceUnknown',
-  'StreamInterruptedAfterFirstToken',
-  { kind: 'PersistenceFailure', commitment: 'NotCommitted' },
-  { kind: 'PersistenceFailure', commitment: 'Committed' },
-  { kind: 'PersistenceFailure', commitment: 'Unknown' },
-]
-
-const nonProviderFailures = failures.filter(
-  (failure) => failure !== 'ProviderTransient' && failure !== 'ProviderPermanent',
-)
-
-const phases = ['NoAcceptedFact', 'AcceptedBeforeProvider', 'ProviderStarted', 'Terminal']
-
-const capacityCases = [null, capacityFence]
-
-const providerCases = [
-  {
-    label: 'transient retry on Closed and Available',
-    failure: 'ProviderTransient',
-    facts: provider,
-    resolution: 'RetryFreshAttempt',
-    breaker: 'RecordProviderTransientFailure',
-  },
-  {
-    label: 'transient terminal after retry exhaustion',
-    failure: 'ProviderTransient',
-    facts: { ...provider, retryBudget: 'Exhausted' },
-    resolution: 'TerminalizeProviderStarted',
-    breaker: 'RecordProviderTransientFailure',
-  },
-  {
-    label: 'transient terminal around an open breaker',
-    failure: 'ProviderTransient',
-    facts: { ...provider, breaker: 'Open' },
-    resolution: 'TerminalizeProviderStarted',
-    breaker: 'RecordProviderTransientFailure',
-  },
-  {
-    label: 'permanent retry on Closed and Available',
-    failure: 'ProviderPermanent',
-    facts: provider,
-    resolution: 'RetryFreshAttempt',
-    breaker: 'RecordProviderPermanentFailure',
-  },
-  {
-    label: 'permanent terminal after retry exhaustion',
-    failure: 'ProviderPermanent',
-    facts: { ...provider, retryBudget: 'Exhausted' },
-    resolution: 'TerminalizeProviderStarted',
-    breaker: 'RecordProviderPermanentFailure',
-  },
-  {
-    label: 'permanent terminal around an open breaker',
-    failure: 'ProviderPermanent',
-    facts: { ...provider, breaker: 'Open' },
-    resolution: 'TerminalizeProviderStarted',
-    breaker: 'RecordProviderPermanentFailure',
-  },
-  ...['BloggerMain', 'BloggerSquash', 'InteractionRepair'].map((requestKind) => ({
-    label: `${requestKind} remains provider-recoverable`,
-    failure: 'ProviderTransient',
-    facts: { ...provider, requestKind },
-    resolution: 'RetryFreshAttempt',
-    breaker: 'RecordProviderTransientFailure',
-  })),
-  {
-    label: 'StrengthReplica cannot consume owner recovery',
-    failure: 'ProviderTransient',
-    facts: { ...provider, requestKind: 'StrengthReplica' },
-    resolution: 'TerminalizeProviderStarted',
-    breaker: 'RecordProviderTransientFailure',
-  },
-]
-
-test('WHAT[execution-failure-policy-005] terminal resolution carries the exact execution key and typed disposition', () => {
-  const expected = [
-    ['NoAcceptedFact', 'PreserveCurrentFact'],
-    ['AcceptedBeforeProvider', 'TerminalizeAcceptedPreProvider'],
-    ['ProviderStarted', 'TerminalizeProviderStarted'],
-    ['Terminal', 'PreserveCurrentFact'],
-  ]
-
-  for (const [phase, expectedKind] of expected) {
+test('WHAT[execution-failure-policy-005] terminal commands carry phase exact execution and typed disposition', () => {
+  for (const [phase, resolution] of [
+    ['NoAcceptedFact', 'PreserveCurrentFact'], ['AcceptedBeforeProvider', 'TerminalizeAcceptedPreProvider'],
+    ['ProviderStarted', 'TerminalizeProviderStarted'], ['Terminal', 'PreserveCurrentFact'],
+  ]) {
     const decision = decide({ phase, failure: 'AuthorizationDenied' })
-    assert.equal(decision.resolution, expectedKind)
-    if (expectedKind.startsWith('Terminalize')) {
+    assert.equal(decision.resolution, resolution)
+    assert.equal(decision.authorization, null)
+    if (resolution.startsWith('Terminalize')) {
       assert.deepEqual(decision.executionKey, executionKey)
       assert.equal(decision.terminalDisposition, 'Rejected')
+    } else {
+      assert.equal(decision.terminalDisposition, null)
     }
   }
-
   assert.equal(decide({ failure: 'UserCancelled' }).resolution, 'TerminalizeProviderStarted')
   assert.equal(decide({ failure: 'UserCancelled' }).terminalDisposition, 'Cancelled')
   assert.equal(decide({ failure: 'Superseded' }).terminalDisposition, 'Cancelled')
-  assert.equal(
-    decide({ failure: 'StreamInterruptedAfterFirstToken' }).terminalDisposition,
-    'Failed',
-  )
+  assert.equal(decide({ failure: 'StreamInterruptedAfterFirstToken' }).terminalDisposition, 'Failed')
+  const otherKey = { sessionId: 'other-session', physicalUserMessageId: 'other-message' }
+  assert.deepEqual(decide({ executionKey: otherKey }).executionKey, otherKey)
 })
+
+test.todo('WHAT[execution-failure-policy-005] GAP-120 actual terminal owner rejects a wrong key and a cross-phase command without altering either execution')

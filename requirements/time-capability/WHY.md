@@ -1,33 +1,11 @@
 # time-capability — WHY
 
-## 不可替代的存在理由
+业务若偷偷读取机器时间，同一组事实便可能因执行快慢得到不同结论。把时间作为显式输入，才能解释一次裁决，也能用相同输入重放它。
 
-**时间如果从隐式的全局环境（ambient wall clock / global timer）偷渡进入业务逻辑，同一个事实在不同机器或不同运行时刻就会产生不同的裁决，导致系统的证明体系、回放能力（replay）与测试确定性彻底崩溃。**
+时钟回答现在何时，定时器安排何时唤醒，领域规则决定到期意味着什么。分开这三件事，可以让等待结束而不误造任务成功，也避免测试中的推进操作取得生产权限。
 
-可重放性与可测试性的核心基石是「相同输入必定产生确定性的相同输出」。物理环境墙钟是最大的隐式随机源：它随宿主机性能快慢漂移、受系统负载与时区设置干扰。如果业务决策直接读取全局时间（如 `DateTimeOffset.UtcNow`、`Date.now` 或 `setTimeout`）：
-- 相同逻辑在不同运行环境下随机失败或通过；
-- 并发时序的证明退化为依赖调度器快慢的运气，无法可靠复现与排查；
-- 失败用例无法通过记录的数据流进行确定性重放。
+强类型截止时间把预算、剩余量和到期判断放在同一语义下，减少溢出、时区表示和各处手算造成的分歧。虚拟实现让边界时刻与取消顺序可重复，不必靠真实等待碰运气。
 
-因此，时间严禁作为隐式全局状态存在，必须作为**显式能力（capability）**跨越依赖边界进行注入：任何需要感知时间或设置延时的组件，必须在构造时显式声明对时钟或定时器端口的依赖。
+会话的经过时长需要稳定原点。首次 prompt 的采样与每次 marker 一起保存，才能让新提示反映当前进展，同时让重试、重启和历史重放保留原来的事实。
 
-## 核心张力与设计原则
-
-- **时间是输入，绝非权威（Time is input, never authority）**：时间值自身不携带任何业务裁决权，只有具体的领域规则结合显式注入的时钟才能给出业务判定。
-- **强类型截止时间（Typed Deadline）**：截止时间必须封装为强类型对象，通过纯函数进行过期与剩余量计算，彻底消除裸时间戳比较带来的时区失配与数值溢出风险。
-- **完全可虚拟化（Virtualizability）**：所有时间端口在测试环境中必须能够被确定性的虚拟时钟与虚拟定时器无缝替换，使时序逻辑能够在毫秒级内通过离散推进完成穷尽验证。
-
-## 核心不变量与违约状态（RED）
-
-仓库处于 RED 状态，当且仅当出现以下任一破坏时间确定性的违约：
-1. 业务层（Domain / Application / Session）直接调用或引用原生全局时间 API。
-2. 业务逻辑脱离领域规则，将时间戳作为独立权威直接用于驱动状态转移或分支选择。
-3. 截止时间未通过强类型 `Deadline` 封装，散落为裸 `DateTimeOffset` 或整数毫秒的手工比较。
-4. 测试用例因缺少虚拟时间支持，被迫使用真实等待（sleep）进行时序验证。
-5. Session 起始时间原点在重试或回放中发生漂移，未能严格执行单次绑定。
-6. pure clock/timer capability type与Node clock/timer implementation处于同一slice，使普通consumer传递获得ambient time、timer或mutable runtime authority。
-7. pure `Deadline` 或 `SessionStartedAtProjection` 与Node/virtual timing实现共处同一project，导致只需确定性表示或投影的consumer被迫获得物理timer与可变verification runtime的完整编译闭包。
-
-## Temporal locality 裁决
-
-六类知识具有不同 consumer cohort（该切分由声明式 project/closure 边界与编译边界证明固定，不做 fresh compiler census、不执行任何自定义 FCS 扫描）：clock/timer capability type、pure `Deadline`、bind-once `SessionStartedAtProjection`、Node timing adapter、virtual timing implementation、production-bound representation Surface。它们不得借同一个project互相扩张可见面。前三者各自形成bounded contract；Node adapter与virtual implementation分居独立locality；representation Surface 独占独立 project。consumer 按已声明 ProjectReference 与精确编译闭包引用最窄 slice，同一 consumer 确实使用多个知识时显式引用多个 project。
+纯时间词汇、物理操作和测试驱动的生命周期不同。编译边界使只需要表达时间的消费者不同时获得计时器、可变测试状态或隐式全局权限。

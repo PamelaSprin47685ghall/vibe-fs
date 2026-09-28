@@ -1,3 +1,7 @@
 # host-provider-failure-ownership — WHY
 
-OpenCode 自带 chat retry，而 Wanxiangshu 已拥有 durable provider recovery。两者同时重试会制造无法对账的重复上游请求、容量记账和错误提示。外部 server-plugin 的 event hook 仅能在 EventV2Bridge 广播后被动观察，根本无法拦截或改写 Host 原生 session.error 或上游 UI 呈现。必须把物理失败 owner 和错误 presentation 明确成一个 Host contract：Host 重试无条件固定为零；Wanxiangshu 独占 provider recovery 决策权；在活跃恢复期间 Wanxiangshu 自主发射零额外提示，并在所有恢复耗尽时仅产生一份 typed terminal presentation，避免双重终态噪声。
+Host 和插件同时重试，会让一次失败产生两套无法对账的请求、容量占用和结果。关闭 Host chat retry，把新的物理尝试交给持有明确授权的恢复路径，才能保持唯一责任。
+
+恢复中的失败不必被插件反复宣布为任务终结；真正耗尽又必须让人知道。这个承诺只覆盖插件自己产生的呈现。外部 observer 看见已发布事件，不等于能隐藏 Host 界面；诚实区分两种能力，才能避免无法兑现的静默承诺。
+
+未认领错误和未知错误仍需保留原有报错通道，避免恢复机制把配置错误、权限问题或用户取消当作可无限重试的噪音。Host 的消费与呈现链路变化会破坏这些边界，因此兼容性需要实际证据，版本字符串本身不能证明行为。

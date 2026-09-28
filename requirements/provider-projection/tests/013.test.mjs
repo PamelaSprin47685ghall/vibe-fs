@@ -1,22 +1,15 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { check } from '../../../scripts/checks/llm-facing-format-gate.mjs'
 
-const root = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
+const scan = (file, text) => check({ productionFiles: () => [{ file, text }] }).issues
 
-const read = (path) => readFileSync(join(root, path), 'utf8')
-
-test('WHAT[provider-projection-013] LLM_FACING_single_representation_owner_is_hard_gated', () => {
-  const result = spawnSync(process.execPath, [join(root, 'scripts/checks/llm-facing-format-gate.mjs')], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
-  const owner = read('src/Wanxiangshu/Foundation/LlmFacing.fs')
-  assert.match(owner, /type Document =/)
-  assert.match(owner, /let render \(document: Document\)/)
+test('WHAT[provider-projection-013] existing representation gate accepts the formatting owner and rejects direct low-level access by a feature', () => {
+  const code = 'let result = SyntheticToml.renderString value'
+  assert.deepEqual(scan('src/Wanxiangshu/Foundation/LlmFacing.fs', code), [])
+  assert.deepEqual(scan('src/Wanxiangshu/Feature/Fixture.fs', 'let result = LlmFacing.render document'), [])
+  assert.ok(scan('src/Wanxiangshu/Feature/Fixture.fs', code).some((issue) => issue.code === 'llm-facing-format-violation'))
+  assert.deepEqual(check().issues, [])
 })
+
+test.todo('WHAT[provider-projection-013] all synthetic payloads use the common typed representation owner; the gate currently checks direct SyntheticToml access only (GAP-082)')

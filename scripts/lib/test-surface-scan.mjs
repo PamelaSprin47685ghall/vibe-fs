@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'acorn'
 import { walk } from './walk.mjs'
 
 export const REQUIREMENTS_ROOT = join(
@@ -79,7 +80,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Interaction/Authority/Surface.js',
     owner: 'participant-identity',
-    laws: ['PID-005', 'PID-006'],
+    laws: ['PID-005', 'PID-002'],
     source: 'src/Wanxiangshu/Interaction/Authority/Surface.fs',
     representation: 'json',
     kind: 'pure',
@@ -95,7 +96,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Persona/Surface.js',
     owner: 'participant-identity',
-    laws: ['PID-001', 'PID-002', 'PID-003', 'PID-007', 'PID-009'],
+    laws: ['PID-001', 'PID-002', 'PID-003', 'PID-007', 'PID-009', 'PID-011'],
     source: 'src/Wanxiangshu/Participant/Persona/Surface.fs',
     representation: 'json',
     kind: 'pure',
@@ -385,8 +386,11 @@ export const SURFACE_MANIFEST = [
       'INTRA-PARTICIPANT-PARALLELISM-006',
       'INTRA-PARTICIPANT-PARALLELISM-007',
       'INTRA-PARTICIPANT-PARALLELISM-008',
+      'INTRA-PARTICIPANT-PARALLELISM-009',
       'INTRA-PARTICIPANT-PARALLELISM-011',
       'INTRA-PARTICIPANT-PARALLELISM-013',
+      'INTRA-PARTICIPANT-PARALLELISM-014',
+      'INTRA-PARTICIPANT-PARALLELISM-015',
     ],
     source: 'src/Wanxiangshu/Execution/Fission/Surface.fs',
     representation: 'json',
@@ -453,8 +457,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/SessionRecoveryHostSurface.js',
     owner: 'crash-reconciliation',
-    laws: ['CRASH-018', 'CHATEXEC-012'],
-    lawOwners: { 'CHATEXEC-012': 'managed-chat-execution' },
+    laws: ['CRASH-018', 'CHATEXEC-012', 'PROVIDER-ATTEMPT-RECOVERY-023'],
+    lawOwners: { 'CHATEXEC-012': 'managed-chat-execution', 'PROVIDER-ATTEMPT-RECOVERY-023': 'provider-attempt-recovery' },
     source: 'src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -478,7 +482,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/Surface.js',
     owner: 'knowledge-reuse',
-    laws: ['DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007', 'KNOWLEDGE-REUSE-002', 'KNOWLEDGE-REUSE-003', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-008', 'KNOWLEDGE-REUSE-010'],
+    laws: ['DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007', 'KNOWLEDGE-REUSE-002', 'KNOWLEDGE-REUSE-003', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-007', 'KNOWLEDGE-REUSE-008', 'KNOWLEDGE-REUSE-010', 'KNOWLEDGE-REUSE-014', 'KNOWLEDGE-REUSE-016'],
     lawOwners: {
       'DURABLE-EVENTS-019': 'durable-events',
       'DURABLE-CONVERGENCE-007': 'durable-convergence',
@@ -522,7 +526,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/FetchSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011'],
+    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-015'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -700,7 +704,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/LoopSensorSurface.js',
     owner: 'degeneration-guard',
-    laws: ['DG-002', 'DG-006', 'DG-007', 'DG-008'],
+    laws: ['DG-001', 'DG-002', 'DG-006', 'DG-007', 'DG-008', 'DG-009', 'DG-010', 'DG-013'],
     source: 'src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -895,7 +899,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Cognition/FoldSurface.js',
     owner: 'cognitive-workspace',
-    laws: ['COGNITIVE-WORKSPACE-004', 'COGNITIVE-WORKSPACE-006'],
+    laws: ['COGNITIVE-WORKSPACE-004', 'COGNITIVE-WORKSPACE-006', 'EFFECT-ACCOUNTING-008'],
+    lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/Participant/Cognition/FoldSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -903,7 +908,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Cognition/RuntimeSurface.js',
     owner: 'cognitive-workspace',
-    laws: ['COGNITIVE-WORKSPACE-001', 'COGNITIVE-WORKSPACE-005', 'COGNITIVE-WORKSPACE-006'],
+    laws: ['COGNITIVE-WORKSPACE-001', 'COGNITIVE-WORKSPACE-005', 'COGNITIVE-WORKSPACE-006', 'EFFECT-ACCOUNTING-008'],
+    lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/Participant/Cognition/RuntimeSurface.fs',
     representation: 'json',
     kind: 'resource',
@@ -968,10 +974,9 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008', 'EFFECT-ACCOUNTING-011'],
+    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008'],
     lawOwners: {
       'EFFECT-ACCOUNTING-008': 'effect-accounting',
-      'EFFECT-ACCOUNTING-011': 'effect-accounting',
     },
     source: 'src/Wanxiangshu/Persistence/Journal/Surface.fs',
     representation: 'opaque-capability',
@@ -1384,6 +1389,7 @@ export const SURFACE_MANIFEST = [
       'SPEC-INV-011',
       'SPEC-INV-012',
       'SPEC-INV-013',
+      'SPEC-INV-014',
     ],
     lawOwners: {
       'DURABLE-EVENTS-019': 'durable-events',
@@ -1405,7 +1411,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Change/Surface.js',
     owner: 'change-integration',
-    laws: ['CHGINT-001', 'CHGINT-002', 'CHGINT-003', 'CHGINT-004', 'CHGINT-005', 'CHGINT-006', 'CHGINT-007', 'CHGINT-008', 'CHGINT-009', 'CHGINT-010', 'CHGINT-011', 'CHGINT-012', 'CHGINT-013', 'CRASH-019', 'DELEG-014', 'DELEG-015'],
+    laws: ['CHGINT-001', 'CHGINT-002', 'CHGINT-003', 'CHGINT-004', 'CHGINT-005', 'CHGINT-006', 'CHGINT-007', 'CHGINT-008', 'CHGINT-009', 'CHGINT-011', 'CHGINT-013', 'CHGINT-014', 'CHGINT-015', 'CRASH-019', 'DELEG-014', 'DELEG-015'],
     lawOwners: { 'CRASH-019': 'crash-reconciliation', 'DELEG-014': 'delegation', 'DELEG-015': 'delegation' },
     source: 'src/Wanxiangshu/Change/Surface.fs',
     representation: 'opaque-capability',
@@ -1424,6 +1430,14 @@ export const SURFACE_MANIFEST = [
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-016'],
     source: 'src/Wanxiangshu/OpenCode/Host/EventsSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Host/WorkspaceEventStoreSurface.js',
+    owner: 'durable-events',
+    laws: ['DURABLE-EVENTS-020'],
+    source: 'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
   },
@@ -1686,8 +1700,8 @@ export const SURFACE_MANIFEST = [
   },
   {
     module: 'Foundation/FsToolkitFableCompat.js',
-    owner: 'intra-participant-parallelism',
-    laws: ['INTRA-PARTICIPANT-PARALLELISM-016'],
+    owner: 'structured-workflow',
+    laws: ['STRUCTURED-WORKFLOW-019'],
     source: 'src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs',
     representation: 'json',
     kind: 'pure',
@@ -1825,6 +1839,45 @@ const A_TEMPLATE_IMPORT = /new URL\(\s*[`'"][^`'"]*dist\/[^`'"]*\$\{[^}]+\}[^`'"
 const B_EXPORT_DISCOVERY = /Object\.(?:keys|entries|values)\(\s*([A-Za-z_$][\w$]*)/
 const B_MANGLED_LOOKUP = /(?:\.startsWith|\.endsWith)\(\s*['"`][^'"`]*(?:__|_[A-Z])/
 
+const isEnvironmentKeys = (node) => node?.type === 'CallExpression'
+  && node.callee?.object?.name === 'Object' && node.callee?.property?.name === 'keys'
+  && node.arguments[0]?.object?.name === 'process' && node.arguments[0]?.property?.name === 'env'
+
+const mangledLookupLines = (source) => {
+  const lines = new Set()
+  const visit = (node, environmentNames = new Set()) => {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'ForOfStatement' && isEnvironmentKeys(node.right)) {
+      const name = node.left.declarations?.[0]?.id?.name
+      visit(node.body, new Set([...environmentNames, name]))
+      return
+    }
+    if (node.type === 'CallExpression') {
+      const callee = node.callee
+      if (callee?.property?.name === 'filter' && isEnvironmentKeys(callee.object)) {
+        const callback = node.arguments[0]
+        visit(callback?.body, new Set([...environmentNames, callback?.params?.[0]?.name]))
+        return
+      }
+      if (['startsWith', 'endsWith'].includes(callee?.property?.name)
+        && typeof node.arguments[0]?.value === 'string' && /__|_[A-Z]/.test(node.arguments[0].value)
+        && !(callee.object?.type === 'Identifier' && environmentNames.has(callee.object.name))) {
+        lines.add(node.loc.start.line)
+      }
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach((child) => visit(child, environmentNames))
+      else if (value && typeof value === 'object') visit(value, environmentNames)
+    }
+  }
+  try {
+    visit(parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true }))
+  } catch {
+    source.split('\n').forEach((line, index) => { if (B_MANGLED_LOOKUP.test(line)) lines.add(index + 1) })
+  }
+  return lines
+}
+
 const C1_DU_SHAPE = /\.cases\(\)|\.fields\b|\.tag\b/
 const C2_FSHARP = /\bFSharp(?:List|Map|Set|Option|Result)\b/
 const C3_FABLE_MODULES = /fable_modules/
@@ -1868,13 +1921,14 @@ export const scanFile = (absPath, relPath) => {
   const source = readFileSync(absPath, 'utf8')
   const lines = source.split('\n')
   const moduleNames = moduleBindingNames(source)
+  const mangledLines = mangledLookupLines(source)
   const hits = []
   for (let i = 0; i < lines.length; i++) {
     const text = lines[i]
     for (const [rule, re] of RULES) {
       if (rule === 'export-discovery') {
         if (isModuleDiscovery(text, moduleNames)) hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
-      } else if (re.test(text)) {
+      } else if (rule === 'mangled-lookup' ? mangledLines.has(i + 1) : re.test(text)) {
         hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
       }
     }

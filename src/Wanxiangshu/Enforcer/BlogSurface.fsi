@@ -12,15 +12,8 @@ module BlogSurface =
     /// Chronicle's canonical text gate.
     val canonicalText: value: obj -> obj
 
-    /// Physical Blogger flight is the only live-cycle authority.
-    val hasLiveCycle: hasFlight: bool -> _sessionId: string -> bool
-
-    /// Pure semantic execute decision for the chronicle owner. The real Host
-    /// supplies the physical abort; this boundary returns the exact observable
-    /// consequence so tests do not construct ToolSpec/HostToolContext values.
-    val execute: value: obj -> obj
-
-    val tipFieldNames: unit -> string array
+    /// Read a real durable blob and use the production recovery decoder.
+    val reloadRequest: journal: obj -> value: obj -> System.Threading.Tasks.Task<obj>
 
     val continueTerminal:
         scope: obj ->
@@ -99,17 +92,8 @@ module BlogSurface =
     /// squash instruction placement behind the Blog owner boundary.
     val buildProjectionPlan: value: obj -> obj
 
-    /// Blog-part status predicates used by continuation repair. The result is
-    /// deliberately named and boolean rather than exposing a status DU.
-    val classifyPart: part: obj -> obj
-
     /// Coverage birth guard: sequence and cutoff advance together with the
     /// first durable frame; no synthetic zero/zero coverage is accepted.
     val coverageBirth: value: obj -> obj
 
-    /// Commit branch classification over semantic evidence. Each branch keeps
-    /// the production failure meaning visible without leaking a Cycle DU.
-    val classifyCommit: value: obj -> obj
-
-    /// Protocol transition for one terminal assistant step.
-    val protocol: value: obj -> obj
+    val decodeCycle: messages: obj array -> obj

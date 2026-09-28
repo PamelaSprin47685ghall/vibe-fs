@@ -1,4 +1,30 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createVirtualClock } from './support/temporal-harness.mjs'
+
+test('WHAT[verification-system-007] explicit virtual time and cancellation replay the same causal trace', async () => {
+  async function replay() {
+    const clock = createVirtualClock()
+    const trace = []
+    const cancelled = clock.port.delay(10)
+    const due = clock.port.delay(20)
+    cancelled.delay().then(() => trace.push(['cancelled-fired', clock.nowMs()]))
+    due.delay().then(() => trace.push(['due-fired', clock.nowMs()]))
+    cancelled.cancel()
+    trace.push(['cancel', clock.nowMs()])
+    clock.advance(19)
+    await Promise.resolve()
+    trace.push(['before-deadline', clock.nowMs()])
+    clock.advance(1)
+    await due.delay()
+    trace.push(['observed', clock.nowMs()])
+    clock.port.dispose()
+    return trace
+  }
+  const expected = [['cancel', 0], ['before-deadline', 19], ['due-fired', 20], ['observed', 20]]
+  assert.deepEqual(await replay(), expected)
+  assert.deepEqual(await replay(), expected)
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

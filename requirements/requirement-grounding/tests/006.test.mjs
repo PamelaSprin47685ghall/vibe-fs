@@ -111,3 +111,20 @@ test('WHAT[requirement-grounding-006] reanchor_resets_horizon_coverage_so_the_sa
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
+
+test('WHAT[requirement-grounding-006] a read returning old bytes does not mark the newer disk version visible', { todo: 'GAP-085: observation records the current disk content from its path instead of the actual returned bytes' }, async () => {
+  const { dir, cleanup } = sandbox()
+  let opened
+  try {
+    opened = await host.createJournal(dir)
+    const path = join(dir, 'requirements', 'alpha', 'WHAT.md')
+    writeFileSync(path, 'what-v2\n')
+    await host.observationDecision(opened.journal, dir, 's-stale-read', 'read', { filePath: path }, 'what-v1\n')
+    const result = await host.projectWithJournal(opened.journal, 's-stale-read', terminalRead(join(dir, 'src', 'main.fs')))
+    assert.equal(result.ok, true)
+    assert.ok(result.value.at(-1).parts[0].state.output.includes('what-v2'))
+  } finally {
+    if (opened?.ok) host.disposeJournal(opened.journal)
+    cleanup()
+  }
+})

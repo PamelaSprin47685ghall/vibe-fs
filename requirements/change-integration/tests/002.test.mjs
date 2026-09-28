@@ -45,7 +45,22 @@ const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKT
 test('WHAT[change-integration-002] GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
   assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, ' M file.fs\n', '']]]).runner), WORKTREE), true)
   assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, '', '']]]).runner), WORKTREE), false)
-  assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [1, '', 'boom']]]).runner), WORKTREE), false)
+})
+test('WHAT[change-integration-002] failed cleanliness inspection is not a clean admission result', {
+  todo: 'GAP-214: early GitPort.IsDirty maps command failure to false; FfMerge has a separate safe check',
+}, async () => {
+  const result = await change.gitIsDirty(git(fakeRunner([['status --porcelain', [128, '', 'cannot inspect']]]).runner), WORKTREE)
+    .then(value => value, () => 'rejected')
+  assert.notEqual(result, false)
+})
+test('WHAT[change-integration-002] unreadable target cleanliness cannot authorize ff publication', async () => {
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'status --porcelain'
+    ? [prefix, [128, '', 'cannot inspect worktree']]
+    : [prefix, response])
+  const fake = fakeRunner(answers)
+  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02', 'cafe01')
+  assert.equal(result.ok, false)
+  assert.equal(fake.calls.some(call => call.args[0] === 'merge'), false)
 })
 test('WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
   const answers = ffAnswers().map(([prefix, response]) => prefix === 'status --porcelain' ? [prefix, [0, ' M dirty.fs\n', '']] : [prefix, response])
@@ -71,13 +86,13 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[change-integration-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
+test('WHAT[change-integration-002] Git adapter reports worktree enumeration failure', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([128, '', 'no .git']) : Promise.resolve([0, '', ''])
   const result = await change.gitListWorktrees(change.createGit('/repo', runner))
   assert.equal(result.ok, false)
   assert.match(result.error, /no \.git/)
 })
-test('WHAT[change-integration-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
+test('WHAT[change-integration-002] Git adapter detects a modified target worktree', async () => {
   const runner = () => Promise.resolve([0, ' M dirty.fs\n', ''])
   assert.equal(await change.gitIsDirty(change.createGit('/repo', runner), '/tmp/hostfw5'), true)
 })

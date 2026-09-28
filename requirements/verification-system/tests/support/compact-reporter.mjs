@@ -62,14 +62,14 @@ export function createCompactReporter(options = {}) {
           const isTodo = Boolean(data.todo)
           const isCancelled = Boolean(data.cancelled || data.details?.error?.failureType === 'testAborted')
 
-          if (type === 'test:fail') {
-            out.write(`✖ ${name} (${duration.toFixed(3)}ms)\n`)
+          if (isCancelled) {
+            out.write(`﹣ ${name} (${duration.toFixed(3)}ms) # CANCELLED\n`)
           } else if (isSkip) {
             out.write(`﹣ ${name} (${duration.toFixed(3)}ms) # SKIP\n`)
           } else if (isTodo) {
-            out.write(`✔ ${name} (${duration.toFixed(3)}ms) # TODO\n`)
-          } else if (isCancelled) {
-            out.write(`✖ ${name} (${duration.toFixed(3)}ms) # CANCELLED\n`)
+            out.write(`﹣ ${name} (${duration.toFixed(3)}ms) # TODO\n`)
+          } else if (type === 'test:fail') {
+            out.write(`✖ ${name} (${duration.toFixed(3)}ms)\n`)
           } else {
             out.write(`✔ ${name} (${duration.toFixed(3)}ms)\n`)
           }
@@ -105,6 +105,9 @@ export function createCompactReporter(options = {}) {
       (summary.cancelled > 0 ? `, ${summary.cancelled} cancelled` : '') +
       ` (${(summary.wallMs / 1000).toFixed(2)}s wall, ${(summary.sumTestMs / 1000).toFixed(2)}s test time)\n`
     err.write(summaryText)
+    for (const item of summary.exclusions) {
+      err.write(`  ${item.status}: ${item.file}:${item.name} — ${item.reason}\n`)
+    }
 
     options.onSummary?.(summary)
   }

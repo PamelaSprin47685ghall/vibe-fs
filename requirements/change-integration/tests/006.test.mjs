@@ -1,6 +1,51 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const change = await import('../../../dist/Change/Surface.js')
+
+test('WHAT[change-integration-006] projecting candidate and conflict facts preserves the recorded Road worktree identity', () => {
+  let projection = change.createJob(change.empty(), {
+    jobId: 'job-1',
+    managerSessionId: 'ses-manager-1',
+    managerAgent: 'manager',
+    byname: 'Road',
+    worktreeIdentity: 'manager/job-1',
+    worktreePath: '/tmp/wt-job-1',
+    targetRef: 'refs/heads/main',
+    targetBranchFrozen: 'refs/heads/main',
+  })
+
+  projection = change.recordFact(
+    projection,
+    'job-1',
+    change.fact('CandidateReady', {
+      candidateCommit: 'candidate-head',
+      workspaceSnapshotId: 'snapshot-1',
+      qualityCertificateId: 'certificate-1',
+    }),
+  )
+  projection = change.recordFact(
+    projection,
+    'job-1',
+    change.fact('ConflictDetected', {
+      candidateCommit: 'candidate-head',
+      targetHeadSnapshot: 'target-head-1',
+      workspaceSnapshotId: 'snapshot-conflict',
+      conflictFiles: ['src/conflict.fs'],
+      diagnosticsDigest: 'conflict-digest',
+    }),
+  )
+
+  const job = change.find(projection, 'job-1')
+  assert.equal(job.worktreePath, '/tmp/wt-job-1')
+  assert.equal(job.worktreeIdentity, 'manager/job-1')
+  assert.deepEqual(job.facts, ['CandidateReady', 'ConflictDetected'])
+  assert.equal(change.activeJobs(projection).length, 1)
+})
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 
@@ -16,7 +61,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[change-integration-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
+test('WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
   const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
   assert.equal(resource.ok, true)
@@ -474,3 +519,5 @@ test('WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentr
   )
 })
 }
+
+test.todo('WHAT[change-integration-006] GAP-212: an interrupted publish resumes from its actual durable events and actual Git refs in a fresh process without replacing the Road worktree')

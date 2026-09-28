@@ -1,23 +1,10 @@
 # work-record — WHY
 
-一段 work 会在多个边界之间传递（如父子 delegation、process review、Finality、SyncDelegate caller 等）。每个 receiver 需要同一个事实：这段 work 做了什么、边界在哪。但不同 receiver 的投影需求不同（例如是否包含 Opening）。如果不同 receiver 各自生成摘要，同一个 work 就会存在多份互相矛盾的表述，使得 review 与 finality 无法互证。
+交接、审阅和继续工作需要知道同一段工作做了什么。如果每个接收方自行概括，记录就会随读者变化，无法互相核对。共用 canonical record，让不同视图仍有同一事实依据。
 
-**work-record 保证：一段 work 只有一个 canonical bounded statement（LifecycleWorkRecord / LWR），receiver 只能选择投影视图，不能改变事实本身。**
+会话复用保留经验，却不应把旧成果算成本次交付，也不能让后来发生的事改写过去。因此工作范围取自客观因果边界，记录与接收方的“最近看过什么”无关。
 
-## 核心不变量与张力
-
-- **事实统一 vs 视图投影**：同一份 canonical record 必须完整保留 Opening、Chronicle 与 Recent work；`includeOpening` 仅控制渲染，不改变事实内容。
-- **因果边界 vs 会话时间**：record 的范围严格由因果游标界定，不受会话物理顺序或读取者主观新近性影响；多次 resume 产生各自独立的因果 record。
-- **诚实陈述 vs 格式束缚**：正式陈述采用散文 claim 表达，严禁以固定 DTO schema 绑架真实工作语义。
-- **Fission 汇聚一致性**：Fission 多 lane 并发执行在收敛后形成单一完整的 canonical record，向属主提供确定性的单次交付证据。
-
-## 违反边界的失败意义
-
-- receiver 收到的工作记录混入其它 invocation 或 session 的历史数据。
-- 记录丢失 constitutive Opening，或尝试从次要文本拼接重建。
-- 记录因 receiver 不同而改变事实本身而非仅改变投影。
-- 要求 participant 填写固定字段 DTO 才算完成工作。
-- Fission 产生多个分裂的、未收敛的局部工作记录碎片泄露给调度方。
+Opening 保存最初责任及其成立过程；Chronicle 与 Recent work 表示材料的覆盖状态。把这些材料和模型的散文陈述保留下来，既能连续工作，也能区分实际证据与完成声称。固定报告模板不能代替诚实，内部工具协议也不必成为每次交接的正文。
 
 ## DEPENDS ON
 

@@ -86,3 +86,19 @@ test('WHAT[process-execution-005] EXEC_010_process_request_carries_all_fields', 
   assert.equal(estView.memory, 'large')
 })
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const runtime = await import('../../../dist/Process/Surface.js')
+  test('WHAT[process-execution-005] estimate validation rejects nonfinite or nonpositive time and negative output', () => {
+    assert.equal(runtime.validateEstimate(10, 0).ok, true)
+    for (const invalid of [NaN, Infinity, -Infinity, 0, -5]) {
+      const result = runtime.validateEstimate(invalid, 1024)
+      assert.equal(result.ok, false)
+      assert.match(result.error, /finite positive number/)
+    }
+    const result = runtime.validateEstimate(10, -1)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /non-negative/)
+  })
+}

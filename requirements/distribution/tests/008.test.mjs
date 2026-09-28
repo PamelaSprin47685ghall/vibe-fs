@@ -77,7 +77,7 @@ test('WHAT[distribution-008] DISTRIBUTION_provider_resource_closure_is_language_
   }
 })
 
-integrationTest('WHAT[distribution-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
+integrationTest('WHAT[distribution-008] repository runtime resources include both languages for active role laws and rulebook', () => {
   const providerDir = path.join(root, 'resources', 'provider')
   const enforcerDir = path.join(root, 'resources', 'enforcer')
 
@@ -110,3 +110,5 @@ integrationTest('WHAT[distribution-008] PACKAGE_resources_provider_role_laws_and
     'catalog.json must not ship after rulebook folder cutover',
   )
 })
+
+test.todo('WHAT[distribution-008] GAP-210: every declared resource is available from the exact installed artifact')

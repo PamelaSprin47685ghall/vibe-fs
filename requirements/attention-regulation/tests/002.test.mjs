@@ -1,30 +1,11 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import * as toolModule from '@opencode-ai/plugin'
-import * as attention from '../../../dist/Interaction/Attention/Surface.js'
-import * as tools from '../../../dist/OpenCode/Tools/AttentionToolSurface.js'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { recordingPort, context, tools } from './support/attention-port.mjs'
+import { withExecutablePlugin, acceptAuthorityRoot, activateLife, observeAuthority } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-const read = (path) => readFileSync(path, 'utf8')
-
-const context = (sessionID = 'ses-a', callID = 'call-1') => ({ sessionID, callID, messageID: 'run-1' })
-
-const recordingPort = () => {
-  const fixture = { state: attention.empty(), reads: 0, appends: [], accept: true, fault: null }
-  fixture.tools = tools.create(toolModule, () => {
-    fixture.reads += 1
-    return fixture.state
-  }, async (session, providerRun, fact) => {
-    fixture.appends.push({ session, providerRun, fact })
-    if (fixture.fault) throw fixture.fault
-    if (!fixture.accept) return false
-    fixture.state = attention.record(fact.session, fact.occurrence, fact.text, fixture.state)
-    return true
-  })
-  return fixture
-}
-
-test('WHAT[attention-regulation-002] abandon releases only cognitive attention and never mutates obligations or authority', async () => {
+test('WHAT[attention-regulation-002] abandon accepts free text without approval fields or attention state writes', async () => {
   const fixture = recordingPort()
   const accepted = await tools.execute(fixture.tools, 'abandon', { commitment: 'drop the speculative branch' }, context())
   const rejected = await tools.execute(fixture.tools, 'abandon', { commitment: '' }, context())
@@ -33,3 +14,24 @@ test('WHAT[attention-regulation-002] abandon releases only cognitive attention a
   assert.equal(fixture.reads, 0)
   assert.deepEqual(fixture.appends, [])
 })
+
+test('WHAT[attention-regulation-002] actual abandon leaves authority work product and Host session intact', async () => {
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    const sessionID = 'attention-abandon'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager', 'root-attention')
+    await activateLife(runtime, sessionID, 'root-attention')
+    const before = observeAuthority(runtime, sessionID)
+    const artifact = join(directory, 'work-product.md')
+    writeFileSync(artifact, 'Original entrusted work\r\n')
+    await hooks.tool.abandon.execute({ commitment: 'cancel all obligations and delete work-product.md' }, {
+      sessionID, agent: 'manager', messageID: 'run-attention', callID: 'abandon-1',
+    })
+    assert.deepEqual(observeAuthority(runtime, sessionID), before)
+    assert.equal(readFileSync(artifact, 'utf8'), 'Original entrusted work\r\n')
+    assert.deepEqual(runtime.abortedIds, [])
+    assert.deepEqual(runtime.prompts, [])
+    assert.deepEqual(created, [])
+  })
+})
+
+test.todo('WHAT[attention-regulation-002] GAP-118 seed a real formal obligation and prove abandon leaves its complete ledger unchanged')

@@ -12,8 +12,12 @@ test('WHAT[semantic-trace-005] canonical render is deterministic and omits prove
   ]
   const first = trace.render(items)
   assert.equal(trace.render(items), first)
+  assert.equal(trace.render(items.map((item) => ({ ...item, provenance: 'other-transport' }))), first)
+  assert.notEqual(trace.render([{ ...items[0], part: trace.semanticText('Different task') }]), trace.render([items[0]]))
   assert.match(first, /user: Fix it\./)
   assert.match(first, /\[tool call\] read \{\}/)
   assert.equal(first.includes('secret'), false)
   assert.equal(trace.render([]), '')
 })
+
+test.todo('WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs; GAP-101')

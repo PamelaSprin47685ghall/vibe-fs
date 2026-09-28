@@ -132,6 +132,7 @@ module AttemptPlannerSurface =
                         |> List.sort
                         |> List.toArray
                        requestKind = ProviderRequestKind.label profile.RequestKind
+                       clearsFailureCountOnSuccess = ProviderRequestKind.clearsFailureCountOnSuccess profile.RequestKind
                        projectionChoice =
                         match profile.ProjectionChoice with
                         | XProjectionChoice.UseCommittedEpoch -> "UseCommittedEpoch"

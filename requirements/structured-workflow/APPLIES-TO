@@ -15,6 +15,5 @@
 /scripts/checks/subsystems.mjs
 /scripts/checks/subsystems.json
 /scripts/checks/fsharp-control-pyramid.mjs
-/scripts/checks/g4r-ce-vocabulary.mjs
-/scripts/checks/cross-callback-pc.mjs
+/scripts/checks/aggregate-retired.mjs
 /scripts/lib/walk.mjs

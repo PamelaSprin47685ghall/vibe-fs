@@ -60,7 +60,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[dispatch-protocol-007] DP_007_runtime_start_stamp_is_audit_only_not_restart_recovery_authority', () => {
+test('WHAT[dispatch-protocol-007] fresh claim projection begins with no observed runtime restarts', () => {
   const root = profileOf()
   const key = 'pk_r'
   const projection = authority.registerClaim(
@@ -71,11 +71,6 @@ test('WHAT[dispatch-protocol-007] DP_007_runtime_start_stamp_is_audit_only_not_r
 
   const claim = findClaim(projection, key)
   assert.equal(claim.claimedAtRuntimeStartCount, 0)
-  assert.deepEqual(dispatch.runtimeStartPolicy(), {
-    claimStamp: 'workspace-runtime-start-count',
-    advancesWorkspaceWatermark: true,
-    restartRecoveryAuthority: false,
-  })
 })
 }
 
@@ -131,7 +126,7 @@ const profileFor = (session, runtime = 'rt-007c') => {
     rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
-  const seed = authority.issueInheritedIdentitySeed('coder', owner.value)
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner.value)
   assert.equal(seed.ok, true, seed.error)
   const built = authority.createAuthorityRoot(hash, runtime, session, 'AgentOwnerRoot', `msg-root-${session}`, seed.value)
   assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built.error))
@@ -195,7 +190,7 @@ test('WHAT[dispatch-protocol-007] PROMPT_007_detached_refused_abandons_send_fail
   const opened = await openGitJournal(base, writerId, 'rt-007-refused')
   try {
     const owner = await acceptOwner(opened.journal, 'ses_007_refused_owner')
-    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const captured = []
     const sent = await sendDetachedRoot(
       verdictPort(captured, () => dispatch.retryable('host refused before accept')),
@@ -223,7 +218,7 @@ test('WHAT[dispatch-protocol-007] PROMPT_007_detached_outcome_unknown_keeps_clai
   const opened = await openGitJournal(base, writerId, 'rt-007-unknown')
   try {
     const owner = await acceptOwner(opened.journal, 'ses_007_unknown_owner')
-    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const captured = []
     await sendDetachedRoot(
       verdictPort(captured, () => dispatch.acceptanceUnknown('response lost after enqueue')),
@@ -282,7 +277,7 @@ const appendAuthorityRoot = async (handle, session) => {
     managerRootSelection,
   )
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
-  const inherited = authority.issueInheritedIdentitySeed('coder', owner.profile)
+  const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
   return dispatch.appendAuthorityRoot(handle, session, inherited.value)
 }
@@ -392,7 +387,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
     inheritedIdentity,
   )
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
-  const seed = authority.issueInheritedIdentitySeed('coder', owner.profile)
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }
@@ -402,7 +397,7 @@ const userMessageWithKey = (id, keyValue) => ({
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-test('WHAT[dispatch-protocol-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
+test('WHAT[dispatch-protocol-007] opening additional journal writers does not abandon an unresolved claim', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
     const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp011b-1', 'rt_1', 4242, '2020-01-01T00:00:00Z')
@@ -418,8 +413,7 @@ test('WHAT[dispatch-protocol-007] DP_007_restarts_never_auto_abandon_an_unresolv
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.equal(captured.length, 1)
 
-      // Repeated process restarts are not recovery authority. No physical message
-      // means StillPending forever unless an explicit later workflow proves it.
+      // These are new journal writers in the same process, not process crashes.
       for (let start = 2; start <= 3; start += 1) {
         const reopened = await journal.JournalSurface_bootWithWriterId(
           base,
@@ -436,7 +430,7 @@ test('WHAT[dispatch-protocol-007] DP_007_restarts_never_auto_abandon_an_unresolv
         journal.JournalSurface_dispose(reopened.journal)
       }
 
-      // Even a fourth restart cannot manufacture Abandoned/GaveUp.
+      // A fourth writer still cannot manufacture Abandoned/GaveUp.
       const fourth = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp011b-4', 'rt_4', 4244, BOOT_AFTER_CLAIM)
       assert.equal(fourth.ok, true, fourth.ok ? '' : JSON.stringify(fourth.error))
       try {

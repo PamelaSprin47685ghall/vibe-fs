@@ -7,7 +7,7 @@ const assistantStep = (id, parts, { completed = true } = {}) => [
     info: {
       id,
       role: 'assistant',
-      ...(completed ? { time: { completed: Date.now() } } : { time: { created: Date.now() } }),
+      ...(completed ? { time: { completed: 2 } } : { time: { created: 1 } }),
     },
     parts,
   },
@@ -61,9 +61,11 @@ test('WHAT[provider-attempt-recovery-012] PAR_012_an_interrupted_tool_call_is_no
   assert.equal(evidence.errored, false)
 })
 
-test('WHAT[provider-attempt-recovery-012] PAR_012_a_tool_error_without_interrupted_is_the_confirmed_failure', () => {
-  // status=error 且无 interrupted → 工具本身失败,才计入已确认失败。
+test('WHAT[provider-attempt-recovery-012] ordinary tool error remains distinct from interrupted cleanup residue', () => {
+  // 工具错误分类本身不授予 provider 重试权限，也不证明预算推进。
   const evidence = repair.classifyBlogAttempt(erroredBlog('asst-tool-error', 'blog-crash'))
   assert.equal(evidence.errored, true)
   assert.equal(evidence.aborted, false)
 })
+
+test.todo('WHAT[provider-attempt-recovery-012] actual aborted Host tool residue leaves provider budget unchanged through reconciliation (GAP-139)')

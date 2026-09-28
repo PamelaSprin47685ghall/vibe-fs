@@ -1,14 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
-
-const pluginHooksSource = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs', import.meta.url), 'utf8')
-
-const pluginTransformsSource = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url), 'utf8')
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-opencode-'))
@@ -25,75 +21,77 @@ const toolBatch = (providerID, path) => [
   { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
-test('WHAT[requirement-grounding-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes', async () => {
+test('WHAT[requirement-grounding-007] actual pair and grounding transforms append result-only bytes for each tested provider without synthetic calls', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const sourcePath = join(dir, 'src', 'main.fs')
-    const ordinaryJournal = await grounding.createJournal(dir)
-    await grounding.requestPaths(ordinaryJournal.journal, dir, 'ordinary', [sourcePath])
-    const paired = await pair.tryInject('ordinary', pair.text, toolBatch('anthropic', sourcePath))
-    assert.equal(paired.ok, true)
-    const ordinary = await grounding.projectWithJournal(ordinaryJournal.journal, 'ordinary', paired.value)
-    const ordinaryTerminal = ordinary.value.at(-1).parts[0].state.output
-    assert.ok(ordinaryTerminal.includes(`${grounding.cursorSeparator}# ground truth`))
-    assert.equal(ordinary.value.some((m) => m.info?.source === grounding.source), false, 'Universal cursor mode has result-only grounding')
-    grounding.disposeJournal(ordinaryJournal.journal)
-
-    const cursorJournal = await grounding.createJournal(dir)
-    await grounding.requestPaths(cursorJournal.journal, dir, 'cursor', [sourcePath])
-    const cursorPair = await pair.tryInject('cursor', pair.text, toolBatch('cursor', sourcePath))
-    const cursor = await grounding.projectWithJournal(cursorJournal.journal, 'cursor', cursorPair.value)
-    const terminal = cursor.value.at(-1).parts[0].state.output
-    const pairAt = terminal.indexOf(pair.text.trim())
-    const requirementAt = terminal.indexOf('requirement_source_path = "requirements/alpha/WHAT.md"')
-    assert.ok(pairAt >= 0 && requirementAt > pairAt)
-    assert.ok(terminal.includes(`${grounding.cursorSeparator}# ground truth`))
-    assert.doesNotMatch(terminal, /<skill_content|<requirement_read/)
-    assert.equal(cursor.value.some((m) => m.info?.source === grounding.source), false, 'Cursor has result-only grounding')
-
-    const score = pluginTransformsSource.slice(
-      pluginTransformsSource.indexOf('let normalTransform'),
-      pluginTransformsSource.indexOf('let private ordinaryProviderTransform'),
-    )
-    const pairProjectionAt = score.indexOf('caps.InjectPairGuideline')
-    const requirementProjectionAt = score.indexOf('caps.ProjectRequirementGrounding')
-    assert.ok(pairProjectionAt >= 0 && requirementProjectionAt > pairProjectionAt, 'production transform fixes pair → grounding order')
-    grounding.disposeJournal(cursorJournal.journal)
+    assert.equal(grounding.cursorSeparator, '\0\uFEFF')
+    for (const provider of ['anthropic', 'cursor', 'openai']) {
+      const opened = await grounding.createJournal(dir)
+      try {
+        await grounding.requestPaths(opened.journal, dir, provider, [sourcePath])
+        const input = toolBatch(provider, sourcePath)
+        const paired = await pair.tryInject(provider, pair.text, input)
+        assert.equal(paired.ok, true)
+        const result = await grounding.projectWithJournal(opened.journal, provider, paired.value)
+        assert.equal(result.ok, true)
+        assert.equal(result.value.length, input.length)
+        assert.deepEqual(result.value.map((message) => message.info), input.map((message) => message.info))
+        assert.deepEqual(result.value[0], input[0], 'pending tool call remains untouched')
+        const terminal = result.value.at(-1).parts[0].state.output
+        assert.ok(terminal.startsWith('before\n'))
+        assert.ok(terminal.includes('\0\uFEFF# ground truth'))
+        assert.ok(terminal.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
+        assert.equal(result.value.some((message) => message.info?.source === grounding.source), false)
+        const pairAt = terminal.indexOf(pair.text.trim())
+        if (paired.value.at(-1).parts[0].state.output.includes(pair.text.trim())) {
+          assert.ok(pairAt >= 0)
+          assert.ok(terminal.indexOf('requirement_source_path') > pairAt)
+        }
+        assert.deepEqual(input, toolBatch(provider, sourcePath), 'input is not mutated')
+      } finally { grounding.disposeJournal(opened.journal) }
+    }
   } finally { cleanup() }
 })
 
-test('WHAT[requirement-grounding-007] grep match files do not trigger APPLIES-TO before an explicit read', async () => {
+test('WHAT[requirement-grounding-007] candidate discovery tools do not ground, while an explicit read does', async () => {
   const { dir, cleanup } = sandbox()
+  const opened = await grounding.createJournal(dir)
   try {
     const sourcePath = join(dir, 'src', 'main.fs')
-    const opened = await grounding.createJournal(dir)
-
-    const grep = await grounding.observationDecision(
-      opened.journal,
-      dir,
-      'grep-does-not-ground',
-      'grep',
-      { path: join(dir, 'src') },
-      `${sourcePath}:1:before\n`,
-    )
-    assert.equal(grep.ok, true)
-    assert.equal(grep.needsGrounding, false)
-    assert.equal(grep.requested, 0)
-    assert.deepEqual(grep.packages, [])
-
-    const read = await grounding.observationDecision(
-      opened.journal,
-      dir,
-      'grep-does-not-ground',
-      'read',
-      { filePath: sourcePath },
-      'before\n',
-    )
+    for (const tool of ['grep', 'glob', 'list']) {
+      const result = await grounding.observationDecision(opened.journal, dir, 'candidate', tool, { filePath: sourcePath, path: join(dir, 'src') }, `${sourcePath}:1:before\n`)
+      assert.equal(result.ok, true)
+      assert.equal(result.needsGrounding, false)
+      assert.equal(result.requested, 0)
+      assert.deepEqual(result.packages, [])
+    }
+    const read = await grounding.observationDecision(opened.journal, dir, 'candidate', 'read', { filePath: sourcePath }, 'before\n')
     assert.equal(read.ok, true)
     assert.equal(read.needsGrounding, true)
     assert.equal(read.requested, 1)
     assert.deepEqual(read.packages, ['alpha'])
-
+  } finally {
     grounding.disposeJournal(opened.journal)
-  } finally { cleanup() }
+    cleanup()
+  }
 })
+
+test('WHAT[requirement-grounding-007] original Markdown bytes survive the actual result suffix unchanged', { todo: 'GAP-086: current LlmFacing instruction rendering adds comments and normalizes newlines; resolve the representation contract' }, async () => {
+  const { dir, cleanup } = sandbox()
+  const opened = await grounding.createJournal(dir)
+  try {
+    const content = 'first\r\n\r\nsecond  \r\n'
+    writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), content)
+    const path = join(dir, 'src', 'main.fs')
+    await grounding.requestPaths(opened.journal, dir, 'raw-bytes', [path])
+    const result = await grounding.projectWithJournal(opened.journal, 'raw-bytes', toolBatch('anthropic', path))
+    assert.equal(result.ok, true)
+    assert.ok(result.value.at(-1).parts[0].state.output.includes(content))
+  } finally {
+    grounding.disposeJournal(opened.journal)
+    cleanup()
+  }
+})
+
+test.todo('WHAT[requirement-grounding-007] actual plugin hook composition fixes guidance before grounding for all paths; manually calling transforms in that order proves their composition only (GAP-085)')

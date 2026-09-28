@@ -1,77 +1,41 @@
 import assert from 'node:assert/strict'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
-import * as Ablation from '../../../dist/Ablation/Surface.js'
+import { withAblationFixture, withAblationEnv } from './support/ablation-fixture.mjs'
 
-const ROOT = new URL('../../..', import.meta.url).pathname
-
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-
-const nodesDoc = JSON.parse(read('resources/ablation/nodes.json'))
-
-test('WHAT[feature-ablation-003] ABL_003_station_order_edges_are_acyclic_by_construction', () => {
-  const edges = nodesDoc.edges.filter((edge) => edge.kind === 'station-order')
-  const graph = new Map()
-  for (const edge of edges) {
-    if (!graph.has(edge.from)) graph.set(edge.from, [])
-    graph.get(edge.from).push(edge.to)
-  }
-  const visiting = new Set()
-  const visited = new Set()
-  const visit = (node) => {
-    if (visited.has(node)) return
-    if (visiting.has(node)) throw new Error(`cycle at ${node}`)
-    visiting.add(node)
-    for (const next of graph.get(node) ?? []) visit(next)
-    visiting.delete(node)
-    visited.add(node)
-  }
-  for (const node of graph.keys()) visit(node)
-})
-
-test('WHAT[feature-ablation-003] ABL_003_dag_station_order_and_borrow_edges_are_acyclic', () => {
-  const edges = nodesDoc.edges.filter((e) => e.kind === 'station-order' || e.kind === 'borrow')
-  const graph = new Map()
-  for (const edge of edges) {
-    if (!graph.has(edge.from)) graph.set(edge.from, [])
-    graph.get(edge.from).push(edge.to)
-  }
-  const visiting = new Set()
-  const visited = new Set()
-  const visit = (node) => {
-    if (visited.has(node)) return
-    if (visiting.has(node)) throw new Error(`cycle at ${node}`)
-    visiting.add(node)
-    for (const next of graph.get(node) ?? []) visit(next)
-    visiting.delete(node)
-    visited.add(node)
-  }
-  for (const node of graph.keys()) visit(node)
-
-  // Only station-order and borrow edge kinds should exist
-  for (const edge of nodesDoc.edges) {
-    assert.ok(
-      edge.kind === 'station-order' || edge.kind === 'borrow',
-      `unexpected edge kind ${edge.kind}`,
-    )
+test('WHAT[feature-ablation-003] loading rejects cycles through either edge kind', async () => {
+  for (const kind of ['station-order', 'borrow']) {
+    await withAblationFixture((doc) => {
+      doc.edges.push({ from: 'verification-system', to: 'requirement-system', kind })
+    }, (surface) => {
+      const result = surface.load()
+      assert.equal(result.ok, false)
+      assert.equal(result.kind, 'DagViolation')
+      assert.match(result.error, /cycle/i)
+      assert.deepEqual(surface.manifestNodeIds(), [])
+    })
   }
 })
 
-test('WHAT[feature-ablation-003] ABL_003_cyclic_graph_load_fails_closed', () => {
-  // The cycle is expressed as a document value, so the shared manifest is never
-  // rewritten and no sibling test can observe a half-written file.
-  const doc = JSON.parse(read('resources/ablation/nodes.json'))
-  doc.edges.push({
-    from: 'verification-system',
-    to: 'requirement-system',
-    kind: 'station-order',
-  })
-
-  const result = Ablation.loadFromNodes(doc)
-  assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
-  assert.equal(result.kind, 'DagViolation')
-  assert.match(result.error, /cycle/i)
-  // A rejected document installs nothing, so no registry survives to answer later.
-  assert.equal(Ablation.installed(), null)
+test('WHAT[feature-ablation-003] station-order and borrow prerequisites are enforced on load', async () => {
+  for (const kind of ['station-order', 'borrow']) {
+    await withAblationFixture((doc) => {
+      doc.nodes = ['prerequisite', 'target'].map((id) => ({ id, package: id,
+        station: id === 'prerequisite' ? 0 : 1, kind: 'package', borrowed_surface: [] }))
+      doc.edges = [{ from: 'prerequisite', to: 'target', kind }]
+    }, (surface) => {
+      for (const from of ['ablated', 'borrowed', 'active']) {
+        for (const to of ['ablated', 'borrowed', 'active']) {
+          withAblationEnv([
+            ['WANXIANGSHU_ABLATION_prerequisite', from],
+            ['WANXIANGSHU_ABLATION_target', to],
+          ], () => {
+            const result = surface.load()
+            const allowed = from !== 'ablated' || (kind === 'station-order' ? to !== 'active' : to === 'ablated')
+            assert.equal(result.ok, allowed, `${kind}: ${from} -> ${to}`)
+            if (!allowed) assert.equal(result.kind, 'DagViolation')
+          })
+        }
+      }
+    })
+  }
 })

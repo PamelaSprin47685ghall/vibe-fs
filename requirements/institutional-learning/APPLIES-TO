@@ -3,8 +3,7 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs
-/src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs
-/src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs
-/src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs
-/src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs
-/src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/**
+/src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs
+/src/Wanxiangshu/Composition/Durable/InstitutionalLearningJournalAdapter.fs
+/resources/provider/institutional-learning/**

@@ -2,74 +2,21 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
-const H = (input) => `H(${input})`
-
-const RUNTIME = 'rt_1'
-
-const SESSION = 'ses_a'
-
-const findClaim = (projection, key) => projection.pendingClaims.find((claim) => claim.promptKey === key)
-
-const promptOrigin = (kind) => authority.originForContinuation(kind)
-
-const personas = {
-  engineer: 'Engineer',
-  coder: 'Coder',
-  manager: 'Lead',
+for (const receipt of ['accepted-queue-entry', 'msg-looks-like-physical']) {
+  test(`WHAT[dispatch-protocol-003] typed transport receipt ${receipt} remains pending and grants no authority after journal reopen`, async () => {
+    await withJournal(`receipt-${receipt}`, async (handle, reopen) => {
+      const seed = authority.issueInheritedIdentitySeed('engineer', await acceptOwner(handle))
+      assert.equal(seed.ok, true)
+      const sent = await dispatch.sendAgentOwnerRootAwait(hostPort(async () => dispatch.admittedWithReceipt(receipt)), handle, 'child', 'assignment', seed.value)
+      assert.equal(sent.ok, true, sent.error)
+      handle = await reopen()
+      const projection = dispatch.projectionObservation(handle, 'child')
+      assert.equal(projection.activeLogicalRun, null)
+      assert.equal(projection.pendingClaims.length, 1)
+      assert.equal(projection.pendingClaims[0].promptKey, sent.key)
+      assert.equal(projection.pendingClaims[0].receipt, receipt)
+    })
+  })
 }
-
-const rootSelection = (participant) => {
-  const role = participant === 'predictor' ? 'inspector' : participant
-  return {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      participant,
-      role,
-      selectedTier: 'deep',
-      persona: personas[participant] ?? 'Unknown',
-      personaCatalogVersion: 1,
-      origin: 'ResolvedAtRoot',
-    },
-  }
-}
-
-const inheritedSeed = (agent, physical) => {
-  const owner = authority.createAuthorityRoot(
-    H,
-    RUNTIME,
-    SESSION,
-    'HumanRoot',
-    physical,
-    rootSelection('manager'),
-  )
-  assert.equal(owner.ok, true, owner.error)
-  const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
-  assert.equal(inherited.ok, true, inherited.error)
-  return inherited.value
-}
-
-const profileOf = () => {
-  const built = authority.createAuthorityRoot(
-    H,
-    RUNTIME,
-    SESSION,
-    'HumanRoot',
-    'msg_u1',
-    rootSelection('engineer'),
-  )
-  assert.equal(built.ok, true, built.ok ? '' : built.error)
-  return built.value
-}
-
-test('WHAT[dispatch-protocol-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity', () => {
-  const admission = 'accepted-1a2b'
-  const physical = 'msg_real'
-  assert.equal(admission, 'accepted-1a2b')
-  assert.equal(physical, 'msg_real')
-  assert.equal(authority.transportReceiptShape(admission), true, 'accepted-* is admission shape')
-  assert.equal(authority.transportReceiptShape(physical), false, 'msg_* is not admission shape')
-})

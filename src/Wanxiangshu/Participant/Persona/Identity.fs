@@ -146,17 +146,11 @@ module ParticipantIdentity =
         |> Result.map (fun (name, kind) ->
             create name kind (personaV1 kind) currentVersion PersonaOrigin.ResolvedAtRoot)
 
-    let private parseInheritedName canonicalManagedName =
-        match parseCanonicalName canonicalManagedName with
-        | Ok p -> Ok p
-        | Error(ParticipantIdentityError.LegacyParticipantName name) -> Ok(PersonaName name, ManagedRole Role.Engineer)
-        | Error err -> Error err
-
     let inheritFromOwner
         (canonicalManagedName: string)
         (owner: ParticipantIdentityEvidence)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        parseInheritedName canonicalManagedName
+        parseCanonicalName canonicalManagedName
         |> Result.map (fun (name, kind) ->
             create name kind (persona owner) (identity owner).PersonaCatalogVersion PersonaOrigin.InheritedFromOwner)
 
@@ -224,7 +218,9 @@ module ParticipantIdentity =
         | Error(ParticipantIdentityError.LegacyParticipantName name) when
             input.Origin = PersonaOrigin.InheritedFromOwner
             ->
-            Ok(PersonaName name, ManagedRole(input.Role |> Option.defaultValue Role.Engineer))
+            Roles.tryParseHistoricalRole name
+            |> Option.map (fun role -> Ok(PersonaName name, ManagedRole role))
+            |> Option.defaultValue (Error(ParticipantIdentityError.LegacyParticipantName name))
         | Error err -> Error err
 
     let rehydrate

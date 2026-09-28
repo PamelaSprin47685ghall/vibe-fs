@@ -97,6 +97,7 @@ module Parallel =
             do! semaphore.WaitAsync(cancellation)
 
             try
+                cancellation.ThrowIfCancellationRequested()
                 return! action item cancellation
             finally
                 semaphore.Release()

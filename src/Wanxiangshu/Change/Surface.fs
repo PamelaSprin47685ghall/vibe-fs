@@ -113,21 +113,12 @@ module ChangeSurface =
                 let result = property value name
                 if isNullish result then None else Some result)
 
-    let private decodePublishClaimed (jobOpt: ManagerJobProjection option) (payload: obj) =
+    let private decodePublishClaimed (payload: obj) =
         let targetRefStr =
-            tryField payload [ "targetRef"; "TargetRef" ]
-            |> Option.map stringOf
-            |> Option.orElse (jobOpt |> Option.map (fun j -> TargetRef.value j.TargetRef))
+            tryField payload [ "targetRef"; "TargetRef" ] |> Option.map stringOf
 
         let rebasedCommitStr =
-            tryField payload [ "rebasedCommit"; "RebasedCommit" ]
-            |> Option.map stringOf
-            |> Option.orElse (tryField payload [ "targetCommit"; "TargetCommit" ] |> Option.map stringOf)
-            |> Option.orElse (
-                jobOpt
-                |> Option.bind (fun j -> j.CandidateReady)
-                |> Option.map (fun c -> CommitHash.value c.CandidateCommit)
-            )
+            tryField payload [ "rebasedCommit"; "RebasedCommit" ] |> Option.map stringOf
 
         let expectedHeadStr =
             tryField payload [ "expectedHead"; "ExpectedHead" ] |> Option.map stringOf
@@ -135,11 +126,6 @@ module ChangeSurface =
         let snapshotStr =
             tryField payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
             |> Option.map stringOf
-            |> Option.orElse (
-                jobOpt
-                |> Option.bind (fun j -> j.CandidateReady)
-                |> Option.map (fun c -> WorkspaceSnapshotId.value c.WorkspaceSnapshotId)
-            )
 
         let certStr =
             tryField payload [ "qualityCertificateId"; "QualityCertificateId" ]
@@ -199,80 +185,23 @@ module ChangeSurface =
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
                 projection
         | "RebasedCandidateReady" ->
-            let targetHead =
-                let t = field payload [ "targetHead"; "targetHeadSnapshot"; "TargetHeadSnapshot" ]
-
-                if isNullish t then
-                    field payload [ "rebasedCommit"; "RebasedCommit" ]
-                else
-                    t
-
-            let ws =
-                let w = field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
-                if isNullish w then box "snap-synthetic" else w
-
             OrchestratorProjection.recordRebasedCandidateReady
                 managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
-                   TargetHeadSnapshot = commit targetHead
-                   WorkspaceSnapshotId = snapshotId ws |}
+                   TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
                 projection
         | "PublishClaimed" ->
-            let job = OrchestratorProjection.tryFind managerJobId projection
-
-            match decodePublishClaimed job payload with
+            match decodePublishClaimed payload with
             | Ok claim -> OrchestratorProjection.recordPublishClaimed managerJobId claim projection
             | Error err -> invalidArg "fact" err
-        | "CertificateInvalidated" ->
-            match OrchestratorProjection.tryFind managerJobId projection with
-            | Some job ->
-                { projection with
-                    Jobs =
-                        Map.add
-                            managerJobId
-                            { job with
-                                CandidateReady = None
-                                RebasedCandidateReady = None }
-                            projection.Jobs }
-            | None -> projection
         | "Published" ->
             OrchestratorProjection.recordTerminal
                 managerJobId
                 (TerminalOutcome.Published
-                    {| CandidateCommit =
-                        commit (
-                            let c =
-                                field
-                                    payload
-                                    [ "candidateCommit"; "CandidateCommit"; "publishedCommit"; "PublishedCommit" ] in
-
-                            if isNullish c then box "commit-published" else c
-                        )
-                       ResultingTargetHead =
-                        commit (
-                            let r =
-                                field
-                                    payload
-                                    [ "resultingTargetHead"
-                                      "ResultingTargetHead"
-                                      "publishedCommit"
-                                      "PublishedCommit" ] in
-
-                            if isNullish r then box "head-published" else r
-                        ) |})
+                    {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
+                       ResultingTargetHead = commit (field payload [ "resultingTargetHead"; "ResultingTargetHead" ]) |})
                 projection
-        | "TargetAdvanced" ->
-            match OrchestratorProjection.tryFind managerJobId projection with
-            | Some job ->
-                { projection with
-                    Jobs =
-                        Map.add
-                            managerJobId
-                            { job with
-                                CandidateReady = None
-                                RebasedCandidateReady = None }
-                            projection.Jobs }
-            | None -> projection
         | "JobFailed" ->
             OrchestratorProjection.recordTerminal
                 managerJobId
@@ -374,185 +303,6 @@ module ChangeSurface =
         let next = OrchestratorProjection.createJob (createPayload payload) proj
         ProjectionHandle next :> obj
 
-    let createJobResult (projection: obj) (payload: obj) : obj =
-        let handle = createJob projection payload
-        box {| ok = true; state = handle |}
-
-    let applyFact (state: obj) (factObj: obj) : obj =
-        let proj = getProjection state |> Option.defaultValue OrchestratorProjection.empty
-
-        let projHandle =
-            if not (isNullish state) && stringField state [ "ok" ] = "true" then
-                field state [ "state" ]
-            else
-                state
-
-        let jId =
-            let p =
-                let rawP = field factObj [ "payload"; "value"; "data" ] in if isNullish rawP then factObj else rawP
-
-            let explicitId = stringField p [ "jobId"; "ManagerJobId" ]
-
-            if not (String.IsNullOrWhiteSpace explicitId) then
-                explicitId
-            else
-                let targetCommit =
-                    stringField
-                        p
-                        [ "candidateCommit"
-                          "CandidateCommit"
-                          "targetCommit"
-                          "TargetCommit"
-                          "publishedCommit"
-                          "PublishedCommit" ]
-
-                if not (String.IsNullOrWhiteSpace targetCommit) then
-                    let cp =
-                        getProjection projHandle |> Option.defaultValue OrchestratorProjection.empty
-
-                    OrchestratorProjection.activeJobs cp
-                    |> List.tryFind (fun j ->
-                        j.CandidateReady
-                        |> Option.map (fun c -> CommitHash.value c.CandidateCommit = targetCommit)
-                        |> Option.defaultValue false)
-                    |> Option.map (fun j -> ManagerJobId.value j.ManagerJobId)
-                    |> Option.defaultValue ""
-                else
-                    ""
-
-        let targetJobId =
-            if String.IsNullOrWhiteSpace jId then
-                OrchestratorProjection.activeJobs (
-                    getProjection projHandle |> Option.defaultValue OrchestratorProjection.empty
-                )
-                |> List.tryHead
-                |> Option.map (fun j -> ManagerJobId.value j.ManagerJobId)
-                |> Option.defaultValue ""
-            else
-                jId
-
-        try
-            let kind, pld = factKindAndPayload factObj
-            let pRaw = if isNullish pld then factObj else pld
-
-            if kind = "PublishClaimed" then
-                let currentProj =
-                    getProjection projHandle |> Option.defaultValue OrchestratorProjection.empty
-
-                let activeJobId =
-                    if not (String.IsNullOrWhiteSpace targetJobId) then
-                        targetJobId
-                    else
-                        OrchestratorProjection.activeJobs currentProj
-                        |> List.tryHead
-                        |> Option.map (fun j -> ManagerJobId.value j.ManagerJobId)
-                        |> Option.defaultValue ""
-
-                if
-                    isNullish (field pRaw [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
-                    && isNullish (field pRaw [ "targetCommit"; "TargetCommit" ])
-                then
-                    invalidArg "fact" "Incomplete PublishClaimed payload: missing required publication evidence"
-
-                let job = OrchestratorProjection.tryFind (jobId activeJobId) currentProj
-
-                if
-                    job.IsNone
-                    || (job.Value.CandidateReady.IsNone && job.Value.RebasedCandidateReady.IsNone)
-                then
-                    invalidArg "fact" "Candidate not ready or certificate invalidated"
-
-            let currentProj =
-                getProjection projHandle |> Option.defaultValue OrchestratorProjection.empty
-
-            let next =
-                if kind = "PublishClaimed" then
-                    let job = OrchestratorProjection.tryFind (jobId targetJobId) currentProj
-
-                    match decodePublishClaimed job pRaw with
-                    | Ok claim -> OrchestratorProjection.recordPublishClaimed (jobId targetJobId) claim currentProj
-                    | Error _ ->
-                        let claim =
-                            {| TargetRef = TargetRef.create "refs/heads/main"
-                               RebasedCommit = CommitHash.create "c1"
-                               ExpectedHead = CommitHash.create "h1"
-                               WorkspaceSnapshotId = WorkspaceSnapshotId.create "snap-1"
-                               QualityCertificateId = QualityCertificateId.create "qc-1"
-                               AuthorityRevision = AuthorityRevision.create "ar-1" |}
-
-                        OrchestratorProjection.recordPublishClaimed (jobId targetJobId) claim currentProj
-                else
-                    recordFactValue currentProj (jobId targetJobId) factObj
-
-            let next =
-                if kind = "Published" then
-                    let cp =
-                        getProjection projHandle |> Option.defaultValue OrchestratorProjection.empty
-
-                    let otherJobs =
-                        OrchestratorProjection.activeJobs cp
-                        |> List.filter (fun j -> ManagerJobId.value j.ManagerJobId <> targetJobId)
-
-                    let updatedJobs =
-                        otherJobs
-                        |> List.fold
-                            (fun acc j ->
-                                Map.add
-                                    j.ManagerJobId
-                                    { j with
-                                        CandidateReady = None
-                                        RebasedCandidateReady = None }
-                                    acc)
-                            next.Jobs
-
-                    { next with Jobs = updatedJobs }
-                else
-                    next
-
-            box
-                {| ok = true
-                   state = (ProjectionHandle next :> obj) |}
-        with err ->
-            box
-                {| ok = false
-                   error = err.Message
-                   state = state |}
-
-    let jobView (state: obj) (jobIdStr: string) : obj =
-        let j = find state jobIdStr
-
-        if isNull j then
-            null
-        else
-            let jRecord =
-                getProjection state
-                |> Option.bind (OrchestratorProjection.tryFind (jobId jobIdStr))
-
-            let facts: string array = unbox (property j "facts")
-
-            let status =
-                if facts.Length > 0 then
-                    facts.[facts.Length - 1]
-                else
-                    "Auditing"
-
-            let ws =
-                jRecord
-                |> Option.bind (fun r -> r.CandidateReady)
-                |> Option.map (fun c -> WorkspaceSnapshotId.value c.WorkspaceSnapshotId)
-                |> Option.defaultValue ""
-
-            let qc =
-                jRecord
-                |> Option.bind (fun r -> r.CandidateReady)
-                |> Option.map (fun c -> QualityCertificateId.value c.QualityCertificateId)
-                |> Option.defaultValue ""
-
-            box
-                {| status = status
-                   workspaceSnapshotId = ws
-                   qualityCertificateId = qc |}
-
     let job (state: obj) (jobId: string) : obj = find state jobId
 
     let jobForSession (state: obj) (sessionId: string) : obj =
@@ -580,8 +330,6 @@ module ChangeSurface =
             | Some j -> j.Terminal.IsNone
             | None -> false
         | None -> false
-
-    let dropEphemeral (state: obj) : obj = state
 
     /// ORCH-007 domain classification for a rebased candidate. Returns a
     /// physical-world classification, not a program counter.
@@ -710,7 +458,7 @@ module ChangeSurface =
             match job.RebasedCandidateReady with
             | None -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
             | Some rebased ->
-                match decodePublishClaimed (Some job) payload with
+                match decodePublishClaimed payload with
                 | Error err -> Error err
                 | Ok claim ->
                     if claim.RebasedCommit <> rebased.RebasedCommit then

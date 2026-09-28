@@ -1,51 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import * as calibration from '../../../dist/OpenCode/Host/PairProgrammingCalibrationSurface.js'
 
-const { compose, renderToolEstimate } = calibration
+const comment = (text) => text.trim().split('\n').map((line) => line === '' ? '#' : `# ${line}`).join('\n') + '\n'
 
-const english = 'English'
-
-const simplifiedChinese = 'SimplifiedChinese'
-
-test('WHAT[guidance-delivery-012] GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
-  const guideline = 'canonical pair guideline'
-  assert.equal(compose(undefined, undefined, guideline), '# canonical pair guideline\n')
-  assert.equal(compose('tip guidance', undefined, guideline), '# tip guidance\n# canonical pair guideline\n')
+test('WHAT[guidance-delivery-012] actual composition preserves all provided dynamic fragments and omits absent ones', () => {
+  const fragments = ['tip identity', 'elapsed calibration', 'remaining estimate', 'guideline body']
+  assert.equal(calibration.composeWithElapsed(...fragments), comment(fragments.join('\n')))
+  assert.equal(calibration.compose(undefined, undefined, fragments[3]), comment(fragments[3]))
 })
 
-test('WHAT[guidance-delivery-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text', () => {
-  const guideline = 'canonical pair guideline'
-  const oldMarker = compose(undefined, renderToolEstimate(english, 3), guideline)
-  const newMarker = compose(undefined, renderToolEstimate(english, 0), guideline)
+for (const [locale, resource] of [['English', 'en'], ['SimplifiedChinese', 'zh-CN']]) {
+  test(`WHAT[guidance-delivery-012] ${locale} estimate uses complete authored calibration with the current value`, () => {
+    const template = readFileSync(new URL(`../../../resources/provider/host/pair-programming-tool-estimate/${resource}.md`, import.meta.url), 'utf8').trim()
+    for (const remaining of [0, 4, 17]) {
+      assert.equal(calibration.renderToolEstimate(locale, remaining), template.replaceAll('{{remaining}}', String(remaining)))
+    }
+  })
+}
 
-  assert.match(oldMarker, /3/)
-  assert.match(newMarker, /0/)
-  assert.notEqual(newMarker, oldMarker)
-  assert.match(oldMarker, /3/, 'the previously materialized string remains unchanged')
-})
-
-test('WHAT[guidance-delivery-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instruction_plane', () => {
-  const tip = 'tip guidance'
-  const estimate = renderToolEstimate(english, 2)
-  const guideline = 'canonical pair guideline'
-  const marker = compose(tip, estimate, guideline)
-
-  assert.ok(marker.indexOf('# tip guidance') < marker.indexOf(`# ${estimate}`))
-  assert.ok(marker.indexOf(`# ${estimate}`) < marker.indexOf('# canonical pair guideline'))
-  assert.equal(marker.split('\n').filter(Boolean).every((line) => line.startsWith('# ')), true)
-})
-
-test('WHAT[guidance-delivery-012] GD_012_tool_estimate_calibration_rendered_for_guideline_instruction', () => {
-  const en = renderToolEstimate(english, 4)
-  assert.match(en, /4/)
-  assert.match(en, /delegator|commissioner/i)
-  assert.match(en, /not .*limit|not .*cap|advisory/i)
-  assert.match(en, /scope|parallel|delegate|split/i)
-
-  const zh = renderToolEstimate(simplifiedChinese, 4)
-  assert.match(zh, /4/)
-  assert.match(zh, /委任|委托|估算/)
-  assert.match(zh, /不是.*上限|并非.*上限|不.*限制/)
-  assert.match(zh, /范围|并行|委派|分裂/)
-})
+test.todo('WHAT[guidance-delivery-012] GAP-116 actual new occurrence reads each dynamic owner once and freezes concern consumption atomically; replay reads none')

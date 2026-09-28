@@ -1,6 +1,50 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const { assertProductionSourcesAssigned } = await import('../../../scripts/lib/compile-shards.mjs')
+
+test('WHAT[structured-workflow-011] untracked new production source fails compile-shard inventory', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-untracked-source-'))
+  try {
+    const sourceRoot = join(root, 'src/Wanxiangshu')
+    mkdirSync(sourceRoot, { recursive: true })
+    const aggregate = join(sourceRoot, 'Wanxiangshu.fsproj')
+    const trackedSource = join(sourceRoot, 'Tracked.fs')
+    const untrackedSource = join(sourceRoot, 'Untracked.fs')
+
+    writeFileSync(trackedSource, 'module Tracked\n', 'utf8')
+    writeFileSync(untrackedSource, 'module Untracked\n', 'utf8')
+
+    writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuEmitProject>true</WanxiangshuEmitProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Tracked.fs"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    assert.throws(
+      () => assertProductionSourcesAssigned({
+        repositoryRoot: root,
+        sourceRoot,
+        aggregatePath: aggregate,
+        discoveredSources: new Set([trackedSource, untrackedSource]),
+        shardImplementations: new Set([trackedSource]),
+      }),
+      /production source coverage mismatch/,
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+}
+
+{
 const { test } = await import("node:test");
 const { default: assert } = await import("node:assert/strict");
 const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");

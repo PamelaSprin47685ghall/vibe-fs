@@ -1,44 +1,37 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
-test('WHAT[execution-failure-policy-012] stop physical run secures admission barrier before detached physical abort and preserves isolation', async () => {
-  let terminationCalled = false
-  let terminateSessionId = null
-  let terminateReason = null
+const bind = async (session, physical, role) => {
+  const acquired = await routing.acquireSharedExecutionAdmission(session, physical, role, role, null)
+  assert.equal(acquired.kind, 'Acquired')
+  assert.deepEqual(routing.commitSharedExecutionAdmission(acquired.lease, {
+    sessionId: session, physicalUserMessageId: physical, role, participant: role,
+    target: routing.sharedExecutionAdmissionTarget(acquired.lease),
+  }), { kind: 'Applied' })
+}
 
-  // Termination mock representing detached Host termination port
-  const terminate = async (sessionId, why) => {
-    terminationCalled = true
-    terminateSessionId = sessionId
-    terminateReason = why
-    return { ok: true }
+test('WHAT[execution-failure-policy-012] real admission is barred before abort outcome and stays barred after rejection or exception', async () => {
+  await routing.initialize()
+  for (const outcome of ['success', 'refusal', 'exception']) {
+    const target = { session: `stop-${outcome}`, physical: `message-${outcome}` }
+    const other = { session: `other-${outcome}`, physical: `other-message-${outcome}` }
+    await bind(target.session, target.physical, 'blogger')
+    await bind(other.session, other.physical, 'engineer')
+    await routing.sharedEnterProviderStep(target.session, target.physical, [])
+    let completeAbort
+    let rejectAbort
+    const pending = new Promise((resolve, reject) => { completeAbort = resolve; rejectAbort = reject })
+    const calls = []
+    blog.applyPhysicalStop((session, reason) => { calls.push({ session, reason }); return pending }, target.session, target.physical, 'request-protocol-stop')
+    assert.deepEqual(calls, [{ session: target.session, reason: 'request-protocol-stop' }])
+    await assert.rejects(routing.sharedEnterProviderStep(target.session, target.physical, []), /no active execution binding/)
+    await routing.sharedEnterProviderStep(other.session, other.physical, [])
+    if (outcome === 'exception') rejectAbort(new Error('physical abort failed'))
+    else completeAbort(outcome === 'success' ? { ok: true } : { ok: false, error: 'abort refused' })
+    await new Promise((resolve) => setImmediate(resolve))
+    await assert.rejects(routing.sharedEnterProviderStep(target.session, target.physical, []), /no active execution binding/)
+    assert.deepEqual(routing.releasePhysical(other.session, other.physical), { kind: 'Applied' })
   }
-
-  // 1. Admission barrier lands before/alongside detached physical stop
-  blog.applyPhysicalStop(terminate, 'ses-execfail-012', 'msg-execfail-012', 'CHRONICLE_EMPTY_ENFORCER_061')
-  assert.equal(terminationCalled, true)
-  assert.equal(terminateSessionId, 'ses-execfail-012')
-  assert.equal(terminateReason, 'CHRONICLE_EMPTY_ENFORCER_061')
-
-  // 2. Physical abort error or rejection does not throw or unbar admission
-  const failingTerminate = async (_sid, _why) => {
-    throw new Error('Host termination rejected')
-  }
-
-  assert.doesNotThrow(() => {
-    blog.applyPhysicalStop(failingTerminate, 'ses-execfail-012', 'msg-execfail-012', 'REASON_TEST')
-  })
-
-  // 3. Isolated session effect: Target session is explicitly scoped and does not contaminate other sessions
-  let otherSessionTerminated = false
-  const scopedTerminate = async (sessionId, _why) => {
-    if (sessionId !== 'ses-execfail-012') {
-      otherSessionTerminated = true
-    }
-    return { ok: true }
-  }
-
-  blog.applyPhysicalStop(scopedTerminate, 'ses-execfail-012', 'msg-execfail-012', 'ISOLATION_TEST')
-  assert.equal(otherSessionTerminated, false)
 })

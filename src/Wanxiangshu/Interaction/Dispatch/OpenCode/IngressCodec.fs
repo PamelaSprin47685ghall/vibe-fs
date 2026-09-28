@@ -218,7 +218,7 @@ module PromptIngressCodec =
                 | MissingText -> MalformedText
                 | carrier -> carrier
 
-    let private sessionIdOf (input: obj) (output: obj) =
+    let private sessionCarrier (input: obj) (output: obj) =
         let fromSource (sourceCarrier: RawCarrier) =
             let source = carrierObject sourceCarrier
 
@@ -239,8 +239,6 @@ module PromptIngressCodec =
         [ recordSource input; recordSource output; message; info ]
         |> List.collect fromSource
         |> consolidateText
-        |> textOption
-        |> Option.map SessionId.create
 
     let private messageIdOf (input: obj) (output: obj) =
         let message = childObject output "message"
@@ -265,8 +263,6 @@ module PromptIngressCodec =
               |> Array.map (fun part -> metadataCarrier part PromptMetadataCodec.PromptKeyField)
               |> Array.toList ]
         |> consolidateText
-        |> textOption
-        |> Option.map PromptKey.create
 
     /// Classify one physical message part; synthetic and non-text parts are not
     /// opening content.
@@ -293,23 +289,35 @@ module PromptIngressCodec =
         let info = childObject output "info"
         let properties = childObject output "properties"
 
-        let sessionId = sessionIdOf input output
+        let session = sessionCarrier input output
+        let sessionId = session |> textOption |> Option.map SessionId.create
+        let promptKey = promptKeyOf input output
 
-        let explicitAgent =
+        let agent =
             [ input; output; message; info; properties ]
             |> List.collect agentCarriers
             |> consolidateText
 
         let explicitAgent =
-            match explicitAgent with
+            match agent with
             | Text agent -> Some agent
             | MissingText -> sessionId |> Option.bind tryResolveAgent
             | MalformedText -> None
 
-        { SessionId = sessionId
+        let invalidCarrier =
+            [ session, ChatAdmissionIntent.IdentityCarrierError.SessionId
+              agent, ChatAdmissionIntent.IdentityCarrierError.Agent
+              promptKey, ChatAdmissionIntent.IdentityCarrierError.PromptKey ]
+            |> List.tryPick (fun (carrier, kind) ->
+                match carrier with
+                | MalformedText -> Some kind
+                | _ -> None)
+
+        { InvalidIdentityCarrier = invalidCarrier
+          SessionId = sessionId
           PhysicalUserMessageId = messageIdOf input output
           ExplicitAgent = explicitAgent
-          PromptKey = promptKeyOf input output
+          PromptKey = promptKey |> textOption |> Option.map PromptKey.create
           IsHostCompaction = isHostCompaction output
           IsHostSynthetic = isHostSynthetic output
           Text = textOf output }

@@ -58,7 +58,7 @@ const registered = (replica, budget) => {
 }
 const apply = async (runtime, output) => Strength.transformApply(H, runtime, output)
 
-test('WHAT[speculative-investigation-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
+test('WHAT[speculative-investigation-003] K1 transform retires and requests Host abort after one supplied complete batch', async () => {
   const runtime = registered('replica-k1', 'K1')
   const output = { messages: [user('u1', 'replica-k1', [hostText('Continue.')]), assistant('a1', 'replica-k1', [hostCall('c1', 'read', { filePath: 'a' })]), tool('t1', 'replica-k1', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] }
   const outcome = await apply(runtime, output)
@@ -106,7 +106,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_K1_counts_OpenCode_comple
   assert.equal(outcome.batches[0].exchanges[0].canonicalResult, 'alpha')
   assert.deepEqual(outcome.aborted, ['replica-host-k1'])
 })
-test('WHAT[speculative-investigation-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
+test('WHAT[speculative-investigation-003] K2 transform remains ready after one supplied batch and requests abort after the second', async () => {
   const runtime = registered('replica-k2', 'K2')
   const first = { messages: [user('u1', 'replica-k2', [hostText('Continue.')]), assistant('a1', 'replica-k2', [hostResult('c1', 'grep', { pattern: 'x' }, 'a:1:x')])] }
   assert.equal((await apply(runtime, first)).kind, 'Ready')
@@ -206,3 +206,5 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_replica_request_counts_ne
   assert.equal(outcome.requestsAdmitted, 2)
 })
 }
+
+test.todo('WHAT[speculative-investigation-003] GAP-183: installed Host and controlled provider prove request K+1 is never sent; runtime transform callbacks alone do not observe physical egress')

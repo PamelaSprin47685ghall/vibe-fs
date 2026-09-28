@@ -96,6 +96,14 @@ export class TestRunState {
       if (typeof data.file === 'string') {
         this._fileSet.add(data.file)
       }
+      if (type === 'test:fail') {
+        this._containerFailures.push({
+          name: data.name,
+          file: data.file,
+          nesting: data.nesting,
+          error: data.details?.error,
+        })
+      }
       return
     }
 
@@ -143,18 +151,24 @@ export class TestRunState {
       const isCancelled = Boolean(data.cancelled || data.details?.error?.failureType === 'testAborted')
 
       let verdict = 'pass'
-      if (type === 'test:fail') {
-        verdict = 'fail'
+      if (isCancelled) {
+        verdict = 'cancelled'
       } else if (isSkip) {
         verdict = 'skip'
       } else if (isTodo) {
         verdict = 'todo'
-      } else if (isCancelled) {
-        verdict = 'cancelled'
+      } else if (type === 'test:fail') {
+        verdict = 'fail'
       }
 
       const fileRecord = this._getFileRecord(filePath)
       const isExisting = this._leaves.has(key)
+      if (isExisting) {
+        if (this._leaves.get(key).verdict !== verdict) {
+          throw new Error(`Conflicting final verdict for ${file}:${name}`)
+        }
+        return
+      }
 
       this._leaves.set(key, {
         file: filePath,
@@ -163,6 +177,10 @@ export class TestRunState {
         verdict,
         durationMs: duration,
         error: data.details?.error,
+        reason: isCancelled
+          ? data.details?.error?.message || 'cancelled without a reported cause'
+          : typeof data.skip === 'string' ? data.skip
+            : typeof data.todo === 'string' ? data.todo : 'reason not supplied',
       })
 
       // 仅当首次记录叶子或从非判定状态转为判定时更新度量
@@ -249,6 +267,9 @@ export class TestRunState {
       todo,
       cancelled,
       containerFailures: this._containerFailures.length,
+      exclusions: [...this._leaves.values()]
+        .filter(({ verdict }) => ['skip', 'todo', 'cancelled'].includes(verdict))
+        .map(({ file, name, verdict, reason }) => ({ file, name, status: verdict, reason })),
       leafDurations: [...this._leafDurations],
       failures: [...this._failures],
       byFile: Array.from(this._byFile.values()).map((rec) => ({ ...rec })),

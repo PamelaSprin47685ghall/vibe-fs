@@ -338,7 +338,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[execution-failure-policy-003] rejects illegal retry and breaker policy mutations', () => {
+test('WHAT[execution-failure-policy-003] production retry matrix excludes other failures and gives stable attempt-bound authorization', () => {
   for (const failure of nonProviderFailures) {
     const decision = decide({ failure })
     assert.notEqual(decision.resolution, 'RetryFreshAttempt')
@@ -382,3 +382,5 @@ test('WHAT[execution-failure-policy-003] rejects illegal retry and breaker polic
   assert.notEqual(exhausted.resolution, 'RetryFreshAttempt')
 })
 }
+
+test.todo('WHAT[execution-failure-policy-003] GAP-120 caller cannot construct sealed recovery authorization and actual ledger deduplicates physical emission of one identity')

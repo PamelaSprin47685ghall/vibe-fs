@@ -2,64 +2,64 @@
 
 ## [001] 同 epoch append-only prefix law
 
-在同一 PrefixEpoch 内，第 $n$ 次请求的 provider wire 必须是第 $n+1$ 次请求的精确字节前缀。权威判定唯一由 `ProviderProjection.isAppendOnlyPrefix` 给出，比较范围包含 provider、model、variant、tools、system prompt 及完整 message 序列。Tools 必须完全一致，严禁仅为前缀。
+同一 PrefixEpoch 内，前一次 provider wire 必须是后一次的精确字节前缀。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。
 
-## [002] 冷边界只有三证据源
+## [002] 冷边界只有三种已提交证据
 
-同一 PrefixEpoch 内前缀逐字节稳定。Epoch 切换仅允许由以下三个已提交证据源驱动，且必须使 `EpochId += 1`：
-1. 成功 prefix probe 提升（`EvidenceKind=Probe`）；
-2. Host compaction 重锚（`Snapshot=None`）；
-3. TodoCheckpoint lag-1 rebase（`EvidenceKind=TodoCheckpoint`）。
-严禁按容量或 Token 数量主动切换 epoch。
+Epoch 只由成功 prefix probe、Host compaction 重锚或 context-compression-028/029 规定的阶段窗口 rebase 推进，且每次恰好加一。不得按容量或 Token 数主动切换。
 
-## [003] candidate ≠ committed
+## [003] candidate 不等于 committed
 
-未提交的候选前缀仅进入不可变的 attempt profile，不修改 `ActivePrefixEpoch`。Probe 失败直接丢弃候选，不产生任何持久化事件，亦无回滚事实。
+候选前缀只进入当前 attempt 的不可变 profile，不修改已提交 epoch；失败直接丢弃，不产生前缀提交或回滚事实。
 
-## [004] ActivePrefixEpoch 是唯一 epoch SSOT
+## [004] 唯一 epoch 真相源
 
-既有的 `ActivePrefixEpoch` 与 `PrefixRebaseCommitted` 是系统唯一的 prefix epoch 单一真相源。Magic Todo lag-1 rebase 必须接入该合同，禁止维护平行的 todo-only epoch 或状态机旁路。
+ActivePrefixEpoch 与 PrefixRebaseCommitted 是唯一前缀 epoch 合同。阶段窗口 rebase 共用该合同，不另设阶段 epoch 或旁路状态机。
 
-## [005] 已 seal epoch 不因 provider 成败回滚
+## [005] rebase 先于下一 attempt seal
 
-`PrefixRebaseCommitted` 在下一次真实 provider attempt seal 绑定前原子提交。随后的 provider Failed 或 Aborted 结局绝不回滚已 seal 的 epoch。
+PrefixRebaseCommitted 须在下一次真实 provider attempt 的 seal 绑定前原子提交。已提交事实的不可逆性见 [012]。
 
-## [006] ContextReanchored 重锚语义
+## [006] Host compaction 重锚
 
-Host compaction 的唯一合法收容语义是 `ContextReanchored`：`PrefixEpochId + 1`、`Snapshot = None` 且 PrefixCoverage 归零。重锚记录已发生 run 集合，同一个 compaction run 绝不重锚两次。
+Host compaction 只通过 ContextReanchored 收容：epoch 加一、清除 Snapshot、PrefixCoverage 归零。记录已处理 run，同一 compaction 不重锚两次。
 
 ## [007] 同 Life system prompt byte-identical
 
-Office system prompt 在同一个生命周期（Life）内保持逐字节一致。严禁因 T1 交托、Fallback 切换、Review 或 Host compaction 等事件改写 system prompt 字节或重绑 Persona。
+同一 Life 的 Office system prompt 保持逐字节一致，Persona 不重绑；交托、fallback、review 和 compaction 均不例外。
 
-## [008] FrozenRecordPrefix 是明确标记的 low-trust context
+## [008] FrozenRecordPrefix 是 low-trust context
 
-FrozenRecordPrefix 以明确标记的 low-trust context block 注入上下文，绝不伪装为人类或系统指令；同一 epoch 内其内容保持完全冻结。
+FrozenRecordPrefix 必须明确标记为 low-trust context，不伪装成人类或系统指令；同一 epoch 内内容完全冻结。
 
-## [009] cutoff 只在 canonical XTrace 完整语义 turn 边界，digest 失配 fail closed
+## [009] canonical cutoff 与精确写回
 
-Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic turn 边界。`CoveredPrefixDigest` 的生产与 probe step-5 重算必须对同一个 `XTraceMaterialization.currentProjection` 做截断；请求级 provider presentation 的合法变化不得制造假 `CutoffProofFailed`。写回 Host 时必须把 semantic-turn cutoff 映射为 stable XTrace Host message identity，严禁把 cutoff 当作本次 provider message 数组下标。`ProviderRetryAttempt` 不具有 X semantic part，因此当前 retry 的 request-start cutoff 可以从与 XTrace capture 相同的 decodable Host message universe 取得 semantic-turn 坐标；这只用于定位 live request，不得把 retry 文本重新引入 canonical X。retry transport row 的退休同样受 prefix horizon 约束：`Current` presentation 必须保留已经进入当前 provider prefix 的所有 retry rows；只有新的 `TentativeCold` presentation 才可按 stable Host id 精确退休此前 horizon 的 retry rows，同时保留触发本次 cold presentation 的 current physical retry。由此 retry 控制文本可以不进入 X/Y/digest，而同一 horizon 的 provider wire 仍保持 append-only。真实 canonical X 历史发生变化时 digest 仍必须失配并 fail-closed 拒绝执行。
+Cutoff 只落在 current-generation canonical XTrace 的完整 semantic turn 边界。coverage digest 的生成和验证使用同一 canonical projection；请求级呈现变化不得造成假失配，真实历史失配须 fail closed。写回按 stable Host message identity 定位，不把 cutoff 当 provider 数组下标。
 
-## [010] 同一 horizon 的 guidance occurrence 原位 replay；reanchor 退休旧 replay set
+ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start 时，可从与 XTrace capture 相同的可解码 Host 消息范围取得 turn 坐标。同一 Current horizon 保留已进入 provider prefix 的 retry rows；仅新的 TentativeCold 可按 stable Host id 退休旧 rows，且保留触发本次切换的当前 physical retry。
 
-全 provider 统一 cursor 模式：永不产生 synthetic skill 消息。Pair-programming guidance 仅以 `NUL+BOM` 后缀形式附着于终端真实工具结果（completed/error 均可）；首回合仅有首条用户消息的特殊情况，允许在首条用户消息末尾以同样的 `NUL+BOM` 隔开并结合 `<skill_content>`（不含 `name=""`）注入；无终端工具结果的后续轮次不产生任何 guidance 载体。在同一未重锚 horizon 内，历史 guidance 字节必须按其持久化的 occurrence 保持原位置、原字节回放，禁止删除、过滤、去重、重新定位或叠加第二后缀；重放先剥离后缀做 placement 判定再精确重附。`ContextReanchored` 将旧 occurrence 的可见性退休，新 occurrence 采用新的序号追加。
+## [010] guidance 原位、原字节 replay
 
-## [011] 冷边界由事实驱动
+所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 用 NUL+BOM 后缀附于真实 terminal 工具结果（completed/error）；仅首轮只有首条用户消息时，可附于该消息末尾并使用无 name 属性的 skill_content 包装。后续无 terminal 工具结果则不生成载体。
 
-同一 epoch 内历史前缀严禁发生漂移，严禁通过频繁切换 PrefixEpoch 来掩盖实现层的前缀漂移缺陷。历史 marker 不得在重放时重新计算流逝时间。
+同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。ContextReanchored 退休旧 occurrence 的可见性，新 occurrence 以新序号追加。
 
-## [012] reanchor/rebase 一旦提交不因后续 provider failure 回滚
+## [011] 不用冷边界掩盖漂移
 
-已合法提交的 `ContextReanchored` 与 `PrefixRebaseCommitted` 是不可逆的历史事实，后续的 provider 失败绝不撤销已提交的重锚与 rebase。
+不得频繁切换 epoch 掩盖实现造成的历史字节漂移；历史 marker 重放时不得重新计算流逝时间。
 
-## [013] prefix identity 范围
+## [012] 已提交前缀事实不可逆
 
-参与前缀一致性比较的范围包括 provider、model、variant、tools、system prompt 与消息序列。任何一项发生变更均构成冷边界，不可当作追加前缀处理。
+合法提交的 ContextReanchored 与 PrefixRebaseCommitted 不因后续 provider Failed 或 Aborted 而撤销。
 
-## [014] HOST-013 guidance 后缀正文不进 trace 系
+## [013] prefix identity 的比较范围
 
-Pair-programming guidance 后缀正文仅用于影响 provider prompt 字节以维持前缀缓存，严禁进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入；仅 guidance 的 durable occurrence 投影事实（PairProgrammingGuidelineAnchored → Guidelines）参与 HOST-013 恢复。
+比较覆盖 provider、model、variant、完整 tools、system prompt 及 message 序列。身份、工具、system 或历史 message 的变更均不能视为追加；冷边界仍须满足 [002]。
 
-## [015] synthetic id 确定性派生
+## [014] guidance 正文不进入 trace
 
-Synthetic ID 必须由 SealRoot、frameEpoch 与 ordinal 等输入确定性派生，严禁使用 GUID、随机数、时间戳或临时运行时 ID。
+guidance 后缀正文只参与 provider 呈现，不进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入。仅其 durable occurrence 投影参与 guidance 恢复。
+
+## [015] synthetic identity 确定性
+
+Synthetic ID 由 SealRoot、frameEpoch、ordinal 等持久化身份材料确定性派生，不用 GUID、随机数、时间戳或临时运行时 ID。

@@ -1,34 +1,10 @@
 import assert from 'node:assert/strict'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import * as presentation from '../../../dist/OpenCode/Host/ProviderFailurePresentation.js'
 import { scanRetryOwnership } from '../../../scripts/checks/retry-owner.mjs'
+import { fileURLToPath } from 'node:url'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-
-const input = (failure, change = {}) => ({
-  failure,
-  phase: 'ProviderStarted',
-  executionKey: {
-    sessionId: 'ses-provider-presentation',
-    physicalUserMessageId: 'msg-provider-presentation',
-  },
-  capacityFence: null,
-  provider: {
-    logicalRun: 'logical-provider-presentation',
-    providerRun: 'run-provider-presentation',
-    requestKind: 'WorkMain',
-    retryBudget: 'Available',
-    breaker: 'Closed',
-  },
-  ...change,
+test('WHAT[host-provider-failure-ownership-005] retry ownership heuristic detects no known forbidden source pattern', () => {
+  assert.deepEqual(scanRetryOwnership(fileURLToPath(new URL('../../../', import.meta.url))), [])
 })
 
-const classify = (failure, episodeId, change) =>
-  presentation.classifyPolicyInput(input(failure, change), episodeId)
-
-test('WHAT[host-provider-failure-ownership-005] policy owner recovers with zero Host retry', () => {
-  assert.equal(classify('ProviderPermanent', 'episode-5').hasFinalPresentation, false)
-  assert.deepEqual(scanRetryOwnership(ROOT), [])
-})
+test.todo('WHAT[host-provider-failure-ownership-005] actual Host observer and Change Orchestrator cannot send recovery without the policy owner licence (GAP-143)')

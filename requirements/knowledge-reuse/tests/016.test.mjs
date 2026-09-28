@@ -53,6 +53,7 @@ test('WHAT[knowledge-reuse-016] present_entry_maintains_immutable_content_addres
     assert.equal(entry3.kind, 'Present')
     assert.notEqual(entry3.payloadRef, entry1.payloadRef, 'modified content must generate a new payloadRef')
     assert.equal(entry3.sha256, casebook.contentHash('hello changed content'))
+    assert.equal(new TextDecoder().decode(await eventStore.readPayload(store, entry1.payloadRef)), 'hello immutable baseline')
   } finally {
     eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })

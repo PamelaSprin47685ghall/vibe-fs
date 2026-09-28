@@ -1,27 +1,35 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { withDispatch, dispatch, journal } from './support/dispatch.mjs'
 
-const ROOT = new URL('../../../', import.meta.url).pathname
-
-const runtime = () => readFileSync(join(ROOT, 'src/Wanxiangshu/Change/Runtime.fs'), 'utf8')
-
-const body = () => runtime().slice(runtime().indexOf('let forkManagerCore'), runtime().indexOf('member _.ForkManager'))
-
-const indexOf = (text, token) => {
-  const index = text.indexOf(token)
-  assert.notEqual(index, -1, `missing ${token}`)
-  return index
-}
-
-test('WHAT[effect-accounting-003] PERSIST_009_fork_appends_worktree_request_created_then_manager_job', () => {
-  const source = body()
-  const requested = indexOf(source, 'OrchestratorFact.WorktreeCreateRequested')
-  const created = indexOf(source, 'OrchestratorFact.WorktreeCreated')
-  const manager = indexOf(source, 'OrchestratorFact.ManagerJobCreated')
-  assert.ok(requested < created, 'request must be durable before physical creation result')
-  assert.ok(created < manager, 'manager job must be durable after the Manager session exists')
-  assert.ok(indexOf(source, 'appendFact StreamId.Workspace requestFact') < indexOf(source, 'WorktreeResource.Create'))
-  assert.ok(indexOf(source, 'appendFact StreamId.Workspace createdFact') < indexOf(source, 'relay.CreateManagerSession'))
+test('WHAT[effect-accounting-003] physical send sees its exact intent already recoverable from the production journal', async () => {
+  await withDispatch(async ({ open, send }) => {
+    let sends = 0
+    const result = await send({
+      SendPrompt: async (_session, _text, options) => {
+        const reopened = await open('observer-writer')
+        const claims = dispatch.projectionObservation(reopened, 'child').pendingClaims
+        assert.equal(claims.length, 1)
+        assert.equal(claims[0].promptKey, options.Metadata.wanxiangshu_prompt_key)
+        sends += 1
+        return dispatch.admittedWithReceipt('transport-receipt')
+      },
+    })
+    assert.equal(result.ok, true, result.error)
+    assert.equal(sends, 1)
+  })
 })
+
+test('WHAT[effect-accounting-003] a disposed journal handle prevents the physical send', async () => {
+  await withDispatch(async ({ handle, send }) => {
+    journal.JournalSurface_dispose(handle)
+    let sends = 0
+    await assert.rejects(() => send({ SendPrompt: async () => {
+      sends += 1
+      return dispatch.admittedWithReceipt('must-not-happen')
+    } }), /Journal handle is disposed/)
+    assert.equal(sends, 0)
+  })
+})
+
+test.todo('WHAT[effect-accounting-003] actual worktree creation and provider todo mutation are blocked until their own intent commit succeeds')

@@ -9,11 +9,8 @@
 /src/Wanxiangshu/Process/VirtualTiming.fs
 /src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs
 /src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs
-/src/Wanxiangshu/Verification/TemporalSurface.fs
+/src/Wanxiangshu/Execution/Session/SessionStartedAtPort.fs
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs
 /scripts/lib/raw-time-scan.mjs
-/requirements/process-execution/tests/process-wait.test.mjs
-/requirements/process-execution/tests/process-runner.test.mjs
-/requirements/process-execution/tests/handle-process.test.mjs
 /src/Wanxiangshu/Process/Surface.fs

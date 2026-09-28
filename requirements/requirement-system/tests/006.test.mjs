@@ -1,22 +1,29 @@
 import assert from 'node:assert/strict'
-import { existsSync, statSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import { packageProblems } from './support/structure.mjs'
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const REQUIREMENTS = join(ROOT, 'requirements')
-
-// 新 [006]：所有合法包必须完整包含 {WHY,WHAT}.md 与 tests/ 目录
-const REQUIRED_DOCS = ['WHY.md', 'WHAT.md']
-
-test('WHAT[requirement-system-006] package completeness requires WHY.md, WHAT.md, and tests/ directory', () => {
-  // 最小语义验证：requirement-system 自身必须严格满足包完备性要求
-  // 全树层级的完备性机械扫描由 017 meta-verifier 集中执行
-  const pkgDir = join(REQUIREMENTS, 'requirement-system')
-  for (const doc of REQUIRED_DOCS) {
-    assert.ok(existsSync(join(pkgDir, doc)), `requirement-system must contain ${doc}`)
+test('WHAT[requirement-system-006] package completeness accepts the two documents and a tests directory', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'spec-package-'))
+  try {
+    writeFileSync(join(directory, 'WHY.md'), '# Reasons\n')
+    writeFileSync(join(directory, 'WHAT.md'), '# Rules\n')
+    mkdirSync(join(directory, 'tests'))
+    assert.deepEqual(packageProblems(directory), [])
+    for (const name of ['WHY.md', 'WHAT.md', 'tests']) {
+      const path = join(directory, name)
+      rmSync(path, { recursive: true })
+      assert.equal(packageProblems(directory).length, 1, `missing ${name}`)
+      if (name === 'tests') writeFileSync(path, 'not a directory')
+      else mkdirSync(path)
+      assert.equal(packageProblems(directory).length, 1, `wrong type: ${name}`)
+      rmSync(path, { recursive: true })
+      if (name === 'tests') mkdirSync(path)
+      else writeFileSync(path, '# Restored\n')
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
   }
-  const testsDir = join(pkgDir, 'tests')
-  assert.ok(existsSync(testsDir) && statSync(testsDir).isDirectory(), 'requirement-system must contain tests/ directory')
 })

@@ -1,40 +1,10 @@
 /**
- * time-budget.js — every wall-clock bound the harness owns, named exactly once.
- *
- * verification-system-006: 挂死判据必须是距上次因果进展的静默时长，wall-clock 总超时不得当作唯一判据（禁止退化清单）；墙钟兜底值在本文件集中定义，不散落为字面量。 Package W1 measured what 散落 had become: 23 timing literals across 13
- * files, none of them visible to any gate. Two were the same 3000ms diagnostic race written
- * independently in two files. One (10000) was spelled a third and fourth time inside
- * user-facing strings that would have kept saying "within 10s" after the budget moved. One
- * (2000) had three declarations under two spellings, plus a fourth site that named it in a
- * default parameter without importing it — so that default would have thrown a ReferenceError
- * if any caller had ever omitted the argument.
- *
- * The magnitude threshold IS the semantic line, which is what makes this file mechanically
- * enforceable. A polling slice must poll faster than the budget that bounds it, so a
- * legitimate slice is below 1000ms by construction — the fact loop in `canary-driver.mjs`
- * slices at 500ms under the 3000ms silence budget, the listen poll runs at 50ms, the socket
- * retry at 30ms. Anything at or above 1000ms is therefore a budget rather than a slice, and a
- * budget belongs here, where raising it is one visible diff instead of a quiet edit at a call
- * site. `scripts/budget-gate.mjs` enforces exactly that, and deliberately offers no exemption
- * channel: every pseudo-gate package W is replacing rotted through one.
- *
- * Values are moved verbatim; this is a migration, not a retuning. Where two call sites held
- * the same number for the same reason they now share one name; where they held the same number
- * for different reasons they keep separate names, because collapsing those would decide
- * something a migration is not entitled to decide.
+ * Shared timing budgets for the current verification facilities.
+ * WHAT 006 defines causal silence; these constants implement the current windows,
+ * diagnostic ceilings and physical backstops. Their values are unchanged in this revision.
  */
 
-// ── the gate's own discriminator ─────────────────────────────────────────────
-
-/**
- * At or above this, a millisecond literal is a budget rather than a polling slice, and
- * `scripts/budget-gate.mjs` refuses it outside this file. The threshold lives here for the same
- * reason everything else does: it is the one number that decides what every other number means,
- * so it is the last one that should be a literal in a script.
- *
- * Not arbitrary. A slice must poll faster than the budget bounding it, and the tightest budget
- * here is WATCHDOG_TIMEOUT_MS at 5000, against which the real slices measure 500, 100, 50, 30.
- */
+// Historical discriminator retained in the frozen budget table; its scanner was retired.
 export const LITERAL_BUDGET_THRESHOLD_MS = 1000;
 
 /**

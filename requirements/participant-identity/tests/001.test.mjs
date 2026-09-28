@@ -13,27 +13,6 @@ const EXPECTED_ROLES = [
   'devops',
   'blogger',
 ]
-const EXPECTED_LEGACY = [
-  'coder',
-  'inspector',
-  'browser',
-  'inquiry',
-  'distiller',
-  'build',
-  'plan',
-  'student',
-  'teacher',
-  'meditator',
-  'executor',
-]
-const EXPECTED_PERSONAS = {
-  orchestrator: 'Director',
-  manager: 'Lead',
-  engineer: 'Engineer',
-  devops: 'Operator',
-  blogger: 'Chronicler',
-}
-const personaLabel = (role) => identity.persona(role, '')
 
 test('WHAT[participant-identity-001] catalog_has_canonical_roles', () => {
   assertJsData(identity.allRoleLabels, 'allRoleLabels')
@@ -142,33 +121,6 @@ test('WHAT[participant-identity-001] rejects SessionId keyed identity cache', ()
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const fission = await import("../../../dist/Execution/Fission/Surface.js");
-const roles = await import("../../../dist/Foundation/RolesSurface.js");
-const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
-const identity = await import("../../../dist/Participant/Persona/Surface.js");
-const journalCodec = await import("../../../dist/Persistence/Journal/CodecSurface.js");
-const factCodec = await import("../../../dist/Persistence/Journal/FactCodecSurface.js");
-
-
-test('WHAT[participant-identity-001] registered identity surfaces load and expose their narrow contracts', async () => {
-  const engineer = identity.resolveParticipantIdentityAtRoot('engineer')
-  assert.equal(engineer.ok, true)
-  assert.equal(engineer.identity.name, 'engineer')
-  assert.equal(engineer.identity.role, 'engineer')
-  assert.equal(engineer.identity.persona, 'Engineer')
-  assert.equal(authority.promotePhysical('msg_identity_surface_smoke'), 'msg_identity_surface_smoke')
-  assert.equal(journalCodec.deserialize('{}').ok, false)
-  assert.equal(factCodec.containsLegacyFallbackFields('{}'), false)
-  assert.deepEqual(fission.ringMergeOrder(1), [])
-  assert.equal(identity.nameOf('fast', 'engineer'), 'engineer')
-  assert.equal(identity.nameOf('deep', 'engineer'), 'engineer')
-  assert.deepEqual(roles.allInternalRoleLabels, ['blogger'])
 })
 }
 

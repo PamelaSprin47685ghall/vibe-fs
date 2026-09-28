@@ -1,64 +1,59 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
-import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
-import {
-  BUILD_VERIFICATION_FILES,
-  SURFACE_MANIFEST,
-  scanAll,
-  semanticImportEdges,
-  semanticTestFiles,
-} from '../../../scripts/lib/test-surface-scan.mjs'
-import { walk } from '../../../scripts/lib/walk.mjs'
 
-const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
+class RuntimeValue {
+  constructor() { Object.assign(this, { tag: 0, fields: ['value'] }) }
+}
 
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
+test('WHAT[js-semantic-surface-005] the validator accepts the declared JS-native values without reserving ordinary field names', () => {
+  const values = [
+    undefined, null, 's', 42, true, 10n, [], { a: [1, { b: 'c' }] }, () => 1,
+    Object.assign(Object.create(null), { value: 1 }),
+    { tag: 'article', fields: ['title'], head: 'heading', tail: 'tail', cases: () => [] },
+  ]
+  for (const value of values) {
+    assert.equal(isJsData(value), true)
+    assert.equal(assertJsData(value), value, 'validation must preserve the boundary value')
+  }
+})
 
-const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
+test('WHAT[js-semantic-surface-005] Promise is a permitted carrier and its fulfilled value is validated separately', async () => {
+  const value = { ok: true, value: [1, 2] }
+  const promise = Promise.resolve(value)
+  assert.equal(isJsData(promise), true)
+  assert.equal(assertJsData(promise), promise)
+  assert.deepEqual(assertJsData(await promise), value)
+  const leaked = Promise.resolve(new RuntimeValue())
+  const awaitedValue = await leaked
+  assert.throws(() => assertJsData(awaitedValue), /JS-native/)
+})
 
-const distImport = (prefix, module) => `${prefix}dist/${module}`
+test('WHAT[js-semantic-surface-005] runtime instances and nested non-native values are rejected', () => {
+  for (const value of [
+    new RuntimeValue(), new Date(), new Map(), new Set(), Symbol('hidden'),
+    { nested: [new RuntimeValue()] },
+  ]) {
+    assert.equal(isJsData(value), false)
+    assert.throws(() => assertJsData(value), /JS-native/)
+  }
+  assert.equal(isJsData({ at: '2026-09-26T00:00:00Z', epochMs: 1790380800000 }), true)
+})
 
-const wholeScan = scanAll(join(ROOT, 'requirements'))
+test('WHAT[js-semantic-surface-005] shared and cyclic native data remain native', () => {
+  const shared = { value: 1 }
+  const graph = { left: shared, right: shared }
+  graph.self = graph
+  assert.equal(assertJsData(graph), graph)
+  graph.invalid = new RuntimeValue()
+  assert.equal(isJsData(graph), false)
+})
 
-const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
-
-const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
-
-test('WHAT[js-semantic-surface-005] JS_SURFACE_005_js_native_representation_rules', () => {
-  assert.equal(isJsData(null), true)
-  assert.equal(isJsData('s'), true)
-  assert.equal(isJsData(42), true)
-  assert.equal(isJsData(true), true)
-  assert.equal(isJsData(10n), true)
-  assert.equal(isJsData([]), true)
-  assert.equal(isJsData({ a: [1, { b: 'c' }] }), true)
-
-  assert.equal(isJsData({ tag: 0, fields: ['x'] }), false)
-  assert.equal(isJsData({ cases: () => ['A', 'B'] }), false)
-  assert.equal(isJsData({ head: 1, tail: null }), false)
-  assert.equal(isJsData({ $reflection: {}, value: 1 }), false)
-  assert.equal(isJsData(new Date()), false)
-
-  const fsharpMapLike = new (class {
-    constructor() {
-      this.size = 0
-    }
-    entries() {
-      return []
-    }
-  })()
-  assert.equal(isJsData(fsharpMapLike), false)
-  assert.throws(() => assertJsData({ tag: 1, fields: [] }), /JS-native/)
-  assert.equal(assertJsData({ ok: true, value: [1, 2] }).ok, true)
-
-  assert.equal(assertOpaque({}, 'h') !== undefined, true)
-  assert.equal(assertOpaque(() => {}, 'f') !== undefined, true)
-  assert.throws(() => assertOpaque('s'), /opaque/)
-  assert.throws(() => assertOpaque(1), /opaque/)
+test('WHAT[js-semantic-surface-005] opaque validation preserves identity without reading private state', () => {
+  const handle = Object.create(null)
+  Object.defineProperty(handle, 'privateState', { get() { assert.fail('opaque internals must not be read') } })
+  assert.equal(assertOpaque(handle), handle)
+  const callable = () => 1
+  assert.equal(assertOpaque(callable), callable)
+  for (const value of [undefined, null, 's', 1, false]) assert.throws(() => assertOpaque(value), /opaque/)
 })

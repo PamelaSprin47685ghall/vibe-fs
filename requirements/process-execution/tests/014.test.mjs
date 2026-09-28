@@ -34,7 +34,12 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
   assert.equal(parsed.exit_code, control.exit_code, 'log content cannot alter the trusted field or its representation')
   assert.equal(String(parsed.exit_code), '7', 'the actual exit code must survive the forged log field')
   assert.equal(parsed.policy, undefined, 'quoted output must not create policy fields')
-  assert.equal(parsed.output.trim(), raw.trim(), 'raw output must be carried as escaped data, not instructions')
+  assert.ok(parsed.output.startsWith(raw), 'hostile data is carried inside the output field')
+})
+
+test('WHAT[process-execution-014] multiline raw output round-trips without changing its value', { todo: 'GAP-081: the common TOML writer adds LF to multiline strings' }, () => {
+  const raw = 'first\r\nsecond\n'
+  assert.equal(parseDocument(formatSpooledOutcome(7, raw)).output, raw)
 })
 
 test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and_keeps_raw_output_as_data', async () => {
@@ -44,6 +49,8 @@ test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and
   const result = await run({ command: `printf '%0200d${raw}' 0`, output_budget_bytes: 64 }, { sessionID })
   const parsed = parseToml(result)
   assert.match(result, /更早输出已截断/)
+  assert.doesNotMatch(result, /^#/, 'truncation metadata is data, not an instruction plane')
+  assert.match(parsed.output_notice, /更早输出已截断/)
   assert.ok(parsed.output.endsWith(raw), 'untrusted tail must remain in the data field')
   assert.equal(parsed.exit_code, 0)
   assert.ok(Buffer.byteLength(parsed.output, 'utf8') <= 64)

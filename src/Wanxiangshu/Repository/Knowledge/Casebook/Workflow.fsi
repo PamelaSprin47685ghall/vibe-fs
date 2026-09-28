@@ -43,7 +43,5 @@ module CasebookWorkflow =
         a: string ->
             Task<Result<unit, string>>
 
-    val singlePassDiffRefresh: input: obj -> Task<obj>
-    val applyExternalChangeToCase: input: obj -> obj
     val finalizeCase: store: IEventStore -> case: Case -> Task<Result<unit, string>>
     val touchCaseAccess: store: IEventStore -> identity: string -> Task<Result<unit, string>>

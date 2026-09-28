@@ -2,17 +2,15 @@
 
 ## [001] 投影是纯代数管线而非 AST 解释器
 
-Provider 消息投影必须通过类型化组合子与直接执行的计算管线表达。严禁引入中介的 AST 与二次解释器，严禁各功能模块直接接收并就地修改消息列表（Message list）。
+Provider 消息投影采用类型化组合与直接计算，不引入中介 AST 及二次解释器；功能模块不得就地修改消息列表。
 
 ## [002] 投影输入为不可变的 ProjectionSnapshot
 
-投影管线的核心输入是只读、不可变的 `ProjectionSnapshot`。快照只包含当前 canonical semantic projection；不得携带 feature cache、lifecycle state，不直接查询外部存储或推测会话状态。
+投影以不可变的 `ProjectionSnapshot` 为输入，只含当前规范语义投影，不含功能缓存或生命周期状态；投影不得查外部存储或推测会话状态。
 
 ## [003] 输出管线严格分层且 Semantic 与 Wire 类型隔离
 
-投影输出依次遵循 `SemanticEventTree → ProviderSemanticProjection → ProviderWireProjection`。`ProviderSemanticProjection`（语义视图，去除易失 ID，供跨会话等价性比对与规范摘要）与 `ProviderWireProjection`（Wire 视图，包含物理 ID 与本地时间线序号）属于不同类型，严禁隐式混用。
-
-Host ingress 的 SessionId 是 opaque 非空字符串。`sessionID`、`sessionId`、字符串 `session`，以及对象 `session.id/sessionID/sessionId` 必须投影为同一 SessionId；不得用 `ses_` 等值前缀猜测 wire 类型。未知对象、非字符串标量与空白值必须 fail-closed。
+输出依次为 `SemanticEventTree → ProviderSemanticProjection → ProviderWireProjection`。语义视图去除易失 ID，用于等价比对与规范摘要；Wire 视图保留物理 ID 和本地序号。两者使用不同类型，不得隐式混用。
 
 ## [004] 严格划分 Coordinator、Planner 与 Renderer 三层
 
@@ -21,48 +19,51 @@ Host ingress 的 SessionId 是 opaque 非空字符串。`sessionID`、`sessionId
 2. **Pure Projection Planner**：负责收集意图、规范排序与冲突仲裁；
 3. **Canonical Renderer**：负责纯函数式渲染最终字节与确定性表示。
 
-Feature owner 必须先把己方决策完整物化为 provider rows；Renderer 只解释 generic row intent。Host write-back adapter 只把渲染结果写入原生对象，不得重新解释 feature policy。
+功能所有者先把决策物化为 Provider rows；Renderer 只处理通用行意图，Host 写回只搬运结果，不重新解释功能策略。
 
 ## [005] 功能模块仅声明 ProjectionIntent
 
-功能 owner 必须先把己方策略结果完整物化为 provider rows，然后只能提交 `ReplaceMessageBase` 或 `InsertMessageRows` 两种 generic `ProjectionIntent`。Provider projection 不得定义 prefix/context/repair/Strength 等 feature-specific intent；功能模块不得直接拦截或修改原始 Host 消息流。
+功能所有者只能提交 `ReplaceMessageBase` 或 `InsertMessageRows` 两类通用 `ProjectionIntent`，不得直接修改 Host 消息流。投影不得定义 prefix/context/repair/Strength 等功能专用意图。
 
 ## [006] 规范排序与显式合并冲突，禁止注册顺序依赖
 
-不同 message-base replacement 同批出现，或同一 insertion key 对应不同 anchor/rows/Host metadata 时，必须显式返回 `ProjectionConflict` 并终止（fail-closed）。同值重复必须幂等；合法 insertion 必须按 anchor+key 产生与注册顺序无关的 canonical 顺序。
+同批出现不同消息基底，或同一 insertion key 对应不同 anchor、rows 或 Host metadata，必须返回 `ProjectionConflict` 并终止。同值重复幂等；合法插入按 anchor+key 规范排序，不依赖注册顺序。
 
 ## [007] 投影 DSL 不承担生命周期驱动
 
-投影管线仅负责从不可变快照和 generic rows 生成确定性呈现。严禁在投影层物化 prefix/context/repair/Strength policy，启动/等待 Agent、执行工具、写入存储、推进生命周期状态或处理在线心跳。
+投影只根据不可变快照和通用行生成呈现，不决定功能策略，不启动或等待 Agent、执行工具、写存储、推进生命周期或处理心跳。
 
-## [008] SyntheticToml 是唯一的 TOML 渲染器且故意不设解析器
+## [008] TOML 编码由唯一所有者负责
 
-所有合成 TOML 文本的布局、转义与字符串编码统一由 `SyntheticToml` 负责，确保相同输入产生完全一致的字节序列。`SyntheticToml` 故意不提供反向解析器（parser），从结构上禁止业务逻辑反向读取渲染文本作为控制流依据。
+合成 TOML 的布局、转义和字符串编码由唯一所有者统一完成，同输入产生相同字节。该所有者不提供反向解析器，业务逻辑不得解析呈现文本作为控制流依据。
 
 ## [009] 指令面与数据面的划分由消费语义决定
 
-合成内容中的分面规则基于**当前接收 Agent 对内容的消费语义**裁决，而不是内容的来源：凡是要求当前 Agent 行动、约束当前 Agent、改变其推理前提、为其续接责任或告诉它“接下来据此做什么”的内容，均属于广义 Instruction Plane，必须位于顶部连续 `#` 注释；只有当前 Agent 仅作参考、不由该材料本身产生行动要求的状态、参数、观测与证据值，才属于 Data Plane，必须编码为 TOML 字段/表格。
+按当前接收者的消费语义分面，不按来源、可信度、语法或材料名称分面：
 
-因此“事实”不天然等于 Data。典型反例：child → parent 的 LifecycleWorkRecord 虽然是已发生事实，但其接收语义是把未完成责任交还父 Agent 继续执行，所以属于 Instruction Plane；repository hint、可核对的状态快照等仅供参考材料才属于 Data Plane。来源可信度、生产模块、原始语法或是否称作 record/report 均不得代替接收语义判断。
+- **Instruction Plane**：要求行动、施加约束、改变推理前提或交还责任的内容，置于顶部连续 `#` 注释。
+- **Data Plane**：仅供参考、不由材料本身产生行动要求的状态、参数、观测与证据，编码为 TOML 字段或表。
+
+事实也可能是指令：child → parent 的 LifecycleWorkRecord 交还责任，属于 Instruction；repository hint 等参考材料属于 Data。
 
 ## [010] 表示层严禁反向创造权威与状态
 
-投影是单向的“类型化状态 → 表示层”映射。合成的角色标记（user/system/assistant 文本）不得反向推导为领域权威根或完成凭证，严禁从输出文本反推业务控制流。
+投影只能由类型化状态生成表示。合成 user/system/assistant 标记不构成权威根或完成凭证，输出文本不得反向驱动业务控制流。
 
 ## [011] 规范摘要唯一派生自语义投影
 
-规范摘要（Canonical Digest）必须对 `ProviderSemanticProjection` 进行确定性规范序列化后计算 SHA-256。计算过程必须剥离时间戳、耗时、成本等传输层专用字段，严禁通过解析 Wire 文本反算摘要。
+Canonical Digest 对语义投影作确定性规范序列化后计算 SHA-256，排除时间戳、耗时、成本等传输字段，不解析 Wire 文本反算。
 
 ## [012] 确定性渲染器保证同输入必同字节
 
-渲染器必须保证纯函数确定性：统一采用 LF 换行、固定的转义规则与字段排序，以 UTF-8 字节计算长度。相同语义输入在任何运行环境下必须产生完全相同的字节序列。
+渲染采用统一 LF、转义规则和字段排序，以 UTF-8 字节计算长度；相同语义输入在不同环境下产生相同字节。
 
 ## [013] 所有 LLM-facing 合成内容只有一个表示所有者
 
-所有 production 中由 Wanxiangshu 合成并最终可被 LLM 看到的 system prompt、user/assistant synthetic message、continuation、fork/fission/delegation handoff、tool result、provider projection 注入、context/prefix material 与其它广义提示，只能先构造成 `LlmFacing.Document`，再由 `LlmFacing.render` 一次性得到最终文本。业务模块只能声明 Instruction Plane 与 Data Plane 的语义内容，不得自行添加 `#`、`[table]`、`key = value`、XML/Markdown envelope、空行分隔、TOML 转义，也不得把多个已经 render 的 document 再用字符串拼接。
+所有面向 LLM 的合成提示、消息、交接、工具结果及上下文材料，必须先用统一的强类型构造能力组合 Instruction 与 Data，再由唯一表示所有者渲染。业务模块不得自行拼接注释、表格、字段、envelope、分隔或转义，不得直接调用低层 TOML writer。
 
-`SyntheticToml` 是 `LlmFacing` 背后的低层 canonical TOML writer，不是业务模块的格式化 API。任何新的 LLM-facing 表示需求必须扩展 `LlmFacing` 的强类型构造能力，而不是在 feature owner 中复制格式规则。
+新增表示需求应扩展统一构造能力，不在功能模块复制格式规则。
 
 ## [014] 一个物理 LLM-facing payload 只能 render 一次
 
-Instruction 与 Data 必须在 render 前组合。禁止 `render(A) + render(B)`、`render(A) + prose`、`prose + render(B)` 或任何等价的后渲染拼接。该规则确保所有 instruction 永远位于第一个 data field/table 之前，并阻止后追加 bare field 被 TOML 最后一个 table 静默吸收。批量 join、warm-start appendix、parent delta、finality record、T1 tool result 等组合场景同样适用。
+一个物理 payload 只渲染一次；Instruction 与 Data 必须先组合，所有指令位于第一个数据字段或表之前。禁止 `render(A) + render(B)`、渲染结果与散文拼接及等价做法，批量结果、附录和交接同样适用。

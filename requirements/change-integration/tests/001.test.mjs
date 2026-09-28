@@ -27,7 +27,6 @@ test('WHAT[change-integration-001] fresh quality candidate runs the full publish
     'fact:PublishClaimed',
     'git:ff:rebased-1',
     'fact:Published',
-    'relay:terminate',
     'gate:release',
     'relay:terminate',
   ])

@@ -2,8 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Attempt from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as ProviderFailure from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
-import * as Dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as Fission from '../../../dist/Execution/Fission/Surface.js'
 import * as Authority from '../../../dist/Interaction/Authority/Surface.js'
 import * as Runtime from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as Strength from '../../../dist/Strength/Surface.js'
@@ -87,7 +85,6 @@ test('WHAT[participant-identity-004] terminal dispatch preserves the exact Ident
   projection = Runtime.registerClaim(claim, projection)
   projection = Runtime.acceptClaim(promptKey, 'msg_identity_terminal_dispatch', projection)
 
-  assert.equal(Dispatch.sendMemberObservation().owner, 'PromptDispatcher.Runtime')
   assert.equal(projection.pendingClaims.length, 0)
   assert.equal(projection.acceptedDispatches.length, 1)
   assert.deepEqual(projection.acceptedDispatches[0].identitySeed, profile.identitySeed)
@@ -111,22 +108,14 @@ test('WHAT[participant-identity-004] Strength replica inherits owner Persona and
   )
 })
 
-test('WHAT[participant-identity-004] Fission lane inherits owner Persona and version without physical-parent inference', () => {
+test('WHAT[participant-identity-004] inherited Engineer seed retains owner Persona version and logical run', () => {
   const owner = rootProfile('engineer', 'ses_identity_fission_owner')
   const laneIdentity = inheritedSeed('engineer', owner)
-  const lane = Fission.startedLane(2, 'ses_unrelated_physical_parent', 'inspect lane')
 
   assert.equal(laneIdentity.participantIdentity.participant, 'engineer')
   assert.equal(laneIdentity.participantIdentity.role, owner.participantIdentity.role)
   assert.deepEqual(personaVersion(laneIdentity.participantIdentity), personaVersion(owner.participantIdentity))
   assert.equal(laneIdentity.ownerLogicalRun, owner.logicalRun)
-  assert.deepEqual(lane, {
-    index: 2,
-    prompt: 'inspect lane',
-    hasAgentId: false,
-    hasHandle: false,
-    hasParent: false,
-  })
 })
 
 test('WHAT[participant-identity-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded', () => {

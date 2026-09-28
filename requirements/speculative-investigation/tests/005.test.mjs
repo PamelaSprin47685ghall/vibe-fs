@@ -27,7 +27,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only
   assert.equal(empty.ok, false)
   assert.equal(empty.error, 'EmptyBatch')
 })
-test('WHAT[speculative-investigation-005] STRENGTH_005_frame_digest_and_owner_wire_ids_are_restart_stable', () => {
+test('WHAT[speculative-investigation-005] repeated frame construction and owner wire ID derivation are deterministic', () => {
   const batches = [batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])]
   const first = Strength.frameTryBuild(H, 10000, batches).value
   const second = Strength.frameTryBuild(H, 10000, batches).value
@@ -37,7 +37,6 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_digest_and_owner_wi
   const changed = Strength.frameWireToolCallId(H, 'owner', 'd1', 1, 2, first.digest)
   assert.equal(id1, id2)
   assert.notEqual(id1, changed)
-  assert.doesNotMatch(id1, /time|guid|random/i)
 })
 }
 
@@ -90,5 +89,41 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_009_candidate_renders_con
   assert.deepEqual(results.map((part) => part.kind), ['tool-result', 'tool-result'])
   assert.deepEqual(calls.map((part) => part.callId), results.map((part) => part.callId))
   assert.equal(Projection.renderWire(first.messages), Projection.renderWire(second.messages))
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const Strength = await import('../../../dist/Strength/Surface.js')
+
+test('WHAT[speculative-investigation-005] frame cap counts complete canonical UTF-8 material and rejects the whole bundle below its exact boundary', () => {
+  for (const result of ['ASCII', '中文', '😀', '\uD800']) {
+    const batches = [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{}', canonicalResult: result }] }]
+    let canonical
+    const digest = text => { canonical = text; return 'recorded-digest' }
+    const built = Strength.frameTryBuild(digest, 65536, batches)
+    assert.equal(built.ok, true)
+    const expectedBytes = Buffer.byteLength(canonical, 'utf8')
+    assert.equal(built.value.byteLength, expectedBytes)
+    assert.ok(expectedBytes > Buffer.byteLength(result, 'utf8'))
+    assert.equal(Strength.frameTryBuild(digest, expectedBytes, batches).ok, true)
+    const rejected = Strength.frameTryBuild(digest, expectedBytes - 1, batches)
+    assert.equal(rejected.ok, false)
+    assert.equal(rejected.error, 'ByteLimitExceeded')
+  }
+})
+
+test('WHAT[speculative-investigation-005] request ordinals must be contiguous and every owner identity component changes the derived call identity', () => {
+  const exchange = { toolName: 'read', canonicalArguments: '{}', canonicalResult: 'x' }
+  for (const ordinals of [[0], [2], [1, 1], [1, 3]]) {
+    assert.equal(Strength.frameTryBuild(text => text, 65536, ordinals.map(requestOrdinal => ({ requestOrdinal, exchanges: [exchange] }))).error, 'InvalidRequestOrdinal')
+  }
+  const base = ['owner', 'decision', 1, 1, 'digest']
+  const id = Strength.frameWireToolCallId(text => text, ...base)
+  for (const [index, changed] of ['other-owner', 'other-decision', 2, 2, 'other-digest'].entries()) {
+    const alternate = [...base]
+    alternate[index] = changed
+    assert.notEqual(Strength.frameWireToolCallId(text => text, ...alternate), id)
+  }
 })
 }

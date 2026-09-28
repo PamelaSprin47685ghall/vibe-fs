@@ -98,6 +98,17 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
       eventStore.dispose(store)
     }
 
+    const reopened = eventStore.create(commonDir, 'business-registration-reopen')
+    try {
+      assert.equal(eventStore.head(reopened, structuralEvent.stream), structuralEvent.id)
+      assert.equal(eventStore.read(reopened, structuralEvent.id)?.payload?.proof, 'structural')
+      assert.equal(strength.projectionDecisionForTarget('canonical-target-run', strength.storeCurrent(reopened)), 'canonical-decision')
+      assert.equal(mustOk(await casebook.fetchCase(reopened, 10, 'canonical-case'), 'replayed Casebook Current').value?.a, 'A')
+      assert.deepEqual(transaction.pending(reopened).map(({ transactionId }) => transactionId), ['canonical-transaction'])
+    } finally {
+      eventStore.dispose(reopened)
+    }
+
     const booted = mustOk(
       await journal.JournalSurface_bootWithWriterId(
         commonDir,
@@ -151,10 +162,20 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
     } finally {
       journal.JournalSurface_dispose(booted.journal)
     }
+    const reopenedJournal = mustOk(await journal.JournalSurface_bootWithWriterId(
+      commonDir, 'journal-reopen', 'runtime-journal-reopen', 4343, '9999-01-02T00:00:00Z',
+    ), 'reopen Journal')
+    try {
+      assert.equal(journal.JournalSurface_hasSession(reopenedJournal.journal, 'canonical-session'), true)
+    } finally {
+      journal.JournalSurface_dispose(reopenedJournal.journal)
+    }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[durable-events-019] removing each actual domain registration prevents its live fact from producing the expected Current')
 }
 
 {

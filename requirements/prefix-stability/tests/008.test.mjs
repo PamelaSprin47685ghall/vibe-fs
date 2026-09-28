@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as companion from '../../../dist/Context/Companion/ProjectionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
@@ -14,18 +13,13 @@ const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
     syntheticId: `synthetic-${seal}`,
   })
 
-const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
-  probeId: id,
-  basedOnEpoch: 0,
-  candidate: snapshotAt(cutoff),
-})
-
-test('WHAT[prefix-stability-008] COMPANION_010_the_memory_returns_same_session_responsibility_as_instruction', () => {
+test('WHAT[prefix-stability-008] same snapshot and record render the same separated memory body', () => {
   const plan = prefix.forSnapshot(snapshotAt(3), companion.memoryPreamble, 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)
   assert.equal(plan.dropLeading, 3)
-  assert.match(plan.memoryText, /prior responsibility|既有责任/i)
   assert.match(plan.memoryText, /^# THE WORK LOG$/m)
-  assert.doesNotMatch(plan.memoryText, /<work-log>|not a new user instruction/)
+  assert.deepEqual(plan, prefix.forSnapshot(snapshotAt(3), companion.memoryPreamble, 'THE WORK LOG'))
 })
+
+test.todo('WHAT[prefix-stability-008] review actual provider memory block for explicit low-trust status and separation from human authority; current responsibility wording is not that evidence; GAP-107')

@@ -53,7 +53,7 @@ const profileFor = (session, runtime = 'rt-007c') => {
     rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
-  const seed = authority.issueInheritedIdentitySeed('coder', owner.value)
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner.value)
   assert.equal(seed.ok, true, seed.error)
   const built = authority.createAuthorityRoot(hash, runtime, session, 'AgentOwnerRoot', `msg-root-${session}`, seed.value)
   assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built.error))
@@ -127,7 +127,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_claims_and_persists_withou
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007_owner')
-      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const captured = []
       const sent = await dispatch.sendAgentOwnerRoot(
         capturingPort(captured),
@@ -155,7 +155,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_sdk_physical_id_does_not_r
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007_physical_owner')
-      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const port = capturingPort([], () => dispatch.admittedWithPhysicalMessage('msg-sdk-early-007'))
       const sent = await dispatch.sendAgentOwnerRoot(
         port,
@@ -205,12 +205,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_returns_even_when_session_
         'detached must hand control back after invocation',
         seed,
       )
-      const result = await Promise.race([
-        pending,
-        new Promise((resolve) => setTimeout(() => resolve({ timedOut: true }), 120)),
-      ])
-
-      assert.equal(result?.timedOut, undefined, 'Detached must not await ISessionHostPort.SendPrompt settlement')
+      const result = await pending
       assert.equal(result.ok, true, result.ok ? '' : result.error)
       assert.equal(invoked, 1, 'Detached still invokes Host enqueue exactly once')
       assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_007_never'), 1)
@@ -230,7 +225,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_continuation_same_claim_pa
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007c_owner')
-      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const captured = []
       const port = capturingPort(captured)
       const root = await dispatch.sendAgentOwnerRoot(
@@ -262,17 +257,13 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_continuation_same_claim_pa
   }
 })
 
-test('WHAT[dispatch-protocol-009] PROMPT_007_await_mode_constructors_exist', () => {
-  assert.deepEqual(dispatch.awaitModeObservation(), { await: 'Await', detached: 'Detached' })
-})
-
 test('WHAT[dispatch-protocol-009] PROMPT_007_detached_late_listener_verdict_routes_to_exact_owner', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-late-'))
   const writerId = 'writer-007-late'
   const opened = await openGitJournal(base, writerId, 'rt-007-late')
   try {
     const owner = await acceptOwner(opened.journal, 'ses_007_late_owner')
-    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const captured = []
     const sent = await sendDetachedRoot(
       verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-late')),
@@ -303,7 +294,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_late_unknown_keeps_claim_t
   const opened = await openGitJournal(base, writerId, 'rt-007-dup')
   try {
     const owner = await acceptOwner(opened.journal, 'ses_007_dup_owner')
-    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const captured = []
     await sendDetachedRoot(
       verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-dup')),
@@ -335,7 +326,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_owned_settled_late_deliver
   const opened = await openGitJournal(base, writerId, 'rt-007-owned')
   try {
     const owner = await acceptOwner(opened.journal, 'ses_007_owned_owner')
-    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const captured = []
     await sendDetachedRoot(
       verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-owned')),

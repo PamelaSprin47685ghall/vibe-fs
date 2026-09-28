@@ -26,16 +26,16 @@ module LifecycleWorkRecordProjection =
             | _ -> return None
         }
 
-    let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : Task<string list> =
-        task {
-            let resolved = ResizeArray<string>()
-
-            for frame in frames do
+    let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : Task<Result<string list, string>> =
+        frames
+        |> TaskResultList.traverseM (fun frame ->
+            task {
                 let! text = tryResolveFrameText durable frame
-                Option.iter resolved.Add text
 
-            return resolved |> Seq.toList
-        }
+                return
+                    text
+                    |> Result.requireSome ("WorkRecord frame unavailable or corrupt: " + BlobDigest.value frame.Digest)
+            })
 
     let private tryReadPartBody (durable: AgentJournal) (part: XTraceSemanticPartView) : Task<string option> =
         task {
@@ -192,14 +192,15 @@ module LifecycleWorkRecordProjection =
             let! constitutive = renderRange durable constitutiveRange xTrace
             let! gap = renderWorkRecordRange durable gapRange xTrace
 
-            match renderedRecordEvidence constitutive gap with
-            | None -> return None
-            | Some evidence ->
+            match frames, renderedRecordEvidence constitutive gap with
+            | Error _, _
+            | _, None -> return None
+            | Ok verifiedFrames, Some evidence ->
                 let openingMaterial =
                     LifecycleWorkRecord.withConstitutive opening evidence.ConstitutiveBody
 
                 let! finalGap = completeFullGap durable xTrace gapStart evidence.Gap
-                return Some(LifecycleWorkRecord.materialize openingMaterial frames finalGap includeOpening)
+                return Some(LifecycleWorkRecord.materialize openingMaterial verifiedFrames finalGap includeOpening)
         }
 
     let private materializeOpenedSession
@@ -321,12 +322,13 @@ module LifecycleWorkRecordProjection =
             let gapRange = XTraceRange.create gapStart (XTraceRange.endExclusive workRange)
             let! gap = renderWorkRecordRange durable gapRange xTrace
 
-            match gap with
-            | Error _ -> return None
-            | Ok renderedGap ->
+            match frames, gap with
+            | Error _, _
+            | _, Error _ -> return None
+            | Ok verifiedFrames, Ok renderedGap ->
                 let! finalGap = completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap
 
-                return Some(LifecycleWorkRecord.materialize opening frames finalGap false)
+                return Some(LifecycleWorkRecord.materialize opening verifiedFrames finalGap false)
         }
 
     let private materializeBoundedOpenedSession

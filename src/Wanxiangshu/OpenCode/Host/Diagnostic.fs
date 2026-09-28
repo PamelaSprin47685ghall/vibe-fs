@@ -124,12 +124,16 @@ module Diagnostic =
         with _ ->
             ()
 
-    /// Unexpected invariant break. Print one JSON line, then kill the process.
-    let fatal (operation: string) (fields: (string * string) list) : unit =
+    let private reportFatal (operation: string) (fields: (string * string) list) : unit =
         try
             validate fields
             error (stringify (payload operation fields))
         with _ ->
             error "{\"operation\":\"diagnostic-fatal-render-failed\",\"result\":\"[REDACTED]\"}"
 
-        FatalProcess.kill ()
+    /// Unexpected invariant break. Reporting failure must not bypass termination.
+    let fatal (operation: string) (fields: (string * string) list) : unit =
+        try
+            reportFatal operation fields
+        finally
+            FatalProcess.kill ()

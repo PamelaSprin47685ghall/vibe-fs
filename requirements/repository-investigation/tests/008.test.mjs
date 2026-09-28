@@ -1,74 +1,40 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
-import * as warmStart from '../../../dist/Repository/Investigation/WarmStartSurface.js'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { hint, warmStart, withWorkspace } from './support/warm-start.mjs'
 
-const here = dirname(fileURLToPath(import.meta.url))
-
-const providerRoot = join(here, '../../../resources/provider')
-
-const hint = (ordinal, rank, file, content, score = 0.9) => ({
-  keywordOrdinal: ordinal,
-  localRank: rank,
-  filePath: file,
-  startLine: rank,
-  endLine: rank + 2,
-  content,
-  score,
-  totalLines: 100,
+test('WHAT[repository-investigation-008] actual consumer admission rejects other roles before search and admits Engineer and DevOps', async () => {
+  await withWorkspace(async (directory) => {
+    const calls = []
+    const search = async (query, workspace) => { calls.push({ query, workspace }); return [hint('source.fs', 'candidate')] }
+    for (const role of ['Manager', 'Orchestrator', 'Blogger', 'Bookkeeper']) {
+      const result = await warmStart.prepareWithSearch(search, 'investigation-role', role, directory, 'query', 'Inspect.')
+      assert.equal(result.ok, false, role)
+      assert.equal(calls.length, 0)
+    }
+    for (const role of ['Engineer', 'DevOps']) {
+      const result = await warmStart.prepareWithSearch(search, 'investigation-role', role, directory, 'query', 'Inspect.')
+      assert.equal(result.ok, true, role)
+      assert.ok(result.value.includes('candidate'))
+    }
+    assert.deepEqual(calls, [{ query: 'query', workspace: directory }, { query: 'query', workspace: directory }])
+  })
 })
 
-const search = (ordinal, query, hints) => ({ ordinal, query, hints })
-
-const readLines = (semanticPath, replacements = {}) => {
-  let text = readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trimEnd()
-  for (const key in replacements) {
-    text = text.replaceAll(`{{${key}}}`, replacements[key])
-  }
-  return text.split('\n')
-}
-
-const renderCharge = (charge, searches) =>
-  warmStart.render(readLines('lifecycle/warm-start/charge-envelope', { charge }), charge, searches)
-
-const appendAppendix = (base, searches) =>
-  warmStart.appendToProviderPrompt(readLines('lifecycle/warm-start/appendix'), base, searches)
-
-const sid = 'ses_warm_start'
-
-const waitFor = async (predicate, message, ms = 1500) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
-test('WHAT[repository-investigation-008] AGENT_032_nonconsumer_nonempty_keywords_fail_and_missing_workspace_skips', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'wxs-warm-start-role-'))
-  let calls = 0
-  const searchFn = async () => {
-    calls += 1
-    return []
-  }
-
-  try {
-    const denied = await warmStart.prepareWithSearch(searchFn, sid, 'Browser', root, 'repo', 'raw charge')
-    assert.equal(denied.ok, false)
-    assert.match(denied.error, /only available to Engineer or DevOps/)
-    assert.equal(calls, 0)
-
-    const noWorkspace = await warmStart.appendToBaseWithSearch(searchFn, sid, 'Engineer', undefined, 'repo', 'base')
-    assert.deepEqual(noWorkspace, { ok: true, value: '# base\n' })
-    assert.equal(calls, 0)
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
+test('WHAT[repository-investigation-008] absent, blank, nonexistent and file-valued workspace paths skip without guessing a search directory', async () => {
+  await withWorkspace(async (directory) => {
+    const file = join(directory, 'file.txt')
+    writeFileSync(file, 'not a directory')
+    let calls = 0
+    const search = async () => { calls += 1; return [] }
+    const baseline = await warmStart.appendToBaseWithSearch(search, 'investigation-path', 'Engineer', directory, '', 'Base task')
+    for (const workspace of [undefined, '', ' ', join(directory, 'missing'), file]) {
+      const result = await warmStart.appendToBaseWithSearch(search, 'investigation-path', 'Engineer', workspace, 'query', 'Base task')
+      assert.deepEqual(result, baseline)
+      assert.equal(calls, 0)
+    }
+  })
 })
+
+test.todo('WHAT[repository-investigation-008] an existing but unrelated directory is not accepted as the task workspace; Directory.Exists alone does not establish provenance (GAP-083)')

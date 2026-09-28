@@ -91,9 +91,9 @@ const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js
 
 const { bootstrapAndLoadAt, invokeScheduler } = routing
 const template = `export default function route(role, running) {
-  if (role !== 'coder') return null
+  if (role !== 'engineer') return null
   return running.length === 0
-    ? { model: 'provider/coder-model', reasoning: 'none' }
+    ? { model: 'provider/engineer-model', reasoning: 'none' }
     : null
 }\n`
 const withTemp = async (run) => {
@@ -110,8 +110,8 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_preserves_running_dupl
     const body = `export default function route(role, running, previous) {
       if (running.length !== 2) throw new Error('duplicates lost')
       if (running[0].model !== running[1].model) throw new Error('unexpected running')
-      if (role === 'new' && previous !== null) throw new Error('new conversation previous must be null')
-      if (role === 'continued' && (previous?.model !== 'provider/previous' || previous?.reasoning !== 'high')) {
+      if (role === 'engineer' && previous !== null) throw new Error('new conversation previous must be null')
+      if (role === 'manager' && (previous?.model !== 'provider/previous' || previous?.reasoning !== 'high')) {
         throw new Error('previous target lost')
       }
       return previous
@@ -121,9 +121,9 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_preserves_running_dupl
       { model: 'provider/shared', reasoning: 'low' },
       { model: 'provider/shared', reasoning: 'low' },
     ]
-    assert.equal(invokeScheduler(scheduler, 'new', running, null), null)
+    assert.equal(invokeScheduler(scheduler, 'engineer', running, null), null)
     assert.deepEqual(
-      invokeScheduler(scheduler, 'continued', running, { model: 'provider/previous', reasoning: 'high' }),
+      invokeScheduler(scheduler, 'manager', running, { model: 'provider/previous', reasoning: 'high' }),
       { model: 'provider/previous', reasoning: 'high' },
     )
   })
@@ -136,17 +136,17 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default async () => ({ model: 'provider/x', reasoning: 'none' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /Promise|synchronous/i)
+    assert.throws(() => invokeScheduler(scheduler, 'engineer', []), /Promise|synchronous/i)
   })
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default () => ({ model: 'bare-model', reasoning: 'none' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /provider\/model/i)
+    assert.throws(() => invokeScheduler(scheduler, 'engineer', []), /provider\/model/i)
   })
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default () => ({ model: 'provider/model', reasoning: '' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /reasoning/i)
+    assert.throws(() => invokeScheduler(scheduler, 'engineer', []), /reasoning/i)
   })
 })
 }

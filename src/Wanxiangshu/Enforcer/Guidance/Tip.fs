@@ -41,22 +41,13 @@ module EnforcerTipGuidance =
         else
             sprintf "%s\ntip = \"%s\"\n\n%s" (tipHeading lang) tipName body
 
-    let private asMainIfNotCompanion (associations: Map<SessionId, SessionAssociation>) (sessionId: SessionId) =
-        if SessionAssociationProjection.isCompanion sessionId associations then
-            None
-        else
-            Some sessionId
-
     let private tryOwnerMainSession (journal: AgentJournal) (mainOrBloggerSession: SessionId) : SessionId option =
         let associations = (AgentJournal.snapshot journal).AgentProjections.Associations
 
-        match SessionAssociationProjection.tryMainSessionOf mainOrBloggerSession associations with
-        | Some owner -> Some owner
-        | None ->
-            // Already a main / work session (or unassociated): treat as main session id.
-            SessionAssociationProjection.tryBloggerOf mainOrBloggerSession associations
-            |> Option.map (fun _ -> mainOrBloggerSession)
-            |> Option.orElseWith (fun () -> asMainIfNotCompanion associations mainOrBloggerSession)
+        match SessionAssociationProjection.tryFind mainOrBloggerSession associations with
+        | Some { Kind = ManagedSessionKind.WorkSession } -> Some mainOrBloggerSession
+        | Some { Kind = ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) } -> Some owner
+        | None -> None
 
     let private latestOwnerTipField (journal: AgentJournal) (mainSessionId: SessionId) : string option =
         match

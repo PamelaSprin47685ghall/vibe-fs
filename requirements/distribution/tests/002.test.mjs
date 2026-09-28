@@ -41,8 +41,7 @@ test('WHAT[distribution-002] DISTRIBUTION_resource_reads_resolve_under_package_r
 })
 
 test('WHAT[distribution-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources', () => {
-  // 干净子进程 + cwd=/：既不能靠 cwd 找到 resources，也不能靠源码树。唯一能成功
-  // 的路径是包内 fixed-relative lookup（import.meta.url → ../../../resources）。
+  // 证明进程工作目录不影响读取；仍导入仓库产物，不是独立安装验证。
   const script = `
     import { readText } from ${JSON.stringify(packageResourcesUrl)};
     const text = readText('provider/role/manager/en.md');

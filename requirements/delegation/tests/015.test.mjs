@@ -239,3 +239,57 @@ test('WHAT[delegation-015] JOIN_WAKE_permit_gate_fails_closed_and_keeps_runtime_
   quiescentMailbox(probe)
 })
 }
+
+{
+const change = await import('../../../dist/Change/Surface.js')
+const assert = (await import('node:assert/strict')).default
+const published = (jobId, head) => ({ kind: 'Published', jobId, head })
+
+test('WHAT[delegation-015] interrupted commission join leaves the job active and the next waiter receives its verdict once', async () => {
+  const mailbox = change.createVerdictMailbox()
+  change.verdictMailboxStartJob(mailbox)
+  const interrupt = change.createVerdictInterrupt()
+  const pending = change.verdictMailboxJoinAvailable(mailbox, 8, interrupt)
+  change.fireVerdictInterrupt(interrupt, 'UserMessageArrived')
+  const out = await pending
+  assert.equal(out.kind, 'Interrupted')
+  assert.equal(out.reason, 'UserMessageArrived')
+  const next = change.verdictMailboxJoinAvailable(mailbox, 8, change.createVerdictInterrupt())
+  change.verdictMailboxPublish(mailbox, published('job-2', 'head-2'))
+  const after = await next
+  assert.equal(after.kind, 'ResultsAvailable')
+  assert.equal(after.count, 1)
+  assert.equal(after.verdicts[0].kind, 'Published')
+  assert.equal(after.verdicts[0].detail, 'head-2')
+  assert.equal(change.verdictMailboxPendingCount(mailbox), 0)
+})
+
+test('WHAT[delegation-015] a queued or racing commission verdict is consumed before reporting a join interruption', async () => {
+  for (const order of ['queued-before-join', 'publish-then-interrupt', 'interrupt-then-publish']) {
+    const mailbox = change.createVerdictMailbox()
+    change.verdictMailboxStartJob(mailbox)
+    const interrupt = change.createVerdictInterrupt()
+    let pending
+    if (order === 'queued-before-join') {
+      change.verdictMailboxPublish(mailbox, published('job-1', 'head-1'))
+      change.fireVerdictInterrupt(interrupt, 'OperatorAbort')
+      pending = change.verdictMailboxJoinAvailable(mailbox, 8, interrupt)
+    } else {
+      pending = change.verdictMailboxJoinAvailable(mailbox, 8, interrupt)
+      if (order === 'publish-then-interrupt') {
+        change.verdictMailboxPublish(mailbox, published('job-1', 'head-1'))
+        change.fireVerdictInterrupt(interrupt, 'OperatorAbort')
+      } else {
+        change.fireVerdictInterrupt(interrupt, 'OperatorAbort')
+        change.verdictMailboxPublish(mailbox, published('job-1', 'head-1'))
+      }
+    }
+    const out = await pending
+    assert.equal(out.kind, 'ResultsAvailable', order)
+    assert.equal(out.count, 1)
+    assert.equal(out.verdicts[0].kind, 'Published')
+    assert.equal(out.verdicts[0].detail, 'head-1')
+    assert.equal(change.verdictMailboxPendingCount(mailbox), 0, order)
+  }
+})
+}

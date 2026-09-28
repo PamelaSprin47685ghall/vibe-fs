@@ -42,7 +42,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
     inheritedIdentity,
   )
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
-  const seed = authority.issueInheritedIdentitySeed('coder', owner.profile)
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }
@@ -53,7 +53,7 @@ const userMessageWithKey = (id, keyValue) => ({
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-test('WHAT[dispatch-protocol-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery', async () => {
+test('WHAT[dispatch-protocol-013] reopened journal retains a pending claim until explicit reconciliation observes its physical message', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dispatch-activation-'))
   try {
     const first = await journal.JournalSurface_bootWithWriterId(
@@ -93,7 +93,7 @@ test('WHAT[dispatch-protocol-013] DP_013_construction_waits_for_durability_activ
       assert.equal(
         dispatch.pendingClaimCount(activated.journal, 'ses_dispatch_activation'),
         1,
-        'constructing the registered dispatch surface must not read Host evidence or start recovery',
+        'journal reopen has not resolved the pending claim',
       )
 
       const outcomes = await recovery.reconcile(activated.journal, [
@@ -112,7 +112,7 @@ test('WHAT[dispatch-protocol-013] DP_013_construction_waits_for_durability_activ
       assert.equal(
         dispatch.pendingClaimCount(activated.journal, 'ses_dispatch_activation'),
         0,
-        'only explicit recovery after successful durable activation may establish PhysicalAccepted',
+        'explicit recovery records the supplied physical evidence',
       )
     } finally {
       journal.JournalSurface_dispose(activated.journal)
@@ -121,3 +121,5 @@ test('WHAT[dispatch-protocol-013] DP_013_construction_waits_for_durability_activ
     rmSync(base, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[dispatch-protocol-013] actual plugin construction reads no journal or Host evidence and recovery cannot run before successful durability activation (GAP-136)')

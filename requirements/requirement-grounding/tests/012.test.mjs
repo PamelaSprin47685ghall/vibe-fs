@@ -25,7 +25,7 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[requirement-grounding-012] freezes result-only terminal bytes across restart replay while changed digests append without rewriting the provider prefix', async () => {
+test('WHAT[requirement-grounding-012] reopening the durable journal replays exact messages and appends changed content only to a new terminal result', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const source = join(dir, 'src', 'main.fs')
@@ -48,16 +48,25 @@ test('WHAT[requirement-grounding-012] freezes result-only terminal bytes across 
     assert.equal(replay.ok, true)
     assert.equal(replay.value.at(-1).parts[0].state.output, frozen)
     assert.equal(replay.value.at(-1).parts[0].state.output.includes('what-v2'), false)
+    assert.deepEqual(replay.value, first.value)
 
     // A fresh request grounds the changed digest by appending after the frozen prefix.
     const changed = await host.requestPaths(opened.journal, dir, 's-restart', [source])
     assert.equal(changed.needsGrounding, true)
     assert.equal(changed.requested, 1)
-    const appended = await host.projectWithJournal(opened.journal, 's-restart', terminalRead(source))
+    const nextRead = terminalRead(source)
+    nextRead[0].info.id = 'r2'
+    nextRead[0].parts[0].callID = 'source-read-2'
+    const transcript = [...terminalRead(source), ...nextRead]
+    const appended = await host.projectWithJournal(opened.journal, 's-restart', transcript)
     assert.equal(appended.ok, true)
     const grown = appended.value.at(-1).parts[0].state.output
-    assert.ok(grown.startsWith(frozen))
+    assert.deepEqual(appended.value.slice(0, first.value.length), first.value)
     assert.ok(grown.includes('what-v2'))
+    const repeated = await host.projectWithJournal(opened.journal, 's-restart', appended.value)
+    assert.deepEqual(repeated, appended)
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
+
+test.todo('WHAT[requirement-grounding-012] a separate restarted process replays the durable bytes at the same anchors; reopening a journal in one process does not cross that boundary (GAP-085)')

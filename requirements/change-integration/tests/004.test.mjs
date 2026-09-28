@@ -1,6 +1,44 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const change = await import('../../../dist/Change/Surface.js')
+
+test('WHAT[change-integration-004] rebase work holds the gate only for the ff mutation', async () => {
+  const observation = await change.observeRelayProgram('fresh')
+
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.deepEqual(observation.ffGateHeld, [true])
+  assert.deepEqual(observation.ffExpectedHeads, ['target-1'])
+  assert.equal(observation.gateAcquireCount, 1)
+  assert.equal(observation.gateReleaseCount, 1)
+  assert.equal(observation.gateHeldAfterRun, false)
+})
+test('WHAT[change-integration-004] conflict resolution never acquires the publish gate', async () => {
+  const observation = await change.observeRelayProgram('rebase-conflict')
+
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.deepEqual(observation.ffGateHeld, [])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.gateHeldAfterRun, false)
+})
+test('WHAT[change-integration-004] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources', async () => {
+  const observation = await change.observeManagerLoopBurst(10000)
+
+  assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'burst-complete' })
+  assert.equal(observation.continuationCount, 10000)
+  assert.equal(observation.signalCount, 10001)
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.gateReleaseCount, 0)
+  assert.equal(observation.gateHeldAfterRun, false)
+  assert.equal(observation.factCount, 0)
+  assert.equal(observation.gitCallCount, 0)
+  assert.equal(observation.continuations, undefined)
+  assert.equal(observation.timeline, undefined)
+})
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
@@ -268,3 +306,17 @@ test('WHAT[change-integration-004] THEOREM_orchestrator_independent_jobs_conflue
   }
 })
 }
+
+test('WHAT[change-integration-004] actual publish program releases the gate before cleaning Road resources exactly once', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const change = await import('../../../dist/Change/Surface.js')
+  const observation = await change.observeRelayProgram('fresh')
+  const release = observation.timeline.indexOf('gate:release')
+  const terminations = observation.timeline.flatMap((event, index) => event === 'relay:terminate' ? [index] : [])
+  assert.ok(release >= 0)
+  assert.equal(terminations.length, 1)
+  assert.ok(terminations[0] > release)
+  assert.equal(observation.verdict.kind, 'Published')
+})
+
+test.todo('WHAT[change-integration-004] GAP-215 / 55-D1: determine how durable claim and Published writes fit the stated ref-only critical section; actual program currently performs them under the gate')

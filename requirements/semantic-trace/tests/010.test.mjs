@@ -32,6 +32,19 @@ test('WHAT[semantic-trace-010] opening capture reports idempotent evidence', asy
     assert.deepEqual(trace.openingEvidence(trace.snapshot(handle, SESSION)).authoritativeRequirements, ['Ship it.', 'Add tests.'])
   })
 })
+test('WHAT[semantic-trace-010] durable capture refuses conflicting text and requirements without changing opening', async () => {
+  await withJournal(async (handle) => {
+    assert.equal((await trace.captureOpening(handle, SESSION, 'Original task', ['r1'])).ok, true)
+    for (const [text, requirements] of [['Other task', ['r1']], ['Original task', ['r2']]]) {
+      const result = await trace.captureOpening(handle, SESSION, text, requirements)
+      assert.equal(result.ok, false, 'a conflicting capture must return a refusal, not an idempotent success')
+      assert.match(result.error, /opening-already-captured/)
+      assert.deepEqual(trace.openingEvidence(trace.snapshot(handle, SESSION)), {
+        assignmentText: 'Original task', authoritativeRequirements: ['r1'], constitutiveBody: '',
+      })
+    }
+  })
+})
 }
 
 {

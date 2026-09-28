@@ -46,7 +46,7 @@ test('WHAT[verification-system-011] coverage exclude globs are fixed: node_modul
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawnSync, fork } = await import("node:child_process");
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync } = await import("node:fs");
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync, symlinkSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { default: path, join } = await import("node:path");
 const { default: crypto } = await import("node:crypto");
@@ -185,6 +185,25 @@ assert.equal(foo(1), 'positive')
   return { distDir, testScript, assertBuildFreshFn, collectInputsFn }
 }
 
+test('WHAT[verification-system-011] a workspace symlink preserves the production coverage denominator', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cov-root-alias-'))
+  try {
+    const actual = join(directory, 'actual')
+    const alias = join(directory, 'alias')
+    const { assertBuildFreshFn, collectInputsFn } = createMiniFixture(actual)
+    symlinkSync(actual, alias, 'dir')
+    const result = await runCoverage({ root: alias, c8Bin: C8_BIN,
+      unitRunnerScript: join(alias, 'test.js'), assertBuildFreshFn, collectInputsFn, silent: true })
+    assert.equal(result.ok, true, JSON.stringify(result))
+    assert.equal(result.productionModulesCount, 2)
+    const missing = await runCoverage({ root: join(directory, 'missing') })
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'BUILD_NOT_FRESH')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[verification-system-011] 1. 一份被测文件、一份未导入文件: 两者都在分母，未导入文件为零', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-1-'))
   try {
@@ -198,7 +217,7 @@ test('WHAT[verification-system-011] 1. 一份被测文件、一份未导入文�
       silent: true,
     })
 
-    assert.equal(result.ok, true, `expected coverage ok, got ${result.code}`)
+    assert.equal(result.ok, true, `expected coverage ok, got ${JSON.stringify(result)}`)
     const reportJson = JSON.parse(
       readFileSync(path.join(result.reportDir, 'coverage-final.json'), 'utf8'),
     )

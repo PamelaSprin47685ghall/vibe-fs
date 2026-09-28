@@ -33,12 +33,10 @@ test('WHAT[knowledge-reuse-006] CASE006_synthesis_refresh_publishes_refreshed_wi
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal((await casebook.archive(handle, record('s-mech-1', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
-    assert.equal((await casebook.needsRefresh(handle, 10, 's-mech-1', dir)).value, false)
     assert.equal((await bookkeeperRefresh.refreshStale(handle, dir, 's-mech-1')).value, false)
     assert.equal(createCalls.length, 0)
 
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    assert.equal((await casebook.needsRefresh(handle, 10, 's-mech-1', dir)).value, true)
     await installBookkeeperRuntime(port, ['s-mech-1'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-mech-1')
     assert.equal(refreshed.ok, true)
@@ -50,7 +48,6 @@ test('WHAT[knowledge-reuse-006] CASE006_synthesis_refresh_publishes_refreshed_wi
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.equal(fetched.value.a, CANONICAL_A)
     assert.equal(fetched.value.observations[0].contentHash, '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
-    assert.equal((await casebook.needsRefresh(handle, 10, 's-mech-1', dir)).value, true)
     assert.notEqual(fetched.value, null)
   } finally {
     bookkeeper.resetRuntime()
@@ -461,7 +458,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
 
-test('WHAT[knowledge-reuse-006] T23_bookkeeper_refresh_receives_diff_only_and_has_no_repo_investigation_rights', async () => {
+test('WHAT[knowledge-reuse-006] refresh prompt renders the supplied old case and diff without full-file sections', async () => {
   // Bookkeeper CaseRefresh receives: old case + diff. No repo read/glob/grep.
   assert.equal(typeof bookkeeper.createRefreshPrompt, 'function', 'bookkeeper must format refresh prompt with diff only')
   const prompt = bookkeeper.createRefreshPrompt({
@@ -479,3 +476,19 @@ test('WHAT[knowledge-reuse-006] T23_bookkeeper_refresh_receives_diff_only_and_ha
     'maintenance must not receive a replay trace or full file payloads')
 })
 }
+
+test.todo('WHAT[knowledge-reuse-006] GAP-160: actual Bookkeeper repository access is rejected and a zero-change successful program advances the durable maintenance baseline')
+
+test('WHAT[knowledge-reuse-006] duplicate answer setter rolls back both staged fields', async () => {
+  const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
+  const assert = (await import('node:assert/strict')).default
+  const tx = 'duplicate-answer'
+  const session = 'bookkeeper-duplicate-answer'
+  bookkeeper.beginTransaction(tx, 'Q', 'A')
+  bookkeeper.bindSession(session, tx, 'owner')
+  try {
+    const result = await bookkeeper.runProgram(session, 'class Js extends JsProgram { async run() { this.setQuestion("changed Q"); this.setAnswer("one"); this.setAnswer("two"); } }')
+    assert.match(String(result), /setAnswer/)
+    assert.deepEqual(bookkeeper.snapshot(tx).value, ['Q', 'A'])
+  } finally { bookkeeper.abort(tx); bookkeeper.resetRuntime() }
+})

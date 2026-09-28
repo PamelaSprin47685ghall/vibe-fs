@@ -1,92 +1,23 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import { record, commitFrame, withReopenableJournal } from './support/record.mjs'
 
-{
-const { test } = await import("node:test");
-const { default: assert } = await import("node:assert/strict");
-const workRecord = await import("../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js");
-const traceOwner = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
-
-const xTrace = {
-  item: traceOwner.item,
-  text: traceOwner.textPart,
-  reasoning: traceOwner.reasoningPart,
-  toolCall: (name, args) => traceOwner.toolCallPart('fixture-call', name, args),
-  toolResult: (result) => traceOwner.toolResultPart('fixture-call', result),
-}
-const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
-const materialize = (
-  openingValue,
-  frames,
-  trace,
-  coverage,
-  openingEnd = { Sequence: 0 },
-  includeOpening = true,
-) => {
-  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
-  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
-  return workRecord.materialize(openingValue, frames, gap, includeOpening)
-}
-const OPENING_END = { Sequence: 1 }
-
-test('WHAT[work-record-005] LWR_gap_starts_at_record_coverage_not_prefix_cutoff', () => {
-  const trace = [
-    xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
-    xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work a') }),
-    xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('work b') }),
-  ]
-
-  // IngestedThrough 可落在 turn 中间（cursor 2）；gap 从 max(IngestedThrough, openingEnd)=2 起，不含 work a
-  const rendered = materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
-  assert.match(rendered, /assistant: work b/)
-  assert.equal(rendered.includes('work a'), false)
+test('WHAT[work-record-005] actual Recent work advances by RecordCoverage within a turn while PrefixCoverage remains zero', async () => {
+  await withReopenableJournal(async handle => {
+    const session = 'record-mid-turn'
+    await record.captureOpening(handle, session, 'task', [])
+    await record.captureProjection(handle, session, { messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'task' }] },
+      { role: 'assistant', parts: [
+        { kind: 'reasoning', text: 'earlier analysis' },
+        { kind: 'text', text: 'last formal statement' },
+      ] },
+    ] })
+    const before = await record.lifecycleWorkRecord(handle, session, false)
+    assert.ok(before.includes('earlier analysis'))
+    assert.ok(before.includes('last formal statement'))
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'recorded investigation', id: 'partial' })
+    const after = await record.lifecycleWorkRecord(handle, session, false)
+    assert.equal(after, 'Chronicle\nrecorded investigation\n\nRecent work\nassistant: last formal statement')
+  })
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const workRecord = await import("../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js");
-const traceOwner = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
-
-const xTrace = {
-  item: traceOwner.item,
-  text: traceOwner.textPart,
-  reasoning: traceOwner.reasoningPart,
-}
-const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
-const materialize = (
-  openingValue,
-  frames,
-  trace,
-  coverage,
-  openingEnd = { Sequence: 0 },
-  includeOpening = true,
-) => {
-  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
-  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
-  return workRecord.materialize(openingValue, frames, gap, includeOpening)
-}
-const trace = [
-  xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('Charge') }),
-  xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.reasoning('thinking') }),
-  xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('delivered') }),
-]
-
-test('WHAT[work-record-005] LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
-  // With coverage at origin, the gap is the whole trace after the opening end —
-  // still NOT turn-bounded: a partial turn is a valid uncovered suffix.
-  const rendered = materialize(
-    opening('Charge'),
-    [],
-    trace,
-    { Sequence: 0 },
-    { Sequence: 1 },
-    true,
-  )
-
-  // work-record-005：Recent work = bounded invocation 内 Y 未覆盖的 X-derived suffix，
-  // 不是「最近发生的事」。coverage 在 origin 时 suffix 就是全部历史——包括 partial turn。
-  assert.ok(rendered.includes('thinking'))
-  assert.ok(rendered.includes('delivered'))
-})
-}

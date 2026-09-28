@@ -9,4 +9,5 @@ open Wanxiangshu.Persistence.Journal
 module WorkspaceEventStore =
     val acquire: commonDir: string -> IEventStore
     val tryCurrent: commonDir: string -> IEventStore option
+    val release: commonDir: string -> unit
     val bootPort: commonDir: string -> IJournalEventStoreBoot

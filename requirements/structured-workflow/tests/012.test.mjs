@@ -1,4 +1,71 @@
 import test from 'node:test'
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const { planImpactCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+
+test('WHAT[structured-workflow-012] changed .fs with unchanged .fsi triggers reverse-consumer recompile', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-inline-fsi-'))
+  try {
+    const aggregate = join(root, 'Wanxiangshu.fsproj')
+    const providerProj = join(root, 'Provider.fsproj')
+    const consumerProj = join(root, 'Consumer.fsproj')
+
+    const providerFsi = join(root, 'Provider.fsi')
+    const providerFs = join(root, 'Provider.fs')
+    const consumerFs = join(root, 'Consumer.fs')
+
+    writeFileSync(providerFsi, 'namespace Sample\n', 'utf8')
+    writeFileSync(providerFs, 'namespace Sample\nlet inline helper x = x + 1\n', 'utf8')
+    writeFileSync(consumerFs, 'namespace Sample\nlet consume x = helper x\n', 'utf8')
+
+    writeFileSync(providerProj, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="${providerFsi}"/>
+    <Compile Include="${providerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    writeFileSync(consumerProj, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="${providerProj}"/>
+    <Compile Include="${consumerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="${providerFsi}"/>
+    <Compile Include="${providerFs}"/>
+    <Compile Include="${consumerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    // Change .fs only (unchanged .fsi)
+    const plan = planImpactCompile({
+      changedPaths: [providerFs],
+      projectDirectory: root,
+      aggregatePath: aggregate,
+      fullThreshold: 1,
+    })
+
+    assert.equal(plan.mode, 'focused')
+    assert.ok(
+      plan.projectPaths.includes(consumerProj),
+      'reverse consumer must be included when .fs implementation changes, even with unchanged .fsi',
+    )
+    assert.ok(
+      plan.compileItems.includes(consumerFs),
+      'consumer compile item must be in compile plan',
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+}
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
@@ -1932,6 +1999,28 @@ integrationTest('WHAT[structured-workflow-012] compile-impact CLI compiles a foc
       findEmittedJs(outputDir, 'BetaTwo.js'),
       'full fallback must emit the whole fixture closure',
     )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] switching focused closures in one output directory emits the newly selected module', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, outputDir } = baseArgs(dir)
+    const core = runCli([join(dir, 'Core', 'Core.fs'), ...flags])
+    assert.equal(core.status, 0, core.stderr || core.stdout)
+    assert.match(core.stdout, /compiled focused impact \(2 items\)/)
+    assert.ok(findEmittedJs(outputDir, 'Core.js'))
+    assert.equal(findEmittedJs(outputDir, 'Alpha.js'), null)
+
+    const alpha = runCli([join(dir, 'Alpha', 'Alpha.fs'), ...flags])
+    assert.equal(alpha.status, 0, alpha.stderr || alpha.stdout)
+    assert.match(alpha.stdout, /compiled focused impact \(4 items\)/)
+    const output = findEmittedJs(outputDir, 'Alpha.js')
+    assert.ok(output, 'successful focused compilation must emit the newly selected Alpha module')
+    assert.ok(readFileSync(output, 'utf8').includes('baseValue + 10'))
+    assert.equal(findEmittedJs(outputDir, 'BetaOne.js'), null, 'repair must remain focused')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

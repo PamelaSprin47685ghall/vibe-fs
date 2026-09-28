@@ -2,7 +2,6 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
 const { default: test } = await import("node:test");
 
 const templateUrl = new URL('../../../resources/wanxiangshu.mjs', import.meta.url)
@@ -15,8 +14,6 @@ const MANAGED = [
 ]
 
 test('WHAT[execution-model-routing-001] EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
-  const source = await readFile(templateUrl, 'utf8')
-  assert.match(source, /export default function route/)
   const { default: scheduler } = await import(`${templateUrl.href}?test=${Date.now()}`)
   const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
   const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
@@ -41,9 +38,9 @@ const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js
 
 const { bootstrapAndLoadAt, invokeScheduler } = routing
 const template = `export default function route(role, running) {
-  if (role !== 'coder') return null
+  if (role !== 'engineer') return null
   return running.length === 0
-    ? { model: 'provider/coder-model', reasoning: 'none' }
+    ? { model: 'provider/engineer-model', reasoning: 'none' }
     : null
 }\n`
 const withTemp = async (run) => {
@@ -59,8 +56,8 @@ test('WHAT[execution-model-routing-001] EMR_001_missing_scheduler_is_created_onc
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), template)
-    const selected = invokeScheduler(scheduler, 'coder', [])
-    assert.equal(selected.model, 'provider/coder-model')
+    const selected = invokeScheduler(scheduler, 'engineer', [])
+    assert.equal(selected.model, 'provider/engineer-model')
     assert.equal(selected.reasoning, 'none')
   })
 })
@@ -72,7 +69,7 @@ test('WHAT[execution-model-routing-001] EMR_001_existing_scheduler_is_never_over
 
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), existing)
-    assert.equal(invokeScheduler(scheduler, 'coder', []).model, 'provider/user-choice')
+    assert.equal(invokeScheduler(scheduler, 'engineer', []).model, 'provider/user-choice')
   })
 })
 test('WHAT[execution-model-routing-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async () => {
@@ -83,8 +80,8 @@ test('WHAT[execution-model-routing-001] EMR_001_concurrent_bootstrap_keeps_one_a
     ])
 
     assert.equal(await readFile(path, 'utf8'), template)
-    assert.equal(invokeScheduler(left, 'coder', []).model, 'provider/coder-model')
-    assert.equal(invokeScheduler(right, 'coder', []).model, 'provider/coder-model')
+    assert.equal(invokeScheduler(left, 'engineer', []).model, 'provider/engineer-model')
+    assert.equal(invokeScheduler(right, 'engineer', []).model, 'provider/engineer-model')
   })
 })
 }

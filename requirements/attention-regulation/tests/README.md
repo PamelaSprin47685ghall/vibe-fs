@@ -1,11 +1,15 @@
-# Proof status
+# attention-regulation 测试与证明范围
 
-Unit oracles for `attention-regulation-001` through `006`.
+本目录不定义额外规则。认知声明、工具边界行为与持久化事实分开验证。
 
-The test suite covers:
-- Cognitive stop semantics of `enough` with zero durable authority mutation (`001`).
-- Decommit semantics of `abandon` without mutating obligations or authority (`002`).
-- Work postponement with `defer` without creating execution or obligation state (`003`).
-- Occurrence idempotence and participant-life isolation for deferred work (`004`).
-- Single-consumption resurfacing during celebration without automatic activation (`005`).
-- Minimal projection boundary of attention state without workflow engine machinery (`006`).
+001—004 的 recordingPort 连接真实工具实现与真实 attention fold，但持久端口由测试控制；它证明空输入、准入材料、失败传递和 occurrence 去重，不等于经过真实磁盘。001 的实际模型是否停止无意义调查仍需行为评估，关键词不能代替。
+
+002 另经真实插件，传入含“删除产物、取消义务”的自然语言，确认实际 authority 投影、文件和 Host 会话保持不变；尚未种入完整正式 obligation ledger，因此不声称全部义务路径已证明。
+
+004 新增真实插件三次启动和两位参与者：暂缓事项在磁盘重开后保留，某参与者的露出不泄漏另一位的工作，已冻结的 celebration 结果在再重启后仍可重放。它未覆盖同一 SessionId 的旧 life 关闭及新 life 复用；当前只按 SessionId 存储，见 GAP-118。
+
+005 经真实插件验证 regret 不消费、celebrate 尾部露出、旧 occurrence 重放不消费后来新增条目；未创建新 session、prompt 或 authority。006 保留实际纯投影的选择消费与状态不变，撤下源码禁词扫描；依赖隔离仍待证，不能据几个单词不存在推断没有调度器。
+
+相同 occurrence 若携带不同正文，目前保留首次内容，却向调用方复述新输入。004 不再把这种不一致当正常幂等样本；先记录 30-D1，未额外规定必须覆盖、冻结返回或拒绝。
+
+TODO 不计入通过。GAP-118、施工记录与发布 TODO 共同保留未完成范围。

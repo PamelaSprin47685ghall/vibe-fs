@@ -1,22 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as delivery from '../../../dist/Enforcer/Guidance/DeliverySurface.js'
+import * as guidance from '../../../dist/Enforcer/Guidance/TipSurface.js'
+import { link, observe, withJournal, main } from './support/journal.mjs'
 
-const { empty, apply, applyReanchor, hasFullDelivered } = delivery
-
-const TipPresentation = Object.freeze({ Full: 'Full', IdentityOnly: 'IdentityOnly' })
-
-test('WHAT[guidance-delivery-001] TDP_006_frontier_and_coverage_are_two_axes_not_one_bool', () => {
-  // guidance-delivery-001 两轴分离：Frontier（哪些 occurrence 已交付，durable/monotonic）与
-  // Coverage（全文此刻是否可恢复，horizon-relative）不得压成单一 durable bool。
-  // 前沿轴：Full 交付被记录（monotonic 前进）。
-  const firstFull = apply('primitive-obsession', TipPresentation.Full, empty)
-  assert.equal(hasFullDelivered('primitive-obsession', firstFull), true)
-  // 覆盖轴：reanchor 清 Coverage 表达（FullDeliveredTips 投影被 void），
-  // 但 re-Full 后的状态与首次 Full 逐字节相同——既不误删已交付事实，
-  // 也不把语义恢复记成新 occurrence（单一 bool 必然在二选一上失败）。
-  const afterReanchor = applyReanchor(firstFull)
-  assert.equal(hasFullDelivered('primitive-obsession', afterReanchor), false)
-  const refilled = apply('primitive-obsession', TipPresentation.Full, afterReanchor)
-  assert.deepEqual(refilled, firstFull)
+test('WHAT[guidance-delivery-001] a new occurrence of the same tip has its own first delivery', { todo: 'GAP-115: current delivery stores only TipName; keep the real counterexample until 29-D1 settles occurrence semantics' }, async () => {
+  await withJournal(async ({ journal }) => {
+    await link(journal)
+    await observe(journal)
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'Full')
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'IdentityOnly')
+    await observe(journal, 2)
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'Full')
+  })
 })
