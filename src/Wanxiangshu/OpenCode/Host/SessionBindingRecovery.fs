@@ -7,6 +7,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Fission
 
 /// Restart drops every process-local execution binding. The durable handle
@@ -19,12 +20,20 @@ open Wanxiangshu.Execution.Fission
 module SessionBindingRecovery =
 
     let private agentNameOf (record: HandleRecord) : string =
-        let target = if isNull record.TargetAgent then "" else record.TargetAgent.Trim()
+        let target =
+            if isNull record.TargetAgent then
+                ""
+            else
+                record.TargetAgent.Trim()
+
         let byname = if isNull record.Byname then "" else record.Byname.Trim()
         // The execution agent is what the Host dispatches with (`engineer`), never
         // the logical reuse address (`decision-record-readonly`); binding the
         // byname would fail the next dispatch on participant drift.
-        if not (System.String.IsNullOrWhiteSpace target) then target else byname
+        if not (System.String.IsNullOrWhiteSpace target) then
+            target
+        else
+            byname
 
     let private parentOwningHandle (projections: AgentProjectionSet) (handle: HandleId) : SessionId option =
         projections.Sessions
@@ -38,12 +47,17 @@ module SessionBindingRecovery =
     /// Only parent-visible durable handles answer; Host-owned hidden leaves stay
     /// invisible to the parent's binding surface.
     let evidenceFor (projections: AgentProjectionSet) (childSessionId: SessionId) : (string * string) option =
+        // 1. Check parent-visible durable handles
         projections.HandleByChildSession
         |> Map.tryFind childSessionId
         |> Option.filter (fun record -> record.Ownership = HandleOwnership.DurableParentHandle)
         |> Option.bind (fun record ->
             parentOwningHandle projections record.Handle
             |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, agentNameOf record))
+        |> Option.orElseWith (fun () ->
+            // 2. Check durable Companion session associations
+            SessionAssociationProjection.tryMainSessionOf childSessionId projections.Associations
+            |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, "blogger"))
 
     /// Install the resolver over any projection source (the journal in production,
     /// a folded projection under test). The source is read on demand, so a later
@@ -69,7 +83,8 @@ module SessionBindingRecovery =
 
     /// Load Phase: install every durable resolver behind the process caches.
     let install (journal: AgentJournal) : unit =
-        let projections () = (AgentJournal.snapshot journal).AgentProjections
+        let projections () =
+            (AgentJournal.snapshot journal).AgentProjections
 
         installFrom projections
         FissionRuntime.installDurableLaneEvidence (fun laneSessionId -> fissionLaneFor (projections ()) laneSessionId)

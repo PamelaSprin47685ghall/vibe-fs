@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as binding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
-import { recovery, fold, link, admittedFission } from './support/load-projection.mjs'
+import { recovery, fold, link, admittedFission, canonical, id } from './support/load-projection.mjs'
 
 test('WHAT[crash-reconciliation-021] durable handles answer by id and byname without process registration', () => {
   const state = recovery.create()
@@ -38,6 +38,32 @@ test('WHAT[crash-reconciliation-021] a hidden Host-owned leaf yields no parent-v
   const state = recovery.create()
   link(state, { ownership: 'HostOwnedHidden' })
   assert.equal(recovery.bindingEvidence(state, 'child'), null)
+})
+
+test('WHAT[crash-reconciliation-021] a Companion binding cache miss resolves its durable main session and Blogger agent', () => {
+  const state = recovery.create()
+  const companion = 'ses-blogger-companion'
+  binding.drop(companion)
+  recovery.installResolvers(state)
+  try {
+    assert.equal(binding.tryParent(companion), '')
+    assert.equal(binding.tryAgent(companion), '')
+    assert.equal(recovery.bindingEvidence(state, companion), null)
+    fold(state, canonical('Companion', 'CompanionBloggerLinked', {
+      SessionId: id('SessionId', 'parent'),
+      BloggerSessionId: id('SessionId', companion),
+      BloggerAgent: 'blogger',
+    }))
+    assert.deepEqual(recovery.bindingEvidence(state, companion), { parent: 'parent', agent: 'blogger' })
+    assert.equal(binding.tryParent(companion), 'parent')
+    assert.equal(binding.tryAgent(companion), 'blogger')
+    binding.drop(companion)
+    assert.equal(binding.tryParent(companion), 'parent')
+    assert.equal(binding.tryAgent(companion), 'blogger')
+  } finally {
+    recovery.clearResolvers()
+    binding.drop(companion)
+  }
 })
 
 test('WHAT[crash-reconciliation-021] a Fission lane cache miss resolves the folded owner and slot without pre-registration', () => {
