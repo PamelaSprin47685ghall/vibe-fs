@@ -118,6 +118,8 @@
     <Compile Include="OpenCode/Host/SessionBindingRecovery.fs"/>
     <Compile Include="OpenCode/Host/ChildWorkRecovery.fsi"/>
     <Compile Include="OpenCode/Host/ChildWorkRecovery.fs"/>
+    <Compile Include="OpenCode/Host/DurableChildAdoption.fsi"/>
+    <Compile Include="OpenCode/Host/DurableChildAdoption.fs"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>

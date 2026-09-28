@@ -470,3 +470,111 @@ integrationTest('WHAT[crash-reconciliation-020] DevOps crash recovery maintains 
     assert.equal(listOf(ChildWorkRecovery.orphanedChildRuns(unlinked)).length, 0)
   })
 }
+
+// WHAT[crash-reconciliation-020]: a plain restart has no `/continue`, so the fork
+// runtime's child registry starts empty and a manager reuse of an existing byname
+// was answered with "person-unavailable" for every durable child. The durable
+// handles are the evidence for who may be addressed again; re-enlisting them is
+// bookkeeping, and reuse itself stays the manager's explicit action.
+{
+  const { default: assert } = await import('node:assert/strict')
+  const { default: test } = await import('node:test')
+  const root = '../../../dist'
+  const Fold = await import(`${root}/Composition/Durable/Fold.js`)
+  const Adoption = await import(`${root}/OpenCode/Host/DurableChildAdoption.js`)
+  const DelegationFacts = await import(`${root}/Execution/Delegation/Facts.js`)
+  const Roles = await import(`${root}/Foundation/Roles.js`)
+  const Fact = await import(`${root}/Composition/Durable/Fact.js`)
+  const Identity = await import(`${root}/Foundation/Identity.js`)
+
+  const parentSessionId = 'ses-road-root'
+  const sid = (value) => Identity.SessionIdModule_create(value)
+  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+  const listOf = (value) => Array.from(value)
+
+  const link = (handle, childSessionId, ownership, lifecycleTail = null) => {
+    const executions = [
+      new Fact.Fact(1, [
+        new Fact.AgentFact(3, [
+          new DelegationFacts.ExecutionFactCases(0, [
+            {
+              ParentSessionId: sid(parentSessionId),
+              ChildSessionId: sid(childSessionId),
+              Handle: handle,
+              TargetAgent: 'engineer',
+              Byname: handle,
+              CanonicalRole: Roles.Role.Engineer,
+              Ownership: ownership,
+            },
+          ]),
+        ]),
+      ]),
+    ]
+
+    let projections = Fold.empty
+
+    for (const fact of executions) {
+      const folded = Fold.foldFact(projections, fact)
+      assert.equal(folded.tag, 0, `the ${handle} link must fold`)
+      projections = folded.fields[0]
+    }
+
+    for (const tail of lifecycleTail === null ? [] : [].concat(lifecycleTail)) {
+      const closed = Fold.foldFact(
+        projections,
+        new Fact.Fact(1, [
+          new Fact.AgentFact(3, [new DelegationFacts.ExecutionFactCases(tail.tag, [tail.payload])]),
+        ]),
+      )
+
+      assert.equal(closed.tag, 0, `the ${handle} lifecycle tail must fold`)
+      projections = closed.fields[0]
+    }
+
+    return projections.AgentProjections
+  }
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_durable_children_are_addressable_after_a_plain_restart', () => {
+    const projections = link('frame-integrity', 'ses-engineer-child', DelegationFacts.HandleOwnership.DurableParentHandle)
+    const adoptable = listOf(Adoption.adoptableChildren(projections))
+
+    assert.equal(adoptable.length, 1, 'a live durable child is addressable again after restart')
+    assert.equal(raw(adoptable[0][1].ChildSessionId), 'ses-engineer-child')
+    assert.equal(raw(adoptable[0][1].Byname), 'frame-integrity')
+    assert.equal(raw(adoptable[0][0]), parentSessionId)
+  })
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_tombstones_and_hidden_leaves_are_not_addressable', () => {
+    // Retirement is only reachable through a durable completion first.
+    const retired = link('decision-record-readonly', 'ses-retired-child', DelegationFacts.HandleOwnership.DurableParentHandle, [
+      {
+        tag: 1,
+        payload: {
+          ParentSessionId: sid(parentSessionId),
+          Handle: 'decision-record-readonly',
+          Kind: DelegationFacts.HandleCompletionKind.Terminal,
+          CompletionRef: null,
+          CompletionDigest: null,
+        },
+      },
+      { tag: 2, payload: { ParentSessionId: sid(parentSessionId), Handle: 'decision-record-readonly' } },
+    ])
+    assert.equal(listOf(Adoption.adoptableChildren(retired)).length, 0, 'a retired handle is a tombstone')
+
+    const hidden = link('executor-leaf', 'ses-hidden-child', DelegationFacts.HandleOwnership.HostOwnedHidden)
+    assert.equal(listOf(Adoption.adoptableChildren(hidden)).length, 0, 'a Host-owned hidden leaf stays parent-invisible')
+
+    // A completion awaiting join is still addressable: the child owes a result.
+    const awaiting = link('w3ci5f', 'ses-awaiting-child', DelegationFacts.HandleOwnership.DurableParentHandle, {
+      tag: 1,
+      payload: {
+        ParentSessionId: sid(parentSessionId),
+        Handle: 'w3ci5f',
+        Kind: DelegationFacts.HandleCompletionKind.Terminal,
+        CompletionRef: null,
+        CompletionDigest: null,
+      },
+    })
+    assert.equal(listOf(Adoption.adoptableChildren(awaiting)).length, 1)
+  })
+}
