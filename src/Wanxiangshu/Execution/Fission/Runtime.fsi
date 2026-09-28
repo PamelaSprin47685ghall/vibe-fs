@@ -20,6 +20,9 @@ module FissionRuntime =
             unit
 
     val unbindLane: laneSessionId: SessionId -> unit
+    /// Load Phase: install the durable lane resolver behind the in-process cache.
+    val installDurableLaneEvidence: resolve: (SessionId -> FissionLaneBinding option) -> unit
+
     val tryLane: laneSessionId: SessionId -> FissionLaneBinding option
     val tryOwner: laneSessionId: SessionId -> SessionId option
     val logicalOwner: sessionId: SessionId -> SessionId

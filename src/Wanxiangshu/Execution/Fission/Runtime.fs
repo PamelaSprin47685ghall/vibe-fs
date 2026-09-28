@@ -69,11 +69,22 @@ module FissionRuntime =
     let unbindLane laneSessionId =
         lock gate (fun () -> lanes.Remove(SessionId.value laneSessionId) |> ignore)
 
+    // DSL-MUTABLE: single-flight — durable lane evidence installed at Load Phase.
+    // The registry above is a cache of the lanes this process drives; the fission
+    // projection is the truth that survives a restart (same rule as child
+    // bindings: durable answers existence, process tables answer "driving it now").
+    let mutable private durableLaneEvidence: (SessionId -> FissionLaneBinding option) option = None
+
+    let installDurableLaneEvidence (resolve: SessionId -> FissionLaneBinding option) =
+        durableLaneEvidence <- Some resolve
+
     let tryLane laneSessionId =
         lock gate (fun () ->
             match lanes.TryGetValue(SessionId.value laneSessionId) with
             | true, binding -> Some binding
-            | false, _ -> None)
+            | false, _ ->
+                durableLaneEvidence
+                |> Option.bind (fun resolve -> resolve laneSessionId))
 
     let tryOwner laneSessionId =
         tryLane laneSessionId |> Option.map (fun binding -> binding.OwnerSessionId)

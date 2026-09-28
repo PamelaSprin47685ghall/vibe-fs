@@ -568,3 +568,35 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     assert.equal(Lookup.byHandleId(linkedHandles(), '  ') ?? null, null)
   })
 }
+
+// WHAT[crash-reconciliation-020]: fission lanes follow the same rule — the lane
+// registry is a cache of what this process drives, the projection is the truth.
+// After a restart a lane caller must still resolve to its owner instead of being
+// silently treated as a plain session.
+{
+  const { default: assert } = await import('node:assert/strict')
+  const { default: test } = await import('node:test')
+  const FissionRuntime = await import('../../../dist/Execution/Fission/Runtime.js')
+  const Identity = await import('../../../dist/Foundation/Identity.js')
+
+  const sid = (value) => Identity.SessionIdModule_create(value)
+  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_fission_lane_resolves_from_durable_evidence_after_restart', () => {
+    FissionRuntime.FissionRuntime_installDurableLaneEvidence((laneSessionId) => {
+      if (raw(laneSessionId) !== 'ses-fission-lane') return null
+
+      return { GroupId: 'group-1', OwnerSessionId: sid('ses-owner'), LaneIndex: 1, LaneCount: 2 }
+    })
+
+    const binding = FissionRuntime.FissionRuntime_tryLane(sid('ses-fission-lane'))
+
+    assert.ok(binding, 'a restarted process must resolve the lane from durable evidence')
+    assert.equal(raw(binding.OwnerSessionId), 'ses-owner')
+    assert.equal(binding.GroupId, 'group-1')
+    assert.equal(binding.LaneIndex, 1)
+    assert.equal(binding.LaneCount, 2)
+    assert.equal(raw(FissionRuntime.FissionRuntime_tryOwner(sid('ses-fission-lane'))), 'ses-owner')
+    assert.equal(FissionRuntime.FissionRuntime_tryLane(sid('ses-unknown-lane')) ?? null, null)
+  })
+}

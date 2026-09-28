@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode.Host
 
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 
@@ -16,5 +17,8 @@ module SessionBindingRecovery =
     /// Install the resolver over a projection source.
     val installFrom: projections: (unit -> AgentProjectionSet) -> unit
 
-    /// Load Phase: install the durable resolver behind the binding cache.
+    /// Durable evidence for one fission lane (owner, group and slot).
+    val fissionLaneFor: projections: AgentProjectionSet -> laneSessionId: SessionId -> FissionLaneBinding option
+
+    /// Load Phase: install every durable resolver behind the process caches.
     val install: journal: AgentJournal -> unit

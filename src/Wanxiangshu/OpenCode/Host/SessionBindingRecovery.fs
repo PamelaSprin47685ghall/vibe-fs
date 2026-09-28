@@ -7,6 +7,8 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Execution.Fission
+
 /// Restart drops every process-local execution binding. The durable handle
 /// projection is the evidence that outlives it: which child session belongs to
 /// which parent, and with which execution agent. This module installs that
@@ -50,6 +52,24 @@ module SessionBindingRecovery =
         SessionExecutionBinding.installDurableChildEvidence (fun sessionKey ->
             evidenceFor (projections ()) (SessionId.create sessionKey))
 
-    /// Load Phase: install the durable resolver behind the binding cache.
+    /// Durable evidence for one fission lane: which owner and slot it belongs to.
+    /// The fission projection is the truth; the lane registry is the cache of the
+    /// lanes this process is currently driving.
+    let fissionLaneFor (projections: AgentProjectionSet) (laneSessionId: SessionId) : FissionLaneBinding option =
+        let state = projections.Fission
+
+        FissionProjection.tryMembershipOfLane laneSessionId state
+        |> Option.bind (fun (group, laneIndex) ->
+            FissionProjection.tryOwnerOfLane laneSessionId state
+            |> Option.map (fun owner ->
+                { GroupId = group.GroupId
+                  OwnerSessionId = owner
+                  LaneIndex = laneIndex
+                  LaneCount = group.LaneCount }))
+
+    /// Load Phase: install every durable resolver behind the process caches.
     let install (journal: AgentJournal) : unit =
-        installFrom (fun () -> (AgentJournal.snapshot journal).AgentProjections)
+        let projections () = (AgentJournal.snapshot journal).AgentProjections
+
+        installFrom projections
+        FissionRuntime.installDurableLaneEvidence (fun laneSessionId -> fissionLaneFor (projections ()) laneSessionId)
