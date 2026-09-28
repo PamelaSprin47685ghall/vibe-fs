@@ -1,4 +1,7 @@
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
+
+// Let Node deliver completed case results between the synchronous journal work.
+afterEach(() => new Promise(resolve => setImmediate(resolve)))
 
 {
 const { default: assert } = await import('node:assert/strict')
@@ -349,34 +352,43 @@ test('WHAT[behavior-diagnosis-017] late observers after settlement failure get t
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair observations preserve bounded effects', async (t) => {
+  let traceNumber = 0
   await fc.assert(fc.asyncProperty(
     fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
     async (trace) => {
-      const cleanups = []
-      const owner = await setupOwner({ after: fn => cleanups.push(fn) })
-      const { durable, scope, request, ids, ports, calls } = owner
-      try {
-        const { records } = await captureFatal(async () => {
-          let run = 0
-          for (const observation of trace) {
-            if (!observation.duplicate) run += 1
-            const providerRun = `generated-run-${run}`
-            if (observation.idle) {
-              await blog.observeIdleRepair(scope, durable, request,
-                idleObservation(ports, ids, providerRun, observation))
-            } else {
-              await blog.continueTransform(scope, durable, ids.blogger, ownedTerminal(ids, providerRun))
+      const proof = (async () => {
+        const cleanups = []
+        const owner = await setupOwner({ after: fn => cleanups.push(fn) })
+        const { durable, scope, request, ids, ports, calls } = owner
+        try {
+          const { records } = await captureFatal(async () => {
+            let run = 0
+            for (const observation of trace) {
+              if (!observation.duplicate) run += 1
+              const providerRun = `generated-run-${run}`
+              if (observation.idle) {
+                await blog.observeIdleRepair(scope, durable, request,
+                  idleObservation(ports, ids, providerRun, observation))
+              } else {
+                await blog.continueTransform(scope, durable, ids.blogger, ownedTerminal(ids, providerRun))
+              }
+              assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
+              assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
+              if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
             }
-            assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
-            assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
-            if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
-          }
-        })
-        assert.deepEqual(records, [])
-      } finally {
-        for (const cleanup of cleanups.reverse()) await cleanup()
-      }
+          })
+          assert.deepEqual(records, [])
+        } finally {
+          for (const cleanup of cleanups.reverse()) await cleanup()
+        }
+      })()
+      await t.test(`WHAT[behavior-diagnosis-017] generated repair trace ${++traceNumber}`, () => proof)
+      // Deliver the completed verdict before starting the next real trace.
+      await new Promise(resolve => setImmediate(resolve))
+      // node:test records child failure without rejecting t.test; FastCheck must
+      // receive the original proof rejection so counterexamples still shrink.
+      await proof
     },
   ), { seed: 20260914, numRuns: 60 })
 })

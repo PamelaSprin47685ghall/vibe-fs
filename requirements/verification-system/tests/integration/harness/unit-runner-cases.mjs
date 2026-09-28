@@ -139,6 +139,8 @@ export const unitRunnerCases = [
       const run = await runFixture('hangs-with-handle-and-chatter.fixture.mjs', scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS));
 
       assertTrue(run.code !== 0 || run.signal !== null, `a hung run must not succeed: code=${run.code}`);
+      assertTrue(run.stderr.includes('verdict counts unavailable; no authoritative summary'), 'a silence failure without summary must identify missing counts');
+      assertTrue(!/\b0 passed, 0 failed\b/.test(run.stderr), 'missing counts must not be reported as zero verdicts');
       assertTrue(
         run.elapsedMs < PARKED_IF_SLOWER_THAN_MS,
         `the run took ${run.elapsedMs}ms; the injected window is ${UNIT_RUNNER_PROBE_SILENCE_MS}ms and the backstop ` +
@@ -147,7 +149,7 @@ export const unitRunnerCases = [
       const silenceNamed =
         run.stderr.includes("WATCHDOG: 'tests/unit' silent for") ||
         run.stderr.includes('had not reported completion') ||
-        run.stderr.includes('every verdict passed but the child would not exit') ||
+        run.stderr.includes('all planned files completed but the child would not exit') ||
         run.stderr.includes('failed before the silence') ||
         // Piped stderr can lose the WATCHDOG prefix under process.exit; the
         // authoritative summary still proves the hang was judged a failure.
@@ -203,6 +205,10 @@ export const unitRunnerCases = [
         run.stderr.includes('runner: 1 passed, 0 failed'),
         `the authoritative summary must be printed: ${run.stderr.slice(-300)}`,
       );
+      assertTrue(
+        /^runner: post-exit group verification\/reclamation: pid=\d+; elapsedMs=\d+\.\d+; accepted=true$/m.test(run.stderr),
+        `a clean group must report its actual verification result: ${run.stderr}`,
+      );
     },
   },
 
@@ -219,7 +225,7 @@ export const unitRunnerCases = [
 
       assertEq(run.code, 1, `a leaked handle must fail the run even with every verdict green: ${run.stderr.slice(-300)}`);
       assertTrue(
-        run.stderr.includes('every verdict passed but the child would not exit') ||
+        run.stderr.includes('all planned files completed but the child would not exit') ||
           run.stderr.includes("WATCHDOG: 'tests/unit' silent for") ||
           run.stderr.includes('failed before the silence') ||
           /runner:\s*1 passed,\s*[1-9]\d* failed/.test(run.stderr),
@@ -251,7 +257,16 @@ export const unitRunnerCases = [
         assertTrue(run.stderr.includes('residual process group'), `the failure must identify remaining processes: ${run.stderr}`);
         assertEq(survivor, null, 'the supervisor must reclaim the late orphan before returning failure');
         assertTrue(!run.stderr.includes('WATCHDOG'), 'normal-exit cleanup must not wait for silence');
-        assertTrue(run.elapsedMs < UNIT_VERDICT_SILENCE_MS, 'residual group cleanup must finish within the unchanged silence window');
+        const checks = [...run.stderr.matchAll(/^runner: post-exit group verification\/reclamation: pid=(\d+); elapsedMs=(\d+\.\d+); accepted=(true|false)$/gm)];
+        assertEq(checks.length, 1, 'the actual post-exit group check must report exactly once');
+        assertEq(Number(checks[0][1]), evidence.pgid, 'the timed group check must own the fixture group');
+        assertEq(checks[0][3], 'false', 'reclaiming a residual group must not report a clean run');
+        const cleanupMs = Number(checks[0][2]);
+        assertTrue(cleanupMs > 0 && cleanupMs < run.elapsedMs, 'cleanup timing must measure a real phase inside the full run');
+        assertTrue(
+          cleanupMs < PROCESS_TREE_TIMEOUT_MS + SIGKILL_GRACE_MS,
+          `post-exit group verification/reclamation took ${cleanupMs}ms, beyond the existing inspection and SIGKILL budgets`,
+        );
       } catch (error) {
         errors.push(error);
       } finally {

@@ -158,6 +158,32 @@ module ManagerReviewContract =
     [<Emit("new AggregateError([$0, $1], 'Review executor and argument restoration failed', { cause: $0 })")>]
     let private combinedFailure (execution: exn) (restoration: exn) : exn = jsNative
 
+    let private executeRecordingFailure
+        (execute: obj)
+        (tool: obj)
+        (args: obj)
+        (context: obj)
+        (recordFailure: exn -> unit)
+        : Task<obj> =
+        task {
+            try
+                return! invokeExecute execute tool args context
+            with error ->
+                recordFailure error
+                return raise error
+        }
+
+    let private restorationFailure (executionFailure: exn option) (restoration: exn) : exn =
+        match executionFailure with
+        | Some execution -> combinedFailure execution restoration
+        | None -> restoration
+
+    let private restoreAfterExecution (args: obj) (executionFailure: exn option) : unit =
+        try
+            restore args
+        with restoration ->
+            raise (restorationFailure executionFailure restoration)
+
     let wrapReviewExecutors (tools: obj) : unit =
         if not (isPlainObject tools) then
             invalidArg "tools" "Registered tools must be an object"
@@ -175,18 +201,10 @@ module ManagerReviewContract =
                 let mutable executionFailure = None
 
                 try
-                    try
-                        return! invokeExecute execute tool args context
-                    with error ->
-                        executionFailure <- Some error
-                        return raise error
+                    return!
+                        executeRecordingFailure execute tool args context (fun error -> executionFailure <- Some error)
                 finally
-                    try
-                        restore args
-                    with restoration ->
-                        match executionFailure with
-                        | Some execution -> raise (combinedFailure execution restoration)
-                        | None -> raise restoration
+                    restoreAfterExecution args executionFailure
             }
 
         tool?execute <- uncurriedExecute (box wrapped)

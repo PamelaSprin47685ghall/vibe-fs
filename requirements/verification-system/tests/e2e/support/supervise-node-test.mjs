@@ -7,6 +7,7 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { relative, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -112,12 +113,10 @@ export async function superviseNodeTest({
     timeoutMs: silenceMs,
     label,
     onTimeout: () => {
-      const passedCount = runnerSummary?.passed ?? 0
-      const failedCount = runnerSummary?.failed ?? 0
-      if (failedCount === 0 && outstanding.size === 0) {
+      if (outstanding.size === 0) {
         console.error(
-          `${logPrefix}: every verdict passed but the child would not exit — ` +
-            'a handle the suite created is still open',
+          `${logPrefix}: all planned files completed but the child would not exit — ` +
+            'the runner lifecycle is still open',
         )
       } else {
         console.error(
@@ -125,7 +124,9 @@ export async function superviseNodeTest({
             `${[...outstanding].map((file) => relative(process.cwd(), file)).join(', ')}`,
         )
       }
-      console.error(`${logPrefix}: ${passedCount} passed, ${failedCount} failed before the silence`)
+      console.error(runnerSummary
+        ? `${logPrefix}: ${runnerSummary.passed} passed, ${runnerSummary.failed} failed before the silence`
+        : `${logPrefix}: verdict counts unavailable; no authoritative summary before the silence`)
       try {
         process.stderr.write('')
       } catch {}
@@ -182,7 +183,12 @@ export async function superviseNodeTest({
 
   watchdog.stop()
   clearTimeout(backstop)
+  const groupVerificationStarted = performance.now()
   const processGroupClean = child.pid ? await verifyExitedGroup(child.pid, logPrefix) : false
+  console.error(
+    `${logPrefix}: post-exit group verification/reclamation: pid=${child.pid ?? 'none'}; ` +
+      `elapsedMs=${(performance.now() - groupVerificationStarted).toFixed(3)}; accepted=${processGroupClean}`,
+  )
 
   if (!runnerSummary && exit.signal === null) {
     console.error(`${logPrefix}: inner runner failed to provide authoritative summary`)
@@ -195,9 +201,9 @@ export async function superviseNodeTest({
   reportDurationDistribution(logPrefix, leafDurations)
 
   console.error(
-    `\n${logPrefix}: ${passed} passed, ${failed} failed; ` +
-      `${files.length - outstanding.size}/${files.length} planned file(s) completed` +
-      (runnerSummary ? '' : '; no authoritative summary'),
+    `\n${logPrefix}: ` +
+      (runnerSummary ? `${passed} passed, ${failed} failed` : 'verdict counts unavailable; no authoritative summary') +
+      `; ${files.length - outstanding.size}/${files.length} planned file(s) completed`,
   )
 
   if (failed > 0) fail(1)

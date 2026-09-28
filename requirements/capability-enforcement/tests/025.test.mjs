@@ -123,11 +123,15 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     const beforeOutput = {
       args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
     }
+    const originalArgs = beforeOutput.args
+    const expectedArgs = { ...originalArgs }
     await hooks['tool.execute.before'](
       { tool: 'js-manager', sessionID, callID: 'call-p03' },
       beforeOutput,
     )
-    assert.equal('contract' in beforeOutput.args, false, 'js-manager must remain admitted and hide contract')
+    assert.equal(beforeOutput.args, originalArgs, 'admission must preserve the public argument object')
+    assert.deepEqual(originalArgs, expectedArgs, 'an admitted call must retain its public contract hint')
+    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
   })
 })
 
@@ -211,19 +215,19 @@ test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incum
       'js-manager must remain denied after restart when assessment was already accepted',
     )
 
-    // 重启后验证未接纳评审的 session：js-manager 专用只读工具仍准入，contract 正常被隐藏
+    // 重启后未接纳评审的 session 仍准入，公开参数须保留。
     const unacceptedBeforeOutput = {
       args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
     }
+    const originalArgs = unacceptedBeforeOutput.args
+    const expectedArgs = { ...originalArgs }
     await restartedPlugin['tool.execute.before'](
       { tool: 'js-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
       unacceptedBeforeOutput,
     )
-    assert.equal(
-      'contract' in unacceptedBeforeOutput.args,
-      false,
-      'js-manager must remain admitted after restart when assessment was not yet accepted',
-    )
+    assert.equal(unacceptedBeforeOutput.args, originalArgs)
+    assert.deepEqual(originalArgs, expectedArgs, 'admission after reopening must preserve the public contract hint')
+    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
 
     await stop(restartedPlugin)
   })
@@ -264,12 +268,17 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
       },
     }
 
-    // Step 1: before hook 检查通过并放行，私有隐藏 contract
+    const originalArgs = beforeOutput.args
+    const expectedArgs = { ...originalArgs }
+
+    // Step 1: before hook 检查通过并放行，保留公开参数。
     await hooks['tool.execute.before'](
       { tool: 'js-manager', sessionID, callID },
       beforeOutput,
     )
-    assert.equal('contract' in beforeOutput.args, false, 'before hook must strip contract parameter')
+    assert.equal(beforeOutput.args, originalArgs)
+    assert.deepEqual(originalArgs, expectedArgs)
+    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
 
     // Step 2: 在执行前注入已接纳评审事实（AcceptedAssessment）
     await injectAcceptedAssessment(runtime, sessionID)
@@ -289,6 +298,9 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
       /权威确立之前|authority is established/i,
       'Rejection must not be due to unestablished authority',
     )
+    assert.equal(beforeOutput.args, originalArgs)
+    assert.deepEqual(originalArgs, expectedArgs, 'execution denial must restore the original public arguments')
+    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
   })
 })
 
@@ -318,11 +330,16 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
       { sessionID, agent: 'manager', callID: call1ID, messageID: 'msg-p14' },
     )
     assert.deepEqual(parseToml(String(call1ExecResult)).data, { text: 'review evidence' })
+    assert.equal(
+      call1Output.args.contract,
+      'do-not-use-except-for-review',
+      'the actual executor must restore contract before returning',
+    )
 
     // 在 Call 1 获准后，系统接纳 Review
     await injectAcceptedAssessment(runtime, sessionID)
 
-    // Call 1 照常完成 after 恢复
+    // Call 1 的后置回调须保留执行器已经恢复的参数。
     await hooks['tool.execute.after'](
       { tool: 'js-manager', sessionID, callID: call1ID, args: call1Output.args },
       { title: 'js-manager', output: call1ExecResult, metadata: {} },
@@ -330,7 +347,7 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     assert.equal(
       call1Output.args.contract,
       'do-not-use-except-for-review',
-      'Call 1 must restore contract upon completion',
+      'the after callback must preserve the restored contract',
     )
 
     // 后续新调用（Call 2）发起，在入口即被拒绝

@@ -43,7 +43,8 @@ module PluginHooksSurface =
 
     let restoreReviewContract (args: obj) : unit = ManagerReviewContract.restore args
 
-    let wrapReviewExecutors (tools: obj) : unit = ManagerReviewContract.wrapReviewExecutors tools
+    let wrapReviewExecutors (tools: obj) : unit =
+        ManagerReviewContract.wrapReviewExecutors tools
 
     let hookFailurePolicy failure settlement : string =
         let typedFailure =

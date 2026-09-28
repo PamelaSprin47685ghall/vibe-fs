@@ -425,6 +425,7 @@ module HostForkChildDispatch =
 
             let! teardown = teardownChildren sessions (childIdsToCancel |> List.distinct)
             requireOk "Parent teardown failed" teardown
+
             let durableDevOpsChild =
                 durableHandles
                 |> Option.bind (fun handles -> DurableChildLookup.byByname handles "devops")

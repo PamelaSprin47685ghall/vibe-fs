@@ -238,6 +238,7 @@ module HookPolicy =
               Failure = HookFailureDisposition.TypedPolicyFailClosed
               Identity = IdentityPermission.NoIdentityAccess
               Admission = AdmissionPermission.NoAdmissionAccess }
+
     let accepts criticality disposition =
         match criticality, disposition with
         | HookCriticality.Security, HookFailureDisposition.BestEffortDiagnostic
