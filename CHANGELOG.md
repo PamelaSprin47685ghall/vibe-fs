@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **重启归位改为“作废中断 run”：horizon / join / reuse 三处状态一致（crash-reconciliation-020）**：上一版归位把遗留子 run 写成 `HandleCompleted(Cancelled)`，留下一个没有 body 的“未收交付”；但 `horizon` 的名单只收本进程持有或 Abandoned 的 handle（收养的子会话故意 dormant），于是 horizon 空空、join 无可收，而 reuse 门禁却认定有未清交付——三处各说各话（实机：六个既有 Engineer 子会话逐一 resume 全被答“此人目前无法再接下另一项托付”）。用户裁决：中断的 run 什么结果都没产出，就不欠任何人交代——horizon 为空、join 为空、直接 resume 才是正确时序。
+  修复：新增 durable 事实 `ExecutionFactCases.ChildRunVoided`（fold 只产出 `TerminatedChildHandle`，关闭子 run 权威、**不动 handle 生命周期**；codec 与 `ExecutionFact` 帮手同步），`ChildWorkRecovery` 的 Load Phase 结算改用它——子会话保持可复用，horizon 与 join 都不再出现幽灵交付。另修 `Tool.fs::reuseResolvedAgent` 的 `TryFindAgent = None` 分支：重启后的进程登记可能还没有该子会话，此时以 durable handle 为准走正常 reuse 路径，而不是回 `person-unavailable`。
+  验证：`CRASH_020_run_without_terminal_is_settled_at_load` 改为断言“结算后 handle 仍 Active、join 可收集合为空”；`CRASH_020_cancelled_completion_is_reported_and_retired_by_join` 继续覆盖真正带 `Cancelled` 完成时的单次报告；`crash-reconciliation + delegation + managed-session-lifecycle` 共 400 项全绿（durable-events 的 3 红为本会话之前即存在的 WIP：Strength fact 父边/oracle 清单）。
+
 - **取消的归位结果必须能被 join 收取：无主体的 `Cancelled` 完成改为报告一次后退休（crash-reconciliation-020）**：重启归位会把遗留子 run 结算成 `HandleCompleted(Cancelled)`，该完成没有 body；`JoinDrain.missingBodyOutcome` 对 `CompletedAwaitingJoin{Cancelled}` 返回 `None`（静默跳过），于是 join 报“没有在外可接收的工作”，而 fork 的 reuse 门禁又认定该子会话有未清交付——实机表现是 manager 对 domain-core / replica-runtime / spec-author / schema-contract / frame-integrity / recon 六个既有 Engineer 子会话逐一 resume 全被答“此人目前无法再接下另一项托付”，只能不断 fork 新名字。
   修复：`JoinDrain` 新增 `tryConsumeCancelledCompletion`，对无 body 的 `Cancelled` 完成按既有单次报告语义消费（`afterConsumeCas` 参数化 runId 前缀为 `cancelled-`），报告后退休该 handle，等价于 Abandoned 的单报墓碑；有 body 的完成路径不变。
   验证：新增 `CRASH_020_cancelled_completion_is_reported_and_retired_by_join`（真实 `drainFromJournalWhere` + 假 journal port：一次报告、durable append、handle 退休、不重复投递）；crash-reconciliation + delegation + managed-session-lifecycle 共 400 项全绿。

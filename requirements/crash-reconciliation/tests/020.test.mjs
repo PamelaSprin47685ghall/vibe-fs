@@ -177,6 +177,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const sessionId = (value) => Identity.SessionIdModule_create(value)
   const handleId = 'devops'
 
+  const caseTag = (name) => new DelegationFacts.ExecutionFactCases(0, []).cases().indexOf(name)
   const executionFact = (tag, payload) =>
     new Fact.Fact(1, [new Fact.AgentFact(3, [new DelegationFacts.ExecutionFactCases(tag, [payload])])])
 
@@ -257,7 +258,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 
     const abandoned = Fold.foldFact(
       projectionsSet,
-      executionFact(3, {
+      executionFact(caseTag('HandleAbandoned'), {
         ParentSessionId: sessionId(parentSessionId),
         Handle: handleId,
         Reason: DelegationFacts.HandleAbandonReason.HostSessionGone,
@@ -293,6 +294,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const Seed = await import(`${root}/Interaction/Authority/IdentitySeed.js`)
   const PersonaIdentity = await import(`${root}/Participant/Persona/Identity.js`)
   const ChildWorkRecovery = await import(`${root}/OpenCode/Host/ChildWorkRecovery.js`)
+  const Linkage = await import(`${root}/Execution/Delegation/LinkageProjection.js`)
   const DelegationFacts = await import(`${root}/Execution/Delegation/Facts.js`)
   const Roles = await import(`${root}/Foundation/Roles.js`)
   const Fact = await import(`${root}/Composition/Durable/Fact.js`)
@@ -388,8 +390,13 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     assert.equal(raw(orphans[0].Handle), 'devops')
 
     const settlement = ChildWorkRecovery.settlementFact(orphans[0])
-    assert.equal(settlement.tag, 1, 'the settlement rides the HandleCompleted execution fact')
-    assert.equal(settlement.fields[0].Kind, DelegationFacts.HandleCompletionKind.Cancelled)
+
+    assert.equal(
+      settlement.tag,
+      new DelegationFacts.ExecutionFactCases(0, []).cases().indexOf('ChildRunVoided'),
+      'the settlement voids the interrupted run (no completion cell: horizon and join stay empty)',
+    )
+    assert.equal(raw(settlement.fields[0].ChildSessionId), childSessionId)
 
     const settled = Fold.foldFact(
       { ...Fold.empty, AgentProjections: projections },
@@ -404,9 +411,15 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       null,
       'the settled child run must close so the next handoff roots freshly',
     )
+
     const handle = after.Sessions.get(sid(parentSessionId)).Handles.Handles.get('devops')
-    assert.equal(handle.Lifecycle.tag, 1, 'the parent handle must reach CompletedAwaitingJoin')
-    assert.equal(handle.Lifecycle.fields[0].Kind, DelegationFacts.HandleCompletionKind.Cancelled)
+
+    assert.equal(handle.Lifecycle.tag, 0, 'the handle stays Active: the interrupted run owes nothing')
+    assert.equal(
+      Array.from(Linkage.HandleProjection_joinable(after.Sessions.get(sid(parentSessionId)).Handles)).length,
+      0,
+      'join must have nothing to collect after a restart settlement',
+    )
   })
 
   test('WHAT[crash-reconciliation-020] CRASH_020_human_root_and_unlinked_sessions_are_never_settled', () => {

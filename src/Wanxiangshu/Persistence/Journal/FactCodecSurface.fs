@@ -180,6 +180,12 @@ module FactCodecSurface =
                        Reason = abandonReasonOf (payload?Reason)
                        AbandonedAt = DateTimeOffset.Parse(text (payload?AbandonedAt)) |}
             )
+        | "Execution", "ChildRunVoided" ->
+            Fact.Agent(
+                ExecutionFact.ChildRunVoided
+                    {| ParentSessionId = SessionId.create (text (payload?ParentSessionId))
+                       ChildSessionId = SessionId.create (text (payload?ChildSessionId)) |}
+            )
         | "Execution", "HandleCompleted" ->
             Fact.Agent(
                 ExecutionFact.HandleCompleted
@@ -330,6 +336,7 @@ module FactCodecSurface =
         | Fact.Runtime(RuntimeStarted _) -> "RuntimeStarted"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleAbandoned _)) -> "HandleAbandoned"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted _)) -> "HandleCompleted"
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.ChildRunVoided _)) -> "ChildRunVoided"
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreateRequested _)) ->
             "WorktreeCreateRequested"
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreated _)) -> "WorktreeCreated"

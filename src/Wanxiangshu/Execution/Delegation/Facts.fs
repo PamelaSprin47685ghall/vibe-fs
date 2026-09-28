@@ -44,6 +44,13 @@ type ExecutionFactCases =
     | HandleRetired of
         {| ParentSessionId: SessionId
            Handle: HandleId |}
+    /// crash-reconciliation-020: a child work run interrupted by a restart is
+    /// void — it produced nothing, so it owes nothing. The child's logical run is
+    /// closed (a later reuse roots freshly) while the handle itself stays exactly
+    /// as it was: no unreported delivery appears in horizon or join.
+    | ChildRunVoided of
+        {| ParentSessionId: SessionId
+           ChildSessionId: SessionId |}
     | HandleAbandoned of
         {| ParentSessionId: SessionId
            Handle: HandleId

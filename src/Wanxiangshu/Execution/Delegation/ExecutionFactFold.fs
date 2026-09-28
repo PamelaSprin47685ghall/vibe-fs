@@ -130,6 +130,8 @@ module ExecutionFactFold =
 
         // Clean-break: false abort cell → Active only when ref/digest match.
 
+        | ExecutionFactCases.ChildRunVoided payload -> Ok [ TerminatedChildHandle payload.ChildSessionId ]
+
         | ExecutionFactCases.HandleFalseCompletionRejected payload ->
             let priorState = sessionState payload.ParentSessionId
 

@@ -42,6 +42,10 @@ type ExecutionFactCases =
     | HandleRetired of
         {| ParentSessionId: SessionId
            Handle: HandleId |}
+    /// crash-reconciliation-020: a child work run interrupted by a restart is void.
+    | ChildRunVoided of
+        {| ParentSessionId: SessionId
+           ChildSessionId: SessionId |}
     | HandleAbandoned of
         {| ParentSessionId: SessionId
            Handle: HandleId

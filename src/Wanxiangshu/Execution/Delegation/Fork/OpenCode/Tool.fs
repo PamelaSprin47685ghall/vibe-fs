@@ -544,7 +544,12 @@ module ForkTool =
         | false, Some record, _ -> reuseWhileAllowed scope runtime context request language handles record.Role agentId
         | false, None, Role.DevOps ->
             reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
-        | false, None, _ -> Task.FromResult(consequence (prose language Path.Fork.PersonUnavailable))
+        | false, None, _ ->
+            // crash-reconciliation-020: a restarted process may not have the child
+            // in its runtime registry yet; the durable handle is the evidence that
+            // this person exists, so reuse goes through the normal path instead of
+            // answering "person-unavailable".
+            reuseWhileAllowed scope runtime context request language handles handle.CanonicalRole agentId
 
     let private executeManagerReusePerson
         (scope: ToolRuntimeScope)

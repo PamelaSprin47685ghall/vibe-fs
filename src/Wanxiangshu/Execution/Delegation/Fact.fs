@@ -18,6 +18,9 @@ module ExecutionFact =
     let inline HandleAbandoned payload =
         AgentFact.Execution(ExecutionFactCases.HandleAbandoned payload)
 
+    let inline ChildRunVoided payload =
+        AgentFact.Execution(ExecutionFactCases.ChildRunVoided payload)
+
     let inline HandleFalseCompletionRejected payload =
         AgentFact.Execution(ExecutionFactCases.HandleFalseCompletionRejected payload)
 

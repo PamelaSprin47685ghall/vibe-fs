@@ -26,6 +26,12 @@ module ExecutionFact =
                ParentSessionId: SessionId |} ->
             AgentFact
 
+    val inline ChildRunVoided:
+        payload:
+            {| ChildSessionId: SessionId
+               ParentSessionId: SessionId |} ->
+            AgentFact
+
     val inline HandleRetired:
         payload:
             {| Handle: HandleId

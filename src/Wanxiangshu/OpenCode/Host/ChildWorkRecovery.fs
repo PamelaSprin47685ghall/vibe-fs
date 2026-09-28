@@ -20,11 +20,11 @@ open Wanxiangshu.Persistence.Journal
 /// handle that will never complete.
 ///
 /// The explicit reset happens here, once, at load: every child work run still
-/// active at startup is settled as `HandleCompleted(Cancelled)` — the durable
-/// evidence that closes the child authority (the delegation fold derives
-/// `TerminatedChildHandle` from it) and answers the parent's join. The child's
-/// transcript is untouched, and restarting the work remains the manager's own
-/// explicit decision.
+/// active at startup is voided — the durable evidence that closes the child
+/// authority (the delegation fold derives `TerminatedChildHandle` from it) while
+/// leaving the handle itself untouched, so nothing appears as an unreported
+/// delivery. The child's transcript is untouched, and restarting the work
+/// remains the manager's own explicit decision.
 module ChildWorkRecovery =
 
     type OrphanedChildRun =
@@ -68,13 +68,15 @@ module ChildWorkRecovery =
     let orphanedChildRuns (projections: AgentProjectionSet) : OrphanedChildRun list =
         activeChildRuns projections |> List.choose (handleFor projections)
 
+    /// The interrupted run produced nothing, so it owes nothing: closing the
+    /// child's logical run is the whole settlement. Marking a completion here
+    /// would leave an unreported delivery that horizon never shows and join is
+    /// asked to collect — the child stays reusable and both views stay empty,
+    /// exactly as a fresh process should look.
     let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases =
-        ExecutionFactCases.HandleCompleted
+        ExecutionFactCases.ChildRunVoided
             {| ParentSessionId = orphaned.ParentSessionId
-               Handle = orphaned.Handle
-               Kind = HandleCompletionKind.Cancelled
-               CompletionRef = None
-               CompletionDigest = None |}
+               ChildSessionId = orphaned.ChildSessionId |}
 
     let settleOrphanedChildRuns (journal: AgentJournal) : Task<unit> =
         task {
