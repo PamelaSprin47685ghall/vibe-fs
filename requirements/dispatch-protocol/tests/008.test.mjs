@@ -42,7 +42,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
     inheritedIdentity,
   )
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
-  const seed = authority.issueInheritedIdentitySeed('coder', owner.profile)
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }
@@ -55,7 +55,7 @@ const userMessageWithKey = (id, keyValue) => ({
 test('WHAT[dispatch-protocol-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp008-'))
   try {
-    // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt —— claim 挂起。
+    // 首个 writer 发送 AgentOwnerRoot（Detached），Host 只回 receipt —— claim 挂起。
     const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp008-1', 'rt_1', 4242, '2026-01-01T00:00:00Z')
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
@@ -70,7 +70,7 @@ test('WHAT[dispatch-protocol-008] DP_008_unproven_outcome_stays_pending_never_re
       assert.ok(sent.key, 'Detached 仍返回 PromptKey')
       assert.equal(captured.length, 1, '发送只发生一次')
 
-      // 启动 2（崩溃后重开同目录）：快照找不到匹配物理消息 → StillPending，
+      // 同进程第二个 writer 读取同目录：快照无匹配物理消息 → StillPending，
       // 保持 Pending，绝不重发（SendPrompt 不再被调用）。
       const second = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp008-2', 'rt_2', 4243, BOOT_AFTER_CLAIM)
       assert.equal(second.ok, true, second.ok ? '' : JSON.stringify(second.error))
@@ -238,3 +238,5 @@ test('WHAT[dispatch-protocol-008] DP_008_concurrent_exact_gate_nudges_share_one_
   }
 })
 }
+
+test.todo('WHAT[dispatch-protocol-008] repeated post-flight exact occasions send again only after durable Abandoned, never after Pending, Submitted or PhysicalAccepted (GAP-136)')

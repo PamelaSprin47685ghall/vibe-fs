@@ -240,15 +240,6 @@ type SyncDelegateRuntime
             let route = DelegationHandoffRoute.syncRole call.OwnerScope call.Role
             let! prepared = handoff.Prepare call.Owner route |> TaskResultCE.ofTask
 
-            // EXEC-031: capture the Opening from the raw Charge (not the
-            // provider envelope). PromptIngress omits
-            // Opening for AgentOwnerRoot, so the LWR projector would otherwise
-            // return None and the bounded record would be undefined. Idempotent:
-            // a reused child keeps its first invocation's Opening (PERSIST-010).
-            let! _ =
-                XTraceCapture.captureOpeningWithReceipt (Some journal) call.Delegate request.Charge []
-                |> TaskResult.mapError (fun error -> sprintf "sync delegate opening trace capture failed: %A" error)
-
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
             // per-invocation range; the exclusive end is the same head
@@ -279,6 +270,11 @@ type SyncDelegateRuntime
 
             match activeDelegateProfile with
             | None ->
+                // Reused children keep their original Opening; new charges are continuations.
+                let! _ =
+                    XTraceCapture.captureOpeningWithReceipt (Some journal) call.Delegate request.Charge []
+                    |> TaskResult.mapError (fun error -> sprintf "sync delegate opening trace capture failed: %A" error)
+
                 let! _ =
                     dispatcher.SendAgentOwnerRootWithTools
                         (DispatchSessionPort.ofSessionPort sessions)

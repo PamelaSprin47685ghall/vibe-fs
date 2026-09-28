@@ -70,3 +70,16 @@ test('WHAT[time-capability-004] missing_production_root_fails_closed', () => {
     /raw-time scan root does not exist/,
   )
 })
+
+test('WHAT[time-capability-004] comment-only mentions do not access ambient time', () => {
+  assert.deepEqual(scanRawTimeEntries([
+    { file: 'Domain/Doc.fs', text: '/// Do not read DateTimeOffset.UtcNow here.\nmodule Doc\n' },
+  ]), [])
+})
+
+test('WHAT[time-capability-004] an adapter exception applies only to the exact file', () => {
+  const entry = { file: 'Session/PhysicalClockAdapter.fs', text: 'let now = DateTimeOffset.UtcNow\n' }
+  assert.deepEqual(scanRawTimeEntries([entry], { allowlist: [entry.file] }), [])
+  assert.equal(scanRawTimeEntries([entry], { allowlist: ['Session/'] }).length, 1)
+  assert.equal(scanRawTimeEntries([entry], { allowlist: [] }).length, 1)
+})

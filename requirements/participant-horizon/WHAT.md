@@ -2,7 +2,7 @@
 
 ## [001] 信息准入由 decision filter 决定
 
-所有进入 provider-visible 视界的信息必须通过正向准入决策过滤器（Decision Filter）：
+信息进入 Provider 可见视界前，必须通过 Decision Filter：
 1. 参与者是否已知？已知则省略。
 2. 是否为参与者自身刚提供的内容？是则省略。
 3. 是否已被成功状态所蕴含？是则省略（回声不是有效观测）。
@@ -12,63 +12,62 @@
 
 ## [002] 内部机器拓扑不穿过 horizon
 
-任何底层机器拓扑标识（包括 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`FissionGroupId`、`lane_index`、`worktree` 路径、重试 offset、`fast-*`/`deep-*` 绑定自称以及内部 spool 路径）严禁出现在面向模型的提示词�工具参数或返回值中。
+内部会话、任务、终端、分身、调度槽位及重试标识，内部 worktree/spool 路径和 `fast-*`/`deep-*` 绑定自称，不得进入模型提示、工具参数或返回值。
 
 ## [003] 通用状态 DTO 不投影，后果用自然语言
 
-严禁向模型暴露 `status`、`code`、`message`、`count`、`ordinal`、`kind` 等通用 DTO 字段。超时、等待结束、中断及普通失败一律以自然语言后果表述（如 DevOps 等待预算耗尽渲染为自然语言说明，禁止返回 `TIMED_OUT` 或 `status="failed"`）。
+机器控制状态不得作为 `status`、`code`、`message`、`count`、`ordinal`、`kind` 等通用 DTO 字段投影。超时、等待结束、中断与普通失败须表达为自然语言后果，不输出 `TIMED_OUT` 或 `status="failed"` 等状态标签。
 
 ## [004] 已知道/回声/成功蕴含/仅调试信息被省略
 
-已为模型所知的信息、模型自身输入的重复回传、成功完成所隐含的事实以及仅用于内部追踪的元数据，一律从返回视界中剔除。工具成功返回不得机械重复输入内容作为观测。
+返回时省略已知、输入回声、成功已蕴含及仅供追踪的信息，不把重复输入冒充新观测。
 
 ## [005] 需要原始测量时只给必要 observation
 
-当参与者确实需要物理指标以决定后续行动时（如进程退出的 `exit_code`、非空 stdout/stderr 输出），仅提供最小原始测量事实，不附加 Host 的主观判定或状态标签。
+需要测量值来决定下一步时，只提供必要原始观测，如真实 `exit_code`、非空 stdout/stderr；不附加 Host 主观判定或状态标签。
 
 ## [006] 内部状态优先转成行动相关后果
 
-机器内部状态（任务槽位、缓冲区、重试轮次）在进入视界前必须转化为「该状态对当前工作意味着什么、下一步应采取什么行动」的语义后果与工作记录（WorkRecord）。
+任务槽位、缓冲区、重试轮次等内部状态，只以对当前工作和下一步行动的后果或 WorkRecord 呈现。
 
 ## [007] 内部参与者不进入 provider-visible surface
 
-Blogger、Bookkeeper、Predictor 等内部辅助角色严禁出现在模型可见的 enum、Schema、fork 候选或参数说明中。底层的批处理任务切片与内部 session 标识严禁进入工具面。
+Blogger、Bookkeeper、Predictor 等内部辅助角色不进入模型可见的 enum、Schema、fork 候选或参数说明；内部任务切片与会话标识不进入工具面。
 
 ## [008] 隐藏 review 编排不进 Manager horizon
 
-面向 Manager 的所有固定界面（system prompt、continuation、schema、错误提示、tool description 及 result）严禁暴露第二评审身份、专用评审会话、确认屏障或双重检查机制。
-assessment 结论只以原子物化的质量义务与工作权形式进入账本（relay-assessment-004），不携带编排者身份。
+Manager 的 system prompt、continuation、Schema、错误、工具描述及结果不得暴露第二评审身份、专用会话、确认屏障或双重检查。assessment 结论按 relay-assessment-004 原子物化为质量义务与工作权，不附带编排者身份。
 
 ## [009] 隐藏 target 只返回 generic unavailable
 
-当模型尝试访问或调度不可见的目标（如 Predictor、Bookkeeper 等内部角色）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
+访问或调度不可见目标时，只返回通用不可用拒绝，不确认目标存在，也不说明它是内部专用。
 
 ## [010] fork/commission 可见集合与固定 DevOps 语义
 
 - Manager `fork` 仅可见：`engineer`（单一本名版本）；Manager 严禁通过 `fork` 启动 DevOps 或内部身份。
-- Orchestrator `commission` 仅可见：`manager`。
+- Orchestrator `commission` 只委托 Manager；合法身份词汇由 participant-identity 与 delegation 定义。
 - 固定 DevOps 由合法 Runtime 绑定创建，在模型视界中仅以稳定 Byname（常量 `devops`）呈现，仅通过 `resume` 续做调用（传入 name = `devops`），严禁出现在 `fork` 的候选名单中。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
 - Blogger、Bookkeeper、Predictor 等内部角色以及 coder、inspector、browser、inquiry、distiller 严禁出现在可 fork 集合中。
 
 ## [011] `horizon()` 是 pull-only snapshot
 
-`horizon()` 是按需主动拉取的快照接口，禁止轮询、后台推送或 watcher 订阅。其返回当前在场各可见子智能体的最新工作记录；若记录暂不可读则直接说明，不得以陈旧数据伪装最新状态。
+`horizon()` 只在调用时读取当前快照，不轮询、推送或订阅。可见子智能体须提供最新 durable WorkRecord；不可读时说明，不以旧记录代替。
 
-父级可见 child 一旦已经 durable 建立，就不得在其最终后果尚未交付给父级前从 horizon 消失。尤其 `Abandoned` 是“该 child 没有回来”的可行动后果：在 Join 将这项后果消费并把 handle 退休之前，`horizon()` 必须继续按 Byname 展示该 child 并明确说明其未返回。只有已 `Retired` 的 handle 才可从 roster 移除；不得把 `listable/outstanding` 等终结门禁视图误用成 horizon roster。
+已 durable 建立的可见 child，在最终后果交付前不得消失。`Abandoned` 仍按 Byname 显示“未返回”，直至 Join 消费后果并将 handle 置为 `Retired`；仅 `Retired` 可移出名册。
 
 ## [012] warm-start hints 只向有 repository 证据 authority 的角色准入
 
-仓库热启动线索（WarmStart hints）仅向有权直接接触仓库证据的角色（Engineer、DevOps）准入。其余角色仅可沿调用链传递关键词，不得接收仓库代码片段。
+WarmStart hints 仅向有仓库证据权限的 Engineer、DevOps 提供；其他角色只能沿调用链传递关键词，不接收代码片段。
 
 ## [013] hints 是 data，不是 instruction/proof/history
 
-进入模型视界的热启动线索必须明确标记为低置信度的参考数据（orientation data），绝非指令、证明或合成的工具历史，严禁伪造文件读取或搜索历史。
+WarmStart hints 必须明确标为低置信度的 orientation data，不是指令、证明或工具历史，不伪造读取或搜索记录。
 
 ## [014] 虚假 affordance / 不可达路径不穿越
 
-视界中严禁展示指向已不存在实体的路径或标识，工具与动作名称仅表达真实的语义动作，不将无法执行的内部机器状态伪装成可选动作。
+不展示指向已不存在实体的路径或标识，不把不可执行的内部状态伪装成可选动作。
 
 ## [015] Manager 并行来自派出多名 Engineer 而非自身分身
 
-Manager 在视界中通过 fork 派出多名独立的 Engineer 获得任务并行，Manager 自身禁止使用 Fission 分身。Manager 的 horizon 与工具视界中严禁展示 Manager 自身分身、分身共享 DevOps 或管理分裂等虚假 affordance。各 Engineer 子会话独立在场并按稳定 Byname 呈现在 horizon 名册中。
+Manager 的并行来自 fork 多名独立 Engineer，自身不使用 Fission。horizon 与工具面不得呈现 Manager 分身、分身共享 DevOps 或管理分裂；各 Engineer 以稳定 Byname 独立在场。

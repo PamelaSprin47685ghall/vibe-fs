@@ -307,3 +307,5 @@ test('WHAT[dispatch-protocol-012] DP_012_ingress_missing_agent_remains_none_with
   assert.equal(dispatch.decodeIngress({}, {}).explicitAgent, null)
 })
 }
+
+test.todo('WHAT[dispatch-protocol-012] real PhysicalAccepted handoff retains the whole atomic profile and only managed execution acquires exact capacity and creates execution facts (GAP-136)')

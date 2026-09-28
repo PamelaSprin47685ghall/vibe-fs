@@ -226,7 +226,7 @@ const { default: test } = await import("node:test");
 const workRecord = await import("../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js");
 
 
-test('WHAT[work-record-011] WORK_RECORD_SECTIONS_lifecycle_source_declares_three_canonical_headings', () => {
+test('WHAT[work-record-011] actual renderer uses the three canonical sections and omits empty sections', () => {
   const opening = workRecord.opening('Fix the bug', ['Must be tested', 'Must be performant'], 'Plan for the mission')
   const frames = ['Frame 1 chronicle entry', 'Frame 2 chronicle entry']
   const gap = 'Recent edits performed in this round'

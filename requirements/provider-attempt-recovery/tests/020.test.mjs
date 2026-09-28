@@ -118,7 +118,7 @@ const buildPlan = (over) => {
   return built
 }
 
-test('WHAT[provider-attempt-recovery-020] recovery holds manual-only ownership and publishes no background resume', () => {
+test('WHAT[provider-attempt-recovery-020] actual plan freeze bind and consume create no manual intervention', () => {
   const scope = RecoveryScope.createRecoveryScope()
   assert.deepEqual(RecoveryScope.recoveryOwnership(scope), { manuals: 0 })
 
@@ -130,3 +130,5 @@ test('WHAT[provider-attempt-recovery-020] recovery holds manual-only ownership a
   assert.deepEqual(RecoveryScope.recoveryOwnership(scope), { manuals: 0 })
 })
 }
+
+test.todo('WHAT[provider-attempt-recovery-020] real journal replay without exact licence produces no provider retry or resume side effect (GAP-139)')

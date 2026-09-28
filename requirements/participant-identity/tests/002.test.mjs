@@ -1,75 +1,49 @@
 import test from 'node:test'
 
 {
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { assertJsData } = await import("../../verification-system/tests/support/js-contract.mjs");
+const { default: assert } = await import('node:assert/strict')
+const Temporal = await import('../../../dist/Verification/TemporalSurface.js')
 
-const identity = await import('../../../dist/Participant/Persona/Surface.js')
-const EXPECTED_ROLES = [
-  'manager',
-  'orchestrator',
-  'engineer',
-  'devops',
-  'blogger',
-]
-const EXPECTED_LEGACY = [
-  'coder',
-  'inspector',
-  'browser',
-  'inquiry',
-  'distiller',
-  'build',
-  'plan',
-  'student',
-  'teacher',
-  'meditator',
-  'executor',
-]
-const EXPECTED_PERSONAS = {
-  orchestrator: 'Director',
-  manager: 'Lead',
-  engineer: 'Engineer',
-  devops: 'Operator',
-  blogger: 'Chronicler',
-}
-const personaLabel = (role) => identity.persona(role, '')
-
-test('WHAT[participant-identity-002] persona_catalog_maps_roles_to_single_persona', () => {
-  for (const [role, expected] of Object.entries(EXPECTED_PERSONAS)) {
-    assert.equal(personaLabel(role), expected)
+test('WHAT[participant-identity-002] durable provider failure fold preserves the exact IdentitySeed', () => {
+  const session = 'ses-identity-fold'
+  const scope = {
+    SessionId: session,
+    LogicalRunId: 'run-identity-fold',
+    AuthorityRootUserMessageId: 'root-identity-fold',
   }
-  assert.equal(identity.bookkeeperPersona(''), 'Curator')
-  assert.equal(identity.resolveParticipantIdentityAtRoot('bookkeeper').identity.persona, 'Curator')
-  assert.equal(identity.resolveParticipantIdentityAtRoot('predictor').identity.persona, 'Engineer')
-})
-test('WHAT[participant-identity-002] all_legacy_bare_names_are_rejected', () => {
-  assert.deepEqual(new Set(identity.legacyNames), new Set(EXPECTED_LEGACY))
-  for (const bare of EXPECTED_LEGACY) {
-    assert.equal(identity.isLegacyName(bare), true, `'${bare}' must be legacy`)
-    assert.equal(identity.isManagedName(bare), false, `'${bare}' must not parse as managed`)
+  const seed = {
+    Kind: 'RootSelection',
+    OwnerSessionId: null,
+    OwnerLogicalRunId: null,
+    OwnerAuthorityRootUserMessageId: null,
+    ParticipantIdentity: {
+      participant: 'engineer', role: 'engineer', Persona: 'Engineer',
+      PersonaCatalogVersion: 1, Origin: 'ResolvedAtRoot',
+    },
   }
-  assert.equal(identity.isLegacyName('fast_reviewer'), true)
-  assert.equal(identity.isManagedName('fast_reviewer'), false)
-  assert.equal(identity.isLegacyName('reviewer-fast'), false)
-  assert.equal(identity.isManagedName('reviewer-fast'), false)
-  for (const name of identity.requiredNames) assert.equal(identity.isLegacyName(name), false)
-})
-test('WHAT[participant-identity-002] rejection_prose_is_version_agnostic', () => {
-  const supported = identity.formatLegacyNameNotSupported('student')
-  const inConfig = identity.formatLegacyNameInConfig('student')
-  for (const text of [supported, inConfig]) {
-    assert.doesNotMatch(text, /0\.5\.\d/)
-    assert.doesNotMatch(text, /Wanxiangshu\s+0\.5\.0/)
+  const envelope = (seq, family, caseName, payload, run = null) => ({
+    id: `identity-fold-${seq}`, seq, stream: { kind: 'Session', session }, run,
+    fact: { family, case: caseName, payload },
+  })
+  const root = envelope(1, 'Prompt', 'AuthorityRootAccepted', {
+    ...scope, SchemaVersion: 2, AuthorityKind: 'HumanRoot', IdentitySeed: seed,
+  })
+  const events = [root]
+  for (const count of [1, 2]) {
+    const providerRun = `provider-${count}`
+    events.push(envelope(count + 1, 'ProviderFailure', 'FailureRecorded', {
+      ...scope, ProviderRun: providerRun, ConsecutiveFailureCount: count, Reason: 'provider_error',
+    }, providerRun))
+    const folded = Temporal.fold(events)
+    assert.equal(folded.ok, true, JSON.stringify(folded.error))
+    const current = folded.value.sessions[session]
+    assert.equal(current.providerFailures.failures, count)
+    assert.equal(current.providerFailures.exhausted, false)
+    assert.deepEqual(current.activeLogicalRun.identitySeed, seed)
+    assert.deepEqual(current.activeLogicalRun.participantIdentity, seed.ParticipantIdentity)
+    assert.equal(current.activeLogicalRun.logicalRun, scope.LogicalRunId)
+    assert.equal(current.activeLogicalRun.authorityRoot, scope.AuthorityRootUserMessageId)
   }
-  assert.equal(
-    supported,
-    "Legacy agent name 'student' is not supported.",
-  )
-  assert.equal(
-    inConfig,
-    "Legacy agent name 'student' is present in opencode.json.",
-  )
 })
 }
 

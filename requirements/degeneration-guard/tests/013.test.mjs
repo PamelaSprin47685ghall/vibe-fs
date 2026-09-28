@@ -1,39 +1,48 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as loopSensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { assertOptionalObservationNoninterference } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
+import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
+import { awaitOwned, repetitiveText } from './support/stream.mjs'
 
-
-
-test('WHAT[degeneration-guard-013] diagnostic failure cannot alter loop guard arm interrupt consume or continuation', async () => {
-  assert.throws(
-    () => loopSensor.create({ owned: ['session-1'], abort: () => {}, continue: () => {} }),
-    /requires a diagnostic callback/,
-  )
-
+const execute = async (diagnosticThrows, continuationFails) => {
+  const trace = []
   const diagnostics = []
-  const aborts = []
-  const continuations = []
-  const sensor = loopSensor.create({
-    owned: ['session-1'],
-    diagnostic: (operation) => {
-      diagnostics.push(operation)
-      throw new Error('diagnostic unavailable')
+  const handle = sensor.create({
+    owned: ['session'],
+    diagnostic: (operation, fields) => {
+      diagnostics.push([operation, fields])
+      if (diagnosticThrows) throw new Error('diagnostic unavailable')
     },
-    abort: (session) => aborts.push(session),
-    continue: (session, kind) => continuations.push([session, kind]),
+    abort: id => { trace.push(['interrupt', id]); return { ok: true } },
+    continue: (id, kind) => {
+      trace.push(['continue', id, kind])
+      return continuationFails ? { ok: false, error: 'refused' } : { ok: true }
+    },
   })
+  sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
+  await awaitOwned(handle, 'session', 'run')
+  trace.push(['cause', sensor.consumeAbortCause(handle, 'session', 'run')])
+  await awaitOwned(handle, 'session', 'run')
+  trace.push(['duplicate', sensor.consumeAbortCause(handle, 'session', 'run')])
+  trace.push(['remaining', sensor.activeTask(handle, 'session', 'run')])
+  assert.ok(diagnostics.length > 0)
+  return { trace, diagnostics }
+}
 
-  const providerRun = 'provider-run-1'
-  loopSensor.observe(sensor, loopSensor.textDelta('session-1', ' retry'.repeat(2000), providerRun))
-  await loopSensor.activeTask(sensor, 'session-1', providerRun)
-  assert.deepEqual(aborts, ['session-1'])
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'session-1', providerRun), {
-    cause: 'DegenerationGuard',
-    anomaly: 'TooRepetitive',
-  })
-  await loopSensor.activeTask(sensor, 'session-1', providerRun)
-  assert.deepEqual(continuations, [['session-1', 'TooRepetitive']])
-  assert.deepEqual(diagnostics, ['degeneration-guard', 'degeneration-guard', 'degeneration-guard'])
-  await assertOptionalObservationNoninterference()
+test('WHAT[degeneration-guard-013] the diagnostic capability is mandatory', () => {
+  assert.throws(() => sensor.create({ owned: ['session'], abort: () => {}, continue: () => {} }), /requires a diagnostic callback/)
 })
+
+for (const continuationFails of [false, true]) {
+  test(`WHAT[degeneration-guard-013] diagnostic exceptions preserve actual control trace and continuation failure=${continuationFails}`, async () => {
+    const normal = await execute(false, continuationFails)
+    const failed = await execute(true, continuationFails)
+    assert.deepEqual(failed, normal)
+    assert.deepEqual(normal.trace, [
+      ['interrupt', 'session'],
+      ['continue', 'session', 'TooRepetitive'],
+      ['cause', { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' }],
+      ['duplicate', { cause: 'External' }],
+      ['remaining', null],
+    ])
+  })
+}

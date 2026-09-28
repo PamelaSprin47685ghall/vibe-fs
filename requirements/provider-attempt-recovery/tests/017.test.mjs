@@ -6,7 +6,7 @@ const ctx = owner
 const parkedTransform = owner
 const KEY = 'ses-blog-par-017'
 
-test('WHAT[provider-attempt-recovery-017] PAR_017_blogger_retry_replaces_exact_physical_binding_before_redispatch', () => {
+test('WHAT[provider-attempt-recovery-017] runtime request ownership rejects stale release after explicit replacement', () => {
   const scope = parkedTransform.scope()
   const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
   const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })
@@ -36,11 +36,12 @@ test('WHAT[provider-attempt-recovery-017] PAR_017_blogger_retry_replaces_exact_p
     'Conflict:request-replacement',
   )
 
-  // Rebind protection: same request re-materialization with replacement prompt key
-  // does not rebind across active flight
+  // This closes local ownership; it does not persist Abandoned or send a retry.
   assert.equal(
     parkedTransform.releaseCurrentRequest(scope, KEY, 'request-replacement'),
     'Released',
     'replacement can be cleanly released after retry',
   )
 })
+
+test.todo('WHAT[provider-attempt-recovery-017] actual Main→Main Main→Squash and Squash→Main recovery commits old abandonment before fresh materialization and PromptKey binding (GAP-139)')

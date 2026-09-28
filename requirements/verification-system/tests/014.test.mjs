@@ -26,6 +26,9 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
+import { compileScenario } from './e2e/support/scenario-schema.js'
+import { resolveEntry } from './e2e/support/runtime-key.js'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import './e2e/support/env-pin.mjs'
@@ -52,7 +55,7 @@ import {
   collectManagerProviderToolEvidence,
 } from './e2e/support/manager-tool-surface-evidence.mjs'
 
-test('WHAT[verification-system-014] Long Stroke environment enforces single OpenCode process lifetime and static entry gate contract', () => {
+test('WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard', () => {
   // VERIFICATION-SYSTEM-014 requires the Layer 4 Long Stroke environment to be driven
   // by exactly one sole E2E entry executing under a single process lifecycle.
   const here = fileURLToPath(import.meta.url)
@@ -63,6 +66,60 @@ test('WHAT[verification-system-014] Long Stroke environment enforces single Open
 
   // Verify that the entry defines the single physical server and single lifecycle contract
   assert.ok(entryPath.endsWith('014.test.mjs'), 'Long Stroke sole entry must be 014.test.mjs')
+})
+
+test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases', () => {
+  const source = readFileSync(new URL('./e2e/scenarios/long-stroke.toml', import.meta.url), 'utf8')
+  const result = compileScenario(source, { name: 'long-stroke.toml' })
+  assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'))
+  const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]))
+  const ordinary = byId.get('manager-loop.2')
+  assert.deepEqual({ optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
+    { optional: false, lane: 'manager', step: 2 })
+  assert.deepEqual(result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
+    .map((fault) => fault.entryId), ['manager-loop.2', 'continue.0'])
+
+  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide']
+  const managerTools = ['fork', 'resume', 'join', 'horizon', 'assume', 'suicide']
+  const request = (turn, step, tools) => ({
+    messages: [{ role: 'user', content: turn },
+      ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` }))],
+    tools: tools.map((name) => ({ name })),
+  })
+  const bindings = new Map([['manager', 'ses_manager']])
+  const context = { sessionId: 'ses_manager' }
+  assert.equal(resolveEntry(request('# Work remains away.', 1, managerTools), result.scenario.entries, bindings, context).matched?.id,
+    'manager-join-guard.0')
+  const assessUser =
+    '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +
+    '# part of the work, or may already have finished it; investigate the actual workspace before you\n' +
+    "# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n" +
+    '# rather than trusting any inherited claim.\n' +
+    '#\n' +
+    "# During assessment, you may directly use the review-only read tool js-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work"
+  for (const [step, tool] of [[0, 'review'], [1, 'suicide']]) {
+    const id = `manager-reopened-loop.${step}`
+    const entry = byId.get(id)
+    assert.deepEqual({ step: entry?.step, optional: entry?.optional, internal: entry?.internal, tool: entry?.respond?.tool },
+      { step, optional: true, internal: true, tool })
+    assert.equal(resolveEntry(request(assessUser, step, loopTools), result.scenario.entries, bindings, context).matched?.id, id)
+  }
+  assert.equal(result.scenario.flow.filter((step) => step.waitAny).length, 0)
+  for (let index = 0; index <= 2; index += 1) {
+    const id = `manager-loop.${index}`
+    assert.ok(result.scenario.must.includes(id), `${id} must be an exact must step`)
+    assert.deepEqual(byId.get(id)?.tools, loopTools)
+    assert.equal(byId.get(id)?.internal, false)
+  }
+  assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-resume.')))
+  const currentActions = result.scenario.entries.filter((entry) => entry.turnId === 'manager-current-action')
+  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 11 }, (_, index) => index))
+  assert.ok(currentActions.every((entry) => entry.optional === true))
+  assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-current-action.')))
+  assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-repair-resume.')))
+  assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')))
+  assert.deepEqual({ journal: result.scenario.setup.maxJournalEvents, sse: result.scenario.setup.maxSseEvents },
+    { journal: 699, sse: 3351 }, 'the measured scenario ceilings stay fixed during migration')
 })
 
 const STRENGTH_HOST_CANARY_PROMPT =

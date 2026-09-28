@@ -20,6 +20,9 @@ module GroundingCatalog =
     [<Import("statSync", "node:fs")>]
     let private statSync (path: string) : obj = jsNative
 
+    [<Import("lstatSync", "node:fs")>]
+    let private lstatSync (path: string) : obj = jsNative
+
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
 
@@ -28,6 +31,12 @@ module GroundingCatalog =
 
     [<Import("relative", "node:path")>]
     let private pathRelative (fromPath: string, toPath: string) : string = jsNative
+
+    [<Import("dirname", "node:path")>]
+    let private pathDirectory (path: string) : string = jsNative
+
+    [<Import("basename", "node:path")>]
+    let private pathName (path: string) : string = jsNative
 
     [<Import("resolve", "node:path")>]
     let private pathResolve (path: string) : string = jsNative
@@ -78,14 +87,29 @@ module GroundingCatalog =
         else
             Some relative
 
-    let private workspaceRelative workspace canonicalRoot path =
-        let lexicalRoot = pathResolve workspace
-        let absolute = absolutePath lexicalRoot path
-
+    let private missingEntry path =
         try
-            realpathSync absolute |> relativeWithin canonicalRoot
+            lstatSync path |> ignore
+            false
+        with error ->
+            emitJsExpr error "$0.code === 'ENOENT'"
+
+    let rec private canonicalTarget path =
+        try
+            Some(realpathSync path)
         with _ ->
-            relativeWithin lexicalRoot absolute
+            let parent = pathDirectory path
+
+            if parent = path || not (missingEntry path) then
+                None
+            else
+                canonicalTarget parent
+                |> Option.map (fun resolved -> pathJoin (resolved, pathName path))
+
+    let private workspaceRelative workspace canonicalRoot path =
+        absolutePath (pathResolve workspace) path
+        |> canonicalTarget
+        |> Option.bind (relativeWithin canonicalRoot)
 
     let private matches pattern path =
         match GlobMatch.matchesPathPattern pattern path with
@@ -124,6 +148,12 @@ module GroundingCatalog =
         with _ ->
             false
 
+    let private fileExists path =
+        try
+            isFile (statSync path)
+        with _ ->
+            false
+
     let private loadRules packageName packageRoot =
         let path = pathJoin (packageRoot, "APPLIES-TO")
 
@@ -138,7 +168,7 @@ module GroundingCatalog =
         let root = pathJoin (requirementsRoot, name)
         let what = pathJoin (root, "WHAT.md")
 
-        if directoryExists root && existsSync what then
+        if directoryExists root && fileExists what then
             Some
                 { Name = name
                   Root = root

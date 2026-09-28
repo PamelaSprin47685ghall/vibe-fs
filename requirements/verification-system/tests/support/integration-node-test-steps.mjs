@@ -16,7 +16,7 @@ export function integrationNodeTestSteps(root) {
         path.join(root, 'requirements/capability-enforcement/tests/006.test.mjs'),
         path.join(root, 'requirements/capability-enforcement/tests/010.test.mjs'),
         path.join(root, 'requirements/capability-enforcement/tests/011.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/022.test.mjs'),
+        path.join(root, 'requirements/intra-participant-parallelism/tests/017.test.mjs'),
         path.join(root, 'requirements/change-integration/tests/002.test.mjs'),
         path.join(root, 'requirements/change-integration/tests/005.test.mjs'),
         path.join(root, 'requirements/change-integration/tests/008.test.mjs'),

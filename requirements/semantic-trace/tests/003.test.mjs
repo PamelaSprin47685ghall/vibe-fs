@@ -44,6 +44,7 @@ test('WHAT[semantic-trace-003] concurrent same-session captures serialize before
     assert.equal(second.ok, true, second.ok ? '' : second.error)
     const parts = trace.orderedSemanticParts(trace.snapshot(handle, SESSION))
     assert.equal(parts.length, 2)
+    assert.deepEqual(parts.map((part) => part.cursor.sequence), [1, 2])
     assert.deepEqual(parts.map((part) => part.provenance).sort(), [
       'g:0/msg:concurrent-a/host-part:concurrent-a-part',
       'g:0/msg:concurrent-b/host-part:concurrent-b-part',
@@ -87,7 +88,7 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[semantic-trace-003] cursor vocabulary is monotonic and opaque', () => {
+test('WHAT[semantic-trace-003] owner cursor operations are monotonic', () => {
   const origin = trace.originCursor
   const second = trace.next(origin)
   const third = trace.next(second)

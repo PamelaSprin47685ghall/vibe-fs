@@ -1,56 +1,32 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as causal from '../../../dist/Execution/Session/Wait/Surface.js'
 
-const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
+const descriptor = causal.createWait({
+  waitKind: 'business-result',
+  owner: causal.owner('workflow', { id: 'owner' }),
+  subject: { target: 'result' },
+  producer: causal.externalProducer('capability', { id: 'producer' }),
+  escapes: [causal.escape('processLifetime')],
+  source: 'diagnostic-failure-isolation',
+})
 
-const process = await import('../../../dist/Process/Surface.js')
-
-const owner = (id) => causal.owner('flow', { id })
-
-const external = (id) => causal.externalProducer('capability', { id })
-
-const waitFor = (ownerId, producerId, waitKind = 'capability') =>
-  causal.createWait({
-    waitKind,
-    owner: owner(ownerId),
-    subject: { target: producerId },
-    producer: external(producerId),
-    escapes: [causal.escape('processLifetime')],
-    source: 'causal-wait.test',
-  })
-
-const deferred = () => {
-  let resolve
-  let reject
-  const promise = new Promise((resolveValue, rejectValue) => {
-    resolve = resolveValue
-    reject = rejectValue
-  })
-  return {
-    promise,
-    resolve,
-    reject,
-    cancel: () => reject(new Error('Operation Cancelled')),
-  }
-}
-
-const lastExit = (registry) => {
-  const history = causal.snapshot(registry).history
-  assert.ok(history.length > 0, 'expected history')
-  assert.ok(history.at(-1).exit, 'expected leave exit')
-  return history.at(-1).exit
-}
-
-const activeCount = (registry) => causal.snapshot(registry).active.length
-
-test('WHAT[causal-wait-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
+test('WHAT[causal-wait-001] a failing diagnostic destination does not change business completion or failure', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-diagnostic-failure-'))
+  const blocked = join(dir, 'not-a-directory')
+  writeFileSync(blocked, 'ordinary file prevents diagnostic directory creation')
   const registry = causal.createRegistry()
-  const observer = causal.observerCapability(registry)
-  const reader = causal.snapshotReaderCapability(registry)
-  const lease = causal.observerEnter(observer, waitFor('hub', 'ext'))
-  assert.equal(causal.readerSnapshot(reader).active.length, 1)
-  assert.throws(() => causal.readerSnapshot(observer), /snapshot reader capability required/)
-  causal.markExit(lease, 'WaitResolved')
-  causal.dispose(lease)
+  try {
+    assert.equal(causal.bindDiagnosticWorkspace(registry, blocked), true)
+    assert.equal(await causal.awaitTask(registry, descriptor, Promise.resolve('business value')), 'business value')
+    await assert.rejects(causal.awaitTask(registry, descriptor, Promise.reject(new Error('business failure'))), /business failure/)
+    const snapshot = causal.snapshot(registry)
+    assert.equal(snapshot.active.length, 0)
+    assert.deepEqual(snapshot.history.filter(event => event.kind === 'Left').map(event => event.exit), ['WaitResolved', 'WaitFailed'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

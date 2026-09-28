@@ -226,11 +226,11 @@ module ExecutorTool =
         let notice =
             ProviderProse.render language Path.Run.OutputTruncated (Map [ "budget_bytes", string limitBytes ])
 
-        ToolHostCodec.tomlObjectWithInstructions
-            [ notice ]
+        tomlObject
             [ "exit_code", TInt exitCode
               "output", TString output
-              "output_truncated", TBool true ]
+              "output_truncated", TBool true
+              "output_notice", TString notice ]
 
     let private formatTailOutcome language limitBytes exitCode truncated output =
         match truncated with

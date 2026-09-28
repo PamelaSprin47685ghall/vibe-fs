@@ -171,3 +171,20 @@ test(
   },
 )
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const runtime = await import('../../../dist/Process/Surface.js')
+  test('WHAT[process-execution-004] effective deadline takes the smaller estimate and hard limit', () => {
+    for (const [estimate, expected] of [[10, 10], [2000, 2000], [5000, 3600]]) {
+      assert.equal(runtime.effectiveDeadlineSeconds(estimate, 3600), expected)
+    }
+    for (const invalid of [NaN, Infinity, -Infinity, 0, -10]) {
+      assert.equal(runtime.effectiveDeadlineSeconds(invalid, 60), 60)
+    }
+    assert.equal(runtime.defaultHardLimitSeconds, 3600, 'current default policy, not a universal time contract')
+  })
+  test('WHAT[process-execution-004] deadline result describes waiting ending without claiming a return', () => {
+    assert.match(runtime.renderDeadlineExpired(), /No return reached you before your waiting ended/)
+  })
+}

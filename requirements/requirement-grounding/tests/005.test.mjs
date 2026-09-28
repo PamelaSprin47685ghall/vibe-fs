@@ -30,6 +30,8 @@ test('WHAT[requirement-grounding-005] APPLIES-TO external grounding injects only
   try {
     writeFileSync(join(dir, 'requirements', 'alpha', 'PROOF.md'), 'proof\n', 'utf8')
     writeFileSync(join(dir, 'requirements', 'alpha', 'notes.txt'), 'not guidance\n', 'utf8')
+    writeFileSync(join(dir, 'requirements', 'alpha', 'tests', 'README.md'), 'nested Markdown is not grounding\n', 'utf8')
+    mkdirSync(join(dir, 'requirements', 'alpha', 'DIRECTORY.md'))
 
     const opened = await host.createJournal(dir)
     assert.equal(opened.ok, true)
@@ -46,6 +48,12 @@ test('WHAT[requirement-grounding-005] APPLIES-TO external grounding injects only
     assert.equal(terminalOutput.includes('notes.txt'), false)
     assert.equal(terminalOutput.includes('/tests/'), false)
     assert.equal(terminalOutput.includes('/APPLIES-TO'), false)
+    assert.equal(terminalOutput.includes('nested Markdown'), false)
+    assert.equal(terminalOutput.includes('DIRECTORY.md'), false)
+    assert.deepEqual(
+      [...terminalOutput.matchAll(/requirement_source_path = "([^"]+)"/g)].map((match) => match[1]),
+      ['HOW.md', 'PROOF.md', 'WHAT.md', 'WHY.md'].map((file) => `requirements/alpha/${file}`),
+    )
     assert.equal(projected.value.some((m) => m.info?.source === host.source), false)
     host.disposeJournal(opened.journal)
   } finally { cleanup() }

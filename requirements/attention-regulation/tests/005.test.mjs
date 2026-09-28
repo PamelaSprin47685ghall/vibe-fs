@@ -1,37 +1,35 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import * as toolModule from '@opencode-ai/plugin'
-import * as attention from '../../../dist/Interaction/Attention/Surface.js'
-import * as tools from '../../../dist/OpenCode/Tools/AttentionToolSurface.js'
+import { withExecutablePlugin, acceptAuthorityRoot, activateLife, observeAuthority } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-const read = (path) => readFileSync(path, 'utf8')
-
-const context = (sessionID = 'ses-a', callID = 'call-1') => ({ sessionID, callID, messageID: 'run-1' })
-
-const recordingPort = () => {
-  const fixture = { state: attention.empty(), reads: 0, appends: [], accept: true, fault: null }
-  fixture.tools = tools.create(toolModule, () => {
-    fixture.reads += 1
-    return fixture.state
-  }, async (session, providerRun, fact) => {
-    fixture.appends.push({ session, providerRun, fact })
-    if (fixture.fault) throw fixture.fault
-    if (!fixture.accept) return false
-    fixture.state = attention.record(fact.session, fact.occurrence, fact.text, fixture.state)
-    return true
+test('WHAT[attention-regulation-005] actual celebrate appends deferred items at the tail once while regret and replay do not consume new work', async () => {
+  await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
+    const sessionID = 'attention-celebrate'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager', 'root-attention')
+    await activateLife(runtime, sessionID, 'root-attention')
+    const before = observeAuthority(runtime, sessionID)
+    const ctx = (callID) => ({ sessionID, agent: 'manager', messageID: 'run-attention', callID })
+    const defer = (text, callID) => hooks.tool.defer.execute({ new_work: text }, ctx(callID))
+    const args = { experience: 'A local experiment completed.' }
+    await defer('FIRST DEFERRED ITEM', 'defer-1')
+    await defer('SECOND DEFERRED ITEM', 'defer-2')
+    const regret = await hooks.tool.regret.execute(args, ctx('regret-1'))
+    assert.equal(regret.includes('DEFERRED ITEM'), false)
+    const first = await hooks.tool.celebrate.execute(args, ctx('celebrate-1'))
+    assert.ok(first.indexOf('FIRST DEFERRED ITEM') > 0)
+    assert.ok(first.indexOf('SECOND DEFERRED ITEM') > first.indexOf('FIRST DEFERRED ITEM'))
+    assert.ok(first.trimEnd().endsWith('SECOND DEFERRED ITEM'))
+    await defer('THIRD DEFERRED ITEM', 'defer-3')
+    assert.equal(await hooks.tool.celebrate.execute(args, ctx('celebrate-1')), first)
+    const next = await hooks.tool.celebrate.execute(args, ctx('celebrate-2'))
+    assert.ok(next.includes('THIRD DEFERRED ITEM'))
+    assert.equal(next.includes('FIRST DEFERRED ITEM'), false)
+    assert.equal(next.includes('SECOND DEFERRED ITEM'), false)
+    const finished = await hooks.tool.celebrate.execute(args, ctx('celebrate-3'))
+    assert.equal(finished.includes('DEFERRED ITEM'), false)
+    assert.deepEqual(observeAuthority(runtime, sessionID), before)
+    assert.deepEqual(runtime.prompts, [])
+    assert.deepEqual(runtime.abortedIds, [])
+    assert.deepEqual(created, [])
   })
-  return fixture
-}
-
-test('WHAT[attention-regulation-005] resurfacing consumes deferred visibility once without activating work', () => {
-  let state = attention.empty()
-  state = attention.record('ses-a', 'call-1', 'one', state)
-  state = attention.record('ses-a', 'call-2', 'two', state)
-  state = attention.resurface('ses-a', 'learn-1', ['call-1', 'call-2'], state)
-  state = attention.resurface('ses-a', 'learn-1', ['call-1', 'call-2'], state)
-  assert.deepEqual(attention.pending('ses-a', state), [])
-
-  const projection = read('src/Wanxiangshu/Interaction/Attention/Projection.fs')
-  assert.doesNotMatch(projection, /StartWork|Activate|Delegate|Background/)
 })

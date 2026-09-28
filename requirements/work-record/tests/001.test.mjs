@@ -48,3 +48,25 @@ test('WHAT[work-record-001] LWR_same_record_projected_two_ways_shares_work_facts
   assert.equal(withOpening.includes('Opening'), true)
   assert.equal(withoutOpening.startsWith('Opening\n'), false)
 })
+
+{
+const { writeFileSync } = await import('node:fs')
+const { join } = await import('node:path')
+const { record, commitFrame, withReopenableJournal } = await import('./support/record.mjs')
+test('WHAT[work-record-001] corruption after a frame commit cannot become a silently incomplete canonical record', async () => {
+  await withReopenableJournal(async (handle, _reopen, directory) => {
+    const session = 'record-corrupt-frame'
+    await record.captureOpening(handle, session, 'task', [])
+    await record.captureProjection(handle, session, { messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'task' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'work done' }] },
+    ] })
+    const written = await commitFrame(handle, session, { from: 0, through: 2, body: 'settled work', id: 'bad' })
+    writeFileSync(join(directory, 'wanxiang', 'payloads', written.blobDigest), 'tampered after commit')
+    assert.equal(await record.lifecycleWorkRecord(handle, session, true), null)
+    assert.equal(await record.lifecycleWorkRecordBounded(handle, session, {
+      StartInclusive: { Sequence: 1 }, EndExclusive: { Sequence: 3 },
+    }), null)
+  })
+})
+}

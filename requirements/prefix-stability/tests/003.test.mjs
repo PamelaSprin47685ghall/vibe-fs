@@ -22,9 +22,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[prefix-stability-003] CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
-  // The absence of a rollback, seen from the planner: a failed probe attempt produces
-  // no promotable probe, and the next slot's plan reads the same committed snapshot.
+test('WHAT[prefix-stability-003] absent candidate selects the supplied committed snapshot', () => {
   const committed = snapshotAt(4)
 
   const failed = planner.attemptPlan({
@@ -39,8 +37,6 @@ test('WHAT[prefix-stability-003] CTX_010_a_discarded_probe_leaves_the_committed_
   assert.equal(failed.probeId, null)
   assert.equal(failed.noProbeReason, 'NoCoverage')
 
-  // The next, unarmed slot projects the committed prefix — cutoff 4, not the
-  // candidate's 9.
   const next = prefix.forChoice({ kind: 'committed' }, committed, companion.memoryPreamble, 'B BODY')
   assert.equal(next.dropLeading, 4)
 })
@@ -77,43 +73,4 @@ test('WHAT[prefix-stability-003] CTX_010_the_required_blob_follows_the_choice_no
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const prefix = await import("../../../dist/Context/Prefix/Surface.js");
-
-const candidate = ({ cutoff, prefixDigest = `prefix-${cutoff}`, digest = `frozen-${cutoff}`, seal = `seal-${cutoff}` }) =>
-  prefix.snapshot({
-    ref: `blob-frozen-${cutoff}`,
-    frozenDigest: digest,
-    cutoff,
-    prefixDigest,
-    sealRoot: seal,
-    syntheticId: `synthetic-${seal}`,
-  })
-const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixDigest }) =>
-  prefix.applyRebase(
-    { previousEpoch, nextEpoch, candidate: candidate({ cutoff, digest, seal, prefixDigest }) },
-    state,
-  )
-const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
-  prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
-
-test('WHAT[prefix-stability-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
-  // There is no rollback operation to test, and that absence IS the clause: a
-  // discarded candidate never became a fact. The projection a failed probe leaves
-  // behind is byte-identical to the one before it.
-  const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 4 }).value
-
-  // The claim is the absence of a CATEGORY of operation, so it is asserted as a
-  // pattern rather than by enumerating every key. An enumeration breaks whenever an
-  // unrelated accessor is added — it did, when `isReanchored` arrived — and each such
-  // break teaches the reader to update the list rather than to think about the rule.
-  for (const forbidden of ['rollback', 'revert', 'undo', 'restore', 'clear', 'discard']) {
-    assert.equal(typeof prefix[forbidden], 'undefined', `${forbidden} must not be an epoch API`)
-  }
-
-  assert.equal(prefix.epochOf(committed), 1n)
-  assert.deepEqual(committed.snapshot, candidate({ cutoff: 4 }))
-})
-}
+test.todo('WHAT[prefix-stability-003] actual failed probe leaves no prefix commit or rollback in durable history; missing export names do not prove this; GAP-106')

@@ -1376,6 +1376,8 @@ Repository/Programming/Js/OpenCode/ToolHost.fsi
 Repository/Programming/Js/OpenCode/ToolHost.fs
 OpenCode/Host/WorkspaceEventStore.fsi
 OpenCode/Host/WorkspaceEventStore.fs
+OpenCode/Host/WorkspaceEventStoreSurface.fsi
+OpenCode/Host/WorkspaceEventStoreSurface.fs
 Persistence/Journal/Surface.fsi
 Persistence/Journal/Surface.fs
 OpenCode/Host/WorkspaceSharedJournal.fsi

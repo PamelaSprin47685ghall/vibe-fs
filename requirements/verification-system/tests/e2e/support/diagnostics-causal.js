@@ -1,6 +1,5 @@
 /**
- * diagnostics-causal.js — Scheme B causal-wait snapshot collect/format helpers.
- * Kept separate so diagnostics-collect/format stay under the 200-line budget.
+ * Collect and render the causal wait snapshot, including unavailable evidence.
  */
 
 import fs from 'node:fs';
@@ -35,18 +34,29 @@ export function correlateCausalExpectations(blocked, snap) {
 
 export function collectCausalWaits(diag, scenario) {
   const workDir = scenario.host?.workDir;
-  if (!workDir) return;
+  if (!workDir) {
+    diag.causalWaitError = 'snapshot location unavailable: no host work directory';
+    return;
+  }
   const filePath = path.join(workDir, '.wanxiangshu', 'diagnostics', 'causal-waits.json');
-  if (!fs.existsSync(filePath)) return;
+  if (!fs.existsSync(filePath)) {
+    diag.causalWaitError = `snapshot missing: ${filePath}`;
+    return;
+  }
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (!Array.isArray(raw?.active) || !Array.isArray(raw?.history)) {
+      throw new Error('active and history must be arrays');
+    }
     diag.causalWaitSnapshot = raw;
     if (raw.frontiers) diag.causalFrontier = raw.frontiers;
     const blocked = scenario.provider?.blockedExpectations;
     if (Array.isArray(blocked) && blocked.length > 0) {
       diag.causalExpectationCorrelation = correlateCausalExpectations(blocked, raw);
     }
-  } catch {}
+  } catch (error) {
+    diag.causalWaitError = `snapshot invalid or unreadable: ${error.message}`;
+  }
 }
 
 function formatOwner(owner) {
@@ -87,6 +97,7 @@ function formatFrontier(frontier) {
 }
 
 export function formatCausalSection(diag) {
+  if (diag.causalWaitError) return [`Current waits unavailable: ${diag.causalWaitError}`, ''];
   if (!diag.causalWaitSnapshot && !diag.causalFrontier) return [];
   const out = ['════════════ CAUSAL FRONTIER ════════════'];
   const frontiers = diag.causalFrontier

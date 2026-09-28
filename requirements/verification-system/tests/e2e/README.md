@@ -1,10 +1,10 @@
 # E2E — One World / The Long Stroke
 
-Sole entry: `node requirements/verification-system/tests/014.test.mjs`（经 `npm run verify:release`）。
+Sole entry: `requirements/verification-system/tests/014.test.mjs`，由 `npm run verify:release` 开启 release 层执行；直接运行文件不会自动开启真实验收。分层和因果进展例子见 [测试说明](../README.md)。
 
 | File | Role |
 |------|------|
-| `014.test.mjs` | Only top-level E2E entry (G4R / One World) |
+| `../014.test.mjs` | Only top-level E2E entry (One World) |
 | `scenarios/long-stroke.toml` | Provider turn script for the Long Stroke |
 | `support/long-stroke-oracles.mjs` | Sequencing / adversity oracles the TOML cannot express |
 
@@ -31,12 +31,12 @@ mechanism.
 
 ## Related unit proof
 
-`requirements/delegation/tests/join-wake-owner.test.mjs` — real journal-less
+`requirements/delegation/tests/015.test.mjs` — real journal-less
 join interruption, child completion after interruption, spurious wakes and lock release.
 
-`requirements/change-integration/tests/verdict-mailbox.test.mjs` — real verdict
+`requirements/change-integration/tests/014.test.mjs` and `015.test.mjs` — real verdict
 mailbox drain-before-interrupt, removal of interrupted waiters, bounded FIFO and
 idle completion. Neither probe claims journal-backed or fission-lane coverage.
 
-Temporal race extraction lives under `tests/unit/temporal/` (G4R-1/2), not as
-extra E2E canaries.
+Temporal race examples live in `requirements/verification-system/tests/007.test.mjs`,
+with shared support in `requirements/verification-system/tests/support/temporal-harness.mjs`.

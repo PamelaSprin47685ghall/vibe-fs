@@ -1,23 +1,6 @@
 import test from 'node:test'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const tr = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
-const retirement = await import("../../../dist/Mission/Relay/Retirement/Surface.js");
-
-
-test('WHAT[structured-workflow-003] Orchestrator retirement and decision state operates without resumable workflow continuation addresses', () => {
-  const decision = retirement.decide([], {
-    assessed: true,
-    openObligations: 0,
-    testsPassing: true,
-    dirty: false,
-    unmerged: false,
-  })
-  assert.deepEqual(decision, { decision: 'Retire' })
-})
-}
+test.todo('WHAT[structured-workflow-003] actual retirement recovery re-enters its workflow from durable facts without a saved continuation address')
 
 {
 const { default: assert } = await import("node:assert/strict");

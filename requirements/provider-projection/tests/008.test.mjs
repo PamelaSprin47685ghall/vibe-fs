@@ -320,12 +320,9 @@ test('WHAT[provider-projection-008] ARCH_010_no_top_level_comment_appears_after_
   assert.equal('item' in parsed, false, 'the injected table header must not create a table')
   assert.equal('role' in parsed, false, 'the injected field must not become a top-level key')
 })
-test('WHAT[provider-projection-008] ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given', () => {
-  // The load-bearing test. The expectation reads the renderer's own choice instead of predicting it:
-  // a multi-line literal carries one trailing newline, a single-line basic string carries none.
-  // Which form each input takes is pinned by the dedicated tests above; this one asserts only that
-  // the value survives whichever was chosen, so the coverage can be wide without restating the
-  // selection rule.
+test('WHAT[provider-projection-008] current string forms parse with the existing extra-LF convention for multiline literals', () => {
+  // Implementation regression only: multiline literals add LF to the value.
+  // This is not a lossless round trip; its normative status is pending in GAP-081.
   const inputs = [
     '',
     'plain single line',

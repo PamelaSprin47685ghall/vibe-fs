@@ -221,6 +221,7 @@ module CausalFrontier =
             if Set.contains key seen then
                 let cycle =
                     chain
+                    |> List.rev
                     |> List.map (fun node -> node.Owner)
                     |> List.skipWhile (fun o -> ownerKey o <> key)
                     |> fun prefix -> prefix @ [ owner ]

@@ -170,7 +170,8 @@ module ChatAdmissionIntentSurface =
             { ChatAdmissionIntent.DurableSnapshot.Authority = Some projection }
 
     let private decodedMessage (value: obj) : ChatAdmissionIntent.DecodedMessage =
-        { SessionId = optionalString value?sessionId |> Option.map SessionId.create
+        { InvalidIdentityCarrier = None
+          SessionId = optionalString value?sessionId |> Option.map SessionId.create
           PhysicalUserMessageId =
             optionalString value?physicalUserMessageId
             |> Option.map PhysicalUserMessageId.create
@@ -192,6 +193,7 @@ module ChatAdmissionIntentSurface =
 
     let private rejectionName (rejection: ChatAdmissionIntent.Rejection) : string =
         match rejection with
+        | ChatAdmissionIntent.Rejection.MalformedIdentityCarrier _ -> "MalformedIdentityCarrier"
         | ChatAdmissionIntent.Rejection.ManagedIntentMissingSessionId -> "ManagedIntentMissingSessionId"
         | ChatAdmissionIntent.Rejection.ManagedIntentMissingPhysicalUserMessageId ->
             "ManagedIntentMissingPhysicalUserMessageId"

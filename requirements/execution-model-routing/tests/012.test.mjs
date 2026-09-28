@@ -1,5 +1,7 @@
 import test from 'node:test'
 
+test.todo('WHAT[execution-model-routing-012] compiler rejects a fabricated exact opaque capacity fence and direct foreign custody construction (GAP-128)')
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

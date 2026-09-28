@@ -134,3 +134,25 @@ test('WHAT[provider-projection-006] base and row intents have canonical permutat
   ])
 })
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const Projection = await import('../../../dist/Participant/Provider/Projection/Surface.js')
+  const row = { message: { role: 'assistant', parts: [{ kind: 'text', text: 'same content' }] }, hostMessageId: 'id-a', hostIsPhysical: false }
+  const make = (anchor, value = row) => Projection.insertMessageRows({ key: 'same-key', anchor, rows: [value] })
+
+  test('WHAT[provider-projection-006] anchor and each Host metadata difference independently conflict under one insertion key', () => {
+    const original = make({ kind: 'BeforeMessageIndex', index: 0 })
+    const variants = [
+      make({ kind: 'Append' }),
+      make({ kind: 'BeforeMessageIndex', index: 0 }, { ...row, hostMessageId: 'id-b' }),
+      make({ kind: 'BeforeMessageIndex', index: 0 }, { ...row, hostIsPhysical: true }),
+    ]
+    for (const changed of variants) {
+      for (const intents of [[original, changed], [changed, original]]) {
+        assert.deepEqual(Projection.plan(intents), { ok: false, conflict: 'ConflictingMessageRows', key: 'same-key' })
+      }
+    }
+    assert.equal(Projection.plan([original, structuredClone(original)]).ok, true)
+  })
+}

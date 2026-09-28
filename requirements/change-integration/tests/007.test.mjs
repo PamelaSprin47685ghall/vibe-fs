@@ -1,6 +1,57 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const change = await import('../../../dist/Change/Surface.js')
+const JOB = 'job_ea'
+const baseJob = {
+  jobId: JOB,
+  managerSessionId: 'ses_ea',
+  managerAgent: 'manager',
+  byname: 'Road',
+  worktreeIdentity: 'wt_ea',
+  worktreePath: '/tmp/wt_ea',
+  targetRef: 'refs/heads/main',
+  targetBranchFrozen: 'refs/heads/main',
+}
+const managerCreated = { kind: 'ManagerJobCreated', payload: baseJob }
+const rebased = {
+  kind: 'RebasedCandidateReady',
+  payload: { jobId: JOB, rebasedCommit: 'r1', targetHeadSnapshot: 'h1', workspaceSnapshotId: 'snap_2' },
+}
+const claimed = {
+  kind: 'PublishClaimed',
+  payload: {
+    jobId: JOB,
+    targetRef: 'refs/heads/main',
+    rebasedCommit: 'r1',
+    expectedHead: 'h1',
+    workspaceSnapshotId: 'snap_2',
+    qualityCertificateId: 'cert_ea',
+    authorityRevision: 'rev_ea',
+  },
+}
+const fold = (events) => {
+  const result = change.fold(events)
+  assert.equal(result.ok, true, result.error ?? '')
+  return change.unwrapFold(result)
+}
+
+test('WHAT[change-integration-007] publish_claimed_recovery_three_branch_order_is_fixed', () => {
+  const projection = fold([
+    managerCreated,
+    rebased,
+    claimed,
+  ])
+  assert.deepEqual(change.find(projection, JOB).facts, ['RebasedCandidateReady', 'PublishClaimed'])
+  assert.equal(change.classifyPublishClaim('r1', 'r1', 'h1').kind, 'AlreadyFastForwarded')
+  assert.equal(change.classifyPublishClaim('h1', 'r1', 'h1').kind, 'PublishReady')
+  assert.equal(change.classifyPublishClaim('zzz', 'r1', 'h1').kind, 'ClaimExpired')
+  assert.equal(change.classifyPublishClaim(null, 'r1', 'h1').kind, 'HeadUnreadable')
+})
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 
@@ -183,7 +234,7 @@ test('WHAT[change-integration-007] THEOREM_publish_claimed_three_branch_order_is
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 })
-test('WHAT[change-integration-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
+test('WHAT[change-integration-007] repeating the same pure fold preserves publish-claim classification', () => {
   const durable = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A), publishClaimedEvent(JOB_A)]
   const before = foldEvents(durable)
   assert.deepEqual(factsOf(before, JOB_A), ['CandidateReady', 'RebasedCandidateReady', 'PublishClaimed'])

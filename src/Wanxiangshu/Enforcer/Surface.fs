@@ -71,14 +71,13 @@ module EnforcerSurface =
 
     let private rawArgs (value: obj) : Map<string, obj> =
         let tipValue = if isNullish value?tip then value?tipField else value?tip
+        let keys: string array = emitJsExpr value "Object.keys($0)"
 
-        [ "entry", value?entry
-          "text", value?text
-          "tip", tipValue
-          "tipField", tipValue
-          "evidence", value?evidence ]
-        |> List.choose (fun (key, item) -> if isNullish item then None else Some(key, item))
+        keys
+        |> Array.map (fun key -> key, emitJsExpr (value, key) "$0[$1]")
+        |> Array.toList
         |> Map.ofList
+        |> Map.add "tip" tipValue
 
     /// Packaged English rulebook, in lexical order.
     let rules () : obj array = ruleArray (rulebook ())
@@ -146,10 +145,6 @@ module EnforcerSurface =
         | Ok call -> call |> EnforcerCycle.ofCall |> cycleToJs
         | Error error -> box {| ok = false; error = error |}
 
-    let isValidCycle (value: obj) : bool =
-        let textValue = text value?mergedText
-        not (System.String.IsNullOrWhiteSpace textValue)
-
     let maxBlogTextBytes = EnforcerCycle.MaxBlogTextBytes
     let maxEvidenceBytes = EnforcerCycle.MaxEvidenceBytes
 
@@ -164,7 +159,10 @@ module EnforcerSurface =
             else
                 [ basePrompt ]
 
-        EnforcerCatalogResource.composeBloggerSystemPromptFor lang baseInstructions (rulebook ())
+        EnforcerCatalogResource.composeBloggerSystemPromptFor
+            lang
+            baseInstructions
+            (EnforcerCatalogResource.loadFor lang)
 
     /// Load a localized catalog through the same fail-fast resource owner.
     let loadFor (locale: string) : obj array =
@@ -187,52 +185,10 @@ module EnforcerSurface =
                    textBytes = bounds.TextBytes
                    evidenceBytes = bounds.EvidenceBytes |}
 
-    /// Provider-run identity is a required semantic identifier, not a fallback
-    /// to tool-call or session ids.
-    let validateProviderRun (messageId: string) : obj =
-        if System.String.IsNullOrWhiteSpace messageId then
-            box
-                {| ok = false
-                   error = "no provable provider run" |}
-        else
-            box {| ok = true; providerRun = messageId |}
-
-    /// Decode the observable branch for one assistant step without exposing
-    /// the private F# list/DU representation.
-    let classifyAssistantStep (value: obj) : obj =
-        let messageId = text value?messageId
-
-        let parts =
-            if isNullish value?parts then
-                [||]
-            else
-                unbox<obj array> value?parts
-
-        let accepted =
-            parts
-            |> Array.filter (fun part ->
-                not (isNullish part)
-                && (text part?tool = "chronicle" || text part?name = "chronicle")
-                && text part?state?status = "completed"
-                && not (isNullish part?state?input?tip)
-                && not (isNullish part?state?input?text))
-            |> Array.length
-
-        let hasBlog =
-            parts
-            |> Array.exists (fun part ->
-                not (isNullish part)
-                && (text part?tool = "chronicle" || text part?name = "chronicle"))
-
-        box
-            {| acceptedCalls = accepted
-               hasBlogToolPart = hasBlog
-               providerRun =
-                if System.String.IsNullOrWhiteSpace messageId then
-                    null
-                else
-                    box messageId
-               protocol =
-                if accepted = 0 then "ProjectMessages"
-                elif accepted = 1 then "CommitCandidate"
-                else "ProtocolRepair" |}
+    let resolveField (field: string) (rules: obj array) : obj =
+        rules
+        |> Array.map ruleOfJs
+        |> Array.toList
+        |> EnforcerCatalog.resolveByField field
+        |> Option.map ruleToJs
+        |> Option.toObj

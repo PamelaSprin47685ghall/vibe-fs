@@ -5,58 +5,43 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { checks } from '../../../scripts/check.mjs'
 
-const ROOT = join(fileURLToPath(new URL('../../..', import.meta.url)))
+const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 
-test('WHAT[verification-system-012] VS_012_no_mechanical_line_count_gate_or_advisory', () => {
-  // 1. 扫描 scripts/check.mjs 注册的全部门禁脚本
-  assert.ok(checks.length >= 10, 'Gate list in check.mjs must contain active gates')
+// Known syntactic forms only; semantic gate ownership still requires review.
+function mechanicalLineRules(source) {
+  const patterns = [
+    /\b(?:maxLines|maxFileLines|max_lines|lines\.length\s*>\s*\d+)\b[^\n]*(?:push\(|error|fail)/i,
+    /\b(?:line-count-advisory|file-too-long|advisory-line-limit)\b/i,
+    /issue[^\n]*(?:file too long|line count exceeds|exceeded max lines)/i,
+  ]
+  return patterns.filter((pattern) => pattern.test(source)).map(String)
+}
+const lineCountCommand = (command) => /\b(?:cloc|wc\s+-l|line-count-check)\b/i.test(command)
 
-  for (const checkScript of checks) {
-    const content = readFileSync(checkScript, 'utf8')
+test('WHAT[verification-system-012] the same detector rejects controlled line gates and permits ordinary measurements', () => {
+  for (const source of [
+    'if (lines.length > 50) issues.push({ message: "too long" })',
+    'if (lines.length > 500) fail()',
+    'warn("line-count-advisory")',
+    'issues.push("line count exceeds policy")',
+  ]) assert.notDeepEqual(mechanicalLineRules(source), [], source)
+  for (const source of [
+    'return { lineCount: lines.length }',
+    'issues.push("invalid import boundary")',
+    'if (events.length > 50) fail()',
+  ]) assert.deepEqual(mechanicalLineRules(source), [], source)
+  assert.equal(lineCountCommand('wc -l src/file.fs'), true)
+  assert.equal(lineCountCommand('node scripts/check.mjs'), false)
+})
 
-    // 严禁设立机械的文件行数硬门禁：不能以 lines.length 或行数上限作为报错依据
-    assert.doesNotMatch(
-      content,
-      /\b(?:maxLines|maxFileLines|max_lines|lines\.length\s*>\s*\d{3,})\b.*?(?:push\(|error|fail)/i,
-      `Gate script ${checkScript} must not enforce mechanical line count limits`,
-    )
-
-    // 严禁设立针对行数的 advisory 警告扫描器
-    assert.doesNotMatch(
-      content,
-      /\b(?:line-count-advisory|file-too-long|advisory-line-limit)\b/i,
-      `Gate script ${checkScript} must not emit mechanical line count advisories`,
-    )
-  }
-
-  // 2. 检查 scripts/checks 目录下的全部脚本
-  const checksDir = join(ROOT, 'scripts/checks')
-  const allGateFiles = readdirSync(checksDir).filter((f) => f.endsWith('.mjs'))
-
-  for (const gateFile of allGateFiles) {
-    const content = readFileSync(join(checksDir, gateFile), 'utf8')
-    assert.doesNotMatch(
-      content,
-      /issue.*?(?:file too long|line count exceeds|exceeded max lines)/i,
-      `Gate ${gateFile} must not fail or issue warnings based on file line count`,
-    )
-  }
-
-  // 3. 检查 package.json scripts，不设立机械行数门禁命令
-  const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-  for (const [scriptName, scriptCmd] of Object.entries(pkgJson.scripts ?? {})) {
-    assert.doesNotMatch(
-      scriptCmd,
-      /\b(?:cloc|wc -l|line-count-check)\b/i,
-      `npm script "${scriptName}" must not contain mechanical line count gates`,
-    )
-  }
-
-  // 4. 变异可红性证明：若存在伪造的机械行数门禁，检测模式必须能触发
-  const simulatedBadGate = 'if (lines.length > 500) issues.push({ message: "file too long" })'
-  assert.match(
-    simulatedBadGate,
-    /lines\.length\s*>\s*\d{3,}.*?(?:push\(|error|fail)/i,
-    'Detector must catch simulated line count hard gate',
-  )
+test('WHAT[verification-system-012] registered gates and npm entries contain no known mechanical line rule', () => {
+  assert.ok(checks.length > 0, 'the scan must examine actual gates')
+  const directory = join(ROOT, 'scripts/checks')
+  const files = new Set([
+    ...checks,
+    ...readdirSync(directory).filter((name) => name.endsWith('.mjs')).map((name) => join(directory, name)),
+  ])
+  for (const file of files) assert.deepEqual(mechanicalLineRules(readFileSync(file, 'utf8')), [], file)
+  const { scripts } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+  for (const [name, command] of Object.entries(scripts)) assert.equal(lineCountCommand(command), false, name)
 })

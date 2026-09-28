@@ -125,5 +125,10 @@ module CausalAwait =
                         return! interpretWinner loop winnerObj
                 }
 
-            return! loop ()
+            try
+                return! loop ()
+            with ex ->
+                lease.MarkExit(classifyExn ex)
+                deadline.Cancel()
+                return raise ex
         }

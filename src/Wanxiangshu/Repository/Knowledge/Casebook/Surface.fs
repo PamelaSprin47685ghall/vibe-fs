@@ -574,9 +574,3 @@ module CasebookSurface =
 
     let truncateDiffForBudget (diff: string) (budget: int) : obj =
         CasebookCapture.truncateDiffForBudget diff budget
-
-    let singlePassDiffRefresh (input: obj) : Task<obj> =
-        CasebookWorkflow.singlePassDiffRefresh input
-
-    let applyExternalChangeToCase (input: obj) : obj =
-        CasebookWorkflow.applyExternalChangeToCase input

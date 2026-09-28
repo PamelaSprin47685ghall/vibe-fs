@@ -56,7 +56,7 @@ test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_returns_immediately_wh
   assert.equal(activeCount(registry), 0)
   process.timerDispose(timer)
 })
-test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+test('WHAT[causal-wait-005] a deferred signal releases the wait only after material becomes ready', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 5_000)
@@ -79,7 +79,7 @@ test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_canc
   assert.equal(activeCount(registry), 0)
   process.timerDispose(timer)
 })
-test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+test('WHAT[causal-wait-005] two separately delivered stale signals do not replace the deadline', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 250)
@@ -132,7 +132,7 @@ const enteredLeft = (snapshot) => {
   return snapshot.history[1].exit
 }
 
-test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+test('WHAT[causal-wait-005] thousands of immediate stale wakes still form one observation and cancel the deadline on success', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 60_000)
@@ -166,7 +166,7 @@ test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_canc
   assert.equal(handle.cancelCount, 1)
   process.timerDispose(timer)
 })
-test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline termination', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 250)

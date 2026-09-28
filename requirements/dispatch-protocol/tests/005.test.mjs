@@ -95,12 +95,14 @@ test('WHAT[dispatch-protocol-005] DP_005_prompt_key_is_deterministic_and_moves_w
 
   const variants = {
     session: { ...base, session: 'ses_b' },
+    run: { ...base, run: 'another-logical-run' },
+    authorityRootId: { ...base, authorityRootId: 'another-authority-root' },
     origin: { ...base, origin: promptOrigin('DegenerationGuard') },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }
 
-  for (const name of ['session', 'origin', 'payload', 'sequence']) {
+  for (const name of Object.keys(variants)) {
     assert.notEqual(derive(variants[name]), derive(base), `${name} must participate in PromptKey`)
   }
 

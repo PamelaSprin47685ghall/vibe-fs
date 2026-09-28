@@ -28,96 +28,95 @@ module AttachmentSurface =
                decision = decision
                children = children |}
 
-    let scenario (owner: string) (role: string) (firstAgent: string) (secondAgent: string) (usable: bool) : Task<obj> =
+    let scenario
+        (owner: string)
+        (role: string)
+        (firstAgent: string)
+        (secondAgent: string)
+        (retainBinding: bool)
+        : Task<obj> =
         task {
             let roleValue =
-                if role = "Coder" then
-                    SyncDelegateRole.Coder
-                else
-                    SyncDelegateRole.Inspector
+                match role with
+                | "Engineer" -> SyncDelegateRole.Engineer
+                | "Coder" -> SyncDelegateRole.Coder
+                | "Inspector" -> SyncDelegateRole.Inspector
+                | _ -> invalidArg "role" "Unknown attachment role"
 
-            if not usable then
+            // DSL-MUTABLE: algorithm-scratch — attachment id counter
+            let next = ref 0
+            let runtime = AttachedSessionRuntime()
+
+            let createChild
+                (_: SessionId)
+                (_: ReuseScopeId)
+                (_: SyncDelegateRole)
+                (_agent: string)
+                (_directory: string option)
+                : Task<Result<SessionId, string>> =
+                task {
+                    next.Value <- next.Value + 1
+                    return Ok(SessionId.create (sprintf "child-%d" next.Value))
+                }
+
+            let observeChild (_: SessionId) (_: ReuseScopeId) (_: SyncDelegateRole) (_agent: string) =
+                Task.FromResult(Ok AttachedChildObservation.Missing)
+
+            let bindChild (_: SessionId) (_: SessionId) (_agent: string) = ()
+            let onReady (_: SessionId) (_agent: string) = ()
+
+            let! first =
+                runtime.GetOrCreate(
+                    SessionId.create owner,
+                    roleValue,
+                    firstAgent,
+                    None,
+                    observeChild,
+                    createChild,
+                    bindChild,
+                    onReady
+                )
+
+            if not retainBinding then
+                runtime.Remove(SessionId.create owner, roleValue) |> ignore
+
+            let! second =
+                runtime.GetOrCreate(
+                    SessionId.create owner,
+                    roleValue,
+                    secondAgent,
+                    None,
+                    observeChild,
+                    createChild,
+                    bindChild,
+                    onReady
+                )
+
+            match first, second with
+            | Ok firstValue, Ok secondValue ->
                 return
                     box
                         {| owner = owner
                            role = SyncDelegate.roleLabel roleValue
-                           firstChild = "child-1"
-                           firstAgent = firstAgent
-                           secondChild = "child-2"
-                           secondAgent = secondAgent
-                           created = 2 |}
-            else
-                // DSL-MUTABLE: algorithm-scratch — attachment id counter
-                let next = ref 0
-                let runtime = AttachedSessionRuntime()
-
-                let createChild
-                    (_: SessionId)
-                    (_: ReuseScopeId)
-                    (_: SyncDelegateRole)
-                    (_agent: string)
-                    (_directory: string option)
-                    : Task<Result<SessionId, string>> =
-                    task {
-                        next.Value <- next.Value + 1
-                        return Ok(SessionId.create (sprintf "child-%d" next.Value))
-                    }
-
-                let observeChild (_: SessionId) (_: ReuseScopeId) (_: SyncDelegateRole) (_agent: string) =
-                    Task.FromResult(Ok AttachedChildObservation.Missing)
-
-                let bindChild (_: SessionId) (_: SessionId) (_agent: string) = ()
-                let onReady (_: SessionId) (_agent: string) = ()
-
-                let! first =
-                    runtime.GetOrCreate(
-                        SessionId.create owner,
-                        roleValue,
-                        firstAgent,
-                        None,
-                        observeChild,
-                        createChild,
-                        bindChild,
-                        onReady
-                    )
-
-                let! second =
-                    runtime.GetOrCreate(
-                        SessionId.create owner,
-                        roleValue,
-                        secondAgent,
-                        None,
-                        observeChild,
-                        createChild,
-                        bindChild,
-                        onReady
-                    )
-
-                match first, second with
-                | Ok firstValue, Ok secondValue ->
-                    return
-                        box
-                            {| owner = owner
-                               role = SyncDelegate.roleLabel roleValue
-                               firstChild = SessionId.value (fst firstValue)
-                               firstAgent = snd firstValue
-                               secondChild = SessionId.value (fst secondValue)
-                               secondAgent = snd secondValue
-                               created = next.Value |}
-                | Error firstError, _ ->
-                    return
-                        box
-                            {| owner = owner
-                               role = SyncDelegate.roleLabel roleValue
-                               error = firstError
-                               created = next.Value |}
-                | _, Error secondError ->
-                    return
-                        box
-                            {| owner = owner
-                               role = SyncDelegate.roleLabel roleValue
-                               error = secondError
-                               created = next.Value |}
+                           firstChild = SessionId.value (fst firstValue)
+                           firstAgent = snd firstValue
+                           secondChild = SessionId.value (fst secondValue)
+                           secondAgent = snd secondValue
+                           created = next.Value |}
+            | Error firstError, _ ->
+                return
+                    box
+                        {| owner = owner
+                           role = SyncDelegate.roleLabel roleValue
+                           error = firstError
+                           created = next.Value |}
+            | _, Error secondError ->
+                return
+                    box
+                        {| owner = owner
+                           role = SyncDelegate.roleLabel roleValue
+                           error = secondError
+                           created = next.Value |}
         }
 
     let reconciliationScenario (observation: string) : Task<obj> =

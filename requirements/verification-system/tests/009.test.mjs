@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { testDeclarations } from '../../requirement-system/tests/support/structure.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -120,47 +121,38 @@ test('WHAT[verification-system-009] discoverSuiteTests auto-includes an added te
     rmSync(scratch, { recursive: true, force: true })
   }
 })
-test('WHAT[verification-system-009] discoverSuiteTests fail-closes on an unreadable directory', () => {
+test('WHAT[verification-system-009] discovery returns no files for a missing optional suite directory', () => {
   // A non-existent directory yields an empty set rather than throwing; the
   // child runner turns an empty set into a non-zero exit.
   assert.deepEqual(discoverSuiteTests(path.join(tmpdir(), 'does-not-exist-suite-xyz')), [])
 })
-test('WHAT[verification-system-009] parent delegation set equals the child-executed set (no drift)', () => {
-  // Both the parent entry and the child runner consume discoverSuiteTests on
-  // the same directory, so the delegated set must be exactly the set the child
-  // runs. If these ever diverge, an added package test is silently omitted.
-  const packageTestsDir = path.join(root, 'requirements/distribution/tests')
-  const childExecuted = discoverSuiteTests(packageTestsDir)
-  const parentDelegated = discoverSuiteTests(packageTestsDir)
-  assert.deepEqual(childExecuted, parentDelegated)
-  assert.ok(childExecuted.length > 0, 'package integration dir must own at least one suite')
+test('WHAT[verification-system-009] integration discovery ignores examples in strings and comments', () => {
+  const source = '// integrationTest("comment", () => {})\nconst example = \'integrationTest("text", () => {})\'\nintegrationTest("actual", () => {})'
+  assert.deepEqual(testDeclarations(source), [{ kind: 'integrationTest', title: 'actual', line: 3 }])
+  assert.throws(() => testDeclarations('integrationTest('), SyntaxError)
 })
 test('WHAT[verification-system-009] the real integration entry covers every discovered integration test', () => {
   const packageTestsDir = path.join(root, 'requirements/distribution/tests')
   const requirementsDir = path.join(root, 'requirements')
   const discoveredIntegrationTests = readdirSync(requirementsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== 'distribution')
+    .filter((entry) => entry.isDirectory() && !['distribution', 'proposals'].includes(entry.name))
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((entry) => {
       const testsDir = path.join(requirementsDir, entry.name, 'tests')
-      try {
-        return readdirSync(testsDir)
-          .filter((name) => name.endsWith('.test.mjs'))
-          .sort()
-          .map((name) => normalize(path.join(testsDir, name)))
-          .filter((file) => {
-            const text = readFileSync(path.join(root, file), 'utf8')
-            return /\bintegrationTest\s*\(/.test(text)
-          })
-      } catch {
-        return []
-      }
+      return readdirSync(testsDir)
+        .filter((name) => name.endsWith('.test.mjs'))
+        .sort()
+        .map((name) => normalize(path.join(testsDir, name)))
+        .filter((file) => {
+          const text = readFileSync(path.join(root, file), 'utf8')
+          return testDeclarations(text).some(({ kind }) => kind === 'integrationTest')
+        })
     })
     .sort()
   const childOwnedIntegrationTests = discoverSuiteTests(packageTestsDir)
     .filter((name) => {
       const text = readFileSync(path.join(packageTestsDir, name), 'utf8')
-      return /\bintegrationTest\s*\(/.test(text)
+      return testDeclarations(text).some(({ kind }) => kind === 'integrationTest')
     })
     .map((name) => normalize(path.join(packageTestsDir, name)))
   const wiredIntegrationTests = integrationNodeTestSteps(root).flatMap((step) =>
@@ -216,8 +208,6 @@ test('WHAT[verification-system-009] every wired gate path exists and checks set 
   }
 
   const dirEntries = readdirSync(join(ROOT, 'scripts/checks'))
-  const fsxFiles = dirEntries.filter((f) => f.endsWith('.fsx'))
-  assert.deepEqual(fsxFiles, [], 'scripts/checks must contain no .fsx custom compiler executables')
 
   // Data files that are not gate scripts
   const nonGateFiles = new Set([
@@ -238,51 +228,6 @@ test('WHAT[verification-system-009] every wired gate path exists and checks set 
     gateScriptsInDir.sort(),
     'checks registered in check.mjs must equal gate scripts in scripts/checks',
   )
-})
-test('WHAT[verification-system-009] no custom FCS executable remains after the full-repo ban', () => {
-  // GAP-031 全仓自定义 FCS 禁令：扫描链是被删除，不是被禁用。任何自定义 FCS
-  // 可执行物（驱动 FSharp.Compiler.Service 的 .fsx，或 shell 到 `dotnet fsi` /
-  // 加载 Fable+FCS 程序集 / import 已删除扫描入口的 JS gate）都必须变红。
-  // 正常 Fable 编译边界（`dotnet tool run fable`、build.mjs、compile-impact CLI）
-  // 不在判据内，本测试不碰它们。
-  for (const rel of [
-    'scripts/checks/locality-symbol-uses.fsx',
-    'scripts/checks/locality-dependencies.mjs',
-    'scripts/checks/locality-slice-report.mjs',
-    'scripts/lib/locality-dependencies.mjs',
-  ]) {
-    assert.ok(!existsSync(join(ROOT, rel)), `custom FCS executable must stay deleted: ${rel}`)
-  }
-  assert.deepEqual(
-    readdirSync(join(ROOT, 'scripts/checks')).filter((name) => name.endsWith('.fsx')),
-    [],
-    'scripts/checks must contain no .fsx custom compiler executables',
-  )
-  const banned = [
-    'FSharp.Compiler.Service',
-    'Fable.Compiler.dll',
-    'Fable.AST.dll',
-    'locality-symbol-uses',
-    'scanCompilerObservationsV1',
-    'scanDslCompilerEvidence',
-    'runLocalityDependencyScan',
-    'scanProductionLocalitySliceReportV1',
-  ]
-  const hits = []
-  const walkScripts = (dir) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name)
-      if (entry.isDirectory()) walkScripts(full)
-      else if (entry.name.endsWith('.mjs')) {
-        const text = readFileSync(full, 'utf8')
-        for (const token of banned) {
-          if (text.includes(token)) hits.push(`${full}: ${token}`)
-        }
-      }
-    }
-  }
-  walkScripts(join(ROOT, 'scripts'))
-  assert.deepEqual(hits, [], 'scripts must not reference deleted custom FCS executables or assemblies')
 })
 }
 

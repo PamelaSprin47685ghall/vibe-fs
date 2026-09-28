@@ -64,3 +64,5 @@ test('WHAT[speculative-investigation-001] STRENGTH_002_speculation_opportunity_i
   assert.equal(first.request.requestedRounds, 2)
 })
 }
+
+test.todo('WHAT[speculative-investigation-001] GAP-183: compare actual Work execution with optimization absent, Off, fused and K0 across provider bytes, permissions, retry and finality')

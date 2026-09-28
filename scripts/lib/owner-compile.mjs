@@ -1360,13 +1360,8 @@ export async function compileOwnerProject({
 
   const hasAssets = fs.existsSync(materialized.assetsPath)
 
-  // Cache discipline:
-  // - Focused plans live under a fingerprint-addressed scratch dir — the
-  //   input identity pins the cache correctly, so Fable's own cache is safe
-  //   to reuse. Dropping --noCache here is the actual speedup the spec asks
-  //   for: the fingerprint already rules out stale reuse.
-  // - Forced `clean` builds still pass --noCache so a changed fingerprint
-  //   plus cache rebuild can't sneak a stale cache entry past verification.
+  // A shared output can hold another closure's cracked project. Only output
+  // isolated with its project may reuse that compiler cache.
   const args = [
     'tool',
     'run',
@@ -1380,7 +1375,7 @@ export async function compileOwnerProject({
     '--noGitignore',
   ]
 
-  if (plan.forceCompileCache === false) {
+  if (plan.forceCompileCache === false || !isScratchOutput) {
     args.push('--noCache')
   }
 

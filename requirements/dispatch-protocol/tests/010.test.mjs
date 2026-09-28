@@ -60,7 +60,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[dispatch-protocol-010] DP_010_authority_root_profile_cannot_express_a_model', () => {
+test('WHAT[dispatch-protocol-010] authority root public profile exposes identity without a model field', () => {
   const profile = profileOf()
   assert.deepEqual(
     { ...profile, model: profile.model },
@@ -174,13 +174,15 @@ test('WHAT[dispatch-protocol-010] PROMPT_006_send_payload_carries_participant_an
         'dispatch this',
         seed,
       )
+      const accepted = await dispatch.acceptAgentOwnerRoot(opened.journal, 'ses_006', ownerRoot.key, 'msg-actual-root')
+      assert.equal(accepted.ok, true, accepted.error)
       const continuation = await dispatch.sendContinuation(
         capturingPort(),
         opened.journal,
         'ses_006',
         'retry the fixed participant',
         'ProviderRetryAttempt',
-        profileFor(),
+        accepted.profile,
         'Await',
       )
       const captured = [observation(ownerRoot), observation(continuation)]
@@ -276,3 +278,5 @@ test('WHAT[dispatch-protocol-010] DP_010_send_without_session_agent_cache_succee
   }
 })
 }
+
+test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root and all actual synthetic send producers leave model selection to admission (GAP-136)')

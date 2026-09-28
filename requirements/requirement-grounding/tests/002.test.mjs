@@ -25,6 +25,19 @@ test('WHAT[requirement-grounding-002] treats a package own requirements subtree 
       grounding.resolvePackages(dir, join(dir, 'requirements', 'alpha', 'WHAT.md')),
       ['alpha'],
     )
+    assert.deepEqual(grounding.resolvePackages(dir, join(dir, 'requirements', 'alpha', 'tests', 'future.test.mjs')), ['alpha'])
+    for (const rule of ['/requirements/alpha/**', '!/requirements/alpha/**']) {
+      writeFileSync(join(dir, 'requirements', 'alpha', 'APPLIES-TO'), rule)
+      assert.throws(() => grounding.discoverPackages(dir), /must not declare package self coverage/)
+    }
+  } finally { cleanup() }
+})
+
+test('WHAT[requirement-grounding-002] self-subtree declarations are configuration errors even when they do not match WHAT.md', { todo: 'GAP-085: rule validation currently probes only the WHAT.md path' }, () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    pkg(dir, 'alpha', '/requirements/alpha/tests/**\n')
+    assert.throws(() => grounding.discoverPackages(dir), /must not declare package self coverage/)
   } finally { cleanup() }
 })
 
@@ -39,5 +52,13 @@ test('WHAT[requirement-grounding-002] resolves nonexistent paths through a symli
 
     assert.deepEqual(grounding.resolvePackages(alias, join(alias, 'src', 'future.fs')), ['alpha'])
     assert.deepEqual(grounding.resolvePackages(alias, join(dir, 'outside.fs')), [])
+    const outside = join(dir, 'outside')
+    mkdirSync(outside)
+    mkdirSync(join(real, 'src'))
+    symlinkSync(outside, join(real, 'src', 'escape'), 'dir')
+    assert.deepEqual(grounding.resolvePackages(alias, join(alias, 'src', 'escape', 'missing.fs')), [])
+    symlinkSync(join(dir, 'missing-target'), join(real, 'src', 'broken'), 'dir')
+    assert.deepEqual(grounding.resolvePackages(alias, join(alias, 'src', 'broken', 'missing.fs')), [])
+    assert.deepEqual(grounding.resolvePackages(alias, join(alias, 'src', 'new-directory', 'future.fs')), ['alpha'])
   } finally { cleanup() }
 })

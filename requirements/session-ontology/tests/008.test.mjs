@@ -61,6 +61,19 @@ test('WHAT[session-ontology-008] COMPANION_002_second_companion_for_one_work_ses
   assert.match(result.message, /ses_y1/)
   assert.match(result.message, /ses_y2/)
 })
+test('WHAT[session-ontology-008] a registered Work session cannot be overwritten as another session companion', () => {
+  const state = linked([{ main: 'ses_work', blogger: 'ses_existing_companion' }])
+  const before = structuredClone(state)
+  const rejected = assoc.link({ main: 'ses_new_owner', blogger: 'ses_work' }, state)
+
+  assert.equal(rejected.ok, false)
+  assert.equal(rejected.error, 'SatelliteKindConflict')
+  assert.equal(rejected.value, null)
+  assert.deepEqual(state, before, 'rejection leaves both existing association directions unchanged')
+  assert.equal(assoc.bloggerOf('ses_work', state), 'ses_existing_companion')
+  assert.equal(assoc.mainSessionOf('ses_existing_companion', state), 'ses_work')
+  assert.equal(assoc.entry('ses_new_owner', state), null)
+})
 test('WHAT[session-ontology-008] COMPANION_002_unlinking_does_not_disturb_another_pair', () => {
   const state = linked([
     { main: 'ses_x1', blogger: 'ses_y1' },
@@ -72,4 +85,3 @@ test('WHAT[session-ontology-008] COMPANION_002_unlinking_does_not_disturb_anothe
   assert.deepEqual(assoc.ids(unlinked), ['ses_x1', 'ses_x2', 'ses_y2'])
 })
 }
-

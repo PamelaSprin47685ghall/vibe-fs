@@ -31,7 +31,7 @@ const walkFs = (dir) => {
   return out
 }
 
-test('WHAT[distribution-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
+test('WHAT[distribution-007] release orchestration schedules integration, E2E and the package verifier in order', async () => {
   const pipeline = pkg.scripts['verify:release']
   assert.equal(typeof pipeline, 'string', 'verify:release must exist')
   assert.match(pipeline, /node scripts\/verify\.mjs/, 'release proof must dispatch to verify.mjs')
@@ -136,3 +136,28 @@ test('WHAT[distribution-007] P1-P4: validateArchiveEntries rejects missing, extr
 
   fs.rmSync(tmp, { recursive: true, force: true })
 })
+
+test('WHAT[distribution-007] the archive validator accepts the complete declared byte closure', async () => {
+  const tar = await import('tar')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-package-valid-'))
+  try {
+    fs.mkdirSync(path.join(dir, 'package/dist'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'package/resources'), { recursive: true })
+    const content = new Map([
+      ['package.json', '{"name":"wanxiangshu"}'],
+      ['dist/entry.js', 'export default {}\n'],
+      ['resources/example.md', '规则\n'],
+    ])
+    const expected = new Map()
+    for (const [name, text] of content) {
+      const bytes = Buffer.from(text)
+      fs.writeFileSync(path.join(dir, 'package', name), bytes)
+      expected.set(name, { sha256: crypto.createHash('sha256').update(bytes).digest('hex'), size: bytes.length })
+    }
+    const archive = path.join(dir, 'valid.tgz')
+    await tar.c({ gzip: true, file: archive, cwd: dir }, ['package'])
+    assert.deepEqual((await validateArchiveEntries(archive, expected)).issues, [])
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+test.todo('WHAT[distribution-007] GAP-210: full release executes clean build, complete tests and real pack/extract/isolated consume on one generation')

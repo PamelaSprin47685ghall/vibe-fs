@@ -1,40 +1,33 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
-import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
-import {
-  BUILD_VERIFICATION_FILES,
-  SURFACE_MANIFEST,
-  scanAll,
-  semanticImportEdges,
-  semanticTestFiles,
-} from '../../../scripts/lib/test-surface-scan.mjs'
+import { semanticImportEdges } from '../../../scripts/lib/test-surface-scan.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
+import { createWorkspaceFixture } from './support/workspace-fixture.mjs'
 
-const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const otherTestCarriers = (root) => walk(root).filter((file) =>
+  relative(root, file).split(/[\\/]/).includes('tests')
+  && /\.test\.[^/]+$/.test(file) && !file.endsWith('.test.mjs'))
 
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
+test('WHAT[js-semantic-surface-001] formal semantic test carriers use .test.mjs', () => {
+  assert.deepEqual(otherTestCarriers(join(ROOT, 'requirements')), [])
+})
 
-const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
+test('WHAT[js-semantic-surface-001] the carrier check rejects a second language without confusing source fixtures with tests', (t) => {
+  const { root, write } = createWorkspaceFixture(t)
+  write('owner/tests/001.test.mjs', '')
+  write('owner/tests/fixtures/Subject.fs', 'module Subject')
+  assert.deepEqual(otherTestCarriers(root), [])
+  const invalid = write('owner/tests/002.test.ts', '')
+  assert.deepEqual(otherTestCarriers(root), [invalid])
+})
 
-const distImport = (prefix, module) => `${prefix}dist/${module}`
-
-const wholeScan = scanAll(join(ROOT, 'requirements'))
-
-const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
-
-const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
-
-test('WHAT[js-semantic-surface-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
-  const testFiles = walk(join(ROOT, 'requirements'), ['.test.mjs', '.test.js', '.test.fs', '.test.ts', '.test.fsx'])
-  assert.deepEqual(
-    testFiles.filter((file) => !file.endsWith('.test.mjs')).map(relativePath),
-    [],
-    'every automated semantic test must be a .mjs file',
-  )
+test('WHAT[js-semantic-surface-001] imported test support satisfies the required .mjs suffix', {
+  todo: '03-D1: existing .js support conflicts with the current .mjs-only rule; decide the rule before migration',
+}, () => {
+  const targets = semanticImportEdges(join(ROOT, 'requirements'))
+    .map(({ target }) => target).filter((file) => file.endsWith('.js'))
+  assert.deepEqual([...new Set(targets)].map((file) => relative(ROOT, file)), [])
 })

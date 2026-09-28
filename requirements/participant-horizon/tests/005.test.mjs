@@ -3,32 +3,20 @@ import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
 
-const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]/
-
-const completed = (over = {}) => ({ kind: 'completed', agentId: 'a1', agentName: 'coder', role: 'Coder', runId: 'run-a1', workRecord: '', ...over })
-
-const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'engineer', role: 'Engineer', runId: 'run-a1', code: 'E1', message: 'boom', ...over })
-
-const pty = (kind, over = {}) => ({ kind, ptyId: 'pty-1', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...over, ...(kind ? { kind } : {}) })
-
-const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
-
-test('WHAT[participant-horizon-005] MISC_join_render_batch_pty_exit_code_observation', () => {
-  const wire = join.renderBatch('english', [pty('pty-exited')])
-  assert.match(wire, /# npm test has ended\./)
-  assert.match(wire, /exit_code = 0/)
-  assert.ok(!wire.includes('pty_id'))
+const terminal = (kind, values = {}) => ({
+  kind, ptyId: 'private-terminal', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...values,
 })
 
-test('WHAT[participant-horizon-005] MISC_join_render_batch_pty_failure_output_observation', () => {
-  const wire = join.renderBatch('english', [pty('pty-failed', { ptyId: 'pty-2', outcome: 'crash', code: 'RC', message: 'kaboom' })])
-  assert.match(wire, /# npm test has ended\./)
-  assert.match(wire, /output = "kaboom"/)
-  assert.ok(!wire.includes('code ='))
-})
-
-test('WHAT[participant-horizon-005] MISC_join_render_completed_pty_exit_observation', () => {
-  const wire = join.renderBatch('english', [pty('pty-exited', { ptyId: 'pty-9', terminalLabel: 'shell' })])
-  assert.match(wire, /# shell has ended\./)
-  assert.ok(!wire.includes('pty_id'))
+test('WHAT[participant-horizon-005] Join preserves exit measurements without exposing the terminal handle or control codes', () => {
+  for (const code of [0, 7]) {
+    const text = join.renderBatch('en', [terminal('pty-exited', { outcome: `exit ${code}` })])
+    assert.equal(parseToml(text).exit_code, code)
+    assert.match(text, /npm test has ended/)
+    assert.ok(!text.includes('private-terminal'))
+    assert.equal(parseToml(text).status, undefined)
+  }
+  const failed = join.renderBatch('en', [terminal('pty-failed', { outcome: 'crash', code: 'PRIVATE-CODE', message: 'kaboom' })])
+  assert.deepEqual(parseToml(failed), { output: 'kaboom' })
+  assert.ok(!failed.includes('PRIVATE-CODE'))
+  assert.ok(!failed.includes('private-terminal'))
 })

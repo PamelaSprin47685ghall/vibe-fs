@@ -16,11 +16,8 @@ const remainsPending = async (run, message) => {
   assert.equal(observed.finished, false, `${message} must not settle the run`)
   assert.equal(observed.pending, true, 'run must stay pending for a later proven terminal')
 
-  const resolved = await Promise.race([
-    lifecycle.completion(run).then(() => true, () => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), 50)),
-  ])
-  assert.equal(resolved, false, `${message} must not resolve the run completion cell`)
+  await lifecycle.complete(run, { kind: 'Completed', terminalText: 'later proven completion' })
+  assert.equal((await lifecycle.completion(run)).status, 'completed', 'the later proven result must settle the original completion cell')
 }
 
 test('WHAT[effect-accounting-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {

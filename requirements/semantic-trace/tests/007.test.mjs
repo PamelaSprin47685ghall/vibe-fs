@@ -1,4 +1,22 @@
 import test from 'node:test'
+import { withReopenableJournal } from './support/journal.mjs'
+
+test('WHAT[semantic-trace-007] durable materialization survives reopening with exact user and tool text', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  await withReopenableJournal(async (handle, reopen) => {
+    const messages = [
+      { role: 'user', parts: [trace.semanticText('原话\r\n"task" <tag> /path')] },
+      { role: 'assistant', parts: [trace.semanticToolCall('read', '{"path":"a"}'), trace.semanticToolResult('line 1\nline 2\n')] },
+    ]
+    assert.equal((await trace.captureProjection(handle, 'raw-history', { messages })).ok, true)
+    const before = await trace.currentProjection(handle, 'raw-history')
+    assert.deepEqual(before.messages, messages)
+    const next = await reopen()
+    assert.deepEqual(await trace.currentProjection(next, 'raw-history'), before)
+    assert.equal((await trace.captureProjection(next, 'raw-history', { messages })).capturedPartCount, 0)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -63,7 +81,7 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[semantic-trace-007] flatten is the single semantic source', () => {
+test('WHAT[semantic-trace-007] canonical flatten preserves semantic part and role order', () => {
   const flat = trace.flatten([
     { role: 'user', parts: [trace.semanticText('task'), trace.semanticToolCall('read', '{}')] },
     { role: 'assistant', parts: [trace.semanticReasoning('considered'), trace.semanticText('done')] },
@@ -72,3 +90,5 @@ test('WHAT[semantic-trace-007] flatten is the single semantic source', () => {
   assert.deepEqual(flat.map((entry) => entry.part.kind), ['text', 'tool-call', 'reasoning', 'text'])
 })
 }
+
+test.todo('WHAT[semantic-trace-007] actual Y, prefix, WorkRecord and Casebook consumers share the same bounded durable history and exclude request presentation; GAP-101')

@@ -1,4 +1,5 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -156,3 +157,13 @@ test('WHAT[provider-attempt-recovery-001] no_active_run_records_nothing_and_writ
   }
 })
 }
+
+test('WHAT[provider-attempt-recovery-001] separate authority projections keep independent counts', async () => {
+  const { budget, providerFailureProjection } = await import('../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js')
+  const first = providerFailureProjection.forAuthority('run-first', 'root-first')
+  const second = providerFailureProjection.forAuthority('run-second', 'root-second')
+  const advanced = providerFailureProjection.applyFailure(budget.attemptIdentity('session-first', 'run-first', 'root-first', 'provider-first'), 1, first)
+  assert.equal(advanced.ok, true)
+  assert.equal(providerFailureProjection.read(advanced.value).failures, 1)
+  assert.equal(providerFailureProjection.read(second).failures, 0)
+})

@@ -1,164 +1,71 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
+import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import { scanText } from '../../../scripts/checks/provider-leak-gate.mjs'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { join } = await import("node:path");
-const { fileURLToPath } = await import("node:url");
-const { default: test } = await import("node:test");
+const completed = (agentName, workRecord = '') => ({
+  kind: 'completed', agentId: 'private-agent', agentName, role: 'Engineer', runId: 'private-run', workRecord,
+})
 
-const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-const LOCALES = ['en', 'zh-CN']
-const HIDDEN_ORCHESTRATION = /\b(reviewer|witness|barrier|cohort|2N|confirmation rounds?)\b|见证|屏障|评审者/i
-const INTERNAL_PARTICIPANTS = /\b(blogger|distiller|bookkeeper)\b/i
-const MACHINE_BINDING = /\b(fast|deep)-[a-z]+/
-const MANAGER_VISIBLE_SURFACES = [
-  'role/manager',
-  'tool/fork/description',
-  'tool/commission/description',
-  'tool/horizon/description',
-  'tool/join/description',
-  'tool/suicide/description',
-]
+test('WHAT[participant-horizon-003] actual Join renderer distinguishes return, failure and abandonment without control DTO fields', () => {
+  for (const name of ['Ada', 'engineer', 'weird raw name']) {
+    const text = join.renderBatch('en', [completed(name, 'Chronicle\nRecent work')])
+    assert.ok(text.includes(`${name} has returned.`))
+    assert.ok(text.includes('Chronicle'))
+    assert.ok(text.includes('Recent work'))
+    assert.deepEqual(parseToml(text), {})
+    assert.ok(!text.includes('private-agent'))
+    assert.ok(!text.includes('private-run'))
+  }
+  const failed = join.renderBatch('en', [{
+    kind: 'failed', agentId: 'private-agent', agentName: 'Ada', role: 'Engineer', runId: 'private-run', code: 'PRIVATE-CODE', message: 'Could not open input.',
+  }])
+  assert.match(failed, /could not complete the charge/)
+  assert.match(failed, /Could not open input/)
+  assert.deepEqual(parseToml(failed), {})
+  assert.ok(!failed.includes('PRIVATE-CODE'))
+  const abandoned = join.renderBatch('en', [{ kind: 'abandoned', agentId: 'private-agent', agentName: 'Ada', reason: 'parent cancellation' }])
+  assert.match(abandoned, /Ada did not return from this charge/)
+  assert.deepEqual(parseToml(abandoned), {})
+})
 
-test('WHAT[participant-horizon-003] PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {
-  const dtoVocabulary = /\b(status|session_id|agent_id|pty_id|code|ordinal|kind|count)\b/i
-  for (const tool of ['join', 'horizon']) {
-    for (const locale of LOCALES) {
-      const text = read(`resources/provider/tool/${tool}/description/${locale}.md`)
-      assert.doesNotMatch(text, dtoVocabulary, `${tool}/${locale}.md carries state-machine DTO vocabulary`)
-    }
+test('WHAT[participant-horizon-003] actual wait and failure outcomes are natural-language consequences', () => {
+  for (const [reason, message] of [
+    ['OperatorAbort', /Your waiting was interrupted/],
+    ['UserMessageArrived', /Something nearer has arrived/],
+    ['DeadlineExpired', /No return reached you before your waiting ended/],
+  ]) {
+    const text = join.renderInterrupted('en', reason)
+    assert.match(text, message)
+    assert.deepEqual(parseToml(text), {})
+  }
+  for (const [error, message] of [
+    ['Empty', /nothing away to receive/], ['NothingToJoin', /nothing away to receive/],
+    ['Cancelled', /wait was cancelled/], ['JoinInProgress', /already in progress/],
+    ['Abandoned', /did not return/], ['NotFound', /No one by that name/],
+    ['TimedOut', /waiting ended/], ['TerminalMaterializationFailed', /return could not be gathered/],
+  ]) {
+    const text = join.renderForkError('en', error)
+    assert.match(text, message)
+    assert.deepEqual(parseToml(text), {})
   }
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { parse: parseToml } = await import("smol-toml");
-const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
-
-
-test('WHAT[participant-horizon-003] devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
-  const wire = join.renderInterrupted('english', 'DeadlineExpired')
-  assert.match(wire, /No return reached you before your waiting ended/)
-  assert.equal(parseToml(wire).status, undefined)
-  assert.equal(parseToml(wire).error, undefined)
-})
-test('WHAT[participant-horizon-003] devops_join_timed_out_fork_error_also_natural_language', () => {
-  const wire = join.renderForkError('english', 'TimedOut')
-  assert.match(wire, /No return reached you before your waiting ended/)
-  assert.equal(parseToml(wire).status, undefined)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { parse: parseToml } = await import("smol-toml");
-const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
-
-const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]/
-const completed = (over = {}) => ({ kind: 'completed', agentId: 'a1', agentName: 'coder', role: 'Coder', runId: 'run-a1', workRecord: '', ...over })
-const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'engineer', role: 'Engineer', runId: 'run-a1', code: 'E1', message: 'boom', ...over })
-const pty = (kind, over = {}) => ({ kind, ptyId: 'pty-1', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...over, ...(kind ? { kind } : {}) })
-const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
-
-test('WHAT[participant-horizon-003] MISC_join_render_batch_pty_aborted_natural_language', () => {
-  const wire = join.renderBatch('english', [pty('pty-aborted', { ptyId: 'pty-3', outcome: 'interrupted', code: 'AB', message: 'esc' })])
-  assert.match(wire, /# npm test was interrupted\./)
-  assert.match(wire, /output = "esc"/)
-  assert.ok(!wire.includes('pty_id'))
-})
-test('WHAT[participant-horizon-003] MISC_join_render_batch_multiple_items_stable_order', () => {
-  const wire = join.renderBatch('english', [
-    failed({ message: 'boom' }),
-    pty('pty-aborted', { ptyId: 'p', terminalLabel: 'Terminal', outcome: 'x', code: 'C', message: 'm' }),
-    completed({ workRecord: 'done' }),
+test('WHAT[participant-horizon-003] mixed results preserve their input order and physical output stays data', () => {
+  const text = join.renderBatch('en', [
+    { kind: 'failed', agentId: 'private-a', agentName: 'Ada', role: 'Engineer', runId: 'run-a', code: 'E', message: 'FAILED-FIRST' },
+    { kind: 'pty-aborted', ptyId: 'private-terminal', terminalLabel: 'Terminal', outcome: 'interrupted', code: 'C', message: 'status = "business data"' },
+    completed('Bob', 'RETURNED-LAST'),
   ])
-  assert.equal([...wire.matchAll(/could not complete/g)].length, 1)
-  assert.equal([...wire.matchAll(/has returned\./g)].length, 1)
-  assert.equal([...wire.matchAll(/was interrupted\./g)].length, 1)
-  assertClean(wire, 'multiple')
+  assert.ok(text.indexOf('FAILED-FIRST') < text.indexOf('Terminal was interrupted'))
+  assert.ok(text.indexOf('Terminal was interrupted') < text.indexOf('RETURNED-LAST'))
+  assert.equal(parseToml(text).output, 'status = "business data"')
+  assert.equal(parseToml(text).status, undefined)
+  assert.ok(!text.includes('private-terminal'))
 })
-test('WHAT[participant-horizon-003] MISC_join_render_interrupted_natural_language', () => {
-  const operatorWire = join.renderInterrupted('english', 'OperatorAbort')
-  assert.match(operatorWire, /# Your waiting was interrupted\./)
-  assertClean(operatorWire, 'operator')
 
-  const userWire = join.renderInterrupted('english', 'UserMessageArrived')
-  assert.match(userWire, /# Something nearer has arrived\./)
-  assertClean(userWire, 'user')
-
-  const deadlineWire = join.renderInterrupted('english', 'DeadlineExpired')
-  assert.match(deadlineWire, /# No return reached you before your waiting ended\./)
-  assertClean(deadlineWire, 'deadline')
+test('WHAT[participant-horizon-003] current source checker accepts prose and rejects its generic-state DTO fixture', () => {
+  assert.deepEqual(scanText('JoinResultRenderer.fs', 'let text = "Your waiting ended."'), [])
+  assert.ok(scanText('JoinResultRenderer.fs', 'field "status" (str "interrupted")').some((hit) => hit.id === 'field-status'))
 })
-test('WHAT[participant-horizon-003] MISC_join_render_fork_error_natural_language', () => {
-  const cases = [
-    ['Empty', /nothing away to receive/],
-    ['NothingToJoin', /nothing away to receive/],
-    ['Cancelled', /wait was cancelled/],
-    ['JoinInProgress', /already in progress/],
-    ['Abandoned', /did not return from this charge/],
-    ['NotFound', /No one by that name is away/],
-    ['TimedOut', /waiting ended/],
-    ['TerminalMaterializationFailed', /return could not be gathered/],
-  ]
-  for (const [error, pattern] of cases) {
-    const wire = join.renderForkError('english', error)
-    assert.match(wire, pattern, error)
-    assertClean(wire, error)
-    assert.equal(parseToml(wire).status, undefined, error)
-  }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
-
-const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]|work_record\s*=/
-const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
-
-test('WHAT[participant-horizon-003] JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', () => {
-  assertClean(join.renderInterrupted('english', 'OperatorAbort'), 'operator abort')
-  assertClean(join.renderForkError('english', 'NothingToJoin'), 'nothing to join')
-  assertClean(join.renderForkError('english', 'TimedOut'), 'timed out')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { FORBIDDEN_DTO_PATTERNS, FORBIDDEN_TOKENS, scanEntries, scanRepo, scanText } = await import("../../../scripts/checks/provider-leak-gate.mjs");
-
-const CLEAN_HORIZON = `
-module HorizonTool =
-    let private lineForHandle handle _ =
-        sprintf "# %s is still away." "Coder"
-
-    let spec scope =
-        { Name = "horizon"
-          Description = "Orient to what remains at your horizon."
-          Arguments = []
-          Execute = fun _ _ _ -> task { return ToolHostCodec.tomlObjectWithInstructions ["# Nothing"] [] } }
-`
-const LEAKY_JOIN = `
-module JoinResultRenderer =
-    let renderInterrupted reason =
-        field "status" (str "interrupted")
-        field "pty_id" (str payload.PtyId)
-        SessionId.value sid
-`
-
-test('WHAT[participant-horizon-003] gate_b_documents_forbidden_dto_patterns', () => {
-  assert.ok(FORBIDDEN_DTO_PATTERNS.some((p) => p.id === 'field-status'))
-})
-test('WHAT[participant-horizon-003] gate_b_leaky_renderer_fixture_is_red_for_dto_fields', () => {
-  const hits = scanText('JoinResultRenderer.fs', LEAKY_JOIN)
-  assert.ok(hits.some((h) => h.id === 'field-status'))
-})
-}

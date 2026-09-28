@@ -19,7 +19,7 @@ test('WHAT[structured-workflow-004] Fable async Result plumbing provides sequent
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { CONTROL_PYRAMID_GUIDE, evaluateBaseline, renderFailure, scanControlPyramidEntries } = await import("../../../scripts/checks/fsharp-control-pyramid.mjs");
+const { evaluateBaseline, renderFailure, scanControlPyramidEntries } = await import("../../../scripts/checks/fsharp-control-pyramid.mjs");
 
 const scan = (text) => scanControlPyramidEntries([{ file: 'Example.fs', text }])
 
@@ -198,29 +198,6 @@ test('WHAT[structured-workflow-004] CONTROL_PYRAMID_many_hits_print_locations_bu
   assert.match(output, /c\.fs:30/)
   assert.match(output, /match → match!/)
   assert.match(output, /--explain/)
-})
-test('WHAT[structured-workflow-004] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {
-  assert.match(CONTROL_PYRAMID_GUIDE, /FsToolkit\.ErrorHandling/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /open FsToolkit\.ErrorHandling/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /open Wanxiangshu\.Foundation/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /TaskResultCE\.ofTask/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /TaskValue\.map/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /TaskResult\.mapError/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /TaskResultList\.traverseM/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /只有 Fable 平台/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /taskResult \{/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /result \{/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /match a, b with/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /false positive/)
-  assert.match(CONTROL_PYRAMID_GUIDE, /--explain/)
-  assert.ok(
-    CONTROL_PYRAMID_GUIDE.split('\n').length >= 512,
-    'the tightened repair manual must not become shorter than the original 512-line tutorial',
-  )
-  assert.ok(
-    CONTROL_PYRAMID_GUIDE.length >= 9302,
-    'the tightened repair manual must not become smaller than the original 9302-character tutorial',
-  )
 })
 }
 

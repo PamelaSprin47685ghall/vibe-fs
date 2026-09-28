@@ -1,41 +1,39 @@
 # concern-routing — WHAT
 
-## [001] `subscribe` 创建 concern-addressed mailbox 而非 reporting relation
+## [001] Subscribe：语义地址
 
-`subscribe(id, concern)` 接受两个非空自然语言字符串。成功后 `id` 成为当前 workspace 内的语义地址，mailbox owner 即为发起调用的精确 participant。`concern` 仅定义值得投递的信息意图，不授予 owner 对发送者的控制权，亦不要求发送者感知 owner 身份。路由隔离在单一 workspace 内。
+`subscribe(id, concern)` 接受非空自然语言字符串，在当前 workspace 建立由调用 participant 拥有的邮箱。`concern` 只说明值得投递的信息，不建立汇报关系或控制权；发送者无需知道 owner 身份。
 
-`id → concern` 的语义映射在 workspace 内全局稳定且不可变：同一 `id` 永久绑定初始 concern。live mailbox id 不得同时指向多个 owner。同一 owner 对相同 `id + concern` 的重放必须幂等；冲突 claim 必须显式拒绝，禁止 last-writer-wins 覆盖或偷换 concern。
+同一 workspace 的 `id → concern` 永久不变；live id 只能有一个 owner。同一 owner 对相同 id 与 concern 重放幂等，冲突必须明确拒绝，不得覆盖。
 
-## [002] subscription announcement 是 sticky-once semantic address discovery
+## [002] 公告只交付一次
 
-live subscription 建立后，所有有资格接收 Pair Hint 的 live participant（含 owner 本身）必须在各自下一次新的 Pair Hint occurrence 中获得一次紧凑公告（`id + concern`）。
+live subscription 建立后，每个有资格接收 Pair Hint 的 live participant（含 owner）在下一次新 Pair Hint 中收到一次紧凑的 `id + concern` 公告。新加入者在首个可用 Pair Hint 收到尚未见过的 live subscriptions，后续不重复广播。
 
-公告仅用于广播语义地址的存在，不暴露 owner 的运行时拓扑，不产生工作义务。同一 subscription 不得在后续 Pair Hint 中重复广播；新加入的 eligible participant 仅在其首个可用 Pair Hint 中接收尚未见过的 live subscriptions。
+公告只发现语义地址，不暴露 owner 运行时拓扑，不产生工作义务。
 
-## [003] `publish` 只按 semantic address 路由
+## [003] Publish：精确代次
 
-`publish(id, message)` 接受非空 `id` 与自然语言 `message`。仅当前 live subscription 可接收；未知、已退休或冲突的 `id` 必须 fail-closed，禁止广播或猜测接收方。
+`publish(id, message)` 接受非空 id 与自然语言 message，只向当前 live subscription 投递；未知、退休或冲突地址必须拒绝，不广播、不猜测收件方。发送者身份只用于审计与去重。
 
-成功 publish 记录消息事件。发送者身份仅用于审计与去重，无需显式指定 recipient。publish 异步完成，不阻塞等待消费，不打断 owner 当前的 provider attempt。
+成功 publish 记录消息事件，异步返回，不等消费、不打断 owner 的 provider attempt。消息绑定接受时的 exact mailbox generation；解析后、写入前若退休或换代，必须拒绝 stale claim，不得转投新 owner。
 
-消息必须严格绑定接受时的 exact live mailbox generation。若在解析与写入之间 mailbox 发生 retire 或 rebind，publish 必须作为 stale claim 拒绝，禁止自动转投新代次 owner。
+## [004] Pair Hint 边界交付
 
-## [004] 消息只在 owner 下一次新 Pair Hint 自然边界交付
+pending 消息只在 owner 的下一次新 Pair Hint 聚合交付，不即时注入 active context。消息与该 occurrence 的 provider payload 一起冻结；重放须 byte-identical，不重复消费。
 
-已接受的 mailbox 消息不即时注入 active context。owner 仅在下一次新的 Pair Hint occurrence 聚合消费尚未交付的 pending messages，并与该 Pair Hint 的 frozen provider payload 一同呈现。
+消息与公告的交付覆盖必须与 Pair Hint 生成原子提交。placement 放弃或失败不得留下已交付状态，材料留待下一合法 occurrence。
 
-同一 Pair Hint 的重放必须保证消息载荷 byte-identical，不重复消费队列。消息交付覆盖（`MessageDelivered`）及公告覆盖（`SubscriptionAnnounced`）必须与 Pair Hint 的生成在同一原子事务中提交；若 placement 放弃或失败，交付状态回滚，留待下一合法 occurrence 重试。
+## [005] 信息不授予权威
 
-## [005] peer message 是低 authority 信息
+公告和 peer message 不得创建或延续 user interaction authority、改变 office entitlement 或自动创建 obligation。消息不是已验证的世界事实，接收方须按领域证据独立判断行动。
 
-subscription announcement 与 published message 均不得 mint 或 continue user interaction authority，不得变更 office entitlement，不得自动创建 obligation，亦不得被接收方直接视为已验证的世界事实。接收方必须按领域证据法独立判定是否据此采取行动。
+## [006] 邮箱随 owner life 退休
 
-## [006] mailbox 生命周期跟随 owner participant life
+owner participant 终结时，其 mailbox generation 退休；新 publish 拒绝，未交付消息终结，不向 replacement 或 child 继承。
 
-mailbox generation 仅在 owner participant 存活期内有效。owner 终结后 generation 退休，此时新的 publish 必须 fail-closed。已接受但未交付的消息随 generation 退休而终结，禁止跨代或向 replacement/child 自动继承。
+后继 participant 可显式重新 subscribe 同一 id，但 concern 必须保持原义。新 generation 重新公告；旧代消息和交付覆盖不得沿用。
 
-后继 participant 可显式针对同一 `id` 重新 `subscribe`，前提是 `concern` 必须与既有不可变语义完全一致。该操作产生全新的 mailbox generation，并重新触发一次 sticky announcement。旧代次未决消息与 delivery coverage 永久作废。
+## [007] 路由范围最小化
 
-## [007] 路由表保持极小
-
-系统仅维护 live subscriptions、message occurrences 以及 recipient announcement/delivery coverage 的最小事实集合。禁止引入组织层级、presence 派生 authority、优先级调度、工作流编排、实时 ACK 协议或通用事件总线机制。
+只维护语义地址、邮箱、消息 occurrence 及公告/交付覆盖所需的最小事实。不引入组织层级、由 presence 派生的 authority、优先级调度、工作流编排、实时 ACK 或通用事件总线。

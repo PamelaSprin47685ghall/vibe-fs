@@ -55,4 +55,22 @@ test('WHAT[provider-attempt-recovery-023] session idle sweep selectively targets
   assert.equal(sweepOutcomeAbsent.manuals.length, 1, 'unresumed accepted execution must report manual intervention')
   assert.equal(sweepOutcomeAbsent.manuals[0].sessionId, sessionIdA)
   assert.equal(sweepOutcomeAbsent.manuals[0].physicalUserMessageId, 'msg-accepted-absent')
+  const repeated = await recoveryHost.signalSessionQuiesced(handleAbsent, sessionIdA)
+  assert.equal(repeated.calls, 0)
+  assert.deepEqual(repeated.manuals, sweepOutcomeAbsent.manuals)
 })
+
+test('WHAT[provider-attempt-recovery-023] missing resume capability terminalizes the accepted execution instead of leaving it Accepted', { todo: 'GAP-141 / 37-D2: managed-chat-012 allows manual blocked state while this clause requires terminal failure' }, async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-par023-terminal-'))
+  const host = await recoveryHost.bootRecoveryHost(directory, 'absent')
+  try {
+    await recoveryHost.seedAccepted(host, 'session-terminal', 'physical-terminal')
+    await recoveryHost.signalSessionQuiesced(host, 'session-terminal')
+    assert.deepEqual(recoveryHost.executionStatus(host, 'session-terminal', 'physical-terminal'), { phase: 'Terminal', disposition: 'Failed' })
+  } finally {
+    recoveryHost.disposeRecoveryHost(host)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test.todo('WHAT[provider-attempt-recovery-023] real boot sweep after process restart resolves only Accepted-without-start and preserves exact accepted material without replacement send (GAP-139)')

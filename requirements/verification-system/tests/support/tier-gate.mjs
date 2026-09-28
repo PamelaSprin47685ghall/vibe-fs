@@ -21,7 +21,7 @@ function createTierGatedTest(isTierActive, tierName) {
       options = {}
     }
     if (!isTierActive()) {
-      return test.skip(name, options, fn)
+      return test(name, { ...options, skip: `${tierName} tier not enabled` }, fn)
     }
     return test(name, options, fn)
   }
@@ -33,7 +33,7 @@ function createTierGatedTest(isTierActive, tierName) {
       options = {}
     }
     if (!isTierActive()) {
-      return test.skip(name, options, fn)
+      return test(name, { ...options, skip: `${tierName} tier not enabled` }, fn)
     }
     return test.only(name, options, fn)
   }

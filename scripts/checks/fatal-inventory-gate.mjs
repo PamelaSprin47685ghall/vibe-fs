@@ -351,8 +351,8 @@ export function scanFatalInventory(files, entries, testsExist = () => true, root
 
   // (c) FixedWithRegression naming a test that does not exist.
   for (const entry of entries) {
-    if (entry.status !== 'FixedWithRegression' || !entry.formalTestId) continue
-    const testPath = entry.formalTestId.split('::')[0]
+    if (entry.status !== 'FixedWithRegression') continue
+    const testPath = typeof entry.formalTestId === 'string' ? entry.formalTestId.split('::')[0] : ''
     if (!testPath.endsWith('.test.mjs') || !testsExist(testPath)) {
       violations.push({
         code: 'fatal-inventory-missing-regression-test',

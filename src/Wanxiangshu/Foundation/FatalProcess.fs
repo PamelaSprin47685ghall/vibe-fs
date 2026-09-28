@@ -25,5 +25,7 @@ module FatalProcess =
     let kill () : unit = physicalKill ()
 
     let trip (operation: string) (result: string) : unit =
-        report operation result
-        kill ()
+        try
+            report operation result
+        finally
+            kill ()

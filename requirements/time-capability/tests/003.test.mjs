@@ -103,4 +103,69 @@ test('WHAT[time-capability-003] VERIFY_004_virtual_timer_multiple_handles_fire_i
   assert.deepEqual(order, ['short', 'long'])
   process.timerDispose(timer)
 })
+
+test('WHAT[time-capability-003] deadlines follow due time despite reverse registration and cancellation leaves other handles live', async () => {
+  const timer = process.createVirtualTimer()
+  try {
+    const order = []
+    const later = process.timerDelay(timer, 30)
+    const cancelled = process.timerDelay(timer, 5)
+    const earlier = process.timerDelay(timer, 10)
+    process.timerAwait(later).then(() => order.push('later'))
+    process.timerAwait(cancelled).then(() => order.push('cancelled'))
+    process.timerAwait(earlier).then(() => order.push('earlier'))
+    process.timerCancel(cancelled)
+    process.timerCancel(cancelled)
+    process.timerAdvance(timer, 10)
+    await settle()
+    assert.deepEqual(order, ['earlier'])
+    process.timerCancel(earlier)
+    process.timerAdvance(timer, 20)
+    await settle()
+    assert.deepEqual(order, ['earlier', 'later'])
+    process.timerAdvance(timer, 100)
+    await settle()
+    assert.deepEqual(order, ['earlier', 'later'])
+  } finally {
+    process.timerDispose(timer)
+  }
+})
+
+test('WHAT[time-capability-003] a disposed timer cannot fire newly requested handles', async () => {
+  const timer = process.createVirtualTimer()
+  process.timerDispose(timer)
+  process.timerDispose(timer)
+  let fired = false
+  process.timerAwait(process.timerDelay(timer, 10)).then(() => { fired = true })
+  process.timerAdvance(timer, 10)
+  await settle()
+  assert.equal(fired, false)
+})
+
+test('WHAT[time-capability-003] advancing one virtual timer or constructing physical ports does not advance another', async () => {
+  const first = process.createVirtualTimer()
+  const second = process.createVirtualTimer()
+  const nodeTimer = process.createNodeTimer()
+  try {
+    const nodeClock = process.createNodeClock()
+    assertOpaque(nodeClock, 'physical clock')
+    assertOpaque(nodeTimer, 'physical timer')
+    const fired = []
+    process.timerAwait(process.timerDelay(first, 10)).then(() => fired.push('first'))
+    process.timerAwait(process.timerDelay(second, 10)).then(() => fired.push('second'))
+    await settle()
+    assert.deepEqual(fired, [])
+    process.timerAdvance(first, 10)
+    await settle()
+    assert.deepEqual(fired, ['first'])
+    assert.equal(process.timerNowMs(second), 0)
+    process.timerAdvance(second, 10)
+    await settle()
+    assert.deepEqual(fired, ['first', 'second'])
+  } finally {
+    process.timerDispose(first)
+    process.timerDispose(second)
+    process.nodeTimerDispose(nodeTimer)
+  }
+})
 }

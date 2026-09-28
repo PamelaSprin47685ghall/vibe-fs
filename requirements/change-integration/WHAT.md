@@ -1,72 +1,57 @@
 # change-integration — WHAT
 
-## [001] 独立道路进共享 ref 走 publish lifecycle
+## [001] 发布生命周期
 
-独立 worktree 中的变更候选进入共享目标 ref 时，必须经历完整发布生命周期：Relay 在精确 snapshot/authority 上产出有效 `QualityCertificate` → Change 做确定性 artifact admission → 如需 rebase 则先以 durable `InvalidateCertificate` 记录原因、执行 rebase 并以无参数 `ContinueLoop` 继续沿同一 `ManagerJob` 循环 → 下一 `surface-loop-N` incumbency 在新 snapshot 上重新独立 assessment → 获取短门禁执行 CAS → ff-only 发布 → 记录 durable facts。失效原因只存在于 durable invalidation 事实中，`ContinueLoop` 不携带 reason 参数。严禁模型满分直接越过 Git/CAS。
+独立 worktree 的候选进入共享目标 ref 前，须经 Relay 在精确 snapshot/authority 上签发 QualityCertificate、Change 确定性准入、短门禁内 ff-only CAS 与发布事实持久化。需要 rebase 时，先持久化 InvalidateCertificate 的原因，再 rebase；以无参数 ContinueLoop 沿同一 ManagerJob 进入下一 incumbency，在新快照上重新独立 assessment 后才可发布。模型满分不能跳过 Git/CAS。
 
-## [002] Clean Gate——工作区必须干净才受理
+## [002] Clean Gate
 
-编排器处理用户请求前，目标工作区必须处于 clean 状态（无暂存、未暂存、未追踪或脏子模块变更）。严禁自动执行 git stash、自动提交或猜测清理，插件自身的运行时与日志目录必须置于工作树之外。
+Orchestrator 受理用户请求前，目标工作区须无暂存、未暂存、未追踪及脏子模块变更。不得自动 stash、提交或猜测清理；插件运行时与日志放在工作树外。
 
-## [003] candidate/rebase/publish claim/CAS 的原子边界
+## [003] 可恢复的原子边界
 
-从候选产生、变基、发布认领（publish claim）到 CAS 推进，每一步骤均必须产生明确的不可变持久事实标记。状态迁移之间不存在未定义的中间态，保证恢复时动作具有确定性。
+候选、rebase、publish claim 与 CAS 各边界须有明确的不可变持久事实，使任一中断点的未决义务可确定，不留下无法判定的中间态。
 
-## [004] 共享 ref mutation 是唯一短 critical section
+## [004] Integration Gate
 
-Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持有。严禁在 Relay assessment、Manager work、rebase、冲突处理或 loop-continuation 等待期间持有该门禁。
+门禁只覆盖 target 最终重读与共享 ref 的 ff-only CAS。Incumbent 工作、assessment、证书失效、rebase、冲突处理、loop continuation 等待与 audit 都在门禁外。
 
-## [005] conflict 是机器事实，处理者只能是同一循环的下一 loop incumbency
+## [005] 冲突归属
 
-检测到 unmerged entries 或 rebase conflict 时，Change 必须记录 typed `ConflictDetected` 与精确 `WorkspaceSnapshotId`，失效旧 certificate，并在门禁外以无参数 `ContinueLoop` 继续沿同一 `ManagerJob` 循环。不得 `ResumeManager`、不得恢复 retired iteration、不得另起 Reviewer；后续质量判断只能来自下一 loop incumbency 的普通 assessment。失效原因只记录在 durable invalidation 事实中，不作为 `ContinueLoop` 参数重复。
+Unmerged entries 或 rebase conflict 须记录 ConflictDetected 与精确 WorkspaceSnapshotId，并失效旧证书。在门禁外通过同一 ManagerJob 的无参数 ContinueLoop 交给下一 incumbency，以其普通独立 assessment 重新裁决；不得 ResumeManager、复活 retired iteration 或另起 Reviewer。失效原因只记录在 durable invalidation 中。
 
-## [006] restart 后从 durable facts + 外部现实重证 outstanding obligation
+## [006] 从事实恢复
 
-系统崩溃重启后，完全根据持久化事实与当前外部目标分支现实重新计算未决义务并恢复执行。structured-workflow-003 vs structured-workflow-009 消歧：projection 不 fold 成唯一「最新 case」，不新增 ResumeAtXxx 补偿日志，严禁通过扫描文件系统残留或恢复隐藏程序计数器反推执行进度。
+恢复只依据持久事实与当前目标分支现实重证未决义务，不以磁盘残留、隐藏程序计数器、唯一 latest case 或 ResumeAtXxx 补偿日志猜测进度。保留既有 Road/worktree；可继续等待 active incumbent，或在 durable retirement 后 ContinueLoop 到下一 incumbency，不得复活 retired incumbent。
 
-## [007] PublishClaimed 三分支固定顺序、穷尽互斥
+## [007] PublishClaimed 恢复
 
-已认领发布状态在恢复判定时，必须按以下固定顺序穷尽判定：
-1. 当前 head 已等于变基 commit：说明快进已完成，幂等补写 Published 事实；
-2. 当前 head 等于预期 head：说明尚未快进，在短门禁内再次确认后执行快进发布；
-3. 其余情况：说明认领已过期，作废旧验证并重新进入变基发布循环。
+依次、互斥地判定当前 target head：等于 rebased commit 时幂等补记 Published；等于 expected head 时在短门禁内复核并快进；其余情况视为 claim 过期，失效旧验证后重入 rebase/assessment 循环。
 
-## [008] target ref 安全——冻结 + ff-only CAS
+## [008] 冻结目标与 ff-only CAS
 
-目标分支在委托初始阶段即完成符号引用冻结。读取 head 失败时必须快速失败，发布推进必须同时满足当前分支与冻结目标一致、当前 head 与预期一致、且提交关系为严格快进。
+委托开始时冻结目标符号引用，读取 head 失败立即拒绝。推进共享 ref 须同时满足当前分支匹配冻结目标、head 匹配 expected head、提交关系为严格快进。
 
-## [009] Road/worktree 稳定，authority 与 incumbency 可演化
+## [009] Road 连续与任次轮换
 
-同一 Road 沿用既有 `ManagerJobId`、worktree identity 与物理 Manager session 容器，不因追加 charge、冲突或 rebase 创建第二个 worktree。逻辑 `IncumbencyId` 可以并且在 retirement 后必须轮换；追加 charge 通过 durable `AuthorityRevision` 更新当前 active WorkOwned incumbent，而不是把“同一物理 session”误当成同一逻辑 Manager。
+同一 Road 保留 ManagerJobId、worktree identity 与物理 Manager session，不因追加 charge、冲突或 rebase 另建 worktree。Retirement 后须轮换 IncumbencyId；追加 charge 以 durable AuthorityRevision 更新 active WorkOwned incumbent，物理 session 相同不代表逻辑 Manager 相同。
 
-## [010] 长 incumbent/rebase/conflict 工作不占全局门
+## [011] Provider horizon
 
-Relay incumbent 工作、assessment、certificate invalidation、rebase、conflict resolution 与 loop-continuation audit 全部在全局门禁之外；只有 target 重读 + ff-only mutation 处于门内。
+模型只接收自然语言结果与结构化工作记录，不暴露门禁状态、分支指针、内部 job_id、CAS 机制或 worktree 路径。
 
-## [011] 墙内机械不进 provider horizon
+## [013] 目标变化使证书失效
 
-门禁状态、分支指针、内部 job_id、CAS 算法与 worktree 路径等底层机械对调用模型透明，穿透 horizon 的仅为自然语言结果与结构化工作记录。
+Gate 前重读或 CAS 发现 target 已推进时，旧 QualityCertificate 立即失效。释放门禁后，基于最新 head rebase/capture snapshot，以同一循环的无参数 ContinueLoop 请求下一独立 assessment；失效原因只持久化在 invalidation 中。旧证书不得跨 target/base 复用。
 
-## [012] 恢复禁止扫盘反推、禁跳步
+## [014] 机器事实不可被满分覆盖
 
-恢复流程严禁新建 worktree 替换既有 Road 状态、严禁以磁盘残留替代 durable facts、严禁从旧 stage/program-counter 猜下一步。恢复可以继续等待当前 active incumbent，或在 durable retirement 后以无参数 `ContinueLoop` 开启下一 loop incumbency；绝不能为“身份连续”复活 retired incumbent。
+证书与工作区快照不符、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，不得修改共享 ref；须拒绝或失效证书后继续循环。`8×10` 只能产生质量候选，不能覆盖机器事实。
 
-## [013] target 变化/CAS miss 后旧 certificate 作废
+## [015] 工作区变化后重新验证
 
-在 gate 前重读或 CAS 本身发现目标分支已推进时，旧 `QualityCertificate` 立即失效；Change 释放门禁、基于最新 head 重新 rebase/capture snapshot，并以无参数 `ContinueLoop` 继续沿同一循环请求下一独立 assessment。失效原因保留在 durable invalidation 事实中，不进入 `ContinueLoop` 参数。旧证书绝不能在新 target/base 上复用。
+DevOps 修复或 Engineer 变更使快照推进时，旧快照的评估、测试证据与 QualityCertificate 立即失效；须在最新快照重新验证并独立 assessment，不得搬用旧结果。
 
-## [014] stale certificate 与 Git machine facts 永远不能被模型满分覆盖
+## [017] 汇聚后验证
 
-certificate snapshot 与当前 workspace 不一致、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，必须在进入共享 ref mutation 前 fail closed / invalidation + loop continuation。`8×10` 只产生质量候选，不能把这些机器事实翻译成“仍然 perfect，所以继续发布”。
-
-## [015] 修复改变工作树后必须重新验证与证书失效
-
-当 DevOps 在执行过程中自行修复或 Engineer 提交新改动导致工作区快照发生推进时，此前快照上建立的任何评估结论、测试证据及 QualityCertificate 立即失效；必须在最新快照上重新执行验证与独立 assessment。严禁将旧快照的证书或测试结果搬移复用至新状态。
-
-## [016] 并行 Engineer 与 DevOps 不得无协调修改同一验证对象
-
-并行运行的 Engineer 与 DevOps 不得无协调地修改同一验证对象；Manager 必须通过明确的任务边界隔离或固定快照保证验证对象的一致性。严禁以修改前后文件哈希相同冒充运行期间未发生变更，严禁引入未经证明的「自动架构分类器」绕过验证边界。
-
-## [017] 多道路汇聚后必须重新验证且保留证书失效合同
-
-Orchestrator 区分互补道路集成与竞争道路取舍；各独立道路在各自 worktree 上的独立通过不等于多道路汇聚结果通过。合流与变基后必须在最终工作树上执行汇聚后验证，并保留既有的变基冲突失效与重新独立 assessment 合同，严禁跳过汇聚后验证直接发布。
+Orchestrator 须区分互补道路的集成与竞争道路的取舍。各道路独立通过不代表汇聚通过；合流/rebase 后须在最终工作树验证，并保留冲突失效与重新独立 assessment 的要求，不能直接发布。

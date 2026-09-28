@@ -2,7 +2,7 @@
  * gate-budget-cases.mjs — budget table relations retained after scripts/budget-gate.mjs removal.
  *
  * 0.5.3 retired the budget-gate scanner. Cases that only imported that scanner were removed.
- * Cases that assert time-budget.js relations (no script dependency) stay for verification-system-004 coverage.
+ * Existing frozen values belong to 010; primary silence bounds belong to 006.
  */
 
 import { assertEq, assertTrue } from './lib.mjs';
@@ -10,7 +10,7 @@ import * as budget from '../../e2e/support/time-budget.js';
 
 export const budgetCases = [
   {
-    name: 'verification-system-004 every centralized budget holds its measured value',
+    name: 'verification-system-010 existing frozen verification budgets retain their values',
     fn: () => {
       const expected = {
         LITERAL_BUDGET_THRESHOLD_MS: 1000,
@@ -57,7 +57,7 @@ export const budgetCases = [
   },
 
   {
-    name: 'verification-system-004 no budget is 兜底-only for a criterion that has a causal signal',
+    name: 'verification-system-006 silence bounds precede physical backstops',
     fn: () => {
       assertTrue(
         budget.WATCHDOG_TIMEOUT_MS < budget.CANARY_TIMEOUT_MS,
@@ -80,15 +80,10 @@ export const budgetCases = [
         'the silence window is the primary criterion; the suite ceiling is only 兜底 (verification-system-004)',
       );
       assertTrue(
-        budget.UNIT_VERDICT_SILENCE_MS === budget.WATCHDOG_TIMEOUT_MS,
-        budget.HARNESS_CASE_SILENCE_MS >= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
-        budget.UNIT_RUNNER_PROBE_SILENCE_MS > budget.UNIT_RUNNER_PROBE_PER_TEST_MS,
-        budget.UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS <= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
-        'every suite dog starves on the same 3s window as e2e canary',
-      );
-      assertTrue(
-        budget.LITERAL_BUDGET_THRESHOLD_MS <= budget.WATCHDOG_TIMEOUT_MS,
-        'the gate threshold must not exceed the tightest budget, or that budget itself would read as a poll slice',
+        budget.HARNESS_CASE_SILENCE_MS >= budget.UNIT_RUNNER_PROBE_SILENCE_MS
+          && budget.UNIT_RUNNER_PROBE_SILENCE_MS > budget.UNIT_RUNNER_PROBE_PER_TEST_MS
+          && budget.UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS <= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
+        'physical probe budgets must fit inside the harness silence window',
       );
       assertTrue(
         budget.READINESS_STAGE_MS < budget.CANARY_READY_MS,

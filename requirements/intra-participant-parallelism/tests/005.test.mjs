@@ -1,84 +1,58 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertJsData, assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+import { fission, harness, parsed, deferred } from './support/admission.mjs'
 
-const fission = await import('../../../dist/Execution/Fission/Surface.js')
-
-const fissionHost = await import('../../../dist/OpenCode/Host/FissionHostSurface.js')
-
-const parsed = () => fission.parsePrompt([' lane A  ', 'lane B'])
-
-const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'old-parent' } = {}) => {
-  const events = []
-  let serial = 0
-  const runtime = fission.createAdmission({
-    parentOf: async (owner) => {
-      events.push(['parent', owner])
-      return parent
-    },
-    ownerWorkRecord: async (owner) => {
-      events.push(['lwr', owner])
-      return 'CANONICAL-LWR'
-    },
-    createLane: async (_owner, physicalParent, lane) => {
-      events.push(['create', lane.index, physicalParent])
-      if (lane.index === failCreateAt) throw new Error(`create-${lane.index}`)
-      serial += 1
-      return `lane-${serial}`
-    },
-    startLane: async (laneSession, startup) => {
-      const index = Number(/lane_index = (\d+)/.exec(startup)?.[1])
-      events.push(['start', index, laneSession, startup])
-      if (index === failStartAt) throw new Error(`start-${index}`)
-    },
-    abortLane: async (laneSession) => {
-      events.push(['rollback', laneSession])
-    },
-    silentInterruptOwner: async (owner) => {
-      events.push(['silent-interrupt', owner])
-      if (failInterrupt) throw new Error('interrupt-failed')
-    },
-  })
-  return { events, runtime }
-}
-
-test('WHAT[intra-participant-parallelism-005] old caller silent-interrupts only after every lane started', async () => {
-  const { events, runtime } = harness()
+test('WHAT[intra-participant-parallelism-005] original caller cannot be interrupted while the final lane is still starting', async () => {
+  const reached = deferred()
+  const release = deferred()
+  const { events, runtime } = harness({ beforeStart: async index => {
+    if (index === 1) {
+      reached.resolve()
+      await release.promise
+    }
+  } })
   const owner = 'old-caller-interrupt-order'
-  const result = await fission.admit(runtime, owner, parsed())
-  assert.equal(result.ok, true, JSON.stringify(result))
-
-  const interruptAt = events.findIndex(([kind]) => kind === 'silent-interrupt')
-  assert.ok(
-    interruptAt > events.findLastIndex(([kind]) => kind === 'start'),
-    'old caller interrupts only after every lane started',
-  )
+  const admission = fission.admit(runtime, owner, parsed())
+  try {
+    await reached.promise
+    assert.equal(events.filter(([kind]) => kind === 'started').length, 1)
+    assert.equal(events.some(([kind]) => kind === 'silent-interrupt'), false)
+    release.resolve()
+    assert.equal((await admission).ok, true)
+    assert.equal(events.filter(([kind]) => kind === 'silent-interrupt').length, 1)
+    assert.ok(events.findIndex(([kind]) => kind === 'silent-interrupt') > events.findLastIndex(([kind]) => kind === 'started'))
+  } finally {
+    release.resolve()
+    await admission
+    fission.release(runtime, owner)
+  }
 })
 
-test('WHAT[intra-participant-parallelism-005] failed silent interrupt rolls back lanes and old caller stays out of active set', async () => {
-  const failed = harness({ failInterrupt: true })
-  const failedOwner = 'interrupt-owner'
-  assert.equal((await fission.admit(failed.runtime, failedOwner, parsed())).ok, false)
-  assert.equal(failed.events.filter(([k]) => k === 'rollback').length, 2)
-  assert.equal(fission.isActive(failed.runtime, failedOwner), false)
+test('WHAT[intra-participant-parallelism-005] interrupt rejection rolls back all admitted lanes and releases the reservation', async () => {
+  const { events, runtime } = harness({ failInterrupt: true })
+  const owner = 'interrupt-owner'
+  assert.equal((await fission.admit(runtime, owner, parsed())).ok, false)
+  assert.deepEqual(events.filter(([kind]) => kind === 'rollback').map(([, id]) => id), events.filter(([kind]) => kind === 'created').map(([, id]) => id))
+  assert.equal(fission.isActive(runtime, owner), false)
 })
 
-test('WHAT[intra-participant-parallelism-005] FissionRuntime preserves silent interrupt across multiple checks and is cleared only by clearOwner/clearSilentInterrupt', async () => {
-  const owner = 'retired-owner-1'
-  assert.equal(fission.isSilentInterrupt(owner), false)
-
-  fission.markSilentInterrupt(owner)
-  assert.equal(fission.isSilentInterrupt(owner), true)
-  assert.equal(fission.tryConsumeSilentInterrupt(owner), true)
-  // Must NOT be cleared after consuming once:
-  assert.equal(fission.isSilentInterrupt(owner), true)
-  assert.equal(fission.tryConsumeSilentInterrupt(owner), true)
-
-  fission.clearSilentInterrupt(owner)
-  assert.equal(fission.isSilentInterrupt(owner), false)
-
-  fission.markSilentInterrupt(owner)
-  assert.equal(fission.isSilentInterrupt(owner), true)
-  fission.clearOwner(owner)
-  assert.equal(fission.isSilentInterrupt(owner), false)
+test('WHAT[intra-participant-parallelism-005] runtime silent-interrupt marker survives reads until explicit owner cleanup', () => {
+  const owner = 'silent-marker-owner'
+  try {
+    assert.equal(fission.isSilentInterrupt(owner), false)
+    fission.markSilentInterrupt(owner)
+    assert.equal(fission.isSilentInterrupt(owner), true)
+    assert.equal(fission.tryConsumeSilentInterrupt(owner), true)
+    assert.equal(fission.isSilentInterrupt(owner), true)
+    assert.equal(fission.tryConsumeSilentInterrupt(owner), true)
+    fission.clearSilentInterrupt(owner)
+    assert.equal(fission.isSilentInterrupt(owner), false)
+    fission.markSilentInterrupt(owner)
+    fission.clearOwner(owner)
+    assert.equal(fission.isSilentInterrupt(owner), false)
+  } finally {
+    fission.clearOwner(owner)
+  }
 })
+
+test.todo('WHAT[intra-participant-parallelism-005] actual old Host execution retires silently without business Aborted, child cancellation or recovery dispatch (GAP-158)')

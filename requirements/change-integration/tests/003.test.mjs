@@ -471,3 +471,29 @@ test('WHAT[change-integration-003] WORKTREE_CMD_create_surfaces_stderr_on_failur
   assert.equal(result.error, 'already exists')
 })
 }
+
+test('WHAT[change-integration-003] publication claim requires every explicit binding field even when candidate facts already exist', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const change = await import('../../../dist/Change/Surface.js')
+  let projection = change.createJob(change.empty(), {
+    jobId: 'binding-probe', managerSessionId: 'manager-probe', managerAgent: 'manager', byname: 'Road',
+    worktreeIdentity: 'worktree-probe', worktreePath: '/tmp/worktree-probe',
+    targetRef: 'refs/heads/main', targetBranchFrozen: 'refs/heads/main',
+  })
+  projection = change.recordFact(projection, 'binding-probe', change.fact('CandidateReady', {
+    candidateCommit: 'rebased', workspaceSnapshotId: 'snapshot', qualityCertificateId: 'certificate',
+  }))
+  projection = change.recordFact(projection, 'binding-probe', change.fact('RebasedCandidateReady', {
+    rebasedCommit: 'rebased', targetHeadSnapshot: 'target', workspaceSnapshotId: 'snapshot',
+  }))
+  const claim = {
+    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target',
+    workspaceSnapshotId: 'snapshot', qualityCertificateId: 'certificate', authorityRevision: 'authority',
+  }
+  assert.ok(change.find(change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', claim)), 'binding-probe').facts.includes('PublishClaimed'))
+  for (const field of Object.keys(claim)) {
+    const incomplete = { ...claim }
+    delete incomplete[field]
+    assert.throws(() => change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', incomplete)), /Incomplete PublishClaimed payload/, field)
+  }
+})

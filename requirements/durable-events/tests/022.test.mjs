@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { basename, join, resolve } from 'node:path'
 import test from 'node:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
 import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
-import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
+import { planOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 
@@ -144,7 +147,7 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
   assert.ok(!assemblySources.includes('Strength/Runtime.fs'))
 })
 
-test('WHAT[durable-events-022] EventStore focused localities stay within compile budgets', () => {
+test('WHAT[durable-events-022] declared EventStore compile plans stay within source-count budgets', () => {
   for (const shard of CONTRACT_SHARDS) {
     const { plan } = planShard(shard)
     assert.ok(
@@ -160,5 +163,23 @@ test('WHAT[durable-events-022] EventStore focused localities stay within compile
       productionSources(plan).length <= 185,
       `${shard} runtime closure exceeds 185 production sources`,
     )
+  }
+})
+
+test.todo('WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected')
+
+integrationTest('WHAT[durable-events-022] real Fable compiles the journal observation owner using its declared closure', async () => {
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-journal-owner-compile-'))
+  try {
+    const result = await compileOwnerProject({
+      projectPath: join(SOURCE_ROOT, 'Wanxiangshu.Owner.verification-system.verification-eventstorewritersurface.fsproj'),
+      aggregatePath: null,
+      scratchRoot,
+      rootPropsPath: join(ROOT, 'Directory.Build.props'),
+      stdio: 'pipe',
+    })
+    assert.equal(result.ok, true, `journal observation owner must compile without undeclared siblings\n${result.stdout}\n${result.stderr}`)
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
   }
 })

@@ -17,6 +17,12 @@ module ProviderFailureSurface =
     val fold: values: obj array -> obj
     val providerFailureFactCaseNames: string array
 
+    /// Exercise the real retry engine with observable admission and redispatch ports.
+    /// Failure, execution key, ProviderRun and RequestKind come from the policy input;
+    /// current logical identity and budget come from the supplied projection.
+    val retryAttempt:
+        input: obj -> current: obj -> admit: (obj -> Task<string>) -> redispatch: (obj -> Task<unit>) -> Task<string>
+
     val acceptHumanRoot:
         handle: JournalHandle -> session: string -> physicalMessage: string -> agent: string -> Task<obj>
 

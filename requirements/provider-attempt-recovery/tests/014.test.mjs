@@ -34,7 +34,7 @@ async function admit(journal, providerRunName) {
   }
 }
 
-test('WHAT[provider-attempt-recovery-014] a_continuation_has_a_unique_accounted_and_budgeted_occasion', async () => {
+test('WHAT[provider-attempt-recovery-014] ledger replay preserves one licensed failure count', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-continuation-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-continuation', 'rt_ledger_continuation', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)
@@ -54,9 +54,7 @@ test('WHAT[provider-attempt-recovery-014] a_continuation_has_a_unique_accounted_
     )
     assert.deepEqual(first, { ok: true, outcome: 'RetryAuthorized' })
 
-    // The same failure observed again replays the same authorization; the
-    // durable prompt gate refuses a second physical send and the budget still
-    // advances only once.
+    // This exercises ledger replay, not the physical send or Host-stop gate.
     const second = await failureOwner.recordConfirmedFailure(
       journal,
       budget.defaultBudget,
@@ -67,7 +65,7 @@ test('WHAT[provider-attempt-recovery-014] a_continuation_has_a_unique_accounted_
     assert.deepEqual(second, { ok: true, outcome: 'RetryAuthorized' })
 
     const state = failureOwner.snapshot(journal, SESSION)
-    // The continuation itself advances nothing: one record, exactly one unit.
+    // Only one failure was recorded; this test does not send a continuation.
     assert.deepEqual(
       { failures: state.failures, exhausted: state.exhausted },
       { failures: 1, exhausted: false },
@@ -77,3 +75,5 @@ test('WHAT[provider-attempt-recovery-014] a_continuation_has_a_unique_accounted_
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[provider-attempt-recovery-014] actual continuation waits for exact Host stop after failure admission and never spends budget by sending (GAP-139)')

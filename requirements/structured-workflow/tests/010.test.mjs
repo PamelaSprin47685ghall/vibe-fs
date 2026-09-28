@@ -235,3 +235,29 @@ test('WHAT[structured-workflow-010] RECONCILE_SCHEDULER_BOUND_003: kicks after s
   assert.equal(result.postStopRejected, true)
 })
 }
+
+{
+const assert = (await import('node:assert/strict')).default
+const parallel = await import('../../../dist/Foundation/ParallelSurface.js')
+
+test('WHAT[structured-workflow-010] queued work cannot enter after cancellation while waiting for a permit', async () => {
+  const started = Promise.withResolvers()
+  const release = Promise.withResolvers()
+  const token = parallel.liveToken()
+  const calls = []
+  const result = parallel.mapBounded(1, async (item) => {
+    calls.push(item)
+    if (item === 'first') {
+      started.resolve()
+      await release.promise
+    }
+    return item
+  }, ['first', 'queued'], token)
+  const rejected = assert.rejects(result, /cancel/i)
+  await started.promise
+  parallel.cancel(token)
+  release.resolve()
+  await rejected
+  assert.deepEqual(calls, ['first'])
+})
+}

@@ -15,7 +15,7 @@ open Wanxiangshu.Context.Trace
 /// - 父 → 子：`includeOpening = true`（子未见父任务全文）
 /// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
 /// 同 Session prefix replacement 不是第三种 delegation：它用
-/// `includeOpening = true` 保留自己的章程，并由 Companion memory 作为同一
+/// `includeOpening = false`，原始 Opening 留在 X；Companion memory 作为同一
 /// participant 的既有责任重新注入；不得改写成 `commissioner_record` / `attached_work_record`。
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
@@ -43,9 +43,7 @@ module LifecycleWorkRecord =
             if List.isEmpty requirements then
                 ""
             else
-                requirements
-                |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
-                |> String.concat "\n"
+                requirements |> String.concat "\n"
 
         [ record.Opening.AssignmentText; reqText; record.Opening.ConstitutiveBody ]
         |> List.filter (System.String.IsNullOrWhiteSpace >> not)

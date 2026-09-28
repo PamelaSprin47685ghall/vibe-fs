@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, extname, isAbsolute, relative, resolve } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { parseModule } from '../lib/js-syntax.mjs'
+import { parseModule, patternNames, walkSyntax } from '../lib/js-syntax.mjs'
 import { walk } from '../lib/walk.mjs'
 
 const normalize = (value) => value.replace(/\\/g, '/')
@@ -13,7 +13,7 @@ const declarationExports = (declaration) => {
   if (!declaration) return []
   if (declaration.id?.type === 'Identifier') return [declaration.id.name]
   if (Array.isArray(declaration.declarations)) {
-    return declaration.declarations.flatMap((entry) => entry.id?.type === 'Identifier' ? [entry.id.name] : [])
+    return declaration.declarations.flatMap((entry) => patternNames(entry.id))
   }
   return []
 }
@@ -25,6 +25,9 @@ const moduleExports = (program) => {
       names.add('default')
       continue
     }
+    if (node.type === 'ExportAllDeclaration' && node.exported) {
+      names.add(node.exported.name ?? node.exported.value)
+    }
     if (node.type !== 'ExportNamedDeclaration') continue
     for (const name of declarationExports(node.declaration)) names.add(name)
     for (const specifier of node.specifiers ?? []) names.add(specifier.exported.name ?? specifier.exported.value)
@@ -33,13 +36,30 @@ const moduleExports = (program) => {
 }
 
 const relativeTarget = (importer, specifier) => {
-  const target = resolve(dirname(importer), specifier)
-  return extname(target) ? target : `${target}.js`
+  return fileURLToPath(new URL(specifier, pathToFileURL(importer)))
+}
+
+const moduleEdges = (program) => {
+  const edges = []
+  walkSyntax(program, (node) => {
+    if (!['ImportDeclaration', 'ImportExpression', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) return
+    if (typeof node.source?.value !== 'string') return
+    edges.push({
+      specifier: node.source.value,
+      names: (node.specifiers ?? []).flatMap((entry) => {
+        if (entry.type === 'ImportNamespaceSpecifier') return []
+        if (entry.type === 'ImportDefaultSpecifier') return ['default']
+        const name = entry.imported ?? entry.local
+        return [name.name ?? name.value]
+      }),
+    })
+  })
+  return edges
 }
 
 const inside = (root, target) => {
   const path = relative(root, target)
-  return path === '' || (!path.startsWith('..') && !isAbsolute(path))
+  return path !== '..' && !normalize(path).startsWith('../') && !isAbsolute(path)
 }
 
 export function validateModuleLinkage(distRoot, files = walk(resolve(distRoot), ['.js'])) {
@@ -60,11 +80,27 @@ export function validateModuleLinkage(distRoot, files = walk(resolve(distRoot), 
     exportsByFile.set(file, moduleExports(program))
   }
 
+  // Re-export cycles converge because each step only adds known export names.
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [file, program] of programs) {
+      const names = exportsByFile.get(file)
+      for (const node of program.body) {
+        if (node.type !== 'ExportAllDeclaration' || node.exported || !node.source.value.startsWith('.')) continue
+        const target = relativeTarget(file, node.source.value)
+        for (const name of exportsByFile.get(target) ?? []) {
+          if (name === 'default' || names.has(name)) continue
+          names.add(name)
+          changed = true
+        }
+      }
+    }
+  }
+
   for (const [file, program] of programs) {
     const importer = normalize(relative(root, file))
-    for (const node of program.body) {
-      if (node.type !== 'ImportDeclaration' || typeof node.source.value !== 'string') continue
-      const specifier = node.source.value
+    for (const { specifier, names } of moduleEdges(program)) {
       if (!specifier.startsWith('.')) continue
 
       const target = relativeTarget(file, specifier)
@@ -78,11 +114,7 @@ export function validateModuleLinkage(distRoot, files = walk(resolve(distRoot), 
       }
 
       const available = exportsByFile.get(target)
-      for (const imported of node.specifiers) {
-        if (imported.type === 'ImportNamespaceSpecifier') continue
-        const name = imported.type === 'ImportDefaultSpecifier'
-          ? 'default'
-          : imported.imported.name ?? imported.imported.value
+      for (const name of names) {
         if (!available.has(name)) {
           violations.push(
             `${importer}: ${normalize(relative(root, target))} is missing named export '${name}'`,

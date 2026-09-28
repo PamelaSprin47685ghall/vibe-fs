@@ -1,4 +1,106 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import * as cognitive from '../../../dist/Participant/Cognition/RuntimeSurface.js'
+import * as cognitiveFold from '../../../dist/Participant/Cognition/FoldSurface.js'
+
+const deferred = () => {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
+}
+
+function cognitiveJournalPort({ writeGate, blobFailure, appendFailure } = {}) {
+  const trace = []
+  const blobs = new Map()
+  const projections = new Map()
+  const writeStarted = deferred()
+  const port = {
+    writeBlob: async content => {
+      trace.push('blob-requested')
+      writeStarted.resolve()
+      if (writeGate) await writeGate
+      if (blobFailure) return { ok: false, error: blobFailure }
+      const snapshotRef = `snapshot-${blobs.size + 1}`
+      blobs.set(snapshotRef, content)
+      trace.push('blob-durable')
+      return { ok: true, snapshotRef, snapshotDigest: `digest-${snapshotRef}` }
+    },
+    appendCommit: async commit => {
+      trace.push('commit-requested')
+      assert.ok(blobs.has(commit.snapshotRef), 'commit references a completed blob write')
+      if (appendFailure) return { ok: false, error: appendFailure }
+      const folded = cognitiveFold.CognitiveFactFold_fold(projections.get(commit.ownerKey) ?? null, {
+        case: 'AssumePhaseCommitted', fields: commit,
+      })
+      assert.equal(folded.ok, true, folded.error)
+      projections.set(commit.ownerKey, folded.value[0].projection)
+      trace.push('commit-accepted')
+      return { ok: true }
+    },
+    readProjection: ownerKey => projections.get(ownerKey) ?? null,
+    readBlob: async snapshotRef => blobs.has(snapshotRef)
+      ? { ok: true, value: blobs.get(snapshotRef) }
+      : { ok: false, error: 'missing snapshot' },
+  }
+  return { port, trace, blobs, projections, writeStarted: writeStarted.promise }
+}
+
+const cognitiveOwner = { sessionId: 'effect-008-assume' }
+const assumeCall = {
+  toolCallId: 'assume-call-1', inputDigest: 'input-1', canvasJson: '{"decision":"ship"}',
+  todos: [{ content: 'validate result', status: 'pending', priority: 'high' }],
+}
+
+test('WHAT[effect-accounting-008] assume runtime waits for snapshot persistence before committing canvas and todos', async () => {
+  const gate = deferred()
+  const journalPort = cognitiveJournalPort({ writeGate: gate.promise })
+  const runtime = cognitive.CognitiveRuntime_create(journalPort.port)
+  const pending = cognitive.CognitiveRuntime_commit(runtime, cognitiveOwner, assumeCall)
+  await journalPort.writeStarted
+  try {
+    assert.deepEqual(journalPort.trace, ['blob-requested'])
+    assert.equal(journalPort.projections.size, 0)
+    const before = await cognitive.CognitiveRuntime_currentCanvas(runtime, cognitiveOwner)
+    assert.equal(before.ok, true)
+    assert.equal(before.canvasJson, '{}')
+  } finally {
+    gate.resolve()
+  }
+  const result = await pending
+  assert.equal(result.ok, true, result.error)
+  assert.equal(result.state, 'committed')
+  assert.deepEqual(journalPort.trace, ['blob-requested', 'blob-durable', 'commit-requested', 'commit-accepted'])
+  const current = await cognitive.CognitiveRuntime_currentCanvas(runtime, cognitiveOwner)
+  assert.equal(current.canvasJson, assumeCall.canvasJson)
+  assert.deepEqual(current.todos, assumeCall.todos)
+  const recovered = await cognitive.CognitiveRuntime_currentCanvas(
+    cognitive.CognitiveRuntime_create(journalPort.port), cognitiveOwner,
+  )
+  assert.deepEqual(recovered, current)
+  assert.equal((await cognitive.CognitiveRuntime_commit(runtime, cognitiveOwner, assumeCall)).state, 'replayed')
+  assert.equal(journalPort.blobs.size, 1, 'exact replay does not persist another snapshot')
+})
+
+for (const [boundary, failure] of [
+  ['snapshot', { blobFailure: 'snapshot write refused' }],
+  ['commit', { appendFailure: 'commit append refused' }],
+]) {
+  test(`WHAT[effect-accounting-008] assume ${boundary} rejection leaves both canvas and todos uncommitted`, async () => {
+    const journalPort = cognitiveJournalPort(failure)
+    const runtime = cognitive.CognitiveRuntime_create(journalPort.port)
+    const result = await cognitive.CognitiveRuntime_commit(runtime, cognitiveOwner, assumeCall)
+    assert.equal(result.ok, false)
+    assert.equal(result.error, failure.blobFailure ?? failure.appendFailure)
+    assert.equal(journalPort.projections.size, 0)
+    assert.deepEqual(journalPort.trace, boundary === 'snapshot'
+      ? ['blob-requested']
+      : ['blob-requested', 'blob-durable', 'commit-requested'])
+    const current = await cognitive.CognitiveRuntime_currentCanvas(runtime, cognitiveOwner)
+    assert.equal(current.ok, true)
+    assert.equal(current.canvasJson, '{}')
+    assert.deepEqual(current.todos, [])
+  })
+}
 
 {
 const { default: assert } = await import("node:assert/strict");

@@ -175,3 +175,26 @@ test('WHAT[work-record-004] rematerializing an older bounded range never substit
     assert.doesNotMatch(firstBounded, /HISTORY_CHRONICLE_2/)
   })
 })
+
+{
+const { record, commitFrame, withReopenableJournal } = await import('./support/record.mjs')
+test('WHAT[work-record-004] a frame spanning two invocations cannot leak the earlier work into the later bounded record', { todo: 'GAP-111: straddling Y frame leaks earlier work; decide exact bounded representation without contradicting coverage semantics' }, async () => {
+  await withReopenableJournal(async handle => {
+    const session = 'record-crossing-frame'
+    await record.captureOpening(handle, session, 'charge', [])
+    await record.captureProjection(handle, session, { messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'charge' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'EARLIER_WORK' }] },
+      { role: 'user', parts: [{ kind: 'text', text: 'later charge' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'LATER_WORK' }] },
+    ] })
+    await commitFrame(handle, session, { from: 0, through: 4, body: 'EARLIER_WORK and LATER_WORK', id: 'crossing' })
+    const bounded = await record.lifecycleWorkRecordBounded(handle, session, {
+      StartInclusive: { Sequence: 3 }, EndExclusive: { Sequence: 5 },
+    })
+    assert.equal(typeof bounded, 'string')
+    assert.ok(bounded.includes('LATER_WORK'))
+    assert.equal(bounded.includes('EARLIER_WORK'), false)
+  })
+})
+}

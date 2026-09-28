@@ -149,7 +149,9 @@ export async function superviseNodeTest({
   reportDurationDistribution(logPrefix, leafDurations)
 
   console.error(
-    `\n${logPrefix}: ${passed} passed, ${failed} failed (authoritative; the spec reporter undercounts on timeout)`,
+    `\n${logPrefix}: ${passed} passed, ${failed} failed; ` +
+      `${files.length - outstanding.size}/${files.length} planned file(s) completed` +
+      (runnerSummary ? '' : '; no authoritative summary'),
   )
 
   if (failed > 0) fail(1)
@@ -181,6 +183,25 @@ export async function superviseNodeTest({
 
   if (!drained) {
     console.error(`${logPrefix}: the inner runner exited without draining its result stream`)
+    fail(1)
+  }
+
+  if (outstanding.size > 0) {
+    console.error(`${logPrefix}: incomplete run; no completion for ${[...outstanding].join(', ')}`)
+    fail(1)
+  }
+
+  if (runnerSummary.cancelled > 0 || runnerSummary.containerFailures > 0) {
+    console.error(`${logPrefix}: cancelled tests or failed containers prevent complete acceptance`)
+    fail(1)
+  }
+
+  if (runnerSummary.skipped > 0 || runnerSummary.todo > 0) {
+    console.error(`${logPrefix}: partial evidence; ${runnerSummary.skipped ?? 0} skipped, ${runnerSummary.todo ?? 0} TODO; excluded cases are not passes`)
+  }
+
+  if (runnerSummary.todo > 0) {
+    console.error(`${logPrefix}: pending proof prevents complete acceptance`)
     fail(1)
   }
 

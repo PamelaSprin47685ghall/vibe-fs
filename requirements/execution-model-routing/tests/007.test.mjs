@@ -1,141 +1,68 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+import * as signals from '../../../dist/OpenCode/Host/HostSignalSurface.js'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const acquire = async (runtime, sessionId, physicalUserMessageId, role = 'engineer') => {
+  const result = await routing.acquireExecutionAdmission(runtime, sessionId, physicalUserMessageId, role, 'owner', null)
+  assert.equal(result.kind, 'Acquired')
+  const target = routing.executionAdmissionTarget(runtime, result.lease)
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, result.lease, {
+    sessionId, physicalUserMessageId, role, participant: 'owner', target,
+  }), { kind: 'Applied' })
+  return target
+}
 
-const {
-  createRuntime,
-  acquireExecutionAdmission,
-  beginExecutionAdmission,
-  awaitQueuedExecutionAdmission,
-  executionAdmissionTarget,
-  commitExecutionAdmission,
-  tryReserveManaged,
-  tryLease,
-  releasePhysicalExecution,
-  cancelPendingExecution,
-  enterProviderStep,
-  endProviderStep,
-  takeProviderRunTarget,
-  suppressProviderStep,
-  snapshotOccupied,
-  capacitySnapshot,
-  pendingCount,
-} = routing
-const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
-const key = (value) => `${value.model}|${value.reasoning}`
-const acquireManaged = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) => {
-  const acquisition = await acquireExecutionAdmission(
-    runtime,
-    sessionId,
-    physicalUserMessageId,
-    role,
-    participant,
-    lenderSessionId,
-  )
-  if (acquisition.kind !== 'Acquired') return { kind: acquisition.kind, target: null }
+test('WHAT[execution-model-routing-007] exact repeated release wakes a waiter once without removing its ownership', async () => {
+  const runtime = routing.createRuntime((_role, running) => running.length === 0 ? { model: 'provider/one', reasoning: 'none' } : null)
+  await acquire(runtime, 'holder', 'old')
+  const waiting = acquire(runtime, 'waiter', 'fresh')
+  routing.releasePhysicalExecution(runtime, 'holder', 'old')
+  assert.deepEqual(await waiting, { model: 'provider/one', reasoning: 'none' })
+  const before = routing.snapshotOccupied(runtime)
+  routing.releasePhysicalExecution(runtime, 'holder', 'old')
+  assert.deepEqual(routing.snapshotOccupied(runtime), before)
+  assert.equal(before.length, 1)
+  routing.releasePhysicalExecution(runtime, 'waiter', 'fresh')
+})
 
-  const projected = executionAdmissionTarget(runtime, acquisition.lease)
-  const observed = {
-    sessionId,
-    physicalUserMessageId,
-    role,
-    participant,
-    target: projected,
+test('WHAT[execution-model-routing-007] late release of superseded physical key preserves the exact current lease', async () => {
+  const runtime = routing.createRuntime((role) => ({ model: `provider/${role}`, reasoning: 'none' }))
+  await acquire(runtime, 'reused', 'old')
+  const current = await acquire(runtime, 'reused', 'current', 'devops')
+  routing.releasePhysicalExecution(runtime, 'reused', 'old')
+  assert.deepEqual(routing.tryLease(runtime, 'reused', 'current', 'devops', 'owner', null), current)
+  assert.equal(routing.snapshotOccupied(runtime).length, 1)
+  routing.releasePhysicalExecution(runtime, 'reused', 'current')
+  assert.deepEqual(routing.snapshotOccupied(runtime), [])
+})
+
+const assistant = (finish, extra = {}) => ({
+  type: 'message.updated',
+  properties: { info: {
+    role: 'assistant', sessionID: 'session', id: 'provider-run', parentID: 'physical',
+    time: { created: 1, completed: 2 }, finish, ...extra,
+  } },
+})
+
+test('WHAT[execution-model-routing-007] actual decoder distinguishes successful physical end from tool and failed step end', () => {
+  for (const finish of ['stop', 'length', 'content-filter']) {
+    assert.deepEqual(signals.tryDecodePhysicalExecutionEnd(assistant(finish)), {
+      sessionId: 'session', physicalUserMessageId: 'physical',
+    })
   }
-  const settlement = commitExecutionAdmission(runtime, acquisition.lease, observed)
-  assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
-  return { kind: 'Acquired', target: projected }
-}
-const acquireTarget = async (...args) => {
-  const outcome = await acquireManaged(...args)
-  assert.equal(outcome.kind, 'Acquired')
-  return outcome.target
-}
-const provider = (model) => model.slice(0, model.indexOf('/'))
-const providerLimited = (limits, routes) => (role, running, previous) => {
-  const candidates = routes[role] ?? []
-  const count = (name) => running.filter((item) => provider(item.model) === name).length
-  const available = (candidate) => count(provider(candidate.model)) < (limits[provider(candidate.model)] ?? 0)
-  if (previous && candidates.some((candidate) => key(candidate) === key(previous)) && available(previous)) return previous
-  return candidates.find(available) ?? null
-}
-
-test('WHAT[execution-model-routing-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
-  const runtime = createRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
-  await acquireTarget(runtime, 'holder', 'msg-holder', 'engineer', 'alice')
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'devops', 'bob')
-
-  releasePhysicalExecution(runtime, 'holder', 'msg-holder')
-  const acquired = await waiting
-  assert.equal(acquired.model, 'provider/one')
-  assert.equal(snapshotOccupied(runtime).length, 1)
-
-  releasePhysicalExecution(runtime, 'holder', 'msg-holder')
-  assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s execution')
+  for (const finish of ['tool-calls', 'unknown', 'error']) {
+    assert.equal(signals.tryDecodePhysicalExecutionEnd(assistant(finish)), null)
+    assert.ok(signals.tryDecodeProviderStepEnd(assistant(finish)))
+  }
+  for (const event of [
+    assistant('stop', { error: { name: 'TimeoutError' } }),
+    assistant('stop', { parentID: '' }),
+    assistant('stop', { time: { created: 1 } }),
+    { type: 'session.idle', properties: { sessionID: 'session' } },
+  ]) {
+    assert.equal(signals.tryDecodePhysicalExecutionEnd(event), null)
+  }
 })
-test('WHAT[execution-model-routing-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
-  const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  await acquireTarget(runtime, 'reused-session', 'msg-old', 'engineer', 'alice')
-  await acquireTarget(runtime, 'reused-session', 'msg-current', 'devops', 'alice')
-
-  releasePhysicalExecution(runtime, 'reused-session', 'msg-old')
-  assert.equal(
-    key(tryLease(runtime, 'reused-session', 'msg-current', 'devops', 'alice', null)),
-    'provider/devops|none',
-    'late exact terminal evidence for the old physical material must not touch the current lease',
-  )
-  assert.equal(snapshotOccupied(runtime).length, 1)
-
-  releasePhysicalExecution(runtime, 'reused-session', 'msg-current')
-  assert.equal(snapshotOccupied(runtime).length, 0, 'the matching physical terminal releases exactly one occurrence')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
-const { default: test } = await import("node:test");
-
-const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-
-test('WHAT[execution-model-routing-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse_idle_or_business_completion', async () => {
-  const recovery = await source('src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs')
-  const codec = await source('src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs')
-  const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
-
-  assert.match(codec, /tryDecodePhysicalExecutionEnd/)
-  assert.match(codec, /isMessageUpdated\s*=\s*not \(isNull raw\) && HostEventEnvelope\.eventTypeOf raw = "message\.updated"/)
-  assert.match(codec, /info\?parentID/)
-  assert.match(recovery, /let release \(key: ChatExecutionKey\) =[\s\S]*ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
-  assert.match(recovery, /PhysicalReconciliationRequest\.ReleaseTerminalResource\(key, _, _\) ->[\s\S]{0,160}release key/)
-  assert.doesNotMatch(recovery, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
-  assert.doesNotMatch(recovery, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
-  assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
-    'application completion/finality must not own physical capacity release')
-})
-test('WHAT[execution-model-routing-007] EMR_007_chat_message_closes_the_old_idle_window_before_model_admission', async () => {
-  const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const chatHook = host.slice(host.indexOf('let chatMessageHook ='), host.indexOf('let cancelSignals'))
-  const barrier = host.slice(host.indexOf('let observePhysicalAdmission'), host.indexOf('let chatMessageHook ='))
-  const managedAdmission = host.slice(host.indexOf('let admitManagedChatMessage'), host.indexOf('let chatMessageHook ='))
-  const classifiedAdmission = host.slice(host.indexOf('let continueClassifiedChatMessage'), host.indexOf('let chatMessageHook ='))
-  const revoke = barrier.indexOf('Quiescence.ObservePhysicalUserMessage')
-  const invoke = chatHook.indexOf('observePhysicalAdmission output sessionId physicalId')
-  const continueClassified = chatHook.indexOf('continueClassifiedChatMessage intent output')
-  const classify = chatHook.indexOf('PromptIngress.resolveDecision journal decoded')
-  const acquire = managedAdmission.indexOf('ChatAdmissionTransaction.execute')
-
-  assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')
-  assert.notEqual(invoke, -1, 'chat.message must invoke the named physical admission barrier')
-  assert.match(classifiedAdmission, /PendingPromptIntent _, Some durable, Some createTransaction ->\s*admitManagedChatMessage durable createTransaction intent output/)
-  assert.notEqual(continueClassified, -1, 'chat.message must continue through the classified admission owner')
-  assert.notEqual(classify, -1)
-  assert.notEqual(acquire, -1)
-  assert.ok(classify < invoke, 'pure exact intent resolution must precede the physical ingress barrier')
-  assert.ok(invoke < continueClassified, 'physical ingress barrier must run before managed admission begins')
-})
-}
+test.todo('WHAT[execution-model-routing-007] actual Host event closes the physical execution only after durable terminal and idle/business events leave binding intact (GAP-128)')

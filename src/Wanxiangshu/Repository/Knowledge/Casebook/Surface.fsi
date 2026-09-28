@@ -68,7 +68,3 @@ module CasebookSurface =
     val mergeFissionSubstantiveAccess: preFission: obj -> laneAccesses: obj -> obj
 
     val truncateDiffForBudget: diff: string -> budget: int -> obj
-
-    val singlePassDiffRefresh: input: obj -> Task<obj>
-
-    val applyExternalChangeToCase: input: obj -> obj

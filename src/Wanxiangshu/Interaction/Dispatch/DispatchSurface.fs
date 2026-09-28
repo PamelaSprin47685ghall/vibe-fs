@@ -744,6 +744,7 @@ module DispatchSurface =
             handle
             { SessionId = Some(SessionId.create session)
               PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+              InvalidIdentityCarrier = None
               ExplicitAgent = Some agent
               PromptKey = None
               IsHostCompaction = false
@@ -761,6 +762,7 @@ module DispatchSurface =
             handle
             { SessionId = Some(SessionId.create session)
               PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+              InvalidIdentityCarrier = None
               ExplicitAgent = Some agent
               PromptKey = Some(PromptKey.create promptKey)
               IsHostCompaction = false
@@ -847,30 +849,6 @@ module DispatchSurface =
                 projection.ClaimSequences
                 |> Map.toArray
                 |> Array.map (fun (scope, count) -> box {| scope = scope; count = count |}) |}
-
-    let sendMemberObservation () : obj =
-        box
-            {| owner = "PromptDispatcher.Runtime"
-               members =
-                [| "SendAgentOwnerRoot"
-                   "SendAgentOwnerRootDetachedObserved"
-                   "SendAgentOwnerRootWithTools"
-                   "SendContinuation"
-                   "SendContinuationWithTools"
-                   "SendInteractionRepair"
-                   "SendManagerIdleEncouragement" |]
-               standaloneFireAndForget = false |}
-
-    let awaitModeObservation () : obj =
-        box
-            {| await = "Await"
-               detached = "Detached" |}
-
-    let runtimeStartPolicy () : obj =
-        box
-            {| claimStamp = "workspace-runtime-start-count"
-               advancesWorkspaceWatermark = true
-               restartRecoveryAuthority = false |}
 
     let private watermarkText (value: obj) =
         if isNull value then "" else string value
