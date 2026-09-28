@@ -42,6 +42,9 @@ type PluginRuntimeScope =
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member Recovery: PluginRecoveryScope
 
+    /// host-boundary-032 / DELEGATE.md 4.3: protocol argument vault
+    member ProtocolVault: System.Collections.Generic.Dictionary<string, obj option * obj option * obj option>
+
     member AttachSatelliteRuntime: runtime: SatelliteRuntime -> unit
 
     member Satellites: SatelliteRuntime

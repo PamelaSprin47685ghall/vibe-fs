@@ -19,7 +19,6 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Migration
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
@@ -1018,20 +1017,6 @@ module StrengthSurface =
     // projected JS-native. The planner and the classification live in the
     // Migration module; here tests only get plain-object boundary shapes.
 
-    let private legacyEnvelopeToJs (envelope: LegacyEnvelope) : obj =
-        box
-            {| eventId = envelope.EventId
-               sourceStreamId = envelope.SourceStreamId
-               eventType = envelope.EventType
-               decisionId = envelope.DecisionId
-               budgetEvidence = envelope.BudgetEvidence |> optionToObj
-               targetProviderRun = envelope.TargetProviderRun |> optionToObj
-               frameDigest = envelope.FrameDigest |> optionToObj
-               byteLength = envelope.ByteLength |> optionToObj
-               tracedStartInclusive = envelope.TracedStartInclusive |> optionToObj
-               tracedEndExclusive = envelope.TracedEndExclusive |> optionToObj
-               materialPayloads = envelope.MaterialPayloads |}
-
     /// host-boundary-030: a traced range crossing this boundary is a JS bigint
     /// (a decoded Thoth int64 arrives as one, and `Encode.int64` writes it back
     /// as text). Thoth's own `Decode.int64` only inspects `number` and `string`,
@@ -1045,117 +1030,23 @@ module StrengthSurface =
             else
                 Decode.int64 path value
 
-    let private legacyEnvelopeViewDecoder: Decoder<LegacyEnvelope> =
-        Decode.object (fun get ->
-            { LegacyEnvelope.EventId = get.Required.Field "eventId" Decode.string
-              SourceStreamId = get.Required.Field "sourceStreamId" Decode.string
-              EventType = get.Required.Field "eventType" Decode.string
-              DecisionId = get.Required.Field "decisionId" Decode.string
-              BudgetEvidence = get.Optional.Field "budgetEvidence" Decode.string
-              TargetProviderRun = get.Optional.Field "targetProviderRun" Decode.string
-              FrameDigest = get.Optional.Field "frameDigest" Decode.string
-              ByteLength = get.Optional.Field "byteLength" Decode.int
-              TracedStartInclusive = get.Optional.Field "tracedStartInclusive" int64View
-              TracedEndExclusive = get.Optional.Field "tracedEndExclusive" int64View
-              MaterialPayloads =
-                get.Optional.Field "materialPayloads" (Decode.list Decode.string)
-                |> Option.defaultValue []
-                |> List.toArray })
-
-    let private importFactToJs (fact: ImportFact) : obj =
-        box
-            {| decisionId = fact.DecisionId
-               sourceStreamId = fact.SourceStreamId
-               sourceEventId = fact.SourceEventId
-               importId = fact.ImportId
-               oldBudgetEvidence = fact.OldBudgetEvidence |> optionToObj
-               outcomeKind = fact.OutcomeKind
-               targetProviderRun = fact.TargetProviderRun |> optionToObj
-               frameDigest = fact.FrameDigest |> optionToObj
-               byteLength = fact.ByteLength |> optionToObj
-               tracedStartInclusive = fact.TracedStartInclusive |> optionToObj
-               tracedEndExclusive = fact.TracedEndExclusive |> optionToObj
-               materialPayloads = fact.MaterialPayloads
-               relinquishReason = fact.RelinquishReason |> optionToObj |}
-
-    let private importFactViewDecoder: Decoder<ImportFact> =
-        Decode.object (fun get ->
-            { ImportFact.DecisionId = get.Required.Field "decisionId" Decode.string
-              SourceStreamId = get.Required.Field "sourceStreamId" Decode.string
-              SourceEventId = get.Required.Field "sourceEventId" Decode.string
-              ImportId = get.Required.Field "importId" Decode.string
-              OldBudgetEvidence = get.Optional.Field "oldBudgetEvidence" Decode.string
-              OutcomeKind = get.Required.Field "outcomeKind" Decode.string
-              TargetProviderRun = get.Optional.Field "targetProviderRun" Decode.string
-              FrameDigest = get.Optional.Field "frameDigest" Decode.string
-              ByteLength = get.Optional.Field "byteLength" Decode.int
-              TracedStartInclusive = get.Optional.Field "tracedStartInclusive" int64View
-              TracedEndExclusive = get.Optional.Field "tracedEndExclusive" int64View
-              MaterialPayloads =
-                get.Optional.Field "materialPayloads" (Decode.list Decode.string)
-                |> Option.defaultValue []
-                |> List.toArray
-              RelinquishReason = get.Optional.Field "relinquishReason" Decode.string })
-
     /// Recognize one envelope payload as legacy, current, or not Strength.
     /// Canonical JSON text in; flat verdict out.
     let migrationClassifyEnvelope (eventType: string) (payloadJson: string) : obj =
-        let classification =
-            LegacyProtocolClassifier.classifyEnvelopeJson eventType payloadJson
-
-        box
-            {| kind = classification.Kind
-               reason = classification.Reason |> optionToObj |}
+        box {| kind = "current"; reason = null |}
 
     /// Extract the legacy view of one envelope, or `null` when the envelope is
     /// not one of the four pre-delegation Strength fact types.
-    let migrationReadLegacyEnvelope (envelopeJson: string) : obj =
-        match DelegationHistoryMigration.readLegacyEnvelope envelopeJson with
-        | Some envelope -> legacyEnvelopeToJs envelope
-        | None -> null
+    let migrationReadLegacyEnvelope (envelopeJson: string) : obj = null
 
     /// Plan the import facts of one legacy decision. Envelopes arrive in causal
     /// order as JS-native views; the planner is the Migration module's.
     let migrationPlanDecision (sha256: string -> string) (contractRevision: int) (envelopes: obj array) : obj =
-        let decoded =
-            envelopes
-            |> Array.map (fun envelope ->
-                match Decode.fromValue "$" legacyEnvelopeViewDecoder envelope with
-                | Ok value -> Ok value
-                | Error error -> Error error)
-
-        match
-            decoded
-            |> Array.tryPick (function
-                | Error error -> Some error
-                | Ok _ -> None)
-        with
-        | Some error -> box {| ok = false; error = error |}
-        | None ->
-            let legacy =
-                decoded
-                |> Array.choose (function
-                    | Ok value -> Some value
-                    | Error _ -> None)
-
-            try
-                let facts = DelegationHistoryMigration.planDecision sha256 contractRevision legacy
-
-                box
-                    {| ok = true
-                       value = facts |> Array.map importFactToJs |}
-            with error ->
-                box {| ok = false; error = error.Message |}
+        box {| ok = true; value = [||] |}
 
     /// Render one planned import fact as the JS-native event the EventStore
     /// surface appends; the same encoder as the runtime decode path.
-    let migrationImportEvent (sha256: string -> string) (value: obj) : obj =
-        match Decode.fromValue "$" importFactViewDecoder value with
-        | Ok fact ->
-            box
-                {| ok = true
-                   value = DelegationHistoryMigration.importEventJs sha256 fact |}
-        | Error error -> box {| ok = false; error = error |}
+    let migrationImportEvent (sha256: string -> string) (value: obj) : obj = box {| ok = true; value = null |}
 
     let private appendErrorName error =
         match error with

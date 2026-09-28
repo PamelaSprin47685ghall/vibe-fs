@@ -327,34 +327,51 @@ module PluginHooks =
             // both-halves pairing lives in decodeContext, and this hook input
             // carries no messageID, so decodeContext would always answer None.
             let recordProtocolArgumentVault (toolInput: obj) (toolOutput: obj) =
-                if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                    let toolName = toolField toolInput "tool"
-                    let context = ToolHostCodec.decodeContext toolInput
+                if
+                    not (isNull toolInput)
+                    && not (isNull toolOutput)
+                    && not (isNull toolOutput?args)
+                then
+                    let callIdOpt =
+                        if not (isNull toolInput?callID) then
+                            let cid = string toolInput?callID
+                            if String.IsNullOrWhiteSpace cid then None else Some cid
+                        else
+                            None
 
-                    match ToolHostCodec.hookCallId toolInput with
-                    | Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        match ProtocolArgumentVault.snapshotOfArguments toolOutput?args with
-                        | Some snapshot ->
-                            let recorded =
-                                if ManagerReviewTools.isReviewTool toolName then
-                                    snapshot
-                                else
-                                    { snapshot with Contract = None }
+                    match callIdOpt with
+                    | None -> ()
+                    | Some callId ->
+                        let args = toolOutput?args
+                        let toolName = toolField toolInput "tool"
 
+                        let contractOpt =
                             if
-                                recorded.Contract.IsNone
-                                && recorded.ReadonlyRounds.IsNone
-                                && recorded.SelfNote.IsNone
+                                ManagerReviewTools.isReviewTool toolName
+                                && emitJsExpr (args, "contract") "Object.prototype.hasOwnProperty.call($0, $1)"
                             then
-                                ()
+                                Some args?contract
                             else
-                                ProtocolArgumentVault.record
-                                    boot.ProtocolArgumentVault
-                                    context.SessionId
-                                    (ToolCallId.value toolCallId)
-                                    recorded
-                        | None -> ()
-                    | _ -> ()
+                                None
+
+                        let roundsOpt =
+                            if
+                                emitJsExpr
+                                    (args, "delegate_readonly_rounds")
+                                    "Object.prototype.hasOwnProperty.call($0, $1)"
+                            then
+                                Some args?delegate_readonly_rounds
+                            else
+                                None
+
+                        let noteOpt =
+                            if emitJsExpr (args, "self_note") "Object.prototype.hasOwnProperty.call($0, $1)" then
+                                Some args?self_note
+                            else
+                                None
+
+                        if Option.isSome contractOpt || Option.isSome roundsOpt || Option.isSome noteOpt then
+                            boot.Scope.ProtocolVault.[callId] <- (contractOpt, roundsOpt, noteOpt)
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {

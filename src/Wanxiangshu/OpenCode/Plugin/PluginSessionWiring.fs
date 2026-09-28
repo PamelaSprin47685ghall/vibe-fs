@@ -12,6 +12,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -149,6 +150,42 @@ module PluginSessionWiring =
                 wired.RegisterOwned replicaKey
 
                 bindStrengthReplica replicaId agent
+
+                let sub =
+                    sessionPort.SubscribeTerminal(
+                        replicaId,
+                        fun sid terminalOutcome ->
+                            let outcome =
+                                match terminalOutcome with
+                                | TerminalOutcome.Completed _ -> ReconcileProgram.TurnOutcome.TurnCompleted
+                                | TerminalOutcome.Aborted stop ->
+                                    ReconcileProgram.TurnOutcome.TurnFailed(sprintf "%A" stop)
+                                | TerminalOutcome.Failed stop ->
+                                    ReconcileProgram.TurnOutcome.TurnFailed(sprintf "%A" stop)
+
+                            let turn: ReconciledTurn =
+                                { SessionId = sid
+                                  PhysicalUserMessageId = PhysicalUserMessageId.create (SessionId.value sid + "-phys")
+                                  AuthorityRootUserMessageId =
+                                    AuthorityRootUserMessageId.create (SessionId.value sid + "-root")
+                                  ProviderRun = ProviderRunIdentity.create (SessionId.value sid + "-run")
+                                  Role = Some(roleForAgent agent)
+                                  Directory = None
+                                  Parts = [||]
+                                  Finish = Some "stop"
+                                  ErrorName = None
+                                  Model = None
+                                  Outcome = outcome
+                                  Observation = None }
+
+                            match boot.StrengthScope.StrengthReplicaRuntime with
+                            | Some runtime -> runtime.HandleTurn turn |> ignore
+                            | None -> ()
+                    )
+
+                scope.AttachSessionCleanup(fun closedSid ->
+                    if closedSid = replicaKey then
+                        sub.Dispose())
 
             let tryParentKey sessionId =
                 let found, parentKey =

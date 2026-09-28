@@ -23,10 +23,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-delegation-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-frame-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-projection.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-replica-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-replica-runtime.fsproj"/>
     <Compile Include="Strength/TurnEvidence.fsi"/>
     <Compile Include="Strength/TurnEvidence.fs"/>
@@ -34,7 +30,11 @@
     <Compile Include="Strength/Lifecycle.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fsi"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
+    <Compile Include="Strength/OpenCode/Delegate.fsi"/>
+    <Compile Include="Strength/OpenCode/Delegate.fs"/>
     <Compile Include="Strength/OpenCode/PluginScope.fsi"/>
     <Compile Include="Strength/OpenCode/PluginScope.fs"/>
+    <Compile Include="Strength/Surface.fsi"/>
+    <Compile Include="Strength/Surface.fs"/>
   </ItemGroup>
 </Project>

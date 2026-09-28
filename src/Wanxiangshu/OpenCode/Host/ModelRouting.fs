@@ -306,15 +306,6 @@ module ModelRouting =
         | Some actual -> actual = expected
         | None -> false
 
-    [<RequireQualifiedAccess>]
-    type PredictorConfiguration =
-        | Configured
-        | NotConfigured
-        | ConfigurationInvalid of reason: string
-
-    let sharedPredictorConfiguration () : PredictorConfiguration =
-        PredictorConfiguration.NotConfigured
-
     /// A SessionId is a reusable container. Model occupancy belongs to the exact
     /// physical user material that caused the provider execution, never to the
     /// session lifecycle or to a cursor-selected identity. Strength may reserve one
@@ -1337,7 +1328,20 @@ module ModelRouting =
             | Error error -> failedTask<ExecutionAdmissionAcquisition> error
             | Ok(normSessionId, normPhysicalUserMessageId, normRole, normParticipant) ->
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
-                acquireManagedSafe normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender
+
+                let effectivePurpose =
+                    lock gate (fun () ->
+                        match activeBySession.TryGetValue normSessionId with
+                        | true, lease when lease.PhysicalUserMessageId.IsNone -> lease.Purpose
+                        | _ -> purpose)
+
+                acquireManagedSafe
+                    normSessionId
+                    normPhysicalUserMessageId
+                    normRole
+                    normParticipant
+                    effectivePurpose
+                    normLender
 
         member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
 
@@ -1413,7 +1417,18 @@ module ModelRouting =
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
 
                 lock gate (fun () ->
-                    tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender)
+                    let effectivePurpose =
+                        match activeBySession.TryGetValue normSessionId with
+                        | true, lease when lease.PhysicalUserMessageId.IsNone -> lease.Purpose
+                        | _ -> purpose
+
+                    tryLeaseLocked
+                        normSessionId
+                        normPhysicalUserMessageId
+                        normRole
+                        normParticipant
+                        effectivePurpose
+                        normLender)
 
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
@@ -1718,7 +1733,7 @@ module ModelRouting =
 
     /// Same Predictor existence query on the process-shared scheduler, resolved
     /// from the one loaded model configuration.
-    let internal sharedPredictorConfiguration () : PredictorConfiguration = current().PredictorConfiguration
+    let sharedPredictorConfiguration () : PredictorConfiguration = current().PredictorConfiguration
 
     let enterProviderStep
         (sessionId: SessionId)

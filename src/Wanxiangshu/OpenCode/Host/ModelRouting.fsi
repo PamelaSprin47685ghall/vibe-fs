@@ -39,12 +39,6 @@ module ModelRouting =
     val ofOpenCodeModel: model: OpencodeModel -> ModelRoutingTarget option
     val sameTarget: expected: ModelRoutingTarget -> observed: OpencodeModel -> bool
 
-    [<RequireQualifiedAccess>]
-    type PredictorConfiguration =
-        | Configured
-        | NotConfigured
-        | ConfigurationInvalid of reason: string
-
     val sharedPredictorConfiguration: unit -> PredictorConfiguration
 
     type internal ModelRoutingRuntime =

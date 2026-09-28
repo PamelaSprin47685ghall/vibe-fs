@@ -305,14 +305,80 @@ module PluginTransforms =
                     )
                 )
 
-        let restoreProtocolArguments (_outObj: obj) : Task<unit> =
+        let restoreProtocolArguments (outObj: obj) : Task<unit> =
+            if not (isNull outObj) && not (isNull outObj?messages) then
+                let messages = unbox<obj array> outObj?messages
+
+                for msg in messages do
+                    if not (isNull msg) && not (isNull msg?parts) then
+                        let parts = unbox<obj array> msg?parts
+
+                        for part in parts do
+                            if not (isNull part) && string part?``type`` = "tool" && not (isNull part?callID) then
+                                let callId = string part?callID
+
+                                match boot.Scope.ProtocolVault.TryGetValue callId with
+                                | true, (contractOpt, roundsOpt, noteOpt) ->
+                                    let state = part?state
+
+                                    if not (isNull state) && not (isNull state?input) then
+                                        let input = state?input
+
+                                        match contractOpt with
+                                        | Some c when
+                                            not (
+                                                emitJsExpr
+                                                    (input, "contract")
+                                                    "Object.prototype.hasOwnProperty.call($0, $1)"
+                                            )
+                                            ->
+                                            input?contract <- c
+                                        | _ -> ()
+
+                                        match roundsOpt with
+                                        | Some r when
+                                            not (
+                                                emitJsExpr
+                                                    (input, "delegate_readonly_rounds")
+                                                    "Object.prototype.hasOwnProperty.call($0, $1)"
+                                            )
+                                            ->
+                                            input?delegate_readonly_rounds <- r
+                                        | _ -> ()
+
+                                        match noteOpt with
+                                        | Some n when
+                                            not (
+                                                emitJsExpr
+                                                    (input, "self_note")
+                                                    "Object.prototype.hasOwnProperty.call($0, $1)"
+                                            )
+                                            ->
+                                            input?self_note <- n
+                                        | _ -> ()
+                                | false, _ -> ()
+
             Task.FromResult()
 
-        let captureReadonlyDelegation (_outObj: obj) : Task<unit> =
-            Task.FromResult()
+        let captureReadonlyDelegation (outObj: obj) : Task<unit> =
+            let sidOpt = projectionSessionIdFromMessages outObj |> Option.map SessionId.create
+            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
 
-        let applyReadonlyDelegation (_outObj: obj) : Task<unit> =
-            Task.FromResult()
+            let isConfigured () =
+                ModelRouting.sharedPredictorConfiguration () = ModelRouting.PredictorConfiguration.Configured
+
+            StrengthDelegate.tryCapture isConfigured journal strengthDurability sidOpt rawMessages
+
+        let applyReadonlyDelegation (outObj: obj) : Task<unit> =
+            let sidOpt = projectionSessionIdFromMessages outObj |> Option.map SessionId.create
+            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+            StrengthDelegate.tryApply
+                strengthDurability
+                boot.StrengthScope.StrengthReplicaRuntime
+                strengthFailFuse
+                sidOpt
+                rawMessages
 
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform

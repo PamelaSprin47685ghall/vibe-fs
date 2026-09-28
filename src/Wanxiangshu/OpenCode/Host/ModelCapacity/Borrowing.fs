@@ -276,20 +276,15 @@ type internal BorrowingCapacity<'target>
         | _ -> None
 
     let reconcileFence sessionId physicalUserMessageId fence =
-        // Own-step fence progress: finish the owner's current step when the new
-        // transform fence strictly supersedes the in-flight fence.
+        // Own-step fence progress: finish the owner's current step when the owner
+        // re-enters messages.transform for this execution.
         tokens.Values
         |> Seq.tryFind (fun token ->
             match token.State with
             | CapacityCreditState.InFlight step
             | CapacityCreditState.Retiring step -> stepBelongsTo sessionId physicalUserMessageId step
             | CapacityCreditState.Idle -> false)
-        |> Option.iter (fun token ->
-            match token.State with
-            | CapacityCreditState.InFlight step
-            | CapacityCreditState.Retiring step when not (Set.isEmpty (Set.difference fence step.Fence)) ->
-                finishStep token
-            | _ -> ())
+        |> Option.iter finishStep
 
         // Owner transform-entry reclaim: when the owner re-enters messages.transform
         // for this execution, reclaim the owned credit from any foreign InFlight/

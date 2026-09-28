@@ -404,7 +404,7 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role -> ModelRouting.tryLease sessionId physical role agent None
+            | Some role -> ModelRouting.tryLease sessionId physical role agent ModelExecutionPurpose.Normal None
             | None -> None
 
         match leaseOpt with
@@ -854,7 +854,7 @@ module SessionExecutionBinding =
         let leaseOpt =
             match roleOpt with
             | Some role ->
-                ModelRouting.tryLease sessionId physicalUserMessageId role agent None
+                ModelRouting.tryLease sessionId physicalUserMessageId role agent ModelExecutionPurpose.Normal None
             | None -> None
 
         match leaseOpt with

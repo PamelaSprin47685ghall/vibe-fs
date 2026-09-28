@@ -20,6 +20,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let blogger = PluginBloggerScope()
     let sessions = PluginSessionScope()
     let recovery = PluginRecoveryScope(journal)
+    // host-boundary-032 / DELEGATE.md 4.3: protocol argument vault
+    let protocolVault =
+        Collections.Generic.Dictionary<string, obj option * obj option * obj option>()
     // DSL-MUTABLE: resource — session cleanup hook list registered by composition
     let mutable sessionCleanups: (string -> unit) list = []
     // DSL-MUTABLE: resource — scope dispose hook list registered by composition
@@ -152,6 +155,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member _.Recovery = recovery
+    member _.ProtocolVault = protocolVault
 
     member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
 

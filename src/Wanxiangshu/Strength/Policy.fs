@@ -98,13 +98,18 @@ module StrengthPolicy =
                 match opportunity.SourceToolCallIds with
                 | [] -> Error "empty-source-tool-call-set"
                 | calls ->
+                    let raw =
+                        sprintf
+                            "%d:%s:%s:%s"
+                            (DelegationContractRevisions.value opportunity.ContractRevision)
+                            (LogicalRunId.value opportunity.OwnerLogicalRun.LogicalRunId)
+                            (AuthorityRootUserMessageId.value opportunity.OwnerLogicalRun.AuthorityRootUserMessageId)
+                            (ProviderRunIdentity.value opportunity.SourceProviderRun)
+
+                    let did = StrengthDecisionId.create (sha256 raw)
+
                     Ok
-                        { DecisionId =
-                            Delegation.deriveDecisionId
-                                sha256
-                                opportunity.ContractRevision
-                                opportunity.OwnerLogicalRun
-                                opportunity.SourceProviderRun
+                        { DecisionId = did
                           OwnerSessionId = opportunity.OwnerSessionId
                           OwnerLogicalRun = opportunity.OwnerLogicalRun
                           SourcePhysicalUserMessageId = opportunity.SourcePhysicalUserMessageId
