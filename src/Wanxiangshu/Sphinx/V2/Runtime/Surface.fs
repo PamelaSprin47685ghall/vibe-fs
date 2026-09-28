@@ -218,21 +218,23 @@ module Surface =
 
     // --- Recovery -----------------------------------------------------------------
 
-    /// The one action each crash window may take. Windows whose action is pure never
-    /// bill; windows that still have real work to do may.
-    let recoveryAction (window: string) : string =
+    let private crashWindow (window: string) : CrashWindow option =
         match window with
-        | "DispatchPending" -> "dispatch"
-        | "ReceiptPending" -> "reconcile-by-intent"
-        | "RunningUnmarked" -> "reconcile-by-intent"
-        | "ResultPending" -> "accept-if-valid"
-        | "InterpretationPending" -> "interpret"
-        | "CancelPending" -> "await-terminal"
-        | "CommitPending" -> "commit-or-render"
-        | _ -> "unknown"
+        | "DispatchPending" -> Some CrashWindow.DispatchPending
+        | "ReceiptPending" -> Some CrashWindow.ReceiptPending
+        | "RunningUnmarked" -> Some CrashWindow.RunningUnmarked
+        | "ResultPending" -> Some CrashWindow.ResultPending
+        | "InterpretationPending" -> Some CrashWindow.InterpretationPending
+        | "CancelPending" -> Some CrashWindow.CancelPending
+        | "CommitPending" -> Some CrashWindow.CommitPending
+        | _ -> None
+
+    let recoveryAction (window: string) : string =
+        crashWindow window
+        |> Option.map (fun current -> (Recovery.reconcile current).Action)
+        |> Option.defaultValue "unknown"
 
     let recoveryMaySpend (window: string) : bool =
-        match window with
-        | "DispatchPending"
-        | "CommitPending" -> true
-        | _ -> false
+        crashWindow window
+        |> Option.map (Recovery.reconcile >> Recovery.maySpend)
+        |> Option.defaultValue false

@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import * as Core from '../../../dist/Sphinx/V2/Core/Surface.js'
 import * as Loop from '../../../dist/Sphinx/V2/Runtime/Surface.js'
-import * as Persist from '../../../dist/Sphinx/V2/Persistence/Surface.js'
 import * as Ordinal from '../../../dist/Sphinx/V2/Plugins/Ordinal/Surface.js'
 import * as Bayes from '../../../dist/Sphinx/V2/Plugins/Bayes/Surface.js'
 import * as AStar from '../../../dist/Sphinx/V2/Plugins/AStar/Surface.js'

@@ -13,8 +13,8 @@ test('WHAT[crash-reconciliation-020] current role vocabulary includes DevOps and
 test('WHAT[crash-reconciliation-020] the actual cancellation bridge closes child authority and leaves a reportable completion', () => {
   const state = recovery.create()
   link(state)
-  acceptRun(state)
-  const result = recovery.settleChatTerminal(state, terminal('Cancelled'))
+  const child = acceptRun(state)
+  const result = recovery.settleChatTerminal(state, terminal('Cancelled', child))
   assert.equal(result.ok, true, result.error)
   const after = recovery.childView(state, 'parent', 'child')
   assert.equal(after.activeRun, '')
@@ -25,9 +25,9 @@ test('WHAT[crash-reconciliation-020] the actual cancellation bridge closes child
 test('WHAT[crash-reconciliation-020] the cancellation bridge leaves Completed to its own completion path', () => {
   const state = recovery.create()
   link(state)
-  acceptRun(state)
+  const child = acceptRun(state)
   const before = recovery.childView(state, 'parent', 'child')
-  const result = recovery.settleChatTerminal(state, terminal('Completed'))
+  const result = recovery.settleChatTerminal(state, terminal('Completed', child))
   assert.equal(result.ok, true, result.error)
   assert.deepEqual(recovery.childView(state, 'parent', 'child'), before)
 })
@@ -36,8 +36,8 @@ test('WHAT[crash-reconciliation-020] production load decision voids active child
   for (const agent of ['engineer', 'devops']) {
     const state = recovery.create()
     link(state, { agent })
-    acceptRun(state, { agent })
-    assert.equal(recovery.childView(state, 'parent', 'child').activeRun, 'run-child')
+    const child = acceptRun(state, { agent })
+    assert.equal(recovery.childView(state, 'parent', 'child').activeRun, child.logicalRun)
     const settlements = recovery.childSettlements(state)
     assert.equal(settlements.length, 1)
     assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildRunVoided')
@@ -53,13 +53,13 @@ test('WHAT[crash-reconciliation-020] production load decision voids active child
 
 test('WHAT[crash-reconciliation-020] human roots and child runs without a durable handle are not selected for load settlement', () => {
   const human = recovery.create()
-  acceptRun(human, { child: 'parent', agent: 'manager', human: true })
+  const manager = acceptRun(human, { child: 'parent', agent: 'manager', human: true })
   assert.deepEqual(recovery.childSettlements(human), [])
-  assert.equal(recovery.childView(human, 'parent', 'parent').activeRun, 'run-parent')
+  assert.equal(recovery.childView(human, 'parent', 'parent').activeRun, manager.logicalRun)
   const unlinked = recovery.create()
-  acceptRun(unlinked)
+  const child = acceptRun(unlinked)
   assert.deepEqual(recovery.childSettlements(unlinked), [])
-  assert.equal(recovery.childView(unlinked, 'parent', 'child').activeRun, 'run-child')
+  assert.equal(recovery.childView(unlinked, 'parent', 'child').activeRun, child.logicalRun)
 })
 
 test('WHAT[crash-reconciliation-020] a cancelled completion is reportable and production JoinDrain retires it once through the fold port', async () => {

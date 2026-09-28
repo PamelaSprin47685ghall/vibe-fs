@@ -260,7 +260,7 @@ const provider = await startHttpServer(async (request, response) => {
         name: 'js-manager',
         argsStr: JSON.stringify({
           program:
-            'class Js extends JsProgram { async run() { await new Promise(r => setTimeout(r, 60000)); return null; } }',
+            'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
           contract: CONTRACT_TOKEN,
         }),
       };
@@ -380,6 +380,13 @@ try {
   const cancelBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_js_cancel_1',
   );
+  const cancelRunningObs = await waitFor(
+    ({ kind, value }) => kind === 'tool.running.observed' && value?.callID === 'call_js_cancel_1',
+  );
+  assert.equal(observations.some(({ kind, value }) =>
+    kind === 'tool.terminal.observed' && value?.callID === 'call_js_cancel_1'), false,
+  'cancellation requires a live call, not one already failed');
+  const observationsBeforeAbort = observations.length;
 
   // Trigger external abort
   await request(host.baseUrl, 'POST', `/session/${sessionID}/abort`, {}, [200, 204]);
@@ -390,6 +397,8 @@ try {
   const cancelTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_js_cancel_1',
   );
+  assert.ok(cancelTerminal.sequence > observationsBeforeAbort);
+  assert.ok(cancelTerminal.sequence > cancelRunningObs.sequence);
 
   // ── Verification & Assertions against Fixture ───────────────────────────────
 
