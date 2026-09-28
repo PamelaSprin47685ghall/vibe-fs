@@ -10,7 +10,7 @@
 // 7. fail if test runner failed, or if coverage was corrupted/drifted
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import fs, { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -29,7 +29,7 @@ import {
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export async function runCoverage(options = {}) {
-  const root = path.resolve(options.root ?? REPO_ROOT)
+  const root = fs.realpathSync(path.resolve(options.root ?? REPO_ROOT))
   const distDir = path.resolve(root, options.distDir ?? 'dist')
   const unitRunnerScript = options.unitRunnerScript ?? path.join(root, 'requirements/verification-system/tests/run.mjs')
   const c8Bin = options.c8Bin ?? path.join(root, 'node_modules/c8/bin/c8.js')

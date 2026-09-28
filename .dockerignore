@@ -1,0 +1,4 @@
+node_modules
+.fable-build
+dist
+.git

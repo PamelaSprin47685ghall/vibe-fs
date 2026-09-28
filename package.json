@@ -36,6 +36,7 @@
     "check": "wireit",
     "build": "node scripts/build.mjs",
     "build:clean": "node scripts/build.mjs --clean",
+    "ci:local": "bash scripts/ci-local.sh",
     "diagnostics:collect": "node scripts/diagnostics/collect-incident.mjs"
   },
   "wireit": {

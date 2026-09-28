@@ -140,7 +140,7 @@ A candidate not yet seated is only a candidate; if the page turns it is gone, le
 
 Some motions happen outside the door, beyond your reach.
 
-Before every large affair, a light replica goes ahead to scout: read-only, look-only, search-only, shackled on its way out — no writing, no running, no internet. What it brings back is only a candidate: it does not enter the true history and records nothing; what the master has not personally used is not even history. The replica's own success or failure cannot trip the main road; the main road walks as it walked.
+Before every large affair, a light shadow goes ahead to scout: read-only, look-only, search-only, shackled on its way out — no writing, no running, no internet. What it brings back is only a candidate: it does not enter the true history and records nothing; what the master has not personally used is not even history. The shadow's own success or failure cannot trip the main road; the main road walks as it walked.
 
 The Predictor's guesswork is an internal mechanism behind closed doors. It belongs in quiet comparison at the high places, never striding to the front to direct the show, much less sitting in a row with the offices.
 

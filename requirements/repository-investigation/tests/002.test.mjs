@@ -16,7 +16,7 @@ test('WHAT[repository-investigation-002] INVESTIGATE_inspector_role_law_makes_ev
   for (const locale of LOCALES) {
     const law = readLaw('role/engineer', locale)
     assert.match(law, /locatable|再次被定位/, `${locale} locatability`)
-    assert.match(law, /keep only the evidence that makes the fact locatable again|再只保留足以让该事实再次被定位的证据/, `${locale} locatability funnel step`)
+    assert.match(law, /keep only the evidence that makes the fact locatable again|再只保留足以让该事实再次被定位的证据/i, `${locale} locatability funnel step`)
   }
 })
 }

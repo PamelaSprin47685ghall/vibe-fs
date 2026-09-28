@@ -5,12 +5,18 @@
 // format/check/build/unit phases.
 
 import { spawn } from 'node:child_process'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import { collectVerificationInputs, computeDigest, diffVerificationInputs } from './lib/build-state.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+// 确保在沙箱和 CI 容器中，WIREIT_PARALLEL 始终有合理的正整数基准值，防止 WorkerPool got 0
+if (!process.env.WIREIT_PARALLEL || Number(process.env.WIREIT_PARALLEL) < 1) {
+  process.env.WIREIT_PARALLEL = String(Math.max(1, os.cpus()?.length || 4))
+}
 
 export function getTestEnv({ verbose = false, hostEnv = process.env, extra = {} } = {}) {
   const { TESTS_MJS_FILES, ...cleanEnv } = hostEnv
@@ -28,16 +34,19 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
       label: 'format:check',
       cmd: 'npm',
       argv: ['run', 'format:check'],
+      env: hostEnv,
     },
     {
       label: 'check',
       cmd: 'npm',
       argv: ['run', 'check'],
+      env: hostEnv,
     },
     {
       label: 'build',
       cmd: process.execPath,
       argv: [path.join(root, 'scripts/build.mjs'), ...(release ? ['--clean'] : [])],
+      env: hostEnv,
     },
     {
       label: 'unit',
@@ -106,6 +115,9 @@ function defaultRunStepFactory(root, verbose, output) {
       if (childEnv.WXS_RELEASE === undefined) {
         childEnv.WXS_RELEASE = '0'
       }
+      if (!childEnv.WIREIT_PARALLEL || Number(childEnv.WIREIT_PARALLEL) < 1) {
+        childEnv.WIREIT_PARALLEL = String(Math.max(1, os.cpus()?.length || 4))
+      }
       child = spawn(cmd, argv, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -143,6 +155,22 @@ function defaultRunStepFactory(root, verbose, output) {
     clearTimeout(timer)
     logStream.end()
 
+    const ok = exit.code === 0 && !exit.signal && !killed
+
+    if (!ok) {
+      // 无论 verbose 与否，失败时自动 Dump 诊断日志尾部到控制台，消除 CI 无控制台输出的信息黑洞
+      try {
+        const content = fs.readFileSync(stepLog, 'utf8')
+        const lines = content.trim().split('\n')
+        const tailLines = lines.slice(-60).join('\n')
+        if (tailLines) {
+          process.stderr.write(`\n--- [${label}] 错误诊断日志转储 (最后 ${Math.min(60, lines.length)} 行) ---\n`)
+          process.stderr.write(tailLines + '\n')
+          process.stderr.write(`--- [${label}] 完整日志见: ${path.relative(root, stepLog)} ---\n\n`)
+        }
+      } catch {}
+    }
+
     return {
       label,
       exitCode: exit.code ?? 1,
@@ -150,7 +178,7 @@ function defaultRunStepFactory(root, verbose, output) {
       killed,
       durationMs: Date.now() - startedAt,
       logPath: path.relative(root, stepLog),
-      ok: exit.code === 0 && !exit.signal && !killed,
+      ok,
       ...(exit.error ? { error: exit.error } : {}),
     }
   }
@@ -186,13 +214,14 @@ export async function verify({
   runStep: runStepOverride,
   output = process.stdout,
   logDirectory,
+  env: hostEnv = process.env,
 } = {}) {
   const resolvedRoot = path.resolve(root)
   const baseLogDir = logDirectory ? path.resolve(logDirectory) : path.join(resolvedRoot, '.fable-build', 'verify-logs')
   const runLogDir = allocateRunLogDir(baseLogDir)
 
   const stepRunner = runStepOverride ?? defaultRunStepFactory(resolvedRoot, verbose, output)
-  const plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose })
+  const plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv })
   const mode = release ? 'release' : 'daily'
   const runStart = Date.now()
 
@@ -376,7 +405,7 @@ async function main() {
     }
   }
 
-  const result = await verify({ release, verbose, profile })
+  const result = await verify({ release, verbose, profile, env: process.env })
   process.exitCode = result.exitCode
 }
 
