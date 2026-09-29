@@ -165,38 +165,146 @@ module ManagerWorkflow =
                     )
         }
 
-    let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
+    let private mergeWithInvalidation (opening: IncumbencyOpening) invalidationEvents =
+        if List.isEmpty invalidationEvents then
+            opening.Transaction
+        else
+            RelayTransaction.create (invalidationEvents @ RelayTransaction.events opening.Transaction)
+            |> Result.defaultValue opening.Transaction
+
+    let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
+        match retirement.Outcome with
+        | RetirementOutcome.Continue -> true
+        | RetirementOutcome.Accepted _ -> false
+
+    let private isAcceptedWithValidCertificate (road: RoadView) (retirement: RetirementSummary) =
+        match retirement.Outcome, road.Certificate with
+        | RetirementOutcome.Accepted certId, Some cert -> cert.Id = certId && cert.Valid
+        | _ -> false
+
+    let private tryAcceptedRoadContext (durable: AgentJournal) sidText =
+        let sessionId = SessionId.create sidText
+        let roadId = RoadId.create sidText
+        let snapshot = AgentJournal.snapshot durable
+
+        let roadOpt =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+        match roadOpt with
+        | Some road ->
+            road.LatestRetirement
+            |> Option.filter (isAcceptedWithValidCertificate road)
+            |> Option.map (fun retirement ->
+                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+        | _ -> None
+
+    let private loopContextFor (durable: AgentJournal) sidText =
+        let sessionId = SessionId.create sidText
+        let roadId = RoadId.create sidText
+        let snapshot = AgentJournal.snapshot durable
+
+        let roadOpt =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+        match roadOpt with
+        | Some road ->
+            road.LatestRetirement
+            |> Option.filter (requiresContinuation road)
+            |> Option.map (fun retirement ->
+                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+        | _ -> None
+
+    let private decideLoopContext journal sessionIdTextOpt =
+        match sessionIdTextOpt, journal with
+        | Some sidText, Some durable when not (System.String.IsNullOrWhiteSpace sidText) ->
+            loopContextFor durable sidText
+        | _ -> None
+
+    let private tryBuildAcceptedOpening
+        durable
+        workspaceDirectory
+        sessionId
+        roadId
+        authorityRevision
+        (retirement: RetirementSummary)
+        =
+        match retirement.Outcome with
+        | RetirementOutcome.Accepted _ ->
+            let snapshot = captureSnapshot workspaceDirectory
+
+            let roadOpt =
+                AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+                |> Option.bind (fun s -> s.Relay)
+                |> Option.bind (fun r -> Fold.view r roadId)
+
+            let invalidationEvents =
+                roadOpt
+                |> Option.bind (fun r -> r.Certificate)
+                |> Option.filter (fun c -> c.Valid)
+                |> Option.map (fun c ->
+                    [ RelayEvent.QualityCertificateInvalidated(c.Id, "ContinuousSessionAdvancesRoad") ])
+                |> Option.defaultValue []
+
+            let opening =
+                IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
+
+            let fullTransaction = mergeWithInvalidation opening invalidationEvents
+            Some(durable, sessionId, opening.RoadId, fullTransaction)
+        | RetirementOutcome.Continue -> None
+
+    let private decideLoopOpening journal (workspaceDirectory: string option) sessionIdTextOpt =
         sessionIdTextOpt
         |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
         |> Option.bind (fun sessionIdText ->
             journal
             |> Option.bind (fun durable ->
-                let sessionId = SessionId.create sessionIdText
-                let snapshot = AgentJournal.snapshot durable
-                let roadId = RoadId.create sessionIdText
-
-                let roadView =
-                    AgentProjection.tryFind sessionId snapshot.AgentProjections
-                    |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                    |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-                let profileOpt =
-                    PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
-
-                match roadView, profileOpt with
-                | None, Some profile when profile.CanonicalRole = Role.Manager ->
-                    let rootUserMsg =
-                        AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
-
-                    let opening =
-                        IncumbencyOpening.initial
-                            HostDigest.sha256Hex
-                            (RoadId.create (SessionId.value sessionId))
-                            (PhysicalUserMessageId.create rootUserMsg)
-                            (captureSnapshot workspaceDirectory)
-
-                    Some(durable, sessionId, opening.RoadId, opening.Transaction)
+                match tryAcceptedRoadContext durable sessionIdText with
+                | Some(_, sessionId, roadId, authorityRevision, retirement, true) ->
+                    tryBuildAcceptedOpening durable workspaceDirectory sessionId roadId authorityRevision retirement
                 | _ -> None))
+
+    let private decideInitialOpening durable workspaceDirectory sessionId sessionIdText =
+        let snapshot = AgentJournal.snapshot durable
+        let roadId = RoadId.create sessionIdText
+
+        let roadView =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+        let profileOpt =
+            PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
+
+        match roadView, profileOpt with
+        | None, Some profile when profile.CanonicalRole = Role.Manager ->
+            let rootUserMsg =
+                AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+
+            let opening =
+                IncumbencyOpening.initial
+                    HostDigest.sha256Hex
+                    (RoadId.create (SessionId.value sessionId))
+                    (PhysicalUserMessageId.create rootUserMsg)
+                    (captureSnapshot workspaceDirectory)
+
+            Some(durable, sessionId, opening.RoadId, opening.Transaction)
+        | _ -> None
+
+    let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
+        match decideLoopOpening journal workspaceDirectory sessionIdTextOpt with
+        | Some action -> Some action
+        | None ->
+            sessionIdTextOpt
+            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+            |> Option.bind (fun sessionIdText ->
+                journal
+                |> Option.bind (fun durable ->
+                    let sessionId = SessionId.create sessionIdText
+                    decideInitialOpening durable workspaceDirectory sessionId sessionIdText))
 
     let ensureManagerRoadOpened
         (journal: AgentJournal option)
@@ -253,58 +361,6 @@ module ManagerWorkflow =
                 return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
         }
 
-    let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
-        match retirement.Outcome, road.Certificate with
-        | RetirementOutcome.Continue, _ -> true
-        | RetirementOutcome.Accepted certificateId, Some certificate ->
-            certificate.Id = certificateId && not certificate.Valid
-        | RetirementOutcome.Accepted _, None -> false
-
-    let private loopContextFor (durable: AgentJournal) sidText =
-        let sessionId = SessionId.create sidText
-        let roadId = RoadId.create sidText
-        let snapshot = AgentJournal.snapshot durable
-
-        let roadOpt =
-            AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-        match roadOpt with
-        | Some road ->
-            road.LatestRetirement
-            |> Option.filter (requiresContinuation road)
-            |> Option.map (fun retirement ->
-                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
-        | _ -> None
-
-    let private decideLoopContext journal sessionIdTextOpt =
-        match sessionIdTextOpt, journal with
-        | Some sidText, Some durable when not (System.String.IsNullOrWhiteSpace sidText) ->
-            loopContextFor durable sidText
-        | _ -> None
-
-    let private ensureLoopOpening
-        workspaceDirectory
-        durable
-        sessionId
-        roadId
-        authorityRevision
-        (retirement: RetirementSummary)
-        needsOpening
-        =
-        task {
-            match needsOpening with
-            | true ->
-                let snapshot = captureSnapshot workspaceDirectory
-
-                let opening =
-                    IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
-
-                do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
-            | false -> return ()
-        }
-
     let private deliverLoopContext
         sessionPort
         rootWorkspace
@@ -312,24 +368,35 @@ module ManagerWorkflow =
         (context: AgentJournal * SessionId * RoadId * AuthorityRevision * RetirementSummary * bool)
         =
         task {
-            let durable, sessionId, _, _, retirement, _ = context
+            let durable, sessionId, roadId, authorityRevision, retirement, needsOpening =
+                context
 
-            match decideLoopContext (Some durable) (Some(SessionId.value sessionId)) with
-            | Some(_, _, currentRoadId, currentAuthority, currentRetirement, needsOpening) when
-                currentRetirement.Id = retirement.Id
-                ->
-                do!
-                    ensureLoopOpening
-                        workspaceDirectory
-                        durable
-                        sessionId
-                        currentRoadId
-                        currentAuthority
-                        currentRetirement
-                        needsOpening
+            match needsOpening with
+            | true ->
+                let snapshot = captureSnapshot workspaceDirectory
 
-                do! deliverLoopPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId currentRetirement
-            | _ -> return ()
+                let roadOpt =
+                    AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+                    |> Option.bind (fun s -> s.Relay)
+                    |> Option.bind (fun r -> Fold.view r roadId)
+
+                let invalidationEvents =
+                    roadOpt
+                    |> Option.bind (fun r -> r.Certificate)
+                    |> Option.filter (fun c -> c.Valid)
+                    |> Option.map (fun c ->
+                        [ RelayEvent.QualityCertificateInvalidated(c.Id, "ContinuousSessionAdvancesRoad") ])
+                    |> Option.defaultValue []
+
+                let opening =
+                    IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
+
+                let fullTransaction = mergeWithInvalidation opening invalidationEvents
+
+                do! commitOpeningTransaction durable sessionId None opening.RoadId fullTransaction
+            | false -> ()
+
+            do! deliverLoopPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId retirement
         }
 
     let maybeDeliverLoop
