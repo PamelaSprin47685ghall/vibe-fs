@@ -1067,6 +1067,7 @@ type StrengthReplicaRuntime
     /// an already-admitted bootstrap is not re-sent, so a retry cannot turn into
     /// a free extra provider request.
     member this.SendPreparedPrompt(replicaSessionId: SessionId) : Task<Result<unit, string>> =
+        // bootstrapDetachedSend occurs in this stage after state and model are admitted.
         match tryState replicaSessionId with
         | None -> Task.FromResult(Error "StrengthReplica prepared session is not live")
         | Some state when state.SemanticTerminal |> Option.isSome ->
