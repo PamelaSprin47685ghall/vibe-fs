@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -19,6 +20,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
@@ -31,6 +33,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
@@ -97,36 +100,61 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
     /// settlement path; provider-started ones take the terminal path; both reuse
     /// the existing durable writers and write Cancelled. Committed leases are
     /// then released by exact key, never by the session-wide release.
-    member private this.SettleSessionExecutions(sessionId: string) =
-        match journal with
-        | None -> ()
-        | Some durable ->
-            let sid = SessionId.create sessionId
+    member private this.SettleSessionExecutions(sessionId: string) : Task =
+        task {
+            match journal with
+            | None -> ()
+            | Some durable ->
+                let sid = SessionId.create sessionId
 
-            AgentJournal.snapshot durable
-            |> fun projection -> projection.AgentProjections.ChatExecutions
-            |> ChatExecutionProjection.nonTerminal
-            |> List.filter (fun execution -> execution.Key.SessionId = sid)
-            |> List.iter (fun execution ->
-                match execution.ProviderStarted with
-                | Some started ->
-                    Wanxiangshu.Composition.Durable.ManagedChatProviderLifecycle.terminal
-                        durable
-                        execution.Key
-                        started
-                        ChatExecutionTerminalDisposition.Cancelled
-                    |> ignore
-                | None ->
-                    Wanxiangshu.Composition.Durable.PreProviderSettlement.settle
-                        durable
-                        execution.Key
-                        execution.Evidence
-                        ChatExecutionTerminalDisposition.Cancelled
-                    |> ignore)
+                let unfinished =
+                    AgentJournal.snapshot durable
+                    |> fun projection -> projection.AgentProjections.ChatExecutions
+                    |> ChatExecutionProjection.nonTerminal
+                    |> List.filter (fun execution -> execution.Key.SessionId = sid)
 
-            ModelRouting.releasePhysicalExecution
-                sid
-                |> ignore
+                for execution in unfinished do
+                    match execution.ProviderStarted with
+                    | Some started ->
+                        let! settled =
+                            ManagedChatProviderLifecycle.terminal
+                                durable
+                                execution.Key
+                                started
+                                ChatExecutionTerminalDisposition.Cancelled
+
+                        match settled with
+                        | Ok _ -> ()
+                        | Error failure ->
+                            Diagnostic.fatal "p5-settle-terminal-append-failed"
+                                [ "session_id", SessionId.value execution.Key.SessionId
+                                  "failure", sprintf "%A" failure ]
+                    | None ->
+                        let! settled =
+                            PreProviderSettlement.settle
+                                durable
+                                execution.Key
+                                execution.Evidence
+                                ChatExecutionTerminalDisposition.Cancelled
+
+                        match settled with
+                        | Ok _ -> ()
+                        | Error failure ->
+                            Diagnostic.fatal "p5-settle-preprovider-append-failed"
+                                [ "session_id", SessionId.value execution.Key.SessionId
+                                  "failure", sprintf "%A" failure ]
+
+                    // Only a holder of the exact committed lease is released by exact
+                    // key; pending or unacquired demand is not a physical execution
+                    // and is left to its own cancellation path.
+                    match ModelRouting.tryReadExecution execution.Key with
+                    | Some _ ->
+                        ModelRouting.releasePhysicalExecution
+                            execution.Key.SessionId
+                            execution.Key.PhysicalUserMessageId
+                        |> ignore
+                    | None -> ()
+        }
 
     /// Drops the provider-language identity for this session idempotently.
     member _.DropSessionIdentity(sessionId: string) =
@@ -146,7 +174,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
         this.OwnedSessions.Remove sessionId |> ignore
         this.ModelRoutingSessions.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
-        this.SettleSessionExecutions sessionId
+        this.SettleSessionExecutions sessionId |> ignore
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
@@ -173,7 +201,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             |> Seq.toArray
 
         for sessionId in routed do
-            this.SettleSessionExecutions sessionId
+            this.SettleSessionExecutions sessionId |> ignore
             SessionExecutionBinding.drop (SessionId.create sessionId)
 
         this.ModelRoutingSessions.Clear()

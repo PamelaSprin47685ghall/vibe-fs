@@ -113,6 +113,27 @@ module ModelRouting =
         let reasoning = nonEmpty "reasoning" value?reasoning
         { Model = model; Reasoning = reasoning }
 
+    /// A durable road stores the fixed DevOps target as the wire string
+    /// 'provider/model:reasoning'. Decoding it is fail-closed: the result must
+    /// satisfy exactly the field requirements parseTarget enforces on a target
+    /// the scheduler resolved, so a malformed road target is refused instead of
+    /// being silently dropped or guessed from the current configuration.
+    let private parseDurableModelTarget (value: string) : ModelRoutingTarget =
+        if String.IsNullOrWhiteSpace value then
+            invalidOp "execution-model-routing: durable DevOps model target is empty"
+
+        let text = value.Trim()
+        let separator = text.IndexOf ':'
+
+        if separator <= 0 || separator >= text.Length - 1 then
+            invalidOp (
+                sprintf
+                    "execution-model-routing: durable DevOps model target must be 'provider/model:reasoning' (got '%s')"
+                    text
+            )
+
+        parseTarget (createObj [ "model" ==> text.Substring(0, separator); "reasoning" ==> text.Substring(separator + 1) ])
+
     let private targetObject (target: ModelRoutingTarget) =
         createObj [ "model" ==> target.Model; "reasoning" ==> target.Reasoning ]
 
@@ -1774,6 +1795,21 @@ module ModelRouting =
             runtime.BoundDevopsTarget(SessionId.value sessionId)
             |> Option.map toOpenCodeModel
         | None -> None
+
+    /// Seed the fixed DevOps target from a road's durable projection
+    /// (execution-model-routing-019).
+    ///
+    /// The write goes through the same `BindDevopsTarget` path a Normal admission
+    /// uses, so reseeding an identical target is a no-op and a conflicting target
+    /// fails closed instead of overwriting the road's fixed binding. An unloaded
+    /// shared runtime is refused rather than silently bootstrapped.
+    let internal seedBoundDevOpsModel (sessionId: SessionId) (value: string) : unit =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | None ->
+            invalidOp
+                "execution-model-routing: the shared runtime is not loaded, so the durable DevOps model target cannot be seeded; refusing to fall back to the current scheduler preference."
+        | Some runtime ->
+            runtime.BindDevopsTarget(SessionId.value sessionId, parseDurableModelTarget value)
 
     let internal releaseExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with

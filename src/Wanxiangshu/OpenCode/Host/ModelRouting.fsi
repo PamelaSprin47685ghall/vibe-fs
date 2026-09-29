@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 
 module ModelRouting =
     val internal failureOfExecutionAdmissionAcquisition: ExecutionAdmissionAcquisition -> ExecutionFailure option
+    val internal seedBoundDevOpsModel: sessionId: SessionId -> value: string -> unit
     val internal capacityOwnership: lease: ExecutionAdmissionLease -> CapacityOwnership
 
     /// Read-only Predictor slot existence query result, derived from the

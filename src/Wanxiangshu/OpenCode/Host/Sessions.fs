@@ -260,7 +260,7 @@ type InjectedSessionPort
     let interruptManagedAttempt (sessionId: SessionId) =
         task {
             Diagnostic.emit "session-attempt-interrupt" [ "session_id", SessionId.value sessionId ]
-            SessionExecutionBinding.cancelUnacquired sessionId
+            ModelRouting.cancelUnacquiredExecution sessionId |> ignore
 
             match underlyingPort with
             | Some port -> return! port.AbortSession sessionId
@@ -270,7 +270,7 @@ type InjectedSessionPort
     let abortManagedSession (sessionId: SessionId) =
         task {
             Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
-            SessionExecutionBinding.cancelUnacquired sessionId
+            ModelRouting.cancelUnacquiredExecution sessionId |> ignore
             detachChild sessionId
             do! abortChildren sessionId
 
