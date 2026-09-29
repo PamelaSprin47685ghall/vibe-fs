@@ -643,10 +643,16 @@ module HostSignalBootstrap =
                             | false, _ ->
                                 let ports = createTransaction (ModelRouting.projectHostModel output)
 
+                                let managedIntent =
+                                    match ChatAdmissionIntent.tryManaged intent with
+                                    | Some managed -> managed
+                                    | None ->
+                                        invalidArg "intent" "managed chat transaction requires a managed intent"
+
                                 let started =
                                     ChatAdmissionTransaction.execute
                                         ports
-                                        managed
+                                        managedIntent
 
                                 admissionInFlight.[key] <- started
                                 started)
