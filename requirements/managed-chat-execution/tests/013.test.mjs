@@ -49,8 +49,7 @@ test('WHAT[managed-chat-execution-013] queue full and cancellation cross no bind
       'AcquireLease',
       'TerminalizeAccepted',
     ])
-    assert.equal(result.bindCount, 0)
-    assert.equal(result.hostCount, 0)
+      assert.equal(result.hostCount, 0)
     assert.equal(result.commitCount, 0)
     assert.equal(result.releaseCount, 0)
     assert.equal(result.providerCount, 0)
@@ -216,5 +215,52 @@ test('WHAT[managed-chat-execution-013] pre-provider cancellation settlement revo
     assert.equal(settled.sessionId, sessionId)
     assert.equal(settled.physicalUserMessageId, physicalId)
   })
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { readFileSync } = await import("node:fs");
+const { join } = await import("node:path");
+const { fileURLToPath } = await import("node:url");
+const { default: test } = await import("node:test");
+
+const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
+const bootstrap = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs'), 'utf8')
+
+// WHAT[managed-chat-execution-013] concurrent admissions of one exact key merge into a single flight
+// Structure evidence only: the in-flight table lives inside a private HostSignalBootstrap binding and
+// no JS surface can deliver two concurrent chat.message admissions, so this asserts the structural
+// contract (registration, guarded deregistration, no capacity waiting under lock), not runtime
+// concurrency. The durable-accept idempotence and ModelRouting lock/queue guarantees remain the
+// underlying behavior proof; this guards the orchestration-layer coalescing shape.
+test('WHAT[managed-chat-execution-013] concurrent admissions of one exact key merge into a single in-process flight', () => {
+  assert.match(
+    bootstrap,
+    /let admissionInFlight =\n\s*Dictionary<ChatExecutionKey, Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>>\(\)/,
+    'the in-process admission flight table must exist',
+  )
+  assert.match(
+    bootstrap,
+    /lock admissionInFlight \(fun \(\) ->\n\s*match admissionInFlight\.TryGetValue key with\n\s*\| true, existing -> existing/,
+    'a same-key second admission must reuse the registered flight',
+  )
+  assert.match(
+    bootstrap,
+    /admissionInFlight\.\[key\] <- started/,
+    'the owner must register its started flight under the exact key',
+  )
+  assert.match(
+    bootstrap,
+    /finally\n\s*lock admissionInFlight \(fun \(\) ->\n\s*match admissionInFlight\.TryGetValue key with\n\s*\| true, registered when obj\.ReferenceEquals\(registered, flight\) ->\n\s*admissionInFlight\.Remove\(key\) \|> ignore/,
+    'deregistration must be guarded by flight identity so a late owner cannot remove a newer flight',
+  )
+
+  const flightStart = bootstrap.indexOf('let flight: Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =')
+  const flightEnd = bootstrap.indexOf('match! flight with')
+  assert.ok(flightStart >= 0 && flightEnd > flightStart, 'flight registration span must exist before the await')
+  const flightSpan = bootstrap.slice(flightStart, flightEnd)
+  assert.doesNotMatch(flightSpan, /let!|do!|await/, 'no capacity waiting may happen while the lock is held')
 })
+}
+)
 }

@@ -243,9 +243,8 @@ test('WHAT[execution-failure-policy-002] cancel/retry/stream matrix is interpret
     'Exact',
   )
   const fatal = hooks.hookFailurePolicy('LocalInvariant', 'ExactSettlementComplete')
-  assert.deepEqual([...exactSettlement.trace, fatal].slice(-4), [
+  assert.deepEqual([...exactSettlement.trace, fatal].slice(-3), [
     'TerminalizeAccepted',
-    'UnbindExecution',
     'ReleaseBeforeProvider',
     'FatalAfterSettlement',
   ])

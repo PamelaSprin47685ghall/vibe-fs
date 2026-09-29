@@ -46,15 +46,15 @@ const action = (kind, cut, extra = {}) => ({
   ...extra,
 })
 const CUTS = [
-  ['A', 'before Accepted append', [], 'None', { activeCapacity: 0, providerBinding: 0, hostProjected: false }, 0, 'NoDurableExecution'],
-  ['B', 'after Accepted before lease', ['Accepted'], 'Accepted', { activeCapacity: 0, providerBinding: 0, hostProjected: false }, 0, 'ResumePreProvider'],
-  ['C', 'after lease before execution binding', ['Accepted'], 'Accepted', { activeCapacity: 1, providerBinding: 0, hostProjected: false }, 0, 'ResumePreProvider'],
-  ['D', 'after binding before Host projection', ['Accepted'], 'Accepted', { activeCapacity: 1, providerBinding: 1, hostProjected: false }, 0, 'ResumePreProvider'],
-  ['E', 'after Host projection before ProviderStarted', ['Accepted'], 'Accepted', { activeCapacity: 1, providerBinding: 1, hostProjected: true }, 0, 'ResumePreProvider'],
-  ['F', 'after ProviderStarted before Terminal', ['Accepted', 'ProviderStarted'], 'ProviderStarted', { activeCapacity: 1, providerBinding: 1, hostProjected: true }, 1, 'Ignore'],
-  ['G', 'after Terminal before exact release', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 1, providerBinding: 1, hostProjected: true }, 1, 'ReconcilePhysical'],
-  ['H', 'after exact release before Hook return', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, providerBinding: 0, hostProjected: true }, 1, 'Ignore'],
-  ['I', 'after exact release before fatal propagation', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, providerBinding: 0, hostProjected: true }, 1, 'Ignore'],
+  ['A', 'before Accepted append', [], 'None', { activeCapacity: 0, hostProjected: false }, 0, 'NoDurableExecution'],
+  ['B', 'after Accepted before lease', ['Accepted'], 'Accepted', { activeCapacity: 0, hostProjected: false }, 0, 'ResumePreProvider'],
+  ['C', 'after lease before execution binding', ['Accepted'], 'Accepted', { activeCapacity: 1, hostProjected: false }, 0, 'ResumePreProvider'],
+  ['D', 'after target before Host projection', ['Accepted'], 'Accepted', { activeCapacity: 1, hostProjected: false }, 0, 'ResumePreProvider'],
+  ['E', 'after Host projection before ProviderStarted', ['Accepted'], 'Accepted', { activeCapacity: 1, hostProjected: true }, 0, 'ResumePreProvider'],
+  ['F', 'after ProviderStarted before Terminal', ['Accepted', 'ProviderStarted'], 'ProviderStarted', { activeCapacity: 1, hostProjected: true }, 1, 'Ignore'],
+  ['G', 'after Terminal before exact release', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 1, hostProjected: true }, 1, 'ReconcilePhysical'],
+  ['H', 'after exact release before Hook return', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, hostProjected: true }, 1, 'Ignore'],
+  ['I', 'after exact release before fatal propagation', ['Accepted', 'ProviderStarted', 'Terminal'], 'Terminal', { activeCapacity: 0, hostProjected: true }, 1, 'Ignore'],
 ]
 const expectedEffects = (decision) => ({
   NoDurableExecution: [],

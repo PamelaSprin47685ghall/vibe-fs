@@ -44,7 +44,6 @@ test('WHAT[managed-chat-execution-003] managed admission has one fixed success o
     'AcceptedWitness',
     'AcquireLease',
     'LeaseTarget',
-    'BindExecution',
     'ProjectHost',
     'CommitLease',
     'Settled',
@@ -52,8 +51,7 @@ test('WHAT[managed-chat-execution-003] managed admission has one fixed success o
   assert.deepEqual(result.target, { model: 'openai/gpt-5', reasoning: 'high' })
   assert.equal(result.acceptCount, 1)
   assert.equal(result.acquireCount, 1)
-  assert.equal(result.bindCount, 1)
-  assert.equal(result.hostCount, 1)
+    assert.equal(result.hostCount, 1)
   assert.equal(result.commitCount, 1)
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
@@ -66,8 +64,7 @@ test('WHAT[managed-chat-execution-003] append failure performs zero downstream e
     assert.equal(result.error.kind, failurePoint === 'AcceptNotAttempted' ? 'NotAttempted' : 'CommitUnknown')
     assert.deepEqual(result.trace, ['ResolveState', 'Accept'])
     assert.equal(result.acquireCount, 0)
-    assert.equal(result.bindCount, 0)
-    assert.equal(result.hostCount, 0)
+        assert.equal(result.hostCount, 0)
     assert.equal(result.commitCount, 0)
     assert.equal(result.releaseCount, 0)
     assert.equal(result.providerCount, 0)
@@ -85,8 +82,7 @@ test('WHAT[managed-chat-execution-003] acquisition failure crosses no later boun
     'AcquireLease',
     'TerminalizeAccepted',
   ])
-  assert.equal(result.bindCount, 0)
-  assert.equal(result.hostCount, 0)
+    assert.equal(result.hostCount, 0)
   assert.equal(result.commitCount, 0)
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
@@ -103,8 +99,7 @@ test('WHAT[managed-chat-execution-003] superseded demand is a typed nonfatal sho
     'AcquireLease',
     'TerminalizeAccepted',
   ])
-  assert.equal(result.bindCount, 0)
-  assert.equal(result.hostCount, 0)
+    assert.equal(result.hostCount, 0)
   assert.equal(result.commitCount, 0)
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
@@ -117,8 +112,7 @@ test('WHAT[managed-chat-execution-003] already-started replay performs no duplic
   assert.deepEqual(result.trace, ['ResolveState'])
   assert.equal(result.acceptCount, 0)
   assert.equal(result.acquireCount, 0)
-  assert.equal(result.bindCount, 0)
-  assert.equal(result.hostCount, 0)
+    assert.equal(result.hostCount, 0)
   assert.equal(result.providerCount, 0)
 })
 }
@@ -139,7 +133,7 @@ test('WHAT[managed-chat-execution-003] managed path calls one admission transact
   assert.equal(occurrences(/ChatAdmissionTransaction\.execute/g), 1)
   assert.match(
     bootstrap,
-    /let\s+admissionTransaction\s*=\s*\n\s*journal\s*\n\s*\|> Option\.map\s*\(fun durable ->\s*\n\s*let runtime = PromptDispatcher\.forPrompts \(PromptJournalAdapter\.create durable\)\s*\n\s*ChatAdmissionTransaction\.production durable runtime\.AcceptManagedChatIntent\)/,
+    /let\s+admissionTransaction\s*=\s*\n\s*journal\s*\n\s*\|> Option\.map\s*\(fun durable ->\s*\n\s*let runtime = PromptDispatcher\.forPrompts \(PromptJournalAdapter\.create durable\)\s*\n\s*ChatAdmissionTransaction\.production durable \(fun managed ->\s*\n\s*runtime\.AcceptManagedChatIntent\(ChatAdmissionIntent\.ofManaged managed\)\)\)/,
   )
   assert.match(
     bootstrap,
@@ -165,7 +159,7 @@ test('WHAT[managed-chat-execution-003] only Settled crosses the managed provider
 test('WHAT[managed-chat-execution-003] acceptance uncertainty, acquire, bind, and Host projection failures stop before provider', () => {
   const continuation = bootstrap.slice(
     bootstrap.indexOf('let continueManagedChatMessage'),
-    bootstrap.indexOf('let currentExecution'),
+    bootstrap.indexOf('let executionKey'),
   )
   const admission = bootstrap.slice(
     bootstrap.indexOf('let admitManagedChatMessage'),

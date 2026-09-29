@@ -41,7 +41,6 @@ test('WHAT[managed-chat-execution-006] terminal replay performs no acceptance or
   assert.deepEqual(result.trace, ['ResolveState'])
   assert.equal(result.acceptCount, 0)
   assert.equal(result.acquireCount, 0)
-  assert.equal(result.bindCount, 0)
   assert.equal(result.hostCount, 0)
   assert.equal(result.providerCount, 0)
 })

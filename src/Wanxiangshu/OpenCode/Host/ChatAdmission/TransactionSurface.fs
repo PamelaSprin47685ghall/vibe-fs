@@ -199,16 +199,13 @@ module TransactionSurface =
             let mutable appendCount = 0
             // DSL-MUTABLE: algorithm-scratch
             let mutable acquireCount = 0
-            let mutable bindCount = 0
             // DSL-MUTABLE: algorithm-scratch
             let mutable hostCount = 0
             let mutable commitCount = 0
             // DSL-MUTABLE: algorithm-scratch
             let mutable releaseCount = 0
-            let mutable unbindCount = 0
             // DSL-MUTABLE: algorithm-scratch
             let mutable activeCapacity = 0
-            let mutable providerBinding = 0
             // DSL-MUTABLE: algorithm-scratch
             let mutable hostProjected = false
             let mutable crashed = false
@@ -313,20 +310,12 @@ module TransactionSurface =
                             Error ExecutionAdmissionRejection.WrongTarget
                         else
                             Ok target
-                  Bind =
-                    fun _ _ _ ->
-                        bindCount <- bindCount + 1
-                        providerBinding <- 1
 
-                        if failurePoint = "BindExecution" || failurePoint = "ReleaseBeforeProvider" then
-                            Error(InvalidOperationException "injected binding failure")
-                        else
-                            Ok()
                   ProjectHost =
                     fun _ ->
                         hostCount <- hostCount + 1
 
-                        if failurePoint = "ProjectHost" then
+                        if failurePoint = "ProjectHost" || failurePoint = "BindExecution" || failurePoint = "ReleaseBeforeProvider" then
                             Error(InvalidOperationException "injected Host projection failure")
                         else
                             hostProjected <- true
@@ -386,32 +375,25 @@ module TransactionSurface =
                                     } }
 
                         PreProviderSettlement.settleWith settlementPersistence key acceptedEvidence disposition
-                  Unbind =
-                    fun _ ->
-                        unbindCount <- unbindCount + 1
-                        providerBinding <- 0 }
+                  ReadExact = fun _ -> state }
 
-            let key: ChatAdmissionIntent.ExecutionKey =
+            let key: ChatExecutionKey =
                 { SessionId = evidence.SessionId
                   PhysicalUserMessageId = evidence.PhysicalUserMessageId }
 
-            let intent =
-                ChatAdmissionIntent.Decision.ExternalRootIntent
+            let managed =
+                ChatAdmissionIntent.ManagedIntent.ExternalRoot
                     { Key = key
                       ExplicitAgent = ParticipantIdentity.selectedAgent profile.Authority.ParticipantIdentity
                       Origin = profile.Origin
                       IdentitySeed = profile.Authority.IdentitySeed }
-
-            let input =
-                { Intent = intent
-                  CurrentState = state }
 
             let observe step =
                 trace.Add(stepLabel step)
 
                 match failurePoint, step with
                 | "CrashB", ChatAdmissionTransactionStep.AcquireLease
-                | "CrashC", ChatAdmissionTransactionStep.BindExecution
+                | "CrashC", ChatAdmissionTransactionStep.LeaseTarget
                 | "CrashD", ChatAdmissionTransactionStep.ProjectHost ->
                     crashed <- true
                     raise (InvalidOperationException $"crash {failurePoint}")
@@ -420,7 +402,7 @@ module TransactionSurface =
             let! result =
                 task {
                     try
-                        return! ChatAdmissionTransaction.executeWith observe ports input
+                        return! ChatAdmissionTransaction.executeWith observe ports managed
                     with error ->
                         return Error(ChatAdmissionTransactionError.AcceptanceBoundaryFailed error)
                 }
@@ -430,11 +412,11 @@ module TransactionSurface =
 
             let outcome, targetValue, error =
                 match result with
-                | Ok(ChatAdmissionTransactionOutcome.Settled(_, settledTarget, _, _)) ->
+                | Ok(ChatAdmissionTransactionOutcome.Settled _) ->
                     "Settled",
                     box
-                        {| model = settledTarget.Model
-                           reasoning = settledTarget.Reasoning |},
+                        {| model = target.Model
+                           reasoning = target.Reasoning |},
                     null
                 | Ok value -> outcomeLabel value, null, null
                 | Error transactionError -> null, null, errorToJs transactionError
@@ -449,11 +431,9 @@ module TransactionSurface =
                        acceptCount = acceptCount
                        appendCount = appendCount
                        acquireCount = acquireCount
-                       bindCount = bindCount
                        hostCount = hostCount
                        commitCount = commitCount
                        releaseCount = releaseCount
-                       unbindCount = unbindCount
                        providerCount = 0
                        crashed = crashed
                        durableLifecycle =
@@ -466,7 +446,7 @@ module TransactionSurface =
                         |> Option.defaultValue "None"
                        admission =
                         {| activeCapacity = activeCapacity
-                           providerBinding = providerBinding
+
                            hostProjected = hostProjected |} |}
         }
 
@@ -570,14 +550,12 @@ module TransactionSurface =
                     exactIdentity
                 )
 
-            let bindingIntent: ChatAdmissionIntent.Decision =
+            let managed: ChatAdmissionIntent.ManagedIntent =
                 if failureKind = "PluginReplay" then
                     let promptKey = PromptKey.create "prompt-plugin-replay"
 
-                    ChatAdmissionIntent.Decision.PendingPromptIntent
-                        { Key =
-                            { SessionId = key.SessionId
-                              PhysicalUserMessageId = key.PhysicalUserMessageId }
+                    ChatAdmissionIntent.ManagedIntent.PendingPrompt
+                        { Key = key
                           PromptKey = promptKey
                           Claim =
                             { PromptKey = promptKey
@@ -592,29 +570,11 @@ module TransactionSurface =
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
                 else
-                    ChatAdmissionIntent.Decision.ExternalRootIntent
-                        { Key =
-                            { SessionId = key.SessionId
-                              PhysicalUserMessageId = key.PhysicalUserMessageId }
+                    ChatAdmissionIntent.ManagedIntent.ExternalRoot
+                        { Key = key
                           ExplicitAgent = AcceptedChatExecutionEvidence.participant acceptedEvidence
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
-
-            let installBinding model =
-                match bindingIntent with
-                | ChatAdmissionIntent.Decision.PendingPromptIntent intent ->
-                    SessionExecutionBinding.acceptPromptExecution
-                        key.SessionId
-                        intent.PromptKey
-                        key.PhysicalUserMessageId
-                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
-                        model
-                | _ ->
-                    SessionExecutionBinding.acceptExternalExecution
-                        key.SessionId
-                        key.PhysicalUserMessageId
-                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
-                        model
 
             let ports: ChatAdmissionTransactionPorts =
                 { Accept = accept
@@ -632,17 +592,9 @@ module TransactionSurface =
                             activeCapacity <- 1
                             Task.FromResult(Ok(ExecutionAdmissionAcquisition.Admitted lease))
                   LeaseTarget = fun _ -> Ok target
-                  Bind =
-                    fun _ _ model ->
-                        installBinding model
-
-                        if failureKind = "ExecutionBindingError" || failureKind = "FatalMembraneInput" then
-                            Error(InvalidOperationException "injected pre-provider binding failure")
-                        else
-                            Ok()
-                  ProjectHost =
+                                    ProjectHost =
                     fun _ ->
-                        if failureKind = "ProjectionError" then
+                        if failureKind = "ProjectionError" || failureKind = "ExecutionBindingError" || failureKind = "FatalMembraneInput" then
                             Error(InvalidOperationException "injected pre-provider projection failure")
                         else
                             Ok()
@@ -654,11 +606,7 @@ module TransactionSurface =
 
                         CapacityTransitionOutcome.Applied
                   SettlePreProvider = PreProviderSettlement.settleWith settlementPersistence
-                  Unbind =
-                    fun requested ->
-                        SessionExecutionBinding.releaseAcceptedExecution
-                            requested.SessionId
-                            requested.PhysicalUserMessageId }
+                  ReadExact = fun _ -> ChatExecutionProjection.byKey key projection }
 
             let current = ChatExecutionProjection.byKey key projection
 
@@ -666,8 +614,7 @@ module TransactionSurface =
                 ChatAdmissionTransaction.executeWith
                     (stepLabel >> trace.Add)
                     ports
-                    { Intent = bindingIntent
-                      CurrentState = current }
+                    managed
 
             let state = ChatExecutionProjection.byKey key projection
 

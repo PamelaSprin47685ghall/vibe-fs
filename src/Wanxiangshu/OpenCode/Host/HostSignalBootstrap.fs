@@ -518,7 +518,9 @@ module HostSignalBootstrap =
                 journal
                 |> Option.map (fun durable ->
                     let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
-                    ChatAdmissionTransaction.production durable runtime.AcceptManagedChatIntent)
+
+                    ChatAdmissionTransaction.production durable (fun managed ->
+                        runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)))
 
             // Operator kill switch: the git-hook integration (hook installation and
             // the ref-triggered converge it launches) stays off while its hang is
@@ -598,23 +600,6 @@ module HostSignalBootstrap =
                 requireDurabilityActivation ()
                 JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
 
-            let currentExecution durable intent =
-                let key =
-                    match intent with
-                    | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
-                        { SessionId = evidence.Key.SessionId
-                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-                    | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-                        { SessionId = evidence.Key.SessionId
-                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-                    | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
-                        { SessionId = evidence.Key.SessionId
-                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-                    | _ -> invalidArg "intent" "managed chat transaction requires a managed intent"
-
-                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey key
-
             let executionKey intent =
                 match intent with
                 | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
@@ -661,8 +646,7 @@ module HostSignalBootstrap =
                                 let started =
                                     ChatAdmissionTransaction.execute
                                         ports
-                                        { Intent = intent
-                                          CurrentState = currentExecution durable intent }
+                                        managed
 
                                 admissionInFlight.[key] <- started
                                 started)

@@ -34,9 +34,8 @@ test('WHAT[host-boundary-022] fatal diagnostic follows exact settlement', async 
   })
   const fatalPolicy = hooks.hookFailurePolicy('LocalInvariant', 'ExactSettlementComplete')
   const orderedTrace = [...settled.trace, fatalPolicy]
-  assert.deepEqual(orderedTrace.slice(-4), [
+  assert.deepEqual(orderedTrace.slice(-3), [
     'TerminalizeAccepted',
-    'UnbindExecution',
     'ReleaseBeforeProvider',
     'FatalAfterSettlement',
   ])

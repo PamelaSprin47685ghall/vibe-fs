@@ -36,7 +36,7 @@ const run = (failurePoint = 'None', state = 'None') =>
 test('WHAT[managed-chat-execution-007] every acquired pre-commit failure releases exactly once', async () => {
   const expectations = new Map([
     ['LeaseTarget', 'LeaseTargetFailed'],
-    ['BindExecution', 'BindingFailed'],
+    ['BindExecution', 'HostProjectionFailed'],
     ['ProjectHost', 'HostProjectionFailed'],
     ['CommitLease', 'LeaseCommitFailed'],
   ])
@@ -51,11 +51,6 @@ test('WHAT[managed-chat-execution-007] every acquired pre-commit failure release
     assert.equal(result.providerCount, 0)
     assert.equal(result.trace.at(-1), 'ReleaseBeforeProvider')
     assert.ok(result.trace.indexOf('TerminalizeAccepted') < result.trace.indexOf('ReleaseBeforeProvider'))
-    assert.ok(result.trace.indexOf('UnbindExecution') < result.trace.indexOf('ReleaseBeforeProvider'))
-
-    if (failurePoint === 'BindExecution') {
-      assert.equal(result.hostCount, 0)
-    }
 
     if (failurePoint === 'ProjectHost') {
       assert.equal(result.commitCount, 0)
@@ -66,10 +61,10 @@ test('WHAT[managed-chat-execution-007] release boundary failure is typed without
   const result = await run('ReleaseBeforeProvider')
 
   assert.equal(result.ok, false)
-  assert.equal(result.error.kind, 'BindingFailed')
+  assert.equal(result.error.kind, 'HostProjectionFailed')
   assert.equal(result.error.release, 'BoundaryFailed')
   assert.equal(result.releaseCount, 1)
-  assert.equal(result.hostCount, 0)
+  assert.equal(result.hostCount, 1)
   assert.equal(result.commitCount, 0)
   assert.equal(result.providerCount, 0)
 })
