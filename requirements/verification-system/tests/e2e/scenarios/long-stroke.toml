@@ -1226,7 +1226,7 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
 tools = ["js-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", delegate_readonly_rounds = 2, self_note = "read-only survey before publishing" } }
+  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 2, self_note = "read-only survey before publishing" } }
 
   # The continuation whose transform starts the decision (Bound → companion
   # rounds → Prepared) and renders the candidate before the target assistant
@@ -1250,7 +1250,7 @@ tools = ["read"]
 forbiddenTools = ["js-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", delegate_readonly_rounds = 0 } }
+  respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", estimated_readonly_rounds = 0 } }
 
   # Second admitted round: the companion ends itself in prose (early end,
   # WHAT[speculative-investigation-003]/[005]); the round was already counted
@@ -1277,7 +1277,7 @@ user = "STRENGTH_RECOVERY: resume the readonly delegation after a provider failu
 tools = ["js-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", delegate_readonly_rounds = 1 } }
+  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 1, self_note = "verify probe content after provider fault recovery" } }
 
   # First delivery of this step is refused by the declared fault; the Host
   # retry serves this same response. DelegationRequested was persisted by the
@@ -1300,7 +1300,7 @@ tools = ["read"]
 forbiddenTools = ["js-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", delegate_readonly_rounds = 0 } }
+  respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", estimated_readonly_rounds = 0 } }
 
 # Candidate frames render into the owner's request before the target assistant
 # output (WHAT[speculative-investigation-008]) — a mid-conversation insertion

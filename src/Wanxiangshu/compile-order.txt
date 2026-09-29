@@ -334,6 +334,8 @@ Repository/Investigation/WarmStart/Prompt.fsi
 Repository/Investigation/WarmStart/Prompt.fs
 Strength/Budget.fsi
 Strength/Budget.fs
+Strength/InvestigationEstimateContract.fsi
+Strength/InvestigationEstimateContract.fs
 Strength/Delegation.fsi
 Strength/Delegation.fs
 Strength/Policy.fsi

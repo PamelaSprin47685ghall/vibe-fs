@@ -1,6 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -184,15 +186,26 @@ module PluginHooksSurface =
                    rounds = ReadonlyRoundBudget.value budget |}
         | Error message -> box {| ok = false; error = message |}
 
-    /// DELEGATE.md 3.2: self_note validation as a JS-native result:
+    [<Emit("arguments.length > 1")>]
+    let private hasSecondArg () : bool = jsNative
+
+    [<Emit("arguments[1]")>]
+    let private getSecondArg () : obj = jsNative
+
+    /// DELEGATE_REVISE.md 7.1/7.2: self_note validation as a JS-native result:
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
-    let readonlyDelegationSelfNoteOf (value: obj) : obj =
-        match ReadonlyDelegationContract.trySelfNote value with
-        | Ok note ->
+    let readonlyDelegationSelfNoteOf (rounds: obj) : obj =
+        let hasNote = hasSecondArg ()
+        let args: obj = createEmpty
+        args?(InvestigationEstimateContract.EstimatedReadonlyRoundsField) <- rounds
+        if hasNote then
+            args?self_note <- getSecondArg ()
+        match InvestigationEstimateContract.parseParticipatingArguments args with
+        | Ok (_, noteOpt) ->
             box
                 {| ok = true
-                   note = Option.toObj note |}
-        | Error message -> box {| ok = false; error = message |}
+                   note = Option.toObj noteOpt |}
+        | Error err -> box {| ok = false; error = sprintf "%A" err |}
 
     /// Production tool.execute.before calls the same hide: the business
     /// argument view drops both protocol fields while provider evidence keeps

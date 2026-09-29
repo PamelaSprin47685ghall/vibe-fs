@@ -77,7 +77,7 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 
 ## [018] RulebookRevision 按 Blogger life 冻结与生效边界
 
-Blogger participant life 在创建时绑定确定的 `RulebookRevision`，同时决定 system prompt 字节、`chronicle.tip` 枚举、解码映射表与 Main 处置索引。Blogger life 存活期间四者保持冻结，新规则的诞生不打断当前 in-flight cycle，仅在下一 cycle 创建 fresh life 时绑定最新 revision，确保 byte stability 与工具定义不分叉。Blogger life 冻结的工具定义还包含宿主在 Predictor 已配置时对全部可见工具静态追加的只读委托协议字段（必选 `delegate_readonly_rounds`、可选 `self_note`）与稳定协作说明：它们随 life 一同逐字节冻结，不随剩余预算或请求变化改写；Blogger 及内部请求见到同一装饰时预算恒按 0 填写，且 Blogger 不具有发出只读委托授权的权能。协议装饰不改变 [004] 的 system prompt 合成与 RulebookRevision 冻结语义。
+Blogger participant life 在创建时绑定确定的 `RulebookRevision`，同时决定 system prompt 字节、`chronicle.tip` 枚举、解码映射表与 Main 处置索引。Blogger life 存活期间四者保持冻结，新规则的诞生不打断当前 in-flight cycle，仅在下一 cycle 创建 fresh life 时绑定最新 revision，确保 byte stability 与工具定义不分叉。Blogger 唯一定义的 `chronicle` 工具属于非参与工具，无只读委托协议增量，亦不承载任何估计字段；Blogger 不具有发出只读委托授权的权能，且不参与委托协议。这不改变 [004] 的 system prompt 合成与 RulebookRevision 冻结语义。
 
 ## [019] Enforcer fatal 只解释typed incident且经mandatory capability执行
 

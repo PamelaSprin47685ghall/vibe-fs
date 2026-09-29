@@ -72,7 +72,7 @@ module StrengthSurface =
     /// host-boundary-030: only an exact JavaScript integer inside the declared
     /// range is a rounds value. A string, a boolean, a fraction, NaN and
     /// infinity are refused here instead of being coerced by a blind unbox.
-    /// The upper bound is the `delegate_readonly_rounds` schema maximum.
+    /// The upper bound is the `estimated_readonly_rounds` schema maximum.
     let private isDeclaredRounds (value: obj) : bool =
         emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647"
 
@@ -82,12 +82,12 @@ module StrengthSurface =
 
     /// A binding boundary has no channel to argue a parameter with its caller:
     /// a missing, non-positive or otherwise illegal declared value is simply an
-    /// empty budget there, so nothing may be registered on it.
+    /// error there, so nothing may be registered on it.
     let private roundsResult (value: obj) : Result<ReadonlyRoundBudget, string> =
         if isDeclaredRounds value then
             ReadonlyRoundBudget.tryCreate (unbox<int> value)
         else
-            ReadonlyRoundBudget.tryCreate 0
+            Error requestedRoundsOutOfRange
 
     let private requestKindResult (value: obj) : Result<ProviderRequestKind, string> =
         match textOf value with

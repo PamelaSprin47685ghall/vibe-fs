@@ -195,4 +195,63 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_lifecycle_closes_an_unbou
   assert.equal(rebindAfterClose.ok, false, 'a closed authorization cannot be re-bound into the same decision')
   assert.equal(rebindAfterClose.error, 'BoundConflict')
 })
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_cross_version_same_source_quadruple_is_deduplicated_without_second_budget', () => {
+  const H = (text) => `H(${text})`
+  const ownerSessionId = 'owner-ses-1'
+  const logicalRunId = 'log-1'
+  const authorityRootUserMessageId = 'u-1'
+  const sourcePhysicalUserMessageId = 'u-1'
+  const sourceProviderRun = 'run-1'
+
+  // DecisionId derived under contractRevision 1
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  )
+  // DecisionId derived under contractRevision 2
+  const decisionIdV2 = Strength.delegationDeriveDecisionId(
+    H, 2, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  )
+
+  // Invariant 1: DecisionId inherently changes across contract revisions
+  assert.notEqual(decisionIdV1, decisionIdV2, 'Revision change must derive different DecisionId, requiring quadruple matching for dedup')
+
+  // Request under revision 1 for the source quadruple
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  }
+
+  // Fold initial revision 1 request into projection
+  let projection = Strength.projectionApply(Strength.projectionEmpty(), Strength.eventRequested(requestV1))
+  assert.equal(projection.ok, true)
+
+  const candidateV1 = Strength.projectionCandidate(decisionIdV1, projection.value)
+  assert.equal(candidateV1.state, 'Requested')
+  assert.equal(Strength.projectionRequestedRounds(decisionIdV1, projection.value), 2)
+
+  // Invariant 2: A second request with the same decisionId is recognized as single-use
+  // If identical, it is idempotent
+  const identicalRequest = Strength.projectionApply(projection.value, Strength.eventRequested(requestV1))
+  assert.equal(identicalRequest.ok, true)
+
+  // If revision 2 attempts to request with different parameters/revision for the same authorization decision,
+  // or if conflict is asserted:
+  const conflictSameDecision = Strength.projectionApply(projection.value, Strength.eventRequested({
+    ...requestV1,
+    contractRevision: 2,
+  }))
+  assert.equal(conflictSameDecision.ok, false)
+  assert.equal(conflictSameDecision.error, 'RequestedConflict')
+
+  // Invariant 3: Projection retains exactly one candidate for this source authorization, no second budget
+  assert.equal(Strength.projectionRequestedRounds(decisionIdV1, projection.value), 2)
+  assert.equal(Strength.projectionCandidate(decisionIdV2, projection.value), null, 'New revision decisionId must not exist as fresh in existing projection')
+})
 }

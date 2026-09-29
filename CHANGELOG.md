@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+## [Unreleased]
+
+- speculative-investigation / host-boundary: 切换到 DELEGATE_REVISE.md 新合同。
+  - 将面向模型的意图性字段 `delegate_readonly_rounds` 重构为事实性连续只读轮数估计 `estimated_readonly_rounds`（0..2147483647 原生整数）。
+  - 将 `self_note` 明确为条件参数：估计大于 0 时必须提供非空白未来展望；估计为 0 时必须完全省略。
+  - 实施严格的逐工具判定（第 5.2 节 12 个参与工具装饰，未参与工具无任何增量）。
+  - 彻底剔除执行意图与信任叙事；同伴防递归完全由真实身份边界保证，去除副本必须填 0 的虚假约定。
+  - 跨版本按真实来源防重，旧历史保持 append-only 不改写，古老 K1/K2 材料与本次协议修订边界清晰分离。
+
+
 ## Unreleased — PROMPT-006 执行绑定去层化收尾（P1–P6）
 
 - **删除 Host 侧平行执行身份/模型权威（PROMPT-006 全类根因）**：`SessionExecutionBinding` 的进程本地身份表（`agents`/`parents`/`internalRoots`/`hostAuxiliaryChildren`/`acceptedPromptBindings`/`providerAttemptBindings`/`persistentDevOpsModels`）与 JS 测试面 `SessionBindingSurface` 全部删除。模块只保留两件事：durable `Accepted` 证据查询（`isManagedExecution`）与 transform 的 provider-step 门（`beginPhysicalProviderAttemptForTransform`）。原 24 处 `PROMPT-006` 报错（"no accepted execution binding"/"no frozen agent binding"/agent drift from cache 等）随平行表一起消失；`chat.params` 只剩 4 处基于 exact 证据的 fail-closed（agent/model 漂移、缺 lease、缺观察）。

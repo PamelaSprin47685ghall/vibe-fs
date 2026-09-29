@@ -1072,12 +1072,21 @@ const requestModel = (request) => {
   return model?.modelID ?? model?.id ?? null;
 };
 
+const PARTICIPATING_TOOLS = new Set([
+  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+]);
+
+const toolNameOfCall = (call) => call?.function?.name ?? call?.name ?? '';
+
 const budgetOfCall = (call) => {
+  const toolName = toolNameOfCall(call);
+  if (!PARTICIPATING_TOOLS.has(toolName)) return null;
   const args = call?.function?.arguments ?? call?.arguments;
   if (typeof args !== 'string') return null;
   try {
-    const value = JSON.parse(args)?.delegate_readonly_rounds;
-    return typeof value === 'number' ? value : null;
+    const value = JSON.parse(args)?.estimated_readonly_rounds;
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
   } catch {
     return null;
   }
@@ -1087,7 +1096,10 @@ const hasPositiveBudgetCall = (request) =>
   (request?.messages ?? []).some(
     (message) =>
       Array.isArray(message?.tool_calls)
-      && message.tool_calls.some((call) => (budgetOfCall(call) ?? 0) > 0),
+      && message.tool_calls.some((call) => {
+        const budget = budgetOfCall(call);
+        return typeof budget === 'number' && budget > 0;
+      }),
   );
 
 /**
@@ -1152,7 +1164,7 @@ export async function bindDelegationReplicas(scenario, ctx) {
  * DELEGATE 14.5: the companion's real readonly result (the large-probe marker
  * carried by the frame, alive at its head under any tool truncation) must
  * reach both delegating owners' later provider requests. Owners are the
- * sessions whose wire carried a positive delegate_readonly_rounds call.
+ * sessions whose wire carried a positive estimated_readonly_rounds call.
  */
 export async function assertDelegationMaterialOnWire(scenario) {
   const requests = scenario.provider.requests ?? [];
@@ -1308,20 +1320,24 @@ const toolFunctionShape = (tool) => {
  * DELEGATE 4.1/11.2 + E5 + G10 on the real provider wire, in the configured
  * world this scenario drives:
  *
- *   1. tool enumeration — on at least one real provider request, EVERY visible
- *      tool (built-in + plugin + MCP) exposes the required
- *      `delegate_readonly_rounds` and keeps `self_note` out of `required`.
- *      The world declares a stdio MCP fixture by name (setup.mcpFixture =
- *      "semble"), so the wire surface must include an MCP tool; the MCP check
- *      below keys on the fixture's own tool description rather than a guessed
- *      host naming scheme. Dynamically discovered tools after
- *      mcp.tools.changed are NOT covered — see the boundary note below;
+ *   1. tool enumeration — on at least one real provider request, only
+ *      participating tools (the 12 tools in PARTICIPATING_TOOLS) expose the
+ *      required `estimated_readonly_rounds` and keep `self_note` out of
+ *      `required`; non-participating tools remain untouched with zero
+ *      protocol increment. The world declares a stdio MCP fixture by name
+ *      (setup.mcpFixture = "semble"), so the wire surface must include an MCP
+ *      tool; the MCP check below keys on the fixture's own tool description
+ *      rather than a guessed host naming scheme. Dynamically discovered tools
+ *      after mcp.tools.changed are NOT covered — see the boundary note below.
+ *      Long Stroke semantics are preserved without dilution: delegating owner
+ *      identification checks both participating membership and positive budget,
+ *      while per-tool assertions enforce strict protocol partitioning.
  *   2. wire history retention (E5) — a completed owner call appears in a LATER
  *      request's history with both original arguments (budget and note) intact,
  *      so the persisted record was never stripped or rewritten;
- *   3. collaboration text (G10) — every visible tool's description carries the
- *      stable companion narrative in the actual provider language (this world
- *      runs English); a dropped or reworded-away note turns this red.
+ *   3. collaboration text (G10) — every participating tool's description carries
+ *      the stable investigation outlook note in the actual provider language
+ *      (this world runs English); a dropped or reworded-away note turns this red.
  *
  * Red capability: each clause is a per-tool exact assertion against the bytes
  * the Host actually sent. Missing field, note promoted to required, note text
@@ -1337,7 +1353,9 @@ export async function assertDelegationProtocolSurface(scenario) {
   }
   assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions for the protocol surface');
 
-  // 1 + 3: the full visible tool surface of a delegating owner's real requests.
+  // 1 + 3: per-tool assertion across the visible tool surface of a delegating owner's real requests.
+  // Participating tools (5.2) expose estimated_readonly_rounds and conditional self_note;
+  // non-participating tools (5.3) remain unmodified with zero protocol increment.
   let examinedRequests = 0;
   let examinedTools = 0;
   for (const request of requests) {
@@ -1348,22 +1366,76 @@ export async function assertDelegationProtocolSurface(scenario) {
     for (const tool of tools) {
       examinedTools += 1;
       const { name, description, properties, required } = toolFunctionShape(tool);
-      assert.ok(
-        properties.delegate_readonly_rounds !== undefined,
-        `DELEGATE 4.1: tool ${name} on the owner wire must expose delegate_readonly_rounds in its schema`,
-      );
-      assert.ok(
-        required.includes('delegate_readonly_rounds'),
-        `DELEGATE 4.1: tool ${name} must list delegate_readonly_rounds as required`,
-      );
-      assert.ok(
-        !required.includes('self_note'),
-        `DELEGATE 4.1: tool ${name} must keep self_note optional (never required)`,
-      );
-      assert.ok(
-        description.includes('delegate_readonly_rounds') && /companion/i.test(description),
-        `DELEGATE G10: tool ${name} must carry the stable companion collaboration note`,
-      );
+      if (PARTICIPATING_TOOLS.has(name)) {
+        assert.ok(
+          properties.estimated_readonly_rounds !== undefined,
+          `DELEGATE 5.2: participating tool ${name} on the owner wire must expose estimated_readonly_rounds in its schema`,
+        );
+        assert.equal(
+          properties.estimated_readonly_rounds?.type,
+          'integer',
+          `DELEGATE 5.2: participating tool ${name} estimated_readonly_rounds type must be integer`,
+        );
+        assert.equal(
+          properties.estimated_readonly_rounds?.minimum,
+          0,
+          `DELEGATE 5.2: participating tool ${name} estimated_readonly_rounds minimum must be 0`,
+        );
+        assert.equal(
+          properties.estimated_readonly_rounds?.maximum,
+          2147483647,
+          `DELEGATE 5.2: participating tool ${name} estimated_readonly_rounds maximum must be 2147483647`,
+        );
+        assert.ok(
+          required.includes('estimated_readonly_rounds'),
+          `DELEGATE 5.2: participating tool ${name} must list estimated_readonly_rounds as required`,
+        );
+        assert.ok(
+          properties.self_note !== undefined,
+          `DELEGATE 5.2: participating tool ${name} must expose optional self_note in its schema`,
+        );
+        assert.equal(
+          properties.self_note?.type,
+          'string',
+          `DELEGATE 5.2: participating tool ${name} self_note type must be string`,
+        );
+        assert.equal(
+          properties.self_note?.minLength,
+          undefined,
+          `DELEGATE 5.2: participating tool ${name} self_note must not have minLength constraint`,
+        );
+        assert.ok(
+          !required.includes('self_note'),
+          `DELEGATE 5.2: participating tool ${name} must keep self_note optional (never required)`,
+        );
+        assert.ok(
+          description.includes('estimated_readonly_rounds'),
+          `DELEGATE 7.3: participating tool ${name} must carry the investigation outlook note`,
+        );
+      } else {
+        assert.equal(
+          properties.estimated_readonly_rounds,
+          undefined,
+          `DELEGATE 5.3: non-participating tool ${name} must have zero protocol increment (no estimated_readonly_rounds)`,
+        );
+        assert.equal(
+          properties.self_note,
+          undefined,
+          `DELEGATE 5.3: non-participating tool ${name} must not expose self_note`,
+        );
+        assert.ok(
+          !required.includes('estimated_readonly_rounds'),
+          `DELEGATE 5.3: non-participating tool ${name} must not require estimated_readonly_rounds`,
+        );
+        assert.ok(
+          !required.includes('self_note'),
+          `DELEGATE 5.3: non-participating tool ${name} must not require self_note`,
+        );
+        assert.ok(
+          !description.includes('estimated_readonly_rounds'),
+          `DELEGATE 5.3: non-participating tool ${name} must not carry investigation outlook prose`,
+        );
+      }
     }
   }
   assert.ok(examinedRequests > 0, 'DELEGATE 4.1: no delegating owner provider request with a tool surface was observed');
@@ -1397,11 +1469,9 @@ export async function assertDelegationProtocolSurface(scenario) {
       'either the fixture never connected or the Host does not advertise MCP tools to the provider',
   );
 
-  // 2: retention in later histories + the note-less call is legal. Every call
-  // the mock sees already lives inside a request history (a response never
-  // becomes a request), so finding the budget call with both arguments intact
-  // IS the later-history retention; the companion's own note-less calls are the
-  // executed-omission witness.
+  // 2: retention in later histories + legal pairing:
+  // - estimated_readonly_rounds > 0 requires non-empty self_note;
+  // - estimated_readonly_rounds === 0 requires self_note omitted.
   let retainedWithNote = false;
   let noteLessExecuted = false;
   for (const request of requests) {
@@ -1416,24 +1486,29 @@ export async function assertDelegationProtocolSurface(scenario) {
         } catch {
           continue;
         }
-        if (typeof parsed?.delegate_readonly_rounds !== 'number') continue;
-        if (typeof parsed?.self_note === 'string' && parsed.self_note.length > 0) retainedWithNote = true;
-        else noteLessExecuted = true;
+        if (typeof parsed?.estimated_readonly_rounds !== 'number') continue;
+        const rounds = parsed.estimated_readonly_rounds;
+        const hasNoteProp = Object.hasOwn(parsed, 'self_note');
+        if (rounds > 0 && typeof parsed?.self_note === 'string' && parsed.self_note.trim().length > 0) {
+          retainedWithNote = true;
+        } else if (rounds === 0 && !hasNoteProp) {
+          noteLessExecuted = true;
+        }
       }
     }
   }
   assert.ok(
     retainedWithNote,
-    'DELEGATE E5: a completed call with both delegate_readonly_rounds and self_note must survive into later request histories',
+    'DELEGATE E5: a completed call with both estimated_readonly_rounds > 0 and valid self_note must survive verbatim into later request histories',
   );
   assert.ok(
     noteLessExecuted,
-    'DELEGATE 4.1: a completed call omitting self_note must exist on the wire (the note is optional in practice)',
+    'DELEGATE 4.1: a completed call with estimated_readonly_rounds === 0 omitting self_note must exist on the wire (legal pairing in practice)',
   );
 
   console.log(
     `[delegation] protocol surface ok: ${examinedTools} tools across ${examinedRequests} owner requests; ` +
-      'budget required, note optional, companion note present, history retained',
+      'estimated_readonly_rounds required on participating tools, self_note conditional, outlook prose present, history retained',
   );
 }
 

@@ -37,7 +37,8 @@ module StrengthDelegate =
 
     /// WHAT-014: stable code-level contract version of the delegation field set.
     /// It never changes with environment, configuration or rollout state.
-    let private contractRevision = DelegationContractRevisions.create 1
+    let private contractRevision =
+        DelegationContractRevisions.create InvestigationEstimateContract.ProtocolRevision
 
     let private failClosed (strengthScope: PluginStrengthScope) (reason: string) : 'a =
         strengthScope.TripStrengthFuse reason
@@ -251,38 +252,51 @@ module StrengthDelegate =
         else
             None
 
-    let private tryExtractToolCall (part: obj) : (ToolCallId * string) option =
+    type private SourceToolCall =
+        { CallId: ToolCallId
+          ToolName: string
+          CanonicalArguments: string }
+
+    let private tryExtractToolCall (part: obj) : SourceToolCall option =
         let state = ProviderWireDecode.readField part "state"
 
         let callId =
             ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ]
             |> Option.map ToolCallId.create
 
+        let toolName =
+            ProviderWireDecode.firstString part [ "tool"; "name"; "toolName"; "tool_name"; "toolID" ]
+            |> Option.map (fun s -> s.Trim().ToLowerInvariant())
+
         let args = tryExtractToolCallArgs state part
 
-        match callId, args with
-        | Some cid, Some a -> Some(cid, a)
+        match callId, toolName, args with
+        | Some cid, Some name, Some a when not (String.IsNullOrWhiteSpace name) ->
+            Some
+                { CallId = cid
+                  ToolName = name
+                  CanonicalArguments = a }
         | _ -> None
 
     let private validateExtractedToolCalls
         (expectedCount: int)
-        (calls: (ToolCallId * string) list)
-        : (ToolCallId * string) list option =
-        let ids = calls |> List.map fst
+        (calls: SourceToolCall list)
+        : SourceToolCall list option =
+        let ids = calls |> List.map (fun call -> call.CallId)
 
         if calls.Length = expectedCount && Set.count (Set.ofList ids) = ids.Length then
             Some calls
         else
             None
 
-    let private tryExtractUniqueCalls (toolParts: obj list) : (ToolCallId * string) list option =
+    let private tryExtractUniqueCalls (toolParts: obj list) : SourceToolCall list option =
         if List.forall isToolPartCompleted toolParts then
             let calls = toolParts |> List.choose tryExtractToolCall
             validateExtractedToolCalls toolParts.Length calls
         else
             None
 
-    let private tryExtractRawAssistantBatch (assistant: obj) : (ToolCallId * string) list option =
+    let private tryExtractRawAssistantBatch (assistant: obj) : SourceToolCall list option =
         let parts = ProviderWireDecode.rawPartsOf assistant
 
         let toolParts =
@@ -300,15 +314,24 @@ module StrengthDelegate =
         else
             tryExtractUniqueCalls toolParts
 
-    let private extractWireToolCalls (parts: ProviderProjection.WirePart list) : (ToolCallId * string) list =
+    let private extractWireToolCalls (parts: ProviderProjection.WirePart list) : SourceToolCall list =
         parts
         |> List.choose (function
-            | ProviderProjection.WireToolCall(callId, _, arguments) -> Some(callId, arguments)
+            | ProviderProjection.WireToolCall(callId, name, arguments) ->
+                let toolName = name.Trim().ToLowerInvariant()
+
+                if String.IsNullOrWhiteSpace toolName then
+                    None
+                else
+                    Some
+                        { CallId = callId
+                          ToolName = toolName
+                          CanonicalArguments = arguments }
             | _ -> None)
 
     let private tryExtractWireAssistantCalls
         (message: ProviderProjection.WireMessage)
-        : (ToolCallId * string) list option =
+        : SourceToolCall list option =
         if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
             None
         else
@@ -317,20 +340,27 @@ module StrengthDelegate =
 
     let private matchBatchWithTailCalls
         (wireMessages: ProviderProjection.WireMessage list)
-        (tailCalls: (ToolCallId * string) list)
-        : (ToolCallId * string) list option =
+        (tailCalls: SourceToolCall list)
+        : SourceToolCall list option =
         match List.tryLast (StrengthBatchCollector.collectCompleteBatches wireMessages) with
         | Some batch ->
-            let batchArgs =
-                batch.Exchanges |> List.map (fun exchange -> exchange.CanonicalArguments)
+            let batchSignatures =
+                batch.Exchanges
+                |> List.map (fun exchange -> exchange.ToolName, exchange.CanonicalArguments)
 
-            let callArgs = tailCalls |> List.map snd
-            if batchArgs = callArgs then Some tailCalls else None
+            let callSignatures =
+                tailCalls
+                |> List.map (fun call -> call.ToolName, call.CanonicalArguments)
+
+            if batchSignatures = callSignatures then
+                Some tailCalls
+            else
+                None
         | None -> None
 
     let private tryExtractWireCompletedBatch
         (wire: ProviderProjection.ProviderWireProjection)
-        : (ToolCallId * string) list option =
+        : SourceToolCall list option =
         let assistantBatches = wire.Messages |> List.choose tryExtractWireAssistantCalls
 
         match assistantBatches with
@@ -344,7 +374,7 @@ module StrengthDelegate =
     let private resolveCompletedSourceBatch
         (rawMessages: obj list)
         (wire: ProviderProjection.ProviderWireProjection)
-        : (ToolCallId * string) list option =
+        : SourceToolCall list option =
         let fromRaw =
             rawMessages
             |> List.choose (fun raw ->
@@ -374,55 +404,66 @@ module StrengthDelegate =
         with _ ->
             Error(sprintf "delegation arguments of call %s are not valid JSON" (ToolCallId.value callId))
 
-    let private tryExtractRawRounds (callId: ToolCallId) (value: obj) : Result<obj, string> =
-        let raw = value?delegate_readonly_rounds
+    [<RequireQualifiedAccess>]
+    type private BatchAggregation =
+        | NoEstimateOpportunity
+        | EstimatedZero
+        | PositiveEstimate of budget: ReadonlyRoundBudget
+        | ArgumentError of reason: string
 
-        if isNull raw then
-            Error(sprintf "delegate_readonly_rounds is absent for call %s" (ToolCallId.value callId))
-        else
-            Ok raw
+    let private aggregateBatchEstimate (calls: SourceToolCall list) : BatchAggregation =
+        let estimateCalls =
+            calls
+            |> List.filter (fun call ->
+                match InvestigationEstimateContract.classifyTool call.ToolName with
+                | InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall -> true
+                | _ -> false)
 
-    let private tryUnboxRoundsNumber (callId: ToolCallId) (raw: obj) : Result<float, string> =
-        try
-            Ok(unbox<float> raw)
-        with _ ->
-            Error(sprintf "delegate_readonly_rounds of call %s is not a number" (ToolCallId.value callId))
+        match estimateCalls with
+        | [] -> BatchAggregation.NoEstimateOpportunity
+        | _ ->
+            let parsedResults =
+                estimateCalls
+                |> List.map (fun call ->
+                    match tryParseCallArguments call.CallId call.CanonicalArguments with
+                    | Error err -> Error err
+                    | Ok parsedObj ->
+                        match InvestigationEstimateContract.parseParticipatingArguments parsedObj with
+                        | Ok(rounds, _noteOpt) -> Ok rounds
+                        | Error err ->
+                            Error(
+                                sprintf
+                                    "delegation arguments of call %s rejected: %A"
+                                    (ToolCallId.value call.CallId)
+                                    err
+                            ))
 
-    let private validateRoundsNumber (callId: ToolCallId) (number: float) : Result<int, string> =
-        if
-            Double.IsNaN number
-            || Double.IsInfinity number
-            || number < 0.0
-            || number <> floor number
-        then
-            Error(sprintf "delegate_readonly_rounds of call %s is not a non-negative integer" (ToolCallId.value callId))
-        elif number > float Int32.MaxValue then
-            Error(sprintf "delegate_readonly_rounds of call %s is out of range" (ToolCallId.value callId))
-        else
-            Ok(int number)
+            let firstError =
+                parsedResults
+                |> List.tryPick (function
+                    | Error err -> Some err
+                    | Ok _ -> None)
 
-    /// DELEGATE-002: the batch budget is one integer per call, validated exactly
-    /// as written. Missing, null, string, boolean, fractional, negative or
-    /// out-of-range values are a call-argument error: the batch never starts and
-    /// the value is never silently normalized to zero.
-    let private budgetOfCall (callId: ToolCallId) (arguments: string) : Result<int, string> =
-        result {
-            let! value = tryParseCallArguments callId arguments
-            let! raw = tryExtractRawRounds callId value
-            let! number = tryUnboxRoundsNumber callId raw
-            return! validateRoundsNumber callId number
-        }
+            match firstError with
+            | Some reason -> BatchAggregation.ArgumentError reason
+            | None ->
+                let roundsList =
+                    parsedResults
+                    |> List.choose (function
+                        | Ok rounds -> Some rounds
+                        | Error _ -> None)
 
-    let private batchBudgetOfCalls (calls: (ToolCallId * string) list) : Result<ReadonlyRoundBudget, string> =
-        let rec loop remaining acc =
-            match remaining with
-            | [] -> Ok(List.rev acc)
-            | Ok value :: tail -> loop tail (value :: acc)
-            | Error reason :: _ -> Error reason
+                let maxRounds =
+                    roundsList
+                    |> List.maxBy InvestigationEstimateContract.EstimatedReadonlyRounds.value
 
-        match loop (calls |> List.map (fun (callId, arguments) -> budgetOfCall callId arguments)) [] with
-        | Error reason -> Error reason
-        | Ok values -> values |> List.max |> ReadonlyRoundBudget.tryCreate
+                let maxValue = InvestigationEstimateContract.EstimatedReadonlyRounds.value maxRounds
+
+                if maxValue = 0 then
+                    BatchAggregation.EstimatedZero
+                else
+                    let budget = InvestigationEstimateContract.EstimatedReadonlyRounds.toExecutionBudget maxRounds
+                    BatchAggregation.PositiveEstimate budget
 
     // ---- phase one: capture the authorization ----------------------------------
 
@@ -438,23 +479,27 @@ module StrengthDelegate =
         else
             Ok()
 
-    let private tryResolveSourceCalls (surface: OwnerSurface) : Result<(ToolCallId * string) list, string> =
+    let private tryResolveSourceCalls (surface: OwnerSurface) : Result<SourceToolCall list, string> =
         match resolveCompletedSourceBatch surface.RawMessages surface.Wire with
         | Some calls -> Ok calls
         | None -> Error "no-completed-source-batch"
 
     let private tryResolveCaptureCallsAndBudget
         (surface: OwnerSurface)
-        : Result<(ToolCallId * string) list * ReadonlyRoundBudget, string> =
+        : Result<SourceToolCall list * ReadonlyRoundBudget, string> =
         result {
             let! calls = tryResolveSourceCalls surface
-            let! budget = batchBudgetOfCalls calls
-            return calls, budget
+
+            match aggregateBatchEstimate calls with
+            | BatchAggregation.PositiveEstimate budget -> return calls, budget
+            | BatchAggregation.NoEstimateOpportunity -> return! Error "no-estimate-opportunity"
+            | BatchAggregation.EstimatedZero -> return! Error "estimated-zero"
+            | BatchAggregation.ArgumentError reason -> return! Error reason
         }
 
     let private buildDelegationRequest
         (surface: OwnerSurface)
-        (calls: (ToolCallId * string) list)
+        (calls: SourceToolCall list)
         (budget: ReadonlyRoundBudget)
         : DelegationRequest =
         let ownerLogicalRun =
@@ -464,7 +509,7 @@ module StrengthDelegate =
         let decisionId =
             Delegation.deriveDecisionId HostDigest.sha256Hex contractRevision ownerLogicalRun surface.Target
 
-        let sourceToolCallIds = calls |> List.map fst
+        let sourceToolCallIds = calls |> List.map (fun call -> call.CallId)
 
         { DecisionId = decisionId
           OwnerSessionId = surface.Owner
@@ -481,15 +526,43 @@ module StrengthDelegate =
         | Conflict
         | Fresh of DelegationRequest
 
+    let private tryFindExistingBySourceQuadruple
+        (durableProjection: StrengthProjection)
+        (owner: SessionId)
+        (logicalRun: OwnerLogicalRunIdentity)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (sourceProviderRun: ProviderRunIdentity)
+        : StrengthDelegationView option =
+        durableProjection.ByDecision
+        |> Map.toList
+        |> List.map snd
+        |> List.tryFind (fun view ->
+            view.Request.OwnerSessionId = owner
+            && view.Request.OwnerLogicalRun = logicalRun
+            && view.Request.SourcePhysicalUserMessageId = physicalUserMessageId
+            && view.Request.SourceProviderRun = sourceProviderRun)
+
     let private evaluateCaptureDisposition
         (durableProjection: StrengthProjection)
         (request: DelegationRequest)
         : CaptureDisposition =
-        match StrengthProjection.tryCandidate request.DecisionId durableProjection with
+        match
+            tryFindExistingBySourceQuadruple
+                durableProjection
+                request.OwnerSessionId
+                request.OwnerLogicalRun
+                request.SourcePhysicalUserMessageId
+                request.SourceProviderRun
+        with
         | Some existing when Delegation.sameRequest existing.Request request ->
             CaptureDisposition.Replay existing.Request
         | Some _ -> CaptureDisposition.Conflict
-        | None -> CaptureDisposition.Fresh request
+        | None ->
+            match StrengthProjection.tryCandidate request.DecisionId durableProjection with
+            | Some existing when Delegation.sameRequest existing.Request request ->
+                CaptureDisposition.Replay existing.Request
+            | Some _ -> CaptureDisposition.Conflict
+            | None -> CaptureDisposition.Fresh request
 
     let private tryAdmitDelegationRequest
         (surface: OwnerSurface)
@@ -910,6 +983,15 @@ module StrengthDelegate =
                 DelegationClosedReason.Superseded
         elif strengthScope.StrengthFuseReason |> Option.isSome then
             failClosed strengthScope "Strength fuse is tripped; delegation is closed for this process"
+        elif request.ContractRevision <> contractRevision then
+            // DELEGATE_REVISE §12.4: v1 Requested that was not Bound is explicitly closed
+            // upon contract revision upgrade; owner continues normally without launching old protocol child.
+            appendClosed
+                strengthScope
+                surface
+                request.DecisionId
+                DelegationClosedFrom.Requested
+                DelegationClosedReason.CannotContinue
         elif not predictorConfigured then
             appendClosed
                 strengthScope

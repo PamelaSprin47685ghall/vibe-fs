@@ -48,9 +48,9 @@ module PluginHooksSurface =
     /// JS-native view: { ok = true; rounds: number } or { ok: false; error: string }.
     val readonlyDelegationBudgetOf: value: obj -> obj
 
-    /// DELEGATE.md 3.2: self_note validation projected as a JS-native view:
+    /// DELEGATE_REVISE.md 7.1/7.2: self_note validation projected as a JS-native view:
     /// { ok = true; note: string | null } or { ok: false; error: string }.
-    val readonlyDelegationSelfNoteOf: value: obj -> obj
+    val readonlyDelegationSelfNoteOf: rounds: obj -> obj
 
     /// Production tool.execute.before hide for the two protocol fields.
     val hideReadonlyDelegationArgs: args: obj -> unit

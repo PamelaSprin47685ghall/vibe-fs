@@ -5,8 +5,8 @@
  *  - the production plugin is loaded by a real OpenCode host against a mock
  *    provider, with a Predictor model configured in the isolated
  *    `wanxiangshu.mjs` (the only enablement condition);
- *  - the provider wire is inspected and every visible tool must carry the
- *    required `delegate_readonly_rounds` integer budget and the optional
+ *  - the provider wire is inspected: participating tools must carry the
+ *    required `estimated_readonly_rounds` integer budget and the optional
  *    `self_note`, including Host built-ins whose definition carries an Effect
  *    argument schema and no JSON schema (`read`, `glob`, `grep`, …);
  *  - original tool constraints survive decoration (built-in `required` entries
@@ -48,7 +48,13 @@ export default function route(role, running, previous, purpose) {
 const READ_FILE = 'canary-sample.txt'
 const FILE_BODY = 'readonly delegation schema canary\n'
 const CALL_ID = 'call_read_delegated_0'
-const BUDGET = 0
+const BUDGET = 2
+const SELF_NOTE = 'checking the canary fixture'
+
+const PARTICIPATING_TOOLS = new Set([
+  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+])
 
 const isTitleRequest = (body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -98,12 +104,17 @@ const provider = http.createServer(async (request, response) => {
           description: tool?.function?.description ?? '',
           required: Array.isArray(parameters.required) ? [...parameters.required] : [],
           properties: Object.keys(parameters.properties ?? {}),
-          budget: parameters.properties?.delegate_readonly_rounds ?? null,
+          budget: parameters.properties?.estimated_readonly_rounds ?? null,
           note: parameters.properties?.self_note ?? null,
+          isParticipating: PARTICIPATING_TOOLS.has(name),
         })
       }
 
-      const args = JSON.stringify({ filePath: READ_FILE, delegate_readonly_rounds: BUDGET, self_note: 'checking the canary fixture' })
+      const args = JSON.stringify(
+        BUDGET > 0
+          ? { filePath: READ_FILE, estimated_readonly_rounds: BUDGET, self_note: SELF_NOTE }
+          : { filePath: READ_FILE, estimated_readonly_rounds: BUDGET },
+      )
       sendSSE(response, buildToolCallChunks(CALL_ID, 'read', args, 10))
       return
     }
@@ -145,6 +156,16 @@ const sessionIdOf = (payload) =>
 const summary = () => {
   const names = [...wireTools.keys()].sort()
 
+  const participating = {}
+  const nonParticipating = {}
+  for (const [name, view] of wireTools.entries()) {
+    if (PARTICIPATING_TOOLS.has(name)) {
+      participating[name] = view
+    } else {
+      nonParticipating[name] = view
+    }
+  }
+
   // The follow-up request to our own tool call is the one whose history carries
   // the result for CALL_ID; the engineer session is not the only session the
   // host talks to (companion sessions reuse the same provider).
@@ -171,6 +192,8 @@ const summary = () => {
     providerRequests: providerRequests.length,
     visibleTools: names,
     tools: Object.fromEntries(wireTools),
+    participatingTools: participating,
+    nonParticipatingTools: nonParticipating,
     read: wireTools.get('read') ?? null,
     followUpObserved: followUp !== undefined,
     historicalArguments,

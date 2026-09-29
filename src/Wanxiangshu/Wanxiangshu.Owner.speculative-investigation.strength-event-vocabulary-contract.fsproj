@@ -11,6 +11,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <Compile Include="Strength/Budget.fsi"/>
     <Compile Include="Strength/Budget.fs"/>
+    <Compile Include="Strength/InvestigationEstimateContract.fsi"/>
+    <Compile Include="Strength/InvestigationEstimateContract.fs"/>
     <Compile Include="Strength/Delegation.fsi"/>
     <Compile Include="Strength/Delegation.fs"/>
     <Compile Include="Strength/EventVocabulary.fsi"/>

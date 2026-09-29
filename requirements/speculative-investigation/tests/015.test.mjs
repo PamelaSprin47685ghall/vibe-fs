@@ -581,12 +581,11 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_registered_version_pa
 })
 
 test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_matches_the_runtime_contract', async () => {
-  // WHAT[015]: the tool's registered input version and contract revision are
-  // the runtime contract's current values, not free-standing CLI choices.
-  // Each side is read from its own source: the registry from the tool script,
-  // the revision from the one code-level constant, and the input version plus
-  // the invocation guidance from the classifier the runtime refuses with.
-  // Changing any single side without the others must turn this red.
+  // WHAT[015]: the tool's registered input version and contract revision govern
+  // offline historical migration, while the runtime contract revision is governed
+  // by the code-level ProtocolRevision constant.
+  // The guidance emitted by the runtime classifier directs operators to the
+  // script's registered offline migration targets.
   const script = readFileSync(resolve(repoRoot, 'scripts/migrate-delegation-history.mjs'), 'utf8')
   const registryInputVersions = script.match(/const INPUT_VERSIONS = \[([^\]]*)\]/)
   const registryRevisions = script.match(/const CONTRACT_REVISIONS = \[([^\]]*)\]/)
@@ -601,9 +600,9 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_ma
     .map((token) => Number(token.trim()))
 
   const delegateSource = readFileSync(resolve(repoRoot, 'src/Wanxiangshu/Strength/OpenCode/Delegate.fs'), 'utf8')
-  const revisionSites = [...delegateSource.matchAll(/DelegationContractRevisions\.create (\d+)/g)].map((match) => Number(match[1]))
-  assert.equal(revisionSites.length, 1, '运行时当前契约修订必须恰好有一处代码级常量')
-  assert.deepEqual(contractRevisions, revisionSites, '迁移登记的契约修订必须等于运行时当前修订；两侧必须由同一次改动同步更新')
+  const revisionSites = [...delegateSource.matchAll(/DelegationContractRevisions\.create\s+([\w.]+)/g)]
+  assert.equal(revisionSites.length, 1, '运行时当前契约修订必须恰好有一处代码级常量绑定')
+  assert.equal(revisionSites[0][1], 'InvestigationEstimateContract.ProtocolRevision', '运行时契约修订必须引用 InvestigationEstimateContract.ProtocolRevision')
 
   const classifierSource = readFileSync(resolve(repoRoot, 'src/Wanxiangshu/Strength/Migration/LegacyProtocolClassifier.fs'), 'utf8')
   const guidanceInputVersion = classifierSource.match(/--input-version ([\w.-]+)/)
@@ -611,7 +610,7 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_ma
   assert.notEqual(guidanceInputVersion, null, '运行时拒绝指引必须写明 --input-version 取值')
   assert.notEqual(guidanceRevision, null, '运行时拒绝指引必须写明 --contract-revision 取值')
   assert.deepEqual(inputVersions, [guidanceInputVersion[1]], '迁移登记的输入版本必须等于运行时指引写给操作者的取值')
-  assert.deepEqual(revisionSites, [Number(guidanceRevision[1])], '运行时当前修订必须等于运行时指引写给操作者的取值')
+  assert.deepEqual(contractRevisions, [Number(guidanceRevision[1])], '迁移登记的契约修订必须等于运行时指引写给操作者的取值')
 })
 }
 

@@ -88,8 +88,11 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => `H(${text})`
-// A binding boundary never invents a budget: a missing rounds value is an
-// empty budget there (Surface roundsResult), so the fixture declares one.
+// A binding boundary has no channel to argue parameters with its caller:
+// missing, illegal, or out-of-range declared values are parameter errors
+// there (Surface roundsResult). The fixture explicitly declares a valid
+// round count so the test exercises domain-layer budget rejection rather
+// than boundary-layer parameter rejection.
 const binding = (owner, replica, decision, rounds = 1, role = 'Engineer') =>
   Strength.runtimeBinding(owner, replica, decision, `run-${decision}`, role, rounds, `sem-${decision}`, [])
 
@@ -118,7 +121,7 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_unknown_r
   assert.equal(zeroBudget.error, 'EmptyBudget')
   const negativeBudget = Strength.runtimeRegister(runtime, binding('o3', 'r3', 'd3', -1))
   assert.equal(negativeBudget.ok, false)
-  assert.equal(negativeBudget.error, 'EmptyBudget')
+  assert.equal(negativeBudget.error, 'requested-rounds-out-of-range')
 })
 test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_roles_without_readonly_capabilities', () => {
   const runtime = Strength.runtimeCreate()
@@ -127,5 +130,61 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_roles_wit
     assert.equal(result.ok, false)
     assert.equal(result.error, 'RoleIneligible')
   }
+})
+
+test('WHAT[speculative-investigation-004] STRENGTH_004_replica_or_internal_leaf_with_positive_rounds_is_refused_at_admission_without_second_delegation', () => {
+  const H = (text) => `H(${text})`
+  const baseOpportunity = {
+    isRootWork: true,
+    requestKind: 'work-main',
+    canonicalRole: 'engineer',
+    ownerSessionId: 'owner-session',
+    ownerLogicalRun: ['logical-1', 'authority-root-1'],
+    sourcePhysicalUserMessageId: 'user-1',
+    sourceProviderRun: 'run-1',
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 3,
+    contractRevision: 2,
+    hasPrefixProbe: false,
+    isReplicaOrInternalLeaf: false,
+    isInteractionRepair: false,
+    isExplicitRecoveryBranch: false,
+    ownerCancelled: false,
+    targetProviderRunBound: true,
+    eventStoreHealthy: true,
+    hostBoundaryHealthy: true,
+    processFuseHealthy: true,
+    ownerLogicalRunSuperseded: false,
+    pendingRequested: true,
+    predictorConfigured: true,
+  }
+
+  // Baseline: ordinary owner work with positive rounds is eligible and admitted
+  const ownerEligibility = Strength.policyEligibility(baseOpportunity)
+  assert.equal(ownerEligibility.kind, 'Eligible')
+  const ownerAdmission = Strength.policyDecide(H, baseOpportunity)
+  assert.equal(ownerAdmission.kind, 'Admit')
+  assert.equal(ownerAdmission.request.requestedRounds, 3)
+
+  // Anti-recursion (H02): Replica or InternalLeaf identity submitting positive rounds
+  const replicaOpportunity = {
+    ...baseOpportunity,
+    isReplicaOrInternalLeaf: true,
+  }
+
+  // 1. Eligibility gate check: Ineligible with exact reason 'replica-or-internal-leaf'
+  const eligibility = Strength.policyEligibility(replicaOpportunity)
+  assert.equal(eligibility.kind, 'Ineligible')
+  assert.equal(eligibility.reason, 'replica-or-internal-leaf')
+
+  // 2. Admission decision check: Skip with exact reason, no second delegation request created
+  const replicaDecision = Strength.policyDecide(H, replicaOpportunity)
+  assert.equal(replicaDecision.kind, 'Skip')
+  assert.equal(replicaDecision.reason, 'replica-or-internal-leaf')
+  assert.equal('request' in replicaDecision, false, 'Replica must not receive an admitted DelegationRequest')
+
+  // 3. Confirm projection is unaffected: without an admitted request, no DelegationRequested can be created or applied
+  const emptyProjection = Strength.projectionEmpty()
+  assert.equal(Strength.projectionCandidate('any-decision', emptyProjection), null)
 })
 }

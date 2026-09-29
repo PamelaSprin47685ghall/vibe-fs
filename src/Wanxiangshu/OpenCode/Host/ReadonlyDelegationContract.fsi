@@ -10,16 +10,19 @@ open Wanxiangshu.Strength
 module ReadonlyDelegationContract =
 
     /// Idempotently decorates a tool object schema for the read-only
-    /// delegation protocol: adds delegate_readonly_rounds (required) and
-    /// self_note (optional, never required) to properties, keeps the original
-    /// required entries, additionalProperties and other compatibility
-    /// constraints, and keeps the original schema composition structure.
+    /// delegation protocol: adds estimated_readonly_rounds (required) and
+    /// self_note (optional, never required) to properties of participating tools
+    /// (classifyTool = EstimateAfterCall), keeps the original required entries,
+    /// additionalProperties and other compatibility constraints, and keeps the
+    /// original schema composition structure.
+    /// Non-participating and unreviewed tools receive zero increment and
+    /// are returned immediately unmodified.
     /// Hosts exposing both parameters and jsonSchema get two consistent
     /// views, including the note's omissibility. Same-name properties are
     /// accepted only when identical to this protocol; a conflicting
     /// property, a non-array required, or a root schema that cannot be
     /// legally extended fails loudly instead of publishing a partial
-    /// protocol. The stable bilingual collaboration prose (DELEGATE.md 3.3)
+    /// protocol. The stable bilingual outlook prose (DELEGATE_REVISE.md 7.3)
     /// is appended once to the tool description, selected by the existing
     /// ProviderLanguageBinding preference; it never carries remaining
     /// rounds, random identifiers, prices or timestamps.

@@ -8,10 +8,17 @@
 /src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
 /src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs
+/src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fsi
+/src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+/src/Wanxiangshu/OpenCode/Host/ProtocolArgumentVault.fs
+/src/Wanxiangshu/OpenCode/Host/ProtocolArgumentVault.fsi
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginStrengthPorts.fs
+/src/Wanxiangshu/Strength/InvestigationEstimateContract.fs
+/src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi
 /src/Wanxiangshu/Strength/Delegation.fs
 /src/Wanxiangshu/Strength/Events.fs
 /src/Wanxiangshu/Strength/EventVocabulary.fs
@@ -33,3 +40,6 @@
 /src/Wanxiangshu/Strength/Surface.fs
 /src/Wanxiangshu/Strength/TurnEvidence.fs
 /scripts/migrate-delegation-history.mjs
+/requirements/host-boundary/tests/032.test.mjs
+/requirements/verification-system/tests/e2e/scenarios/long-stroke.toml
+/requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs

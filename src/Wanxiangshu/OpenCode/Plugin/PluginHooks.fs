@@ -87,6 +87,9 @@ open PluginHostInterop
 
 module PluginHooks =
 
+    [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
+    let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
+
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -315,22 +318,26 @@ module PluginHooks =
                 if ManagerReviewTools.isReviewTool toolName then
                     assertReviewPermitted toolName (toolField toolInput "sessionID")
 
-            // host-boundary-032 / DELEGATE.md 4.3: snapshot the protocol
+            // host-boundary-032 / DELEGATE_REVISE.md: snapshot the protocol
             // fields the model actually produced, before either contract family
             // hides them. The Host persists the stripped arguments, so the
             // provider transform restores the fields into the request from this
             // vault. contract only for review tools (the only place review hide
-            // runs); the delegation fields are recorded wherever they appear,
-            // matching the unconditional readonly hide.
+            // runs); delegation fields only for participating tools (classifyTool = EstimateAfterCall).
             //
             // The call id is read from the hook input itself: WHAT[009]'s
             // both-halves pairing lives in decodeContext, and this hook input
             // carries no messageID, so decodeContext would always answer None.
             let sanitizeSnapshot (toolName: string) (snapshot: ProtocolArgumentVault.Snapshot) =
-                if ManagerReviewTools.isReviewTool toolName then
-                    snapshot
-                else
-                    { snapshot with Contract = None }
+                let isReview = ManagerReviewTools.isReviewTool toolName
+                let isParticipating =
+                    InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+                { ProtocolArgumentVault.Snapshot.Contract =
+                    (if isReview then snapshot.Contract else None)
+                  ProtocolArgumentVault.Snapshot.ReadonlyRounds =
+                    (if isParticipating then snapshot.ReadonlyRounds else None)
+                  ProtocolArgumentVault.Snapshot.SelfNote =
+                    (if isParticipating then snapshot.SelfNote else None) }
 
             let commitRecordedSnapshot
                 (vault: ProtocolArgumentVault.Vault)
@@ -398,6 +405,21 @@ module PluginHooks =
 
                     checkManagerReviewPermissions toolName toolInput
 
+                    let isParticipatingTool =
+                        InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+
+                    if isParticipatingTool && not (isNull toolOutput) && not (isNull toolOutput?args) then
+                        let args = toolOutput?args
+                        let hasProtocolFields =
+                            hasOwnProperty args InvestigationEstimateContract.EstimatedReadonlyRoundsField
+                            || hasOwnProperty args "self_note"
+                            || hasOwnProperty args "delegate_readonly_rounds"
+
+                        if hasProtocolFields then
+                            match InvestigationEstimateContract.parseParticipatingArguments args with
+                            | Ok _ -> ()
+                            | Error err -> invalidOp (sprintf "Invalid investigation estimate arguments: %A" err)
+
                     recordProtocolArgumentVault toolInput toolOutput
 
                     let context = ToolHostCodec.decodeContext toolInput
@@ -417,26 +439,26 @@ module PluginHooks =
                     then
                         ManagerReviewContract.hide toolOutput?args
 
-                    // host-boundary-032 / DELEGATE.md 4.3: the same cleanup
-                    // mechanism serves both contract families. The protocol
-                    // fields are hidden from the business view whenever the
-                    // provider produced them, independently of protocol
-                    // decoration; absent fields are the same optimistic
-                    // no-op as a missing review contract. ReadonlyDelegationContract
-                    // keeps its own private Symbol, so the review contract's
-                    // saved descriptor is never touched.
-                    if not (isNull toolOutput) && not (isNull toolOutput?args) then
+                    // host-boundary-032 / DELEGATE_REVISE.md: narrow hide to participating tools only.
+                    // Non-participating and unreviewed tools are untouched, leaving their own business
+                    // arguments intact.
+                    if isParticipatingTool && not (isNull toolOutput) && not (isNull toolOutput?args) then
                         ReadonlyDelegationContract.hide toolOutput?args
                 }
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
+                    let toolName = toolField toolInput "tool"
+                    let isParticipatingTool =
+                        InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+
                     if not (isNull toolInput) && not (isNull toolInput?args) then
                         // host-boundary-032: same-source restore for both
                         // contract families on exception, repeat and concurrent
                         // paths. Restore is idempotent and a no-op when the
                         // after hook receives a different object than before.
-                        ReadonlyDelegationContract.restore toolInput?args
+                        if isParticipatingTool then
+                            ReadonlyDelegationContract.restore toolInput?args
                         ManagerReviewContract.restore toolInput?args
 
                     do!

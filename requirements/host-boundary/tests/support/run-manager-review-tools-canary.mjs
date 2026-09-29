@@ -202,7 +202,7 @@ const provider = await startHttpServer(async (request, response) => {
         wireInspection.providerVisibleToolNames = body.tools.map((tool) => tool?.function?.name ?? tool?.name).sort();
         wireInspection.providerVisibleProtocolAbsence = body.tools.every((tool) => {
           const properties = tool?.function?.parameters?.properties ?? tool?.parameters?.properties ?? {};
-          return !Object.hasOwn(properties, 'delegate_readonly_rounds') && !Object.hasOwn(properties, 'self_note');
+          return !Object.hasOwn(properties, 'estimated_readonly_rounds') && !Object.hasOwn(properties, 'self_note');
         });
         const readManagerTool = body.tools.find(
           (t) => (t?.function?.name ?? t?.name) === 'js-manager',

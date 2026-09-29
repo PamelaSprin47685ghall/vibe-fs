@@ -121,9 +121,9 @@ node scripts/migrate-delegation-history.mjs \
   --contract-revision 1 --report migration-report.json --execute
 ```
 
-`--input-version` 与 `--contract-revision` 按迁移工具内的登记表校验：输入版本只有 `pre-delegation`（分类器只认定这一种旧协议），契约修订与运行时一致为 `1`（定义在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs`）。
+`--input-version` 与 `--contract-revision` 按迁移工具内的登记表校验：输入版本只有 `pre-delegation`（分类器只认定这一种旧协议），历史导入工具登记的契约修订版本保持为 `1`（这是历史事实），而当前运行时采用的委托契约修订版本为 `2`（定义在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs`）。
 
-迁移只追加 `DelegationHistoryImported` 导入事实，不改写 append-only 历史、Git 对象或 refs，也不触碰用户配置；脚本拒绝在活库上运行。已配置并启用后，主模型的可见工具会多出必填参数 `delegate_readonly_rounds` 与可选参数 `self_note`；角色语义与 Prompt 见 [requirements/README.md](requirements/README.md)。
+迁移只追加 `DelegationHistoryImported` 导入事实，不改写 append-only 历史、Git 对象或 refs，也不触碰用户配置；脚本拒绝在活库上运行。已配置并启用后，主模型的可见工具会多出必填参数 `estimated_readonly_rounds` 与可选参数 `self_note`；角色语义与 Prompt 见 [requirements/README.md](requirements/README.md)。
 
 ### 快速开始
 

@@ -87,7 +87,7 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
 
     // Prior to human input, manager tools are denied (retirement frozen / Accepted certificate)
     const forkDuringRetirement = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'alice', charge: 'check', delegate_readonly_rounds: 0 },
+      { calling: 'engineer', name: 'alice', charge: 'check' },
       context('call-fork-stale', 'msg-stale'),
     )
     assert.match(forkDuringRetirement, /(当前不可用|is not available right now)/)
@@ -113,7 +113,7 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
 
     // Step 4: After human input, fork must NOT be denied
     const forkSuccessor = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'alice', charge: 'implement', delegate_readonly_rounds: 0 },
+      { calling: 'engineer', name: 'alice', charge: 'implement' },
       context('call-fork-successor', 'msg-successor'),
     )
     assert.doesNotMatch(forkSuccessor, /(当前不可用|is not available right now)/, 'fork must be unblocked after human input advances the continuous session')

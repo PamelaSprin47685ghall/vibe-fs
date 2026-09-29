@@ -496,22 +496,27 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
 
     const props = definition.parameters.properties
-    // 预算：integer、范围 [0, 2147483647]、原文 description，且必填
-    assert.equal(props.delegate_readonly_rounds.type, 'integer')
-    assert.equal(props.delegate_readonly_rounds.minimum, 0)
-    assert.equal(props.delegate_readonly_rounds.maximum, 2147483647)
+    // 估计字段：integer、范围 [0, 2147483647]、7.1 事实性估计说明，且必填
+    assert.equal(props.estimated_readonly_rounds.type, 'integer')
+    assert.equal(props.estimated_readonly_rounds.minimum, 0)
+    assert.equal(props.estimated_readonly_rounds.maximum, 2147483647)
     assert.ok(
-      typeof props.delegate_readonly_rounds.description === 'string' &&
-        props.delegate_readonly_rounds.description.length > 0,
-      'budget must carry the DELEGATE.md 3.2 description',
+      typeof props.estimated_readonly_rounds.description === 'string' &&
+        props.estimated_readonly_rounds.description.includes('consecutive read-only investigation rounds'),
+      'budget must carry the DELEGATE_REVISE.md 7.1 description',
     )
     assert.deepEqual(
       definition.parameters.required,
-      ['path', 'delegate_readonly_rounds'],
+      ['path', 'estimated_readonly_rounds'],
       'original required entry must be preserved and only the budget appended',
     )
-    // 短记：string 可省略，绝不进 required，不设 minLength
+    // 短记：string、7.1 条件说明、绝不进 required、不设 minLength
     assert.equal(props.self_note.type, 'string')
+    assert.ok(
+      typeof props.self_note.description === 'string' &&
+        props.self_note.description.includes('estimated_readonly_rounds is greater than 0'),
+      'self_note must carry the DELEGATE_REVISE.md 7.1 description',
+    )
     assert.equal(
       definition.parameters.required.includes('self_note'),
       false,
@@ -521,14 +526,41 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     // 原有属性与兼容约束保持
     assert.deepEqual(definition.parameters.properties.path, { type: 'string' })
     assert.equal(definition.parameters.additionalProperties, false)
-    // 协作说明幂等追加在原描述之后，不替换原描述
+    // 调查展望短说明幂等追加在原描述之后，不替换原描述，删去旧同伴/信任措辞
     assert.ok(
       definition.description.startsWith('Original description of the tool'),
       'original tool description must stay as the prefix',
     )
     assert.ok(
-      definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'),
-      'English collaboration prose must be appended once',
+      definition.description.includes('Investigation outlook: estimated_readonly_rounds estimates'),
+      'English investigation outlook prose must be appended once',
+    )
+    assert.equal(
+      definition.description.includes('Fill in delegate_readonly_rounds on every tool call'),
+      false,
+      'legacy delegation prose must not appear',
+    )
+    assert.equal(
+      /companion/i.test(definition.description),
+      false,
+      'companion narrative must not appear in new tool description',
+    )
+
+    // 非参与工具（如 join）零增量断言：无新字段、无短说明、required 不变
+    const joinDefinition = {
+      description: 'Original join description',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    }
+    const joinSnapshot = structuredClone(joinDefinition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('join', joinDefinition)
+    assert.deepEqual(
+      joinDefinition,
+      joinSnapshot,
+      'non-participating tool join must remain completely unmodified',
     )
   } finally {
     if (previousLanguage === undefined) {
@@ -572,24 +604,41 @@ test('WHAT[host-boundary-032] C18_budget_rejects_illegal_values_and_never_coerce
   }
 })
 
-test('WHAT[host-boundary-032] C19_self_note_is_optional_string_only_and_empty_is_legal', () => {
-  const missing = PluginHooksSurface.readonlyDelegationSelfNoteOf(undefined)
-  assert.equal(missing.ok, true, 'absent self_note is legal')
-  assert.equal(missing.note, null)
+test('WHAT[host-boundary-032] C19_self_note_requires_pairing_with_positive_budget_and_omitted_for_zero', () => {
+  // 1. 估计为 0 时：属性必须不存在（undefined/null/空串/空白/数字/对象/数组均拒绝）
+  // 属性不存在时合法
+  const zeroOmitted = PluginHooksSurface.readonlyDelegationSelfNoteOf(0)
+  assert.equal(zeroOmitted.ok, true, 'absent self_note is required when estimated_readonly_rounds is 0')
+  assert.equal(zeroOmitted.note, null)
 
-  const empty = PluginHooksSurface.readonlyDelegationSelfNoteOf('')
-  assert.equal(empty.ok, true, 'empty string is legal')
-  assert.equal(empty.note, '')
-
-  const noteText = '我怀疑入口与调用方对空值的约定不同，接下来先核对调用点'
-  const note = PluginHooksSurface.readonlyDelegationSelfNoteOf(noteText)
-  assert.equal(note.ok, true)
-  assert.equal(note.note, noteText, 'note content must round-trip verbatim')
-
-  for (const value of [0, 1, true, null, {}, [], ['note']]) {
-    const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(value)
-    assert.equal(result.ok, false, `self_note ${JSON.stringify(value)} must be rejected without coercion`)
+  // 估计为 0 但提供了任何形式的 self_note（包括 undefined、null、空串、空白、字符串、其他类型）均拒绝
+  for (const noteValue of [undefined, null, '', '   ', 'some note', 0, 1, true, {}, []]) {
+    const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(0, noteValue)
+    assert.equal(
+      result.ok,
+      false,
+      `self_note must be rejected when rounds is 0 even if value is ${JSON.stringify(noteValue)}`,
+    )
   }
+
+  // 2. 正数估计时：必须是非空白字符串（缺失/空串/空白/非字符串拒绝）
+  const missingForPositive = PluginHooksSurface.readonlyDelegationSelfNoteOf(2)
+  assert.equal(missingForPositive.ok, false, 'absent self_note must be rejected when rounds > 0')
+
+  for (const invalidNote of ['', '   ', '\t\n', null, undefined, 0, 123, true, {}, []]) {
+    const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(2, invalidNote)
+    assert.equal(
+      result.ok,
+      false,
+      `invalid note ${JSON.stringify(invalidNote)} must be rejected when rounds > 0`,
+    )
+  }
+
+  // 3. 合法正数 + 非空白短记：round-trip 原样保留（包括首尾空格、换行等原始证据）
+  const noteText = '我怀疑入口与调用方对空值的约定不同，接下来先核对调用点'
+  const validPositive = PluginHooksSurface.readonlyDelegationSelfNoteOf(2, noteText)
+  assert.equal(validPositive.ok, true)
+  assert.equal(validPositive.note, noteText, 'note content must round-trip verbatim')
 })
 
 test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', () => {
@@ -617,7 +666,7 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
 
     assert.deepEqual(definition, firstSnapshot, 'coexisting decorations must be idempotent across repeats')
     assert.equal(
-      definition.parameters.required.filter((x) => x === 'delegate_readonly_rounds').length,
+      definition.parameters.required.filter((x) => x === 'estimated_readonly_rounds').length,
       1,
       'budget must appear exactly once in required',
     )
@@ -632,7 +681,7 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
       'review contract must appear exactly once and stay intact beside the delegation protocol',
     )
     assert.equal(
-      definition.description.split('Fill in delegate_readonly_rounds on every tool call.').length - 1,
+      definition.description.split('Investigation outlook: estimated_readonly_rounds estimates').length - 1,
       1,
       'collaboration prose must be appended exactly once',
     )
@@ -655,11 +704,11 @@ test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_a
     }
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
     assert.ok(
-      definition.description.includes('每个工具调用都要填写 delegate_readonly_rounds'),
+      definition.description.includes('调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数'),
       'Chinese collaboration prose required under zh-CN preference',
     )
     assert.equal(
-      definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'),
+      definition.description.includes('Investigation outlook: estimated_readonly_rounds estimates'),
       false,
       'English prose must not arrive under a Chinese preference',
     )
@@ -670,9 +719,9 @@ test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_a
     // 语言切换后只剩当前语言一段，不叠加
     process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
-    assert.ok(definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'))
+    assert.ok(definition.description.includes('Investigation outlook: estimated_readonly_rounds estimates'))
     assert.equal(
-      definition.description.includes('每个工具调用都要填写 delegate_readonly_rounds'),
+      definition.description.includes('调查展望：estimated_readonly_rounds'),
       false,
       'prior-language prose must be replaced, not stacked',
     )
@@ -696,14 +745,14 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
       type: 'object',
       properties: {
         path: { type: 'string' },
-        delegate_readonly_rounds: { type: 'integer', minimum: 0, maximum: 100, description: 'tool-local budget' },
+        estimated_readonly_rounds: { type: 'integer', minimum: 0, maximum: 100, description: 'tool-local budget' },
       },
       required: ['path'],
     },
   }
   assert.throws(
     () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', budgetConflict),
-    /conflicting delegate_readonly_rounds/,
+    /conflicting estimated_readonly_rounds/,
     'a same-name property that differs from the protocol must fail, not be overwritten',
   )
 
@@ -755,14 +804,14 @@ test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_
     const beforeOutput = {
       args: {
         filePath: 'src/A.fs',
-        delegate_readonly_rounds: 5,
+        estimated_readonly_rounds: 5,
         self_note: note,
       },
     }
 
     await hooks['tool.execute.before']({ tool, sessionID, callID }, beforeOutput)
     assert.equal(
-      'delegate_readonly_rounds' in beforeOutput.args,
+      'estimated_readonly_rounds' in beforeOutput.args,
       false,
       'business view must not see the budget field',
     )
@@ -775,7 +824,7 @@ test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_
     )
 
     assert.equal(
-      beforeOutput.args.delegate_readonly_rounds,
+      beforeOutput.args.estimated_readonly_rounds,
       5,
       'original provider arguments must preserve the budget as evidence',
     )
@@ -784,6 +833,18 @@ test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_
       note,
       'original provider arguments must preserve the note as evidence',
     )
+
+    // 非参与工具（如 join）即使 arguments 携带同名字段也不被 hide/restore 触碰
+    const nonParticipatingOutput = {
+      args: {
+        id: 'job-1',
+        estimated_readonly_rounds: 5,
+        self_note: note,
+      },
+    }
+    await hooks['tool.execute.before']({ tool: 'join', sessionID, callID: 'call-c23-join' }, nonParticipatingOutput)
+    assert.equal('estimated_readonly_rounds' in nonParticipatingOutput.args, true, 'non-participating tool arguments must not be stripped')
+    assert.equal('self_note' in nonParticipatingOutput.args, true, 'non-participating tool note must not be stripped')
   })
 })
 
@@ -797,7 +858,7 @@ test('WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_
       args: {
         path: 'src/App.fs',
         contract: 'js-manager-contract-v1',
-        delegate_readonly_rounds: 2,
+        estimated_readonly_rounds: 2,
         self_note: 'note-c24',
       },
     }
@@ -815,7 +876,7 @@ test('WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_
     )
 
     assert.equal(beforeOutput.args.contract, 'js-manager-contract-v1', 'review contract must be restored')
-    assert.equal(beforeOutput.args.delegate_readonly_rounds, 2, 'budget must be restored beside the contract')
+    assert.equal(beforeOutput.args.estimated_readonly_rounds, 2, 'budget must be restored beside the contract')
     assert.equal(beforeOutput.args.self_note, 'note-c24', 'note must be restored beside the contract')
   })
 })
@@ -824,7 +885,7 @@ test('WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_witho
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-c25'
     await openIncumbency(runtime, sessionID)
-    const frozenArgs = Object.freeze({ path: 'src/Secret.fs', delegate_readonly_rounds: 3, self_note: 'secret' })
+    const frozenArgs = Object.freeze({ path: 'src/Secret.fs', estimated_readonly_rounds: 3, self_note: 'secret' })
 
     await assert.rejects(
       async () => {
@@ -836,8 +897,17 @@ test('WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_witho
       TypeError,
       'frozen args with protocol fields must fail atomically with TypeError',
     )
-    assert.equal(frozenArgs.delegate_readonly_rounds, 3, 'budget evidence must remain unchanged on failure')
+    assert.equal(frozenArgs.estimated_readonly_rounds, 3, 'budget evidence must remain unchanged on failure')
     assert.equal(frozenArgs.self_note, 'secret', 'note evidence must remain unchanged on failure')
+
+    // 非参与工具（如 join）的冻结入参即使包含同名字段也不被 hide 触碰，因此不会抛出 TypeError
+    const frozenNonParticipating = Object.freeze({ id: 'part-1', estimated_readonly_rounds: 3, self_note: 'secret' })
+    const joinOutput = { args: frozenNonParticipating }
+    await hooks['tool.execute.before'](
+      { tool: 'join', sessionID, callID: 'call-c25-join' },
+      joinOutput,
+    )
+    assert.equal(joinOutput.args.estimated_readonly_rounds, 3)
   })
 })
 
@@ -846,12 +916,12 @@ test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstal
     const call1 = {
       sessionID: 'ses-c26-1',
       callID: 'call-c26-1',
-      output: { args: { path: 'file-alpha.txt', delegate_readonly_rounds: 1, self_note: 'note-alpha' } },
+      output: { args: { path: 'file-alpha.txt', estimated_readonly_rounds: 1, self_note: 'note-alpha' } },
     }
     const call2 = {
       sessionID: 'ses-c26-2',
       callID: 'call-c26-2',
-      output: { args: { path: 'file-beta.txt', delegate_readonly_rounds: 9, self_note: 'note-beta' } },
+      output: { args: { path: 'file-beta.txt', estimated_readonly_rounds: 9, self_note: 'note-beta' } },
     }
 
     await Promise.all([
@@ -864,9 +934,9 @@ test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstal
       hooks['tool.execute.before']({ tool: 'read', sessionID: call2.sessionID, callID: call2.callID }, call2.output),
     ])
 
-    assert.equal('delegate_readonly_rounds' in call1.output.args, false)
+    assert.equal('estimated_readonly_rounds' in call1.output.args, false)
     assert.equal('self_note' in call1.output.args, false)
-    assert.equal('delegate_readonly_rounds' in call2.output.args, false)
+    assert.equal('estimated_readonly_rounds' in call2.output.args, false)
     assert.equal('self_note' in call2.output.args, false)
 
     // 乱序恢复也不串值
@@ -881,9 +951,9 @@ test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstal
       ),
     ])
 
-    assert.equal(call1.output.args.delegate_readonly_rounds, 1, 'call1 must restore its own budget')
+    assert.equal(call1.output.args.estimated_readonly_rounds, 1, 'call1 must restore its own budget')
     assert.equal(call1.output.args.self_note, 'note-alpha', 'call1 must restore its own note')
-    assert.equal(call2.output.args.delegate_readonly_rounds, 9, 'call2 must restore its own budget')
+    assert.equal(call2.output.args.estimated_readonly_rounds, 9, 'call2 must restore its own budget')
     assert.equal(call2.output.args.self_note, 'note-beta', 'call2 must restore its own note')
   })
 })
@@ -892,7 +962,7 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-c27'
     await openIncumbency(runtime, sessionID)
-    const directArgs = { path: 'src/App.fs', delegate_readonly_rounds: 0, self_note: 'stays out of the business view' }
+    const directArgs = { path: 'src/App.fs', estimated_readonly_rounds: 0 }
 
     await hooks['tool.execute.before'](
       { tool: 'js-manager', sessionID, callID: 'call-c27' },
@@ -905,7 +975,7 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
     // 业务执行视图在 before 暂存之后不再持有协议字段；在 after 恢复之前断言，
     // 证明 execute 收到的确实是剥净后的视图（C24 已在 before 后证明同一机制）。
     assert.equal(
-      'delegate_readonly_rounds' in directArgs,
+      'estimated_readonly_rounds' in directArgs,
       false,
       'business execution view must not carry the budget field',
     )
@@ -923,14 +993,14 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
     // after 的同源恢复之后，provider 原始 arguments 证据重新出现；这与
     // C23/C24/C26 证明的恢复契约同构——字段不丢，只是不进业务视图。
     assert.equal(
-      directArgs.delegate_readonly_rounds,
+      directArgs.estimated_readonly_rounds,
       0,
       'budget evidence must be restored to the original arguments',
     )
     assert.equal(
-      directArgs.self_note,
-      'stays out of the business view',
-      'note evidence must be restored to the original arguments',
+      'self_note' in directArgs,
+      false,
+      'self_note must remain absent when rounds is 0',
     )
   })
 })
@@ -971,7 +1041,7 @@ test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions
       }
       await hooks['tool.definition']({ toolID }, output)
       assert.equal(
-        output.parameters.properties?.delegate_readonly_rounds,
+        output.parameters.properties?.estimated_readonly_rounds,
         undefined,
         `${toolID} must not gain the budget field while Predictor is unconfigured`,
       )
@@ -981,7 +1051,7 @@ test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions
         `${toolID} must not gain the note field while Predictor is unconfigured`,
       )
       assert.equal(
-        output.parameters.required.includes('delegate_readonly_rounds'),
+        output.parameters.required.includes('estimated_readonly_rounds'),
         false,
         `${toolID} must not require the budget while Predictor is unconfigured`,
       )
@@ -1012,7 +1082,7 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
         }
         await hooks['tool.definition']({ toolID }, output)
         assert.equal(
-          output.parameters.properties.delegate_readonly_rounds.type,
+          output.parameters.properties.estimated_readonly_rounds.type,
           'integer',
           `${toolID} must gain the required budget when Predictor is configured`,
         )
@@ -1022,7 +1092,7 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
           `${toolID} must gain the optional note when Predictor is configured`,
         )
         assert.equal(
-          output.parameters.required.includes('delegate_readonly_rounds'),
+          output.parameters.required.includes('estimated_readonly_rounds'),
           true,
           `${toolID} must require the budget when Predictor is configured`,
         )
@@ -1058,6 +1128,28 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
           )
         }
       }
+
+      // 非参与工具（如 join）在配置 Predictor 时保持零增量
+      const joinOutput = {
+        description: 'Original join description',
+        parameters: { type: 'object', properties: {}, required: [] },
+      }
+      await hooks['tool.definition']({ toolID: 'join' }, joinOutput)
+      assert.equal(
+        joinOutput.parameters.properties?.estimated_readonly_rounds,
+        undefined,
+        'join must not gain estimated_readonly_rounds even when Predictor is configured',
+      )
+      assert.equal(
+        joinOutput.parameters.properties?.self_note,
+        undefined,
+        'join must not gain self_note even when Predictor is configured',
+      )
+      assert.equal(
+        joinOutput.parameters.required.includes('estimated_readonly_rounds'),
+        false,
+        'join must not require estimated_readonly_rounds',
+      )
     })
   } finally {
     clearPredictorState()
@@ -1091,7 +1183,7 @@ test('WHAT[host-boundary-032] C30_configured_decoration_through_hook_is_idempote
         'repeated definition hook calls must not duplicate required entries or prose',
       )
       assert.equal(
-        output.parameters.required.filter((x) => x === 'delegate_readonly_rounds').length,
+        output.parameters.required.filter((x) => x === 'estimated_readonly_rounds').length,
         1,
         'budget must appear exactly once in required across repeats',
       )
@@ -1121,7 +1213,7 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
         'invalid Predictor configuration must fail closed on the tool.definition hook',
       )
       assert.equal(
-        output.parameters.properties?.delegate_readonly_rounds,
+        output.parameters.properties?.estimated_readonly_rounds,
         undefined,
         'no partial protocol may be published on the fail-closed path',
       )
@@ -1135,7 +1227,7 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
       setPredictorState('configured')
       await hooks['tool.definition']({ toolID: 'read' }, output)
       assert.equal(
-        output.parameters.properties.delegate_readonly_rounds.type,
+        output.parameters.properties.estimated_readonly_rounds.type,
         'integer',
         'the hook must decorate again once the configuration is repaired',
       )
@@ -1163,7 +1255,7 @@ test('WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_co
     }
     await hooks['tool.definition']({ toolID: 'read' }, output)
     assert.equal(
-      output.parameters.properties?.delegate_readonly_rounds,
+      output.parameters.properties?.estimated_readonly_rounds,
       undefined,
       'decoration must stay off while the shared query reports NotConfigured',
     )
@@ -1186,7 +1278,7 @@ test('WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_co
     }
     await hooks['tool.definition']({ toolID: 'read' }, output)
     assert.equal(
-      output.parameters.properties.delegate_readonly_rounds.type,
+      output.parameters.properties.estimated_readonly_rounds.type,
       'integer',
       'decoration must follow the same single query result',
     )
@@ -1209,7 +1301,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
       const configuredOutput = makeDefinition()
       await hooks['tool.definition']({ toolID: 'read' }, configuredOutput)
       assert.equal(
-        configuredOutput.parameters.properties.delegate_readonly_rounds.type,
+        configuredOutput.parameters.properties.estimated_readonly_rounds.type,
         'integer',
         'configured state must decorate within one plugin instance',
       )
@@ -1218,7 +1310,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
       const revertedOutput = makeDefinition()
       await hooks['tool.definition']({ toolID: 'read' }, revertedOutput)
       assert.equal(
-        revertedOutput.parameters.properties?.delegate_readonly_rounds,
+        revertedOutput.parameters.properties?.estimated_readonly_rounds,
         undefined,
         'removing the configuration must stop decoration in the same instance',
       )
@@ -1232,7 +1324,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
       const reconfiguredOutput = makeDefinition()
       await hooks['tool.definition']({ toolID: 'read' }, reconfiguredOutput)
       assert.equal(
-        reconfiguredOutput.parameters.properties.delegate_readonly_rounds.type,
+        reconfiguredOutput.parameters.properties.estimated_readonly_rounds.type,
         'integer',
         'reconfiguring must resume decoration without a second enabled truth',
       )
@@ -1371,7 +1463,7 @@ test('WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into
       args: {
         path: 'src/App.fs',
         contract: 'js-manager-contract-v1',
-        delegate_readonly_rounds: 3,
+        estimated_readonly_rounds: 3,
         self_note: 'note-c34',
       },
     }
@@ -1406,7 +1498,7 @@ test('WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into
       'review contract must return to the persisted history on the wire',
     )
     assert.equal(
-      restoredInput.delegate_readonly_rounds,
+      restoredInput.estimated_readonly_rounds,
       3,
       'budget must return to the persisted history on the wire',
     )
@@ -1546,7 +1638,8 @@ test('WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restor
         args: {
           path: 'src/App.fs',
           contract: 'js-manager-contract-v1',
-          delegate_readonly_rounds: 1,
+          estimated_readonly_rounds: 1,
+          self_note: 'note-c37',
         },
       },
     )
@@ -1586,7 +1679,7 @@ test('WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restor
       'the call itself must still be restored beside its result',
     )
     assert.equal(
-      transformed.messages[0].parts[0].state.input.delegate_readonly_rounds,
+      transformed.messages[0].parts[0].state.input.estimated_readonly_rounds,
       1,
       'the budget must still be restored beside its result',
     )
@@ -1607,7 +1700,8 @@ test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_bus
           path: 'src/App.fs',
           pattern: 'TODO',
           limit: 10,
-          delegate_readonly_rounds: 2,
+          estimated_readonly_rounds: 2,
+          self_note: 'note-c38',
         },
       },
     )
@@ -1642,13 +1736,18 @@ test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_bus
       'every business argument must survive verbatim',
     )
     assert.equal(
-      input.delegate_readonly_rounds,
+      input.estimated_readonly_rounds,
       2,
       'the protocol field must be restored beside the business arguments',
     )
+    assert.equal(
+      input.self_note,
+      'note-c38',
+      'the note field must be restored beside the business arguments',
+    )
     assert.deepEqual(
       Object.keys(input),
-      ['path', 'pattern', 'limit', 'delegate_readonly_rounds'],
+      ['path', 'pattern', 'limit', 'estimated_readonly_rounds', 'self_note'],
       'business keys must keep their order before the appended protocol key',
     )
   })

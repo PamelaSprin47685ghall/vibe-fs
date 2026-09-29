@@ -185,14 +185,14 @@ export default {
           requiredList: [...required],
           propertiesKeys: Object.keys(properties).sort(),
           description,
-          hasBudgetProperty: properties.delegate_readonly_rounds !== undefined,
-          budgetType: properties.delegate_readonly_rounds?.type ?? null,
-          requiredIncludesBudget: required.includes('delegate_readonly_rounds'),
+          hasBudgetProperty: properties.estimated_readonly_rounds !== undefined,
+          budgetType: properties.estimated_readonly_rounds?.type ?? null,
+          requiredIncludesBudget: required.includes('estimated_readonly_rounds'),
           hasNoteProperty: properties.self_note !== undefined,
           requiredIncludesNote: required.includes('self_note'),
           descriptionHasCollaborationProse:
             description !== null &&
-            /Fill in delegate_readonly_rounds on every tool call\.|每个工具调用都要填写 delegate_readonly_rounds/.test(
+            /estimated_readonly_rounds/.test(
               description,
             ),
         };

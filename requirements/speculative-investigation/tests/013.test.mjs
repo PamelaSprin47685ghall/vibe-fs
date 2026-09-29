@@ -206,7 +206,14 @@ const assistantMessage = (id, sessionId, parentId, parts) => ({
   info: { id, role: 'assistant', sessionID: sessionId, parentID: parentId, time: { created: 1 } }, parts,
 })
 const budgetCall = (callId, rounds) =>
-  hostToolCall(callId, 'read', { filePath: 'a.md', delegate_readonly_rounds: rounds }, 'alpha')
+  hostToolCall(
+    callId,
+    'read',
+    rounds > 0
+      ? { filePath: 'a.md', estimated_readonly_rounds: rounds, self_note: 'inspect the file' }
+      : { filePath: 'a.md', estimated_readonly_rounds: rounds },
+    'alpha',
+  )
 
 // A tool call whose results have not all arrived: the wire view carries the
 // call but no paired result, so the domain collector cannot complete a batch.
@@ -214,7 +221,13 @@ const pendingCall = (callId, rounds) => ({
   type: 'tool',
   tool: 'read',
   callID: callId,
-  state: { status: 'pending', input: { filePath: 'a.md', delegate_readonly_rounds: rounds } },
+  state: {
+    status: 'pending',
+    input:
+      rounds > 0
+        ? { filePath: 'a.md', estimated_readonly_rounds: rounds, self_note: 'inspect the file' }
+        : { filePath: 'a.md', estimated_readonly_rounds: rounds },
+  },
 })
 
 // The unified EventStore keeps writer NDJSON files under the workspace Git
@@ -284,17 +297,123 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
 
       // The process-shared Predictor existence query is observed per call, not
       // frozen at plugin construction: tool decoration sees the configured
-      // state and appends the required budget plus the collaboration prose.
-      const schemaOutput = {
-        description: 'read a file',
-        parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+      // state and decorates participating tools per DELEGATE_REVISE.md contract.
+      const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+      try {
+        process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+        const schemaOutput = {
+          description: 'read a file',
+          parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+        }
+        await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+
+        const props = schemaOutput.parameters.properties
+        assert.equal(props.estimated_readonly_rounds?.type, 'integer')
+        assert.equal(props.estimated_readonly_rounds?.minimum, 0)
+        assert.equal(props.estimated_readonly_rounds?.maximum, 2147483647)
+        assert.equal(
+          props.estimated_readonly_rounds?.description,
+          "Estimate how many consecutive read-only investigation rounds will still be needed after ALL tool calls in this response have completed, before a substantive change, a command, user clarification, a conclusion, or a consequential judgment that you must make yourself. One round is one model request and may contain several parallel tool calls; do not count the current batch. Routine choices about which reference or file to inspect are part of investigation. Use 0 when no such investigation remains or the next step already reaches one of those boundaries. Give your current best estimate; it need not be exact, and do not add work to match it.",
+          'budget description must match English verbatim constant',
+        )
+        assert.ok(
+          schemaOutput.parameters.required.includes('estimated_readonly_rounds'),
+          'read must require estimated_readonly_rounds',
+        )
+
+        assert.equal(props.self_note?.type, 'string')
+        assert.equal(
+          props.self_note?.description,
+          "Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely, without an empty string or null. For a positive estimate, leave a brief, non-empty outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace.",
+          'self_note description must match English verbatim constant',
+        )
+        assert.equal('minLength' in props.self_note, false, 'self_note must not set minLength')
+        assert.equal(
+          schemaOutput.parameters.required.includes('self_note'),
+          false,
+          'self_note must not be required',
+        )
+
+        assert.equal(
+          props.delegate_readonly_rounds,
+          undefined,
+          'legacy delegate_readonly_rounds must not be present',
+        )
+        assert.equal(
+          schemaOutput.parameters.required.includes('delegate_readonly_rounds'),
+          false,
+          'legacy delegate_readonly_rounds must not be required',
+        )
+        assert.ok(schemaOutput.description.startsWith('read a file'))
+        assert.ok(schemaOutput.description.includes("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."))
+        assert.equal(schemaOutput.description.includes('delegate_readonly_rounds'), false)
+        assert.equal(/companion|trust|retain control|同伴|信任|保留控制权/i.test(schemaOutput.description), false)
+
+        // Idempotency: repeating decoration on the same definition does not duplicate required fields or stack prose
+        await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+        assert.equal(
+          schemaOutput.parameters.required.filter((x) => x === 'estimated_readonly_rounds').length,
+          1,
+          'estimated_readonly_rounds must appear exactly once in required after repeat decoration',
+        )
+        assert.equal(
+          schemaOutput.description.split("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0.").length - 1,
+          1,
+          'English collaboration prose must be appended exactly once and not stack',
+        )
+
+        // Chinese language binding test: verbatim Chinese descriptions from ReadonlyDelegationContract.fs
+        process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'zh-CN'
+        const schemaOutputZh = {
+          description: '读取文件',
+          parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+        }
+        await hooks['tool.definition']({ toolID: 'read' }, schemaOutputZh)
+        const zhProps = schemaOutputZh.parameters.properties
+        assert.equal(zhProps.estimated_readonly_rounds?.type, 'integer')
+        assert.equal(zhProps.estimated_readonly_rounds?.minimum, 0)
+        assert.equal(zhProps.estimated_readonly_rounds?.maximum, 2147483647)
+        assert.equal(
+          zhProps.estimated_readonly_rounds?.description,
+          "当前响应的全部工具执行完成后，预计还需要连续进行多少轮只读查证，才会到达实质修改、执行命令、向用户确认、给出结论，或必须亲自权衡的关键判断？一轮是一次模型请求，可以包含多个并行工具调用；当前这批不计入。选择接着查哪个文件或引用属于普通调查，不必一概当成关键判断。已经没有后续查证，或下一步就到达上述边界时，填 0。按当前材料估计即可，不要求精确，也不要为了符合估计增加调查。",
+          'budget description must match Chinese verbatim constant',
+        )
+        assert.equal(zhProps.self_note?.type, 'string')
+        assert.equal(
+          zhProps.self_note?.description,
+          "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。",
+          'self_note description must match Chinese verbatim constant',
+        )
+        assert.ok(schemaOutputZh.description.includes("调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"))
+        assert.equal(schemaOutputZh.description.includes("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."), false)
+
+        // Per-tool verification: a non-participating tool (e.g. join) and unreviewed tool gain zero increment
+        const joinOutput = {
+          description: 'Original join description',
+          parameters: { type: 'object', properties: {}, required: [] },
+        }
+        await hooks['tool.definition']({ toolID: 'join' }, joinOutput)
+        assert.equal(joinOutput.parameters.properties?.estimated_readonly_rounds, undefined)
+        assert.equal(joinOutput.parameters.properties?.self_note, undefined)
+        assert.equal(joinOutput.parameters.required.includes('estimated_readonly_rounds'), false)
+        assert.equal(joinOutput.description, 'Original join description')
+
+        const unreviewedOutput = {
+          description: 'custom unreviewed tool',
+          parameters: { type: 'object', properties: {}, required: [] },
+        }
+        await hooks['tool.definition']({ toolID: 'custom-unreviewed' }, unreviewedOutput)
+        assert.equal(unreviewedOutput.parameters.properties?.estimated_readonly_rounds, undefined)
+        assert.equal(unreviewedOutput.parameters.properties?.self_note, undefined)
+        assert.equal(unreviewedOutput.parameters.required.includes('estimated_readonly_rounds'), false)
+        assert.equal(unreviewedOutput.description, 'custom unreviewed tool')
+      } finally {
+        if (previousLanguage === undefined) {
+          delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+        } else {
+          process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+        }
       }
-      await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
-      assert.ok(
-        schemaOutput.parameters.properties.delegate_readonly_rounds,
-        'a configured Predictor decorates every tool schema with the required budget',
-      )
-      assert.ok(schemaOutput.parameters.required.includes('delegate_readonly_rounds'))
 
       // Drive the real owner transform with a complete, fresh tool batch whose
       // only call requests one readonly round.
@@ -366,9 +485,29 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
       }
       await hooks['tool.definition']({ toolID: 'read' }, bareOutput)
       assert.equal(
+        bareOutput.parameters.properties.estimated_readonly_rounds,
+        undefined,
+        'an unconfigured Predictor decorates no estimated_readonly_rounds',
+      )
+      assert.equal(
+        bareOutput.parameters.properties.self_note,
+        undefined,
+        'an unconfigured Predictor decorates no self_note',
+      )
+      assert.equal(
         bareOutput.parameters.properties.delegate_readonly_rounds,
         undefined,
-        'an unconfigured Predictor decorates nothing',
+        'legacy delegate_readonly_rounds must not be added',
+      )
+      assert.equal(
+        bareOutput.parameters.required.includes('estimated_readonly_rounds'),
+        false,
+        'an unconfigured Predictor does not require estimated_readonly_rounds',
+      )
+      assert.equal(
+        bareOutput.description,
+        'read a file',
+        'an unconfigured Predictor leaves tool description unmodified',
       )
       await hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
       assert.deepEqual(
@@ -537,12 +676,36 @@ import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/proces
 
 {
 const { default: assert } = await import('node:assert/strict')
+const { parseParticipatingArguments } = await import('../../../dist/Strength/InvestigationEstimateContract.js')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
 const runnerPath = path.join(here, '../../host-boundary/tests/support/run-readonly-delegation-schema-canary.mjs')
 
 const builtins = ['read', 'glob', 'grep', 'edit', 'write']
+
+const PARTICIPATING_TOOLS = new Set([
+  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+])
+
+const readonlyRoundsDescriptionEn =
+  "Estimate how many consecutive read-only investigation rounds will still be needed after ALL tool calls in this response have completed, before a substantive change, a command, user clarification, a conclusion, or a consequential judgment that you must make yourself. One round is one model request and may contain several parallel tool calls; do not count the current batch. Routine choices about which reference or file to inspect are part of investigation. Use 0 when no such investigation remains or the next step already reaches one of those boundaries. Give your current best estimate; it need not be exact, and do not add work to match it."
+
+const selfNoteDescriptionEn =
+  "Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely, without an empty string or null. For a positive estimate, leave a brief, non-empty outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace."
+
+const englishCollaboration =
+  "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."
+
+const readonlyRoundsDescriptionZh =
+  "当前响应的全部工具执行完成后，预计还需要连续进行多少轮只读查证，才会到达实质修改、执行命令、向用户确认、给出结论，或必须亲自权衡的关键判断？一轮是一次模型请求，可以包含多个并行工具调用；当前这批不计入。选择接着查哪个文件或引用属于普通调查，不必一概当成关键判断。已经没有后续查证，或下一步就到达上述边界时，填 0。按当前材料估计即可，不要求精确，也不要为了符合估计增加调查。"
+
+const selfNoteDescriptionZh =
+  "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。"
+
+const chineseCollaboration =
+  "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"
 
 const checkOpencodeExecutable = () => {
   if (process.env.OPENCODE_BIN && existsSync(process.env.OPENCODE_BIN)) return true
@@ -594,27 +757,166 @@ integrationTest(
     }
 
     for (const [name, view] of Object.entries(summary.tools)) {
-      assert.ok(
-        view.required.includes('delegate_readonly_rounds'),
-        `${name} must require the readonly delegation budget on the provider wire`,
+      // 1. Legacy protocol field delegate_readonly_rounds must never appear on any tool
+      assert.equal(
+        view.properties.includes('delegate_readonly_rounds'),
+        false,
+        `${name} must not expose legacy delegate_readonly_rounds`,
       )
       assert.equal(
-        view.required.filter((entry) => entry === 'delegate_readonly_rounds').length,
-        1,
-        `${name} must require the budget exactly once`,
+        view.required.includes('delegate_readonly_rounds'),
+        false,
+        `${name} must not require legacy delegate_readonly_rounds`,
       )
-      assert.ok(
-        view.properties.includes('self_note'),
-        `${name} must expose the optional self_note on the provider wire`,
+
+      // 2. Companion/trust narrative must never appear in any description
+      assert.equal(
+        /companion|trust|retain control|同伴|信任|保留控制权/i.test(view.description),
+        false,
+        `${name} description must not contain companion or trust narrative`,
       )
-      assert.ok(
-        !view.required.includes('self_note'),
-        `${name} must not require self_note`,
-      )
-      assert.equal(view.budget?.type, 'integer', `${name} budget must be an integer`)
-      assert.equal(view.budget?.minimum, 0, `${name} budget minimum must be 0`)
-      assert.equal(view.budget?.maximum, 2147483647, `${name} budget maximum must be the int range`)
-      assert.equal(view.note?.type, 'string', `${name} self_note must be a string`)
+
+      if (PARTICIPATING_TOOLS.has(name)) {
+        // Participating tools (12 tools): must carry estimated_readonly_rounds & self_note
+        assert.ok(
+          view.properties.includes('estimated_readonly_rounds'),
+          `participating tool ${name} must expose estimated_readonly_rounds on the provider wire`,
+        )
+        assert.ok(
+          view.required.includes('estimated_readonly_rounds'),
+          `participating tool ${name} must require estimated_readonly_rounds`,
+        )
+        assert.equal(
+          view.required.filter((entry) => entry === 'estimated_readonly_rounds').length,
+          1,
+          `participating tool ${name} must require estimated_readonly_rounds exactly once`,
+        )
+
+        assert.ok(
+          view.properties.includes('self_note'),
+          `participating tool ${name} must expose self_note on the provider wire`,
+        )
+        assert.equal(
+          view.required.includes('self_note'),
+          false,
+          `participating tool ${name} must not require self_note`,
+        )
+        assert.equal(
+          'minLength' in (view.note ?? {}),
+          false,
+          `participating tool ${name} self_note must not set minLength`,
+        )
+
+        assert.equal(view.budget?.type, 'integer', `${name} estimated_readonly_rounds must be an integer`)
+        assert.equal(view.budget?.minimum, 0, `${name} estimated_readonly_rounds minimum must be 0`)
+        assert.equal(view.budget?.maximum, 2147483647, `${name} estimated_readonly_rounds maximum must be 2147483647`)
+        assert.equal(view.note?.type, 'string', `${name} self_note must be a string`)
+
+        // Verbatim description checks for participating tools matching ReadonlyDelegationContract.fs
+        const isChinese =
+          view.budget?.description === readonlyRoundsDescriptionZh ||
+          view.description.includes('调查展望：estimated_readonly_rounds')
+        if (isChinese) {
+          assert.equal(
+            view.budget?.description,
+            readonlyRoundsDescriptionZh,
+            `${name} budget description must match Chinese verbatim constant`,
+          )
+          assert.equal(
+            view.note?.description,
+            selfNoteDescriptionZh,
+            `${name} self_note description must match Chinese verbatim constant`,
+          )
+          assert.ok(
+            view.description.includes(chineseCollaboration),
+            `${name} description must contain Chinese collaboration prose`,
+          )
+          assert.equal(
+            view.description.split(chineseCollaboration).length - 1,
+            1,
+            `${name} Chinese collaboration prose must be appended exactly once (idempotent)`,
+          )
+        } else {
+          assert.equal(
+            view.budget?.description,
+            readonlyRoundsDescriptionEn,
+            `${name} budget description must match English verbatim constant`,
+          )
+          assert.equal(
+            view.note?.description,
+            selfNoteDescriptionEn,
+            `${name} self_note description must match English verbatim constant`,
+          )
+          assert.ok(
+            view.description.includes(englishCollaboration),
+            `${name} description must contain English collaboration prose`,
+          )
+          assert.equal(
+            view.description.split(englishCollaboration).length - 1,
+            1,
+            `${name} English collaboration prose must be appended exactly once (idempotent)`,
+          )
+        }
+
+        // Idempotent and stable prose: no volatile tokens, remaining counts, timestamps, or tiers
+        assert.equal(
+          /remaining rounds|\b\d{4}-\d{2}-\d{2}\b|model tier/i.test(view.description),
+          false,
+          `${name} description must not contain volatile counters, timestamps, or tiers`,
+        )
+
+        // For js-manager: review contract and delegation protocol coexist without mutual interference
+        if (name === 'js-manager') {
+          assert.ok(
+            view.properties.includes('contract'),
+            'js-manager must expose review contract property beside delegation protocol',
+          )
+          assert.ok(
+            view.required.includes('contract'),
+            'js-manager must require review contract beside delegation protocol',
+          )
+          assert.equal(
+            view.required.filter((entry) => entry === 'contract').length,
+            1,
+            'js-manager must require contract exactly once',
+          )
+        }
+      } else {
+        // Non-participating tools (including 28 NoEstimate tools and unreviewed Host tools such as question/todo/web):
+        // Must carry ZERO increment: no protocol properties, not required, no collaboration prose.
+        assert.equal(
+          view.properties.includes('estimated_readonly_rounds'),
+          false,
+          `non-participating/unreviewed tool ${name} must not gain estimated_readonly_rounds`,
+        )
+        assert.equal(
+          view.properties.includes('self_note'),
+          false,
+          `non-participating/unreviewed tool ${name} must not gain self_note`,
+        )
+        assert.equal(
+          view.required.includes('estimated_readonly_rounds'),
+          false,
+          `non-participating/unreviewed tool ${name} must not require estimated_readonly_rounds`,
+        )
+        assert.equal(
+          view.required.includes('self_note'),
+          false,
+          `non-participating/unreviewed tool ${name} must not require self_note`,
+        )
+        assert.equal(view.budget, null, `non-participating tool ${name} budget view must be null`)
+        assert.equal(view.note, null, `non-participating tool ${name} note view must be null`)
+        assert.equal(
+          view.description.includes(englishCollaboration),
+          false,
+          `non-participating tool ${name} must not append English collaboration prose`,
+        )
+        assert.equal(
+          view.description.includes(chineseCollaboration),
+          false,
+          `non-participating tool ${name} must not append Chinese collaboration prose`,
+        )
+      }
     }
 
     // Decoration extends the schema; it never replaces the tool's own contract.
@@ -623,25 +925,69 @@ integrationTest(
     assert.ok(summary.tools.edit.required.includes('oldString'), 'edit must still require oldString')
     assert.ok(summary.tools.grep.required.includes('pattern'), 'grep must still require pattern')
     assert.ok(
-      summary.tools.read.description.includes('delegate_readonly_rounds on every tool call'),
-      'built-in descriptions must carry the collaboration prose',
+      summary.tools.read.description.includes(englishCollaboration) ||
+        summary.tools.read.description.includes(chineseCollaboration),
+      'built-in descriptions must carry the new collaboration prose',
     )
-    assert.ok(
-      summary.tools.read.description.includes('companion'),
-      'the collaboration prose must name the companion, not a cheaper model',
+    assert.equal(
+      summary.tools.read.description.includes('delegate_readonly_rounds on every tool call'),
+      false,
+      'legacy delegation prose must not appear',
+    )
+    assert.equal(
+      /companion|trust|retain control|同伴|信任|保留控制权/i.test(summary.tools.read.description),
+      false,
+      'the collaboration prose must not carry companion narrative',
     )
 
     // The decorated call really executed with the model's own arguments, and the
     // provider-wire history kept them.
     assert.equal(summary.followUpObserved, true, 'the built-in tool call must settle into a follow-up request')
     assert.equal(summary.historicalArguments?.filePath, 'canary-sample.txt')
-    assert.equal(summary.historicalArguments?.delegate_readonly_rounds, 0)
+    assert.equal(summary.historicalArguments?.estimated_readonly_rounds, 2)
     assert.equal(summary.historicalArguments?.self_note, 'checking the canary fixture')
+    assert.equal(
+      summary.historicalArguments?.delegate_readonly_rounds,
+      undefined,
+      'legacy delegate_readonly_rounds must not be present in historical arguments',
+    )
     assert.match(
       summary.toolResultPreview ?? '',
       /readonly delegation schema canary/,
       'the built-in tool must execute and return its real result',
     )
+
+    // Contract validation: legal combinations vs historical anti-pattern
+    // 1. Legal positive estimate: non-blank self_note paired with rounds > 0
+    const validPositive = parseParticipatingArguments({
+      filePath: 'canary-sample.txt',
+      estimated_readonly_rounds: 2,
+      self_note: 'checking the canary fixture',
+    })
+    assert.equal(validPositive.tag, 0, 'positive estimate with non-empty note is valid')
+
+    // 2. Legal zero estimate: self_note is omitted
+    const validZero = parseParticipatingArguments({
+      filePath: 'canary-sample.txt',
+      estimated_readonly_rounds: 0,
+    })
+    assert.equal(validZero.tag, 0, 'zero estimate omitting self_note is valid')
+    assert.equal(validZero.fields[0][1], undefined, 'parsed note must be None/undefined for zero estimate')
+
+    // 3. Historical anti-pattern (0 with note): must be rejected under new contract
+    const invalidZeroWithNote = parseParticipatingArguments({
+      filePath: 'canary-sample.txt',
+      estimated_readonly_rounds: 0,
+      self_note: 'checking the canary fixture',
+    })
+    assert.equal(invalidZeroWithNote.tag, 1, '0 with self_note is an illegal combination and must be rejected')
+
+    // 4. Legacy field rejection: delegate_readonly_rounds must be rejected
+    const legacyAttempt = parseParticipatingArguments({
+      filePath: 'canary-sample.txt',
+      delegate_readonly_rounds: 0,
+    })
+    assert.equal(legacyAttempt.tag, 1, 'legacy delegate_readonly_rounds field must be rejected')
   },
 )
 }

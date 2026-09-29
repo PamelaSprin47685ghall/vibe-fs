@@ -3,8 +3,9 @@ namespace Wanxiangshu.OpenCode.Host
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Strength
 
-/// host-boundary-032 / DELEGATE.md 4.3: process-local vault of the protocol
+/// host-boundary-032 / DELEGATE_REVISE.md: process-local vault of the protocol
 /// fields exactly as the model produced them on the wire.
 ///
 /// The Host serializes persisted tool-call arguments after tool.execute.before
@@ -23,8 +24,7 @@ module ProtocolArgumentVault =
     [<Literal>]
     let private contractField = "contract"
 
-    [<Literal>]
-    let private roundsField = "delegate_readonly_rounds"
+    let private roundsField = InvestigationEstimateContract.EstimatedReadonlyRoundsField
 
     [<Literal>]
     let private noteField = "self_note"
