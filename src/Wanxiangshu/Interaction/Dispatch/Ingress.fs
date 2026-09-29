@@ -10,6 +10,24 @@ open Wanxiangshu.Composition.Durable
 [<RequireQualifiedAccess>]
 module PromptIngress =
 
+    let private tryActiveHumanRootAgent (proj: PromptAuthority.PromptAuthorityProjection) =
+        match proj.ActiveLogicalRun with
+        | Some activeRun when activeRun.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
+            Some activeRun.SelectedAgent
+        | _ -> None
+
+    let private enrichHostMessage authority (message: PromptIngressCodec.DecodedMessage) =
+        let agentOpt =
+            match message.ExplicitAgent, message.PromptKey with
+            | None, None -> authority |> Option.bind tryActiveHumanRootAgent
+            | _ -> None
+
+        match agentOpt with
+        | Some agent ->
+            { message with
+                ExplicitAgent = Some agent }
+        | None -> message
+
     let resolveDecision (journal: AgentJournal option) (message: PromptIngressCodec.DecodedMessage) =
         let authority =
             match journal, message.SessionId with
@@ -19,4 +37,8 @@ module PromptIngress =
             | Some _, None -> Some PromptAuthority.empty
             | None, _ -> None
 
-        ChatAdmissionIntent.resolve message { Authority = authority }
+        // interaction-authority-009: When host message omits explicit agent,
+        // Ingress boundary projects active participant to admit as HumanMessage continuation
+        let enrichedMessage = enrichHostMessage authority message
+
+        ChatAdmissionIntent.resolve enrichedMessage { Authority = authority }

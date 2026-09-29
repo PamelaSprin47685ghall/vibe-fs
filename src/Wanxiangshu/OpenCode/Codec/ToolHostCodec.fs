@@ -39,6 +39,9 @@ module HostIngressCodec =
     [<Emit("$0.value")>]
     let private descriptorValue (descriptor: obj) : obj = jsNative
 
+    [<Emit("(() => { try { if ($0 == null || (typeof $0 !== 'object' && typeof $0 !== 'function')) return null; const v = $0[$1]; return (v != null) ? v : null; } catch { return null; } })()")>]
+    let private safeHostProperty (source: obj) (name: string) : obj = jsNative
+
     type private TextCarrier =
         | Missing
         | Malformed
@@ -135,9 +138,18 @@ module HostIngressCodec =
         | _ -> None
 
     let sessionAgent (raw: obj) =
-        recordProperty raw "data"
-        |> Option.defaultValue raw
-        |> fun body -> stringProperty body "agent"
+        if isNull raw then
+            None
+        else
+            let data = safeHostProperty raw "data"
+            let body = if isNull data then raw else data
+            let agentVal = safeHostProperty body "agent"
+
+            primitiveNonBlankString agentVal
+            |> Option.orElseWith (fun () ->
+                recordProperty raw "data"
+                |> Option.defaultValue raw
+                |> fun b -> stringProperty b "agent")
 
     let primitiveBoolean (value: obj) =
         if isBoolean value then Some(unbox<bool> value) else None

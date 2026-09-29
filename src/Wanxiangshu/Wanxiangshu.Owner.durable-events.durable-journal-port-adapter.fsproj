@@ -35,6 +35,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-requirement-grounding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-prompt-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
     <Compile Include="Composition/Durable/PromptJournalAdapter.fsi"/>

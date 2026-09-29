@@ -124,12 +124,20 @@ module HostEventCodec =
             unbox<string> error?name
 
     let private failureReasonOf (error: obj) : string =
-        if not (isNull error) && not (isNull error?message) then
-            unbox<string> error?message
-        elif not (isNull error) && not (isNull error?data) && not (isNull error?data?message) then
-            unbox<string> error?data?message
+        let rawReason =
+            if not (isNull error) && not (isNull error?message) then
+                unbox<string> error?message
+            elif not (isNull error) && not (isNull error?data) && not (isNull error?data?message) then
+                unbox<string> error?data?message
+            elif not (isNull error) && emitJsExpr error "typeof $0 === 'string'" then
+                unbox<string> error
+            else
+                "provider failure"
+
+        if rawReason.Contains("The operation timed out") then
+            "The operation timed out while awaiting provider response; execution lease safely released."
         else
-            "provider failure"
+            rawReason
 
 
     let private failureOf (error: obj) : ExecutionFailure =
@@ -148,7 +156,10 @@ module HostEventCodec =
             match errName with
             | "MessageAbortedError"
             | "AbortError" -> ExecutionFailure.UserCancelled
+            | "TimeoutError" when reason.Contains("The operation timed out") -> ExecutionFailure.UserCancelled
+            | "TimeoutError" -> ExecutionFailure.ProviderTransient
             | "SupersededError" -> ExecutionFailure.Superseded
+            | _ when reason.ToLowerInvariant().Contains("abort") -> ExecutionFailure.UserCancelled
             | _ -> ExecutionFailure.ProviderTransient
 
         match isUpstreamAbort with
