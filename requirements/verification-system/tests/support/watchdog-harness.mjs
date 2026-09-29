@@ -40,6 +40,7 @@ export function createWatchdogHarness(options = {}) {
         write(message) {
           diagnostics.push(message)
           trace.push('diagnostic')
+          options.deps?.diagnostic?.write?.(message)
         },
       },
       terminate() {
