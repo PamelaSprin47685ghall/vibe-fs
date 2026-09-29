@@ -60,8 +60,9 @@ const { tmpdir } = await import("node:os");
 const { default: path } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 const { assessIntegrationEntryCoverage } = await import("./support/integration-entry-coverage.mjs");
-const { discoverSuiteTests } = await import("./support/discover-suite-tests.mjs");
-const { integrationNodeTestSteps, selectIntegrationSteps } = await import("./support/integration-node-test-steps.mjs");
+const { discoverSuiteTests, discoverIntegrationTests, discoverRepositoryIntegrationTests } = await import("./support/discover-suite-tests.mjs");
+const { spawnSync } = await import("node:child_process");
+const { pathToFileURL } = await import("node:url");
 const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 const assess = (discoveredTests, wiredTests, childOwnedTests = []) =>
@@ -121,15 +122,64 @@ test('WHAT[verification-system-009] discoverSuiteTests auto-includes an added te
     rmSync(scratch, { recursive: true, force: true })
   }
 })
-test('WHAT[verification-system-009] discovery returns no files for a missing optional suite directory', () => {
-  // A non-existent directory yields an empty set rather than throwing; the
-  // child runner turns an empty set into a non-zero exit.
-  assert.deepEqual(discoverSuiteTests(path.join(tmpdir(), 'does-not-exist-suite-xyz')), [])
+test('WHAT[verification-system-009] discovery rejects a missing required suite directory', () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), 'missing-suite-'))
+  try {
+    assert.throws(() => discoverSuiteTests(path.join(scratch, 'tests')), { code: 'ENOENT' })
+    writeFileSync(path.join(scratch, 'tests'), 'not a directory')
+    assert.throws(() => discoverSuiteTests(path.join(scratch, 'tests')), { code: 'ENOTDIR' })
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
 })
 test('WHAT[verification-system-009] integration discovery ignores examples in strings and comments', () => {
   const source = '// integrationTest("comment", () => {})\nconst example = \'integrationTest("text", () => {})\'\nintegrationTest("actual", () => {})'
   assert.deepEqual(testDeclarations(source), [{ kind: 'integrationTest', title: 'actual', line: 3 }])
   assert.throws(() => testDeclarations('integrationTest('), SyntaxError)
+})
+test('WHAT[verification-system-009] integration discovery selects real declarations and propagates malformed source', () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), 'integration-discovery-'))
+  try {
+    writeFileSync(path.join(scratch, 'actual.test.mjs'), 'integrationTest("actual", () => {})')
+    writeFileSync(path.join(scratch, 'todo.test.mjs'), 'integrationTest.todo("pending")')
+    writeFileSync(path.join(scratch, 'example.test.mjs'), '// integrationTest("comment", () => {})\nconst text = "WXS_TIER_INTEGRATION integrationTest()"')
+    writeFileSync(path.join(scratch, 'import-only.test.mjs'), 'import { integrationTest } from "./helper.mjs"')
+    writeFileSync(path.join(scratch, 'ordinary.test.mjs'), 'test("unit", () => {})')
+    assert.deepEqual(discoverIntegrationTests(scratch), [
+      path.join(scratch, 'actual.test.mjs'), path.join(scratch, 'todo.test.mjs'),
+    ])
+    writeFileSync(path.join(scratch, 'broken.test.mjs'), 'integrationTest(')
+    assert.throws(() => discoverIntegrationTests(scratch), SyntaxError)
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+})
+test('WHAT[verification-system-009] the actual repository discovery refuses missing or malformed suites with nonzero exit', () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), 'integration-missing-'))
+  try {
+    mkdirSync(path.join(scratch, 'requirements/broken-package'), { recursive: true })
+    const moduleUrl = pathToFileURL(path.join(root, 'requirements/verification-system/tests/support/discover-suite-tests.mjs')).href
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const args = ['--input-type=module', '-e',
+      `import { discoverRepositoryIntegrationTests } from ${JSON.stringify(moduleUrl)}; discoverRepositoryIntegrationTests(process.argv[1]);`, scratch,
+    ]
+    const result = spawnSync(process.execPath, args, { encoding: 'utf8', env })
+    assert.equal(result.error, undefined)
+    assert.equal(result.signal, null)
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stderr, /ENOENT/)
+    assert.ok(result.stderr.includes(path.join(scratch, 'requirements/broken-package/tests')))
+    mkdirSync(path.join(scratch, 'requirements/broken-package/tests'))
+    writeFileSync(path.join(scratch, 'requirements/broken-package/tests/001.test.mjs'), 'integrationTest(')
+    const malformed = spawnSync(process.execPath, args, { encoding: 'utf8', env })
+    assert.equal(malformed.error, undefined)
+    assert.equal(malformed.signal, null)
+    assert.equal(malformed.status, 1, malformed.stderr)
+    assert.match(malformed.stderr, /SyntaxError/)
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
 })
 test('WHAT[verification-system-009] the real integration entry covers every discovered integration test', () => {
   const packageTestsDir = path.join(root, 'requirements/distribution/tests')
@@ -155,21 +205,29 @@ test('WHAT[verification-system-009] the real integration entry covers every disc
       return testDeclarations(text).some(({ kind }) => kind === 'integrationTest')
     })
     .map((name) => normalize(path.join(packageTestsDir, name)))
-  const wiredIntegrationTests = integrationNodeTestSteps(root).flatMap((step) =>
-    step.files.map(normalize),
-  )
+  const entryFiles = (entry) => {
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const result = spawnSync(process.execPath, [path.join(root, entry), '--dry-run'], {
+      cwd: root, encoding: 'utf8', env,
+    })
+    assert.equal(result.error, undefined)
+    assert.equal(result.signal, null)
+    assert.equal(result.status, 0, result.stderr || result.stdout)
+    return result.stdout.split('\n').filter((line) => line.startsWith('    requirements/')).map((line) => line.trim())
+  }
+  const wiredIntegrationTests = entryFiles('requirements/verification-system/tests/integration/run.mjs')
+  const actualChildOwnedTests = entryFiles('requirements/distribution/tests/integration/package/run.mjs')
+  assert.deepEqual(wiredIntegrationTests, discoverRepositoryIntegrationTests(root).map(normalize))
+  assert.deepEqual(actualChildOwnedTests, childOwnedIntegrationTests)
   const result = assessIntegrationEntryCoverage({
     discoveredTests: [...discoveredIntegrationTests, ...childOwnedIntegrationTests].sort(),
     wiredTests: wiredIntegrationTests,
-    childOwnedTests: childOwnedIntegrationTests,
+    childOwnedTests: actualChildOwnedTests,
   })
   assert.equal(result.ok, true, JSON.stringify(result, null, 2))
-  assert.deepEqual(childOwnedIntegrationTests.sort(), [
-    'requirements/distribution/tests/001.test.mjs',
-    'requirements/distribution/tests/003.test.mjs',
-    'requirements/distribution/tests/004.test.mjs',
-    'requirements/distribution/tests/008.test.mjs',
-  ])
+  assert.ok(childOwnedIntegrationTests.length > 0)
+  assert.ok(discoveredIntegrationTests.length > 0)
 })
 }
 
@@ -296,8 +354,11 @@ test('WHAT[verification-system-009] repository closure gates reject an unassigne
 `)
     write(fixture, 'src/Wanxiangshu/Owned.fsi', 'namespace ClosureFixture\n')
     write(fixture, 'src/Wanxiangshu/Owned.fs', 'namespace ClosureFixture\n')
-    write(fixture, 'src/Wanxiangshu/Unowned.fs', 'namespace ClosureFixture\n')
+    const validSubsystemGate = runNode(fixture, ['scripts/checks/subsystems.mjs'])
+    assert.equal(validSubsystemGate.status, 0, validSubsystemGate.stderr || validSubsystemGate.stdout)
+    assert.match(validSubsystemGate.stdout, /subsystems: OK/)
 
+    write(fixture, 'src/Wanxiangshu/Unowned.fs', 'namespace ClosureFixture\n')
     const subsystemGate = runNode(fixture, ['scripts/checks/subsystems.mjs'])
     assert.equal(subsystemGate.status, 1, subsystemGate.stderr || subsystemGate.stdout)
     assert.match(subsystemGate.stderr, /production source coverage mismatch/)
@@ -308,28 +369,27 @@ test('WHAT[verification-system-009] repository closure gates reject an unassigne
       join(repositoryRoot, 'requirements/distribution/tests/004.test.mjs'),
       join(fixture, 'requirements/distribution/tests/004.test.mjs'),
     )
-    mkdirSync(join(fixture, 'requirements/verification-system/tests/support'), { recursive: true })
-    copyFileSync(
-      join(repositoryRoot, 'requirements/verification-system/tests/support/tier-gate.mjs'),
-      join(fixture, 'requirements/verification-system/tests/support/tier-gate.mjs'),
-    )
-    write(fixture, 'package.json', JSON.stringify({
-      main: './dist/OpenCode/Plugin/Plugin.js',
-      exports: { '.': './dist/OpenCode/Plugin/Plugin.js' },
-      files: ['resources/'],
-      scripts: {},
-    }))
-
-    mkdirSync(join(fixture, 'dist/OpenCode/Plugin'), { recursive: true })
-    write(fixture, 'dist/OpenCode/Plugin/Plugin.js', 'export default {}\n')
-
-    const packageGate = runNode(fixture, [
+    const packageArgs = [
       '--test',
-      '--test-name-pattern=DISTRIBUTION_files_whitelist_is_explicit',
+      '--test-reporter=tap',
       'requirements/distribution/tests/004.test.mjs',
-    ])
-    assert.equal(packageGate.status, 1, packageGate.stderr || packageGate.stdout)
-    assert.match(`${packageGate.stdout}\n${packageGate.stderr}`, /files whitelist must include dist/)
+    ]
+    write(fixture, 'package.json', JSON.stringify({ files: ['dist/', 'resources/'] }))
+    const validPackageGate = runNode(fixture, packageArgs)
+    assert.equal(validPackageGate.status, 0, validPackageGate.stderr || validPackageGate.stdout)
+    assert.match(validPackageGate.stdout, /# tests 1\b/)
+    assert.match(validPackageGate.stdout, /# pass 1\b/)
+
+    for (const files of [['resources/'], ['dist/'], ['dist/', 'resources/', 'src/'], ['resources/', 'dist/']]) {
+      write(fixture, 'package.json', JSON.stringify({ files }))
+      const packageGate = runNode(fixture, packageArgs)
+      assert.equal(packageGate.status, 1, packageGate.stderr || packageGate.stdout)
+      assert.match(packageGate.stdout, /not ok 1 - WHAT\[distribution-004\]/)
+      assert.match(packageGate.stdout, /code: 'ERR_ASSERTION'/)
+      assert.match(packageGate.stdout, /operator: 'deepStrictEqual'/)
+      assert.match(packageGate.stdout, /# tests 1\b/)
+      assert.match(packageGate.stdout, /# fail 1\b/)
+    }
   } finally {
     rmSync(fixture, { recursive: true, force: true })
   }
