@@ -11,6 +11,14 @@ open Wanxiangshu.Strength.Projection
 [<RequireQualifiedAccess>]
 module StrengthIntegrationRules =
 
+    let private decodeAndApply current envelope =
+        match StrengthStore.tryDecodeEnvelope envelope with
+        | Error error -> Error error
+        | Ok event ->
+            StrengthProjection.apply (unbox<StrengthProjection> current) event
+            |> Result.map box
+            |> Result.mapError (fun error -> sprintf "Strength integration rejected: %A" error)
+
     let strengthRule: IntegrationRule =
         { Name = "Strength"
           Initial = box StrengthProjection.empty
@@ -21,13 +29,7 @@ module StrengthIntegrationRules =
                 match LegacyProtocolClassifier.classifyPayload envelope.EventType envelope.Payload with
                 | LegacyProtocolVerdict.LegacyStrength reason -> Error(LegacyProtocolClassifier.refusalMessage reason)
                 | LegacyProtocolVerdict.CurrentProtocol
-                | LegacyProtocolVerdict.NotStrength ->
-                    match StrengthStore.tryDecodeEnvelope envelope with
-                    | Error error -> Error error
-                    | Ok event ->
-                        StrengthProjection.apply (unbox<StrengthProjection> current) event
-                        |> Result.map box
-                        |> Result.mapError (fun error -> sprintf "Strength integration rejected: %A" error)
+                | LegacyProtocolVerdict.NotStrength -> decodeAndApply current envelope
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 

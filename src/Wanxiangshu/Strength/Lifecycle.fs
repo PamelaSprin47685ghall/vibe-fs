@@ -29,21 +29,25 @@ module StrengthLifecycle =
             Some(StrengthEvents.abandoned view.Request.DecisionId binding.TargetProviderRun)
         | _ -> None
 
+    let private promotionFromDecision (view: StrengthDelegationView) (prepared: StrengthCandidatePrepared) turn decision =
+        match decision with
+        | StrengthPromotionDecision.Promote ->
+            Some(
+                StrengthEvents.promoted
+                    prepared.OwnerSessionId
+                    prepared.DecisionId
+                    prepared.TargetProviderRun
+                    prepared.FrameDigest
+                    prepared.MaterialPayloads
+            )
+        | StrengthPromotionDecision.IgnoreWrongRun -> None
+        | StrengthPromotionDecision.AwaitOrAbandon -> abandonOrWait view turn
+
     let private promotionEvent (view: StrengthDelegationView) (turn: ReconciledTurn) =
         match view.Binding, view.Prepared with
         | Some binding, Some prepared ->
-            match StrengthTurnEvidence.promotionDecision binding.TargetProviderRun turn with
-            | StrengthPromotionDecision.Promote ->
-                Some(
-                    StrengthEvents.promoted
-                        prepared.OwnerSessionId
-                        prepared.DecisionId
-                        prepared.TargetProviderRun
-                        prepared.FrameDigest
-                        prepared.MaterialPayloads
-                )
-            | StrengthPromotionDecision.IgnoreWrongRun -> None
-            | StrengthPromotionDecision.AwaitOrAbandon -> abandonOrWait view turn
+            let decision = StrengthTurnEvidence.promotionDecision binding.TargetProviderRun turn
+            promotionFromDecision view prepared turn decision
         | _ -> None
 
     let reconcileEvent (projection: StrengthProjection) (turn: ReconciledTurn) : StrengthEvent option =
@@ -80,6 +84,26 @@ module StrengthLifecycle =
         else
             Ok()
 
+    let private chooseReplayCandidate (ownerSessionId: SessionId) (view: StrengthDelegationView) =
+        match view.Prepared, view.State with
+        | Some prepared, (StrengthCandidateState.Promoted | StrengthCandidateState.Traced) when
+            prepared.OwnerSessionId = ownerSessionId
+            ->
+            Some(prepared, view)
+        | _ -> None
+
+    let private resolveBeforeIndex prepared target authorityRoot messages messageIdOf =
+        let targetIndex =
+            messages |> List.tryFindIndex (fun message -> messageIdOf message = Some target)
+
+        let rootIndex =
+            messages
+            |> List.tryFindIndex (fun message -> messageIdOf message = Some authorityRoot)
+
+        match targetIndex, rootIndex with
+        | Some targetAt, Some rootAt when rootAt < targetAt -> Ok targetAt
+        | _ -> anchorMissingError prepared target
+
     /// Build deterministic replay plans for every unretired Promoted decision owned
     /// by this Session. The caller supplies Host message ids and payload loading;
     /// this module never guesses an anchor or reconstructs missing payload bytes.
@@ -94,18 +118,7 @@ module StrengthLifecycle =
             projection.ByDecision
             |> Map.toList
             |> List.map snd
-            |> List.choose (fun view ->
-                match view.Prepared with
-                | Some prepared when prepared.OwnerSessionId = ownerSessionId ->
-                    match view.State with
-                    | StrengthCandidateState.Promoted
-                    | StrengthCandidateState.Traced -> Some(prepared, view)
-                    | StrengthCandidateState.Requested
-                    | StrengthCandidateState.Bound
-                    | StrengthCandidateState.Prepared
-                    | StrengthCandidateState.Closed _
-                    | StrengthCandidateState.Abandoned -> None
-                | _ -> None)
+            |> List.choose (chooseReplayCandidate ownerSessionId)
             |> List.sortBy (fun (prepared, _) -> StrengthDecisionId.value prepared.DecisionId)
 
         let rec loop
@@ -122,17 +135,7 @@ module StrengthLifecycle =
                         view.Request.OwnerLogicalRun.AuthorityRootUserMessageId
                         |> AuthorityRootUserMessageId.value
 
-                    let targetIndex =
-                        messages |> List.tryFindIndex (fun message -> messageIdOf message = Some target)
-
-                    let rootIndex =
-                        messages
-                        |> List.tryFindIndex (fun message -> messageIdOf message = Some authorityRoot)
-
-                    let! beforeIndex =
-                        match targetIndex, rootIndex with
-                        | Some targetAt, Some rootAt when rootAt < targetAt -> Ok targetAt
-                        | _ -> anchorMissingError prepared target
+                    let! beforeIndex = resolveBeforeIndex prepared target authorityRoot messages messageIdOf
 
                     let! bundle = loadBundle prepared
                     do! requireDigestMatch prepared bundle

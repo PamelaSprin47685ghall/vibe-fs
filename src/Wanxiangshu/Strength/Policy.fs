@@ -84,34 +84,38 @@ module StrengthPolicy =
         else
             StrengthEligibility.Eligible
 
+    let private buildRequest (sha256: string -> string) (opportunity: StrengthOpportunity) budget calls =
+        match calls with
+        | [] -> Error "empty-source-tool-call-set"
+        | _ ->
+            Ok
+                { DecisionId =
+                    Delegation.deriveDecisionId
+                        sha256
+                        opportunity.ContractRevision
+                        opportunity.OwnerLogicalRun
+                        opportunity.SourceProviderRun
+                  OwnerSessionId = opportunity.OwnerSessionId
+                  OwnerLogicalRun = opportunity.OwnerLogicalRun
+                  SourcePhysicalUserMessageId = opportunity.SourcePhysicalUserMessageId
+                  SourceProviderRun = opportunity.SourceProviderRun
+                  SourceToolCallIds = calls
+                  RequestedRounds = budget
+                  ContractRevision = opportunity.ContractRevision }
+
+    let private checkEligibilityBudget (sha256: string -> string) (opportunity: StrengthOpportunity) =
+        match opportunity.RequestedRounds with
+        | None -> Error "no-authorization-opportunity"
+        | Some budget when ReadonlyRoundBudget.value budget = 0 -> Error "zero-round-budget"
+        | Some budget -> buildRequest sha256 opportunity budget opportunity.SourceToolCallIds
+
     /// Pure Evidence -> Decision. Predictor configuration is the caller's input
     /// and means existence only: temporary capacity shortage is not a reason to
     /// refuse admission, and capacity is never probed here.
     let tryRequest (sha256: string -> string) (opportunity: StrengthOpportunity) : Result<DelegationRequest, string> =
         match eligibility opportunity with
         | StrengthEligibility.Ineligible reason -> Error reason
-        | StrengthEligibility.Eligible ->
-            match opportunity.RequestedRounds with
-            | None -> Error "no-authorization-opportunity"
-            | Some budget when ReadonlyRoundBudget.value budget = 0 -> Error "zero-round-budget"
-            | Some budget ->
-                match opportunity.SourceToolCallIds with
-                | [] -> Error "empty-source-tool-call-set"
-                | calls ->
-                    Ok
-                        { DecisionId =
-                            Delegation.deriveDecisionId
-                                sha256
-                                opportunity.ContractRevision
-                                opportunity.OwnerLogicalRun
-                                opportunity.SourceProviderRun
-                          OwnerSessionId = opportunity.OwnerSessionId
-                          OwnerLogicalRun = opportunity.OwnerLogicalRun
-                          SourcePhysicalUserMessageId = opportunity.SourcePhysicalUserMessageId
-                          SourceProviderRun = opportunity.SourceProviderRun
-                          SourceToolCallIds = calls
-                          RequestedRounds = budget
-                          ContractRevision = opportunity.ContractRevision }
+        | StrengthEligibility.Eligible -> checkEligibilityBudget sha256 opportunity
 
     let decide (sha256: string -> string) (opportunity: StrengthOpportunity) : StrengthAdmission =
         match tryRequest sha256 opportunity with

@@ -170,14 +170,11 @@ module Delegation =
             | DelegationLifecycle.Bound _ -> Some DelegationClosedFrom.Bound
             | _ -> None
 
-        match lifecycle with
-        | DelegationLifecycle.Requested _
-        | DelegationLifecycle.Bound _ ->
-            if expectedFrom lifecycle <> Some closed.From then
-                Error(DelegationTransitionError.Conflict closed.DecisionId)
-            else
-                Ok(DelegationLifecycle.Closed(Option.get (requestOf lifecycle), closed))
-        | _ -> Error(DelegationTransitionError.IllegalFrom(decisionId lifecycle))
+        match expectedFrom lifecycle with
+        | Some expected when expected = closed.From ->
+            Ok(DelegationLifecycle.Closed(Option.get (requestOf lifecycle), closed))
+        | Some _ -> Error(DelegationTransitionError.Conflict closed.DecisionId)
+        | None -> Error(DelegationTransitionError.IllegalFrom(decisionId lifecycle))
 
     let tryAbandon (lifecycle: DelegationLifecycle) : Result<DelegationLifecycle, DelegationTransitionError> =
         match lifecycle with

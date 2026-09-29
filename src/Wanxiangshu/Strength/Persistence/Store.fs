@@ -67,6 +67,11 @@ module StrengthStore =
     let private streamIdFor decisionId =
         EventStreamId.create ("strength/" + decisionText decisionId)
 
+    let private closedParentFor (id: string -> string) =
+        function
+        | DelegationClosedFrom.Requested -> [ id StrengthEventTypes.DelegationRequested ]
+        | DelegationClosedFrom.Bound -> [ id StrengthEventTypes.DelegationBound ]
+
     let private parentsFor sha256 event =
         let decisionId = decisionOf event
         let id eventType = eventIdFor sha256 decisionId eventType
@@ -75,10 +80,7 @@ module StrengthStore =
         | StrengthEvent.DelegationHistoryImported _ -> []
         | StrengthEvent.DelegationRequested _ -> []
         | StrengthEvent.DelegationBound _ -> [ id StrengthEventTypes.DelegationRequested ]
-        | StrengthEvent.DelegationClosed closed ->
-            match closed.From with
-            | DelegationClosedFrom.Requested -> [ id StrengthEventTypes.DelegationRequested ]
-            | DelegationClosedFrom.Bound -> [ id StrengthEventTypes.DelegationBound ]
+        | StrengthEvent.DelegationClosed closed -> closedParentFor id closed.From
         | StrengthEvent.Prepared _ -> [ id StrengthEventTypes.DelegationBound ]
         | StrengthEvent.Promoted _ -> [ id StrengthEventTypes.CandidatePrepared ]
         | StrengthEvent.Traced _ -> [ id StrengthEventTypes.CandidatePromoted ]
@@ -112,48 +114,46 @@ module StrengthStore =
         | "recovery-abandoned" -> Some DelegationClosedReason.RecoveryAbandoned
         | _ -> None
 
+    let private encodeImportOutcome =
+        function
+        | DelegationImportOutcome.Adopted material ->
+            Encode.object
+                [ "kind", Encode.string "adopted"
+                  "target_provider_run", Encode.string (ProviderRunIdentity.value material.TargetProviderRun)
+                  "frame_digest", Encode.string material.FrameDigest
+                  "byte_length", Encode.int material.ByteLength
+                  "payload_refs",
+                  Encode.list (
+                      material.MaterialPayloads
+                      |> List.map (fun payloadRef -> Encode.string (PayloadRef.value payloadRef))
+                  )
+                  "traced_start_inclusive",
+                  (match material.TracedStartInclusive with
+                   | Some value -> Encode.int64 value
+                   | None -> Encode.nil)
+                  "traced_end_exclusive",
+                  (match material.TracedEndExclusive with
+                   | Some value -> Encode.int64 value
+                   | None -> Encode.nil) ]
+        | DelegationImportOutcome.Relinquished material ->
+            Encode.object
+                [ "kind", Encode.string "relinquished"
+                  "target_provider_run",
+                  (match material.TargetProviderRun with
+                   | Some value -> Encode.string (ProviderRunIdentity.value value)
+                   | None -> Encode.nil)
+                  "reason", Encode.string (closedReasonText material.Reason) ]
+
     let private encodePayload =
         function
         | StrengthEvent.DelegationHistoryImported imported ->
-            let outcomeJson =
-                match imported.Outcome with
-                | DelegationImportOutcome.Adopted material ->
-                    Encode.object
-                        [ "kind", Encode.string "adopted"
-                          "target_provider_run", Encode.string (ProviderRunIdentity.value material.TargetProviderRun)
-                          "frame_digest", Encode.string material.FrameDigest
-                          "byte_length", Encode.int material.ByteLength
-                          "payload_refs",
-                          Encode.list (
-                              material.MaterialPayloads
-                              |> List.map (fun payloadRef -> Encode.string (PayloadRef.value payloadRef))
-                          )
-                          "traced_start_inclusive",
-                          (match material.TracedStartInclusive with
-                           | Some value -> Encode.int64 value
-                           | None -> Encode.nil)
-                          "traced_end_exclusive",
-                          (match material.TracedEndExclusive with
-                           | Some value -> Encode.int64 value
-                           | None -> Encode.nil) ]
-                | DelegationImportOutcome.Relinquished material ->
-                    Encode.object
-                        [ "kind", Encode.string "relinquished"
-                          "target_provider_run",
-                          (match material.TargetProviderRun with
-                           | Some value -> Encode.string (ProviderRunIdentity.value value)
-                           | None -> Encode.nil)
-                          "reason", Encode.string material.Reason ]
+            let outcomeJson = encodeImportOutcome imported.Outcome
 
             Encode.object
-                [ "decision_id", Encode.string (decisionText imported.DecisionId)
-                  "source_stream_id", Encode.string imported.SourceStreamId
-                  "source_event_id", Encode.string imported.SourceEventId
-                  "import_id", Encode.string imported.ImportId
-                  "old_budget_evidence",
-                  (match imported.OldBudgetEvidence with
-                   | Some value -> Encode.string value
-                   | None -> Encode.nil)
+                [ "import_id", Encode.string (StrengthImportId.value imported.ImportId)
+                  "contract_revision", Encode.int (DelegationContractRevision.value imported.ContractRevision)
+                  "decision_id", Encode.string (decisionText imported.DecisionId)
+                  "owner_session_id", Encode.string (SessionId.value imported.OwnerSessionId)
                   "outcome", outcomeJson ]
         | StrengthEvent.DelegationRequested requested ->
             Encode.object

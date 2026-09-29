@@ -321,22 +321,25 @@ module private StrengthReplicaRuntimeLogic =
         { ReplicaSessionId = replica
           PriorProviderRun = None }
 
+    let private isNonToolPart =
+        function
+        | ProviderProjection.WireToolCall _
+        | ProviderProjection.WireToolResult _ -> false
+        | _ -> true
+
+    let private isAssistantPlainText (raw: obj) =
+        match ProviderWireCapture.decodeMessage raw with
+        | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
+            message.Parts |> List.forall isNonToolPart
+        | _ -> false
+
     /// DELEGATE-003/005: a pure-text assistant response is the companion's own
     /// early end. It is an early-end signal, never material for the master, and
     /// the round it spent was already counted at admission.
     let private endsWithPlainText (rawMessages: obj list) : bool =
         match List.tryLast rawMessages with
         | None -> false
-        | Some raw ->
-            match ProviderWireCapture.decodeMessage raw with
-            | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
-                message.Parts
-                |> List.forall (fun part ->
-                    match part with
-                    | ProviderProjection.WireToolCall _
-                    | ProviderProjection.WireToolResult _ -> false
-                    | _ -> true)
-            | _ -> false
+        | Some raw -> isAssistantPlainText raw
 
     [<RequireQualifiedAccess>]
     type ReplicaAdmission =
@@ -389,6 +392,27 @@ module private StrengthReplicaRuntimeLogic =
         else
             Error "StrengthReplica observed batches diverge from the owned material"
 
+    let private applyReadyOutcome replaceState complete state batches =
+        match observeCompletedBatch state.Batches batches with
+        | Ok observed ->
+            replaceState state { state with Batches = observed } |> ignore
+            true
+        | Error reason ->
+            complete (StrengthReplicaTerminal.InvalidFrame reason) state
+            true
+
+    let private applyRetiredOutcome replaceState complete state reason batches =
+        match observeCompletedBatch state.Batches batches with
+        | Ok observed ->
+            let next = { state with Batches = observed }
+
+            replaceState state next |> ignore
+            complete (terminalForRetiredReason reason) next
+            true
+        | Error reason ->
+            complete (StrengthReplicaTerminal.InvalidFrame reason) state
+            true
+
     /// Applies the admitted transform to decision state. Ready fresh material is
     /// appended without touching the request count; a diverging observation is an
     /// invariant failure that closes the decision InvalidFrame. Retired
@@ -402,24 +426,88 @@ module private StrengthReplicaRuntimeLogic =
         match transformed with
         | StrengthReplicaTransformOutcome.NotReplica -> false
         | StrengthReplicaTransformOutcome.Ready batches ->
-            match observeCompletedBatch state.Batches batches with
-            | Ok observed ->
-                replaceState state { state with Batches = observed } |> ignore
-                true
-            | Error reason ->
-                complete (StrengthReplicaTerminal.InvalidFrame reason) state
-                true
+            applyReadyOutcome replaceState complete state batches
         | StrengthReplicaTransformOutcome.Retired(reason, batches) ->
-            match observeCompletedBatch state.Batches batches with
-            | Ok observed ->
-                let next = { state with Batches = observed }
+            applyRetiredOutcome replaceState complete state reason batches
 
-                replaceState state next |> ignore
-                complete (terminalForRetiredReason reason) next
-                true
-            | Error reason ->
-                complete (StrengthReplicaTerminal.InvalidFrame reason) state
-                true
+    let private resolveAdmittedState state candidate transformed =
+        match transformed with
+        | StrengthReplicaTransformOutcome.Retired("provider-request-budget-reached", _) -> state
+        | _ -> candidate
+
+    let private completeIfPlainTextEnded tryState complete replica handled endedInPlainText =
+        let shouldComplete = handled && endedInPlainText
+
+        match shouldComplete, tryState replica with
+        | true, Some current when current.SemanticTerminal |> Option.isNone ->
+            complete StrengthReplicaTerminal.TextCompleted current
+        | _ -> ()
+
+    let private handleAdmittedSession
+        (tryState: SessionId -> StrengthReplicaDecisionState option)
+        (replaceState: StrengthReplicaDecisionState -> StrengthReplicaDecisionState -> bool)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (liveRegistry: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replica: SessionId)
+        (output: obj)
+        (state: StrengthReplicaDecisionState)
+        (candidate: StrengthReplicaDecisionState)
+        (endedInPlainText: bool)
+        : Task<bool> =
+        task {
+            let! transformed =
+                StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output true
+
+            let admitted = resolveAdmittedState state candidate transformed
+            let handled = applyTransformOutcome replaceState complete admitted transformed
+            completeIfPlainTextEnded tryState complete replica handled endedInPlainText
+            return handled
+        }
+
+    let private handleIdempotentSession
+        (replaceState: StrengthReplicaDecisionState -> StrengthReplicaDecisionState -> bool)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (liveRegistry: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (output: obj)
+        (admitted: StrengthReplicaDecisionState)
+        : Task<bool> =
+        task {
+            let! transformed =
+                StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output false
+
+            return applyTransformOutcome replaceState complete admitted transformed
+        }
+
+    let private handleAdmission
+        (tryState: SessionId -> StrengthReplicaDecisionState option)
+        (replaceState: StrengthReplicaDecisionState -> StrengthReplicaDecisionState -> bool)
+        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (liveRegistry: StrengthRuntime)
+        (sessions: ISessionHostPort)
+        (replica: SessionId)
+        (output: obj)
+        (state: StrengthReplicaDecisionState)
+        (key: StrengthReplicaRequestKey)
+        (endedInPlainText: bool)
+        : Task<bool> =
+        match admitRequest state key with
+        | ReplicaAdmission.Rejected -> Task.FromResult true
+        | ReplicaAdmission.Admitted candidate ->
+            handleAdmittedSession
+                tryState
+                replaceState
+                complete
+                liveRegistry
+                sessions
+                replica
+                output
+                state
+                candidate
+                endedInPlainText
+        | ReplicaAdmission.Idempotent admitted ->
+            handleIdempotentSession replaceState complete liveRegistry sessions output admitted
 
     /// DELEGATE-5.3: admission happens here, before the transform may let this
     /// outbound request leave the process. The transform only mirrors an
@@ -434,65 +522,27 @@ module private StrengthReplicaRuntimeLogic =
         (sessionIdText: string)
         (output: obj)
         : Task<bool> =
-        task {
-            let replica = SessionId.create sessionIdText
+        let replica = SessionId.create sessionIdText
 
-            match tryState replica with
-            | None -> return false
-            | Some state when state.SemanticTerminal |> Option.isSome ->
-                // Semantic completion may precede physical Host terminal. Keep
-                // the Replica branch closed over this already-cancelled tail;
-                // the original abort owns physical interruption, so do not emit
-                // another abort or reinterpret the request as Ordinary work.
-                return true
-            | Some state ->
-                let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+        match tryState replica with
+        | None -> Task.FromResult false
+        | Some state when state.SemanticTerminal |> Option.isSome -> Task.FromResult true
+        | Some state ->
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+            let key = requestKeyOf replica rawMessages
+            let endedInPlainText = endsWithPlainText rawMessages
 
-                let key = requestKeyOf replica rawMessages
-
-                // WHAT[003]/[005]: read the companion's own ending before the
-                // transform runs. The transform writes the frozen mirror back
-                // into this same `output` object in place, so afterwards the
-                // last message is the owner's, not the child's answer.
-                let endedInPlainText = endsWithPlainText rawMessages
-
-                match admitRequest state key with
-                | ReplicaAdmission.Rejected -> return true
-                | ReplicaAdmission.Admitted candidate ->
-                    // The live registry owns this request's budget verdict; the
-                    // transform retires an unadmitted request before any
-                    // physical send. A refused request is never recorded as
-                    // admitted, so the decision's admission count stays exact.
-                    let! transformed =
-                        StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output true
-
-                    let admitted =
-                        match transformed with
-                        | StrengthReplicaTransformOutcome.Retired("provider-request-budget-reached", _) -> state
-                        | _ -> candidate
-
-                    let handled = applyTransformOutcome replaceState complete admitted transformed
-
-                    if handled && endedInPlainText then
-                        match tryState replica with
-                        | Some current when current.SemanticTerminal |> Option.isNone ->
-                            // The companion ended itself in prose. Close the
-                            // decision now instead of waiting for a Host turn
-                            // that reports an ordinary failure for the very same
-                            // ending.
-                            complete StrengthReplicaTerminal.TextCompleted current
-                        | _ -> ()
-
-                    return handled
-                | ReplicaAdmission.Idempotent admitted ->
-                    // The same physical request transformed again: the registry
-                    // already admitted and counted it, so the mirror is applied
-                    // without consuming another round.
-                    let! transformed =
-                        StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output false
-
-                    return applyTransformOutcome replaceState complete admitted transformed
-        }
+            handleAdmission
+                tryState
+                replaceState
+                complete
+                liveRegistry
+                sessions
+                replica
+                output
+                state
+                key
+                endedInPlainText
 
     let completeFromTurnOutcome
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
@@ -740,6 +790,69 @@ type StrengthReplicaRuntime
         if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
             removeState state
 
+    let sendPreparedPromptWithModel state identitySeed admitted promptModel replicaSessionId =
+        task {
+            replaceState state admitted |> ignore
+
+            do!
+                StrengthReplicaRuntimeLogic.bootstrapDetachedSend
+                    dispatcher
+                    sessions
+                    complete
+                    abortReplica
+                    promptModel
+                    directory
+                    replicaSessionId
+                    identitySeed
+                    admitted
+
+            return Ok()
+        }
+
+    let acquireAndSendBootstrapPrompt state identitySeed admitted replicaSessionId =
+        task {
+            match!
+                StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort
+                    sessions
+                    tryAcquireModel
+                    replicaSessionId
+                    state.Agent
+            with
+            | Error error ->
+                complete (StrengthReplicaTerminal.Failed error) admitted
+                do! abortReplica admitted
+                return Error error
+            | Ok promptModel ->
+                return! sendPreparedPromptWithModel state identitySeed admitted promptModel replicaSessionId
+        }
+
+    let sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId =
+        task {
+            if not (liveRegistry.TryAdmitRequest replicaSessionId) then
+                complete StrengthReplicaTerminal.BudgetReached state
+                do! abortReplica state
+                return Error "StrengthReplica budget reached before the bootstrap request"
+            else
+                return! acquireAndSendBootstrapPrompt state identitySeed admitted replicaSessionId
+        }
+
+    let sendPreparedPromptWithSeed state identitySeed replicaSessionId =
+        match
+            StrengthReplicaRuntimeLogic.admitRequest
+                state
+                (StrengthReplicaRuntimeLogic.bootstrapRequestKey replicaSessionId)
+        with
+        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Rejected ->
+            Task.FromResult(Error "StrengthReplica decision already closed")
+        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Idempotent _ -> Task.FromResult(Ok())
+        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Admitted admitted ->
+            sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId
+
+    let sendPreparedPromptForState state replicaSessionId =
+        match state.IdentitySeed with
+        | None -> Task.FromResult(Error "StrengthReplica prepared session has no identity seed")
+        | Some identitySeed -> sendPreparedPromptWithSeed state identitySeed replicaSessionId
+
     member _.IsReplica(sessionId: SessionId) =
         liveRegistry.TryFindByReplica sessionId |> Option.isSome
 
@@ -954,65 +1067,11 @@ type StrengthReplicaRuntime
     /// an already-admitted bootstrap is not re-sent, so a retry cannot turn into
     /// a free extra provider request.
     member this.SendPreparedPrompt(replicaSessionId: SessionId) : Task<Result<unit, string>> =
-        task {
-            match tryState replicaSessionId with
-            | None -> return Error "StrengthReplica prepared session is not live"
-            | Some state when state.SemanticTerminal |> Option.isSome ->
-                return Error "StrengthReplica decision already closed"
-            | Some state ->
-                match state.IdentitySeed with
-                | None -> return Error "StrengthReplica prepared session has no identity seed"
-                | Some identitySeed ->
-                    match
-                        StrengthReplicaRuntimeLogic.admitRequest
-                            state
-                            (StrengthReplicaRuntimeLogic.bootstrapRequestKey replicaSessionId)
-                    with
-                    | StrengthReplicaRuntimeLogic.ReplicaAdmission.Rejected ->
-                        return Error "StrengthReplica decision already closed"
-                    | StrengthReplicaRuntimeLogic.ReplicaAdmission.Idempotent _ ->
-                        // The bootstrap request was already admitted (and sent);
-                        // a repeat call must not resend it as a free round.
-                        return Ok()
-                    | StrengthReplicaRuntimeLogic.ReplicaAdmission.Admitted admitted when
-                        not (liveRegistry.TryAdmitRequest replicaSessionId)
-                        ->
-                        // The live registry owns the request budget: a spent
-                        // budget closes the decision before any bootstrap send.
-                        complete StrengthReplicaTerminal.BudgetReached state
-                        do! abortReplica state
-                        return Error "StrengthReplica budget reached before the bootstrap request"
-                    | StrengthReplicaRuntimeLogic.ReplicaAdmission.Admitted admitted ->
-                        // The registry consumed this request's round above; the
-                        // bootstrap prompt is this run's first outbound request.
-                        match!
-                            StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort
-                                sessions
-                                tryAcquireModel
-                                replicaSessionId
-                                state.Agent
-                        with
-                        | Error error ->
-                            complete (StrengthReplicaTerminal.Failed error) admitted
-                            do! abortReplica admitted
-                            return Error error
-                        | Ok promptModel ->
-                            replaceState state admitted |> ignore
-
-                            do!
-                                StrengthReplicaRuntimeLogic.bootstrapDetachedSend
-                                    dispatcher
-                                    sessions
-                                    complete
-                                    abortReplica
-                                    promptModel
-                                    directory
-                                    replicaSessionId
-                                    identitySeed
-                                    admitted
-
-                            return Ok()
-        }
+        match tryState replicaSessionId with
+        | None -> Task.FromResult(Error "StrengthReplica prepared session is not live")
+        | Some state when state.SemanticTerminal |> Option.isSome ->
+            Task.FromResult(Error "StrengthReplica decision already closed")
+        | Some state -> sendPreparedPromptForState state replicaSessionId
 
     /// Single-step decision entry: prepare the empty replica child, then send
     /// the prompt. Wiring that must persist DelegationBound between the two
