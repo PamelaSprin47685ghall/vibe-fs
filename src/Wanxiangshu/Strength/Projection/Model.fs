@@ -282,7 +282,7 @@ module StrengthProjection =
                 { projection with
                     ByDecision = Map.add dkey view projection.ByDecision }
 
-    let private bindExistingView projection dkey tkey bound (existing: StrengthDelegationView) =
+    let private bindExistingView projection dkey tkey (bound: DelegationBinding) (existing: StrengthDelegationView) =
         match existing.State with
         | StrengthCandidateState.Bound when
             existing.Binding
@@ -303,7 +303,7 @@ module StrengthProjection =
                     ByTargetRun = Map.add tkey bound.DecisionId projection.ByTargetRun }
         | _ -> Error(StrengthProjectionError.BoundConflict bound.DecisionId)
 
-    let private resolveBoundView projection dkey tkey bound =
+    let private resolveBoundView projection dkey tkey (bound: DelegationBinding) =
         match Map.tryFind dkey projection.ByDecision with
         | None -> Error(StrengthProjectionError.BoundWithoutRequested bound.DecisionId)
         | Some existing -> bindExistingView projection dkey tkey bound existing
@@ -365,7 +365,7 @@ module StrengthProjection =
         dkey
         (prepared: StrengthCandidatePrepared)
         (existing: StrengthDelegationView)
-        binding
+        (binding: DelegationBinding)
         =
         if
             prepared.TargetProviderRun <> binding.TargetProviderRun

@@ -326,35 +326,45 @@ module PluginHooks =
             // The call id is read from the hook input itself: WHAT[009]'s
             // both-halves pairing lives in decodeContext, and this hook input
             // carries no messageID, so decodeContext would always answer None.
+            let sanitizeSnapshot (toolName: string) (snapshot: ProtocolArgumentVault.Snapshot) =
+                if ManagerReviewTools.isReviewTool toolName then
+                    snapshot
+                else
+                    { snapshot with Contract = None }
+
+            let commitRecordedSnapshot (vault: ProtocolArgumentVault.Vault) (sessionId: string) (toolCallId: ToolCallId) (recorded: ProtocolArgumentVault.Snapshot) =
+                if
+                    recorded.Contract.IsNone
+                    && recorded.ReadonlyRounds.IsNone
+                    && recorded.SelfNote.IsNone
+                then
+                    ()
+                else
+                    ProtocolArgumentVault.record
+                        vault
+                        sessionId
+                        (ToolCallId.value toolCallId)
+                        recorded
+
+            let recordSnapshotIfPresent (vault: ProtocolArgumentVault.Vault) (sessionId: string) (toolCallId: ToolCallId) (toolName: string) (args: obj) =
+                match ProtocolArgumentVault.snapshotOfArguments args with
+                | Some snapshot -> commitRecordedSnapshot vault sessionId toolCallId (sanitizeSnapshot toolName snapshot)
+                | None -> ()
+
+            let tryRecordVaultEntry (vault: ProtocolArgumentVault.Vault) (toolInput: obj) (toolOutput: obj) (toolCallId: ToolCallId) =
+                let context = ToolHostCodec.decodeContext toolInput
+                if not (String.IsNullOrWhiteSpace context.SessionId) then
+                    let toolName = toolField toolInput "tool"
+                    recordSnapshotIfPresent vault context.SessionId toolCallId toolName toolOutput?args
+
+            let tryRecordCall (vault: ProtocolArgumentVault.Vault) (toolInput: obj) (toolOutput: obj) (callIdOpt: ToolCallId option) =
+                match callIdOpt with
+                | Some toolCallId -> tryRecordVaultEntry vault toolInput toolOutput toolCallId
+                | None -> ()
+
             let recordProtocolArgumentVault (toolInput: obj) (toolOutput: obj) =
                 if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                    let toolName = toolField toolInput "tool"
-                    let context = ToolHostCodec.decodeContext toolInput
-
-                    match ToolHostCodec.hookCallId toolInput with
-                    | Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        match ProtocolArgumentVault.snapshotOfArguments toolOutput?args with
-                        | Some snapshot ->
-                            let recorded =
-                                if ManagerReviewTools.isReviewTool toolName then
-                                    snapshot
-                                else
-                                    { snapshot with Contract = None }
-
-                            if
-                                recorded.Contract.IsNone
-                                && recorded.ReadonlyRounds.IsNone
-                                && recorded.SelfNote.IsNone
-                            then
-                                ()
-                            else
-                                ProtocolArgumentVault.record
-                                    boot.ProtocolArgumentVault
-                                    context.SessionId
-                                    (ToolCallId.value toolCallId)
-                                    recorded
-                        | None -> ()
-                    | _ -> ()
+                    tryRecordCall boot.ProtocolArgumentVault toolInput toolOutput (ToolHostCodec.hookCallId toolInput)
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {

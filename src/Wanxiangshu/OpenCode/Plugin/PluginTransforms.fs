@@ -315,6 +315,48 @@ module PluginTransforms =
         // same history. Pure per part: business arguments verbatim, protocol
         // keys appended when missing or different, results untouched, no vault
         // entry means fail-open.
+        let restoreMergedPart (part: obj) (state: obj) (hasStateInput: bool) (current: obj) (merged: obj) : obj =
+            if obj.ReferenceEquals(merged, current) then
+                part
+            elif hasStateInput then
+                let stateCopy = shallowCopyObj state
+                stateCopy?input <- merged
+                let partCopy = shallowCopyObj part
+                partCopy?state <- stateCopy
+                partCopy
+            else
+                let partCopy = shallowCopyObj part
+                partCopy?args <- merged
+                partCopy
+
+        let tryRestoreSnapshot (part: obj) (snapshot: ProtocolArgumentVault.Snapshot) : obj =
+            let state = ProviderWireDecode.readField part "state"
+            let hasStateInput = not (isNull state) && not (isNull state?input)
+            let hasTopLevelArgs = not (isNull part?args)
+
+            if not hasStateInput && not hasTopLevelArgs then
+                part
+            else
+                let current = if hasStateInput then state?input else part?args
+                let merged = ProtocolArgumentVault.restoreArguments snapshot current
+                restoreMergedPart part state hasStateInput current merged
+
+        let tryRestoreWithSnapshot (part: obj) (snapshotOpt: ProtocolArgumentVault.Snapshot option) : obj =
+            match snapshotOpt with
+            | Some snapshot -> tryRestoreSnapshot part snapshot
+            | None -> part
+
+        let tryRestoreWithCallId (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) (callId: string option) : obj =
+            match callId with
+            | None -> part
+            | Some id -> tryRestoreWithSnapshot part (ProtocolArgumentVault.tryFind vault sessionId id)
+
+        let restoreToolCallPart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) (isToolCallPart: bool) : obj =
+            if not isToolCallPart then
+                part
+            else
+                tryRestoreWithCallId vault sessionId part (ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ])
+
         let restorePart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) : obj =
             if isNull part then
                 part
@@ -325,70 +367,42 @@ module PluginTransforms =
                     |> fun value -> value.ToLowerInvariant()
 
                 let isToolCallPart = kind = "tool" || kind = "tool-call" || kind = "tool_call"
+                restoreToolCallPart vault sessionId part isToolCallPart
 
-                if not isToolCallPart then
-                    part
-                else
-                    match ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ] with
-                    | None -> part
-                    | Some callId ->
-                        match ProtocolArgumentVault.tryFind vault sessionId callId with
-                        | None -> part
-                        | Some snapshot ->
-                            let state = ProviderWireDecode.readField part "state"
+        let restoreRawParts (raw: obj) (parts: obj list) (restoredParts: obj list) : obj =
+            if List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) parts restoredParts then
+                raw
+            else
+                let copy = shallowCopyObj raw
+                copy?parts <- box (List.toArray restoredParts)
+                copy
 
-                            let hasStateInput = not (isNull state) && not (isNull state?input)
+        let restoreMessage (vault: ProtocolArgumentVault.Vault) (sessionId: string) (raw: obj) : obj =
+            if isNull raw then
+                raw
+            else
+                let parts = ProviderWireDecode.rawPartsOf raw
+                let restoredParts = parts |> List.map (restorePart vault sessionId)
+                restoreRawParts raw parts restoredParts
 
-                            let hasTopLevelArgs = not (isNull part?args)
+        let applyRewrittenMessages (outObj: obj) (rawMessages: obj list) (rewritten: obj list) : unit =
+            if not (List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) rawMessages rewritten) then
+                HostMessageProjection.replaceMessagesInPlace outObj rewritten
 
-                            if not hasStateInput && not hasTopLevelArgs then
-                                part
-                            else
-                                let current = if hasStateInput then state?input else part?args
+        let rewriteSessionMessages (vault: ProtocolArgumentVault.Vault) (outObj: obj) (sessionId: string) : unit =
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+            let rewritten = rawMessages |> List.map (restoreMessage vault sessionId)
+            applyRewrittenMessages outObj rawMessages rewritten
 
-                                let merged = ProtocolArgumentVault.restoreArguments snapshot current
-
-                                if obj.ReferenceEquals(merged, current) then
-                                    part
-                                elif hasStateInput then
-                                    let stateCopy = shallowCopyObj state
-                                    stateCopy?input <- merged
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?state <- stateCopy
-                                    partCopy
-                                else
-                                    let partCopy = shallowCopyObj part
-                                    partCopy?args <- merged
-                                    partCopy
+        let tryRestoreSessionArguments (vault: ProtocolArgumentVault.Vault) (outObj: obj) (sessionIdOpt: string option) : unit =
+            match sessionIdOpt with
+            | Some sessionId -> rewriteSessionMessages vault outObj sessionId
+            | None -> ()
 
         let restoreProtocolArguments (outObj: obj) : Task<unit> =
             task {
                 if not (isNull outObj) && not (isNull outObj?messages) then
-                    match ProviderWireDecode.projectionSessionIdFromMessages outObj with
-                    | Some sessionId ->
-                        let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
-
-                        let restoreMessage (raw: obj) : obj =
-                            if isNull raw then
-                                raw
-                            else
-                                let parts = ProviderWireDecode.rawPartsOf raw
-
-                                let restoredParts =
-                                    parts |> List.map (restorePart boot.ProtocolArgumentVault sessionId)
-
-                                if List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) parts restoredParts then
-                                    raw
-                                else
-                                    let copy = shallowCopyObj raw
-                                    copy?parts <- box (List.toArray restoredParts)
-                                    copy
-
-                        let rewritten = rawMessages |> List.map restoreMessage
-
-                        if not (List.forall2 (fun a b -> obj.ReferenceEquals(a, b)) rawMessages rewritten) then
-                            HostMessageProjection.replaceMessagesInPlace outObj rewritten
-                    | None -> ()
+                    tryRestoreSessionArguments boot.ProtocolArgumentVault outObj (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
         let captureReadonlyDelegation outObj =

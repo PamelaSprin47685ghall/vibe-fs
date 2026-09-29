@@ -158,6 +158,10 @@ module ToolSchemaJson =
                     pushed <- Set.add key pushed
                     true))
 
+    let private cleanAdditionalProperties (schema: obj) : unit =
+        if field schema "additionalProperties" = box true then
+            deleteKey schema "additionalProperties"
+
     let rec private normalizeWith (stripNull: bool) (value: obj) : obj =
         if isArray value then
             unbox<obj array> value |> Array.map (normalizeWith false) |> box
@@ -165,36 +169,30 @@ module ToolSchemaJson =
             value
         else
             let schema = buildSchema value
-
-            if field schema "additionalProperties" = box true then
-                deleteKey schema "additionalProperties"
-
+            cleanAdditionalProperties schema
             stripNullMembers stripNull schema
+
+    and private propertyField (required: Set<string> option) (property: obj) : obj =
+        let name = entryKey property
+
+        let strip =
+            match required with
+            | Some names -> not (Set.contains name names)
+            | None -> true
+
+        box [| box name; normalizeWith strip (entryValue property) |]
+
+    and private buildPropertyEntry (required: Set<string> option) (key: string) (item: obj) : obj =
+        if key = "properties" && isRecord item then
+            let properties = entries item |> Array.map (propertyField required)
+            box [| box key; fromEntries properties |]
+        else
+            box [| box key; normalizeWith false item |]
 
     and private buildSchema (value: obj) : obj =
         let required = requiredNames value
-
         entries value
-        |> Array.map (fun entry ->
-            let key = entryKey entry
-            let item = entryValue entry
-
-            if key = "properties" && isRecord item then
-                let properties =
-                    entries item
-                    |> Array.map (fun property ->
-                        let name = entryKey property
-
-                        let strip =
-                            match required with
-                            | Some names -> not (Set.contains name names)
-                            | None -> true
-
-                        box [| box name; normalizeWith strip (entryValue property) |])
-
-                box [| box key; fromEntries properties |]
-            else
-                box [| box key; normalizeWith false item |])
+        |> Array.map (fun entry -> buildPropertyEntry required (entryKey entry) (entryValue entry))
         |> fromEntries
 
     and private stripNullMembers (stripNull: bool) (schema: obj) : obj =
@@ -212,36 +210,39 @@ module ToolSchemaJson =
         | Some kept -> normalizeWith false (merge schema (createObj [ "anyOf" ==> box kept ]))
         | None -> normalizeAnyOf schema
 
+    and private simplifyAnyOfMembers (members: obj array) (schema: obj) : obj =
+        let number = members |> Array.tryFind isNumberMember
+        let nonFinite = members |> Array.filter isNonFiniteEnumMember
+        let rest = withoutKey schema "anyOf"
+
+        if number.IsSome && nonFinite.Length = members.Length - 1 then
+            normalizeWith false (merge number.Value rest)
+        elif isEmptyStructUnion members then
+            normalizeWith false (merge (createObj [ "type" ==> box "object"; "properties" ==> createObj [] ]) rest)
+        elif members.Length = 1 && isRecord members[0] then
+            normalizeWith false (merge members[0] rest)
+        else
+            normalizeAllOf schema
+
     and private normalizeAnyOf (schema: obj) : obj =
         let anyOf = field schema "anyOf"
 
         if not (isArray anyOf) then
             normalizeAllOf schema
         else
-            let members = unbox<obj array> anyOf
-            let number = members |> Array.tryFind isNumberMember
-            let nonFinite = members |> Array.filter isNonFiniteEnumMember
-            let rest = withoutKey schema "anyOf"
+            simplifyAnyOfMembers (unbox<obj array> anyOf) schema
 
-            if number.IsSome && nonFinite.Length = members.Length - 1 then
-                normalizeWith false (merge number.Value rest)
-            elif isEmptyStructUnion members then
-                normalizeWith false (merge (createObj [ "type" ==> box "object"; "properties" ==> createObj [] ]) rest)
-            elif members.Length = 1 && isRecord members[0] then
-                normalizeWith false (merge members[0] rest)
-            else
-                normalizeAllOf schema
+    and private flattenAllOfMembers (members: obj array) (schema: obj) : obj =
+        if members |> Array.forall isRecord && canFlattenAllOf members schema then
+            normalizeWith false (merge (mergeAll members) (withoutKey schema "allOf"))
+        else
+            normalizeIntegerBounds schema
 
     and private normalizeAllOf (schema: obj) : obj =
         let allOf = field schema "allOf"
 
         if isArray allOf then
-            let members = unbox<obj array> allOf
-
-            if members |> Array.forall isRecord && canFlattenAllOf members schema then
-                normalizeWith false (merge (mergeAll members) (withoutKey schema "allOf"))
-            else
-                normalizeIntegerBounds schema
+            flattenAllOfMembers (unbox<obj array> allOf) schema
         else
             normalizeIntegerBounds schema
 
@@ -251,7 +252,62 @@ module ToolSchemaJson =
         else
             schema
 
-    let rec private inlineLocalReferences (value: obj) (definitions: obj) (seen: Set<string>) : obj =
+    and private extractDefs (value: obj) : obj =
+        match field value "$defs" with
+        | defs when isRecord defs -> defs
+        | _ -> null
+
+    and private resolveLocalDefinitions (definitions: obj) (value: obj) : obj =
+        if not (isNull definitions) then
+            definitions
+        else
+            extractDefs value
+
+    and private resolveTargetReference (target: obj) (value: obj) (localDefinitions: obj) (seen: Set<string>) (name: string) : obj option =
+        if isNull target then
+            None
+        else
+            let base' = if isRecord target then target else createObj []
+            Some(
+                inlineLocalReferences
+                    (merge base' (withoutKey value "$ref"))
+                    localDefinitions
+                    (Set.add name seen)
+            )
+
+    and private tryResolveNamedReference (localDefinitions: obj) (value: obj) (seen: Set<string>) (name: string) : obj option =
+        if Set.contains name seen then
+            None
+        else
+            resolveTargetReference (field localDefinitions name) value localDefinitions seen name
+
+    and private inlineNamedReference (referenceName: string option) (localDefinitions: obj) (value: obj) (seen: Set<string>) : obj option =
+        match referenceName with
+        | Some name -> tryResolveNamedReference localDefinitions value seen name
+        | None -> None
+
+    and private tryInlineReference (reference: obj) (localDefinitions: obj) (value: obj) (seen: Set<string>) : obj option =
+        if isString reference && not (isNull localDefinitions) then
+            inlineNamedReference (localReferenceName (string reference)) localDefinitions value seen
+        else
+            None
+
+    and private inlineLocalRecord (value: obj) (definitions: obj) (seen: Set<string>) : obj =
+        let localDefinitions = resolveLocalDefinitions definitions value
+        let reference = field value "$ref"
+        let inlined = tryInlineReference reference localDefinitions value seen
+
+        match inlined with
+        | Some resolved -> resolved
+        | None ->
+            entries value
+            |> Array.map (fun entry ->
+                box
+                    [| box (entryKey entry)
+                       inlineLocalReferences (entryValue entry) localDefinitions seen |])
+            |> fromEntries
+
+    and private inlineLocalReferences (value: obj) (definitions: obj) (seen: Set<string>) : obj =
         if isArray value then
             unbox<obj array> value
             |> Array.map (fun item -> inlineLocalReferences item definitions seen)
@@ -259,46 +315,7 @@ module ToolSchemaJson =
         elif not (isRecord value) then
             value
         else
-            let localDefinitions =
-                if not (isNull definitions) then
-                    definitions
-                else
-                    match field value "$defs" with
-                    | defs when isRecord defs -> defs
-                    | _ -> null
-
-            let reference = field value "$ref"
-
-            let inlined =
-                if isString reference && not (isNull localDefinitions) then
-                    match localReferenceName (string reference) with
-                    | Some name when not (Set.contains name seen) ->
-                        let target = field localDefinitions name
-
-                        if isNull target then
-                            None
-                        else
-                            let base' = if isRecord target then target else createObj []
-
-                            Some(
-                                inlineLocalReferences
-                                    (merge base' (withoutKey value "$ref"))
-                                    localDefinitions
-                                    (Set.add name seen)
-                            )
-                    | _ -> None
-                else
-                    None
-
-            match inlined with
-            | Some resolved -> resolved
-            | None ->
-                entries value
-                |> Array.map (fun entry ->
-                    box
-                        [| box (entryKey entry)
-                           inlineLocalReferences (entryValue entry) localDefinitions seen |])
-                |> fromEntries
+            inlineLocalRecord value definitions seen
 
     and private localReferenceName (reference: string) : string option =
         if reference.StartsWith "#/$defs/" then
@@ -332,16 +349,18 @@ module ToolSchemaJson =
 
     let private isJsonSchema (value: obj) : bool = isRecord value || isBoolean value
 
+    let private configureRenderer (schema: obj) : unit =
+        if isNull schema || not (isFunction (field schema "toJsonSchemaDocument")) then
+            rendererFailure <- "the `effect` package does not expose Schema.toJsonSchemaDocument"
+        else
+            renderer <- schema
+
     let initialize () : Task =
         task {
             try
                 let! moduleObj = importEffect ()
                 let schema = if isNull moduleObj then null else field moduleObj "Schema"
-
-                if isNull schema || not (isFunction (field schema "toJsonSchemaDocument")) then
-                    rendererFailure <- "the `effect` package does not expose Schema.toJsonSchemaDocument"
-                else
-                    renderer <- schema
+                configureRenderer schema
             with ex ->
                 rendererFailure <- string ex
         }

@@ -57,19 +57,7 @@ module StrengthReplicaTools =
 /// Process-local single-flight registry. One owner may have at most one live
 /// replica, and a replica session may belong to exactly one decision. Retire
 /// removes both indexes atomically.
-    let private tryConsumeBudget (admittedRequests: System.Collections.Generic.Dictionary<string, int>) key (binding: StrengthReplicaBinding) =
-        let used =
-            match admittedRequests.TryGetValue key with
-            | true, count -> count
-            | false, _ -> 0
-
-        if used < ReadonlyRoundBudget.value binding.RequestedRounds then
-            admittedRequests.[key] <- used + 1
-            true
-        else
-            false
-
-    type StrengthRuntime() =
+type StrengthRuntime() =
     let gate = obj ()
     /// DSL-cross-callback-proof: physical single-flight — live replica ownership index by owner
     // DSL-MUTABLE: resource — owner-to-replica binding map
@@ -84,6 +72,18 @@ module StrengthReplicaTools =
     /// owner's count, and a refused request consumes nothing.
     // DSL-MUTABLE: resource — admitted outbound request count per live replica
     let admittedRequests = Dictionary<string, int>()
+
+    let tryConsumeBudget key (binding: StrengthReplicaBinding) =
+        let used =
+            match admittedRequests.TryGetValue key with
+            | true, count -> count
+            | false, _ -> 0
+
+        if used < ReadonlyRoundBudget.value binding.RequestedRounds then
+            admittedRequests.[key] <- used + 1
+            true
+        else
+            false
 
     member _.Register(binding: StrengthReplicaBinding) : Result<unit, StrengthRuntimeRegisterError> =
         lock gate (fun () ->
@@ -130,7 +130,7 @@ module StrengthReplicaTools =
 
             match byReplica.TryGetValue key with
             | false, _ -> false
-            | true, binding -> tryConsumeBudget admittedRequests key binding)
+            | true, binding -> tryConsumeBudget key binding)
 
     member _.Retire(replicaSessionId: SessionId) : StrengthReplicaBinding option =
         lock gate (fun () ->

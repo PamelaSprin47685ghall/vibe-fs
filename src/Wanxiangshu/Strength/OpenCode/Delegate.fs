@@ -160,7 +160,7 @@ module StrengthDelegate =
 
     let private tryResolveAssistantRun
         (physical: PhysicalUserMessageId)
-        (messages: 'M list)
+        (messages: SessionMessage list)
         : Result<ProviderRunIdentity, string> =
         match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
         | Ok assistant -> Ok(ProviderRunIdentity.create assistant.Id)
@@ -297,14 +297,14 @@ module StrengthDelegate =
         else
             tryExtractUniqueCalls toolParts
 
-    let private extractWireToolCalls (parts: ProviderProjection.ProviderWirePart list) : (ToolCallId * string) list =
+    let private extractWireToolCalls (parts: ProviderProjection.WirePart list) : (ToolCallId * string) list =
         parts
         |> List.choose (function
             | ProviderProjection.WireToolCall(callId, _, arguments) -> Some(callId, arguments)
             | _ -> None)
 
     let private tryExtractWireAssistantCalls
-        (message: ProviderProjection.ProviderWireMessage)
+        (message: ProviderProjection.WireMessage)
         : (ToolCallId * string) list option =
         if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
             None
@@ -313,7 +313,7 @@ module StrengthDelegate =
             if List.isEmpty calls then None else Some calls
 
     let private matchBatchWithTailCalls
-        (wireMessages: ProviderProjection.ProviderWireMessage list)
+        (wireMessages: ProviderProjection.WireMessage list)
         (tailCalls: (ToolCallId * string) list)
         : (ToolCallId * string) list option =
         match List.tryLast (StrengthBatchCollector.collectCompleteBatches wireMessages) with
@@ -487,7 +487,7 @@ module StrengthDelegate =
         (surface: OwnerSurface)
         (predictorConfigured: bool)
         (request: DelegationRequest)
-        : Result<DelegationAdmitted, string> =
+        : Result<DelegationRequest, string> =
         let opportunity =
             { OwnerSessionId = surface.Owner
               OwnerLogicalRun = request.OwnerLogicalRun
@@ -516,7 +516,7 @@ module StrengthDelegate =
 
     let private handleCaptureAppendOutcome
         (strengthScope: PluginStrengthScope)
-        (admitted: DelegationAdmitted)
+        (admitted: DelegationRequest)
         (appendResult: StrengthDurableAppend)
         : CaptureOutcome =
         match appendResult with
@@ -712,7 +712,7 @@ module StrengthDelegate =
     let private consumePreparedBundle
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
-        (prepared: StrengthPreparedCandidate)
+        (prepared: StrengthCandidatePrepared)
         : Task<unit> =
         task {
             verifyPreparedAnchor strengthScope surface.RawMessages prepared.AnchorDigest
@@ -726,7 +726,7 @@ module StrengthDelegate =
     let private consumePreparedCandidate
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
-        (preparedOpt: StrengthPreparedCandidate option)
+        (preparedOpt: StrengthCandidatePrepared option)
         : Task<unit> =
         match preparedOpt with
         | Some prepared -> consumePreparedBundle strengthScope surface prepared
@@ -735,7 +735,7 @@ module StrengthDelegate =
     let private consumeBoundCandidate
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
-        (bindingOpt: StrengthBinding option)
+        (bindingOpt: DelegationBinding option)
         : Task<unit> =
         match bindingOpt with
         | Some binding when not (surface.Ports.Runtime.IsReplica binding.ReplicaSessionId) ->
@@ -767,7 +767,7 @@ module StrengthDelegate =
 
     let private tryBuildBundleOrThrow
         (strengthScope: PluginStrengthScope)
-        (batches: StrengthFrameBatch list)
+        batches
         : StrengthFrameBundle =
         match StrengthFrame.tryBuild HostDigest.sha256Hex batches with
         | Ok bundle -> bundle
@@ -777,7 +777,7 @@ module StrengthDelegate =
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
         (decisionId: StrengthDecisionId)
-        (completed: StrengthReplicaCompletion)
+        (completed: StrengthReplicaOutcome)
         : Task<unit> =
         match completed.Terminal with
         | StrengthReplicaTerminal.InvalidFrame reason ->
@@ -797,7 +797,7 @@ module StrengthDelegate =
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
         (decisionId: StrengthDecisionId)
-        (preparation: ReplicaPreparation)
+        (preparation: StrengthReplicaPreparation)
         : Task<unit> =
         task {
             match! surface.Ports.Runtime.SendPreparedPrompt preparation.ReplicaSessionId with
@@ -818,7 +818,7 @@ module StrengthDelegate =
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
         (request: DelegationRequest)
-        (preparation: ReplicaPreparation)
+        (preparation: StrengthReplicaPreparation)
         : Task<unit> =
         task {
             match!
@@ -848,7 +848,7 @@ module StrengthDelegate =
         (surface: OwnerSurface)
         (request: DelegationRequest)
         (replicaAgent: string)
-        (replicaMirror: ProviderProjection.ProviderWireMessage list)
+        (replicaMirror: ProviderProjection.WireMessage list)
         : Task<unit> =
         task {
             match!

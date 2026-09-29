@@ -67,7 +67,7 @@ module StrengthStore =
     let private streamIdFor decisionId =
         EventStreamId.create ("strength/" + decisionText decisionId)
 
-    let private closedParentFor (id: string -> string) =
+    let private closedParentFor (id: string -> EventId) =
         function
         | DelegationClosedFrom.Requested -> [ id StrengthEventTypes.DelegationRequested ]
         | DelegationClosedFrom.Bound -> [ id StrengthEventTypes.DelegationBound ]
@@ -142,7 +142,7 @@ module StrengthStore =
                   (match material.TargetProviderRun with
                    | Some value -> Encode.string (ProviderRunIdentity.value value)
                    | None -> Encode.nil)
-                  "reason", Encode.string (closedReasonText material.Reason) ]
+                  "reason", Encode.string material.Reason ]
 
     let private encodePayload =
         function
@@ -150,10 +150,14 @@ module StrengthStore =
             let outcomeJson = encodeImportOutcome imported.Outcome
 
             Encode.object
-                [ "import_id", Encode.string (StrengthImportId.value imported.ImportId)
-                  "contract_revision", Encode.int (DelegationContractRevision.value imported.ContractRevision)
-                  "decision_id", Encode.string (decisionText imported.DecisionId)
-                  "owner_session_id", Encode.string (SessionId.value imported.OwnerSessionId)
+                [ "decision_id", Encode.string (decisionText imported.DecisionId)
+                  "source_stream_id", Encode.string imported.SourceStreamId
+                  "source_event_id", Encode.string imported.SourceEventId
+                  "import_id", Encode.string imported.ImportId
+                  "old_budget_evidence",
+                  (match imported.OldBudgetEvidence with
+                   | Some value -> Encode.string value
+                   | None -> Encode.nil)
                   "outcome", outcomeJson ]
         | StrengthEvent.DelegationRequested requested ->
             Encode.object
