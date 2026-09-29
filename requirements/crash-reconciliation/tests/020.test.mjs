@@ -49,18 +49,18 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const handleId = 'devops'
 
   const participantIdentity = (name, role, persona) =>
-    Identity.ParticipantIdentityModule_fromInput({
+    Fold.unwrap(Identity.ParticipantIdentityModule_fromInput({
       SelectedAgent: name,
       Role: role,
       Persona: persona,
       PersonaCatalogVersion: 1,
       Origin: new Identity.PersonaOrigin(1, []),
-    }).fields[0]
+    }))
 
   // Compiler representation (Result tag / DU fields) is not product semantics, so
   // it is read through one local accessor pair instead of poked at each call site.
-  const foldedOk = (result) => result.tag === 0
-  const foldedValue = (result) => result.fields[0]
+  const foldedOk = (result) => Fold.isOk(result)
+  const foldedValue = (result) => Fold.unwrap(result)
 
   // The exact durable state a live host leaves behind for a child work run:
   // rooted AgentOwnerRoot authority plus the parent's durable handle. Identities
@@ -73,22 +73,22 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const physicalUserMessageId = () => FoundationIdentity.PhysicalUserMessageIdModule_create('msg-devops-run-1')
 
   const childIdentitySeed = () =>
-    Seed.PromptIdentitySeedModule_inheritFromOwner(
+    Fold.unwrap(Seed.PromptIdentitySeedModule_inheritFromOwner(
       'devops',
       FoundationIdentity.SessionIdModule_create(parentSessionId),
       FoundationIdentity.LogicalRunIdModule_create('lr-owner'),
       FoundationIdentity.AuthorityRootUserMessageIdModule_create('msg-owner-root'),
       participantIdentity('manager', Roles.Role.Manager, 'Operator'),
-    ).fields[0]
+    ))
 
   const interruptedChild = () => {
-    const profile = Model.createAuthorityExecutionProfileFromSeed(
+    const profile = Fold.unwrap(Model.createAuthorityExecutionProfileFromSeed(
       sessionId(),
       logicalRunId(),
       authorityRootId(),
       Origin.PromptRootAuthorityKind.AgentOwnerRoot,
       childIdentitySeed(),
-    ).fields[0]
+    ))
 
     const withChild = Projection.AgentProjection_update(
       sessionId(),
@@ -259,7 +259,6 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const sessionId = (value) => Identity.SessionIdModule_create(value)
   const handleId = 'devops'
 
-  const caseTag = (name) => new DelegationFacts.ExecutionFactCases(0, []).cases().indexOf(name)
   const executionFact = (tag, payload) =>
     new Fact.Fact(1, [new Fact.AgentFact(3, [new DelegationFacts.ExecutionFactCases(tag, [payload])])])
 
@@ -284,8 +283,8 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       }),
     )
 
-    assert.equal(linked.tag, 0, 'the handle link must fold')
-    return { projections: linked.fields[0].AgentProjections, projectionsSet: linked.fields[0] }
+    assert.equal(Fold.isOk(linked), true, 'the handle link must fold')
+    return { projections: Fold.unwrap(linked).AgentProjections, projectionsSet: Fold.unwrap(linked) }
   }
 
   test('WHAT[crash-reconciliation-020] CRASH_020_restart_rebinds_the_durable_parented_child', () => {
@@ -361,11 +360,11 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
         undefined,
         Fold.empty.AgentProjections.Associations,
     )
-      assert.equal(linked.tag, 0, 'link must succeed')
+      assert.equal(Fold.isOk(linked), true, 'link must succeed')
 
       const projectionsWithBlogger = {
           ...Fold.empty.AgentProjections,
-        Associations: linked.fields[0],
+        Associations: Fold.unwrap(linked),
 }
 
       const evidence = Recovery.evidenceFor(projectionsWithBlogger, sessionId(companionSessionId))
@@ -403,35 +402,35 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const Identity = await import(`${root}/Foundation/Identity.js`)
 
   const parentSessionId = 'ses-road-root'
-  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+  const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
   const sid = (value) => Identity.SessionIdModule_create(value)
   const listOf = (value) => Array.from(value)
 
   const persona = (name, role, personaName) =>
-    PersonaIdentity.ParticipantIdentityModule_fromInput({
+    Fold.unwrap(PersonaIdentity.ParticipantIdentityModule_fromInput({
       SelectedAgent: name,
       Role: role,
       Persona: personaName,
       PersonaCatalogVersion: 1,
       Origin: new PersonaIdentity.PersonaOrigin(1, []),
-    }).fields[0]
+    }))
 
   const owner = persona('manager', Roles.Role.Manager, 'Operator')
 
   const childProfile = (childSessionId, agentName, role) =>
-    Model.createAuthorityExecutionProfileFromSeed(
+    Fold.unwrap(Model.createAuthorityExecutionProfileFromSeed(
       childSessionId,
-      `lr-${childSessionId}`,
+      'lr-child',
       `msg-${childSessionId}-root`,
       Origin.PromptRootAuthorityKind.AgentOwnerRoot,
-      Seed.PromptIdentitySeedModule_inheritFromOwner(
+      Fold.unwrap(Seed.PromptIdentitySeedModule_inheritFromOwner(
         agentName,
         parentSessionId,
         'lr-owner',
         'msg-owner-root',
         owner,
-      ).fields[0],
-    ).fields[0]
+      )),
+    ))
 
   const rootProfile = () =>
     Model.createAuthorityExecutionProfile(
@@ -472,8 +471,8 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       ]),
     )
 
-    assert.equal(linked.tag, 0, 'the handle link must fold')
-    return linked.fields[0].AgentProjections
+    assert.equal(Fold.isOk(linked), true, 'the handle link must fold')
+    return Fold.unwrap(linked).AgentProjections
   }
 
   test('WHAT[crash-reconciliation-020] CRASH_020_run_without_terminal_is_settled_at_load', () => {
@@ -484,7 +483,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     // fact exists, so the chat-execution fold has nothing to settle.
     const projections = linkChild(withAuthority, childSessionId, 'devops', 'devops', Roles.Role.DevOps)
     const linkedRecord = projections.Sessions.get(sid(parentSessionId)).Handles.Handles.get('devops')
-    assert.equal(linkedRecord.Lifecycle.tag, 0, 'precondition: the handle is still Active')
+    assert.deepEqual(linkedRecord.Lifecycle, Linkage.HandleLifecycle.Active, 'precondition: the handle is still Active')
 
     const orphans = listOf(ChildWorkRecovery.orphanedChildRuns(projections))
     assert.equal(orphans.length, 1, 'the child work run left active by the dead runtime is an orphan')
@@ -493,20 +492,25 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 
     const settlement = ChildWorkRecovery.settlementFact(orphans[0])
 
-    assert.equal(
-      settlement.tag,
-      new DelegationFacts.ExecutionFactCases(0, []).cases().indexOf('ChildRunVoided'),
+    const expectedSettlement = new DelegationFacts.ExecutionFactCases(3, [
+      {
+        ParentSessionId: sid(parentSessionId),
+        ChildSessionId: sid(childSessionId),
+      },
+    ])
+    assert.deepEqual(
+      settlement,
+      expectedSettlement,
       'the settlement voids the interrupted run (no completion cell: horizon and join stay empty)',
     )
-    assert.equal(raw(settlement.fields[0].ChildSessionId), childSessionId)
 
     const settled = Fold.foldFact(
       { ...Fold.empty, AgentProjections: projections },
       new Fact.Fact(1, [new Fact.AgentFact(3, [settlement])]),
     )
 
-    assert.equal(settled.tag, 0, 'the settlement must fold')
-    const after = settled.fields[0].AgentProjections
+    assert.equal(Fold.isOk(settled), true, 'the settlement must fold')
+    const after = Fold.unwrap(settled).AgentProjections
 
     assert.equal(
       after.Sessions.get(sid(childSessionId)).PromptAuthority.ActiveLogicalRun ?? null,
@@ -516,7 +520,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 
     const handle = after.Sessions.get(sid(parentSessionId)).Handles.Handles.get('devops')
 
-    assert.equal(handle.Lifecycle.tag, 0, 'the handle stays Active: the interrupted run owes nothing')
+    assert.deepEqual(handle.Lifecycle, Linkage.HandleLifecycle.Active, 'the handle stays Active: the interrupted run owes nothing')
     assert.equal(
       Array.from(Linkage.HandleProjection_joinable(after.Sessions.get(sid(parentSessionId)).Handles)).length,
       0,
@@ -544,11 +548,13 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 // work to any of its existing Engineer children. The drain must report once and
 // retire the handle.
 {
-  const JoinDrain = await import('../../../dist/Execution/Delegation/Handle/JoinDrain.js')
-  const Linkage = await import('../../../dist/Execution/Delegation/LinkageProjection.js')
-  const DelegationFacts = await import('../../../dist/Execution/Delegation/Facts.js')
-  const Roles = await import('../../../dist/Foundation/Roles.js')
-  const Identity = await import('../../../dist/Foundation/Identity.js')
+  const dist = '../../../dist'
+  const Fold = await import(`${dist}/Composition/Durable/Fold.js`)
+  const JoinDrain = await import(`${dist}/Execution/Delegation/Handle/JoinDrain.js`)
+  const Linkage = await import(`${dist}/Execution/Delegation/LinkageProjection.js`)
+  const DelegationFacts = await import(`${dist}/Execution/Delegation/Facts.js`)
+  const Roles = await import(`${dist}/Foundation/Roles.js`)
+  const Identity = await import(`${dist}/Foundation/Identity.js`)
 
   const parentSessionId = 'ses-road-root'
   const handleId = 'frame-integrity'
@@ -566,13 +572,13 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       Linkage.HandleProjection_empty,
     )
 
-    assert.equal(linked.tag, 0, 'precondition: the handle links')
+    assert.equal(Fold.isOk(linked), true, 'precondition: the handle links')
 
     const completion = new Linkage.HandleCompletion(DelegationFacts.HandleCompletionKind.Cancelled, null, null)
-    const completed = Linkage.HandleProjection_complete(handle(handleId), completion, linked.fields[0])
+    const completed = Linkage.HandleProjection_complete(handle(handleId), completion, Fold.unwrap(linked))
 
-    assert.equal(completed.tag, 0, 'precondition: the Cancelled completion is written')
-    return completed.fields[0]
+    assert.equal(Fold.isOk(completed), true, 'precondition: the Cancelled completion is written')
+    return Fold.unwrap(completed)
   }
 
   test('WHAT[crash-reconciliation-020] CRASH_020_cancelled_completion_is_reported_and_retired_by_join', async () => {
@@ -589,7 +595,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
         if (appended.length === 0) return handles
 
         const retired = Linkage.HandleProjection_retire(handle(handleId), handles)
-        return retired.tag === 0 ? retired.fields[0] : handles
+        return Fold.isOk(retired) ? Fold.unwrap(retired) : handles
       },
       ReadBlob: () => Promise.resolve({ tag: 1, fields: ['no body'] }),
       WriteBlob: () => Promise.resolve({ tag: 1, fields: ['unsupported'] }),
@@ -604,9 +610,9 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       () => true,
     )
 
-    assert.equal(drained.tag, 0, 'the drain must not fail')
+    assert.equal(Fold.isOk(drained), true, 'the drain must not fail')
 
-    const completions = Array.from(drained.fields[0])
+    const completions = Array.from(Fold.unwrap(drained))
 
     assert.equal(completions.length, 1, 'the cancelled run must be reported once, not skipped')
     assert.equal(completions[0].RunId, `cancelled-${handleId}`)
@@ -616,7 +622,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
     const after = port.HandleProjection(sid(parentSessionId))
     const record = Linkage.HandleProjection_tryFind(handle(handleId), after)
 
-    assert.equal(record.Lifecycle.tag, 3, 'the reported handle retires so it is never delivered twice')
+    assert.deepEqual(record.Lifecycle, Linkage.HandleLifecycle.Retired, 'the reported handle retires so it is never delivered twice')
   })
 }
 
@@ -636,7 +642,7 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const Fact = await import(`${root}/Composition/Durable/Fact.js`)
 
   const sessionId = (value) => Identity.SessionIdModule_create(value)
-  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+  const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
 
   const linkedHandles = () => {
     const linked = Fold.foldFact(
@@ -658,10 +664,10 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       ]),
     )
 
-    assert.equal(linked.tag, 0, 'the handle link must fold')
+    assert.equal(Fold.isOk(linked), true, 'the handle link must fold')
 
     const parent = sessionId('ses-road-root')
-    return linked.fields[0].AgentProjections.Sessions.get(parent).Handles
+    return Fold.unwrap(linked).AgentProjections.Sessions.get(parent).Handles
   }
 
   test('WHAT[crash-reconciliation-020] CRASH_020_reuse_resolves_the_child_from_its_durable_handle', () => {
@@ -686,11 +692,12 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 {
   const { default: assert } = await import('node:assert/strict')
   const { default: test } = await import('node:test')
-  const FissionRuntime = await import('../../../dist/Execution/Fission/Runtime.js')
-  const Identity = await import('../../../dist/Foundation/Identity.js')
+  const dist = '../../../dist'
+  const FissionRuntime = await import(`${dist}/Execution/Fission/Runtime.js`)
+  const Identity = await import(`${dist}/Foundation/Identity.js`)
 
   const sid = (value) => Identity.SessionIdModule_create(value)
-  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+  const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
 
   test('WHAT[crash-reconciliation-020] CRASH_020_fission_lane_resolves_from_durable_evidence_after_restart', () => {
     FissionRuntime.FissionRuntime_installDurableLaneEvidence((laneSessionId) => {
@@ -734,13 +741,14 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const requestId = 'req-left-open'
   const sid = (value) => Identity.SessionIdModule_create(value)
   const rid = (value) => Identity.BloggerRequestIdModule_create(value)
-  const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+  const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
 
+  const contextFactTag = {
+    BloggerRequestMaterialized: 2,
+    BloggerRequestAbandoned: 3,
+  }
   const contextFact = (caseName, payload) =>
-    new Fact.AgentFact(
-      new Fact.AgentFact(0, []).cases().indexOf('Context'),
-      [new ContextFacts.ContextFactCases(new ContextFacts.ContextFactCases(0, []).cases().indexOf(caseName), [payload])],
-    )
+    new Fact.AgentFact(6, [new ContextFacts.ContextFactCases(contextFactTag[caseName], [payload])])
 
   const materialized = () =>
     contextFact('BloggerRequestMaterialized', {
@@ -768,8 +776,8 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 
   const foldedWith = (fact) => {
     const folded = Fold.foldFact(Fold.empty, new Fact.Fact(1, [fact]))
-    assert.equal(folded.tag, 0, folded.tag === 0 ? '' : folded.fields[0].Reason)
-    return folded.fields[0].AgentProjections
+    assert.equal(Fold.isOk(folded), true, 'folded fact must succeed')
+    return Fold.unwrap(folded).AgentProjections
   }
 
   const openRequestOf = (projections) =>
