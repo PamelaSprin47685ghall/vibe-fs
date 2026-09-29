@@ -15,7 +15,7 @@ const Identity = await import(`${root}/Foundation/Identity.js`)
 const Fact = await import(`${root}/Composition/Durable/Fact.js`)
 
 const sessionId = (value) => Identity.SessionIdModule_create(value)
-const raw = (value) => (value !== null && typeof value === 'object' && Array.isArray(value.fields) ? value.fields[0] : value)
+const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
 
 // WHAT[crash-reconciliation-021]: the in-process registries are a cache of what
 // this process currently drives. Existence is answered by the durable projection,
@@ -40,8 +40,8 @@ const projectWithChild = () => {
     ]),
   )
 
-  assert.equal(linked.tag, 0, 'the handle link must fold')
-  return linked.fields[0].AgentProjections
+  assert.equal(Fold.isOk(linked), true, 'the handle link must fold')
+  return Fold.unwrap(linked).AgentProjections
 }
 
 test('WHAT[crash-reconciliation-021] CRASH_021_durable_lookup_answers_without_any_process_registration', () => {

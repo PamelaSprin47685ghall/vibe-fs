@@ -175,6 +175,16 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
+
+    let isOk (result: Result<'T, 'E>) : bool =
+        match result with
+        | Ok _ -> true
+        | Error _ -> false
+
+    let unwrap (result: Result<'T, 'E>) : 'T =
+        match result with
+        | Ok value -> value
+        | Error err -> failwithf "Fold resulted in error: %A" err
 // Historical enumeration intentionally has no Journal-owned API. Boot and
 // live facts both enter through CanonicalIntegrator, which invokes only
 // foldEnvelope for one already-ordered durable event at a time.
