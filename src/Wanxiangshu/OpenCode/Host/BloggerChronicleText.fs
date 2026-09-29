@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -19,10 +20,20 @@ module BloggerChronicleText =
 
     let private bloggerChronicleTextModelPrefixes: string list = [ "step-3.5-flash" ]
 
-    let private bloggerChronicleTextEnabled (projectionSessionIdOpt: string option) =
+    let private bloggerChronicleTextEnabled (projectionSessionIdOpt: string option) (outObj: obj) =
         projectionSessionIdOpt
-        |> Option.map SessionId.create
-        |> Option.bind SessionExecutionBinding.currentProviderModel
+        |> Option.bind (fun sessionId ->
+            // host-boundary-008: read the exact committed lease target for this
+            // request's trailing physical user message. Missing physical id or
+            // missing lease means no model information; never another
+            // execution's current model.
+            ProviderWireDecode.messagesFromTransformOutput outObj
+            |> ProviderWireCapture.lastUserMessageId
+            |> Option.bind (fun physical ->
+                ModelRouting.tryReadExecution
+                    { SessionId = SessionId.create sessionId
+                      PhysicalUserMessageId = physical }
+                |> Option.map (fun lease -> ModelRouting.toOpenCodeModel lease.Identity.Target)))
         |> Option.exists (fun model ->
             List.exists
                 (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal))
@@ -95,7 +106,7 @@ module BloggerChronicleText =
         =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId when
-            bloggerChronicleTextEnabled projectionSessionIdOpt
+            bloggerChronicleTextEnabled projectionSessionIdOpt outObj
             && SessionAssociationProjection.isCompanion
                 (SessionId.create sessionId)
                 (AgentJournal.snapshot durable).AgentProjections.Associations

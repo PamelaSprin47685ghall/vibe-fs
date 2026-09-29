@@ -40,8 +40,8 @@
 
 ## [010] Root 与 dispatch 不得选择、等待或覆盖 model
 
-调度与 Authority Root 阶段严禁指定、修改或等待底层物理模型 ID。发送参数固定为未指定模型，具体的模型分配与算力租赁严格延迟至宿主执行准入阶段由专门路由模块裁决。
-发送的 Host `agent` 固定为不可变的 `participant`，`model` 固定为 null；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。显式外部 agent 仍作为输入保留，并与 participant 做一致性校验。
+调度与 Authority Root 阶段严禁指定、修改或等待底层物理模型 ID。发送参数固定为未指定模型（managed send 固定 `Model=None`），具体的模型分配与算力租赁严格延迟至宿主执行准入阶段由专门路由模块裁决。
+发送的 Host `agent` 固定为不可变的 `participant`：Root 直接使用已验证的 `IdentitySeed` 投影，Continuation 使用既有 active profile / `AuthorityExecutionProfile`；`model` 固定为 null。发送不要求会话形态的执行绑定缓存存在。continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。显式外部 agent 仍作为输入保留，并与 participant 做一致性校验；wire 中未提供 agent 时保持缺失，由 authority ingress 按既有合法规则解析 durable active/history，不得从会话缓存补出字符串再称为 ExplicitAgent。
 
 ## [011] 插件 user-shaped message 一律经 PROMPT-005
 
@@ -49,7 +49,7 @@
 
 ## [012] PhysicalAccepted 后只交接 exact identity
 
-Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、agent-free `PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须直接包含由 `IdentitySeed` 派生且在 logical run 内不可变的 `ParticipantIdentityEvidence`（原子包含固定的 participant、role、persona、personaCatalogVersion 与 provenance evidence；continuation 保持 participant 不变，不存在 peer/effective agent 轮换语义），不得退化为可重新推导的 authority metadata。每个 fresh physical execution 将固定的 role 经 MJS scheduler 路由至模型 target，且 capacity exact identity 严格绑定为 `session + physical + role + participant + target + fence`。Turn reconciliation 在 process-local binding 缺字段时必须从同一 durable authority profile 恢复 participant/role；显式 Host agent 证据优先，但缺席的 role 不得遮蔽 durable role，否则同一 Manager continuation 会被误路由为 Ordinary。Accepted execution evidence 只暴露由 `IdentitySeed` 派生的 participant+role，不含 effectiveAgent。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
+Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、agent-free `PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须直接包含由 `IdentitySeed` 派生且在 logical run 内不可变的 `ParticipantIdentityEvidence`（原子包含固定的 participant、role、persona、personaCatalogVersion 与 provenance evidence；continuation 保持 participant 不变，不存在 peer/effective agent 轮换语义），不得退化为可重新推导的 authority metadata。每个 fresh physical execution 将固定的 role 经 MJS scheduler 路由至模型 target，且 capacity exact identity 严格绑定为 `session + physical + role + participant + target + fence`。Turn reconciliation 不依赖会话形态的执行绑定缓存；需要 participant/role 时从同一 durable authority profile 解析；显式 Host agent 证据优先，但缺席的 role 不得遮蔽 durable role，否则同一 Manager continuation 会被误路由为 Ordinary。Accepted execution evidence 只暴露由 `IdentitySeed` 派生的 participant+role，不含 effectiveAgent。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
 
 ## [013] Construction 纯 wiring，recovery 晚于 durability activation
 

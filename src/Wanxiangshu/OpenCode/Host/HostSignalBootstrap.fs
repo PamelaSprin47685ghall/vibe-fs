@@ -61,7 +61,6 @@ module HostSignalBootstrap =
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
-          ResolveSessionAgent: SessionId -> Task<string option>
           ObserveEvent: obj -> Task<unit> }
 
     let private observeSessionIdentity (sessionId: SessionId) (hasParent: bool) (agent: string option) =
@@ -371,14 +370,14 @@ module HostSignalBootstrap =
 
             let rejectProviderStart
                 (started: ExactProviderStartObservation)
-                (error: SessionExecutionBinding.ProviderStartObservationError<unit>)
+                (error: ProviderLifecycle.ProviderStartObservationError<unit>)
                 =
                 Diagnostic.emit
                     "provider-start-observation-rejected"
                     [ "session_id", SessionId.value started.SessionId
                       "physical_user_message_id", PhysicalUserMessageId.value started.PhysicalUserMessageId
                       "provider_run", ProviderRunIdentity.value started.ProviderRun
-                      "reason", SessionExecutionBinding.providerStartObservationErrorCode error ]
+                      "reason", ProviderLifecycle.providerStartObservationErrorCode error ]
 
             let signalProviderStarted (started: ExactProviderStartObservation) =
                 let key =
@@ -402,7 +401,7 @@ module HostSignalBootstrap =
                 (started: ExactProviderStartObservation)
                 (providerStepEnded: bool)
                 (terminal: ExactProviderTerminalObservation option)
-                (persistence: Result<bool, SessionExecutionBinding.ProviderStartObservationError<unit>>)
+                (persistence: Result<bool, ProviderLifecycle.ProviderStartObservationError<unit>>)
                 =
                 match persistence with
                 | Error error ->
@@ -434,7 +433,7 @@ module HostSignalBootstrap =
                             (terminal: ExactProviderTerminalObservation option) ->
                             task {
                                 let! providerStarted =
-                                    SessionExecutionBinding.persistProviderStartedFromObservation
+                                    ProviderLifecycle.persistProviderStartedFromObservation
                                         journal
                                         scope.TryBindAttemptPlan
                                         started
@@ -634,19 +633,51 @@ module HostSignalBootstrap =
                 | ChatAdmissionIntent.Decision.HostInternal _
                 | ChatAdmissionIntent.Decision.Reject _ -> None
 
+            // PROMPT-006-P4: same exact key concurrent admissions merge into one
+            // in-process flight. Durable accept idempotence and the ModelRouting
+            // lock/queue deduplication stay the underlying guarantee; this table
+            // only coalesces the orchestration layer, where two parallel
+            // transactions would race Host projection and one failure's
+            // compensation could release the lease the other still uses. The
+            // table holds no identity, persists nothing, never keeps a lock
+            // across capacity waiting, and no same-key serial work waits on it.
+            let admissionInFlight =
+                Dictionary<ChatExecutionKey, Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>>()
+
             let admitManagedChatMessage durable createTransaction intent output =
                 task {
-                    let ports = createTransaction (ModelRouting.projectHostModel output)
+                    let key =
+                        match executionKey intent with
+                        | Some exact -> exact
+                        | None -> invalidArg "intent" "managed chat transaction requires a managed intent"
 
-                    match!
-                        ChatAdmissionTransaction.execute
-                            ports
-                            { Intent = intent
-                              CurrentState = currentExecution durable intent }
-                    with
-                    | Ok(ChatAdmissionTransactionOutcome.Settled _) -> continueManagedChatMessage intent output
-                    | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
-                    | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
+                    let flight: Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =
+                        lock admissionInFlight (fun () ->
+                            match admissionInFlight.TryGetValue key with
+                            | true, existing -> existing
+                            | false, _ ->
+                                let ports = createTransaction (ModelRouting.projectHostModel output)
+
+                                let started =
+                                    ChatAdmissionTransaction.execute
+                                        ports
+                                        { Intent = intent
+                                          CurrentState = currentExecution durable intent }
+
+                                admissionInFlight.[key] <- started
+                                started)
+
+                    try
+                        match! flight with
+                        | Ok(ChatAdmissionTransactionOutcome.Settled _) -> continueManagedChatMessage intent output
+                        | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
+                        | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
+                    finally
+                        lock admissionInFlight (fun () ->
+                            match admissionInFlight.TryGetValue key with
+                            | true, registered when obj.ReferenceEquals(registered, flight) ->
+                                admissionInFlight.Remove(key) |> ignore
+                            | _ -> ())
                 }
 
             let rejectedChatMessage failure =
@@ -676,129 +707,15 @@ module HostSignalBootstrap =
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, _, _ ->
                     rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
 
-            let client = if isNull input then null else input?client
-
-            let sessionAgentOfResponse (rawBody: obj) : string option = HostIngressCodec.sessionAgent rawBody
-
-            let executeSessionGet (sessObj: obj) (getFn: obj) (sId: string) : Task<string option> =
-                task {
-                    let payload =
-                        createObj
-                            [ "path", box (createObj [ "id", box sId ])
-                              "sessionID", box sId
-                              "headers", box (createObj []) ]
-
-                    let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
-                    return sessionAgentOfResponse res
-                }
-
-            let canQuerySession =
-                not (isNull client)
-                && not (isNull client?session)
-                && not (isNull client?session?get)
-
-            let safeQuerySession (sessionId: SessionId) : Task<string option> =
-                task {
-                    try
-                        return! executeSessionGet client?session client?session?get (SessionId.value sessionId)
-                    with _ ->
-                        return None
-                }
-
-            let tryGetSessionAgent (sessionId: SessionId) : Task<string option> =
-                if not canQuerySession then
-                    Task.FromResult None
-                else
-                    safeQuerySession sessionId
-
-            let queryMissingAgent sid =
-                task {
-                    let! fetched = tryGetSessionAgent sid
-                    fetched |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sid)
-                    return fetched
-                }
-
-            let tryDurableSessionAgent (sessionId: SessionId) : string option =
-                journal
-                |> Option.bind (fun durable ->
-                    let snapshot = AgentJournal.snapshot durable
-
-                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
-                    |> Option.bind (fun s -> s.PromptAuthority)
-                    |> Option.bind (fun pa ->
-                        pa.ActiveLogicalRun
-                        |> Option.map (fun run -> run.SelectedAgent)
-                        |> Option.orElseWith (fun () ->
-                            pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent))))
-
-            let resolveFallbackAgent sid =
-                match tryDurableSessionAgent sid with
-                | Some agent ->
-                    SessionExecutionBinding.observeUserFacingAgent sid agent
-                    Some agent
-                | None when not (hasPhysicalParent sid) ->
-                    let activeFallback =
-                        journal
-                        |> Option.bind (fun durable ->
-                            let snapshot = AgentJournal.snapshot durable
-
-                            snapshot.AgentProjections.Sessions
-                            |> Map.values
-                            |> Seq.tryPick (fun s ->
-                                s.PromptAuthority
-                                |> Option.bind (fun pa ->
-                                    pa.ActiveLogicalRun
-                                    |> Option.map (fun run -> run.SelectedAgent)
-                                    |> Option.orElseWith (fun () ->
-                                        pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent)))))
-
-                    let defaultAgent = activeFallback |> Option.defaultValue "manager"
-                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
-                    Some defaultAgent
-                | None -> None
-
-            let resolveMissingOrFallbackAgent sid =
-                task {
-                    match! queryMissingAgent sid with
-                    | Some agent -> return Some agent
-                    | None -> return resolveFallbackAgent sid
-                }
-
-            let resolveAgentForSession sid =
-                task {
-                    match SessionExecutionBinding.tryAgent sid with
-                    | Some agent -> return Some agent
-                    | None -> return! resolveMissingOrFallbackAgent sid
-                }
-
-            let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =
-                match agentOpt with
-                | Some agent ->
-                    { decoded with
-                        ExplicitAgent = Some agent }
-                | None -> decoded
-
-            let resolveAgentForDecodedMessage (decoded: PromptIngressCodec.DecodedMessage) =
-                task {
-                    match decoded.ExplicitAgent, decoded.SessionId with
-                    | Some _, _
-                    | _, None -> return decoded
-                    | None, Some sid ->
-                        let! agentOpt = resolveAgentForSession sid
-                        return applyResolvedAgent agentOpt decoded
-                }
-
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
                         requireDurabilityActivation ()
 
-                        // Decode and resolve once; routing and physical authority consume
+                        // Decode once; routing and physical authority consume
                         // the same frozen claim and identity evidence.
                         let decoded =
-                            PromptIngressCodec.decodeWith SessionExecutionBinding.tryAgent input output
-
-                        let! decoded = resolveAgentForDecodedMessage decoded
+                            PromptIngressCodec.decodeWith input output
 
                         let intent =
                             match decoded.SessionId with
@@ -850,7 +767,6 @@ module HostSignalBootstrap =
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                         |> Option.map PhysicalUserMessageId.value)
                   ChatMessageHook = chatMessageHook
-                  ResolveSessionAgent = resolveAgentForSession
                   ObserveEvent =
                     (fun raw ->
                         task {

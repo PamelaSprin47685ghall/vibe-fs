@@ -12,7 +12,6 @@ test('WHAT[interaction-authority-014] EXEC_016_join_guard_is_a_continuation', ()
 
 test('WHAT[interaction-authority-014] EXEC_016_join_guard_instruction_requires_join_before_finish', () => {
   const instructions = readFileSync(join(process.cwd(), 'resources/provider/runtime/background-join/en.md'), 'utf8')
-  assert.match(instructions, /Work remains away/)
-  assert.match(instructions, /Receive arrived consequences before claiming completion/)
-  assert.match(instructions, /Use join/)
+  assert.match(instructions, /Delegated work you sent out has not come back yet/)
+  assert.match(instructions, /Continue the work/)
 })

@@ -341,7 +341,6 @@ module PromptDispatcherSend =
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (onDetachedFailure: (string -> Task) option)
             (tools: Map<string, bool> option)
-            (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
             taskResult {
                 let! participantIdentity =
@@ -376,7 +375,7 @@ module PromptDispatcherSend =
                 use _listener = this.SubscribeNoOp port sessionId
 
                 let options =
-                    { Model = model
+                    { Model = None
                       Agent = Some agent
                       Directory = directory
                       Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
@@ -429,7 +428,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None None
+            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None
 
         member this.SendAgentOwnerRootDetachedObserved
             (port: IDispatchSessionPort)
@@ -449,7 +448,6 @@ module PromptDispatcherSend =
                 None
                 (Some onFailure)
                 None
-                None
 
         member this.SendAgentOwnerRootWithTools
             (port: IDispatchSessionPort)
@@ -460,7 +458,6 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool>)
-            (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
             this.SendAgentOwnerRootCore
                 port
@@ -472,7 +469,6 @@ module PromptDispatcherSend =
                 onAccepted
                 None
                 (Some tools)
-                model
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///

@@ -431,7 +431,7 @@ tools = ["commission", "join"]
 [[turn]]
 id = "orch-join-guard"
 internal = true
-user = "# Work remains away."
+user = "# Delegated work you sent out has not come back yet. Continue the work."
 tools = ["commission", "horizon", "join"]
 
   [[turn.step]]
@@ -523,7 +523,7 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
 id = "manager-join-guard"
 internal = true
 optional = true
-user = "# Work remains away."
+user = "# Delegated work you sent out has not come back yet. Continue the work."
 tools = ["fork", "resume", "join", "horizon", "assume", "suicide"]
 forbiddenTools = ["commission"]
 
@@ -570,7 +570,7 @@ forbiddenTools = ["commission"]
 [[turn]]
 id = "continue"
 internal = true
-user = "# The previous physical attempt did not complete.\n#\n# Continue the same work from the evidence already before you.\n#\n# The failed attempt itself is not evidence about the task.\n"
+user = "# A network failure just interrupted you. Continue the work."
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }

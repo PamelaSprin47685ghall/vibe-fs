@@ -7,21 +7,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
 module SessionExecutionBinding =
-    [<RequireQualifiedAccess>]
-    type ProviderStartObservationError<'bindingError> =
-        | DurableJournalUnavailable
-        | PhysicalUserMessageMissing of SessionId
-        | AttemptPlanFreezeFailed of 'bindingError
-        | FrozenAttemptPlanMissing of ChatExecutionKey * ProviderRunIdentity
-        | AcceptedExecutionMissing of ChatExecutionKey
-        | AcceptedExecutionAlreadyTerminal of ChatExecutionKey
-        | BloggerRequestMissing of SessionId
-        | BloggerRequestKindUnsupported of string
-        | AuthorityEvidenceInvalid of AcceptedChatExecutionEvidence
-        | PersistenceFailed of ManagedChatProviderLifecycleError
-
-    val providerStartObservationErrorCode: ProviderStartObservationError<'bindingError> -> string
-
     val exactExecutionBindingCount: sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> int
 
     val releaseAcceptedExecution: sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> unit
@@ -70,19 +55,6 @@ module SessionExecutionBinding =
 
     val beginPhysicalProviderAttemptForTransform:
         beginQuiescence: (SessionId -> unit) -> projectionSessionIdOpt: string option -> outObj: obj -> Task<unit>
-
-    val freezeProviderAttemptPlanForTransform:
-        journal: AgentJournal option ->
-        freezeAttemptPlan: (SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>) ->
-        projectionSessionIdOpt: string option ->
-        outObj: obj ->
-            Task<Result<unit, ProviderStartObservationError<'bindingError>>>
-
-    val persistProviderStartedFromObservation:
-        journal: AgentJournal option ->
-        bindAttemptPlan: (SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option) ->
-        observation: ExactProviderStartObservation ->
-            Task<Result<bool, ProviderStartObservationError<unit>>>
 
     val drop: sessionId: SessionId -> unit
     val cancelUnacquired: sessionId: SessionId -> unit

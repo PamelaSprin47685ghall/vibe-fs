@@ -122,7 +122,12 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   const context = { sessionId: 'ses_manager' };
 
   assert.equal(
-    resolveEntry(request('# Work remains away.', 1), result.scenario.entries, bindings, context).matched?.id,
+    resolveEntry(
+      request('# Delegated work you sent out has not come back yet. Continue the work.', 1),
+      result.scenario.entries,
+      bindings,
+      context,
+    ).matched?.id,
     'manager-join-guard.0',
   );
 

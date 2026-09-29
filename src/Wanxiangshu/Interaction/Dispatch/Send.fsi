@@ -38,7 +38,6 @@ module PromptDispatcherSend =
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
             tools: Map<string, bool> ->
-            model: OpencodeModel option ->
                 Task<Result<PromptKey, string>>
 
         member SendContinuation:

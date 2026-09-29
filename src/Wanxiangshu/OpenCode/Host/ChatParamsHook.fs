@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 
 /// PROMPT-006 / execution-model-routing-009: chat.params is an observation barrier, not a routing
@@ -33,7 +34,7 @@ module ChatParamsHook =
 
         let modelId =
             // chat.params receives the resolved provider catalog Model. Its
-            // canonical model identifier is `id`; `modelID` belongs to the
+            // canonical model identifier is 'id'; 'modelID' belongs to the
             // persisted UserMessage model reference. The compatibility fallback
             // is raw-model-local; message.model never supplies provider identity.
             textField rawModel "id"
@@ -79,6 +80,8 @@ module ChatParamsHook =
         else
             None
 
+    /// host-boundary-008: decode the exact physical user message id for this
+    /// request. The id is the physical user message, never an assistant id.
     let private tryPhysicalUserMessageId (input: obj) =
         if isNull input then
             None
@@ -96,23 +99,65 @@ module ChatParamsHook =
         else
             None
 
-    let private checkObservedProvider sessionId agent model =
-        match SessionExecutionBinding.validateObservedProvider sessionId agent model with
-        | Ok true -> ()
-        | Ok false ->
+    /// host-boundary-008 / execution-model-routing-009: validate the observed
+    /// provider against the exact committed lease for this physical user
+    /// message. Read-only: the hook never writes identity, never re-routes,
+    /// never allocates a lease. A managed input without exact lease evidence
+    /// fails closed.
+    let private validateObservedProvider sessionId physicalUserMessageId agent model =
+        let key: ChatExecutionKey =
+            { SessionId = sessionId
+              PhysicalUserMessageId = physicalUserMessageId }
+
+        match ModelRouting.tryReadExecution key with
+        | None ->
             invalidOp (
                 sprintf
-                    "PROMPT-006: managed provider run '%s' was not recognized as bound session '%s'"
+                    "PROMPT-006: managed provider run '%s' for session '%s' has no committed execution lease for physical user message '%s'"
                     agent
                     (SessionId.value sessionId)
+                    (PhysicalUserMessageId.value physicalUserMessageId)
             )
-        | Error error -> invalidOp error
+        | Some lease ->
+            let expectedParticipant = lease.Identity.Participant
+
+            if not (String.Equals(expectedParticipant, agent, StringComparison.Ordinal)) then
+                invalidOp (
+                    sprintf
+                        "PROMPT-006: provider agent drift for physical user message '%s' (%s -> %s)"
+                        (PhysicalUserMessageId.value physicalUserMessageId)
+                        expectedParticipant
+                        agent
+                )
+            elif not (ModelRouting.sameTarget lease.Identity.Target model) then
+                let expected = ModelRouting.toOpenCodeModel lease.Identity.Target
+
+                invalidOp (
+                    sprintf
+                        "PROMPT-006: provider model/reasoning drift for physical user message '%s' (%s/%s[%s] -> %s/%s[%s])"
+                        (PhysicalUserMessageId.value physicalUserMessageId)
+                        expected.providerID
+                        expected.modelID
+                        (expected.variant |> Option.defaultValue "<missing>")
+                        model.providerID
+                        model.modelID
+                        (model.variant |> Option.defaultValue "<missing>")
+                )
 
     let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
         match currentModel input with
         | None ->
             invalidOp (sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent)
-        | Some model -> checkObservedProvider sessionId agent model
+        | Some model ->
+            match tryPhysicalUserMessageId input with
+            | None ->
+                invalidOp (
+                    sprintf
+                        "PROMPT-006: managed provider run '%s' for session '%s' has no physical user message id"
+                        agent
+                        (SessionId.value sessionId)
+                )
+            | Some physical -> validateObservedProvider sessionId physical agent model
 
     let private validateSessionAndAgent sessionText agent =
         if String.IsNullOrWhiteSpace sessionText || not (isManagedName agent) then
@@ -182,7 +227,6 @@ module ChatParamsHook =
         match trySessionAndAgent input with
         | Some(sessionId, _) when SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId -> ()
         | Some(sessionId, agent) ->
-            SessionExecutionBinding.observeUserFacingAgent sessionId agent
             validateModel sessionId agent input
             applyManagedTemperature input output
         | None -> ()

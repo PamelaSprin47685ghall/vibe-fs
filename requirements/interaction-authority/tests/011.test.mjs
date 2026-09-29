@@ -64,17 +64,90 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const binding = await import("../../../dist/OpenCode/Host/SessionBindingSurface.js");
 const chatParams = await import("../../../dist/OpenCode/Host/ChatParamsSurface.js");
+const { default: plugin } = await import("../../../dist/OpenCode/Plugin/Plugin.js");
+const { execFileSync } = await import("node:child_process");
+const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+
+// P2a: chat.params validates the exact committed ModelRouting lease, so a
+// passing observation needs a real chat.message admission first. The routing
+// environment is process-local (temp HOME + wanxiangshu.mjs); the committed
+// lease lives on the process-shared runtime the hook reads.
+const createChatParamsEnvironment = () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-chat-params-'))
+  const home = join(root, 'home')
+  const routingDir = join(home, '.config', 'opencode')
+  mkdirSync(routingDir, { recursive: true })
+  writeFileSync(
+    join(routingDir, 'wanxiangshu.mjs'),
+    'export const routingProtocol = 2\n' +
+      'export default function route(role, running) {\n' +
+      "  if (role === 'engineer') {\n" +
+      "    const occupied = running.filter((item) => item.model === 'provider/model-a' && item.reasoning === 'none').length\n" +
+      '    return occupied === 0\n' +
+      "      ? { model: 'provider/model-a', reasoning: 'none' }\n" +
+      "      : { model: 'provider/model-b', reasoning: 'none' }\n" +
+      '  }\n' +
+      "  throw new Error('unexpected role: ' + role)\n" +
+      '}\n',
+    'utf8',
+  )
+  return {
+    home,
+    createPlugin: async (name) => {
+      const directory = join(root, name)
+      mkdirSync(directory, { recursive: true })
+      execFileSync('git', ['init', '--quiet', directory])
+      return plugin.server({
+        directory,
+        client: {},
+        events: { listen: () => () => {} },
+      })
+    },
+    dispose: () => rmSync(root, { recursive: true, force: true }),
+  }
+}
+
+const managedAgentConfig = () => {
+  const agent = {}
+  for (const role of ['orchestrator', 'manager', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']) {
+    agent[role] = {}
+  }
+  return { agent }
+}
+
+// Admit one physical execution through the real chat.message hook; returns
+// the projected message model (the committed lease target).
+const admitExecution = async (hooks, sessionID, messageID) => {
+  const admitted = {
+    message: {
+      id: messageID,
+      role: 'user',
+      sessionID,
+      agent: 'engineer',
+      model: { providerID: 'host', modelID: 'placeholder' },
+    },
+    parts: [],
+  }
+  await hooks['chat.message']({ sessionID, agent: 'engineer', messageID }, admitted)
+  return admitted.message.model
+}
 
 
-test('WHAT[interaction-authority-011] CHAT_PARAMS_parented_session_requires_provider_model_binding', () => {
-  binding.bindChild('ses_chat_params_root', 'ses_chat_params_child', 'coder')
+test('WHAT[interaction-authority-011] CHAT_PARAMS_managed_provider_run_without_committed_lease_fails_closed', () => {
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const rejected = chatParams.apply(
-    { sessionID: 'ses_chat_params_child', agent: 'coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
+    {
+      sessionID: 'ses_chat_params_child',
+      messageID: 'msg-chat-params-unleased',
+      agent: 'engineer',
+      model: { providerID: 'anthropic', id: 'fast-haiku' },
+    },
     output,
   )
   assert.equal(rejected.ok, false)
-  assert.match(rejected.error, /no observable provider\/model binding|no exact physical execution binding/)
+  assert.match(rejected.error, /no committed execution lease for physical user message 'msg-chat-params-unleased'/)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 test('WHAT[interaction-authority-011] CHAT_PARAMS_unbound_Host_auxiliary_child_does_not_claim_managed_execution', () => {
@@ -89,125 +162,162 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_unbound_Host_auxiliary_child_d
   assert.equal(observed.temperature, undefined)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
-test('WHAT[interaction-authority-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model', () => {
-  binding.bindChild('ses_chat_params_root_2', 'ses_chat_params_child_2', 'coder')
-  binding.acceptPromptExecution(
-    'ses_chat_params_child_2',
-    'pk-chat-params',
-    'physical-chat-params',
-    'coder',
-    { providerID: 'anthropic', modelID: 'deep-opus' },
-  )
-  const output = { model: { providerID: 'anthropic', modelID: 'deep-opus' } }
-  const observed = chatParams.apply(
-    { sessionID: 'ses_chat_params_child_2', agent: 'coder', model: { providerID: 'anthropic', modelID: 'deep-opus' } },
-    output,
-  )
-  assert.equal(observed.ok, true, observed.error)
-  assert.equal(observed.modelID, 'deep-opus')
-  assert.equal(observed.temperature, 1)
-  assert.equal(output.model.modelID, 'deep-opus')
-})
-test('WHAT[interaction-authority-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', () => {
-  binding.bindChild('ses_chat_params_root_3', 'ses_chat_params_child_3', 'coder')
-  binding.acceptPromptExecution(
-    'ses_chat_params_child_3',
-    'pk-chat-params-actual-model',
-    'physical-chat-params-actual-model',
-    'coder',
-    { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
-  )
+test('WHAT[interaction-authority-011] CHAT_PARAMS_admitted_lease_validates_without_rewriting_host_model', async () => {
+  const environment = createChatParamsEnvironment()
+  const previousHome = process.env.HOME
+  process.env.HOME = environment.home
+  let hooks
+  try {
+    hooks = await environment.createPlugin('chat-params-admitted')
+    await hooks.config(managedAgentConfig())
+    const sessionID = 'ses_chat_params_admitted'
+    const messageID = 'msg-chat-params-admitted'
+    const leaseModel = await admitExecution(hooks, sessionID, messageID)
 
-  const output = {}
-  const observed = chatParams.apply(
-    {
-      sessionID: 'ses_chat_params_child_3',
-      agent: 'coder',
-      model: { id: 'fast-haiku', providerID: 'anthropic' },
-      message: {
-        model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
+    const output = { model: { providerID: leaseModel.providerID, modelID: leaseModel.modelID } }
+    const observed = chatParams.apply(
+      {
+        sessionID,
+        messageID,
+        agent: 'engineer',
+        model: { providerID: leaseModel.providerID, id: leaseModel.modelID },
+        message: { id: messageID, model: { providerID: leaseModel.providerID, modelID: leaseModel.modelID, variant: leaseModel.variant } },
       },
-    },
-    output,
-  )
-
-  assert.equal(observed.ok, false)
-  assert.match(observed.error, /model\/reasoning drift/i)
-})
-test('WHAT[interaction-authority-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', () => {
-  binding.bindChild('ses_chat_params_root_4', 'ses_chat_params_child_4', 'coder')
-  binding.acceptPromptExecution(
-    'ses_chat_params_child_4',
-    'pk-chat-params-real-shape',
-    'physical-chat-params-real-shape',
-    'coder',
-    { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
-  )
-
-  const inputModel = {
-    id: 'deep-opus',
-    providerID: 'anthropic',
-    capabilities: { temperature: true },
-    variants: { high: { reasoning: { effort: 'high' } }, low: {} },
-    options: {},
+      output,
+    )
+    assert.equal(observed.ok, true, observed.error)
+    assert.equal(observed.modelID, leaseModel.modelID)
+    assert.equal(observed.temperature, 1)
+    assert.equal(output.model.modelID, leaseModel.modelID)
+  } finally {
+    binding.drop('ses_chat_params_admitted')
+    if (hooks) await hooks.dispose()
+    process.env.HOME = previousHome
+    environment.dispose()
   }
-  const output = { options: { existing: 'sentinel' } }
-
-  const observed = chatParams.apply(
-    {
-      sessionID: 'ses_chat_params_child_4',
-      agent: 'coder',
-      model: inputModel,
-      message: {
-        model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
-      },
-    },
-    output,
-  )
-
-  assert.equal(observed.ok, true, observed.error)
-  assert.equal(observed.temperature, 1)
-  assert.equal(output.temperature, 1)
-  assert.equal(output.options.temperature, 1)
-  assert.equal(output.options.existing, 'sentinel')
-  assert.equal(inputModel.variants.high.temperature, 1)
-  assert.equal(inputModel.variants.low.temperature, 1)
-  assert.equal(inputModel.options.temperature, 1)
 })
-test('WHAT[interaction-authority-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
-  binding.bindChild('ses_chat_params_root_5', 'ses_chat_params_child_5', 'coder')
-  binding.acceptPromptExecution(
-    'ses_chat_params_child_5',
-    'pk-chat-params-reasoning-shape',
-    'physical-chat-params-reasoning-shape',
-    'coder',
-    { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
-  )
+test('WHAT[interaction-authority-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', async () => {
+  const environment = createChatParamsEnvironment()
+  const previousHome = process.env.HOME
+  process.env.HOME = environment.home
+  let hooks
+  try {
+    hooks = await environment.createPlugin('chat-params-resolved-model')
+    await hooks.config(managedAgentConfig())
+    const sessionID = 'ses_chat_params_resolved'
+    const messageID = 'msg-chat-params-resolved'
+    const leaseModel = await admitExecution(hooks, sessionID, messageID)
 
-  const inputModel = {
-    id: 'o3-mini',
-    providerID: 'openai',
-    capabilities: { temperature: false },
-    variants: { high: {} },
-  }
-  const output = { options: {} }
-  const observed = chatParams.apply(
-    {
-      sessionID: 'ses_chat_params_child_5',
-      agent: 'coder',
-      model: inputModel,
-      message: {
-        model: { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
+    // The resolved catalog model (input.model.id) is the validation subject;
+    // the persisted user-message model reference never supplies identity.
+    const output = {}
+    const observed = chatParams.apply(
+      {
+        sessionID,
+        messageID,
+        agent: 'engineer',
+        model: { id: 'model-drifted', providerID: leaseModel.providerID },
+        message: { model: { providerID: leaseModel.providerID, modelID: leaseModel.modelID, variant: leaseModel.variant } },
       },
-    },
-    output,
-  )
+      output,
+    )
+    assert.equal(observed.ok, false)
+    assert.match(observed.error, /model\/reasoning drift/i)
+  } finally {
+    binding.drop('ses_chat_params_resolved')
+    if (hooks) await hooks.dispose()
+    process.env.HOME = previousHome
+    environment.dispose()
+  }
+})
+test('WHAT[interaction-authority-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', async () => {
+  const environment = createChatParamsEnvironment()
+  const previousHome = process.env.HOME
+  process.env.HOME = environment.home
+  let hooks
+  try {
+    hooks = await environment.createPlugin('chat-params-real-shape')
+    await hooks.config(managedAgentConfig())
+    const sessionID = 'ses_chat_params_real_shape'
+    const messageID = 'msg-chat-params-real-shape'
+    const leaseModel = await admitExecution(hooks, sessionID, messageID)
 
-  assert.equal(observed.ok, true, observed.error)
-  assert.equal(observed.temperature, undefined)
-  assert.equal(output.temperature, undefined)
-  assert.equal(output.options.temperature, undefined)
-  assert.equal(inputModel.variants.high.temperature, undefined)
+    const inputModel = {
+      id: leaseModel.modelID,
+      providerID: leaseModel.providerID,
+      capabilities: { temperature: true },
+      variants: { none: {}, high: { reasoning: { effort: 'high' } } },
+      options: {},
+    }
+    const output = { options: { existing: 'sentinel' } }
+
+    const observed = chatParams.apply(
+      {
+        sessionID,
+        messageID,
+        agent: 'engineer',
+        model: inputModel,
+        message: { id: messageID, model: { providerID: leaseModel.providerID, modelID: leaseModel.modelID, variant: leaseModel.variant } },
+      },
+      output,
+    )
+
+    assert.equal(observed.ok, true, observed.error)
+    assert.equal(observed.temperature, 1)
+    assert.equal(output.temperature, 1)
+    assert.equal(output.options.temperature, 1)
+    assert.equal(output.options.existing, 'sentinel')
+    assert.equal(inputModel.variants.none.temperature, 1)
+    assert.equal(inputModel.variants.high.temperature, 1)
+    assert.equal(inputModel.options.temperature, 1)
+  } finally {
+    binding.drop('ses_chat_params_real_shape')
+    if (hooks) await hooks.dispose()
+    process.env.HOME = previousHome
+    environment.dispose()
+  }
+})
+test('WHAT[interaction-authority-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', async () => {
+  const environment = createChatParamsEnvironment()
+  const previousHome = process.env.HOME
+  process.env.HOME = environment.home
+  let hooks
+  try {
+    hooks = await environment.createPlugin('chat-params-temperature-off')
+    await hooks.config(managedAgentConfig())
+    const sessionID = 'ses_chat_params_temperature_off'
+    const messageID = 'msg-chat-params-temperature-off'
+    const leaseModel = await admitExecution(hooks, sessionID, messageID)
+
+    const inputModel = {
+      id: leaseModel.modelID,
+      providerID: leaseModel.providerID,
+      capabilities: { temperature: false },
+      variants: { none: {} },
+    }
+    const output = { options: {} }
+    const observed = chatParams.apply(
+      {
+        sessionID,
+        messageID,
+        agent: 'engineer',
+        model: inputModel,
+        message: { id: messageID, model: { providerID: leaseModel.providerID, modelID: leaseModel.modelID, variant: leaseModel.variant } },
+      },
+      output,
+    )
+
+    assert.equal(observed.ok, true, observed.error)
+    assert.equal(observed.temperature, undefined)
+    assert.equal(output.temperature, undefined)
+    assert.equal(output.options.temperature, undefined)
+    assert.equal(inputModel.variants.none.temperature, undefined)
+  } finally {
+    binding.drop('ses_chat_params_temperature_off')
+    if (hooks) await hooks.dispose()
+    process.env.HOME = previousHome
+    environment.dispose()
+  }
 })
 test('WHAT[interaction-authority-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }

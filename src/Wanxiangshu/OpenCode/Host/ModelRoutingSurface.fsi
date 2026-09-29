@@ -71,6 +71,8 @@ module ModelRoutingSurface =
         purpose: obj ->
             obj
 
+    val tryReadExecution: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> obj
+
     val bindDevopsTarget: runtime: obj -> sessionId: string -> target: obj -> unit
     val boundDevopsTarget: runtime: obj -> sessionId: string -> obj
 

@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Execution.Session.ChatExecution
 
 [<RequireQualifiedAccess>]
 module ChatAdmissionIntent =
@@ -20,10 +21,6 @@ module ChatAdmissionIntent =
 
     type DurableSnapshot =
         { Authority: PromptAuthority.PromptAuthorityProjection option }
-
-    type ExecutionKey =
-        { SessionId: SessionId
-          PhysicalUserMessageId: PhysicalUserMessageId }
 
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
@@ -44,20 +41,20 @@ module ChatAdmissionIntent =
         | UnknownOriginWhileActive
 
     type ExternalRootEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           ExplicitAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type PendingPromptEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           PromptKey: PromptKey
           Claim: PromptAuthority.PromptClaim
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type ActiveHumanContinuationEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           Origin: PromptAuthority.PromptOrigin
           Authority: PromptAuthority.AuthorityExecutionProfile }
 
@@ -74,6 +71,33 @@ module ChatAdmissionIntent =
         | PendingPromptIntent of PendingPromptEvidence
         | HostInternal of HostInternalEvidence
         | Reject of Rejection
+
+    [<RequireQualifiedAccess>]
+    type ManagedIntent =
+        | ExternalRoot of ExternalRootEvidence
+        | ActiveHumanContinuation of ActiveHumanContinuationEvidence
+        | PendingPrompt of PendingPromptEvidence
+
+    let tryManaged (decision: Decision) : ManagedIntent option =
+        match decision with
+        | Decision.ExternalRootIntent evidence -> Some(ManagedIntent.ExternalRoot evidence)
+        | Decision.ActiveHumanContinuationIntent evidence -> Some(ManagedIntent.ActiveHumanContinuation evidence)
+        | Decision.PendingPromptIntent evidence -> Some(ManagedIntent.PendingPrompt evidence)
+        | Decision.NoManagedExecution _
+        | Decision.HostInternal _
+        | Decision.Reject _ -> None
+
+    let ofManaged (managed: ManagedIntent) : Decision =
+        match managed with
+        | ManagedIntent.ExternalRoot evidence -> Decision.ExternalRootIntent evidence
+        | ManagedIntent.ActiveHumanContinuation evidence -> Decision.ActiveHumanContinuationIntent evidence
+        | ManagedIntent.PendingPrompt evidence -> Decision.PendingPromptIntent evidence
+
+    let managedKey (managed: ManagedIntent) : ChatExecutionKey =
+        match managed with
+        | ManagedIntent.ExternalRoot evidence -> evidence.Key
+        | ManagedIntent.ActiveHumanContinuation evidence -> evidence.Key
+        | ManagedIntent.PendingPrompt evidence -> evidence.Key
 
     let private isHostInternal (message: DecodedMessage) : bool =
         message.IsHostCompaction || message.IsHostSynthetic
@@ -108,7 +132,7 @@ module ChatAdmissionIntent =
         | PromptAuthority.PromptOrigin.UnknownOrigin -> false
 
     let private pendingPrompt
-        (key: ExecutionKey)
+        (key: ChatExecutionKey)
         (promptKey: PromptKey)
         (claim: PromptAuthority.PromptClaim)
         (explicitAgentOpt: string option)
@@ -132,7 +156,7 @@ module ChatAdmissionIntent =
                   IdentitySeed = claim.IdentitySeed }
 
     let private externalRoot
-        (key: ExecutionKey)
+        (key: ChatExecutionKey)
         (explicitAgent: string)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Decision =
@@ -177,7 +201,7 @@ module ChatAdmissionIntent =
         | None, None, false -> KnownEvidence.Unaccepted
 
     let private resolveUnaccepted
-        (key: ExecutionKey)
+        (key: ChatExecutionKey)
         (message: DecodedMessage)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Decision =
@@ -186,7 +210,14 @@ module ChatAdmissionIntent =
             Decision.Reject(Rejection.AgentOwnerRootPromptNotClaimed(promptKey, profile.IdentitySeed))
         | Some promptKey, _, _ -> Decision.Reject(Rejection.PromptKeyNotClaimed promptKey)
         | None, Some explicitAgent, _ -> externalRoot key explicitAgent projection
-        | None, None, Some _ -> Decision.Reject Rejection.UnknownOriginWhileActive
+        | None, None, Some authority ->
+            // interaction-authority-009: a wire message omitting the participant
+            // field resolves against the durable active profile; the omission
+            // itself is not UnknownOrigin.
+            Decision.ActiveHumanContinuationIntent
+                { Key = key
+                  Origin = PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage
+                  Authority = authority }
         | None, None, None -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
 
     let private resolveWithProjection
@@ -195,7 +226,7 @@ module ChatAdmissionIntent =
         (sessionId: SessionId)
         (physicalMessageId: PhysicalUserMessageId)
         : Decision =
-        let key: ExecutionKey =
+        let key: ChatExecutionKey =
             { SessionId = sessionId
               PhysicalUserMessageId = physicalMessageId }
 

@@ -51,7 +51,7 @@ Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求�
 
 ## [009] `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
 
-所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 `chat.params` 仅验证当前物理执行已记录的确切绑定。
+所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 hook（`chat.params`、transform、tool）通过容量所有者的只读查询读取该 exact execution 已提交的租约并与真实观察核对；该查询不得调用 scheduler、不得接管预约、不得发放 fence、不得 commit/release，也不得因读取增加 duplicate/stale/conflict 计数。
 
 ## [010] provider capacity 独立成可抢占 token；只凭显式 lender 借用
 
@@ -60,18 +60,16 @@ ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 
 同一 token 同时面对多个可执行 provider-step demand 时，必须按 demand 的单调序号选择最早者；owned、borrowed、ordinary 只决定该 demand 可使用哪枚 token，不构成调度优先级。较晚到达的 lender owned step 不得越过已等待且可借用该 token 的 child step。
 Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实仍在执行的 token 伪造并发容量。
 
-同一物理执行通知重复进入相同 fence 的 provider step 时，opt-in 携带 `requestKey`（由 SessionExecutionBinding 从 `(sessionId, physicalUserMessageId, fence)` 派生）以实现精确幂等：若当前持有 token 的 step 匹配相同三元组且 fence 不超前，立即返回已完成 Task 复用已持有 step；若 waiters 队列中已存在相同 `(SessionId, PhysicalUserMessageId, RequestKey=Some k)` 的 demand，直接返回该 demand 既有的 Task（同一 Task 对象且 waiters 不增长）。不同 requestKey 或无 requestKey（None）的调用则保持正常的 FIFO 排队与因果辈分。此设计遵循 DELEGATE.md 5.3 的 `admit(exactRequestKey)` 精确幂等原则，杜绝无幂等重入 transform 造成的容量死锁。
+同一物理执行通知重复进入相同 fence 的 provider step 时，opt-in 携带 `requestKey`（由容量所有者从 `(sessionId, physicalUserMessageId, fence)` 派生）以实现精确幂等：若当前持有 token 的 step 匹配相同三元组且 fence 不超前，立即返回已完成 Task 复用已持有 step；若 waiters 队列中已存在相同 `(SessionId, PhysicalUserMessageId, RequestKey=Some k)` 的 demand，直接返回该 demand 既有的 Task（同一 Task 对象且 waiters 不增长）。不同 requestKey 或无 requestKey（None）的调用则保持正常的 FIFO 排队与因果辈分。此设计遵循 DELEGATE.md 5.3 的 `admit(exactRequestKey)` 精确幂等原则，杜绝无幂等重入 transform 造成的容量死锁。
 
-## [011] 物理 admission 顺序固定为 accept → acquire → bind → project
+## [011] 物理 admission 顺序固定为 accept → acquire → project
 
 Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` durable 写入 `Accepted`（携带 IdentitySeed 确立的不可变 canonical participant 证据），路由器随后才可排队或获取容量。
-一次物理执行的顺序严格为：
-1. resolve target：将 IdentitySeed 确立的 fixed canonical Role 经 MJS scheduler 解析为 ModelTarget（同一 physical execution 复用原 target；acquire 输入同时携带 IdentitySeed 派生的 participant 与可选的 `lenderSessionId`）；
-2. durable accept：写入包含 exact session、physical message 与 canonical participant 的 durable `Accepted` 事实；
-3. exact capacity acquire：以包含 SessionId + PhysicalUserMessageId + fixed Role + Participant + target + fence 的 exact capacity identity 获取 capacity fence；
-4. execution binding：建立 execution binding（binding 仅变更 target/lease，绝不修改 participant identity）；
-5. Host projection：将 target 投影至 Host 消息。
-任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 binding，或让未接受的发送意图预占容量。
+一次物理消息执行（physical message execution）的 scheduler/acquire 严格在 durable `Accepted` 之后，顺序为：
+1. durable accept：写入包含 exact session、physical message 与 canonical participant 的 durable `Accepted` 事实；
+2. exact capacity acquire：将 IdentitySeed 确立的 fixed canonical Role 经 MJS scheduler 解析为 ModelTarget（同一 physical execution 复用原 target；acquire 输入同时携带 IdentitySeed 派生的 participant 与可选的 `lenderSessionId`），并以包含 SessionId + PhysicalUserMessageId + fixed Role + Participant + target + fence 的 exact capacity identity 获取 capacity fence；
+3. Host projection：将 target 投影至 Host 消息。
+任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 capacity acquire，或让未接受的发送意图预占容量。此顺序只约束物理消息执行的普通准入；Strength 的非等待预约（reservation）语义按其原所属规范保持，本次修改不扩大、不否决。
 
 ## [012] Capacity 是 exact opaque fenced capability
 

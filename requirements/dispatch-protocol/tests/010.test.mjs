@@ -212,4 +212,67 @@ test('WHAT[dispatch-protocol-010] PROMPT_006_send_payload_carries_participant_an
     rmSync(base, { recursive: true, force: true })
   }
 })
+test('WHAT[dispatch-protocol-010] DP_010_send_agent_owner_root_is_strictly_model_free', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp010-model-free-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp010-model-free', 'rt-dp010-model-free', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const owner = await acceptOwner(opened.journal, 'ses_dp010_owner')
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
+      const sentOptions = []
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: async (sessionId, text, options) => {
+          sentOptions.push({
+            session: sessionId,
+            text,
+            agent: options.Agent ?? null,
+            model: options.Model ?? null,
+          })
+          return dispatch.admittedWithReceipt('accepted-dp010')
+        },
+      }
+      const sent = await dispatch.sendAgentOwnerRoot(port, opened.journal, 'ses_dp010', 'strictly model free', seed)
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      assert.deepEqual(
+        sentOptions,
+        [{ session: 'ses_dp010', text: 'strictly model free', agent: 'engineer', model: null }],
+        'the Root send path must construct its Host options with Model = None',
+      )
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+test('WHAT[dispatch-protocol-010] DP_010_send_without_session_agent_cache_succeeds', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp010-no-cache-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp010-no-cache', 'rt-dp010-no-cache', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      // No session agent cache is installed anywhere: the dispatch path must
+      // not require one, and the Host send must project the validated seed.
+      const owner = await acceptOwner(opened.journal, 'ses_dp010_nocache_owner')
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
+      const sent = await dispatch.sendAgentOwnerRoot(
+        capturingPort(),
+        opened.journal,
+        'ses_dp010_nocache',
+        'send without a session agent cache',
+        seed,
+      )
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      const observation = sent.observation
+      assert.equal(observation.agent, 'engineer')
+      assert.equal(observation.model, null)
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
 }

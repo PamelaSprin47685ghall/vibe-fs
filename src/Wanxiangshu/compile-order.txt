@@ -996,6 +996,8 @@ Interaction/Dispatch/Dispatcher.fsi
 Interaction/Dispatch/Dispatcher.fs
 OpenCode/Host/ChatAdmission/Transaction.fsi
 OpenCode/Host/ChatAdmission/Transaction.fs
+OpenCode/Host/ChatAdmission/ProviderLifecycle.fsi
+OpenCode/Host/ChatAdmission/ProviderLifecycle.fs
 OpenCode/Host/ChatAdmission/TransactionSurface.fsi
 OpenCode/Host/ChatAdmission/TransactionSurface.fs
 Interaction/Dispatch/Send.fsi

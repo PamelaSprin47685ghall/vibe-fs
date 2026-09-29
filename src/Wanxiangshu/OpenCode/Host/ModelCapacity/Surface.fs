@@ -153,3 +153,14 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
                 | ExecutionCapacityLifecycle.Committed _ -> "Committed"
                 | ExecutionCapacityLifecycle.Releasing _ -> "Releasing"
                 | ExecutionCapacityLifecycle.Released _ -> "Released"))
+
+    /// Read-only exact committed lease query; a pending, releasing, released,
+    /// absent or wrong-physical lease is not an executable resource.
+    member _.TryReadCommittedLease(sessionId: string, physicalUserMessageId: string) =
+        lock gate (fun () ->
+            match lifecycleBySession.TryGetValue sessionId with
+            | true, ExecutionCapacityLifecycle.Committed lease when
+                lease.Identity.PhysicalUserMessageId = physicalUserMessageId
+                ->
+                Some lease
+            | _ -> None)

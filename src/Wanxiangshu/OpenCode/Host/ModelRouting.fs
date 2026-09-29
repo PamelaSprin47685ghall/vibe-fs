@@ -1479,6 +1479,22 @@ module ModelRouting =
                 lock gate (fun () ->
                     tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender)
 
+        /// Read-only exact committed lease query: a superseded generation, a
+        /// reservation or another physical message never yields an executable
+        /// lease. The query allocates, adopts and releases nothing.
+        member _.TryReadExecution(sessionId: string, physicalUserMessageId: string) : ExecutionAdmissionLease option =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> None
+            | Some(normSessionId, normPhysicalUserMessageId) ->
+                lock gate (fun () ->
+                    if supersededPhysical.Contains(normSessionId, normPhysicalUserMessageId) then
+                        None
+                    else
+                        match activeBySession.TryGetValue normSessionId with
+                        | true, lease when lease.PhysicalUserMessageId = Some normPhysicalUserMessageId ->
+                            admissionOwner.TryReadCommittedLease(normSessionId, normPhysicalUserMessageId)
+                        | _ -> None)
+
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
                 match boundDevopsTargetBySession.TryGetValue sessionId with
@@ -1738,6 +1754,17 @@ module ModelRouting =
                 participant,
                 purpose,
                 lenderSessionId
+            )
+        | None -> None
+
+    /// Read-only exact committed lease query on the process-shared runtime; an
+    /// unloaded runtime observes nothing.
+    let internal tryReadExecution (key: ChatExecutionKey) : ExecutionAdmissionLease option =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.TryReadExecution(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
             )
         | None -> None
 

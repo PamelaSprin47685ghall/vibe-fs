@@ -259,7 +259,7 @@ module PluginTransforms =
                     | None -> freezeAbsentPlan sessionId physicalUserMessageId plan
 
                 match!
-                    SessionExecutionBinding.freezeProviderAttemptPlanForTransform
+                    ProviderLifecycle.freezeProviderAttemptPlanForTransform
                         journal
                         adaptedFreezeAttemptPlan
                         projectionSessionIdOpt
@@ -271,7 +271,7 @@ module PluginTransforms =
                         invalidOp (
                             sprintf
                                 "HOST-BOUNDARY-008: provider attempt plan freeze failed (%s): %A"
-                                (SessionExecutionBinding.providerStartObservationErrorCode error)
+                                (ProviderLifecycle.providerStartObservationErrorCode error)
                                 error
                         )
             }
@@ -771,7 +771,7 @@ module PluginTransforms =
             // historical auxiliaries must not replay the old horizon into it.
             let! prefixHorizon = caps.ApplyXWire relayProjection outObj
 
-            // 10. SessionExecutionBinding.freezeProviderAttemptPlanForTransform
+            // 10. ProviderLifecycle.freezeProviderAttemptPlanForTransform
             // The transform sees the accepted user message only. Freeze the
             // exact request plan; a later public assistant observation owns
             // ProviderRunIdentity binding and ProviderStarted persistence.

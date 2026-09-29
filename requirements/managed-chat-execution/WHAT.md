@@ -2,7 +2,7 @@
 
 ## [001] 唯一 owner 与 exact execution key
 
-`managed-chat-execution` 是 durable managed chat execution 的唯一 owner。每个执行仅由 exact `(SessionId, PhysicalUserMessageId)` 标识；`SessionId` 可依次承载多个执行，不拥有 session-scoped current execution 终态、租约或替代身份。
+`managed-chat-execution` 是 durable managed chat execution 的唯一 owner。每个执行仅由 exact `(SessionId, PhysicalUserMessageId)` 标识；`SessionId` 可依次承载多个执行，不拥有 session-scoped current execution 终态、租约或替代身份。执行身份的权威来自 durable `Accepted` evidence 与容量所有者（ModelRouting）持有的 exact lease；不要求 Host 侧第二次注册身份或另立一张执行绑定表。
 
 ## [002] Versioned durable fact vocabulary
 
@@ -10,7 +10,7 @@
 
 ## [003] 固定 transaction order
 
-每个 managed chat 必须遵循 `resolve pre-provider identity → durable Accepted → acquire exact capacity → bind exact execution key → project into Host → settle admission → provider effect`。Host 实际暴露 ProviderRun 后才可建立 started evidence 并持久 `ProviderStarted`。`Accepted` 落盘确认前禁止获取容量、建立 binding、修改 Host message 或调用 provider；任一步失败不得越过其后继边界，任何边界不得预测或伪造 ProviderRunIdentity。
+每个 managed chat 必须遵循 `resolve pre-provider identity → durable Accepted → acquire exact capacity → project into Host → commit → provider effect`。成功路径没有独立的 bind/unbind 步骤：容量所有者持有的 exact lease 取得即为该执行的绑定。Host 实际暴露 ProviderRun 后才可建立 started evidence 并持久 `ProviderStarted`。`Accepted` 落盘确认前禁止获取容量、修改 Host message 或调用 provider；任一步失败不得越过其后继边界，任何边界不得预测或伪造 ProviderRunIdentity。
 
 ## [004] Accepted 单次建立且 replay 幂等
 
@@ -36,7 +36,7 @@
 
 capacity lease handle、waiter、callback、queue node、cancellation token 与 subscription 均属 process-local artifact，不得写入 execution facts、快照或恢复 token。恢复只能从 durable semantic facts 重建新的本地 artifact；旧 artifact 的缺失不能被解释为 terminal disposition。
 
-OS process crash/restart 不等于 graceful teardown/reconstruction：同一 durable workspace 重启后，已落盘的 `Accepted` 必须保留；旧进程的 exact binding、capacity ownership、token、custody、execution 与 waiter 必须全部消失，除非新进程从 durable facts 经正常业务路径重新建立。process-local artifact 不得跨进程身份继承。
+OS process crash/restart 不等于 graceful teardown/reconstruction：同一 durable workspace 重启后，已落盘的 `Accepted` 必须保留；旧进程持有的 exact lease、capacity ownership、token、custody、execution 与 waiter 必须全部消失，除非新进程从 durable facts 经正常业务路径重新建立。process-local artifact 不得跨进程身份继承。
 
 ## [010] Cancel/Delete 精确终结并排空
 
@@ -45,7 +45,7 @@ logical cancel 与 session delete 必须枚举 durable projection 中该作用�
 ## [011] Acceptance 原子消费 pre-provider authority evidence
 
 `Accepted` 必须原子消费 Task14 frozen managed intent 与 `interaction-authority` 发布的 current authority evidence，建立 exact `AcceptedChatExecutionEvidence`，包括完整版本化 `ParticipantIdentityEvidence`，但不包含 ProviderRunIdentity。Provider-start owner 随后只能把 Host-observed ProviderRunIdentity 与 accepted evidence 组合成 `ProviderStartedExecutionEvidence`。
-两阶段均只逐字段投影 owner-issued evidence；不得从显式 agent 文本、Session cache、Host parent、model 或旧 execution 推导、补全、改写或独立缓存 participant、Role、initial Tier、Persona、provenance/version 或物理 run。显式外部 agent 仍作为输入保留并与 participant 做一致性校验；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。
+两阶段均只逐字段投影 owner-issued evidence；不得从显式 agent 文本、Session cache、Host parent、model 或旧 execution 推导、补全、改写或独立缓存 participant、Role、initial Tier、Persona、provenance/version 或物理 run。显式外部 agent 仍作为输入保留并与 participant 做一致性校验；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。此处所述 binding 指容量所有者持有的 exact lease 身份；执行身份不要求 Host 侧第二张绑定表登记。
 
 ## [012] Recovery decision 只由 durable execution 与显式 physical evidence 决定
 

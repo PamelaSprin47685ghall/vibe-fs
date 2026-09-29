@@ -170,17 +170,12 @@ type InjectedSessionPort
                 do! abortOneChild childId
         }
 
-    let routeSendOptions (sessionId: SessionId) (opts: SessionPromptOptions) =
+    let routeSendOptions (_sessionId: SessionId) (opts: SessionPromptOptions) =
         // Dispatch admission is intentionally capacity-free. A session is a
         // reusable container, and the async prompt enqueue must never wait for a
         // provider slot. The sole model/capacity owner is chat.message, where the
         // Host is actually preparing this physical user message for execution.
-        if SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId then
-            Ok opts
-        elif managedChild sessionId then
-            SessionExecutionBinding.prepareManagedPrompt sessionId opts
-        else
-            SessionExecutionBinding.prepareUserFacingPrompt sessionId opts
+        Ok opts
 
     let sendThroughPort
         (port: IOpenCodePort)

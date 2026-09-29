@@ -121,7 +121,7 @@ module DispatchSurface =
     let fatal (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Fatal reason
 
     let decodePhysicalUserMessageId (input: obj) (output: obj) : obj =
-        PromptIngressCodec.decodeWith SessionExecutionBinding.tryAgent input output
+        PromptIngressCodec.decodeWith input output
         |> fun decoded -> decoded.PhysicalUserMessageId
         |> Option.map PhysicalUserMessageId.value
         |> Option.map box
@@ -129,7 +129,7 @@ module DispatchSurface =
 
     let decodeIngress (input: obj) (output: obj) : obj =
         let decoded =
-            PromptIngressCodec.decodeWith SessionExecutionBinding.tryAgent input output
+            PromptIngressCodec.decodeWith input output
 
         box
             {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj

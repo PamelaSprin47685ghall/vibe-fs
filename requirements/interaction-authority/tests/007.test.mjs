@@ -69,7 +69,9 @@ test('WHAT[interaction-authority-007] IA_007_unknown_origin_changes_no_projectio
   const state = register(root)
   const before = JSON.stringify(state)
   assert.equal(authority.resolveKnownOrigin('msg_never_proven', 'pk_never_proven', false, state), 'UnknownOrigin')
-  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'engineer', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
+  // No durable active profile: the unproven origin stays a safe no-op — it is
+  // neither admitted nor allowed to change any projection state.
+  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeParticipant: null, activeKind: null, claims: [], acceptedContinuations: [] }), { case: 'NoManagedExecution', reason: 'UnmanagedMessage' })
   assert.equal(JSON.stringify(state), before)
 })
 
@@ -97,10 +99,36 @@ const snapshot = (overrides = {}) => ({
 })
 const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
 
-test('WHAT[interaction-authority-007] unknown origin is rejected while active', () => {
+test('WHAT[interaction-authority-007] absent wire agent continues the durable active participant', () => {
+  // interaction-authority-009: while an active profile exists, an omitted
+  // participant field resolves to that durable participant as a HumanMessage
+  // continuation; it is not UnknownOrigin.
   assert.deepEqual(
     decide(message(), snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' })),
-    { case: 'Reject', reason: 'UnknownOriginWhileActive' },
+    {
+      case: 'ActiveHumanContinuationIntent',
+      sessionId: 'ses-chat',
+      physicalUserMessageId: 'msg-chat',
+      participant: 'engineer',
+      origin: 'HumanMessage',
+    },
+  )
+})
+test('WHAT[interaction-authority-007] durable active profile supplies the participant when the wire omits it', () => {
+  // [009] positive coverage: the continuation identity comes from the durable
+  // active profile — not from a wire placeholder and not from a fresh root.
+  assert.deepEqual(
+    decide(
+      message({ physicalUserMessageId: 'msg-omitted-agent' }),
+      snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' }),
+    ),
+    {
+      case: 'ActiveHumanContinuationIntent',
+      sessionId: 'ses-chat',
+      physicalUserMessageId: 'msg-omitted-agent',
+      participant: 'engineer',
+      origin: 'HumanMessage',
+    },
   )
 })
 }

@@ -32,6 +32,22 @@ test('WHAT[speculative-investigation-011] SPEC_INV_011_the_prepared_stage_create
   assert.match(sendStage, /bootstrapDetachedSend/, 'only the send stage performs the bootstrap prompt')
   assert.match(runtime, /SendAgentOwnerRootWithTools/)
 })
+test('WHAT[speculative-investigation-011] SPEC_INV_011_model_reservation_stays_in_routing_while_the_bootstrap_send_is_model_free', async () => {
+  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
+  assert.match(
+    runtime,
+    /acquireOptionalModelOrAbort/,
+    'the prepared replica still reserves its model through ModelRouting before the bootstrap send',
+  )
+  assert.doesNotMatch(
+    runtime,
+    /promptModel/,
+    'the bootstrap send must not carry a model parameter; the reservation stays in ModelRouting',
+  )
+  const wiring = await read('src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs')
+  assert.match(wiring, /ModelRouting\.tryReserveManaged/, 'the reservation stays registered with ModelRouting')
+  assert.match(wiring, /ModelExecutionPurpose\.ReadonlyDelegate/, 'the replica keeps its readonly-delegate purpose')
+})
 test('WHAT[speculative-investigation-011] SPEC_INV_011_runtime_has_no_production_dry_run_entry', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   assert.doesNotMatch(runtime, /DryRun|dryRunStateAtTargetTerminal|StrengthReplicaPurpose/)

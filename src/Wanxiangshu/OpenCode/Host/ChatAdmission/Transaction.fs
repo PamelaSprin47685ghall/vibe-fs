@@ -13,20 +13,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
-type internal ChatAdmissionBindingKind =
-    | ExternalRoot
-    | ActiveHumanContinuation
-    | PendingPrompt of PromptKey
-
-type internal ChatAdmissionBindingReceipt =
-    private
-        { Identity: ExecutionAdmissionExactIdentity
-          Kind: ChatAdmissionBindingKind }
-
-type internal HostModelProjectionReceipt =
-    private | HostModelProjectionReceipt of ExecutionAdmissionExactIdentity * OpencodeModel
-
-[<RequireQualifiedAccess>]
 /// DSL-class: ExternalSignal
 type internal ChatAdmissionTransactionStep =
     | ResolveState
@@ -34,21 +20,15 @@ type internal ChatAdmissionTransactionStep =
     | AcceptedWitness
     | AcquireLease
     | LeaseTarget
-    | BindExecution
     | ProjectHost
     | CommitLease
     | TerminalizeAccepted
-    | UnbindExecution
     | ReleaseBeforeProvider
     | Settled
 
 [<RequireQualifiedAccess>]
 type internal ChatAdmissionTransactionOutcome =
-    | Settled of
-        witness: ManagedChatAcceptanceWitness *
-        target: ModelRoutingTarget *
-        binding: ChatAdmissionBindingReceipt *
-        hostProjection: HostModelProjectionReceipt
+    | Settled of ManagedChatAcceptanceWitness
     | Superseded of ManagedChatAcceptanceWitness
     | CapacityQueueFull of ManagedChatAcceptanceWitness
     | Cancelled of ManagedChatAcceptanceWitness
@@ -68,25 +48,18 @@ type internal ChatAdmissionTransactionError =
     | AcceptanceBoundaryFailed of exn
     | PreProviderSettlementFailed of PreProviderSettlementError
     | PreProviderSettlementBoundaryFailed of exn
-    | PreProviderUnbindBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseAcquisitionFailed of exn
     | LeaseTargetFailed of ExecutionAdmissionRejection * release: ChatAdmissionReleaseOutcome
     | LeaseTargetBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseTargetProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
-    | BindingFailed of exn * release: ChatAdmissionReleaseOutcome
     | HostProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseCommitFailed of commit: CapacityTransitionOutcome * release: ChatAdmissionReleaseOutcome
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
 
-type internal ChatAdmissionTransactionInput =
-    { Intent: ChatAdmissionIntent.Decision
-      CurrentState: ChatExecutionState option }
-
 type internal ChatAdmissionTransactionPorts =
-    { Accept: ChatAdmissionIntent.Decision -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
+    { Accept: ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
       Acquire: ManagedChatAcceptanceWitness -> Task<Result<ExecutionAdmissionAcquisition, exn>>
       LeaseTarget: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
-      Bind: ChatAdmissionIntent.Decision -> ManagedChatAcceptanceWitness -> OpencodeModel -> Result<unit, exn>
       ProjectHost: OpencodeModel -> Result<unit, exn>
       Commit: ExecutionAdmissionLease -> ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
       ReleaseBeforeProvider: ExecutionAdmissionLease -> CapacityTransitionOutcome
@@ -95,19 +68,11 @@ type internal ChatAdmissionTransactionPorts =
               -> AcceptedChatExecutionEvidence
               -> ChatExecutionTerminalDisposition
               -> Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>>
-      Unbind: ChatExecutionKey -> unit }
+      ReadExact: ChatExecutionKey -> ChatExecutionState option }
 
 type private AdmissionResolution =
     | AdmissionRequired
     | ExistingOutcome of ChatAdmissionTransactionOutcome
-
-type private AcceptedAdmission =
-    { Input: ChatAdmissionTransactionInput
-      Witness: ManagedChatAcceptanceWitness }
-
-type private LeasedAdmission =
-    { Accepted: AcceptedAdmission
-      Lease: ExecutionAdmissionLease }
 
 type private AdmissionSettlementDecision<'outcome> =
     { Evidence: AcceptedChatExecutionEvidence
@@ -116,22 +81,8 @@ type private AdmissionSettlementDecision<'outcome> =
 
 [<RequireQualifiedAccess>]
 type private AdmissionAcquisitionOutcome =
-    | LeaseAcquired of LeasedAdmission
+    | LeaseAcquired of ExecutionAdmissionLease
     | AdmissionStopped of ChatAdmissionTransactionOutcome
-
-type private TargetedAdmission =
-    { Leased: LeasedAdmission
-      Target: ModelRoutingTarget
-      Identity: ExecutionAdmissionExactIdentity
-      Model: OpencodeModel }
-
-type private BoundAdmission =
-    { Targeted: TargetedAdmission
-      Binding: ChatAdmissionBindingReceipt }
-
-type private ProjectedAdmission =
-    { Bound: BoundAdmission
-      HostProjection: HostModelProjectionReceipt }
 
 [<RequireQualifiedAccess>]
 type private TargetPreparationError =
@@ -147,31 +98,8 @@ type private CommitError =
 [<RequireQualifiedAccess>]
 module internal ChatAdmissionTransaction =
 
-    let private intentKey (intent: ChatAdmissionIntent.Decision) : ChatExecutionKey =
-        match intent with
-        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
-            { SessionId = evidence.Key.SessionId
-              PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-            { SessionId = evidence.Key.SessionId
-              PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-        | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
-            { SessionId = evidence.Key.SessionId
-              PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
-        | _ -> invalidArg "intent" "managed chat transaction requires a managed intent"
-
-    let private message (intent: ChatAdmissionIntent.Decision) : ChatAdmissionMessage =
-        let key = intentKey intent
-
-        { SessionId = key.SessionId
-          PhysicalUserMessageId = key.PhysicalUserMessageId
-          ExplicitAgent =
-            match intent with
-            | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> Some evidence.ExplicitAgent
-            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-                Some evidence.Authority.SelectedAgent
-            | ChatAdmissionIntent.Decision.PendingPromptIntent _ -> None
-            | _ -> invalidArg "intent" "managed chat transaction requires a managed intent" }
+    let private intentKey (managed: ChatAdmissionIntent.ManagedIntent) : ChatExecutionKey =
+        ChatAdmissionIntent.managedKey managed
 
     let private exactIdentity
         (witness: ManagedChatAcceptanceWitness)
@@ -223,39 +151,12 @@ module internal ChatAdmissionTransaction =
         with error ->
             ChatAdmissionReleaseOutcome.BoundaryFailed error
 
-    let private unbind observe ports key =
-        observe ChatAdmissionTransactionStep.UnbindExecution
-
-        try
-            ports.Unbind key
-            None
-        with error ->
-            Some error
-
-    let private compensationError createError unbindError released =
-        unbindError
-        |> Option.map (fun error -> ChatAdmissionTransactionError.PreProviderUnbindBoundaryFailed(error, released))
-        |> Option.defaultWith (fun () -> createError released)
-
     let private compensate observe ports witness lease disposition createError =
         taskResult {
             let! _ = settleWitness observe ports witness disposition
-            let key = ManagedChatAcceptanceWitness.evidence witness |> keyOfEvidence
-            let unbindError = unbind observe ports key
             let released = release observe ports lease
-            return! Error(compensationError createError unbindError released)
+            return! Error(createError released)
         }
-
-    let private bindingReceipt intent identity =
-        { Identity = identity
-          Kind =
-            match intent with
-            | ChatAdmissionIntent.Decision.ExternalRootIntent _ -> ChatAdmissionBindingKind.ExternalRoot
-            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _ ->
-                ChatAdmissionBindingKind.ActiveHumanContinuation
-            | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
-                ChatAdmissionBindingKind.PendingPrompt evidence.PromptKey
-            | _ -> invalidArg "intent" "managed chat transaction requires a managed intent" }
 
     let private modelFromTarget target =
         try
@@ -292,24 +193,21 @@ module internal ChatAdmissionTransaction =
 
     let private resolve
         observe
-        (input: ChatAdmissionTransactionInput)
-        : Task<Result<AdmissionResolution, ChatAdmissionTransactionError>> =
+        (ports: ChatAdmissionTransactionPorts)
+        (key: ChatExecutionKey)
+        : Result<AdmissionResolution, ChatAdmissionTransactionError> =
         observe ChatAdmissionTransactionStep.ResolveState
 
-        match input.CurrentState with
+        match ports.ReadExact key with
         | Some { Lifecycle = ChatExecutionLifecycle.Terminal disposition } ->
-            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal disposition)
-            |> Ok
-            |> Task.FromResult
+            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal disposition) |> Ok
         | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
                  ProviderStarted = Some evidence } ->
-            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyStarted evidence)
-            |> Ok
-            |> Task.FromResult
+            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyStarted evidence) |> Ok
         | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
                  ProviderStarted = None } -> invalidOp "ProviderStarted projection is missing exact provider evidence"
         | None
-        | Some { Lifecycle = ChatExecutionLifecycle.Accepted } -> AdmissionRequired |> Ok |> Task.FromResult
+        | Some { Lifecycle = ChatExecutionLifecycle.Accepted } -> AdmissionRequired |> Ok
 
     // semantic-decorator-owner: managed-chat-execution
     // semantic-decorator-WHAT: managed-chat-execution-003
@@ -319,15 +217,15 @@ module internal ChatAdmissionTransaction =
     // semantic-decorator-cancel-policy: step notification is synchronous and adds no cancellation boundary
     // semantic-decorator-deadline-policy: step notification is time-independent and adds no deadline
     // semantic-decorator-invocation-bound: 2
-    let private acceptAdmission observe ports input =
+    let private acceptAdmission observe ports managed =
         task {
             observe ChatAdmissionTransactionStep.Accept
-            let! accepted = accept ports input.Intent
+            let! accepted = accept ports managed
 
             match accepted with
             | Ok witness ->
                 observe ChatAdmissionTransactionStep.AcceptedWitness
-                return Ok { Input = input; Witness = witness }
+                return Ok witness
             | Error(ChatAdmissionTransactionError.AcceptanceFailed(ManagedChatAcceptanceError.EstablishedEvidenceConflict(established,
                                                                                                                           _)) as original) ->
                 let decision =
@@ -339,61 +237,61 @@ module internal ChatAdmissionTransaction =
             | Error error -> return Error error
         }
 
-    let private stoppedAdmissionSettlement accepted outcome =
-        let evidence = ManagedChatAcceptanceWitness.evidence accepted.Witness
+    let private stoppedAdmissionSettlement witness outcome =
+        let evidence = ManagedChatAcceptanceWitness.evidence witness
 
         match outcome with
         | ExecutionAdmissionAcquisition.QueueFull ->
             { Evidence = evidence
               Disposition = ChatExecutionTerminalDisposition.Failed
               Outcome =
-                ChatAdmissionTransactionOutcome.CapacityQueueFull accepted.Witness
+                ChatAdmissionTransactionOutcome.CapacityQueueFull witness
                 |> AdmissionAcquisitionOutcome.AdmissionStopped
                 |> Ok }
         | ExecutionAdmissionAcquisition.Cancelled ->
             { Evidence = evidence
               Disposition = ChatExecutionTerminalDisposition.Cancelled
               Outcome =
-                ChatAdmissionTransactionOutcome.Cancelled accepted.Witness
+                ChatAdmissionTransactionOutcome.Cancelled witness
                 |> AdmissionAcquisitionOutcome.AdmissionStopped
                 |> Ok }
         | ExecutionAdmissionAcquisition.Superseded ->
             { Evidence = evidence
               Disposition = ChatExecutionTerminalDisposition.Cancelled
               Outcome =
-                ChatAdmissionTransactionOutcome.Superseded accepted.Witness
+                ChatAdmissionTransactionOutcome.Superseded witness
                 |> AdmissionAcquisitionOutcome.AdmissionStopped
                 |> Ok }
         | ExecutionAdmissionAcquisition.Admitted _
         | ExecutionAdmissionAcquisition.Queued _ -> invalidOp "handled acquisition outcome reached terminal settlement"
 
-    let rec private acquisitionOutcome observe ports accepted =
+    let rec private acquisitionOutcome observe ports witness =
         function
         | ExecutionAdmissionAcquisition.Admitted lease ->
-            AdmissionAcquisitionOutcome.LeaseAcquired { Accepted = accepted; Lease = lease }
+            AdmissionAcquisitionOutcome.LeaseAcquired lease
             |> Ok
             |> Task.FromResult
         | ExecutionAdmissionAcquisition.Queued node ->
             task {
                 let! completed = node.Completion.Task
-                return! acquisitionOutcome observe ports accepted completed
+                return! acquisitionOutcome observe ports witness completed
             }
-        | outcome -> stoppedAdmissionSettlement accepted outcome |> settleAdmission observe ports
+        | outcome -> stoppedAdmissionSettlement witness outcome |> settleAdmission observe ports
 
-    let private acquireAdmission observe ports accepted =
+    let private acquireAdmission observe ports witness =
         task {
             observe ChatAdmissionTransactionStep.AcquireLease
-            let! acquired = acquire ports accepted.Witness
+            let! acquired = acquire ports witness
 
             match acquired with
             | Error error ->
                 let decision =
-                    { Evidence = ManagedChatAcceptanceWitness.evidence accepted.Witness
+                    { Evidence = ManagedChatAcceptanceWitness.evidence witness
                       Disposition = ChatExecutionTerminalDisposition.Failed
                       Outcome = Error error }
 
                 return! settleAdmission observe ports decision
-            | Ok acquisition -> return! acquisitionOutcome observe ports accepted acquisition
+            | Ok acquisition -> return! acquisitionOutcome observe ports witness acquisition
         }
 
     let private readTarget ports lease =
@@ -404,17 +302,14 @@ module internal ChatAdmissionTransaction =
 
     let private prepareTarget
         (ports: ChatAdmissionTransactionPorts)
-        (leased: LeasedAdmission)
-        : Result<TargetedAdmission, TargetPreparationError> =
-        readTarget ports leased.Lease
+        (witness: ManagedChatAcceptanceWitness)
+        (lease: ExecutionAdmissionLease)
+        : Result<ModelRoutingTarget * ExecutionAdmissionExactIdentity * OpencodeModel, TargetPreparationError> =
+        readTarget ports lease
         |> Result.bind (fun target ->
             modelFromTarget target
             |> Result.mapError TargetPreparationError.ProjectionFailed
-            |> Result.map (fun model ->
-                { Leased = leased
-                  Target = target
-                  Identity = exactIdentity leased.Accepted.Witness target
-                  Model = model }))
+            |> Result.map (fun model -> (target, exactIdentity witness target, model)))
 
     let private targetError =
         function
@@ -425,61 +320,36 @@ module internal ChatAdmissionTransaction =
         | TargetPreparationError.ProjectionFailed error ->
             fun release -> ChatAdmissionTransactionError.LeaseTargetProjectionFailed(error, release)
 
-    let private targetAdmission observe ports leased =
+    let private targetAdmission observe ports witness lease =
         observe ChatAdmissionTransactionStep.LeaseTarget
 
-        match prepareTarget ports leased with
-        | Ok targeted -> Task.FromResult(Ok targeted)
+        match prepareTarget ports witness lease with
+        | Ok(target, identity, model) -> Task.FromResult(Ok(target, identity, model))
         | Error error ->
             compensate
                 observe
                 ports
-                leased.Accepted.Witness
-                leased.Lease
+                witness
+                lease
                 ChatExecutionTerminalDisposition.Failed
                 (targetError error)
 
-    let private bindAdmission observe ports targeted =
-        observe ChatAdmissionTransactionStep.BindExecution
-
-        match
-            effect (fun () ->
-                ports.Bind targeted.Leased.Accepted.Input.Intent targeted.Leased.Accepted.Witness targeted.Model)
-        with
-        | Ok() ->
-            { Targeted = targeted
-              Binding = bindingReceipt targeted.Leased.Accepted.Input.Intent targeted.Identity }
-            |> Ok
-            |> Task.FromResult
-        | Error error ->
-            compensate
-                observe
-                ports
-                targeted.Leased.Accepted.Witness
-                targeted.Leased.Lease
-                ChatExecutionTerminalDisposition.Failed
-                (fun release -> ChatAdmissionTransactionError.BindingFailed(error, release))
-
-    let private projectAdmission observe ports bound =
+    let private projectAdmission observe ports witness lease model =
         observe ChatAdmissionTransactionStep.ProjectHost
 
-        match effect (fun () -> ports.ProjectHost bound.Targeted.Model) with
-        | Ok() ->
-            { Bound = bound
-              HostProjection = HostModelProjectionReceipt(bound.Targeted.Identity, bound.Targeted.Model) }
-            |> Ok
-            |> Task.FromResult
+        match effect (fun () -> ports.ProjectHost model) with
+        | Ok() -> Task.FromResult(Ok())
         | Error error ->
             compensate
                 observe
                 ports
-                bound.Targeted.Leased.Accepted.Witness
-                bound.Targeted.Leased.Lease
+                witness
+                lease
                 ChatExecutionTerminalDisposition.Failed
                 (fun release -> ChatAdmissionTransactionError.HostProjectionFailed(error, release))
 
-    let private commit ports projected =
-        effectValue (fun () -> ports.Commit projected.Bound.Targeted.Leased.Lease projected.Bound.Targeted.Identity)
+    let private commit ports lease identity =
+        effectValue (fun () -> ports.Commit lease identity)
         |> Result.mapError CommitError.BoundaryFailed
         |> Result.bind (function
             | CapacityTransitionOutcome.Applied
@@ -495,14 +365,6 @@ module internal ChatAdmissionTransaction =
         | CommitError.BoundaryFailed error ->
             fun release -> ChatAdmissionTransactionError.LeaseCommitBoundaryFailed(error, release)
 
-    let private settled projected =
-        ChatAdmissionTransactionOutcome.Settled(
-            projected.Bound.Targeted.Leased.Accepted.Witness,
-            projected.Bound.Targeted.Target,
-            projected.Bound.Binding,
-            projected.HostProjection
-        )
-
     // semantic-decorator-owner: managed-chat-execution
     // semantic-decorator-WHAT: managed-chat-execution-003
     // semantic-decorator-trace-relation: one CommitLease step before the lease commit and one Settled step only after it succeeds; business trace unchanged
@@ -511,84 +373,51 @@ module internal ChatAdmissionTransaction =
     // semantic-decorator-cancel-policy: step notification is synchronous and adds no cancellation boundary
     // semantic-decorator-deadline-policy: step notification is time-independent and adds no deadline
     // semantic-decorator-invocation-bound: 2
-    let private commitAdmission observe ports projected =
+    let private commitAdmission observe ports witness lease identity =
         observe ChatAdmissionTransactionStep.CommitLease
 
-        match commit ports projected with
+        match commit ports lease identity with
         | Ok() ->
             observe ChatAdmissionTransactionStep.Settled
-            settled projected |> Ok |> Task.FromResult
+            ChatAdmissionTransactionOutcome.Settled witness |> Ok |> Task.FromResult
         | Error error ->
             compensate
                 observe
                 ports
-                projected.Bound.Targeted.Leased.Accepted.Witness
-                projected.Bound.Targeted.Leased.Lease
+                witness
+                lease
                 ChatExecutionTerminalDisposition.Failed
                 (commitError error)
 
-    let private executeAdmission observe ports input =
+    let private executeAdmission observe ports managed =
         taskResult {
-            let! accepted = acceptAdmission observe ports input
-            let! acquisition = acquireAdmission observe ports accepted
+            let! witness = acceptAdmission observe ports managed
+            let! acquisition = acquireAdmission observe ports witness
 
             match acquisition with
             | AdmissionAcquisitionOutcome.AdmissionStopped outcome -> return outcome
-            | AdmissionAcquisitionOutcome.LeaseAcquired leased ->
-                let! targeted = targetAdmission observe ports leased
-                let! bound = bindAdmission observe ports targeted
-                let! projected = projectAdmission observe ports bound
-                return! commitAdmission observe ports projected
+            | AdmissionAcquisitionOutcome.LeaseAcquired lease ->
+                let! target, identity, model = targetAdmission observe ports witness lease
+                let! _ = projectAdmission observe ports witness lease model
+                return! commitAdmission observe ports witness lease identity
         }
 
     let executeWith
         (observe: ChatAdmissionTransactionStep -> unit)
         (ports: ChatAdmissionTransactionPorts)
-        (input: ChatAdmissionTransactionInput)
+        (managed: ChatAdmissionIntent.ManagedIntent)
         : Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =
         task {
-            match! resolve observe input with
+            match resolve observe ports (intentKey managed) with
             | Error error -> return Error error
             | Ok(ExistingOutcome outcome) -> return Ok outcome
-            | Ok AdmissionRequired -> return! executeAdmission observe ports input
+            | Ok AdmissionRequired -> return! executeAdmission observe ports managed
         }
-
-    let private bindIntent
-        (intent: ChatAdmissionIntent.Decision)
-        (witness: ManagedChatAcceptanceWitness)
-        (model: OpencodeModel)
-        =
-        let evidence = ManagedChatAcceptanceWitness.evidence witness
-
-        match intent with
-        | ChatAdmissionIntent.Decision.ExternalRootIntent intentEvidence ->
-            SessionExecutionBinding.acceptExternalExecution
-                intentEvidence.Key.SessionId
-                intentEvidence.Key.PhysicalUserMessageId
-                (AcceptedChatExecutionEvidence.participant evidence)
-                model
-        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent intentEvidence ->
-            SessionExecutionBinding.acceptExternalExecution
-                intentEvidence.Key.SessionId
-                intentEvidence.Key.PhysicalUserMessageId
-                (AcceptedChatExecutionEvidence.participant evidence)
-                model
-        | ChatAdmissionIntent.Decision.PendingPromptIntent intentEvidence ->
-            SessionExecutionBinding.acceptPromptExecution
-                intentEvidence.Key.SessionId
-                intentEvidence.PromptKey
-                intentEvidence.Key.PhysicalUserMessageId
-                (AcceptedChatExecutionEvidence.participant evidence)
-                model
-        | _ -> invalidArg "intent" "managed chat transaction requires a managed intent"
-
-    let private bind intent witness model =
-        effectValue (fun () -> bindIntent intent witness model)
 
     let production
         (journal: AgentJournal)
         (acceptManagedIntent:
-            ChatAdmissionIntent.Decision -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>)
+            ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>)
         (projectHostModel: OpencodeModel -> Result<unit, exn>)
         : ChatAdmissionTransactionPorts =
         { Accept = acceptManagedIntent
@@ -616,7 +445,6 @@ module internal ChatAdmissionTransaction =
                         return Error error
                 }
           LeaseTarget = ModelRouting.executionAdmissionTarget
-          Bind = bind
           ProjectHost =
             fun model ->
                 try
@@ -626,6 +454,9 @@ module internal ChatAdmissionTransaction =
           Commit = ModelRouting.commitExecutionAdmission
           ReleaseBeforeProvider = fun lease -> ModelRouting.releaseExecutionAdmissionBeforeProvider lease lease.Identity
           SettlePreProvider = PreProviderSettlement.settle journal
-          Unbind = fun key -> SessionExecutionBinding.releaseAcceptedExecution key.SessionId key.PhysicalUserMessageId }
+          ReadExact =
+            fun key ->
+                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey key }
 
-    let execute ports input = executeWith ignore ports input
+    let execute ports managed = executeWith ignore ports managed

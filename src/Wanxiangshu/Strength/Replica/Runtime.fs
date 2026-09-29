@@ -263,7 +263,6 @@ module private StrengthReplicaRuntimeLogic =
         (sessions: ISessionHostPort)
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
         (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
-        (promptModel: OpencodeModel option)
         (directory: string option)
         (replica: SessionId)
         (identitySeed: PromptAuthority.IdentitySeed)
@@ -281,7 +280,6 @@ module private StrengthReplicaRuntimeLogic =
                         PromptDispatcher.AwaitMode.Detached
                         None
                         StrengthReplicaTools.exactReadonlyHostToolMap
-                        promptModel
 
                 do! applyBootstrapSendResult complete abortReplica state sent
             with ex ->
@@ -787,7 +785,7 @@ type StrengthReplicaRuntime
         if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
             removeState state
 
-    let sendPreparedPromptWithModel state identitySeed admitted promptModel replicaSessionId =
+    let sendPreparedPrompt state identitySeed admitted replicaSessionId =
         task {
             replaceState state admitted |> ignore
 
@@ -797,7 +795,6 @@ type StrengthReplicaRuntime
                     sessions
                     complete
                     abortReplica
-                    promptModel
                     directory
                     replicaSessionId
                     identitySeed
@@ -819,8 +816,8 @@ type StrengthReplicaRuntime
                 complete (StrengthReplicaTerminal.Failed error) admitted
                 do! abortReplica admitted
                 return Error error
-            | Ok promptModel ->
-                return! sendPreparedPromptWithModel state identitySeed admitted promptModel replicaSessionId
+            | Ok _ ->
+                return! sendPreparedPrompt state identitySeed admitted replicaSessionId
         }
 
     let sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId =

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
 
 [<RequireQualifiedAccess>]
@@ -16,10 +17,6 @@ module ChatAdmissionIntent =
 
     type DurableSnapshot =
         { Authority: PromptAuthority.PromptAuthorityProjection option }
-
-    type ExecutionKey =
-        { SessionId: SessionId
-          PhysicalUserMessageId: PhysicalUserMessageId }
 
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
@@ -39,20 +36,20 @@ module ChatAdmissionIntent =
         | UnknownOriginWhileActive
 
     type ExternalRootEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           ExplicitAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type PendingPromptEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           PromptKey: PromptKey
           Claim: PromptAuthority.PromptClaim
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type ActiveHumanContinuationEvidence =
-        { Key: ExecutionKey
+        { Key: ChatExecutionKey
           Origin: PromptAuthority.PromptOrigin
           Authority: PromptAuthority.AuthorityExecutionProfile }
 
@@ -69,6 +66,16 @@ module ChatAdmissionIntent =
         | PendingPromptIntent of PendingPromptEvidence
         | HostInternal of HostInternalEvidence
         | Reject of Rejection
+
+    [<RequireQualifiedAccess>]
+    type ManagedIntent =
+        | ExternalRoot of ExternalRootEvidence
+        | ActiveHumanContinuation of ActiveHumanContinuationEvidence
+        | PendingPrompt of PendingPromptEvidence
+
+    val tryManaged: decision: Decision -> ManagedIntent option
+    val ofManaged: managed: ManagedIntent -> Decision
+    val managedKey: managed: ManagedIntent -> ChatExecutionKey
 
     val resolve: message: DecodedMessage -> snapshot: DurableSnapshot -> Decision
     val describeRejection: rejection: Rejection -> string

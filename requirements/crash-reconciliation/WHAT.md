@@ -15,7 +15,7 @@
 ## [004] 恢复复用普通 workflow 入口，不发明程序计数器
 
 恢复过程遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 `RecoveryStage` 等第二状态机。
-所有工具与执行中断均由 crash-reconciliation-017 / crash-reconciliation-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；系统在加载阶段自行归位（结算遗留子 run、重建执行绑定、重新登记子会话），不存在显式续传命令。
+所有工具与执行中断均由 crash-reconciliation-017 / crash-reconciliation-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；系统在加载阶段自行归位（结算遗留子 run、重新登记子会话），不存在显式续传命令；新进程不靠回填执行绑定缓存恢复发送能力，无该缓存时仍依据权威事实正确发送与查询。
 ## [005] ambiguous / multiple / missing 证据 fail closed
 
 恢复证据不足、冲突或缺失时，系统必须显式停留在 `Waiting`、`Blocked` 或 `RecoveryIncomplete` 分支，严禁猜测继续。
@@ -93,6 +93,6 @@ Load Phase 必须一次性结算上一 runtime 遗留、本进程无法继续持
 
 任何“这个子会话/lane/handle 是否存在、属于谁、由谁执行”的判定都必须能从 durable 投影回答；进程本地注册表（子会话登记、dormant 集、执行绑定、lane 注册表）只记录“本进程当前在驱动什么”，不得作为拒绝、忽略或“未知”的唯一依据。
 
-- 未命中缓存时的正确行为是**按需解析并回填**（`DurableChildLookup` by handle id / byname、`SessionExecutionBinding` 的 durable 证据回退、`FissionRuntime` 的 durable lane 证据），而不是回 `Unknown agent id`、`person-unavailable` 或静默跳过；
+- 未命中缓存时的正确行为是**按需解析并回填**（`DurableChildLookup` by handle id / byname、执行身份按 durable authority 投影与 exact lease 解析、`FissionRuntime` 的 durable lane 证据），而不是回 `Unknown agent id`、`person-unavailable` 或静默跳过；
 - 装载阶段不再有“预登记/预热”特例通道：同一件事只有一个按需规则，避免重启路径每多一处读取就多一处补丁；
 - 只有进程资源归属（本进程持有的 PTY、pending run、teardown 集合、live companion host）可以只读本地表；它们描述的是进程，而不是世界。

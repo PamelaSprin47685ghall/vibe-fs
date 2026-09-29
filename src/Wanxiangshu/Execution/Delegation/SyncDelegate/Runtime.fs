@@ -291,7 +291,6 @@ type SyncDelegateRuntime
                             let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
                             accept physical root (FreshAuthorityRoot root)))
                         tools
-                        None
 
                 ()
             | Some profile when

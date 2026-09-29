@@ -23,32 +23,6 @@ open Wanxiangshu.Persistence.Journal
 /// (SessionId, PhysicalUserMessageId) provider execution.
 module SessionExecutionBinding =
 
-    [<RequireQualifiedAccess>]
-    type ProviderStartObservationError<'bindingError> =
-        | DurableJournalUnavailable
-        | PhysicalUserMessageMissing of SessionId
-        | AttemptPlanFreezeFailed of 'bindingError
-        | FrozenAttemptPlanMissing of ChatExecutionKey * ProviderRunIdentity
-        | AcceptedExecutionMissing of ChatExecutionKey
-        | AcceptedExecutionAlreadyTerminal of ChatExecutionKey
-        | BloggerRequestMissing of SessionId
-        | BloggerRequestKindUnsupported of string
-        | AuthorityEvidenceInvalid of AcceptedChatExecutionEvidence
-        | PersistenceFailed of ManagedChatProviderLifecycleError
-
-    let providerStartObservationErrorCode =
-        function
-        | ProviderStartObservationError.DurableJournalUnavailable -> "durable-journal-unavailable"
-        | ProviderStartObservationError.PhysicalUserMessageMissing _ -> "physical-user-message-missing"
-        | ProviderStartObservationError.AttemptPlanFreezeFailed _ -> "attempt-plan-freeze-failed"
-        | ProviderStartObservationError.FrozenAttemptPlanMissing _ -> "frozen-attempt-plan-missing"
-        | ProviderStartObservationError.AcceptedExecutionMissing _ -> "accepted-execution-missing"
-        | ProviderStartObservationError.AcceptedExecutionAlreadyTerminal _ -> "accepted-execution-already-terminal"
-        | ProviderStartObservationError.BloggerRequestMissing _ -> "blogger-request-missing"
-        | ProviderStartObservationError.BloggerRequestKindUnsupported _ -> "blogger-request-kind-unsupported"
-        | ProviderStartObservationError.AuthorityEvidenceInvalid _ -> "authority-evidence-invalid"
-        | ProviderStartObservationError.PersistenceFailed _ -> "persistence-failed"
-
     type private ExpectedBinding =
         { PhysicalUserMessageId: PhysicalUserMessageId
           Agent: string
@@ -352,13 +326,6 @@ module SessionExecutionBinding =
                 // transform re-prove it from its trailing user message.
                 providerAttemptBindings.[sessionKey] <- binding)
 
-    /// Provider-attempt boundary. The transform must bind the exact trailing
-    /// PhysicalUserMessageId that chat.message admitted. PromptKey is still the
-    /// plugin authority identity, but it can never substitute for physical
-    /// execution identity.
-    let private clearProviderAttempt sessionKey =
-        lock gate (fun () -> providerAttemptBindings.Remove sessionKey |> ignore)
-
     let private physicalMismatch promptKey expected observed =
         Error(
             sprintf
@@ -374,12 +341,10 @@ module SessionExecutionBinding =
         (promptKey: PromptKey)
         : Result<unit, string> =
         lock gate (fun () ->
-            let sessionKey = SessionId.value sessionId
             let bindingKey = promptBindingKey sessionId promptKey
 
             match acceptedPromptBindings.TryGetValue bindingKey, physicalUserMessageId with
             | (true, expected), Some physical when expected.PhysicalUserMessageId = physical ->
-                providerAttemptBindings.[sessionKey] <- expected
                 Ok()
             | (true, expected), Some physical -> physicalMismatch promptKey expected.PhysicalUserMessageId physical
             | (true, _), None ->
@@ -425,7 +390,12 @@ module SessionExecutionBinding =
 
         let leaseOpt =
             match roleOpt with
-            | Some role -> ModelRouting.tryLease sessionId physical role agent ModelExecutionPurpose.Normal None
+            | Some _ ->
+                // P2a: read the exact committed lease; this boundary never
+                // allocates, takes over a reservation, or re-issues a fence.
+                ModelRouting.tryReadExecution
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = physical }
             | None -> None
 
         match leaseOpt with
@@ -435,7 +405,7 @@ module SessionExecutionBinding =
                     "PROMPT-006: physical provider attempt %s has no model-routing execution lease"
                     (PhysicalUserMessageId.value physical)
             )
-        | Some target -> rememberLeaseTarget sessionId physical agent roleOpt target
+        | Some lease -> rememberLeaseTarget sessionId physical agent roleOpt lease.Identity.Target
 
     let private beginExternalProviderAttempt sessionId physicalUserMessageId =
         let sessionKey = SessionId.value sessionId
@@ -466,8 +436,6 @@ module SessionExecutionBinding =
         (physicalUserMessageId: PhysicalUserMessageId option)
         (promptKey: PromptKey option)
         : Result<unit, string> =
-        clearProviderAttempt (SessionId.value sessionId)
-
         match promptKey with
         | None -> beginExternalProviderAttempt sessionId physicalUserMessageId
         | Some key ->
@@ -520,19 +488,44 @@ module SessionExecutionBinding =
 
         sprintf "%s:%s:%s" (SessionId.value sessionId) (PhysicalUserMessageId.value physical) sortedRuns
 
+    let private providerBindingRequired (sessionId: SessionId) =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            agents.ContainsKey key
+            || (parents.ContainsKey key && not (hostAuxiliaryChildren.Contains key)))
+
+    /// EMR-010 / host-boundary-008: the provider-step gate reads the exact
+    /// committed lease for this physical message, never the session-current
+    /// binding copy. A managed session whose physical message has no
+    /// committed lease fails closed; an unmanaged session never enters the
+    /// provider step.
     let private enterBoundProviderStep
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId option)
         (rawMessages: obj list)
         (requestKey: string option)
         : Task =
-        match currentProviderModel sessionId, physicalUserMessageId with
-        | Some _, Some physical ->
-            let visibleRuns = ProviderWireCapture.visibleProviderRuns rawMessages
-            ModelRouting.enterProviderStep sessionId physical visibleRuns requestKey
-        | Some _, None ->
-            raise (InvalidOperationException "EMR-010: managed provider step has no physical user message id")
-        | None, _ -> Task.FromResult(())
+        match physicalUserMessageId with
+        | None -> Task.FromResult(())
+        | Some physical when not (providerBindingRequired sessionId) -> Task.FromResult(())
+        | Some physical ->
+            match
+                ModelRouting.tryReadExecution
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = physical }
+            with
+            | Some _ ->
+                let visibleRuns = ProviderWireCapture.visibleProviderRuns rawMessages
+                ModelRouting.enterProviderStep sessionId physical visibleRuns requestKey
+            | None ->
+                raise (
+                    InvalidOperationException(
+                        sprintf
+                            "EMR-010: managed provider step for physical user message %s has no committed model-routing lease"
+                            (PhysicalUserMessageId.value physical)
+                    )
+                )
 
     let private beginSessionPhysicalProviderAttempt
         (beginQuiescence: SessionId -> unit)
@@ -573,317 +566,6 @@ module SessionExecutionBinding =
             | Some sid -> do! beginSessionPhysicalProviderAttempt beginQuiescence (SessionId.create sid) outObj
             | None -> return ()
         }
-
-    let private providerBindingRequired (sessionId: SessionId) =
-        lock gate (fun () ->
-            let key = SessionId.value sessionId
-
-            agents.ContainsKey key
-            || (parents.ContainsKey key && not (hostAuxiliaryChildren.Contains key)))
-
-    let private bloggerRequestKind<'bindingError>
-        (projection: ProjectionSet)
-        (execution: ChatExecutionState)
-        : Result<ProviderRequestKind option, ProviderStartObservationError<'bindingError>> =
-        match
-            SessionAssociationProjection.tryMainSessionOf
-                execution.Evidence.SessionId
-                projection.AgentProjections.Associations
-        with
-        | None -> Ok None
-        | Some mainSessionId ->
-            result {
-                let openRequest =
-                    AgentProjection.tryFind mainSessionId projection.AgentProjections
-                    |> Option.bind (fun session -> session.BloggerCycles)
-                    |> Option.bind (BloggerCycleProjection.tryOpenByBlogger execution.Evidence.SessionId)
-
-                match openRequest, execution.ProviderStarted |> Option.map (fun started -> started.RequestKind) with
-                | Some request, _ ->
-                    return!
-                        OpenBloggerRequest.providerRequestKind request
-                        |> Result.map Some
-                        |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
-                | None, Some(ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash as established) ->
-                    return Some established
-                | None, None when
-                    (match execution.Lifecycle with
-                     | ChatExecutionLifecycle.Terminal _ -> true
-                     | _ -> false)
-                    ->
-                    return None
-                | None, _ ->
-                    return! Error(ProviderStartObservationError.BloggerRequestMissing execution.Evidence.SessionId)
-            }
-
-    let private freezeOrdinaryPlan<'bindingError>
-        (durable: AgentJournal)
-        (key: ChatExecutionKey)
-        : Result<AcceptedChatExecutionEvidence * PendingAttemptPlan, ProviderStartObservationError<'bindingError>> =
-        let projection = AgentJournal.snapshot durable
-
-        result {
-            let! execution =
-                projection.AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey key
-                |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
-
-            let accepted = execution.Evidence
-            let! bloggerKind = bloggerRequestKind projection execution
-
-            let requestKind =
-                bloggerKind
-                |> Option.defaultValue (AttemptPlanner.ordinaryRequestKind accepted.Origin)
-
-            let! pending =
-                AttemptPlanner.freezeOrdinary accepted requestKind
-                |> Result.mapError (fun _ -> ProviderStartObservationError.AuthorityEvidenceInvalid accepted)
-
-            return accepted, pending
-        }
-
-    let private freezeManagedProviderAttemptPlan
-        (journal: AgentJournal option)
-        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
-        (sessionId: SessionId)
-        (outObj: obj)
-        =
-        result {
-            let! durable =
-                journal
-                |> Result.requireSome ProviderStartObservationError.DurableJournalUnavailable
-
-            let rawMessages =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
-
-            let! physicalUserMessageId =
-                ProviderWireCapture.lastUserMessageId rawMessages
-                |> Result.requireSome (ProviderStartObservationError.PhysicalUserMessageMissing sessionId)
-
-            let key =
-                { SessionId = sessionId
-                  PhysicalUserMessageId = physicalUserMessageId }
-
-            let! _, ordinaryPlan = freezeOrdinaryPlan durable key
-
-            do!
-                freezeAttemptPlan sessionId physicalUserMessageId ordinaryPlan
-                |> Result.mapError ProviderStartObservationError.AttemptPlanFreezeFailed
-
-            return ()
-        }
-
-    let private persistPreparedProviderStarted
-        (durable: AgentJournal)
-        (acceptedEvidence: AcceptedChatExecutionEvidence)
-        (plan: AttemptPlan)
-        =
-        let profile = plan.Profile
-
-        let key =
-            { SessionId = acceptedEvidence.SessionId
-              PhysicalUserMessageId = acceptedEvidence.PhysicalUserMessageId }
-
-        task {
-            let! persisted =
-                ManagedChatProviderLifecycle.providerStarted
-                    durable
-                    key
-                    acceptedEvidence
-                    profile.ProviderRun
-                    profile.RequestKind
-                    profile.ProjectionChoice
-
-            return
-                persisted
-                |> Result.map ignore
-                |> Result.mapError ProviderStartObservationError.PersistenceFailed
-        }
-
-    let private admitContinuation
-        (durable: AgentJournal)
-        (key: ChatExecutionKey)
-        (authority: PromptAuthority.AuthorityExecutionProfile)
-        =
-        let evidence =
-            ManagedChatAcceptance.evidenceFromIntent
-                authority
-                key.PhysicalUserMessageId
-                (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage)
-
-        ManagedChatAcceptance.accept durable key evidence
-
-    let private admitExternalRoot (durable: AgentJournal) (key: ChatExecutionKey) (agent: string) =
-        let logicalRunId =
-            LogicalRunId.create (sprintf "run-%s-1" (SessionId.value key.SessionId))
-
-        let rootUserMsgId =
-            AuthorityRootUserMessageId.create (PhysicalUserMessageId.value key.PhysicalUserMessageId)
-
-        taskResult {
-            let! identity = ParticipantIdentity.resolveAtRoot agent |> Result.mapError (sprintf "%A")
-
-            let rootPayload: AuthorityRootAcceptedPayload =
-                { SchemaVersion = 2
-                  SessionId = key.SessionId
-                  LogicalRunId = logicalRunId
-                  AuthorityRootUserMessageId = rootUserMsgId
-                  AuthorityKind = "HumanRoot"
-                  IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
-
-            let! _ =
-                AgentJournal.appendAgent
-                    (StreamId.Session key.SessionId)
-                    None
-                    (PromptFact.AuthorityRootAccepted rootPayload)
-                    durable
-                |> TaskResult.mapError (sprintf "%A")
-
-            let evidence: AcceptedChatExecutionEvidence =
-                { SessionId = key.SessionId
-                  LogicalRunId = logicalRunId
-                  AuthorityRootUserMessageId = rootUserMsgId
-                  AuthorityKind = PromptRootAuthorityKind.HumanRoot
-                  PhysicalUserMessageId = key.PhysicalUserMessageId
-                  IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity
-                  Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot }
-
-            let! _ =
-                ManagedChatAcceptance.accept durable key evidence
-                |> TaskResult.mapError (sprintf "%A")
-
-            return ()
-        }
-
-    let private establishAdmission
-        (durable: AgentJournal)
-        (key: ChatExecutionKey)
-        (agent: string)
-        (projection: ProjectionSet)
-        =
-        task {
-            match PromptAuthorityProjectionQueries.activeProfile key.SessionId projection.AgentProjections with
-            | Some authority when authority.SelectedAgent = agent ->
-                let! res = admitContinuation durable key authority
-                return res |> Result.map ignore |> Result.mapError (fun e -> sprintf "%A" e)
-            | _ -> return! admitExternalRoot durable key agent
-        }
-
-    let private admitUnestablishedKey
-        (durable: AgentJournal)
-        (key: ChatExecutionKey)
-        (agentOpt: string option)
-        (projection: ProjectionSet)
-        =
-        task {
-            match agentOpt with
-            | Some agent ->
-                let! _ = establishAdmission durable key agent projection
-                ()
-            | None -> ()
-        }
-
-    let private ensureChatExecutionAccepted
-        (durable: AgentJournal)
-        (sessionId: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        : Task<unit> =
-        task {
-            let key: ChatExecutionKey =
-                { SessionId = sessionId
-                  PhysicalUserMessageId = physicalUserMessageId }
-
-            let projection = AgentJournal.snapshot durable
-
-            if
-                (ChatExecutionProjection.byKey key projection.AgentProjections.ChatExecutions)
-                    .IsNone
-            then
-                let isSatellite =
-                    SessionAssociationProjection.isSatellite sessionId projection.AgentProjections.Associations
-
-                if not isSatellite then
-                    let agentOpt = baseAgent (SessionId.value sessionId)
-                    do! admitUnestablishedKey durable key agentOpt projection
-        }
-
-    let private freezeExistingDurablePlan
-        (journal: AgentJournal option)
-        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
-        (sessionId: SessionId)
-        (durable: AgentJournal)
-        (outObj: obj)
-        : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
-        task {
-            let rawMessages =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
-
-            match ProviderWireCapture.lastUserMessageId rawMessages with
-            | None -> return Ok()
-            | Some physical ->
-                do! ensureChatExecutionAccepted durable sessionId physical
-                return freezeManagedProviderAttemptPlan journal freezeAttemptPlan sessionId outObj
-        }
-
-    let freezeProviderAttemptPlanForTransform
-        (journal: AgentJournal option)
-        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
-        (projectionSessionIdOpt: string option)
-        (outObj: obj)
-        : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
-        task {
-            match projectionSessionIdOpt, journal with
-            | None, _ -> return Ok()
-            | Some sessionText, _ when not (providerBindingRequired (SessionId.create sessionText)) -> return Ok()
-            | Some sessionText, Some durable ->
-                return!
-                    freezeExistingDurablePlan journal freezeAttemptPlan (SessionId.create sessionText) durable outObj
-            | Some _, None -> return Error ProviderStartObservationError.DurableJournalUnavailable
-        }
-
-    let private persistObservedProviderStart
-        (durable: AgentJournal)
-        (bindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option)
-        (observation: ExactProviderStartObservation)
-        =
-        let key =
-            { SessionId = observation.SessionId
-              PhysicalUserMessageId = observation.PhysicalUserMessageId }
-
-        let execution =
-            AgentJournal.snapshot durable
-            |> fun projection -> projection.AgentProjections.ChatExecutions
-            |> ChatExecutionProjection.byKey key
-
-        match execution |> Option.map _.Lifecycle, execution |> Option.bind _.ProviderStarted with
-        | Some(ChatExecutionLifecycle.Terminal _), _ ->
-            Task.FromResult(Error(ProviderStartObservationError.AcceptedExecutionAlreadyTerminal key))
-        | _, Some _ -> Task.FromResult(Ok false)
-        | _, None ->
-            taskResult {
-                let! acceptedEvidence =
-                    execution
-                    |> Option.map _.Evidence
-                    |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
-
-                let! plan =
-                    bindAttemptPlan observation.SessionId observation.PhysicalUserMessageId observation.ProviderRun
-                    |> Result.requireSome (
-                        ProviderStartObservationError.FrozenAttemptPlanMissing(key, observation.ProviderRun)
-                    )
-
-                do! persistPreparedProviderStarted durable acceptedEvidence plan
-                return true
-            }
-
-    let persistProviderStartedFromObservation
-        (journal: AgentJournal option)
-        (bindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option)
-        (observation: ExactProviderStartObservation)
-        : Task<Result<bool, ProviderStartObservationError<unit>>> =
-        match journal with
-        | None -> Task.FromResult(Error ProviderStartObservationError.DurableJournalUnavailable)
-        | Some durable -> persistObservedProviderStart durable bindAttemptPlan observation
 
     let drop (sessionId: SessionId) =
         lock gate (fun () ->

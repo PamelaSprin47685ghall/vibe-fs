@@ -731,6 +731,21 @@ module ModelRoutingSurface =
         |> Option.map targetObject
         |> Option.defaultValue null
 
+    /// Read-only exact committed lease observation. The opaque token is the same
+    /// capability the acquire path handed out; an unregistered lease gets a token
+    /// so the caller can still bind it to the owner projection.
+    let tryReadExecution (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
+        match (runtimeOf runtime).TryReadExecution(sessionId, physicalUserMessageId) with
+        | None -> null
+        | Some lease ->
+            if hasOpaqueToken executionAdmissionTokens lease then
+                opaqueTokenValue executionAdmissionTokens lease
+            else
+                let created = opaqueLeaseToken ()
+                rememberOpaqueToken executionAdmissionTokens lease created
+                rememberOpaqueLease executionAdmissionLeases created lease
+                created
+
     let bindDevopsTarget (runtime: obj) (sessionId: string) (target: obj) : unit =
         (runtimeOf runtime).BindDevopsTarget(sessionId, targetOf target)
 

@@ -243,4 +243,67 @@ test('WHAT[dispatch-protocol-012] DP_012_physical_acceptance_hands_exact_claim_i
     rmSync(base, { recursive: true, force: true })
   }
 })
+test('WHAT[dispatch-protocol-012] DP_012_continuation_inherits_identity_from_profile_without_host_cache', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp012-no-cache-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp012-cont', 'rt-dp012-cont', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const session = 'ses_dp012_cont'
+      // The immutable authority profile is the only identity authority here:
+      // no Host session cache and no process-local binding exists for it.
+      const profile = profileFor('rt-dp012-cont', session, 'msg_dp012_cont', 'manager')
+      const captured = []
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: async (sessionId, text, options) => {
+          captured.push({
+            session: sessionId,
+            text,
+            agent: options.Agent ?? null,
+            model: options.Model ?? null,
+          })
+          return dispatch.admittedWithReceipt('accepted-dp012')
+        },
+      }
+      const sent = await dispatch.sendContinuation(
+        port,
+        opened.journal,
+        session,
+        'continuation without any host cache',
+        'ManagerGuard',
+        profile,
+        'Await',
+      )
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      assert.deepEqual(
+        captured,
+        [{ session, text: 'continuation without any host cache', agent: 'manager', model: null }],
+        'the continuation must project its exact profile identity and never take a model'
+      )
+      const claim = dispatch
+        .projectionObservation(opened.journal, session)
+        .pendingClaims.find((candidate) => candidate.promptKey === sent.key)
+      assert.deepEqual(
+        { participant: claim.participant, role: claim.role },
+        { participant: 'manager', role: 'manager' },
+        'the continuation claim preserves the durable participant without any host cache'
+      )
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+test('WHAT[dispatch-protocol-012] DP_012_ingress_missing_agent_remains_none_without_cache_synthesis', () => {
+  const sessionOnly = dispatch.decodeIngress({ sessionID: 'ses_dp012_ingress' }, {})
+  assert.equal(sessionOnly.sessionId, 'ses_dp012_ingress')
+  assert.equal(
+    sessionOnly.explicitAgent,
+    null,
+    'a missing agent carrier must stay missing: the ingress never synthesizes one from a session cache'
+  )
+  assert.equal(dispatch.decodeIngress({}, {}).explicitAgent, null)
+})
 }

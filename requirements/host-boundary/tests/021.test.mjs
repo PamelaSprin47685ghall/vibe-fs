@@ -58,7 +58,7 @@ test('WHAT[host-boundary-021] HostSignalBootstrap delegates policy to published 
 
   // Host observations are persisted through the exact execution-binding owner;
   // provider-step lifecycle remains behind ModelRouting's published contract.
-  assert.match(bootstrapSource, /SessionExecutionBinding\.persistProviderStartedFromObservation/)
+  assert.match(bootstrapSource, /ProviderLifecycle\.persistProviderStartedFromObservation/)
   assert.match(bootstrapSource, /ModelRouting\.endProviderStep/)
 
   // Managed chat admission is one transaction. The composition root decodes

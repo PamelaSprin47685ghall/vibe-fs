@@ -128,7 +128,7 @@ module ProviderProjectionSurface =
 
     let decodeIngress (input: obj) (output: obj) : obj =
         let decoded =
-            PromptIngressCodec.decodeWith SessionExecutionBinding.tryAgent input output
+            PromptIngressCodec.decodeWith input output
 
         let physicalUserMessageId =
             decoded.PhysicalUserMessageId |> Option.map PhysicalUserMessageId.value

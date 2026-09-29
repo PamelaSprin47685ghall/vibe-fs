@@ -78,6 +78,9 @@ module ModelRouting =
             lenderSessionId: string option ->
                 ModelRoutingTarget option
 
+        member TryReadExecution:
+            sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
+
         member BindDevopsTarget: sessionId: string * target: ModelRoutingTarget -> unit
         member BoundDevopsTarget: sessionId: string -> ModelRoutingTarget option
 
@@ -153,6 +156,8 @@ module ModelRouting =
         purpose: ModelExecutionPurpose ->
         lenderSessionId: string option ->
             ModelRoutingTarget option
+
+    val internal tryReadExecution: key: ChatExecutionKey -> ExecutionAdmissionLease option
 
     val internal sharedPredictorConfiguration: unit -> PredictorConfiguration
 
