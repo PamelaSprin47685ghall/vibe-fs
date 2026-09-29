@@ -391,8 +391,7 @@ module StrengthProjection =
         (existing: StrengthDelegationView)
         =
         match existing.State, existing.Binding with
-        | StrengthCandidateState.Bound, Some binding ->
-            bindPreparedView projection dkey prepared existing binding
+        | StrengthCandidateState.Bound, Some binding -> bindPreparedView projection dkey prepared existing binding
         | _ -> Error(StrengthProjectionError.PreparedWithoutBound prepared.DecisionId)
 
     let private resolvePreparedState
@@ -422,7 +421,9 @@ module StrengthProjection =
         match existing.State, existing.Prepared with
         | (StrengthCandidateState.Abandoned | StrengthCandidateState.Closed _), _ ->
             Error(StrengthProjectionError.PromotionAfterAbandon promoted.DecisionId)
-        | (StrengthCandidateState.Promoted | StrengthCandidateState.Traced), Some prior when samePromotion prior promoted ->
+        | (StrengthCandidateState.Promoted | StrengthCandidateState.Traced), Some prior when
+            samePromotion prior promoted
+            ->
             Ok projection
         | (StrengthCandidateState.Promoted | StrengthCandidateState.Traced), _ ->
             Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
@@ -435,8 +436,7 @@ module StrengthProjection =
                             { existing with
                                 State = StrengthCandidateState.Promoted }
                             projection.ByDecision }
-        | StrengthCandidateState.Prepared, _ ->
-            Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
+        | StrengthCandidateState.Prepared, _ -> Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
         | _ -> Error(StrengthProjectionError.PromotionWithoutPrepared promoted.DecisionId)
 
     let private applyPromoted projection (promoted: StrengthCandidatePromoted) =
@@ -500,8 +500,7 @@ module StrengthProjection =
         match existing.State, existing.Binding with
         | StrengthCandidateState.Abandoned, Some binding when binding.TargetProviderRun = abandoned.TargetProviderRun ->
             Ok projection
-        | StrengthCandidateState.Abandoned, _ ->
-            Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
+        | StrengthCandidateState.Abandoned, _ -> Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
         | (StrengthCandidateState.Promoted | StrengthCandidateState.Traced), _ ->
             Error(StrengthProjectionError.AbandonAfterPromotion abandoned.DecisionId)
         | StrengthCandidateState.Prepared, Some binding when binding.TargetProviderRun = abandoned.TargetProviderRun ->
@@ -514,8 +513,7 @@ module StrengthProjection =
                                 State = StrengthCandidateState.Abandoned }
                             projection.ByDecision
                     ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
-        | StrengthCandidateState.Prepared, _ ->
-            Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
+        | StrengthCandidateState.Prepared, _ -> Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
         | _ -> Error(StrengthProjectionError.AbandonWithoutPrepared abandoned.DecisionId)
 
     let private applyAbandoned projection (abandoned: StrengthCandidateAbandoned) =

@@ -191,6 +191,7 @@ module ToolSchemaJson =
 
     and private buildSchema (value: obj) : obj =
         let required = requiredNames value
+
         entries value
         |> Array.map (fun entry -> buildPropertyEntry required (entryKey entry) (entryValue entry))
         |> fromEntries
@@ -263,30 +264,46 @@ module ToolSchemaJson =
         else
             extractDefs value
 
-    and private resolveTargetReference (target: obj) (value: obj) (localDefinitions: obj) (seen: Set<string>) (name: string) : obj option =
+    and private resolveTargetReference
+        (target: obj)
+        (value: obj)
+        (localDefinitions: obj)
+        (seen: Set<string>)
+        (name: string)
+        : obj option =
         if isNull target then
             None
         else
             let base' = if isRecord target then target else createObj []
-            Some(
-                inlineLocalReferences
-                    (merge base' (withoutKey value "$ref"))
-                    localDefinitions
-                    (Set.add name seen)
-            )
+            Some(inlineLocalReferences (merge base' (withoutKey value "$ref")) localDefinitions (Set.add name seen))
 
-    and private tryResolveNamedReference (localDefinitions: obj) (value: obj) (seen: Set<string>) (name: string) : obj option =
+    and private tryResolveNamedReference
+        (localDefinitions: obj)
+        (value: obj)
+        (seen: Set<string>)
+        (name: string)
+        : obj option =
         if Set.contains name seen then
             None
         else
             resolveTargetReference (field localDefinitions name) value localDefinitions seen name
 
-    and private inlineNamedReference (referenceName: string option) (localDefinitions: obj) (value: obj) (seen: Set<string>) : obj option =
+    and private inlineNamedReference
+        (referenceName: string option)
+        (localDefinitions: obj)
+        (value: obj)
+        (seen: Set<string>)
+        : obj option =
         match referenceName with
         | Some name -> tryResolveNamedReference localDefinitions value seen name
         | None -> None
 
-    and private tryInlineReference (reference: obj) (localDefinitions: obj) (value: obj) (seen: Set<string>) : obj option =
+    and private tryInlineReference
+        (reference: obj)
+        (localDefinitions: obj)
+        (value: obj)
+        (seen: Set<string>)
+        : obj option =
         if isString reference && not (isNull localDefinitions) then
             inlineNamedReference (localReferenceName (string reference)) localDefinitions value seen
         else

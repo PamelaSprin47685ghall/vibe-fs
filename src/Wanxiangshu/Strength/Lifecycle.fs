@@ -29,7 +29,12 @@ module StrengthLifecycle =
             Some(StrengthEvents.abandoned view.Request.DecisionId binding.TargetProviderRun)
         | _ -> None
 
-    let private promotionFromDecision (view: StrengthDelegationView) (prepared: StrengthCandidatePrepared) turn decision =
+    let private promotionFromDecision
+        (view: StrengthDelegationView)
+        (prepared: StrengthCandidatePrepared)
+        turn
+        decision
+        =
         match decision with
         | StrengthPromotionDecision.Promote ->
             Some(

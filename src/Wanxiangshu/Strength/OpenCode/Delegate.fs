@@ -228,10 +228,12 @@ module StrengthDelegate =
             false
         else
             let status = if isNull state?status then "" else string state?status
+
             let hasInput =
                 not (isNull state?input)
                 || not (isNull part?args)
                 || not (isNull part?arguments)
+
             let hasOutput =
                 not (isNull state?output)
                 || not (isNull state?result)
@@ -267,6 +269,7 @@ module StrengthDelegate =
         (calls: (ToolCallId * string) list)
         : (ToolCallId * string) list option =
         let ids = calls |> List.map fst
+
         if calls.Length = expectedCount && Set.count (Set.ofList ids) = ids.Length then
             Some calls
         else
@@ -318,7 +321,9 @@ module StrengthDelegate =
         : (ToolCallId * string) list option =
         match List.tryLast (StrengthBatchCollector.collectCompleteBatches wireMessages) with
         | Some batch ->
-            let batchArgs = batch.Exchanges |> List.map (fun exchange -> exchange.CanonicalArguments)
+            let batchArgs =
+                batch.Exchanges |> List.map (fun exchange -> exchange.CanonicalArguments)
+
             let callArgs = tailCalls |> List.map snd
             if batchArgs = callArgs then Some tailCalls else None
         | None -> None
@@ -327,6 +332,7 @@ module StrengthDelegate =
         (wire: ProviderProjection.ProviderWireProjection)
         : (ToolCallId * string) list option =
         let assistantBatches = wire.Messages |> List.choose tryExtractWireAssistantCalls
+
         match assistantBatches with
         | [] -> None
         | batches -> matchBatchWithTailCalls wire.Messages (List.last batches)
@@ -370,6 +376,7 @@ module StrengthDelegate =
 
     let private tryExtractRawRounds (callId: ToolCallId) (value: obj) : Result<obj, string> =
         let raw = value?delegate_readonly_rounds
+
         if isNull raw then
             Error(sprintf "delegate_readonly_rounds is absent for call %s" (ToolCallId.value callId))
         else
@@ -382,12 +389,13 @@ module StrengthDelegate =
             Error(sprintf "delegate_readonly_rounds of call %s is not a number" (ToolCallId.value callId))
 
     let private validateRoundsNumber (callId: ToolCallId) (number: float) : Result<int, string> =
-        if Double.IsNaN number || Double.IsInfinity number || number < 0.0 || number <> floor number then
-            Error(
-                sprintf
-                    "delegate_readonly_rounds of call %s is not a non-negative integer"
-                    (ToolCallId.value callId)
-            )
+        if
+            Double.IsNaN number
+            || Double.IsInfinity number
+            || number < 0.0
+            || number <> floor number
+        then
+            Error(sprintf "delegate_readonly_rounds of call %s is not a non-negative integer" (ToolCallId.value callId))
         elif number > float Int32.MaxValue then
             Error(sprintf "delegate_readonly_rounds of call %s is out of range" (ToolCallId.value callId))
         else
@@ -592,9 +600,7 @@ module StrengthDelegate =
             | Ok durableStrength -> return durableStrength
             | Error reason ->
                 return
-                    failClosed
-                        strengthScope
-                        (sprintf "Strength %s cannot prove EventStore health: %s" phaseName reason)
+                    failClosed strengthScope (sprintf "Strength %s cannot prove EventStore health: %s" phaseName reason)
         }
 
     let private tryExecuteCaptureOnBound
@@ -608,9 +614,8 @@ module StrengthDelegate =
         task {
             let ports, _ = bound
             let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "capture"
-            match!
-                resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
-            with
+
+            match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
             | Error reason -> return CaptureOutcome.Skipped reason
             | Ok resolved -> return! captureOnSurface strengthScope predictorConfigured resolved
         }
@@ -705,9 +710,7 @@ module StrengthDelegate =
         (expectedDigest: string)
         : unit =
         if wireAnchorDigest rawMessages <> expectedDigest then
-            failClosed
-                strengthScope
-                "Strength Prepared recovery anchor digest changed before target consumption"
+            failClosed strengthScope "Strength Prepared recovery anchor digest changed before target consumption"
 
     let private consumePreparedBundle
         (strengthScope: PluginStrengthScope)
@@ -716,11 +719,17 @@ module StrengthDelegate =
         : Task<unit> =
         task {
             verifyPreparedAnchor strengthScope surface.RawMessages prepared.AnchorDigest
+
             match! surface.Ports.Durability.LoadFrameBundle prepared with
-            | Error error ->
-                return failClosed strengthScope ("Strength Prepared frame load failed: " + error)
+            | Error error -> return failClosed strengthScope ("Strength Prepared frame load failed: " + error)
             | Ok bundle ->
-                renderCandidateOrThrow strengthScope surface.Owner surface.Target prepared.DecisionId bundle surface.Output
+                renderCandidateOrThrow
+                    strengthScope
+                    surface.Owner
+                    surface.Target
+                    prepared.DecisionId
+                    bundle
+                    surface.Output
         }
 
     let private consumePreparedCandidate
@@ -765,10 +774,7 @@ module StrengthDelegate =
         | StrengthCandidateState.Abandoned
         | StrengthCandidateState.Requested -> Task.FromResult()
 
-    let private tryBuildBundleOrThrow
-        (strengthScope: PluginStrengthScope)
-        batches
-        : StrengthFrameBundle =
+    let private tryBuildBundleOrThrow (strengthScope: PluginStrengthScope) batches : StrengthFrameBundle =
         match StrengthFrame.tryBuild HostDigest.sha256Hex batches with
         | Ok bundle -> bundle
         | Error error -> failClosed strengthScope (sprintf "Strength Replica bundle invalid: %A" error)
@@ -783,12 +789,7 @@ module StrengthDelegate =
         | StrengthReplicaTerminal.InvalidFrame reason ->
             failClosed strengthScope ("Strength Replica invalid frame: " + reason)
         | _ when List.isEmpty completed.Batches ->
-            appendClosed
-                strengthScope
-                surface
-                decisionId
-                DelegationClosedFrom.Bound
-                DelegationClosedReason.NoMaterial
+            appendClosed strengthScope surface decisionId DelegationClosedFrom.Bound DelegationClosedReason.NoMaterial
         | _ ->
             let bundle = tryBuildBundleOrThrow strengthScope completed.Batches
             publishAndRender strengthScope surface decisionId bundle completed.ReplicaSessionId
@@ -870,8 +871,7 @@ module StrengthDelegate =
                         request.DecisionId
                         DelegationClosedFrom.Requested
                         DelegationClosedReason.CannotContinue
-            | Ok preparation ->
-                return! appendBoundAndExecute strengthScope surface request preparation
+            | Ok preparation -> return! appendBoundAndExecute strengthScope surface request preparation
         }
 
     let private prepareAndStartReplica
@@ -880,6 +880,7 @@ module StrengthDelegate =
         (request: DelegationRequest)
         : Task<unit> =
         let replicaAgent = Roles.roleLabel surface.Authority.CanonicalRole
+
         let mirrorResult =
             StrengthFrame.tryLocalizeMirror
                 HostDigest.sha256Hex
@@ -956,10 +957,7 @@ module StrengthDelegate =
         | ConsumeBound of StrengthDelegationView
         | StartPending
 
-    let private decideTargetAction
-        (target: ProviderRunIdentity)
-        (durable: StrengthProjection)
-        : SurfaceApplication =
+    let private decideTargetAction (target: ProviderRunIdentity) (durable: StrengthProjection) : SurfaceApplication =
         match StrengthProjection.tryDecisionForTarget target durable with
         | None -> SurfaceApplication.StartPending
         | Some decisionId ->
@@ -994,9 +992,8 @@ module StrengthDelegate =
         task {
             let ports, _ = bound
             let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "start"
-            match!
-                resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
-            with
+
+            match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
             | Error _ -> return ()
             | Ok surface -> return! applyOnSurface strengthScope predictorConfigured surface
         }
@@ -1014,10 +1011,4 @@ module StrengthDelegate =
         match tryBind journal snapshotPort strengthDurability strengthScope output with
         | Error _ -> Task.FromResult()
         | Ok bound ->
-            executeApplyOnBound
-                bound
-                strengthScope
-                tryAttemptPlan
-                syncDelegateRuntime
-                predictorConfigured
-                output
+            executeApplyOnBound bound strengthScope tryAttemptPlan syncDelegateRuntime predictorConfigured output

@@ -132,6 +132,7 @@ module ReadonlyDelegationContract =
 
     let private ensureFieldDeleted (args: obj) (field: string) =
         let deleted = deleteProperty args field
+
         if not deleted then
             throwTypeError (sprintf "Tool arguments cannot hide the readonly delegation field %s" field)
 
@@ -351,7 +352,13 @@ module ReadonlyDelegationContract =
     /// The Effect schema is never modified — the Host decodes the real
     /// arguments with it, and `tool.execute.before` hides the protocol fields
     /// before that decode.
-    let private applyToolDecoration (toolOutput: obj) (toolId: string) (hasJsonSchema: bool) (jsonSchema: obj) (parameters: obj) =
+    let private applyToolDecoration
+        (toolOutput: obj)
+        (toolId: string)
+        (hasJsonSchema: bool)
+        (jsonSchema: obj)
+        (parameters: obj)
+        =
         if hasJsonSchema then
             decorateRootSchema jsonSchema toolId
         elif parametersHoldSchemaView parameters then
@@ -370,9 +377,7 @@ module ReadonlyDelegationContract =
         let hasJsonSchema = not (isNull jsonSchema) && isPlainObject jsonSchema
 
         if not hasJsonSchema && not (isPlainObject parameters) then
-            raise (
-                InvalidOperationException(sprintf "Tool %s parameters schema is not a valid object schema" toolId)
-            )
+            raise (InvalidOperationException(sprintf "Tool %s parameters schema is not a valid object schema" toolId))
 
         applyToolDecoration toolOutput toolId hasJsonSchema jsonSchema parameters
 

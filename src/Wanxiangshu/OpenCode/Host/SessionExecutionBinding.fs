@@ -102,15 +102,21 @@ module SessionExecutionBinding =
             Some(value.Trim())
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
-        let sameProvider = String.Equals(left.providerID.Trim(), right.providerID.Trim(), StringComparison.OrdinalIgnoreCase)
-        let sameModelId = String.Equals(left.modelID.Trim(), right.modelID.Trim(), StringComparison.OrdinalIgnoreCase)
+        let sameProvider =
+            String.Equals(left.providerID.Trim(), right.providerID.Trim(), StringComparison.OrdinalIgnoreCase)
+
+        let sameModelId =
+            String.Equals(left.modelID.Trim(), right.modelID.Trim(), StringComparison.OrdinalIgnoreCase)
+
         let leftVar = left.variant |> Option.bind nonEmpty
         let rightVar = right.variant |> Option.bind nonEmpty
+
         let sameVariant =
             match leftVar, rightVar with
             | None, None -> true
             | Some l, Some r -> String.Equals(l, r, StringComparison.OrdinalIgnoreCase)
             | _ -> false
+
         sameProvider && sameModelId && sameVariant
 
 
@@ -970,19 +976,18 @@ module SessionExecutionBinding =
 
     let private validateManagedWithoutAttempt (sessionId: SessionId) (observedAgent: string) =
         match tryAgent sessionId with
-        | Some expectedAgent when not (String.Equals(expectedAgent.Trim(), observedAgent, StringComparison.OrdinalIgnoreCase)) ->
+        | Some expectedAgent when
+            not (String.Equals(expectedAgent.Trim(), observedAgent, StringComparison.OrdinalIgnoreCase))
+            ->
             Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expectedAgent observedAgent)
-        | _ ->
-            Error "PROMPT-006: managed provider run has no exact physical execution binding"
+        | _ -> Error "PROMPT-006: managed provider run has no exact physical execution binding"
 
     let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         let observedAgent = if isNull agent then "" else agent.Trim()
 
         match providerExpectation sessionId with
-        | ProviderExpectation.ExactAttempt expected ->
-            validateExactAttempt sessionId expected observedAgent model
-        | ProviderExpectation.ManagedWithoutAttempt ->
-            validateManagedWithoutAttempt sessionId observedAgent
+        | ProviderExpectation.ExactAttempt expected -> validateExactAttempt sessionId expected observedAgent model
+        | ProviderExpectation.ManagedWithoutAttempt -> validateManagedWithoutAttempt sessionId observedAgent
         | ProviderExpectation.Unbound -> Ok false
 
     let participantAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =

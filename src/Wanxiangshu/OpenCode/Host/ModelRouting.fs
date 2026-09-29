@@ -311,14 +311,25 @@ module ModelRouting =
             String.Equals(obsReasoning, expectedReasoning, StringComparison.OrdinalIgnoreCase)
 
     let sameTarget (expected: ModelRoutingTarget) (observed: OpencodeModel) =
-        if String.IsNullOrWhiteSpace observed.providerID || String.IsNullOrWhiteSpace observed.modelID then
+        if
+            String.IsNullOrWhiteSpace observed.providerID
+            || String.IsNullOrWhiteSpace observed.modelID
+        then
             false
         else
             let obsModel = observed.providerID.Trim() + "/" + observed.modelID.Trim()
-            let obsReasoning = observed.variant |> Option.bind (fun v -> if String.IsNullOrWhiteSpace v then None else Some(v.Trim())) |> Option.defaultValue ""
+
+            let obsReasoning =
+                observed.variant
+                |> Option.bind (fun v -> if String.IsNullOrWhiteSpace v then None else Some(v.Trim()))
+                |> Option.defaultValue ""
+
             let expectedModel = expected.Model.Trim()
             let expectedReasoning = expected.Reasoning.Trim()
-            let modelMatch = String.Equals(obsModel, expectedModel, StringComparison.OrdinalIgnoreCase)
+
+            let modelMatch =
+                String.Equals(obsModel, expectedModel, StringComparison.OrdinalIgnoreCase)
+
             let reasoningMatch = matchReasoning expectedReasoning obsReasoning
             modelMatch && reasoningMatch
 
@@ -1382,8 +1393,7 @@ module ModelRouting =
 
         let enforceStaleObservedBinding (observed: ExecutionAdmissionExactIdentity) =
             match staleLeasePurpose observed.SessionId observed.PhysicalUserMessageId with
-            | Some purpose ->
-                enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target purpose
+            | Some purpose -> enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target purpose
             | None ->
                 enforceImmutableDevopsBinding
                     observed.SessionId

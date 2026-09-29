@@ -332,7 +332,12 @@ module PluginHooks =
                 else
                     { snapshot with Contract = None }
 
-            let commitRecordedSnapshot (vault: ProtocolArgumentVault.Vault) (sessionId: string) (toolCallId: ToolCallId) (recorded: ProtocolArgumentVault.Snapshot) =
+            let commitRecordedSnapshot
+                (vault: ProtocolArgumentVault.Vault)
+                (sessionId: string)
+                (toolCallId: ToolCallId)
+                (recorded: ProtocolArgumentVault.Snapshot)
+                =
                 if
                     recorded.Contract.IsNone
                     && recorded.ReadonlyRounds.IsNone
@@ -340,24 +345,38 @@ module PluginHooks =
                 then
                     ()
                 else
-                    ProtocolArgumentVault.record
-                        vault
-                        sessionId
-                        (ToolCallId.value toolCallId)
-                        recorded
+                    ProtocolArgumentVault.record vault sessionId (ToolCallId.value toolCallId) recorded
 
-            let recordSnapshotIfPresent (vault: ProtocolArgumentVault.Vault) (sessionId: string) (toolCallId: ToolCallId) (toolName: string) (args: obj) =
+            let recordSnapshotIfPresent
+                (vault: ProtocolArgumentVault.Vault)
+                (sessionId: string)
+                (toolCallId: ToolCallId)
+                (toolName: string)
+                (args: obj)
+                =
                 match ProtocolArgumentVault.snapshotOfArguments args with
-                | Some snapshot -> commitRecordedSnapshot vault sessionId toolCallId (sanitizeSnapshot toolName snapshot)
+                | Some snapshot ->
+                    commitRecordedSnapshot vault sessionId toolCallId (sanitizeSnapshot toolName snapshot)
                 | None -> ()
 
-            let tryRecordVaultEntry (vault: ProtocolArgumentVault.Vault) (toolInput: obj) (toolOutput: obj) (toolCallId: ToolCallId) =
+            let tryRecordVaultEntry
+                (vault: ProtocolArgumentVault.Vault)
+                (toolInput: obj)
+                (toolOutput: obj)
+                (toolCallId: ToolCallId)
+                =
                 let context = ToolHostCodec.decodeContext toolInput
+
                 if not (String.IsNullOrWhiteSpace context.SessionId) then
                     let toolName = toolField toolInput "tool"
                     recordSnapshotIfPresent vault context.SessionId toolCallId toolName toolOutput?args
 
-            let tryRecordCall (vault: ProtocolArgumentVault.Vault) (toolInput: obj) (toolOutput: obj) (callIdOpt: ToolCallId option) =
+            let tryRecordCall
+                (vault: ProtocolArgumentVault.Vault)
+                (toolInput: obj)
+                (toolOutput: obj)
+                (callIdOpt: ToolCallId option)
+                =
                 match callIdOpt with
                 | Some toolCallId -> tryRecordVaultEntry vault toolInput toolOutput toolCallId
                 | None -> ()

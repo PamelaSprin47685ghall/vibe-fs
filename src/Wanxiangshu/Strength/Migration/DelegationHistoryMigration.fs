@@ -169,7 +169,13 @@ module DelegationHistoryMigration =
         | Some value -> value.TracedStartInclusive, value.TracedEndExclusive
         | None -> None, None
 
-    let private planPreparedImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) tracedStart tracedEnd =
+    let private planPreparedImport
+        baseFact
+        (envelope: LegacyEnvelope)
+        (promoted: LegacyEnvelope option)
+        tracedStart
+        tracedEnd
+        =
         match promoted with
         | Some _ ->
             { baseFact with
@@ -185,7 +191,12 @@ module DelegationHistoryMigration =
                 RelinquishReason = Some "prepared-without-promotion"
                 TargetProviderRun = envelope.TargetProviderRun }
 
-    let private planTracedImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) preparedByteLength =
+    let private planTracedImport
+        baseFact
+        (envelope: LegacyEnvelope)
+        (promoted: LegacyEnvelope option)
+        preparedByteLength
+        =
         match promoted with
         | Some promotedEnvelope ->
             { baseFact with
@@ -198,10 +209,16 @@ module DelegationHistoryMigration =
                 TracedEndExclusive = envelope.TracedEndExclusive }
         | None -> failwith "legacy FramesTraced without its Promoted material inside the retained window"
 
-    let private planEnvelopeImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) preparedByteLength tracedStart tracedEnd =
+    let private planEnvelopeImport
+        baseFact
+        (envelope: LegacyEnvelope)
+        (promoted: LegacyEnvelope option)
+        preparedByteLength
+        tracedStart
+        tracedEnd
+        =
         match envelope.EventType with
-        | "StrengthCandidatePrepared" ->
-            planPreparedImport baseFact envelope promoted tracedStart tracedEnd
+        | "StrengthCandidatePrepared" -> planPreparedImport baseFact envelope promoted tracedStart tracedEnd
         | "StrengthCandidatePromoted" ->
             { baseFact with
                 OutcomeKind = "adopted"
@@ -211,8 +228,7 @@ module DelegationHistoryMigration =
                 MaterialPayloads = envelope.MaterialPayloads
                 TracedStartInclusive = tracedStart
                 TracedEndExclusive = tracedEnd }
-        | "StrengthFramesTraced" ->
-            planTracedImport baseFact envelope promoted preparedByteLength
+        | "StrengthFramesTraced" -> planTracedImport baseFact envelope promoted preparedByteLength
         | "StrengthCandidateAbandoned" ->
             { baseFact with
                 RelinquishReason = Some "abandoned-before-promotion"

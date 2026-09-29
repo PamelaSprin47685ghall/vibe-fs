@@ -346,16 +346,30 @@ module PluginTransforms =
             | Some snapshot -> tryRestoreSnapshot part snapshot
             | None -> part
 
-        let tryRestoreWithCallId (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) (callId: string option) : obj =
+        let tryRestoreWithCallId
+            (vault: ProtocolArgumentVault.Vault)
+            (sessionId: string)
+            (part: obj)
+            (callId: string option)
+            : obj =
             match callId with
             | None -> part
             | Some id -> tryRestoreWithSnapshot part (ProtocolArgumentVault.tryFind vault sessionId id)
 
-        let restoreToolCallPart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) (isToolCallPart: bool) : obj =
+        let restoreToolCallPart
+            (vault: ProtocolArgumentVault.Vault)
+            (sessionId: string)
+            (part: obj)
+            (isToolCallPart: bool)
+            : obj =
             if not isToolCallPart then
                 part
             else
-                tryRestoreWithCallId vault sessionId part (ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ])
+                tryRestoreWithCallId
+                    vault
+                    sessionId
+                    part
+                    (ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ])
 
         let restorePart (vault: ProtocolArgumentVault.Vault) (sessionId: string) (part: obj) : obj =
             if isNull part then
@@ -394,7 +408,11 @@ module PluginTransforms =
             let rewritten = rawMessages |> List.map (restoreMessage vault sessionId)
             applyRewrittenMessages outObj rawMessages rewritten
 
-        let tryRestoreSessionArguments (vault: ProtocolArgumentVault.Vault) (outObj: obj) (sessionIdOpt: string option) : unit =
+        let tryRestoreSessionArguments
+            (vault: ProtocolArgumentVault.Vault)
+            (outObj: obj)
+            (sessionIdOpt: string option)
+            : unit =
             match sessionIdOpt with
             | Some sessionId -> rewriteSessionMessages vault outObj sessionId
             | None -> ()
@@ -402,7 +420,10 @@ module PluginTransforms =
         let restoreProtocolArguments (outObj: obj) : Task<unit> =
             task {
                 if not (isNull outObj) && not (isNull outObj?messages) then
-                    tryRestoreSessionArguments boot.ProtocolArgumentVault outObj (ProviderWireDecode.projectionSessionIdFromMessages outObj)
+                    tryRestoreSessionArguments
+                        boot.ProtocolArgumentVault
+                        outObj
+                        (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
         let captureReadonlyDelegation outObj =

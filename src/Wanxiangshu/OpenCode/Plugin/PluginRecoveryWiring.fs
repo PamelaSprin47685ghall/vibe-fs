@@ -8,7 +8,11 @@ open Wanxiangshu.OpenCode.Host
 
 module PluginRecoveryWiring =
 
-    let private isFlightActive (bloggerHost: IBloggerRuntimeHost) (bloggerSessionId: SessionId) (requestId: BloggerRequestId) : bool =
+    let private isFlightActive
+        (bloggerHost: IBloggerRuntimeHost)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        : bool =
         match bloggerHost.TryGetFlight(SessionId.value bloggerSessionId) with
         | Some flight -> BloggerRequestContext.requestId flight = requestId
         | None -> false

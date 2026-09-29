@@ -425,8 +425,7 @@ module private StrengthReplicaRuntimeLogic =
         : bool =
         match transformed with
         | StrengthReplicaTransformOutcome.NotReplica -> false
-        | StrengthReplicaTransformOutcome.Ready batches ->
-            applyReadyOutcome replaceState complete state batches
+        | StrengthReplicaTransformOutcome.Ready batches -> applyReadyOutcome replaceState complete state batches
         | StrengthReplicaTransformOutcome.Retired(reason, batches) ->
             applyRetiredOutcome replaceState complete state reason batches
 
@@ -456,8 +455,7 @@ module private StrengthReplicaRuntimeLogic =
         (endedInPlainText: bool)
         : Task<bool> =
         task {
-            let! transformed =
-                StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output true
+            let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output true
 
             let admitted = resolveAdmittedState state candidate transformed
             let handled = applyTransformOutcome replaceState complete admitted transformed
@@ -474,8 +472,7 @@ module private StrengthReplicaRuntimeLogic =
         (admitted: StrengthReplicaDecisionState)
         : Task<bool> =
         task {
-            let! transformed =
-                StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output false
+            let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output false
 
             return applyTransformOutcome replaceState complete admitted transformed
         }
