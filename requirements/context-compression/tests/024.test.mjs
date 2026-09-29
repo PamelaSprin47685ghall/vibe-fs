@@ -852,6 +852,7 @@ const compression = await import("../../../dist/Context/Companion/CompressionSur
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const resources = await import("../../../dist/Resources/PromptSurface.js");
+const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const ownership = await import("../../verification-system/tests/support/blogger-ownership.mjs");
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -932,7 +933,7 @@ test('WHAT[context-compression-024] a later step answering a superseded physical
   const stale = [
     ownership.userMessage('msg-p0'),
     ownership.assistantMessage('msg-a0', 'msg-p0', [
-      ownership.chroniclePart('call-old', blog.tipFieldNames()[0], 'old request entry'),
+      ownership.chroniclePart('call-old', enforcer.fieldNames()[0], 'old request entry'),
     ]),
   ]
 

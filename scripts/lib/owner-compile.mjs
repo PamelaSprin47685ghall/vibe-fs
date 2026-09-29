@@ -343,12 +343,11 @@ export function planOwnerCompile({ projectPath, aggregatePath = null } = {}) {
     }
   }
 
-  // WP2: compile order is canonical shard-DAG order, never the aggregate
-  // document order once the wrapper file is gone. Order is identical this
-  // run whether the aggregate exists or not — the difference is only whether
-  // a file-side drift check ran.
   const closureSourcesSet = new Set(sourceToOwnerProject.keys())
-  const orderedCompileItems = canonicalImpactOrder([...closureProjects.keys()], closureProjects)
+  const orderedCompileItems = orderCompileSources(
+    path.dirname(resolvedProjectPath),
+    canonicalImpactOrder([...closureProjects.keys()], closureProjects),
+  ).filter((source) => closureSourcesSet.has(source))
 
   const sortedProjectPaths = [...closureProjects.keys()].sort()
 
@@ -716,27 +715,8 @@ export function readImpactInventory({ projectDirectory, aggregatePath = null } =
     }
   }
 
-  // WP2 cutover: the shard graph is the single source for the compile set and
-  // its order. Even when the aggregate file still exists during migration its
-  // job is reduced to drift-checking — the canonical sequence is always
-  // derived from declared shard order so the inventory alone can re-emit a
-  // correct flat project after the wrapper file is deleted.
   const canonicalItemsBase = canonicalImpactOrder(projectPaths, projects)
-  const canonicalOrderFile = norm(path.join(resolvedProjectDirectory, 'compile-order.txt'))
-  const canonicalItems = fs.existsSync(canonicalOrderFile)
-    ? (() => {
-        const lines = fs.readFileSync(canonicalOrderFile, 'utf8')
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line && !line.startsWith('#'))
-        const order = lines.map((line) => norm(path.resolve(resolvedProjectDirectory, line)))
-        const known = new Set(order)
-        const supplement = [...projects.values()]
-          .flatMap((proj) => proj.compileItems)
-          .filter((item) => !known.has(item))
-        return [...order, ...supplement]
-      })()
-    : canonicalItemsBase
+  const canonicalItems = orderCompileSources(resolvedProjectDirectory, canonicalItemsBase)
   const declaredAggregateSet = aggregateExists ? new Set(aggregate.compileItems) : null
   aggregate.compileItems = canonicalItems
   aggregate.missing = !aggregateExists
@@ -759,6 +739,19 @@ export function readImpactInventory({ projectDirectory, aggregatePath = null } =
     reverseReferences,
   }
   }
+
+function orderCompileSources(projectDirectory, sources) {
+  const manifest = path.join(projectDirectory, 'compile-order.txt')
+  if (!fs.existsSync(manifest)) return sources
+  const declared = new Set(sources)
+  const ordered = fs.readFileSync(manifest, 'utf8').split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => norm(path.resolve(projectDirectory, line)))
+    .filter((source) => declared.has(source))
+  const known = new Set(ordered)
+  return [...ordered, ...sources.filter((source) => !known.has(source))]
+}
 
 /**
  * Canonical compile-item order derived purely from the owner DAG, used when

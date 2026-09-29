@@ -754,7 +754,7 @@ module ModelRoutingSurface =
     /// Normal admission uses, so this surface is the road-recovery entry point and
     /// the observable form of execution-model-routing-019.
     let seedDevOpsModelTarget (runtime: obj) (sessionId: string) (target: string) : unit =
-        ModelRouting.seedBoundDevOpsModel (SessionId.create sessionId) target
+        (runtimeOf runtime).SeedBoundDevOpsModel(sessionId, target)
 
     let boundDevopsTarget (runtime: obj) (sessionId: string) : obj =
         (runtimeOf runtime).BoundDevopsTarget(sessionId)

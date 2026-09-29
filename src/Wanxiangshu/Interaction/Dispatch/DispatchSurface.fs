@@ -128,8 +128,7 @@ module DispatchSurface =
         |> Option.toObj
 
     let decodeIngress (input: obj) (output: obj) : obj =
-        let decoded =
-            PromptIngressCodec.decodeWith input output
+        let decoded = PromptIngressCodec.decodeWith input output
 
         box
             {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj

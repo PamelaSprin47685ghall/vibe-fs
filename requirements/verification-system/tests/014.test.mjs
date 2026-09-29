@@ -88,7 +88,7 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   })
   const bindings = new Map([['manager', 'ses_manager']])
   const context = { sessionId: 'ses_manager' }
-  assert.equal(resolveEntry(request('# Work remains away.', 1, managerTools), result.scenario.entries, bindings, context).matched?.id,
+  assert.equal(resolveEntry(request('# Delegated work you sent out has not come back yet. Continue the work.', 1, managerTools), result.scenario.entries, bindings, context).matched?.id,
     'manager-join-guard.0')
   const assessUser =
     '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +

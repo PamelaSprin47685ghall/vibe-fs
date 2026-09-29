@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -38,6 +39,10 @@ assert.ok(productionPluginPath, 'production plugin must be available');
 const REVIEW_TOOLS = ['js-manager'];
 const CONTROL_TOOLS = ['read', 'grep', 'glob', 'js-engineer', 'js-devops'];
 const CONTRACT_TOKEN = 'do-not-use-except-for-review';
+const CANCEL_ARGUMENTS = {
+  program: 'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
+  contract: CONTRACT_TOKEN,
+};
 
 // ── Collector setup ──────────────────────────────────────────────────────────
 
@@ -60,7 +65,7 @@ const waitFor = (predicate, timeoutMs = 25000) => {
     const timer = setTimeout(() => {
       const idx = waiters.findIndex((w) => w.resolve === resolve);
       if (idx >= 0) waiters.splice(idx, 1);
-      reject(new Error(`Timed out waiting for observation after ${timeoutMs}ms`));
+      reject(new Error(`Timed out waiting for ${predicate.toString()} after ${timeoutMs}ms`));
     }, timeoutMs);
     waiters.push({
       predicate,
@@ -97,6 +102,8 @@ const wireInspection = {
   contractEnum: null,
   historicalToolCallPreservesContract: false,
   round2ToolsStable: false,
+  providerVisibleToolNames: [],
+  providerVisibleProtocolAbsence: false,
 };
 
 let sessionID = null;
@@ -173,6 +180,15 @@ const provider = await startHttpServer(async (request, response) => {
 
     // 2. Isolate Blogger or other companion sidecars -> return harmless text, do not advance manager steps
     if (!isManagerRequest(request, body)) {
+      const chronicle = (body.tools ?? []).find((tool) => (tool?.function?.name ?? tool?.name) === 'chronicle');
+      if (chronicle) {
+        const tip = chronicle.function?.parameters?.properties?.tip?.enum?.[0];
+        assert.equal(typeof tip, 'string', 'Blogger wire must publish a legal chronicle tip');
+        sendSSE(response, buildToolCallChunks(`chronicle_${providerRequests.length}`, 'chronicle', JSON.stringify({
+          entry: 'The Manager canary inspected its tool contract.', tip,
+        }), 1));
+        return;
+      }
       sendSSE(response, buildTextChunks(`companion_${Date.now()}`, 'COMPANION_OK', 1));
       return;
     }
@@ -183,6 +199,11 @@ const provider = await startHttpServer(async (request, response) => {
     // Manager Step 1: Initial prompt -> issue js-manager tool call (with contract)
     if (managerStep === 1) {
       if (Array.isArray(body.tools)) {
+        wireInspection.providerVisibleToolNames = body.tools.map((tool) => tool?.function?.name ?? tool?.name).sort();
+        wireInspection.providerVisibleProtocolAbsence = body.tools.every((tool) => {
+          const properties = tool?.function?.parameters?.properties ?? tool?.parameters?.properties ?? {};
+          return !Object.hasOwn(properties, 'delegate_readonly_rounds') && !Object.hasOwn(properties, 'self_note');
+        });
         const readManagerTool = body.tools.find(
           (t) => (t?.function?.name ?? t?.name) === 'js-manager',
         );
@@ -206,6 +227,10 @@ const provider = await startHttpServer(async (request, response) => {
 
     // Manager Step 2: Follow-up after js-manager normal execution
     if (managerStep === 2) {
+      const historical = (body.messages ?? []).flatMap((message) => message.tool_calls ?? [])
+        .find((call) => call.id === 'call_read_norm_1');
+      wireInspection.historicalToolCallPreservesContract =
+        historical !== undefined && JSON.parse(historical.function?.arguments ?? '{}').contract === CONTRACT_TOKEN;
       sendSSE(response, buildTextChunks('resp_read_norm_done', 'CANARY_READ_DONE', 15));
       return;
     }
@@ -225,10 +250,10 @@ const provider = await startHttpServer(async (request, response) => {
           }
         }
       }
-      wireInspection.historicalToolCallPreservesContract = foundContractInHistory;
+      wireInspection.historicalToolCallPreservesContract ||= foundContractInHistory;
 
       const toolNames = (body.tools ?? []).map((t) => t?.function?.name ?? t?.name);
-      wireInspection.round2ToolsStable = REVIEW_TOOLS.every((name) => toolNames.includes(name));
+      wireInspection.round2ToolsStable = JSON.stringify(toolNames.sort()) === JSON.stringify(wireInspection.providerVisibleToolNames);
 
       publish({ kind: 'manager.stability.done' });
       sendSSE(response, buildTextChunks('resp_stability_done', 'CANARY_STABILITY_DONE', 20));
@@ -258,17 +283,18 @@ const provider = await startHttpServer(async (request, response) => {
     if (managerStep === 6) {
       const call = {
         name: 'js-manager',
-        argsStr: JSON.stringify({
-          program:
-            'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
-          contract: CONTRACT_TOKEN,
-        }),
+        argsStr: JSON.stringify(CANCEL_ARGUMENTS),
       };
       sendSSE(response, buildToolCallChunks('call_js_cancel_1', call.name, call.argsStr, 35));
       return;
     }
 
     // Fallback if additional manager steps arrive
+    if (managerStep === 7) {
+      const cancelled = (body.messages ?? []).flatMap((message) => message.tool_calls ?? [])
+        .find((call) => call.id === 'call_js_cancel_1');
+      publish({ kind: 'manager.cancellation.history', value: cancelled?.function?.arguments ?? null });
+    }
     sendSSE(response, buildTextChunks(`resp_step_${managerStep}`, 'CANARY_OK', 40));
     return;
   }
@@ -343,7 +369,7 @@ try {
 
   // 1. Normal js-manager prompt
   const msg1 = 'msg_canary_prompt_1';
-  await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(msg1, 'READ_SAMPLE'), 204);
+  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg1, 'READ_SAMPLE'), 200);
 
   // Wait for normal before & after observations
   const normBeforeObs = await waitFor(
@@ -355,15 +381,19 @@ try {
   const normalTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_norm_1',
   );
+  await waitFor(({ kind, value, sequence }) =>
+    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > normalTerminal.sequence);
 
   // 2. Round 2: stability prompt
   const msg2 = 'msg_canary_prompt_2';
-  await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(msg2, 'VERIFY_STABILITY'), 204);
-  await waitFor(({ kind }) => kind === 'manager.stability.done');
+  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg2, 'VERIFY_STABILITY'), 200);
+  const stability = await waitFor(({ kind }) => kind === 'manager.stability.done');
+  await waitFor(({ kind, value, sequence }) =>
+    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > stability.sequence);
 
   // 3. Round 3: error path (read nonexistent file)
   const msg3 = 'msg_canary_prompt_3';
-  await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(msg3, 'TRIGGER_ERROR'), 204);
+  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg3, 'TRIGGER_ERROR'), 200);
   const errBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_read_err_1',
   );
@@ -373,6 +403,8 @@ try {
   const errorTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_err_1',
   );
+  await waitFor(({ kind, value, sequence }) =>
+    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > errorTerminal.sequence);
 
   // 4. Round 4: cancellation path (long task + abort)
   const msg4 = 'msg_canary_prompt_4';
@@ -391,14 +423,17 @@ try {
   // Trigger external abort
   await request(host.baseUrl, 'POST', `/session/${sessionID}/abort`, {}, [200, 204]);
 
-  const cancelAfterObs = await waitFor(
-    ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_js_cancel_1',
-  );
   const cancelTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_js_cancel_1',
   );
   assert.ok(cancelTerminal.sequence > observationsBeforeAbort);
   assert.ok(cancelTerminal.sequence > cancelRunningObs.sequence);
+  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt('msg_canary_prompt_5', 'VERIFY_CANCEL_HISTORY'), 200);
+  const cancellationHistory = await waitFor(({ kind }) => kind === 'manager.cancellation.history');
+  assert.equal(typeof cancellationHistory.value, 'string');
+  const cancellationArguments = JSON.parse(cancellationHistory.value);
+  assert.deepEqual(cancellationArguments, CANCEL_ARGUMENTS);
+  assert.deepEqual(Object.keys(cancellationArguments), Object.keys(CANCEL_ARGUMENTS));
 
   // ── Verification & Assertions against Fixture ───────────────────────────────
 
@@ -437,7 +472,6 @@ try {
   for (const [name, observation, terminal] of [
     ['normal', normAfterObs, normalTerminal],
     ['executorError', errAfterObs, errorTerminal],
-    ['cancellation', cancelAfterObs, cancelTerminal],
   ]) {
     const value = observation.value;
     calls[name] = {
@@ -451,11 +485,18 @@ try {
     assert.equal(value.identityWithBefore, true, name);
     assert.equal(value.originalOrder, true, name);
     assert.equal(value.originalValues, true, name);
-    assert.equal(terminal.value.contractRetained, true, name);
-    assert.equal(terminal.value.originalInput, true, name);
   }
+  calls.cancellation = {
+    sameArguments: cancelBeforeObs.value.argsIdentityPreserved,
+    originalOrder: isDeepStrictEqual(Object.keys(cancellationArguments), Object.keys(CANCEL_ARGUMENTS)),
+    originalValues: isDeepStrictEqual(cancellationArguments, CANCEL_ARGUMENTS),
+    status: cancelTerminal.value.status,
+    providerHistoryObserved: true,
+  };
   assert.equal(calls.normal.status, 'completed');
-  assert.equal(calls.executorError.status, 'error');
+  assert.equal(calls.executorError.status, 'completed');
+  assert.match(errorTerminal.value.output, /FILE_NOT_FOUND|nonexistent-missing-file|does not exist/);
+  calls.executorError.failureOutputObserved = true;
   assert.equal(calls.cancellation.status, 'error');
 
   // ── Output Final Summary Artifact ──────────────────────────────────────────
@@ -463,6 +504,9 @@ try {
   const summary = {
     schemaVersion: 1,
     versions: { opencode: opencodeVersion, plugin: pluginVersion },
+    reviewTools: REVIEW_TOOLS,
+    controlTools: CONTROL_TOOLS,
+    wireInspection,
     calls,
     historicalToolCallPreservesContract: wireInspection.historicalToolCallPreservesContract,
     observationsCount: observations.length,
@@ -472,6 +516,16 @@ try {
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } catch (err) {
   console.error('[run-manager-review-tools-canary] Canary failed:', err);
+  console.error(JSON.stringify({
+    observations: observations.slice(-20).map(({ sequence, kind, value }) => ({
+      sequence, kind, sessionID: value?.sessionID, callID: value?.callID, status: value?.status, toolName: value?.toolName,
+    })),
+    providerRequests: providerRequests.map((body) => (body.messages ?? [])
+      .filter((message) => message.role === 'user')
+      .map((message) => typeof message.content === 'string' ? message.content.slice(0, 150) : '<structured>')),
+    providerRequestsCount: providerRequests.length, managerStep,
+  }));
+  console.error(`Host stdout:\n${host.stdoutLog}\nHost stderr:\n${host.stderrLog}`);
   process.exitCode = 1;
 } finally {
   if (sessionID && host.baseUrl) {

@@ -8,7 +8,6 @@ module LoadRecoverySurface =
     val foldCanonical: state: obj -> factJson: string -> obj
     val childSettlements: state: obj -> string array
     val childView: state: obj -> parent: string -> child: string -> obj
-    val settleChatTerminal: state: obj -> factJson: string -> obj
     val lookupChild: state: obj -> parent: string -> key: string -> byName: bool -> obj
     val bindingEvidence: state: obj -> child: string -> obj
     val installResolvers: state: obj -> unit

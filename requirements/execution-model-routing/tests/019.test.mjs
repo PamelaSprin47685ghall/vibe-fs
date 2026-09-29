@@ -109,3 +109,14 @@ test('WHAT[execution-model-routing-019] durable DevOps target seeding is fail-cl
     'a session without a seeded target must have no binding',
   )
 })
+
+test('WHAT[execution-model-routing-019] durable target seeding belongs only to the supplied runtime', () => {
+  const first = routing.createRuntime(() => firstTarget)
+  const second = routing.createRuntime(() => changedTarget)
+  routing.seedDevOpsModelTarget(first, 'same-devops-session', 'provider/first:high')
+  assert.deepEqual(routing.boundDevopsTarget(first, 'same-devops-session'), firstTarget)
+  assert.equal(routing.boundDevopsTarget(second, 'same-devops-session'), null)
+  routing.seedDevOpsModelTarget(second, 'same-devops-session', 'other/changed:none')
+  assert.deepEqual(routing.boundDevopsTarget(second, 'same-devops-session'), changedTarget)
+  assert.deepEqual(routing.boundDevopsTarget(first, 'same-devops-session'), firstTarget)
+})

@@ -57,7 +57,8 @@ type internal ChatAdmissionTransactionError =
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
 
 type internal ChatAdmissionTransactionPorts =
-    { Accept: ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
+    { Accept:
+        ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
       Acquire: ManagedChatAcceptanceWitness -> Task<Result<ExecutionAdmissionAcquisition, exn>>
       LeaseTarget: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
       ProjectHost: OpencodeModel -> Result<unit, exn>
@@ -200,7 +201,8 @@ module internal ChatAdmissionTransaction =
 
         match ports.ReadExact key with
         | Some { Lifecycle = ChatExecutionLifecycle.Terminal disposition } ->
-            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal disposition) |> Ok
+            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal disposition)
+            |> Ok
         | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
                  ProviderStarted = Some evidence } ->
             ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyStarted evidence) |> Ok
@@ -268,9 +270,7 @@ module internal ChatAdmissionTransaction =
     let rec private acquisitionOutcome observe ports witness =
         function
         | ExecutionAdmissionAcquisition.Admitted lease ->
-            AdmissionAcquisitionOutcome.LeaseAcquired lease
-            |> Ok
-            |> Task.FromResult
+            AdmissionAcquisitionOutcome.LeaseAcquired lease |> Ok |> Task.FromResult
         | ExecutionAdmissionAcquisition.Queued node ->
             task {
                 let! completed = node.Completion.Task
@@ -326,13 +326,7 @@ module internal ChatAdmissionTransaction =
         match prepareTarget ports witness lease with
         | Ok(target, identity, model) -> Task.FromResult(Ok(target, identity, model))
         | Error error ->
-            compensate
-                observe
-                ports
-                witness
-                lease
-                ChatExecutionTerminalDisposition.Failed
-                (targetError error)
+            compensate observe ports witness lease ChatExecutionTerminalDisposition.Failed (targetError error)
 
     let private projectAdmission observe ports witness lease model =
         observe ChatAdmissionTransactionStep.ProjectHost
@@ -340,13 +334,8 @@ module internal ChatAdmissionTransaction =
         match effect (fun () -> ports.ProjectHost model) with
         | Ok() -> Task.FromResult(Ok())
         | Error error ->
-            compensate
-                observe
-                ports
-                witness
-                lease
-                ChatExecutionTerminalDisposition.Failed
-                (fun release -> ChatAdmissionTransactionError.HostProjectionFailed(error, release))
+            compensate observe ports witness lease ChatExecutionTerminalDisposition.Failed (fun release ->
+                ChatAdmissionTransactionError.HostProjectionFailed(error, release))
 
     let private commit ports lease identity =
         effectValue (fun () -> ports.Commit lease identity)
@@ -381,13 +370,7 @@ module internal ChatAdmissionTransaction =
             observe ChatAdmissionTransactionStep.Settled
             ChatAdmissionTransactionOutcome.Settled witness |> Ok |> Task.FromResult
         | Error error ->
-            compensate
-                observe
-                ports
-                witness
-                lease
-                ChatExecutionTerminalDisposition.Failed
-                (commitError error)
+            compensate observe ports witness lease ChatExecutionTerminalDisposition.Failed (commitError error)
 
     let private executeAdmission observe ports managed =
         taskResult {

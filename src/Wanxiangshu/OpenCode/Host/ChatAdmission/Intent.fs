@@ -269,16 +269,16 @@ module ChatAdmissionIntent =
         | Some carrier -> Decision.Reject(Rejection.MalformedIdentityCarrier carrier)
         | None -> resolveValid message snapshot
 
+    let private identityCarrierName =
+        function
+        | IdentityCarrierError.SessionId -> "SessionId"
+        | IdentityCarrierError.Agent -> "agent"
+        | IdentityCarrierError.PromptKey -> "PromptKey"
+
     let describeRejection (rejection: Rejection) : string =
         match rejection with
         | Rejection.MalformedIdentityCarrier carrier ->
-            let name =
-                match carrier with
-                | IdentityCarrierError.SessionId -> "SessionId"
-                | IdentityCarrierError.Agent -> "agent"
-                | IdentityCarrierError.PromptKey -> "PromptKey"
-
-            sprintf "Malformed identity carrier: %s" name
+            sprintf "Malformed identity carrier: %s" (identityCarrierName carrier)
         | Rejection.ManagedIntentMissingSessionId -> "Managed chat intent requires a SessionId"
         | Rejection.ManagedIntentMissingPhysicalUserMessageId ->
             "Managed chat intent requires an exact PhysicalUserMessageId"

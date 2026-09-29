@@ -80,6 +80,7 @@ module ManagerReviewContract =
                 [||]
             else
                 ownPropertyNames args |> Array.skipWhile ((<>) "contract") |> Array.skip 1
+
         requireConfigurableProperties args followingKeys
 
         let saved =

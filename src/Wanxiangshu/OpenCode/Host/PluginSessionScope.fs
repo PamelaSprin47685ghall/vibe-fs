@@ -96,65 +96,56 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             // sessionId may itself be a Blogger child being deleted.
             [ sessionId ]
 
-    /// P5: settle this session's unfinished durable executions before the
-    /// process-local caches die. Accepted-only executions take the pre-provider
-    /// settlement path; provider-started ones take the terminal path; both reuse
-    /// the existing durable writers and write Cancelled. Committed leases are
-    /// then released by exact key, never by the session-wide release.
-    member private this.SettleSessionExecutions(sessionId: string) : Task =
+    member private _.SettleExecution(durable: AgentJournal, execution: ChatExecutionState) : Task =
         task {
-            match journal with
-            | None -> ()
-            | Some durable ->
-                let sid = SessionId.create sessionId
+            let! settled =
+                match execution.ProviderStarted with
+                | Some started ->
+                    ManagedChatProviderLifecycle.terminal
+                        durable
+                        execution.Key
+                        started
+                        ChatExecutionTerminalDisposition.Cancelled
+                    |> TaskValue.map (Result.map ignore >> Result.mapError (sprintf "%A"))
+                | None ->
+                    PreProviderSettlement.settle
+                        durable
+                        execution.Key
+                        execution.Evidence
+                        ChatExecutionTerminalDisposition.Cancelled
+                    |> TaskValue.map (Result.map ignore >> Result.mapError (sprintf "%A"))
 
-                let unfinished =
-                    AgentJournal.snapshot durable
-                    |> fun projection -> projection.AgentProjections.ChatExecutions
-                    |> ChatExecutionProjection.nonTerminal
-                    |> List.filter (fun execution -> execution.Key.SessionId = sid)
+            settled
+            |> Result.defaultWith (fun failure ->
+                invalidOp (
+                    sprintf
+                        "session execution settlement failed (%s/%s): %s"
+                        (SessionId.value execution.Key.SessionId)
+                        (PhysicalUserMessageId.value execution.Key.PhysicalUserMessageId)
+                        failure
+                ))
 
-                for execution in unfinished do
-                    match execution.ProviderStarted with
-                    | Some started ->
-                        let! settled =
-                            ManagedChatProviderLifecycle.terminal
-                                durable
-                                execution.Key
-                                started
-                                ChatExecutionTerminalDisposition.Cancelled
+            ModelRouting.releasePhysicalExecution execution.Key.SessionId execution.Key.PhysicalUserMessageId
+            |> ignore
+        }
 
-                        match settled with
-                        | Ok _ -> ()
-                        | Error failure ->
-                            Diagnostic.fatal "p5-settle-terminal-append-failed"
-                                [ "session_id", SessionId.value execution.Key.SessionId
-                                  "failure", sprintf "%A" failure ]
-                    | None ->
-                        let! settled =
-                            PreProviderSettlement.settle
-                                durable
-                                execution.Key
-                                execution.Evidence
-                                ChatExecutionTerminalDisposition.Cancelled
+    member private this.SettleSessionExecutions(sessionId: string) : Task =
+        let sid = SessionId.create sessionId
+        ModelRouting.cancelUnacquiredExecution sid |> ignore
 
-                        match settled with
-                        | Ok _ -> ()
-                        | Error failure ->
-                            Diagnostic.fatal "p5-settle-preprovider-append-failed"
-                                [ "session_id", SessionId.value execution.Key.SessionId
-                                  "failure", sprintf "%A" failure ]
+        let unfinished =
+            journal
+            |> Option.map (fun durable ->
+                AgentJournal.snapshot durable
+                |> fun projection -> projection.AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.nonTerminal
+                |> List.filter (fun execution -> execution.Key.SessionId = sid)
+                |> List.map (fun execution -> durable, execution))
+            |> Option.defaultValue []
 
-                    // Only a holder of the exact committed lease is released by exact
-                    // key; pending or unacquired demand is not a physical execution
-                    // and is left to its own cancellation path.
-                    match ModelRouting.tryReadExecution execution.Key with
-                    | Some _ ->
-                        ModelRouting.releasePhysicalExecution
-                            execution.Key.SessionId
-                            execution.Key.PhysicalUserMessageId
-                        |> ignore
-                    | None -> ()
+        task {
+            for durable, execution in unfinished do
+                do! this.SettleExecution(durable, execution)
         }
 
     /// Drops the provider-language identity for this session idempotently.
@@ -167,6 +158,8 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
     /// session identity.
     member this.ClearSession(sessionId: string) : Task =
         task {
+            do! this.SettleSessionExecutions sessionId
+
             match this.Companions.TryGetValue sessionId with
             | true, companion ->
                 this.Companions.Remove sessionId |> ignore
@@ -176,11 +169,6 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             this.OwnedSessions.Remove sessionId |> ignore
             this.ModelRoutingSessions.Remove sessionId |> ignore
             this.SessionParents.Remove sessionId |> ignore
-            // managed-chat-execution-010: session delete must await each admitted
-            // execution's durable terminal and exact capacity release, so this is
-            // a do! rather than a detached settle.
-            do! this.SettleSessionExecutions sessionId
-
             this.SessionDirectories.Remove sessionId |> ignore
             let sid = SessionId.create sessionId
 
@@ -207,7 +195,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             |> Seq.toArray
 
         for sessionId in routed do
-            this.SettleSessionExecutions sessionId |> ignore
+            ModelRouting.releaseExecution (SessionId.create sessionId) |> ignore
 
         this.ModelRoutingSessions.Clear()
         this.OwnedSessions.Clear()

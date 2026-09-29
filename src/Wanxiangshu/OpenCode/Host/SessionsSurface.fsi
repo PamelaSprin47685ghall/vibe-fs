@@ -8,4 +8,5 @@ module SessionsSurface =
     val flattenedChildAdapterProbe: unit -> Task<obj>
     val interruptAttemptAdapterProbe: unit -> Task<obj>
     val interruptRejectedAdapterProbe: unit -> Task<obj>
+    val terminationProbe: rejectAbort: bool -> Task<obj>
     val interruptTerminatedAdapterProbe: unit -> Task<obj>

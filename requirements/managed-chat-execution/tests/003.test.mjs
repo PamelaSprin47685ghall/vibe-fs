@@ -1,4 +1,27 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+test('WHAT[managed-chat-execution-003] concurrent exact chat admissions project the same committed target into every Host request', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    const input = { sessionID: 'ses-concurrent-admission', messageID: 'msg-concurrent-admission', agent: 'engineer' }
+    const outputs = Array.from({ length: 2 }, () => ({
+      message: {
+        id: input.messageID, sessionID: input.sessionID, role: 'user', agent: input.agent,
+        model: { providerID: 'host', modelID: 'placeholder' },
+      },
+      parts: [],
+    }))
+    await Promise.all(outputs.map((output) => hooks['chat.message'](input, output)))
+    for (const output of outputs) {
+      assert.deepEqual({ ...output.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+    }
+    const capacity = routing.sharedCapacitySnapshot()
+    assert.equal(capacity.executions.filter((execution) => execution.sessionId === input.sessionID).length, 1)
+    assert.equal(capacity.tokens.filter((token) => token.owner.sessionId === input.sessionID).length, 1)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -137,7 +160,7 @@ test('WHAT[managed-chat-execution-003] managed path calls one admission transact
   )
   assert.match(
     bootstrap,
-    /let ports = createTransaction \(ModelRouting\.projectHostModel output\)[\s\S]*?ChatAdmissionTransaction\.execute\s*\n\s*ports/,
+    /let ports = createTransaction \(ModelRouting\.projectHostModel output\)[\s\S]*?ChatAdmissionTransaction\.execute ports managed/,
   )
 
   const construction = bootstrap.indexOf('ChatAdmissionTransaction.production')
@@ -147,11 +170,11 @@ test('WHAT[managed-chat-execution-003] managed path calls one admission transact
 test('WHAT[managed-chat-execution-003] only Settled crosses the managed provider boundary', () => {
   assert.equal(occurrences(/continueManagedChatMessage/g), 2, 'one declaration and one invocation')
   const admission = bootstrap.slice(
-    bootstrap.indexOf('let admitManagedChatMessage'),
+    bootstrap.indexOf('let completeAdmission'),
     bootstrap.indexOf('let rejectedChatMessage'),
   )
 
-  assert.match(admission, /Ok\(ChatAdmissionTransactionOutcome\.Settled _\) ->\s+continueManagedChatMessage intent output/)
+  assert.match(admission, /Ok\(ChatAdmissionTransactionOutcome\.Settled witness\) ->[\s\S]*?projectCommittedAdmission key output\s+continueManagedChatMessage intent output/)
   assert.match(admission, /Ok outcome ->\s+raise \(ChatAdmissionHookException\(TransactionStopped outcome, executionKey intent\)\)/)
   assert.doesNotMatch(admission, /ChatAdmissionTransactionOutcome\.Superseded _\) -> \(\)/)
   assert.equal(occurrences(/TransactionStopped outcome/g), 1)
@@ -162,7 +185,7 @@ test('WHAT[managed-chat-execution-003] acceptance uncertainty, acquire, bind, an
     bootstrap.indexOf('let executionKey'),
   )
   const admission = bootstrap.slice(
-    bootstrap.indexOf('let admitManagedChatMessage'),
+    bootstrap.indexOf('let completeAdmission'),
     bootstrap.indexOf('let rejectedChatMessage'),
   )
 

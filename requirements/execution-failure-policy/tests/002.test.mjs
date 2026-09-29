@@ -218,7 +218,8 @@ test('WHAT[execution-failure-policy-002] cancel/retry/stream matrix is interpret
   assert.equal(fullAdmission.outcome, 'CapacityQueueFull')
   assert.equal(fullAdmission.providerCount, 0)
   assert.equal(fullAdmission.acquireCount, 1)
-  assert.equal(fullAdmission.bindCount, 0)
+  assert.equal(fullAdmission.hostCount, 0)
+  assert.equal(fullAdmission.commitCount, 0)
   assert.equal(fullAdmission.admission.activeCapacity, 0)
 
   const invariant = decide('LocalInvariant')

@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
-const bind = async (session, physical, role) => {
+const admitExecution = async (session, physical, role) => {
   const acquired = await routing.acquireSharedExecutionAdmission(session, physical, role, role, null)
   assert.equal(acquired.kind, 'Acquired')
   assert.deepEqual(routing.commitSharedExecutionAdmission(acquired.lease, {
@@ -17,8 +17,8 @@ test('WHAT[execution-failure-policy-012] real admission is barred before abort o
   for (const outcome of ['success', 'refusal', 'exception']) {
     const target = { session: `stop-${outcome}`, physical: `message-${outcome}` }
     const other = { session: `other-${outcome}`, physical: `other-message-${outcome}` }
-    await bind(target.session, target.physical, 'blogger')
-    await bind(other.session, other.physical, 'engineer')
+    await admitExecution(target.session, target.physical, 'blogger')
+    await admitExecution(other.session, other.physical, 'engineer')
     await routing.sharedEnterProviderStep(target.session, target.physical, [])
     let completeAbort
     let rejectAbort

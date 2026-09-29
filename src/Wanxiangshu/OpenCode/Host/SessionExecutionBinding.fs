@@ -344,8 +344,7 @@ module SessionExecutionBinding =
             let bindingKey = promptBindingKey sessionId promptKey
 
             match acceptedPromptBindings.TryGetValue bindingKey, physicalUserMessageId with
-            | (true, expected), Some physical when expected.PhysicalUserMessageId = physical ->
-                Ok()
+            | (true, expected), Some physical when expected.PhysicalUserMessageId = physical -> Ok()
             | (true, expected), Some physical -> physicalMismatch promptKey expected.PhysicalUserMessageId physical
             | (true, _), None ->
                 Error(

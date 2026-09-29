@@ -22,6 +22,19 @@ module PluginRecoveryWiring =
         | Some flight -> BloggerRequestContext.requestId flight = requestId
         | None -> false
 
+    let private seedDevOpsTarget roadSessionId childSessionId target =
+        try
+            ModelRouting.seedBoundDevOpsModel childSessionId target
+        with ex ->
+            invalidOp (
+                sprintf
+                    "execution-model-routing-019: seeding the fixed DevOps target failed (road session %s, devops session %s, target '%s'): %s"
+                    (SessionId.value roadSessionId)
+                    (SessionId.value childSessionId)
+                    target
+                    ex.Message
+            )
+
     /// Seed every road's fixed DevOps target into the process-shared routing
     /// table from the durable road projection (execution-model-routing-019).
     ///
@@ -34,37 +47,17 @@ module PluginRecoveryWiring =
         let snapshot = AgentJournal.snapshot journal
 
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
-            let roadView =
+            let target =
                 projection.Relay
                 |> Option.bind (fun state -> Fold.view state (RoadId.create (SessionId.value sessionId)))
+                |> Option.bind (fun view -> view.BoundDevOpsModelTarget)
 
-            match roadView with
-            | Some view ->
-                match view.BoundDevOpsModelTarget with
-                | Some target ->
-                    projection.Handles
-                    |> Option.bind (HandleProjection.tryFindByByname "devops")
-                    |> Option.iter (fun handle ->
-                        // The seeding failure surfaces only at scope disposal, so the
-                        // exception must carry the road, the DevOps child session and
-                        // the raw target to stay diagnosable after the drain.
-                        try
-                            ModelRouting.seedBoundDevOpsModel handle.ChildSessionId target
-                        with ex ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf
-                                        "execution-model-routing-019: seeding the fixed DevOps target failed (road session %s, devops session %s, target '%s'): %s"
-                                        (SessionId.value sessionId)
-                                        (SessionId.value handle.ChildSessionId)
-                                        target
-                                        ex.Message
-                                    ,
-                                    ex
-                                )
-                            ))
-                | None -> ()
-            | None -> ()
+            let child =
+                projection.Handles
+                |> Option.bind (HandleProjection.tryFindByByname "devops")
+                |> Option.map (fun handle -> handle.ChildSessionId)
+
+            Option.map2 (seedDevOpsTarget sessionId) child target |> ignore
 
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope

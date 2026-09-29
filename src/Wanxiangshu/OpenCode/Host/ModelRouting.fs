@@ -132,7 +132,11 @@ module ModelRouting =
                     text
             )
 
-        parseTarget (createObj [ "model" ==> text.Substring(0, separator); "reasoning" ==> text.Substring(separator + 1) ])
+        parseTarget (
+            createObj
+                [ "model" ==> text.Substring(0, separator)
+                  "reasoning" ==> text.Substring(separator + 1) ]
+        )
 
     let private targetObject (target: ModelRoutingTarget) =
         createObj [ "model" ==> target.Model; "reasoning" ==> target.Reasoning ]
@@ -1500,21 +1504,25 @@ module ModelRouting =
                 lock gate (fun () ->
                     tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender)
 
+        member private _.ReadCommittedExecutionLocked(normSessionId, normPhysicalUserMessageId) =
+            match activeBySession.TryGetValue normSessionId with
+            | true, lease when
+                lease.PhysicalUserMessageId = Some normPhysicalUserMessageId
+                && not (supersededPhysical.Contains(normSessionId, normPhysicalUserMessageId))
+                ->
+                admissionOwner.TryReadCommittedLease(normSessionId, normPhysicalUserMessageId)
+            | _ -> None
+
         /// Read-only exact committed lease query: a superseded generation, a
         /// reservation or another physical message never yields an executable
         /// lease. The query allocates, adopts and releases nothing.
-        member _.TryReadExecution(sessionId: string, physicalUserMessageId: string) : ExecutionAdmissionLease option =
+        member this.TryReadExecution
+            (sessionId: string, physicalUserMessageId: string)
+            : ExecutionAdmissionLease option =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
             | None -> None
             | Some(normSessionId, normPhysicalUserMessageId) ->
-                lock gate (fun () ->
-                    if supersededPhysical.Contains(normSessionId, normPhysicalUserMessageId) then
-                        None
-                    else
-                        match activeBySession.TryGetValue normSessionId with
-                        | true, lease when lease.PhysicalUserMessageId = Some normPhysicalUserMessageId ->
-                            admissionOwner.TryReadCommittedLease(normSessionId, normPhysicalUserMessageId)
-                        | _ -> None)
+                lock gate (fun () -> this.ReadCommittedExecutionLocked(normSessionId, normPhysicalUserMessageId))
 
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
@@ -1531,6 +1539,15 @@ module ModelRouting =
                             target.Model
                             target.Reasoning
                     )
+                | _ -> boundDevopsTargetBySession.[sessionId] <- target)
+
+        member _.SeedBoundDevOpsModel(sessionId: string, value: string) =
+            let target = parseDurableModelTarget value
+
+            lock gate (fun () ->
+                match boundDevopsTargetBySession.TryGetValue sessionId with
+                | true, bound when bound <> target ->
+                    invalidOp "execution-model-routing: durable DevOps model binding is immutable"
                 | _ -> boundDevopsTargetBySession.[sessionId] <- target)
 
         member _.BoundDevopsTarget(sessionId: string) : ModelRoutingTarget option =
@@ -1799,17 +1816,14 @@ module ModelRouting =
     /// Seed the fixed DevOps target from a road's durable projection
     /// (execution-model-routing-019).
     ///
-    /// The write goes through the same `BindDevopsTarget` path a Normal admission
-    /// uses, so reseeding an identical target is a no-op and a conflicting target
-    /// fails closed instead of overwriting the road's fixed binding. An unloaded
-    /// shared runtime is refused rather than silently bootstrapped.
+    /// Reseeding is idempotent and conflicts fail closed even when the scheduler
+    /// no longer offers the old target. An unloaded runtime is refused.
     let internal seedBoundDevOpsModel (sessionId: SessionId) (value: string) : unit =
         match lock sharedGate (fun () -> sharedRuntime) with
         | None ->
             invalidOp
                 "execution-model-routing: the shared runtime is not loaded, so the durable DevOps model target cannot be seeded; refusing to fall back to the current scheduler preference."
-        | Some runtime ->
-            runtime.BindDevopsTarget(SessionId.value sessionId, parseDurableModelTarget value)
+        | Some runtime -> runtime.SeedBoundDevOpsModel(SessionId.value sessionId, value)
 
     let internal releaseExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with

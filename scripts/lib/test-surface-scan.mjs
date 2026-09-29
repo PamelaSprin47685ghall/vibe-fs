@@ -96,7 +96,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Persona/Surface.js',
     owner: 'participant-identity',
-    laws: ['PID-001', 'PID-002', 'PID-003', 'PID-007', 'PID-009', 'PID-011'],
+    laws: ['PID-001', 'PID-002', 'PID-003', 'PID-007', 'PID-009', 'PID-010'],
     source: 'src/Wanxiangshu/Participant/Persona/Surface.fs',
     representation: 'json',
     kind: 'pure',
@@ -548,14 +548,6 @@ export const SURFACE_MANIFEST = [
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-036'],
     source: 'src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
-    module: 'Sphinx/V2/Persistence/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-020'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
     representation: 'json',
     kind: 'pure',
   },

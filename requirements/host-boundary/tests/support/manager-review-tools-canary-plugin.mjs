@@ -133,6 +133,7 @@ export default {
         const properties = event.properties ?? {};
         const sessionID = properties.sessionID ?? properties.info?.sessionID ?? properties.part?.sessionID;
         if (!sessionID) return;
+        if (event.type === 'session.idle') await emit('session.idle.observed', { sessionID });
         const messages = await fetchMessages(client, sessionID);
         for (const stored of inflightCalls.values()) {
           if (stored.sessionID !== sessionID) continue;
@@ -145,6 +146,8 @@ export default {
             sessionID,
             callID: stored.callID,
             status: part.status,
+            output: part.output,
+            error: part.error,
             originalInput: isDeepStrictEqual(part.input, stored.preArgsSnapshot),
             contractRetained: part.input !== null && Object.hasOwn(part.input, 'contract'),
           });

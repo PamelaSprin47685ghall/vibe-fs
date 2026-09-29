@@ -4,6 +4,51 @@ import { spawnSync } from 'node:child_process'
 import * as fixtureFs from 'node:fs'
 import * as fixturePath from 'node:path'
 import { tmpdir as fixtureTmpdir } from 'node:os'
+import { Readable } from 'node:stream'
+import { reportTestStream } from './support/run-inner.mjs'
+
+test('WHAT[verification-system-005] reporter failure during consumption cannot strand the runner after source close', async () => {
+  const failure = new Error('controlled reporter failure during consumption')
+  const outcome = await reportTestStream({
+    stream: Readable.from([1, 2], { objectMode: true }),
+    reporter: async function* (source) {
+      for await (const event of source) {
+        assert.equal(event, 1)
+        throw failure
+      }
+    },
+  })
+  assert.equal(outcome.drained, false)
+  assert.equal(outcome.error, failure)
+})
+
+test('WHAT[verification-system-005] reporter failure after source completion is reported and cannot produce a successful drain', async () => {
+  const failure = new Error('controlled reporter failure')
+  const reports = []
+  const outcome = await reportTestStream({
+    stream: Readable.from([1, 2], { objectMode: true }),
+    reporter: async function* (source) {
+      for await (const event of source) assert.ok(event)
+      throw failure
+    },
+    send: message => reports.push(message),
+  })
+  assert.equal(outcome.drained, false)
+  assert.equal(outcome.error, failure)
+  assert.equal(reports.some(message => message.type === 'runner:error' && message.data.message === failure.message), true)
+})
+
+test('WHAT[verification-system-005] successful reporter drains every event before reporting completion', async () => {
+  const observed = []
+  const outcome = await reportTestStream({
+    stream: Readable.from([1, 2], { objectMode: true }),
+    reporter: async function* (source) {
+      for await (const event of source) observed.push(event)
+    },
+  })
+  assert.deepEqual(observed, [1, 2])
+  assert.deepEqual(outcome, { drained: true, error: null })
+})
 
 test('WHAT[verification-system-005] the real CI verification step preserves failure and success exit codes', () => {
   const workflow = fixtureFs.readFileSync(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8')

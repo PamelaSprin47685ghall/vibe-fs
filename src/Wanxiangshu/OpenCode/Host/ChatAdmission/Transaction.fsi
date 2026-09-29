@@ -51,7 +51,8 @@ type internal ChatAdmissionTransactionError =
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
 
 type internal ChatAdmissionTransactionPorts =
-    { Accept: ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
+    { Accept:
+        ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
       Acquire: ManagedChatAcceptanceWitness -> Task<Result<ExecutionAdmissionAcquisition, exn>>
       LeaseTarget: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
       ProjectHost: OpencodeModel -> Result<unit, exn>

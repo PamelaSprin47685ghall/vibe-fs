@@ -49,7 +49,7 @@ test('WHAT[durable-events-020] workspace capability acquisition defers malformed
     try {
       assert.deepEqual(readdirSync(events), ['invalid.ndjson'])
       assert.equal(readFileSync(writer, 'utf8'), bytes)
-      assert.throws(() => workspaceStore.allHeadsCount(store), /MalformedEnvelope/)
+      assert.throws(() => workspaceStore.activate(store), /MalformedEnvelope/)
       assert.equal(readFileSync(writer, 'utf8'), bytes, 'failed activation must not repair the historical file')
       assert.deepEqual(readdirSync(events), ['invalid.ndjson'])
     } finally {

@@ -15,6 +15,7 @@
 新道路须同时给出 calling + name + charge。
 继续已知道路时，省略 calling，并使用同一个 name。
 
-calling 选择 Coordinator / Lead（区别在 persona 与 reasoning depth，不是不同的 Office）。
+calling 接受 lead：负责确定道路的推进方向、协调工作并判断完成的 Manager。
+这一 persona 不改变 Office 权限。
 name 是这条道路的 byname。
 charge 是目的地与 constraints，不是对隐藏 tools 的指定。

@@ -48,6 +48,9 @@ module SessionsSurface =
         let abortTimes = ResizeArray<int>()
         let createParents = ResizeArray<string>()
 
+        let abortStarted =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
         let rejection =
             TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
@@ -55,10 +58,14 @@ module SessionsSurface =
         let virtualTime = ref 0
 
         member _.Aborts = aborts.ToArray()
+        member _.AbortStarted = abortStarted.Task
         member _.AbortTimes = abortTimes.ToArray()
         member _.CreateParents = createParents.ToArray()
         member _.VirtualTime = virtualTime.Value
         member _.AdvanceTo(timestamp: int) = virtualTime.Value <- timestamp
+
+        member _.AcceptAbort() =
+            AsyncSupport.trySetResult rejection (Ok()) |> ignore
 
         member _.RejectAbort() =
             AsyncSupport.trySetResult rejection (Error "controlled Host rejected AbortSession")
@@ -70,6 +77,7 @@ module SessionsSurface =
             member _.AbortSession sessionId =
                 aborts.Add(SessionId.value sessionId)
                 abortTimes.Add virtualTime.Value
+                AsyncSupport.trySetResult abortStarted () |> ignore
 
                 if rejectAbort then
                     rejection.Task
@@ -245,6 +253,108 @@ module SessionsSurface =
                           "abortedSessionIds", box transport.Aborts
                           "virtualTimes", box [| 0; 10; 1000 |]
                           "trace", box trace ]
+        }
+
+    let terminationProbe (rejectAbort: bool) : Task<obj> =
+        task {
+            let childId = SessionId.create "termination-child"
+            let rootId = SessionId.create "termination-parent"
+
+            let authority =
+                PhysicalUserMessageId.create "physical-authority"
+                |> PhysicalUserMessageId.promoteToAuthorityRoot
+
+            let transport = ControlledOpenCodePort(childId, true)
+            let terminals = ResizeArray<obj>()
+            let cancelled = ResizeArray<string>()
+
+            let cancellationStarted =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let cancellationFinished =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let subscription =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            let eventPort =
+                { new IEventObservationPort with
+                    member _.SubscribeTerminalListener _ = subscription
+                    member _.SubscribeFutureTerminalListener _ = subscription
+
+                    member _.NotifyTerminal session outcome =
+                        let kind, reason, root =
+                            match outcome with
+                            | Failed stop -> "Failed", stop.Reason, stop.AuthorityRootUserMessageId
+                            | Aborted stop -> "Aborted", stop.Reason, stop.AuthorityRootUserMessageId
+                            | Completed result -> "Completed", "", Some result.AuthorityRootUserMessageId
+
+                        terminals.Add(
+                            box
+                                {| session = SessionId.value session
+                                   kind = kind
+                                   reason = reason
+                                   authority =
+                                    root |> Option.map AuthorityRootUserMessageId.value |> Option.defaultValue "" |}
+                        )
+
+                        true }
+
+            let sessions =
+                InjectedSessionPort(Some(transport :> IOpenCodePort), eventPort) :> ISessionHostPort
+
+            let cancel session : Task =
+                cancelled.Add(SessionId.value session)
+                AsyncSupport.trySetResult cancellationStarted () |> ignore
+                cancellationFinished.Task
+
+            let! rootOutcome =
+                ManagedSessionTermination.terminate cancel sessions eventPort rootId authority "refused root"
+
+            let rootEffects = cancelled.Count + transport.Aborts.Length + terminals.Count
+
+            let! created =
+                sessions.CreateChildSession(
+                    rootId,
+                    { Title = None
+                      Agent = Some "engineer"
+                      Directory = None }
+                )
+
+            match created with
+            | Error error -> return invalidOp error
+            | Ok child ->
+                let pending =
+                    ManagedSessionTermination.terminate cancel sessions eventPort child authority "no successor"
+
+                do! cancellationStarted.Task
+                let beforeDrain = [| transport.Aborts.Length; terminals.Count |]
+                AsyncSupport.trySetResult cancellationFinished () |> ignore
+                do! transport.AbortStarted
+                let beforeAbort = terminals.Count
+
+                if rejectAbort then
+                    transport.RejectAbort()
+                else
+                    transport.AcceptAbort()
+
+                let! outcome = pending
+
+                return
+                    box
+                        {| rootRejected = Result.isError rootOutcome
+                           rootEffects = rootEffects
+                           beforeDrain = beforeDrain
+                           beforeAbort = beforeAbort
+                           cancelled = cancelled.ToArray()
+                           aborted = transport.Aborts
+                           terminals = terminals.ToArray()
+                           ok = Result.isOk outcome
+                           error =
+                            match outcome with
+                            | Ok() -> ""
+                            | Error error -> error |}
         }
 
     /// managed-session-lifecycle-016 already-terminal: a lifecycle-terminated attempt is

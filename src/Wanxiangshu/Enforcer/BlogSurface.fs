@@ -69,57 +69,6 @@ module BlogSurface =
         ChronicleExecution.tryCanonicalText (if isNullish value then null else string value)
         |> resultToJs box box
 
-    /// Physical Blogger flight is the only live-cycle authority.
-    let hasLiveCycle (hasFlight: bool) (_sessionId: string) : bool = hasFlight
-
-    /// Pure semantic execute decision for the chronicle owner. The real Host
-    /// supplies the physical abort; this boundary returns the exact observable
-    /// consequence so tests do not construct ToolSpec/HostToolContext values.
-    let execute (value: obj) : obj =
-        let hasFlight = not (isNullish value?hasFlight) && unbox<bool> value?hasFlight
-        let sessionId = text value?sessionId
-        let entry = if isNullish value?entry then value?text else value?entry
-        let tip = text value?tip
-
-        if not hasFlight then
-            box
-                {| ok = false
-                   error = noLiveCycleError
-                   abortedSession =
-                    if String.IsNullOrWhiteSpace sessionId then
-                        null
-                    else
-                        box sessionId |}
-        else
-            match ChronicleExecution.tryCanonicalText (if isNullish entry then null else string entry) with
-            | Error _ ->
-                box
-                    {| ok = true
-                       text = "nothing-to-remember"
-                       error = emptyTextError |}
-            | Ok _ ->
-                if String.IsNullOrWhiteSpace tip then
-                    box
-                        {| ok = true
-                           text = "missing-tip"
-                           error = "missing required argument: tip" |}
-                elif
-                    EnforcerCatalog.resolveByField tip (EnforcerCatalogResource.load ())
-                    |> Option.isNone
-                then
-                    box
-                        {| ok = true
-                           text = "missing-tip"
-                           error = "missing required argument: tip" |}
-                else
-                    box
-                        {| ok = true
-                           text = "remembered"
-                           error = null |}
-
-    let tipFieldNames () =
-        EnforcerCatalog.fieldNames (EnforcerCatalogResource.load ()) |> List.toArray
-
     /// Live Blogger host owns the process-local flight/episode rendezvous.
     let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 
@@ -222,6 +171,54 @@ module BlogSurface =
                 Some(unbox<AgentJournal> value)
             else
                 Some(unbox<AgentJournal> nested)
+
+    let reloadRequest (journal: obj) (value: obj) : System.Threading.Tasks.Task<obj> =
+        task {
+            let durable = journalOf journal |> Option.get
+
+            let openRequest: OpenBloggerRequest =
+                { RequestId = BloggerRequestId.create (text value?requestId)
+                  MainSessionId = SessionId.create (text value?mainSession)
+                  BloggerSessionId = SessionId.create (text value?bloggerSession)
+                  RequestKind = text value?requestKind
+                  ContextRef = BlobRef.create (text value?contextRef)
+                  ContextDigest = BlobDigest.create (text value?contextDigest)
+                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch)
+                  PreviousIngestedThroughSequence = int64Value value?previousIngested
+                  NextIngestedThroughSequence = int64Value value?nextIngested
+                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
+                  SelectedFrameDigests = arrayOf value?digests |> Array.map (text >> BlobDigest.create) |> Array.toList
+                  PromptKey = None }
+
+            match! EnforcerFrameRecovery.tryReloadRequestContextDetailed durable openRequest with
+            | Error rejection ->
+                return
+                    box
+                        {| ok = false
+                           error = EnforcerFrameRecovery.reloadRejectionLabel rejection |}
+            | Ok(BloggerRequestContext.Main request) ->
+                return
+                    box
+                        {| ok = true
+                           kind = "Main"
+                           requestId = BloggerRequestId.value request.RequestId
+                           toml = request.Toml
+                           deltaDigest = BlobDigest.value request.DeltaDigest
+                           previousIngested = int request.PreviousIngestedThroughSequence
+                           nextIngested = int request.NextIngestedThroughSequence
+                           frameEpoch = int (FrameEpochId.value request.FrameEpochId)
+                           observedEpoch = int (PrefixEpochId.value request.ObservedPrefixEpochId) |}
+            | Ok(BloggerRequestContext.Squash request) ->
+                return
+                    box
+                        {| ok = true
+                           kind = "Squash"
+                           requestId = BloggerRequestId.value request.RequestId
+                           coveredFrameCount = request.CoveredFrameCount
+                           digests = request.FrameDigests |> List.map BlobDigest.value |> List.toArray
+                           frameEpoch = int (FrameEpochId.value request.FrameEpochId)
+                           observedEpoch = int (PrefixEpochId.value request.ObservedPrefixEpochId) |}
+        }
 
     /// Drive the real Blogger continuation transform over a Host-shaped
     /// transcript: step position, ownership proof and the owned branches are
@@ -768,30 +765,6 @@ module BlogSurface =
             {| messages = messages
                isFirstTurnShape = CompanionProjectionBuilder.isFirstTurnShape plan |}
 
-    /// Blog-part status predicates used by continuation repair. The result is
-    /// deliberately named and boolean rather than exposing a status DU.
-    let classifyPart (part: obj) : obj =
-        let isBlog =
-            not (isNullish part)
-            && (text part?tool = "chronicle" || text part?name = "chronicle")
-
-        let state = if isNullish part?state then null else part?state
-        let status = if isNullish state then "" else text state?status
-        let metadata = if isNullish state then null else state?metadata
-
-        let interrupted =
-            if isNullish metadata then
-                false
-            else
-                not (isNullish metadata?interrupted) && unbox<bool> metadata?interrupted
-
-        box
-            {| isBlogToolPart = isBlog
-               status = if isNullish state then null else box status
-               hasIncompleteBlogTool = isBlog && (status = "pending" || status = "running")
-               hasFailedBlogAttempt = isBlog && (status = "error" || interrupted)
-               blogPartInterrupted = isBlog && interrupted |}
-
     /// Explicit trace evidence drives the real fold and coverage birth decision.
     let coverageBirth (value: obj) : obj =
         let previousSequence = int64 (text value?previousIngestedThroughSequence)
@@ -881,67 +854,26 @@ module BlogSurface =
                 {| ok = false
                    error = "unmapped next cursor" |}
 
-    /// Commit branch classification over semantic evidence. Each branch keeps
-    /// the production failure meaning visible without leaking a Cycle DU.
-    let classifyCommit (value: obj) : obj =
-        let calls =
-            if isNullish value?callCount then
-                0
-            else
-                int (text value?callCount)
+    /// Convert the production decoder's result without reimplementing its protocol.
+    let decodeCycle (messages: obj array) : obj =
+        match EnforcerCycleDecode.latestAssistant (Array.toList messages) with
+        | None -> null
+        | Some step ->
+            let calls = EnforcerCycleDecode.callsOf (fun _ _ -> ()) step
 
-        let providerRun = text value?providerRun
-        let tip = text value?tip
+            let decision =
+                EnforcerCycleDecode.validateCycle step.MessageId calls
+                |> resultToJs
+                    (fun (cycle, identities) ->
+                        box
+                            {| text = cycle.MergedText
+                               evidence = cycle.MergedEvidence
+                               ruleId = cycle.CanonicalTip.RuleId
+                               toolCallIds = identities |> List.map ToolCallId.value |> List.toArray |})
+                    box
 
-        if calls <> 1 then
             box
-                {| branch = "ProtocolRepair"
-                   ok = false
-                   reason = "exactly one chronicle call required" |}
-        elif String.IsNullOrWhiteSpace providerRun then
-            box
-                {| branch = "Fatal"
-                   ok = false
-                   reason = "no provable provider run" |}
-        elif String.IsNullOrWhiteSpace tip then
-            box
-                {| branch = "ProtocolRepair"
-                   ok = false
-                   reason = "missing tip" |}
-        elif
-            EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ())
-            |> Option.isNone
-        then
-            box
-                {| branch = "ProtocolRepair"
-                   ok = false
-                   reason = "unknown tip" |}
-        else
-            box
-                {| branch = "Committed"
-                   ok = true
-                   providerRun = providerRun
-                   tipRuleId = tip |}
-
-    /// Protocol transition for one terminal assistant step.
-    let protocol (value: obj) : obj =
-        let step = EnforcerSurface.classifyAssistantStep value
-        let accepted = int step?acceptedCalls
-        let messageId = text value?messageId
-
-        if String.IsNullOrWhiteSpace messageId then
-            box
-                {| state = "ProjectMessages"
-                   fatal = "no provable provider run" |}
-        elif accepted = 0 then
-            box
-                {| state = "ProjectMessages"
-                   fatal = null |}
-        elif accepted = 1 then
-            box
-                {| state = "StopPhysicalRun"
-                   fatal = null |}
-        else
-            box
-                {| state = "ProjectMessages"
-                   fatal = "exactly one chronicle call required" |}
+                {| messageId = step.MessageId
+                   completed = step.Completed
+                   decodedCalls = List.length calls
+                   decision = decision |}

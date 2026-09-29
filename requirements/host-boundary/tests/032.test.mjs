@@ -1343,34 +1343,16 @@ integrationTest(
       true,
       'every provider-visible tool must be free of the delegation protocol fields while Predictor is unconfigured',
     )
-    assert.equal(stdoutSummary.hookIdentityChain?.argsIdentityPreservedInBefore, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.argsIdentityPreservedInAfter, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.contractHiddenInBefore, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.symbolAttachedInBefore, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.contractRestoredInAfter, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.symbolClearedInAfter, true)
-    assert.equal(stdoutSummary.hookIdentityChain?.businessArgsPreserved, true)
-    // WHAT[host-boundary-032] 层界裁定：durableToolPart 观察降为诊断记录。
-    // 宿主持久化快照的 tool part input 在公开 SDK 面不可观测（1.18.29），
-    // runner 的旧 ?? true 兜底已摘除，缺失即如实记录 null；wire 层历史由
-    // historicalToolCallPreservesContract 与 provider-visible 枚举断言承载，
-    // 该层不作为本仓门禁对象，不因 durable 观测缺失或剥离判红。
-    if (stdoutSummary.durableToolPart?.persistedInputRetainsContract === false) {
-      // 观测到「持久化层被剥离」时如实写入失败诊断，不作为本仓门禁。
-      process.stderr.write(
-        '[host-boundary-032 diagnostic] durable tool part input lost the protocol field on the Host-persisted snapshot; ' +
-          'persisted-layer evidence is not a gate in this repository. ' +
-          'wire layer historicalToolCallPreservesContract=' +
-          String(stdoutSummary.wireInspection?.historicalToolCallPreservesContract) +
-          '\n',
-      )
+    for (const [name, status] of [['normal', 'completed'], ['executorError', 'completed'], ['cancellation', 'error']]) {
+      const observed = stdoutSummary.calls?.[name]
+      assert.ok(observed, `${name} must have real Host observations`)
+      assert.equal(observed.sameArguments, true, name)
+      assert.equal(observed.originalOrder, true, name)
+      assert.equal(observed.originalValues, true, name)
+      assert.equal(observed.status, status, name)
     }
-
-    assert.equal(
-      stdoutSummary.terminalStates?.normal,
-      'success',
-      'terminalStates.normal must be success',
-    )
+    assert.equal(stdoutSummary.calls.cancellation.providerHistoryObserved, true)
+    assert.equal(stdoutSummary.calls.executorError.failureOutputObserved, true)
   },
 )
 
@@ -1671,4 +1653,3 @@ test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_bus
     )
   })
 })
-

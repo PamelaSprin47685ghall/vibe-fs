@@ -94,17 +94,20 @@ module GroundingCatalog =
         with error ->
             emitJsExpr error "$0.code === 'ENOENT'"
 
-    let rec private canonicalTarget path =
+    let rec private canonicalMissingTarget path =
+        let parent = pathDirectory path
+
+        if parent = path || not (missingEntry path) then
+            None
+        else
+            canonicalTarget parent
+            |> Option.map (fun resolved -> pathJoin (resolved, pathName path))
+
+    and private canonicalTarget path =
         try
             Some(realpathSync path)
         with _ ->
-            let parent = pathDirectory path
-
-            if parent = path || not (missingEntry path) then
-                None
-            else
-                canonicalTarget parent
-                |> Option.map (fun resolved -> pathJoin (resolved, pathName path))
+            canonicalMissingTarget path
 
     let private workspaceRelative workspace canonicalRoot path =
         absolutePath (pathResolve workspace) path

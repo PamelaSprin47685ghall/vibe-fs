@@ -367,7 +367,13 @@ const withSession = (messages, sessionID = 'engineer-auto-injected') =>
 
 integrationTest('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owned_and_legacy_marker_is_not_plugin_registered', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'engineer-auto-injected', 'engineer')
+    await hooks['chat.message']({ sessionID: 'engineer-auto-injected', agent: 'engineer' }, {
+      message: {
+        id: 'root-engineer-auto-injected', role: 'user', sessionID: 'engineer-auto-injected',
+        agent: 'engineer', model: { providerID: 'host', modelID: 'placeholder' },
+      },
+      parts: [],
+    })
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be in hooks.tool')
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned rather than plugin-registered')
 
@@ -446,7 +452,13 @@ integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cu
   assert.equal(markerToolName, 'skill')
   assert.equal(typeof markerSource, 'string')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-capability-manager', 'manager')
+    await hooks['chat.message']({ sessionID: 'ses-capability-manager', agent: 'manager' }, {
+      message: {
+        id: 'root-ses-capability-manager', role: 'user', sessionID: 'ses-capability-manager',
+        agent: 'manager', model: { providerID: 'host', modelID: 'placeholder' },
+      },
+      parts: [],
+    })
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be plugin-registered')
     const transformed = {
