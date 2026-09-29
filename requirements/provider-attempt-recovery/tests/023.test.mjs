@@ -60,7 +60,7 @@ test('WHAT[provider-attempt-recovery-023] session idle sweep selectively targets
   assert.deepEqual(repeated.manuals, sweepOutcomeAbsent.manuals)
 })
 
-test('WHAT[provider-attempt-recovery-023] missing resume capability terminalizes the accepted execution instead of leaving it Accepted', { todo: 'GAP-141 / 37-D2: managed-chat-012 allows manual blocked state while this clause requires terminal failure' }, async () => {
+test('WHAT[provider-attempt-recovery-023] missing resume capability terminalizes the accepted execution instead of leaving it Accepted', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-par023-terminal-'))
   const host = await recoveryHost.bootRecoveryHost(directory, 'absent')
   try {

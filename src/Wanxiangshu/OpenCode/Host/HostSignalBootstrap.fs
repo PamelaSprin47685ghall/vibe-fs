@@ -182,6 +182,13 @@ module HostSignalBootstrap =
                     // guard ownership (ResetDetector deliberately does not clear it; degeneration-guard-008).
                     scope.LoopSensor.ResetDetector sessionId
 
+                    // provider-attempt-recovery-023: the Host published idle, so this
+                    // session's `Accepted ∧ ¬ProviderStarted` executions are exact
+                    // obligations that must be decided now — resume or terminalize —
+                    // never silently dangle. The recovery host owns the decision.
+                    scope.RunBackground(fun () ->
+                        scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId))
+
                     // HOST-004: the idle observation mints the quiescence permit that
                     // idle-derived continuations must hold at send time. The permit is
                     // process-local — never journalled.

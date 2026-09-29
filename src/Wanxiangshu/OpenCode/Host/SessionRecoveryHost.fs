@@ -122,6 +122,11 @@ type SessionRecoveryHost
         | _ when lifecycleCancellation event -> cancellationFailureEvidence state
         | _ -> RecoveryPolicyEvidence.NoFailureDecision
 
+    let eventIsIdleSweep (event: ChatExecutionRecoveryLifecycleEvent) =
+        match event with
+        | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced _ -> true
+        | _ -> false
+
     let currentState (state: ChatExecutionState) =
         (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
         |> ChatExecutionProjection.byKey state.key
@@ -237,7 +242,46 @@ type SessionRecoveryHost
         | Some port -> port.ResumeAccepted request
         | None -> Task.FromResult false
 
+    /// provider-attempt-recovery-023: the idle-sweep decision must be final. When
+    /// no typed resume capability takes over the exact accepted material, the
+    /// execution settles as a pre-provider terminal failure — it never silently
+    /// dangles as Accepted. The manual-intervention fact stays published as the
+    /// observable reason the turn failed; the terminal is the decision.
+    let settleUnresolvedAsFailed (request: PreProviderResumeRequest) =
+        task {
+            let current =
+                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey request.ExecutionKey
+
+            match current with
+            | Some(ChatExecutionState.Accepted accepted) ->
+                let! settled =
+                    PreProviderSettlement.settle journal request.ExecutionKey accepted ChatExecutionTerminalDisposition.Failed
+
+                (completedLifecycleSettlement (ChatExecutionState.Accepted accepted) settled) |> ignore
+                publishNoAuthorizedDisposition request
+            | Some _
+            | None -> ()
+        }
+
+    let resumeFor (event: ChatExecutionRecoveryLifecycleEvent) (request: PreProviderResumeRequest) =
+        task {
+            let! resumed = tryResumeAccepted request
+
+            if not resumed then
+                publishNoAuthorizedDisposition request
+
+                if eventIsIdleSweep event then
+                    do! settleUnresolvedAsFailed request
+        }
+        :> Task
+
+    let finalize (request: TerminalFinalizationRequest) =
+        persistTerminal request.ExecutionKey request.TerminalEvidence request.TerminalDisposition
+
     let resume (request: PreProviderResumeRequest) =
+        // Non-sweep callers keep the original semantics: publish the manual
+        // intervention fact and leave further settlement to the owner events.
         task {
             let! resumed = tryResumeAccepted request
 
@@ -245,9 +289,6 @@ type SessionRecoveryHost
                 publishNoAuthorizedDisposition request
         }
         :> Task
-
-    let finalize (request: TerminalFinalizationRequest) =
-        persistTerminal request.ExecutionKey request.TerminalEvidence request.TerminalDisposition
 
     let actions =
         { ReconcilePhysical = reconcile
@@ -295,6 +336,10 @@ type SessionRecoveryHost
             let! current = settleAcceptedCancellation event state
             let! provider = providerObservation event current
 
+            let sweepActions =
+                { actions with
+                    ResumePreProvider = resumeFor event }
+
             let evidence =
                 { ExecutionState = current
                   ProviderObservation = provider
@@ -302,7 +347,12 @@ type SessionRecoveryHost
                   PersistenceCommitment = persistenceCommitment ()
                   FailureDecisionEvidence = failureEvidence event current }
 
-            let! _ = ChatExecutionRecoveryRuntime.recover actions evidence
+            // provider-attempt-recovery-023: the idle sweep must decide finally.
+            // `resumeFor event` settles an unresumed Accepted execution as a
+            // pre-provider terminal failure instead of leaving a silent
+            // dangling obligation; other events keep the plain resume port.
+            let! _ = ChatExecutionRecoveryRuntime.recover (if eventIsIdleSweep event then sweepActions else actions) evidence
+
             ()
         }
 
