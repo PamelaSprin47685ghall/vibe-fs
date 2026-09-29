@@ -11,7 +11,7 @@ test('WHAT[execution-model-routing-009] SDK target encoding separates model iden
     return {}
   } } })
   await routing.sendPrompt(port, 'session', 'hello', {
-    agent: 'engineer', bindingIntent: 'Preserve',
+    agent: 'engineer',
     model: { providerID: 'provider', modelID: 'model', variant: 'high' },
   })
   assert.deepEqual(payload.body.model, { providerID: 'provider', modelID: 'model' })

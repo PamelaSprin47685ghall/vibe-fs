@@ -31,7 +31,6 @@ type OpenCodeHostPort(sessions: ISessionHostPort) =
           Directory = None
           Metadata = None
           Tools = None
-          BindingIntent = Unchecked.defaultof<SessionBindingIntent>
           DetachedListener = None }
 
     let createSession (ownerSessionId: SessionId) (label: string) : Task<Result<SessionId, string>> =
@@ -76,7 +75,6 @@ type OpenCodeHostPort(sessions: ISessionHostPort) =
           Directory = None
           Metadata = None
           Tools = None
-          BindingIntent = Unchecked.defaultof<SessionBindingIntent>
           DetachedListener = None }
 
     let createSession (ownerSessionId: SessionId) (label: string) : Task<Result<SessionId, string>> =

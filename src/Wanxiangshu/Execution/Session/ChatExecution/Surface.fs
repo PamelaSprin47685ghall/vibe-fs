@@ -232,35 +232,37 @@ module Surface =
 
     let private stateToJs (state: ChatExecutionState) : obj =
         let phase, disposition =
-            match state.Lifecycle with
-            | ChatExecutionLifecycle.Accepted -> "Accepted", null
-            | ChatExecutionLifecycle.ProviderStarted -> "ProviderStarted", null
-            | ChatExecutionLifecycle.Terminal terminal -> "Terminal", box (dispositionLabel terminal)
+            match state with
+            | ChatExecutionState.Accepted _ -> "Accepted", null
+            | ChatExecutionState.Started _ -> "ProviderStarted", null
+            | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+                "Terminal", box (dispositionLabel (PreStartOutcome.disposition outcome))
+            | ChatExecutionState.EndedAfterStart(_, terminal) -> "Terminal", box (dispositionLabel terminal)
 
         box
-            {| sessionId = SessionId.value state.Key.SessionId
-               physicalUserMessageId = PhysicalUserMessageId.value state.Key.PhysicalUserMessageId
+            {| sessionId = SessionId.value state.key.SessionId
+               physicalUserMessageId = PhysicalUserMessageId.value state.key.PhysicalUserMessageId
                phase = phase
                disposition = disposition
                identity =
-                {| logicalRunId = LogicalRunId.value state.Evidence.LogicalRunId
+                {| logicalRunId = LogicalRunId.value state.acceptedEvidence.LogicalRunId
                    authorityRootUserMessageId =
-                    AuthorityRootUserMessageId.value state.Evidence.AuthorityRootUserMessageId
-                   authorityKind = authorityKindLabel state.Evidence.AuthorityKind
-                   identitySeed = identitySeedToJs state.Evidence.IdentitySeed
+                    AuthorityRootUserMessageId.value state.acceptedEvidence.AuthorityRootUserMessageId
+                   authorityKind = authorityKindLabel state.acceptedEvidence.AuthorityKind
+                   identitySeed = identitySeedToJs state.acceptedEvidence.IdentitySeed
                    providerRun =
-                    state.ProviderStarted
+                    state.startedEvidence
                     |> Option.map (fun evidence -> ProviderRunIdentity.value evidence.ProviderRun)
                     |> Option.toObj
-                   origin = PromptAuthority.originLabel state.Evidence.Origin
-                   participant = AcceptedChatExecutionEvidence.participant state.Evidence
-                   role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole state.Evidence)
+                   origin = PromptAuthority.originLabel state.acceptedEvidence.Origin
+                   participant = AcceptedChatExecutionEvidence.participant state.acceptedEvidence
+                   role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole state.acceptedEvidence)
                    requestKind =
-                    state.ProviderStarted
+                    state.startedEvidence
                     |> Option.map (fun evidence -> ProviderRequestKind.label evidence.RequestKind)
                     |> Option.toObj
                    projectionChoice =
-                    state.ProviderStarted
+                    state.startedEvidence
                     |> Option.map (fun evidence -> projectionChoiceToJs evidence.ProjectionChoice)
                     |> Option.toObj |} |}
 
@@ -419,7 +421,7 @@ module Surface =
             foldFacts serializedFacts
             |> Result.map (fun projection ->
                 ChatExecutionProjection.nonTerminal projection
-                |> List.filter (fun execution -> SessionId.value execution.Key.SessionId = sessionId))
+                |> List.filter (fun execution -> SessionId.value execution.key.SessionId = sessionId))
             |> resultToJs (List.map stateToJs >> List.toArray >> box)
         with error ->
             box
@@ -468,12 +470,12 @@ module Surface =
 
                 match state with
                 | Some execution when
-                    execution.Key.SessionId <> message.SessionId
-                    || execution.Key.PhysicalUserMessageId <> message.PhysicalUserMessageId
+                    execution.key.SessionId <> message.SessionId
+                    || execution.key.PhysicalUserMessageId <> message.PhysicalUserMessageId
                     ->
-                    decide message state execution.Evidence
-                | Some({ Lifecycle = ChatExecutionLifecycle.Terminal _ } as execution) ->
-                    decide message state execution.Evidence
+                    decide message state execution.acceptedEvidence
+                | Some(ChatExecutionState.EndedBeforeStart(accepted, _))
+                | Some(ChatExecutionState.EndedAfterStart({ Accepted = accepted }, _)) -> decide message state accepted
                 | _ -> decide message state (acceptedEvidenceOf attemptedEvidenceValue)
         with error ->
             failure (ChatAdmissionError.AttemptEvidenceInvalid error.Message)
@@ -848,14 +850,16 @@ module Surface =
                 |> Option.bind (fun key -> ChatExecutionProjection.byKey key projection)
                 |> Option.map (fun state ->
                     let phase, disposition =
-                        match state.Lifecycle with
-                        | ChatExecutionLifecycle.Accepted -> "Accepted", null
-                        | ChatExecutionLifecycle.ProviderStarted -> "ProviderStarted", null
-                        | ChatExecutionLifecycle.Terminal terminal -> "Terminal", box (string terminal)
+                        match state with
+                        | ChatExecutionState.Accepted _ -> "Accepted", null
+                        | ChatExecutionState.Started _ -> "ProviderStarted", null
+                        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+                            "Terminal", box (string (PreStartOutcome.disposition outcome))
+                        | ChatExecutionState.EndedAfterStart(_, terminal) -> "Terminal", box (string terminal)
 
                     box
-                        {| sessionId = SessionId.value state.Key.SessionId
-                           physicalUserMessageId = PhysicalUserMessageId.value state.Key.PhysicalUserMessageId
+                        {| sessionId = SessionId.value state.key.SessionId
+                           physicalUserMessageId = PhysicalUserMessageId.value state.key.PhysicalUserMessageId
                            phase = phase
                            disposition = disposition |})
                 |> Option.defaultValue null

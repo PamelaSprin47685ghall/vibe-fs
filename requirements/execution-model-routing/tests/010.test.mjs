@@ -673,20 +673,29 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
     source('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'),
   ])
 
+  // The tool context carries this call's own exact ProviderRunIdentity. The
+  // physical message it answers comes from the ModelRouting relation the
+  // authoritative Host start observation wrote, never from a session-current
+  // binding copy.
   assert.match(
     binding,
-    /let endProviderStepAtToolBoundary[\s\S]*ProviderRunIdentity option[\s\S]*ModelRouting\.endProviderStep/,
-    'the exact provider-attempt binding owns conversion from tool context identity to capacity step end',
+    /let beginPhysicalProviderAttemptForTransform[\s\S]*enterBoundProviderStep/,
+    'the transform boundary enters the exact provider step of its own messages',
   )
 
-  const boundaryCall = 'SessionExecutionBinding.endProviderStepAtToolBoundary'
+  const boundaryCall = 'ModelRouting.tryProviderStepIdentity'
   const boundaryIndex = registry.indexOf(boundaryCall)
 
   assert.ok(boundaryIndex >= 0, 'ToolRegistry must cross the provider→tool capacity boundary')
   assert.match(
     registry,
-    /let providerToolBoundary[\s\S]*SessionExecutionBinding\.endProviderStepAtToolBoundary/,
-    'provider→tool handoff is a named outer execution stage',
+    /let endObservedStep[\s\S]*ModelRouting\.tryProviderStepIdentity[\s\S]*ModelRouting\.endProviderStep/,
+    'the tool boundary resolves the run physical message from the exact run-to-physical relation',
+  )
+  assert.match(
+    registry,
+    /let providerToolBoundary[\s\S]*endObservedStep/,
+    'provider-to-tool handoff is a named stage resolving the run physical message',
   )
   assert.match(
     registry,

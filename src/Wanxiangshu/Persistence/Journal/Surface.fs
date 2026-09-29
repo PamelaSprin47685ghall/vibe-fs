@@ -14,6 +14,8 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Participant.Persona
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
@@ -86,6 +88,11 @@ module JournalSurface =
 
     let private sessionIdOf (value: obj) : SessionId = SessionId.create (str value)
 
+    let private roleOf (value: string) : Role =
+        match Roles.tryParseRole (value.Trim()) with
+        | Some role -> role
+        | None -> failwith $"JournalSurface: unknown role '{value}'"
+
     let private providerRunOf (value: obj) : ProviderRunIdentity option =
         if isNull value then
             None
@@ -115,6 +122,24 @@ module JournalSurface =
                    TextRef = BlobRef.create (str payload?TextRef)
                    TextDigest = BlobDigest.create (str payload?TextDigest)
                    ProviderRun = ProviderRunIdentity.create runId |}
+        | "Execution", "HandleLinked" ->
+            let handleId = str payload?Handle
+
+            ExecutionFact.HandleLinked
+                {| ParentSessionId = sessionIdOf (payload?ParentSessionId)
+                   ChildSessionId = sessionIdOf (payload?ChildSessionId)
+                   Handle = HandleId.Agent(AgentHandleId.create handleId)
+                   TargetAgent = str payload?TargetAgent
+                   Byname =
+                    (if isNull payload?Byname then
+                         str payload?TargetAgent
+                     else
+                         str payload?Byname)
+                   CanonicalRole = roleOf (str payload?CanonicalRole)
+                   Ownership =
+                    match str payload?Ownership with
+                    | "HostOwnedHidden" -> HandleOwnership.HostOwnedHidden
+                    | _ -> HandleOwnership.DurableParentHandle |}
         | _ -> failwith $"JournalSurface: unknown AgentFact {family}.{case}"
 
     let private streamOfJs (value: obj) : StreamId =

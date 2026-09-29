@@ -3,69 +3,20 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
+/// Provider-step boundary of one managed chat execution. It owns no identity:
+/// managed-ness, participant and model all come from durable `Accepted` evidence
+/// and the `ModelRouting` lease for the exact execution key.
 module SessionExecutionBinding =
-    val exactExecutionBindingCount: sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> int
+    /// host-boundary-008: durable managed-execution evidence for one exact key.
+    val isManagedExecution: durable: AgentJournal option -> key: ChatExecutionKey -> bool
 
-    val releaseAcceptedExecution: sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> unit
-
-    val bind: parentId: SessionId -> childId: SessionId -> agent: string option -> unit
-    val restore: parentId: SessionId -> childId: SessionId -> agent: string option -> unit
-    val bindDevOpsModel: sessionId: SessionId -> model: OpencodeModel -> unit
-    val verifyDevOpsModel: sessionId: SessionId -> model: OpencodeModel -> unit
-    val bindInternalRoot: sessionId: SessionId -> agent: string option -> unit
-    val isInternalRoot: sessionId: SessionId -> bool
-    /// Load Phase: install the durable child evidence resolver (sessionId ->
-    /// (parentSessionId, agent)). In-process maps stay a cache in front of it.
-    val installDurableChildEvidence: resolve: (string -> (string * string) option) -> unit
-
-    val tryParent: sessionId: SessionId -> SessionId option
-    val tryAgent: sessionId: SessionId -> string option
-    val isUnboundHostAuxiliaryChild: sessionId: SessionId -> bool
-    val observeHostAuxiliaryChild: sessionId: SessionId -> unit
-    val observeUserFacingAgent: sessionId: SessionId -> agent: string -> unit
-
-    val acceptExternalExecution:
-        sessionId: SessionId ->
-        physicalUserMessageId: PhysicalUserMessageId ->
-        participant: string ->
-        model: OpencodeModel ->
-            unit
-
-    val acceptPromptExecution:
-        sessionId: SessionId ->
-        promptKey: PromptKey ->
-        physicalUserMessageId: PhysicalUserMessageId ->
-        participant: string ->
-        model: OpencodeModel ->
-            unit
-
-    val beginProviderAttempt:
-        sessionId: SessionId ->
-        physicalUserMessageId: PhysicalUserMessageId option ->
-        promptKey: PromptKey option ->
-            Result<unit, string>
-
-    val currentProviderModel: sessionId: SessionId -> OpencodeModel option
-
-    val endProviderStepAtToolBoundary:
-        sessionId: SessionId -> providerRunId: ProviderRunIdentity option -> Result<unit, string>
-
+    /// HOST-004: begin the provider step of the physical message this transform
+    /// request answers. Durable evidence decides whether a step is entered.
     val beginPhysicalProviderAttemptForTransform:
-        beginQuiescence: (SessionId -> unit) -> projectionSessionIdOpt: string option -> outObj: obj -> Task<unit>
-
-    val drop: sessionId: SessionId -> unit
-    val cancelUnacquired: sessionId: SessionId -> unit
-    val requiresProviderBindingProof: sessionId: SessionId -> bool
-
-    val validateObservedProvider: sessionId: SessionId -> agent: string -> model: OpencodeModel -> Result<bool, string>
-
-    val participantAgent: sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<string, string>
-
-    val prepareManagedPrompt:
-        sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<OpenCodePromptOptions, string>
-
-    val prepareUserFacingPrompt:
-        sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<OpenCodePromptOptions, string>
+        journal: AgentJournal option ->
+        beginQuiescence: (SessionId -> unit) ->
+        projectionSessionIdOpt: string option ->
+        outObj: obj ->
+            Task<unit>

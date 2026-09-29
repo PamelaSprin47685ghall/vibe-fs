@@ -59,16 +59,14 @@ module ChatAdmission =
 
     let private classifyState (attemptedEvidence: AcceptedChatExecutionEvidence) (state: ChatExecutionState option) =
         match state with
-        | Some established when established.Evidence <> attemptedEvidence ->
-            Error(ChatAdmissionError.ExistingEvidenceConflict(established.Evidence, attemptedEvidence))
+        | Some established when established.acceptedEvidence <> attemptedEvidence ->
+            Error(ChatAdmissionError.ExistingEvidenceConflict(established.acceptedEvidence, attemptedEvidence))
         | None -> Ok(ChatAdmissionIntent.NeedAcceptance attemptedEvidence)
-        | Some { Lifecycle = ChatExecutionLifecycle.Accepted
-                 Evidence = evidence } -> Ok(ChatAdmissionIntent.ResumeAccepted evidence)
-        | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
-                 ProviderStarted = Some evidence } -> Ok(ChatAdmissionIntent.AlreadyStarted evidence)
-        | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
-                 ProviderStarted = None } -> invalidOp "ProviderStarted projection is missing exact provider evidence"
-        | Some { Lifecycle = ChatExecutionLifecycle.Terminal disposition } ->
+        | Some(ChatExecutionState.Accepted evidence) -> Ok(ChatAdmissionIntent.ResumeAccepted evidence)
+        | Some(ChatExecutionState.Started evidence) -> Ok(ChatAdmissionIntent.AlreadyStarted evidence)
+        | Some(ChatExecutionState.EndedBeforeStart(_, outcome)) ->
+            Ok(ChatAdmissionIntent.AlreadyTerminal(PreStartOutcome.disposition outcome))
+        | Some(ChatExecutionState.EndedAfterStart(_, disposition)) ->
             Ok(ChatAdmissionIntent.AlreadyTerminal disposition)
 
     let decide
@@ -79,8 +77,10 @@ module ChatAdmission =
         let expectedKey = messageKey message
 
         match suppliedState with
-        | Some state when state.Key <> expectedKey -> Error(ChatAdmissionError.StateKeyMismatch(state.Key, expectedKey))
-        | Some { Lifecycle = ChatExecutionLifecycle.Terminal disposition } ->
+        | Some state when state.key <> expectedKey -> Error(ChatAdmissionError.StateKeyMismatch(state.key, expectedKey))
+        | Some(ChatExecutionState.EndedBeforeStart(_, outcome)) ->
+            Ok(ChatAdmissionIntent.AlreadyTerminal(PreStartOutcome.disposition outcome))
+        | Some(ChatExecutionState.EndedAfterStart(_, disposition)) ->
             Ok(ChatAdmissionIntent.AlreadyTerminal disposition)
         | state ->
             AcceptedChatExecutionEvidence.validate attemptedEvidence

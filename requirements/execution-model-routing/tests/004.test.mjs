@@ -224,8 +224,7 @@ const promptOptions = (overrides = {}) => ({
   directory: undefined,
   metadata: undefined,
   tools: undefined,
-  bindingIntent: 'Preserve',
-  ...overrides,
+    ...overrides,
 })
 
 test('WHAT[execution-model-routing-004] EMR_004_sdk_prompt_async_awaits_host_enqueue_and_surfaces_enqueue_rejection', async () => {

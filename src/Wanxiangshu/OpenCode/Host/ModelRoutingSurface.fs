@@ -396,18 +396,12 @@ module ModelRoutingSurface =
             |> Map.ofArray
             |> Some
 
-    let private bindingIntentOf (value: obj) : SessionBindingIntent =
-        match text (field value [ "bindingIntent"; "BindingIntent" ]) with
-        | "ExplicitExecutionOverride" -> SessionBindingIntent.ExplicitExecutionOverride
-        | _ -> SessionBindingIntent.Preserve
-
     let private promptOptionsOf (value: obj) : OpenCodePromptOptions =
         { Model = modelOf (field value [ "model"; "Model" ])
           Agent = optionalText (field value [ "agent"; "Agent" ])
           Directory = optionalText (field value [ "directory"; "Directory" ])
           Metadata = optionalObject (field value [ "metadata"; "Metadata" ])
           Tools = toolsOf value
-          BindingIntent = bindingIntentOf value
           DetachedListener = None }
 
     let private outcomeToJs (outcome: SendOutcome) : obj =
@@ -746,6 +740,27 @@ module ModelRoutingSurface =
                 rememberOpaqueLease executionAdmissionLeases created lease
                 created
 
+    /// The exact provider-run → physical-message relation for a run the Host
+    /// itself observed. Written only from the authoritative start observation.
+    let rememberProviderStepIdentity
+        (runtime: obj)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (providerRun: string)
+        : unit =
+        (runtimeOf runtime)
+            .RememberProviderStepIdentity(sessionId, physicalUserMessageId, providerRun)
+
+    /// Read-only exact lookup. A run this process never observed returns null;
+    /// the session's current physical message is never substituted.
+    let tryProviderStepIdentity (runtime: obj) (providerRun: string) : obj =
+        (runtimeOf runtime).TryProviderStepIdentity(providerRun)
+        |> Option.map (fun (sessionId, physicalUserMessageId) ->
+            box
+                {| sessionId = sessionId
+                   physicalUserMessageId = physicalUserMessageId |})
+        |> Option.defaultValue null
+
     let bindDevopsTarget (runtime: obj) (sessionId: string) (target: obj) : unit =
         (runtimeOf runtime).BindDevopsTarget(sessionId, targetOf target)
 
@@ -834,17 +849,17 @@ module ModelRoutingSurface =
 
     let pendingCount (runtime: obj) : int = (runtimeOf runtime).PendingCount
 
+    /// Observation only: capacity owner truth for this physical execution. It
+    /// reports whether an exact committed lease exists; it never repairs,
+    /// allocates or releases anything.
     let admissionSnapshot (routingRuntime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
-        let sid = SessionId.create sessionId
-        let pid = PhysicalUserMessageId.create physicalUserMessageId
-
-        let exactBindingCount: int =
-            SessionExecutionBinding.exactExecutionBindingCount sid pid
+        let lease =
+            (runtimeOf routingRuntime).TryReadExecution(sessionId, physicalUserMessageId)
 
         box
             {| activeCapacity = snapshotOccupied routingRuntime |> Array.length
                pendingAdmissions = pendingCount routingRuntime
-               providerBinding = exactBindingCount |}
+               exactLeaseCommitted = lease |> Option.isSome |}
 
     let pendingBound (runtime: obj) : int = (runtimeOf runtime).PendingBound
 

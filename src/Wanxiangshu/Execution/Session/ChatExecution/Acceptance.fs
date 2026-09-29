@@ -182,13 +182,13 @@ module ManagedChatAcceptance =
             else
                 Error(ManagedChatAcceptanceError.AttemptKeyMismatch(supplied, key)))
 
-    let private witnessFromProjected key attempted =
-        function
+    let private witnessFromProjected key attempted (projected: ChatExecutionState option) =
+        match projected with
         | None -> Error(ManagedChatAcceptanceError.ProjectionMissingAfterCommit key)
-        | Some established when established.Evidence = attempted ->
-            Ok(ManagedChatAcceptanceWitness(key, established.Evidence))
+        | Some established when established.acceptedEvidence = attempted ->
+            Ok(ManagedChatAcceptanceWitness(key, established.acceptedEvidence))
         | Some established ->
-            Error(ManagedChatAcceptanceError.ProjectionConflictAfterCommit(established.Evidence, attempted))
+            Error(ManagedChatAcceptanceError.ProjectionConflictAfterCommit(established.acceptedEvidence, attempted))
 
     let persistenceError failure =
         match failure with
@@ -199,14 +199,14 @@ module ManagedChatAcceptance =
         | JournalAppendFailure.FactRejected(eventId, rejection) ->
             ManagedChatAcceptanceError.FactRejected(eventId, rejection)
 
-    let private decide key evidence projected =
+    let private decide key evidence (projected: ChatExecutionState option) =
         validate key evidence
         |> Result.bind (fun () ->
             match projected with
-            | Some established when established.Evidence = evidence ->
-                Ok(ExistingWitness(ManagedChatAcceptanceWitness(key, established.Evidence)))
+            | Some established when established.acceptedEvidence = evidence ->
+                Ok(ExistingWitness(ManagedChatAcceptanceWitness(key, established.acceptedEvidence)))
             | Some established ->
-                Error(ManagedChatAcceptanceError.EstablishedEvidenceConflict(established.Evidence, evidence))
+                Error(ManagedChatAcceptanceError.EstablishedEvidenceConflict(established.acceptedEvidence, evidence))
             | None -> Ok AppendRequired)
 
     let private append persistence key evidence =
@@ -262,9 +262,11 @@ module ManagedChatProviderLifecycle =
         |> Result.bind (fun () ->
             match persistence.ReadExact key with
             | None -> Error(ManagedChatProviderLifecycleError.MissingAccepted key)
-            | Some current when current.Evidence = evidence -> Ok current
+            | Some current when current.acceptedEvidence = evidence -> Ok current
             | Some current ->
-                Error(ManagedChatProviderLifecycleError.EstablishedEvidenceConflict(current.Evidence, evidence)))
+                Error(
+                    ManagedChatProviderLifecycleError.EstablishedEvidenceConflict(current.acceptedEvidence, evidence)
+                ))
 
     let private append persistence startedEvidence fact =
         task {
@@ -274,20 +276,15 @@ module ManagedChatProviderLifecycle =
 
     let private startedWitness key startedEvidence persistence =
         match persistence.ReadExact key with
-        | Some { ProviderStarted = Some established
-                 Lifecycle = ChatExecutionLifecycle.ProviderStarted } when established = startedEvidence ->
+        | Some(ChatExecutionState.Started established) when established = startedEvidence ->
             Ok(ManagedChatProviderStartedWitness(key, established))
         | None -> Error(ManagedChatProviderLifecycleError.ProjectionMissingAfterCommit key)
         | Some current -> Error(ManagedChatProviderLifecycleError.ProjectionConflictAfterCommit current)
 
     let private terminalWitness key startedEvidence disposition persistence =
         match persistence.ReadExact key with
-        | Some { ProviderStarted = Some established
-                 TerminalEvidence = Some(ChatExecutionTerminalEvidence.AfterProviderStart terminalEvidence)
-                 Lifecycle = ChatExecutionLifecycle.Terminal projected } when
-            established = startedEvidence
-            && terminalEvidence = startedEvidence
-            && projected = disposition
+        | Some(ChatExecutionState.EndedAfterStart(established, projected)) when
+            established = startedEvidence && projected = disposition
             ->
             Ok(ManagedChatTerminalWitness(key, ChatExecutionTerminalEvidence.AfterProviderStart established, projected))
         | None -> Error(ManagedChatProviderLifecycleError.ProjectionMissingAfterCommit key)
@@ -305,7 +302,7 @@ module ManagedChatProviderLifecycle =
         (current: ChatExecutionState)
         (attempted: ProviderStartedEvidence)
         : Result<ProviderStartedEvidence, ManagedChatProviderLifecycleError> =
-        match current.ProviderStarted with
+        match current.startedEvidence with
         | Some established when established = attempted -> Ok established
         | Some established ->
             Error(ManagedChatProviderLifecycleError.ProviderRunConflict(established.ProviderRun, attempted.ProviderRun))
@@ -324,10 +321,12 @@ module ManagedChatProviderLifecycle =
         (current: ChatExecutionState)
         (startedEvidence: ProviderStartedEvidence)
         : Result<StartDecision, ManagedChatProviderLifecycleError> =
-        match current.Lifecycle with
-        | ChatExecutionLifecycle.Accepted -> Ok AppendStart
-        | ChatExecutionLifecycle.ProviderStarted -> existingStart key current startedEvidence
-        | ChatExecutionLifecycle.Terminal disposition ->
+        match current with
+        | ChatExecutionState.Accepted _ -> Ok AppendStart
+        | ChatExecutionState.Started _ -> existingStart key current startedEvidence
+        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+            Error(ManagedChatProviderLifecycleError.ProviderStartedAfterTerminal(PreStartOutcome.disposition outcome))
+        | ChatExecutionState.EndedAfterStart(_, disposition) ->
             Error(ManagedChatProviderLifecycleError.ProviderStartedAfterTerminal disposition)
 
     let private existingTerminal
@@ -358,12 +357,14 @@ module ManagedChatProviderLifecycle =
         (startedEvidence: ProviderStartedEvidence)
         (disposition: ChatExecutionTerminalDisposition)
         : Result<TerminalDecision, ManagedChatProviderLifecycleError> =
-        match current.Lifecycle with
-        | ChatExecutionLifecycle.Accepted -> Error(ManagedChatProviderLifecycleError.ProviderNotStarted key)
-        | ChatExecutionLifecycle.ProviderStarted ->
+        match current with
+        | ChatExecutionState.Accepted _ -> Error(ManagedChatProviderLifecycleError.ProviderNotStarted key)
+        | ChatExecutionState.Started _ ->
             exactStartedEvidence current startedEvidence
             |> Result.map (fun _ -> AppendTerminal)
-        | ChatExecutionLifecycle.Terminal establishedDisposition ->
+        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+            existingTerminal key current startedEvidence (PreStartOutcome.disposition outcome) disposition
+        | ChatExecutionState.EndedAfterStart(_, establishedDisposition) ->
             existingTerminal key current startedEvidence establishedDisposition disposition
 
     let startWith

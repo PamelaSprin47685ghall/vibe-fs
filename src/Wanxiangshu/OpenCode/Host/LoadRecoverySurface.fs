@@ -107,13 +107,10 @@ module LoadRecoverySurface =
         let projections () =
             (stateOf state).Projection.AgentProjections
 
-        SessionBindingRecovery.installFrom projections
-
         FissionRuntime.installDurableLaneEvidence (fun session ->
             SessionBindingRecovery.fissionLaneFor (projections ()) session)
 
     let clearResolvers () : unit =
-        SessionBindingRecovery.installFrom (fun () -> Fold.empty.AgentProjections)
         FissionRuntime.installDurableLaneEvidence (fun _ -> None)
 
     let lane (session: string) : obj =

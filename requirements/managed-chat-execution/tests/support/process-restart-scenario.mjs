@@ -1,7 +1,6 @@
 import { writeFileSync } from 'node:fs'
 
 import * as statusSurface from '../../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
-import * as bindingSurface from '../../../../dist/OpenCode/Host/SessionBindingSurface.js'
 import * as routingSurface from '../../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import {
   acceptAuthorityRoot,
@@ -41,14 +40,12 @@ const observe = async (withRuntime) => {
       providerStarted: status.providerStarted,
       terminal: status.terminal,
     },
-    bindingCount: bindingSurface.exactExecutionBindingCount(sessionId, physicalUserMessageId),
     decoy: {
       status: {
         accepted: decoyStatus.accepted,
         providerStarted: decoyStatus.providerStarted,
         terminal: decoyStatus.terminal,
       },
-      bindingCount: bindingSurface.exactExecutionBindingCount(sessionId, decoyPhysicalUserMessageId),
     },
     exactCapacity,
     capacityCounts: {

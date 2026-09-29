@@ -86,11 +86,7 @@ module AgentJournalPortAdapter =
 
                 (projections ()).ChatExecutions
                 |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
-                |> Option.exists (fun execution ->
-                    match execution.Lifecycle with
-                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.Terminal _ -> true
-                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.Accepted
-                    | Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionLifecycle.ProviderStarted -> false)
+                |> Option.exists (fun execution -> execution.terminalDisposition.IsSome)
           IsFissionActive =
             fun sessionId ->
                 FissionProjection.tryActiveForOwner sessionId (projections ()).Fission
@@ -137,7 +133,7 @@ module AgentJournalPortAdapter =
                     authority.PendingClaims
                     |> Map.exists (fun _ claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                            PromptAuthority.ContinuationKind.JoinGuard
+                                           PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
 
@@ -184,7 +180,7 @@ module AgentJournalPortAdapter =
 
                         projections.ChatExecutions
                         |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
-                        |> Option.map (fun execution -> execution.Evidence.Origin) }
+                        |> Option.map _.origin }
           ReadBlob = fun blobRef -> journal.Writer.BlobWriter.Read blobRef
           WriteBlob =
             fun content ->

@@ -10,13 +10,11 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Fission
 
-/// Restart drops every process-local execution binding. The durable handle
-/// projection is the evidence that outlives it: which child session belongs to
-/// which parent, and with which execution agent. This module installs that
-/// evidence as the fallback behind `SessionExecutionBinding`'s in-process cache,
-/// so no load-order step has to pre-populate anything — resolution happens on
-/// demand, and a missing binding is never again indistinguishable from a missing
-/// child (crash-reconciliation-020, managed-session-lifecycle-024).
+/// Durable topology evidence: which child session belongs to which parent, with
+/// which execution agent, and which fission lane belongs to which owner. These
+/// are pure reads of the durable projections — process-local tables are only a
+/// cache of what this process currently drives, never the existence truth
+/// (crash-reconciliation-020, managed-session-lifecycle-024).
 module SessionBindingRecovery =
 
     let private agentNameOf (record: HandleRecord) : string =
@@ -67,13 +65,6 @@ module SessionBindingRecovery =
             SessionAssociationProjection.tryMainSessionOf childSessionId projections.Associations
             |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, "blogger"))
 
-    /// Install the resolver over any projection source (the journal in production,
-    /// a folded projection under test). The source is read on demand, so a later
-    /// append is visible without reinstalling.
-    let installFrom (projections: unit -> AgentProjectionSet) : unit =
-        SessionExecutionBinding.installDurableChildEvidence (fun sessionKey ->
-            evidenceFor (projections ()) (SessionId.create sessionKey))
-
     /// Durable evidence for one fission lane: which owner and slot it belongs to.
     /// The fission projection is the truth; the lane registry is the cache of the
     /// lanes this process is currently driving.
@@ -89,10 +80,11 @@ module SessionBindingRecovery =
                   LaneIndex = laneIndex
                   LaneCount = group.LaneCount }))
 
-    /// Load Phase: install every durable resolver behind the process caches.
+    /// Load Phase: install the durable fission-lane resolver behind the process
+    /// lane registry. Child identity is read on demand by its own consumers, so
+    /// there is nothing to pre-populate here.
     let install (journal: AgentJournal) : unit =
         let projections () =
             (AgentJournal.snapshot journal).AgentProjections
 
-        installFrom projections
         FissionRuntime.installDurableLaneEvidence (fun laneSessionId -> fissionLaneFor (projections ()) laneSessionId)

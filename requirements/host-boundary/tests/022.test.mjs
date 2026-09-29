@@ -39,7 +39,7 @@ test('WHAT[host-boundary-022] fatal diagnostic follows exact settlement', async 
     'ReleaseBeforeProvider',
     'FatalAfterSettlement',
   ])
-  assert.deepEqual(settled.admission, { activeCapacity: 0, providerBinding: 0 })
+  assert.deepEqual(settled.admission, { activeCapacity: 0 })
 })
 
 test('WHAT[host-boundary-022] fatal-before-exact-settlement mutation is rejected', async () => {

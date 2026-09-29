@@ -466,6 +466,7 @@ module PluginTransforms =
 
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                journal
                 scope.Sessions.Quiescence.BeginProviderAttempt
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
@@ -494,8 +495,8 @@ module PluginTransforms =
                             (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
                             |> ChatExecutionProjection.byKey key
                             |> Option.exists (fun execution ->
-                                execution.Evidence.Origin = PromptAuthority.PromptOrigin.Continuation
-                                    PromptAuthority.ContinuationKind.HumanMessage)
+                                execution.origin = PromptAuthority.PromptOrigin.Continuation
+                                                       PromptAuthority.ContinuationKind.HumanMessage)
                         | _ -> false
 
                     return!
@@ -723,7 +724,7 @@ module PluginTransforms =
         (outObj: obj)
         : Task<unit> =
         task {
-            // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+            // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform (durable-evidence gate)
             do! caps.BeginPhysicalProviderAttempt projectionSessionIdOpt outObj
 
             // 2. SessionStartedAtLedger.tryBindOrAbort

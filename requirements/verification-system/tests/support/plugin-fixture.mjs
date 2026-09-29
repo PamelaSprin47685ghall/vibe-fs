@@ -24,7 +24,6 @@ const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceShar
 const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface.js')
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
-const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
 
 const withJournalRuntime = async (directory, action) => {
   const journalResult = await workspaceHost.acquireSharedForWorkspace(
@@ -381,9 +380,33 @@ export const acceptAuthorityRoot = async (runtime, sessionId, agent, physicalMes
   return result.profile
 }
 
-/** Bind a managed child session to a parent session in local execution binding. */
-export const bindManagedChild = (parentId, childId, agent) => {
-  return sessionBindingSurface.bindChild(parentId, childId, agent)
+/**
+ * Record a durable parent→child handle link, the production evidence that makes
+ * a session a managed child. This is the same HandleLinked writer the fork
+ * runtime uses; it is not a test-local binding cache.
+ */
+export const bindManagedChild = async (runtime, parentId, childId, agent, handleId = `h-${childId}`) => {
+  const linked = await journalSurface.JournalSurface_appendAgent(
+    runtime.journal,
+    { kind: 'Session', session: parentId },
+    null,
+    {
+      family: 'Execution',
+      case: 'HandleLinked',
+      payload: {
+        ParentSessionId: parentId,
+        ChildSessionId: childId,
+        Handle: handleId,
+        TargetAgent: agent,
+        Byname: agent,
+        CanonicalRole: agent,
+        Ownership: 'DurableParentHandle',
+      },
+    },
+  )
+  if (linked?.ok !== true) {
+    throw new Error(`HandleLinked(${parentId} → ${childId}) rejected: ${linked?.error ?? 'unknown error'}`)
+  }
 }
 
 /**

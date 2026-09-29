@@ -4,6 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.Journal
 
 /// PROMPT-006 / execution-model-routing-009: chat.params is an observation barrier, not a routing
 /// authority. chat.message / internal SendPrompt must already have established the
@@ -55,17 +56,6 @@ module ChatParamsHook =
     let private currentModel (input: obj) =
         if isNull input then None else extractModel input
 
-    let private isManagedName (agent: string) =
-        if String.IsNullOrWhiteSpace agent then
-            false
-        else
-            let trimmed = agent.Trim()
-
-            ManagedAgent.requiredNames
-            |> List.exists (fun name -> String.Equals(name, trimmed, StringComparison.OrdinalIgnoreCase))
-            || String.Equals(trimmed, "coder", StringComparison.OrdinalIgnoreCase)
-            || String.Equals(trimmed, "inspector", StringComparison.OrdinalIgnoreCase)
-
     let private trySessionId (input: obj) =
         if isNull input then
             None
@@ -99,44 +89,30 @@ module ChatParamsHook =
         else
             None
 
-    /// host-boundary-008 / execution-model-routing-009: validate the observed
-    /// provider against the exact committed lease for this physical user
-    /// message. Read-only: the hook never writes identity, never re-routes,
-    /// never allocates a lease. A managed input without exact lease evidence
-    /// fails closed.
-    let private validateObservedProvider sessionId physicalUserMessageId agent model =
-        let key: ChatExecutionKey =
-            { SessionId = sessionId
-              PhysicalUserMessageId = physicalUserMessageId }
+    /// What the exact committed execution for one physical user message says
+    /// this provider run must be. Read-only projection of owner truth: the hook
+    /// never writes identity, never re-routes, never allocates a lease.
+    let private readAdmission (key: ChatExecutionKey) = ModelRouting.readExecutionAdmission key
 
-        let lease =
-            ModelRouting.tryReadExecution key
-            |> Option.defaultWith (fun () ->
-                invalidOp (
-                    sprintf
-                        "PROMPT-006: managed provider run '%s' for session '%s' has no committed execution lease for physical user message '%s'"
-                        agent
-                        (SessionId.value sessionId)
-                        (PhysicalUserMessageId.value physicalUserMessageId)
-                ))
-
-        let expectedParticipant = lease.Identity.Participant
-
+    /// host-boundary-008 / execution-model-routing-009: compare the Host's real
+    /// observation against the exact execution. A managed input without exact
+    /// lease evidence fails closed; nothing is inferred from a session cache.
+    let private validateObservedProvider (key: ChatExecutionKey) expectedParticipant target agent model =
         if not (String.Equals(expectedParticipant, agent, StringComparison.Ordinal)) then
             invalidOp (
                 sprintf
                     "PROMPT-006: provider agent drift for physical user message '%s' (%s -> %s)"
-                    (PhysicalUserMessageId.value physicalUserMessageId)
+                    (PhysicalUserMessageId.value key.PhysicalUserMessageId)
                     expectedParticipant
                     agent
             )
-        elif not (ModelRouting.sameTarget lease.Identity.Target model) then
-            let expected = ModelRouting.toOpenCodeModel lease.Identity.Target
+        elif not (ModelRouting.sameTarget target model) then
+            let expected = ModelRouting.toOpenCodeModel target
 
             invalidOp (
                 sprintf
                     "PROMPT-006: provider model/reasoning drift for physical user message '%s' (%s/%s[%s] -> %s/%s[%s])"
-                    (PhysicalUserMessageId.value physicalUserMessageId)
+                    (PhysicalUserMessageId.value key.PhysicalUserMessageId)
                     expected.providerID
                     expected.modelID
                     (expected.variant |> Option.defaultValue "<missing>")
@@ -145,33 +121,15 @@ module ChatParamsHook =
                     (model.variant |> Option.defaultValue "<missing>")
             )
 
-    let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
-        match currentModel input, tryPhysicalUserMessageId input with
-        | None, _ ->
+    let private validateModel (key: ChatExecutionKey) expectedParticipant target agent (input: obj) =
+        match currentModel input with
+        | None ->
             invalidOp (sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent)
-        | Some _, None ->
-            invalidOp (
-                sprintf
-                    "PROMPT-006: managed provider run '%s' for session '%s' has no physical user message id"
-                    agent
-                    (SessionId.value sessionId)
-            )
-        | Some model, Some physical -> validateObservedProvider sessionId physical agent model
-
-    let private validateSessionAndAgent sessionText agent =
-        if String.IsNullOrWhiteSpace sessionText || not (isManagedName agent) then
-            None
-        else
-            Some(SessionId.create (sessionText.Trim()), agent)
+        | Some model -> validateObservedProvider key expectedParticipant target agent model
 
     let private tryAgent (input: obj) =
         [ input; childObject input "info"; childObject input "message" ]
         |> List.tryPick (fun candidate -> textField candidate "agent")
-
-    let private trySessionAndAgent (input: obj) =
-        match trySessionId input, tryAgent input with
-        | Some sessionId, Some agent -> validateSessionAndAgent (SessionId.value sessionId) agent
-        | _ -> None
 
     let private supportsTemperature (input: obj) =
         if
@@ -222,15 +180,62 @@ module ChatParamsHook =
                 }
             """
 
-    let private applyManagedPolicy input output =
-        match trySessionAndAgent input with
-        | Some(sessionId, _) when SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId -> ()
-        | Some(sessionId, agent) ->
-            validateModel sessionId agent input
+    /// Which execution this observation belongs to, if any. Managed-ness is
+    /// durable evidence: an exact `Accepted` execution for the very physical
+    /// message this request carries. A request the plugin never admitted (Host
+    /// compaction, title generation, an auxiliary child) has no such execution
+    /// and is left entirely to the Host.
+    let private tryExecutionKey (input: obj) =
+        match trySessionId input, tryPhysicalUserMessageId input with
+        | Some sessionId, Some physical ->
+            Some
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physical }
+        | _ -> None
+
+    /// Managed-ness is durable evidence: only a message this plugin durably
+    /// accepted is a managed provider run. Such a run must hold the exact
+    /// committed lease for its own physical message, or the observation fails
+    /// closed. A message nobody accepted is entirely the Host's — never rejected
+    /// for a binding this hook does not own.
+    let private validateManagedObservation
+        (journal: AgentJournal option)
+        (agent: string)
+        (key: ChatExecutionKey)
+        input
+        =
+        match readAdmission key with
+        | Some(participant, target) -> validateModel key participant target agent input
+        | None when not (SessionExecutionBinding.isManagedExecution journal key) -> ()
+        | None ->
+            invalidOp (
+                sprintf
+                    "PROMPT-006: managed provider run '%s' for session '%s' has no committed execution lease for physical user message '%s'"
+                    agent
+                    (SessionId.value key.SessionId)
+                    (PhysicalUserMessageId.value key.PhysicalUserMessageId)
+            )
+
+    /// The observation barrier's whole policy: validate the Host's real
+    /// observation against the exact execution, then project only the approved
+    /// temperature. A message nobody durably accepted is left untouched.
+    /// Project only the approved temperature onto a validated observation.
+    let private projectManagedTemperature (input: obj) (output: obj) =
+        if supportsTemperature input then
             applyManagedTemperature input output
-        | None -> ()
 
-    let private handleInput (input: obj) (output: obj) = applyManagedPolicy input output
+    let private applyManagedPolicy (journal: AgentJournal option) input output =
+        match tryAgent input, tryExecutionKey input with
+        | Some agent, Some key when readAdmission key |> Option.isSome ->
+            validateManagedObservation journal agent key input
+            projectManagedTemperature input output
+        | Some agent, Some key -> validateManagedObservation journal agent key input
+        | _ -> ()
 
-    let create () : obj =
-        box (fun (input: obj) (output: obj) -> handleInput input output)
+    let private handleInput (journal: AgentJournal option) (input: obj) (output: obj) =
+        applyManagedPolicy journal input output
+
+    let createWith (journal: AgentJournal option) : obj =
+        box (fun (input: obj) (output: obj) -> handleInput journal input output)
+
+    let create () : obj = createWith None

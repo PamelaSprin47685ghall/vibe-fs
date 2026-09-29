@@ -71,7 +71,6 @@ const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const { acceptAuthorityRoot, bindManagedChild, grantWorkOwned, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
-const sessionBinding = await import("../../../dist/OpenCode/Host/SessionBindingSurface.js");
 
 const withRoutingHome = async (body) => {
   const previousHome = process.env.HOME
@@ -120,10 +119,10 @@ test('WHAT[intra-participant-parallelism-013] real root chat message carries a r
     })
   })
 })
-test('WHAT[intra-participant-parallelism-013] a bound child retains fission when the physical parent cache is empty', async () => {
-  await withExecutablePlugin(async (hooks) => {
+test('WHAT[intra-participant-parallelism-013] a durably linked child retains fission', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'fission-bound-child-provider-surface'
-    bindManagedChild('fission-binding-parent', sessionID, 'engineer')
+    await bindManagedChild(runtime, 'fission-binding-parent', sessionID, 'engineer')
     const output = {
       message: {
         id: 'msg-fission-bound-child-provider-surface',
@@ -136,13 +135,9 @@ test('WHAT[intra-participant-parallelism-013] a bound child retains fission when
       parts: [{ type: 'text', text: 'Interrupt the active join.' }],
     }
 
-    try {
-      await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
-      assert.equal(output.message.tools.fission, true)
-      assert.equal(output.message.tools.fork, true)
-    } finally {
-      sessionBinding.drop(sessionID)
-    }
+    await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
+    assert.equal(output.message.tools.fission, true)
+    assert.equal(output.message.tools.fork, true)
   })
 })
 test('WHAT[intra-participant-parallelism-013] forced root fission rejects origin before parsing prompts', async () => {

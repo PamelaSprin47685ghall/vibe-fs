@@ -53,7 +53,6 @@ module private Dispatch =
                   Directory = None
                   Metadata = None
                   Tools = None
-                  BindingIntent = Unchecked.defaultof<SessionBindingIntent>
                   DetachedListener = None }
 
             let admitted (run: string) =

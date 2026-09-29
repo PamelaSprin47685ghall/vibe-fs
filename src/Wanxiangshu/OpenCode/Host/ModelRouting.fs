@@ -430,6 +430,12 @@ module ModelRouting =
         // DSL-MUTABLE: resource — one exact provider-run witness per live session
         let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
         let latestProviderRunBySession = Dictionary<string, string>()
+        // DSL-MUTABLE: resource — exact provider-run → (session, physical user message).
+        // Written only from the authoritative Host start observation or the exact
+        // provider-step end; a tool boundary reads it by the run id the Host put
+        // in its own tool context, so a stale tool call can never release the
+        // step of a newer execution.
+        let providerStepIdentityByRun = Dictionary<string, struct (string * string)>()
         // DSL-MUTABLE: resource — one recovery retry target per session: the
         // single-consumption binding written when a confirmed provider failure
         // keeps its target (provider-attempt-recovery-021). Consumed by the next fresh admission.
@@ -535,6 +541,18 @@ module ModelRouting =
 
         let takeProviderRunTarget providerRun =
             takeProviderRunWitness providerRun |> Option.map snd
+
+        /// Exact (session, physical user message) for one Host-observed provider
+        /// run. Written only here and by the authoritative start observation; a
+        /// lookup for a run this process never observed yields None, and the
+        /// caller must not guess a session-current substitute.
+        let rememberProviderStepIdentity sessionId physicalUserMessageId providerRun =
+            providerStepIdentityByRun.[providerRun] <- struct (sessionId, physicalUserMessageId)
+
+        let tryProviderStepIdentity providerRun =
+            match providerStepIdentityByRun.TryGetValue providerRun with
+            | true, struct (sessionId, physicalUserMessageId) -> Some(sessionId, physicalUserMessageId)
+            | false, _ -> None
 
         let takeRecoveryRetryTarget sessionId =
             match recoveryRetryTargetBySession.TryGetValue sessionId with
@@ -735,6 +753,19 @@ module ModelRouting =
             retireProviderRunTarget sessionId
             recoveryRetryTargetBySession.Remove sessionId |> ignore
             leasePurposeBySession.Remove sessionId |> ignore
+
+            // The exact run->physical relations of this session's retired
+            // execution are process-local observations of an execution that no
+            // longer exists; keeping them would let a later tool call end a step
+            // of an execution the capacity owner already settled.
+            providerStepIdentityByRun.Keys
+            |> Seq.filter (fun run ->
+                match providerStepIdentityByRun.TryGetValue run with
+                | true, struct (runSession, _) -> runSession = sessionId
+                | false, _ -> false)
+            |> Seq.toArray
+            |> Array.iter (fun run -> providerStepIdentityByRun.Remove run |> ignore)
+
             capacity.ReleaseSession sessionId |> ignore
 
             if admissionQueue.ContainsSession sessionId then
@@ -1524,6 +1555,26 @@ module ModelRouting =
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () -> this.ReadCommittedExecutionLocked(normSessionId, normPhysicalUserMessageId))
 
+        /// Record the exact provider-run → physical-message relation. Called only
+        /// from the authoritative Host start observation, so the tool boundary
+        /// can end this run's step without reading any session-current binding.
+        member _.RememberProviderStepIdentity(sessionId: string, physicalUserMessageId: string, providerRun: string) =
+            if not (String.IsNullOrWhiteSpace providerRun) then
+                match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+                | None -> ()
+                | Some(normSessionId, normPhysicalUserMessageId) ->
+                    lock gate (fun () ->
+                        rememberProviderStepIdentity normSessionId normPhysicalUserMessageId (providerRun.Trim()))
+
+        /// Read-only exact lookup: no run, or a run this process never observed,
+        /// yields None. The query allocates nothing and never falls back to the
+        /// session's current physical message.
+        member _.TryProviderStepIdentity(providerRun: string) : (string * string) option =
+            if String.IsNullOrWhiteSpace providerRun then
+                None
+            else
+                lock gate (fun () -> tryProviderStepIdentity (providerRun.Trim()))
+
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
                 match boundDevopsTargetBySession.TryGetValue sessionId with
@@ -1581,7 +1632,18 @@ module ModelRouting =
         /// same SessionId after the terminal event was produced.
         member internal _.ReleasePhysicalExecution(sessionId: string, physicalUserMessageId: string) =
             normalizePhysicalExecutionKey sessionId physicalUserMessageId
-            |> Option.map releasePhysicalExecutionLocked
+            |> Option.map (fun normKey ->
+                lock gate (fun () ->
+                    providerStepIdentityByRun.Keys
+                    |> Seq.filter (fun run ->
+                        match providerStepIdentityByRun.TryGetValue run with
+                        | true, struct (runSession, runPhysical) ->
+                            runSession = fst normKey && runPhysical = snd normKey
+                        | false, _ -> false)
+                    |> Seq.toArray
+                    |> Array.iter (fun run -> providerStepIdentityByRun.Remove run |> ignore))
+
+                releasePhysicalExecutionLocked normKey)
             |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
         member _.CancelPendingExecution(sessionId: string) =
@@ -1615,6 +1677,7 @@ module ModelRouting =
                 lock gate (fun () ->
                     let normalizedProviderRun = providerRun.Trim()
                     rememberProviderRunTarget normSessionId normPhysicalUserMessageId normalizedProviderRun
+                    rememberProviderStepIdentity normSessionId normPhysicalUserMessageId normalizedProviderRun
                     capacity.EndStep(normSessionId, normPhysicalUserMessageId, normalizedProviderRun)
                     let prefix = sprintf "%s:%s:" normSessionId normPhysicalUserMessageId
 
@@ -1805,6 +1868,43 @@ module ModelRouting =
                 PhysicalUserMessageId.value key.PhysicalUserMessageId
             )
         | None -> None
+
+    /// Exact provider-run → physical-message relation, written only from the
+    /// authoritative Host start observation.
+    let internal rememberProviderStepIdentity
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (providerRun: ProviderRunIdentity)
+        =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.RememberProviderStepIdentity(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId,
+                ProviderRunIdentity.value providerRun
+            )
+        | None -> ()
+
+    /// Read-only exact lookup for the physical message a Host-observed provider
+    /// run answers. Unobserved run or unloaded runtime yields None; never the
+    /// session's current physical message.
+    let internal tryProviderStepIdentity
+        (providerRun: ProviderRunIdentity)
+        : (SessionId * PhysicalUserMessageId) option =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.TryProviderStepIdentity(ProviderRunIdentity.value providerRun)
+            |> Option.map (fun (sessionId, physicalUserMessageId) ->
+                SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId)
+        | None -> None
+
+    /// What a read-only observation barrier needs about one exact execution:
+    /// the participant it must run as and the model target it must observe.
+    /// Plain values only — the lease itself stays inside the capacity owner, so
+    /// a consumer cannot commit, release or re-fence by holding it.
+    let readExecutionAdmission (key: ChatExecutionKey) : (string * ModelRoutingTarget) option =
+        tryReadExecution key
+        |> Option.map (fun lease -> lease.Identity.Participant, lease.Identity.Target)
 
     let internal boundDevopsModel (sessionId: SessionId) : OpencodeModel option =
         match lock sharedGate (fun () -> sharedRuntime) with

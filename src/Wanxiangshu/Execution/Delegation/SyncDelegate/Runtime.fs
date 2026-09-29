@@ -190,8 +190,6 @@ type SyncDelegateRuntime
               Directory = childDirectory }
         )
 
-    let bindChild owner child agentName =
-        SessionExecutionBinding.restore owner child (Some agentName)
 
     let xTraceFrontier (sessionId: SessionId) : XTraceCursor =
         AgentJournal.snapshot journal
@@ -325,7 +323,7 @@ type SyncDelegateRuntime
           AwaitInvocation = awaitInvocation
           ObserveChild = observeChild
           CreateChild = createChild
-          BindChild = bindChild
+          BindChild = (fun (_: SessionId) (_: SessionId) (_: string) -> ())
           OnDelegateReady = onDelegateReady
           NoteDelegatePrompt = noteDelegatePrompt
           CleanupDelegateDraft = cleanupDelegateDraft

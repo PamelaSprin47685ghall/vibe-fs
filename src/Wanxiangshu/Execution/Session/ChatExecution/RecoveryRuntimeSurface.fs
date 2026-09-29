@@ -38,28 +38,16 @@ module RecoveryRuntimeSurface =
           ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
 
     let private acceptedState (accepted: AcceptedChatExecutionEvidence) : ChatExecutionState =
-        { Key = keyOf accepted
-          Evidence = accepted
-          ProviderStarted = None
-          TerminalEvidence = None
-          Lifecycle = ChatExecutionLifecycle.Accepted }
+        ChatExecutionState.Accepted accepted
 
     let private startedState (evidence: ProviderStartedEvidence) : ChatExecutionState =
-        { Key = keyOf evidence.Accepted
-          Evidence = evidence.Accepted
-          ProviderStarted = Some evidence
-          TerminalEvidence = None
-          Lifecycle = ChatExecutionLifecycle.ProviderStarted }
+        ChatExecutionState.Started evidence
 
     let private terminalState
         (disposition: ChatExecutionTerminalDisposition)
         (evidence: ProviderStartedEvidence)
         : ChatExecutionState =
-        { Key = keyOf evidence.Accepted
-          Evidence = evidence.Accepted
-          ProviderStarted = Some evidence
-          TerminalEvidence = Some(ChatExecutionTerminalEvidence.AfterProviderStart evidence)
-          Lifecycle = ChatExecutionLifecycle.Terminal disposition }
+        ChatExecutionState.EndedAfterStart(evidence, disposition)
 
     let private failurePolicy
         (failure: ExecutionFailure)
@@ -340,7 +328,7 @@ module RecoveryRuntimeSurface =
                         | "AlreadyApplied" -> original.ResourceObservation
                         | "Conflict"
                         | "StaleFence"
-                        | "Unknown" -> PhysicalResourceObservation.ResourceUnknown original.ExecutionState.Key
+                        | "Unknown" -> PhysicalResourceObservation.ResourceUnknown original.ExecutionState.key
                         | value -> invalidArg "capacityOutcome" $"unknown capacity outcome '{value}'"
 
                     let evidence =

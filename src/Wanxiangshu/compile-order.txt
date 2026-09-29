@@ -954,8 +954,6 @@ OpenCode/Host/SessionExecutionBinding.fsi
 OpenCode/Host/SessionExecutionBinding.fs
 OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
-OpenCode/Host/SessionBindingSurface.fsi
-OpenCode/Host/SessionBindingSurface.fs
 OpenCode/Host/SessionHostPort.fsi
 OpenCode/Host/SessionHostPort.fs
 OpenCode/Host/SessionRuntimeOwner.fsi

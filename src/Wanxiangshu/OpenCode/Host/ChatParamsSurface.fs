@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Persistence.Journal
 
 /// JS-native observation surface for the chat.params binding barrier.
 /// The hook mutates only the approved temperature field; provider identity is
@@ -14,8 +15,10 @@ module ChatParamsSurface =
             let model = value?model
             if isNull model then null else model?modelID
 
-    let apply (input: obj) (output: obj) : obj =
-        let hook = ChatParamsHook.create () |> unbox<obj -> obj -> unit>
+    let applyWith (journal: JournalHandle option) (input: obj) (output: obj) : obj =
+        let hook =
+            ChatParamsHook.createWith (journal |> Option.map (fun handle -> handle.Journal))
+            |> unbox<obj -> obj -> unit>
 
         try
             hook input output
@@ -31,3 +34,5 @@ module ChatParamsSurface =
                    error = ex.Message
                    modelID = modelId output
                    temperature = if isNull output then null else output?temperature |}
+
+    let apply (input: obj) (output: obj) : obj = applyWith None input output

@@ -17,7 +17,6 @@
 /src/Wanxiangshu/Interaction/Authority/Model.fs
 /src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs
 /src/Wanxiangshu/Interaction/Authority/Surface.fs
-/src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs
 /src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs
 /resources/provider/role/**

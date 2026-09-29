@@ -380,7 +380,7 @@ export const runInterleaving = async (schedule, family = defaultFamily) => {
     childEvidence.physicalUserMessageId,
   )
   assert.equal(admission.activeCapacity, routing.snapshotOccupied(runtime).length)
-  assert.equal(admission.providerBinding, 0)
+  assert.equal(admission.exactLeaseCommitted, false)
   assert.deepEqual(recovery.decideScenario('CrashAfterAcceptance'), {
     kind: 'ResumePreProvider',
     request: 'ResumeAcceptedAdmission',

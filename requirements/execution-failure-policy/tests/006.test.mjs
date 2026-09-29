@@ -26,7 +26,7 @@ test('WHAT[execution-failure-policy-006] actual pre-provider settlement commits 
     'ResolveState', 'Accept', 'AcceptedWitness', 'AcquireLease', 'LeaseTarget',
     'ProjectHost', 'TerminalizeAccepted', 'ReleaseBeforeProvider',
   ])
-  assert.deepEqual(result.admission, { activeCapacity: 0, providerBinding: 0 })
+  assert.deepEqual(result.admission, { activeCapacity: 0 })
   assert.equal(result.providerEffectCount, 0)
 })
 

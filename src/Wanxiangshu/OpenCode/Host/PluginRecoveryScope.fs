@@ -323,7 +323,7 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         this.TryPeekAttemptPlan sessionId providerRun
 
     member _.PublishManualChatIntervention(request: ManualInterventionRequest) =
-        manualChatInterventions.[request.ExecutionState.Key] <- request
+        manualChatInterventions.[request.ExecutionState.key] <- request
 
     member _.ManualChatInterventions() : ManualInterventionRequest[] =
         manualChatInterventions.Values |> Seq.toArray

@@ -38,7 +38,7 @@ test('WHAT[behavior-diagnosis-006] NoLiveCycle is typed before Host error encodi
 test('WHAT[behavior-diagnosis-006] real plugin aborts obsolete Blogger before exposing NoLiveCycle', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'blogger-no-live-cycle'
-    bindManagedChild('ses-manager', sessionID, 'blogger')
+    await bindManagedChild(runtime, 'ses-manager', sessionID, 'blogger')
     await hooks['chat.message'](
       { sessionID, agent: 'blogger' },
       {

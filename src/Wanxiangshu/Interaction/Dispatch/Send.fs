@@ -380,7 +380,6 @@ module PromptDispatcherSend =
                       Directory = directory
                       Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
                       Tools = tools
-                      BindingIntent = SessionBindingIntent.Preserve
                       DetachedListener =
                         match awaitMode with
                         | PromptDispatcher.AwaitMode.Detached ->
@@ -499,7 +498,6 @@ module PromptDispatcherSend =
                       Directory = directory
                       Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
                       Tools = tools
-                      BindingIntent = SessionBindingIntent.Preserve
                       DetachedListener =
                         match awaitMode with
                         | PromptDispatcher.AwaitMode.Detached ->

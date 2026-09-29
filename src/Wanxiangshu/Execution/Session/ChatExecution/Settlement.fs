@@ -41,32 +41,32 @@ module PreProviderSettlement =
         | ChatExecutionTerminalDisposition.Failed -> true
         | ChatExecutionTerminalDisposition.Completed -> false
 
-    let private currentDecision key evidence disposition =
-        function
+    let private currentDecision key evidence disposition (state: ChatExecutionState option) =
+        match state with
         | None -> Error(PreProviderSettlementError.MissingAccepted key)
-        | Some state when state.Evidence <> evidence ->
-            Error(PreProviderSettlementError.EvidenceConflict(state.Evidence, evidence))
-        | Some { Lifecycle = ChatExecutionLifecycle.Accepted } -> Ok true
-        | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted } ->
-            Error(PreProviderSettlementError.ProviderAlreadyStarted key)
-        | Some { Lifecycle = ChatExecutionLifecycle.Terminal established
-                 TerminalEvidence = Some(ChatExecutionTerminalEvidence.PreProvider establishedEvidence) } when
-            established = disposition && establishedEvidence = evidence
+        | Some current when current.acceptedEvidence <> evidence ->
+            Error(PreProviderSettlementError.EvidenceConflict(current.acceptedEvidence, evidence))
+        | Some(ChatExecutionState.Accepted _) -> Ok true
+        | Some(ChatExecutionState.Started _) -> Error(PreProviderSettlementError.ProviderAlreadyStarted key)
+        | Some(ChatExecutionState.EndedBeforeStart(establishedEvidence, establishedOutcome)) when
+            PreStartOutcome.disposition establishedOutcome = disposition
+            && establishedEvidence = evidence
             ->
             Ok false
-        | Some { Lifecycle = ChatExecutionLifecycle.Terminal established } ->
-            Error(PreProviderSettlementError.TerminalConflict(established, disposition))
+        | Some(ChatExecutionState.EndedBeforeStart(_, establishedOutcome)) ->
+            Error(
+                PreProviderSettlementError.TerminalConflict(PreStartOutcome.disposition establishedOutcome, disposition)
+            )
+        | Some(ChatExecutionState.EndedAfterStart(_, establishedDisposition)) ->
+            Error(PreProviderSettlementError.TerminalConflict(establishedDisposition, disposition))
 
     let private witness key evidence disposition persistence =
         match persistence.ReadExact key with
-        | Some { Evidence = establishedEvidence
-                 Lifecycle = ChatExecutionLifecycle.Terminal established
-                 TerminalEvidence = Some(ChatExecutionTerminalEvidence.PreProvider terminalEvidence) } when
+        | Some(ChatExecutionState.EndedBeforeStart(establishedEvidence, establishedOutcome)) when
             establishedEvidence = evidence
-            && terminalEvidence = evidence
-            && established = disposition
+            && PreStartOutcome.disposition establishedOutcome = disposition
             ->
-            Ok(PreProviderTerminalWitness(key, established))
+            Ok(PreProviderTerminalWitness(key, PreStartOutcome.disposition establishedOutcome))
         | None -> Error(PreProviderSettlementError.ProjectionMissingAfterCommit key)
         | Some state -> Error(PreProviderSettlementError.ProjectionConflictAfterCommit state)
 

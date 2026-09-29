@@ -99,19 +99,19 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
     member private _.SettleExecution(durable: AgentJournal, execution: ChatExecutionState) : Task =
         task {
             let! settled =
-                match execution.ProviderStarted with
+                match execution.startedEvidence with
                 | Some started ->
                     ManagedChatProviderLifecycle.terminal
                         durable
-                        execution.Key
+                        execution.key
                         started
                         ChatExecutionTerminalDisposition.Cancelled
                     |> TaskValue.map (Result.map ignore >> Result.mapError (sprintf "%A"))
                 | None ->
                     PreProviderSettlement.settle
                         durable
-                        execution.Key
-                        execution.Evidence
+                        execution.key
+                        execution.acceptedEvidence
                         ChatExecutionTerminalDisposition.Cancelled
                     |> TaskValue.map (Result.map ignore >> Result.mapError (sprintf "%A"))
 
@@ -120,12 +120,12 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
                 invalidOp (
                     sprintf
                         "session execution settlement failed (%s/%s): %s"
-                        (SessionId.value execution.Key.SessionId)
-                        (PhysicalUserMessageId.value execution.Key.PhysicalUserMessageId)
+                        (SessionId.value execution.key.SessionId)
+                        (PhysicalUserMessageId.value execution.key.PhysicalUserMessageId)
                         failure
                 ))
 
-            ModelRouting.releasePhysicalExecution execution.Key.SessionId execution.Key.PhysicalUserMessageId
+            ModelRouting.releasePhysicalExecution execution.key.SessionId execution.key.PhysicalUserMessageId
             |> ignore
         }
 
@@ -139,7 +139,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
                 AgentJournal.snapshot durable
                 |> fun projection -> projection.AgentProjections.ChatExecutions
                 |> ChatExecutionProjection.nonTerminal
-                |> List.filter (fun execution -> execution.Key.SessionId = sid)
+                |> List.filter (fun execution -> execution.key.SessionId = sid)
                 |> List.map (fun execution -> durable, execution))
             |> Option.defaultValue []
 

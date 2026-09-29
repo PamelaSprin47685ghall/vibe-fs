@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -62,20 +63,6 @@ module HostSignalBootstrap =
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit> }
-
-    let private observeSessionIdentity (sessionId: SessionId) (hasParent: bool) (agent: string option) =
-        if hasParent then
-            SessionExecutionBinding.observeHostAuxiliaryChild sessionId
-
-        agent
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sessionId)
-
-    let private observeSessionEvent (raw: obj) =
-        raw
-        |> HostIngressCodec.sessionObservation
-        |> Option.iter (fun observation ->
-            observeSessionIdentity observation.SessionId observation.HasParent observation.Agent)
 
     let wire
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
@@ -290,7 +277,7 @@ module HostSignalBootstrap =
                     AgentJournal.snapshot durable
                     |> fun projection -> projection.AgentProjections.ChatExecutions
                     |> ChatExecutionProjection.byKey key
-                    |> Option.bind _.ProviderStarted)
+                    |> Option.bind _.startedEvidence)
 
             let rejectProviderTerminal (observation: ExactProviderTerminalObservation) =
                 Diagnostic.emit
@@ -432,6 +419,18 @@ module HostSignalBootstrap =
                             (providerStepEnded: bool)
                             (terminal: ExactProviderTerminalObservation option) ->
                             task {
+                                // The Host itself stated this assistant run's parentID,
+                                // so this is the one authoritative moment the exact
+                                // run→physical relation becomes knowable. Every later
+                                // consumer (tool boundary, step end, diagnostics) reads
+                                // it from here instead of guessing a session-current
+                                // binding, and a durable-fact rejection below cannot
+                                // make the Host's relation untrue.
+                                ModelRouting.rememberProviderStepIdentity
+                                    started.SessionId
+                                    started.PhysicalUserMessageId
+                                    started.ProviderRun
+
                                 let! providerStarted =
                                     ProviderLifecycle.persistProviderStartedFromObservation
                                         journal
@@ -547,24 +546,67 @@ module HostSignalBootstrap =
 
                 reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
 
+            /// Durable topology evidence for this session's parent edge: a
+            /// parent-visible handle or a Companion association. It answers "is
+            /// this a parented session" across a restart, where the Host query
+            /// may be unavailable, without keeping a second cache of the answer.
+            let durableParentOf (sessionId: SessionId) : string option =
+                journal
+                |> Option.bind (fun durable ->
+                    let projections = (AgentJournal.snapshot durable).AgentProjections
+
+                    let fromHandle =
+                        projections.HandleByChildSession
+                        |> Map.tryFind sessionId
+                        |> Option.filter (fun record -> record.Ownership = HandleOwnership.DurableParentHandle)
+                        |> Option.bind (fun record ->
+                            projections.Sessions
+                            |> Map.toList
+                            |> List.tryPick (fun (parentSessionId, session) ->
+                                match session.Handles with
+                                | Some handles when HandleProjection.tryFind record.Handle handles |> Option.isSome ->
+                                    Some(SessionId.value parentSessionId)
+                                | _ -> None))
+
+                    let fromCompanion =
+                        SessionAssociationProjection.tryMainSessionOf sessionId projections.Associations
+                        |> Option.map SessionId.value
+
+                    fromHandle |> Option.orElse fromCompanion)
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+            let rememberParent key parentId =
+                scope.Sessions.SessionParents.[key] <- parentId
+
+            let discoverHostParent (sessionId: SessionId) (key: string) : Task =
+                task {
+                    match! sessionPort.TryGetParentSession sessionId with
+                    | Ok(Some parentId) -> rememberParent key (SessionId.value parentId)
+                    | _ -> ()
+                }
+
+            let rememberDurableParent (sessionId: SessionId) (key: string) =
+                durableParentOf sessionId
+                |> Option.iter (fun parent -> rememberParent key parent)
+
+            let discoverMissingParent (sessionId: SessionId) (key: string) : Task =
+                if scope.Sessions.SessionParents.ContainsKey key then
+                    Task.FromResult()
+                else
+                    discoverHostParent sessionId key
+
             let ensurePhysicalParentDiscovered (sessionId: SessionId) =
                 task {
                     let key = SessionId.value sessionId
 
-                    if
-                        not (scope.Sessions.SessionParents.ContainsKey key)
-                        && (SessionExecutionBinding.tryParent sessionId).IsNone
-                    then
-                        match! sessionPort.TryGetParentSession sessionId with
-                        | Ok(Some parentId) -> scope.Sessions.SessionParents.[key] <- SessionId.value parentId
-                        | _ -> ()
+                    if not (scope.Sessions.SessionParents.ContainsKey key) then
+                        rememberDurableParent sessionId key
+                        do! discoverMissingParent sessionId key
                 }
 
             let hasPhysicalParent sessionId =
-                // Discovery skips Host I/O when execution binding already proves
-                // a parent; request projection must honor that same evidence.
                 scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
-                || (SessionExecutionBinding.tryParent sessionId).IsSome
+                || (durableParentOf sessionId).IsSome
 
             let continueUnmanagedChatMessage intent =
                 requireDurabilityActivation ()
@@ -618,14 +660,15 @@ module HostSignalBootstrap =
                 | ChatAdmissionIntent.Decision.HostInternal _
                 | ChatAdmissionIntent.Decision.Reject _ -> None
 
-            // PROMPT-006-P4: same exact key concurrent admissions merge into one
-            // in-process flight. Durable accept idempotence and the ModelRouting
-            // lock/queue deduplication stay the underlying guarantee; this table
-            // only coalesces the orchestration layer, where two parallel
-            // transactions would race Host projection and one failure's
-            // compensation could release the lease the other still uses. The
-            // table holds no identity, persists nothing, never keeps a lock
-            // across capacity waiting, and no same-key serial work waits on it.
+            // managed-chat-execution-004 / P4: same exact key concurrent
+            // admissions merge into one in-process flight. Durable accept
+            // idempotence and the ModelRouting lock/queue deduplication stay the
+            // underlying guarantee; this table only coalesces the orchestration
+            // layer, where two parallel transactions would race Host projection
+            // and one failure's compensation could release the lease the other
+            // still uses. It holds no identity, persists nothing, never keeps a
+            // lock across capacity waiting, and no same-key serial work waits on
+            // it.
             let admissionInFlight =
                 Dictionary<
                     ChatExecutionKey,
@@ -780,7 +823,6 @@ module HostSignalBootstrap =
                             HostEventCodec.tryDecodeExactProviderTerminal raw
                             |> Option.iter observeHostInternalTerminal
 
-                            observeSessionEvent raw
                             do! signalRouter.ObserveLocal raw
                             SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
                             MessageVisibilitySignal.observeEvent messageVisibility raw

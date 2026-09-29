@@ -359,13 +359,22 @@ module ToolRegistry =
                 | ToolAdmission.PrivateAttachment attachmentAdmission ->
                     executePrivateAttachment attachmentAdmission args ctx
 
+            /// execution-model-routing-010: the tool context carries this call's
+            /// own exact ProviderRunIdentity. The physical message it answers is
+            /// the one the Host stated for that run; a run this process never
+            /// observed has no step to end, and must never be resolved from the
+            /// session's current binding.
+            let endObservedStep (providerRun: ProviderRunIdentity) =
+                ModelRouting.tryProviderStepIdentity providerRun
+                |> Option.iter (fun (sessionId, physicalUserMessageId) ->
+                    ModelRouting.endProviderStep sessionId physicalUserMessageId providerRun)
+
             let providerToolBoundary (ctx: HostToolContext) =
                 if String.IsNullOrWhiteSpace ctx.SessionId then
                     Ok()
                 else
-                    SessionExecutionBinding.endProviderStepAtToolBoundary
-                        (SessionId.create ctx.SessionId)
-                        ctx.ProviderRunId
+                    ctx.ProviderRunId |> Option.iter endObservedStep
+                    Ok()
 
             let isStrengthReplica (ctx: HostToolContext) =
                 match isReplicaSession with

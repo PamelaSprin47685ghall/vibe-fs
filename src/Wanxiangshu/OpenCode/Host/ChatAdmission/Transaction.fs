@@ -200,16 +200,16 @@ module internal ChatAdmissionTransaction =
         observe ChatAdmissionTransactionStep.ResolveState
 
         match ports.ReadExact key with
-        | Some { Lifecycle = ChatExecutionLifecycle.Terminal disposition } ->
+        | Some(ChatExecutionState.EndedBeforeStart(_, outcome)) ->
+            ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal(PreStartOutcome.disposition outcome))
+            |> Ok
+        | Some(ChatExecutionState.EndedAfterStart(_, disposition)) ->
             ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyTerminal disposition)
             |> Ok
-        | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
-                 ProviderStarted = Some evidence } ->
+        | Some(ChatExecutionState.Started evidence) ->
             ExistingOutcome(ChatAdmissionTransactionOutcome.AlreadyStarted evidence) |> Ok
-        | Some { Lifecycle = ChatExecutionLifecycle.ProviderStarted
-                 ProviderStarted = None } -> invalidOp "ProviderStarted projection is missing exact provider evidence"
         | None
-        | Some { Lifecycle = ChatExecutionLifecycle.Accepted } -> AdmissionRequired |> Ok
+        | Some(ChatExecutionState.Accepted _) -> AdmissionRequired |> Ok
 
     // semantic-decorator-owner: managed-chat-execution
     // semantic-decorator-WHAT: managed-chat-execution-003

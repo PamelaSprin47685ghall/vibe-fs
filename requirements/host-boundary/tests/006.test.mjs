@@ -6,7 +6,6 @@ const { mkdtemp, mkdir, rm, writeFile } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test, after } = await import("node:test");
-const binding = await import("../../../dist/OpenCode/Host/SessionBindingSurface.js");
 const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
 const { runListenerRefcountScenario } = await import("./support/listener-refcount.mjs");
 
@@ -69,119 +68,49 @@ const modelFromLease = async (sessionId, physicalUserMessageId, role, participan
   return { providerID, modelID: modelParts.join('/'), variant: target.reasoning }
 }
 
-test('WHAT[host-boundary-006] HOST-006_user_facing_agent_is_not_session_authority', () => {
-  binding.drop('ses_binding_1')
-  binding.observeUserFacingAgent('ses_binding_1', 'engineer')
-  const prepared = binding.prepareUserFacing('ses_binding_1', 'engineer', false, model)
-  assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'engineer')
-  assert.equal(binding.tryAgent('ses_binding_1'), 'engineer')
+test('WHAT[host-boundary-006] HOST-006_params_observation_rejects_participant_drift_against_the_exact_lease', async () => {
+  const params = await import('../../../dist/OpenCode/Host/ChatParamsSurface.js')
+  const session = 'ses_hb006_drift'
+  const physical = 'msg_hb006_drift'
+  await modelFromLease(session, physical, 'engineer', 'engineer', undefined)
+
+  const observed = params.apply(
+    {
+      sessionID: session,
+      messageID: physical,
+      agent: 'devops',
+      model: { providerID: 'test', id: 'system', capabilities: {} },
+      message: { id: physical, model: {} },
+    },
+    {},
+  )
+
+  assert.equal(observed.ok, false)
+  assert.match(observed.error, /provider agent drift for physical user message 'msg_hb006_drift' \(engineer -> devops\)/)
 })
-test('WHAT[host-boundary-006] HOST-006_accept_prompt_execution_binds_physical_prompt_and_provider_model', async () => {
-  binding.drop('ses_binding_2')
-  const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'engineer', 'engineer', undefined)
-  binding.acceptPromptExecution('ses_binding_2', 'prompt-1', 'physical-1', 'engineer', leasedModel)
-  const began = binding.beginProviderAttempt('ses_binding_2', 'physical-1', 'prompt-1')
-  assert.equal(began.ok, true)
-  const allowed = binding.validateObservedProvider('ses_binding_2', 'engineer', leasedModel)
-  assert.equal(allowed.ok, true)
-  assert.equal(allowed.value, true)
-})
-test('WHAT[host-boundary-006] HOST-006_external_acceptance_immediately_binds_participant', async () => {
-  const session = 'ses_binding_external_acceptance'
-  binding.drop(session)
-  const leasedModel = await modelFromLease(session, 'physical-external', 'engineer', 'engineer', undefined)
+test('WHAT[host-boundary-006] HOST-006_params_observation_leaves_a_message_without_an_exact_lease_to_the_host', async () => {
+  const params = await import('../../../dist/OpenCode/Host/ChatParamsSurface.js')
 
-  binding.acceptExternalExecution(session, 'physical-external', 'engineer', leasedModel)
+  // No durable Accepted execution and no committed lease exists for this exact
+  // key: the observation barrier owns nothing here and must not invent an error.
+  const observed = params.apply(
+    {
+      sessionID: 'ses_hb006_unmanaged',
+      messageID: 'msg_hb006_unmanaged',
+      agent: 'engineer',
+      model: { providerID: 'test', id: 'system', capabilities: {} },
+      message: { id: 'msg_hb006_unmanaged', model: {} },
+    },
+    {},
+  )
 
-  assert.equal(binding.tryAgent(session), 'engineer')
-  const allowed = binding.validateObservedProvider(session, 'engineer', leasedModel)
-  assert.equal(allowed.ok, true, allowed.error)
-  assert.equal(allowed.value, true)
-})
-test('WHAT[host-boundary-006] HOST-006_provider_drift_is_rejected_after_prompt_binding', () => {
-  binding.drop('ses_binding_3')
-  binding.acceptPromptExecution('ses_binding_3', 'prompt-1', 'physical-1', 'engineer', model)
-  binding.beginProviderAttempt('ses_binding_3', 'physical-1', 'prompt-1')
-  const stale = binding.validateObservedProvider('ses_binding_3', 'inspector', model)
-  assert.equal(stale.ok, false)
-  assert.match(stale.error, /provider agent drift/)
-})
-test('WHAT[host-boundary-006] HOST-006_stale_physical_terminal_cannot_strip_the_lease_before_chat_params_validation', async () => {
-  const session = 'ses_binding_stale_terminal'
-  binding.drop(session)
-
-  await modelFromLease(session, 'physical-old', 'engineer', 'engineer', undefined)
-  const currentModel = await modelFromLease(session, 'physical-current', 'engineer', 'engineer', undefined)
-
-  routing.releasePhysical(session, 'physical-old')
-  binding.acceptPromptExecution(session, 'prompt-current', 'physical-current', 'engineer', currentModel)
-
-  const observed = binding.validateObservedProvider(session, 'engineer', currentModel)
   assert.equal(observed.ok, true, observed.error)
-  assert.equal(observed.value, true)
-
-  binding.drop(session)
-})
-test('WHAT[host-boundary-006] HOST-006_managed_prompt_preserves_agent_but_does_not_acquire_model', () => {
-  binding.drop('ses_binding_4')
-  binding.bindChild('ses_parent_4', 'ses_binding_4', 'engineer')
-  const prepared = binding.prepareManaged('ses_binding_4', 'engineer', false, model)
-  assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'engineer')
-  assert.equal(prepared.value.modelProvided, false)
-})
-test('WHAT[host-boundary-006] HOST-006_child_enqueue_uses_binding_agent_and_model_free_options', () => {
-  const created = binding.bindChild('ses_parent', 'ses_child', 'engineer')
-  assert.equal(created.ok, true)
-  const prepared = binding.prepareManaged('ses_child', 'engineer', false, null)
-  assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'engineer')
-  assert.equal(prepared.value.modelProvided, false)
-})
-test('WHAT[host-boundary-006] HOST-006_private_bookkeeper_child_stays_outside_managed_execution_binding', () => {
-  const child = 'ses_binding_bookkeeper_child'
-  binding.drop(child)
-
-  const created = binding.bindChild('ses_binding_bookkeeper_parent', child, 'bookkeeper')
-  assert.equal(created.ok, true, created.error)
-  assert.equal(binding.tryAgent(child), '')
-  assert.equal(binding.isUnboundHostAuxiliaryChild(child), true)
 })
 test('WHAT[host-boundary-006] HOST-006_terminal_listener_refcounts_do_not_share_disposal', () => {
   const observed = runListenerRefcountScenario()
   assert.equal(observed.afterOneDisposeFatal, true)
   assert.equal(observed.afterAllDisposeFatal, false)
   assert.deepEqual(observed.sends, [])
-})
-test('WHAT[host-boundary-006] HOST-006_querying_agent_does_not_clear_accepted_prompt_binding', async () => {
-  const session = 'ses_binding_base_agent_side_effect'
-  binding.drop(session)
-  binding.observeUserFacingAgent(session, 'engineer')
-  const leasedModel = await modelFromLease(session, 'physical-1', 'engineer', 'engineer', undefined)
-  binding.acceptPromptExecution(session, 'prompt-1', 'physical-1', 'engineer', leasedModel)
-
-  // Trigger user-facing preparation
-  const queried = binding.prepareUserFacing(session, 'engineer', false, leasedModel)
-  assert.equal(queried.ok, true, queried.error)
-
-  // Verify prompt binding was not destroyed
-  const began = binding.beginProviderAttempt(session, 'physical-1', 'prompt-1')
-  assert.equal(began.ok, true, began.error)
-})
-test('WHAT[host-boundary-006] HOST-006_active_lease_allows_fallback_continuation_when_prompt_key_unregistered', async () => {
-  const session = 'ses_binding_fallback_continuation'
-  binding.drop(session)
-  const leasedModel = await modelFromLease(session, 'physical-cont', 'engineer', 'engineer', undefined)
-  binding.observeUserFacingAgent(session, 'engineer')
-
-  // Begin provider attempt with an unregistered internal continuation prompt key
-  const began = binding.beginProviderAttempt(session, 'physical-cont', 'prompt-internal-nudge-1')
-  assert.equal(began.ok, true, began.error)
-
-  const allowed = binding.validateObservedProvider(session, 'engineer', leasedModel)
-  assert.equal(allowed.ok, true, allowed.error)
-  assert.equal(allowed.value, true)
 })
 }
 

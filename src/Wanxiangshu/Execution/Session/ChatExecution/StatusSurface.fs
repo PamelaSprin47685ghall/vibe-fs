@@ -23,11 +23,12 @@ module StatusSurface =
                    disposition = null |}
         | Some execution ->
             let providerStarted, terminal, disposition =
-                match execution.Lifecycle with
-                | ChatExecutionLifecycle.Accepted -> false, false, null
-                | ChatExecutionLifecycle.ProviderStarted -> true, false, null
-                | ChatExecutionLifecycle.Terminal value ->
-                    execution.ProviderStarted.IsSome, true, box (dispositionLabel value)
+                match execution with
+                | ChatExecutionState.Accepted _ -> false, false, null
+                | ChatExecutionState.Started _ -> true, false, null
+                | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+                    false, true, box (dispositionLabel (PreStartOutcome.disposition outcome))
+                | ChatExecutionState.EndedAfterStart(_, value) -> true, true, box (dispositionLabel value)
 
             box
                 {| accepted = true

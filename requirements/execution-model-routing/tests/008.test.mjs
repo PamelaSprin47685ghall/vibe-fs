@@ -12,8 +12,7 @@ const promptOptions = (overrides = {}) => ({
   directory: undefined,
   metadata: undefined,
   tools: undefined,
-  bindingIntent: 'Preserve',
-  ...overrides,
+    ...overrides,
 })
 
 test('WHAT[execution-model-routing-008] EMR_008_sdk_prompt_never_recovers_a_model_from_agent_or_host_inventory', async () => {

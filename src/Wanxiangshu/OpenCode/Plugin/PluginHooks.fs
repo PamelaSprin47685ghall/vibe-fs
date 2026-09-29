@@ -99,7 +99,7 @@ module PluginHooks =
             let sessionPort = host.SessionPort
             let snapshotOpt = host.SnapshotOpt
             let eventPort = host.EventPort
-            let chatParams = ChatParamsHook.create ()
+            let chatParams = ChatParamsHook.createWith journal
 
             let roleFor (sessionId: SessionId) =
                 journal

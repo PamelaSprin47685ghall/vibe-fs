@@ -83,6 +83,11 @@ module ModelRouting =
 
         member BindDevopsTarget: sessionId: string * target: ModelRoutingTarget -> unit
         member SeedBoundDevOpsModel: sessionId: string * value: string -> unit
+
+        member RememberProviderStepIdentity:
+            sessionId: string * physicalUserMessageId: string * providerRun: string -> unit
+
+        member TryProviderStepIdentity: providerRun: string -> (string * string) option
         member BoundDevopsTarget: sessionId: string -> ModelRoutingTarget option
 
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome
@@ -162,6 +167,13 @@ module ModelRouting =
 
     val internal sharedPredictorConfiguration: unit -> PredictorConfiguration
 
+
+    val internal rememberProviderStepIdentity:
+        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> providerRun: ProviderRunIdentity -> unit
+
+    val internal tryProviderStepIdentity: providerRun: ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option
+
+    val readExecutionAdmission: key: ChatExecutionKey -> (string * ModelRoutingTarget) option
     val internal boundDevopsModel: sessionId: SessionId -> OpencodeModel option
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome
 

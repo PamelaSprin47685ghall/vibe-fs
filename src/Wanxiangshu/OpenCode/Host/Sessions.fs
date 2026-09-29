@@ -102,7 +102,6 @@ type InjectedSessionPort
     let managedChild (sessionId: SessionId) =
         lock lockObj (fun () -> childParents.ContainsKey sessionId)
         || restoredParent sessionId |> Option.isSome
-        || SessionExecutionBinding.tryParent sessionId |> Option.isSome
 
     let registerChild (parentId: SessionId) (childId: SessionId) =
         lock lockObj (fun () ->
@@ -199,11 +198,9 @@ type InjectedSessionPort
         | Ok sendOptions -> sendAvailablePort sessionId text sendOptions
 
     let bindSiblingExecution (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
-        match agent with
-        | Some name when ManagedAgentCatalog.isBookkeeperName name ->
-            SessionExecutionBinding.bind ownerSessionId laneId agent
-        | _ -> SessionExecutionBinding.bindInternalRoot laneId agent
-
+        // A fission lane's participant comes from the durable lane/owner projection
+        // and its own Accepted evidence; this boundary only inherits language.
+        ignore agent
         ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
 
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
@@ -251,7 +248,6 @@ type InjectedSessionPort
 
             let! childId = port.CreateChildSession hostParentId options
             registerChild rootId childId
-            SessionExecutionBinding.bind parentId childId options.Agent
             // HOST-026: inherit owner/commissioner language (parentId), not family root.
             ProviderLanguageBinding.ensureInherited parentId childId |> ignore
             return childId

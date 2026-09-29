@@ -37,28 +37,16 @@ module RecoverySurface =
           ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
 
     let private acceptedState (accepted: AcceptedChatExecutionEvidence) : ChatExecutionState =
-        { Key = keyOf accepted
-          Evidence = accepted
-          ProviderStarted = None
-          TerminalEvidence = None
-          Lifecycle = ChatExecutionLifecycle.Accepted }
+        ChatExecutionState.Accepted accepted
 
     let private startedState (started: ProviderStartedEvidence) : ChatExecutionState =
-        { Key = keyOf started.Accepted
-          Evidence = started.Accepted
-          ProviderStarted = Some started
-          TerminalEvidence = None
-          Lifecycle = ChatExecutionLifecycle.ProviderStarted }
+        ChatExecutionState.Started started
 
     let private terminalState
         (disposition: ChatExecutionTerminalDisposition)
         (started: ProviderStartedEvidence)
         : ChatExecutionState =
-        { Key = keyOf started.Accepted
-          Evidence = started.Accepted
-          ProviderStarted = Some started
-          TerminalEvidence = Some(ChatExecutionTerminalEvidence.AfterProviderStart started)
-          Lifecycle = ChatExecutionLifecycle.Terminal disposition }
+        ChatExecutionState.EndedAfterStart(started, disposition)
 
     let private policy
         (failure: ExecutionFailure)

@@ -214,9 +214,6 @@ test('WHAT[managed-chat-execution-003] bootstrap contains no fragmented admissio
     /PromptIngress\.createHook/,
     /ModelRouting\.routeChatExecution/,
     /ModelRouting\.AcquireAndCommitRoutedExecution/,
-    /SessionExecutionBinding\.acceptRoutedExecution/,
-    /SessionExecutionBinding\.acceptExternalExecution/,
-    /SessionExecutionBinding\.acceptPromptExecution/,
     /ModelRouting\.projectRoutedModel/,
   ]) {
     assert.doesNotMatch(bootstrap, forbidden)

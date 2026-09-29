@@ -50,9 +50,9 @@ type SessionRecoveryHost
             // idle observation must never re-judge them.
             ChatExecutionProjection.current projection
             |> List.filter (fun state ->
-                state.Key.SessionId = sessionId
-                && state.Lifecycle = ChatExecutionLifecycle.Accepted
-                && state.ProviderStarted.IsNone)
+                state.key.SessionId = sessionId
+                && state.startedEvidence.IsNone
+                && state.terminalDisposition.IsNone)
         | _ ->
             eventKey event
             |> Option.map (fun key -> ChatExecutionProjection.byKey key projection |> Option.toList)
@@ -63,10 +63,10 @@ type SessionRecoveryHost
             messages
             |> List.filter (fun message ->
                 message.Role = "assistant"
-                && message.ParentId = Some(PhysicalUserMessageId.value state.Key.PhysicalUserMessageId))
+                && message.ParentId = Some(PhysicalUserMessageId.value state.key.PhysicalUserMessageId))
 
-        match matches, state.ProviderStarted with
-        | [], _ -> ProviderPhysicalObservation.ProviderAbsent state.Key
+        match matches, state.startedEvidence with
+        | [], _ -> ProviderPhysicalObservation.ProviderAbsent state.key
         | [ message ], Some started when
             message.Id = ProviderRunIdentity.value started.ProviderRun
             && not message.Completed
@@ -77,7 +77,7 @@ type SessionRecoveryHost
 
     let providerFromSnapshot (state: ChatExecutionState) =
         task {
-            match! snapshot.GetMessages state.Key.SessionId with
+            match! snapshot.GetMessages state.key.SessionId with
             | Error _ -> return ProviderPhysicalObservation.ReceiptMissing
             | Ok messages -> return classifyProviderSnapshot state messages
         }
@@ -89,7 +89,7 @@ type SessionRecoveryHost
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(started, disposition) ->
             Task.FromResult(ProviderPhysicalObservation.ProviderTerminal(started, disposition))
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted _ ->
-            Task.FromResult(ProviderPhysicalObservation.ProviderAbsent state.Key)
+            Task.FromResult(ProviderPhysicalObservation.ProviderAbsent state.key)
         | _ -> providerFromSnapshot state
 
     let lifecycleCancellation (event: ChatExecutionRecoveryLifecycleEvent) =
@@ -102,7 +102,7 @@ type SessionRecoveryHost
         ExecutionFailurePolicy.decide
             { Failure = ExecutionFailure.UserCancelled
               Lifecycle = DurableExecutionLifecycle.ProviderStarted
-              ExecutionKey = state.Key
+              ExecutionKey = state.key
               Capacity = CapacityOwnership.NoCapacityFence
               Provider =
                 { LogicalRun = started.Accepted.LogicalRunId
@@ -113,7 +113,7 @@ type SessionRecoveryHost
         |> RecoveryPolicyEvidence.FailureDecision
 
     let cancellationFailureEvidence (state: ChatExecutionState) =
-        state.ProviderStarted
+        state.startedEvidence
         |> Option.map (cancelledProviderDecision state)
         |> Option.defaultValue RecoveryPolicyEvidence.NoFailureDecision
 
@@ -124,7 +124,7 @@ type SessionRecoveryHost
 
     let currentState (state: ChatExecutionState) =
         (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
-        |> ChatExecutionProjection.byKey state.Key
+        |> ChatExecutionProjection.byKey state.key
         |> Option.defaultValue state
 
     let completedLifecycleSettlement
@@ -137,17 +137,13 @@ type SessionRecoveryHost
 
     let settleAcceptedCancellation (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
         task {
-            match lifecycleCancellation event, state.Lifecycle with
-            | true, ChatExecutionLifecycle.Accepted ->
+            match lifecycleCancellation event, state with
+            | true, ChatExecutionState.Accepted accepted ->
                 let! settled =
-                    PreProviderSettlement.settle
-                        journal
-                        state.Key
-                        state.Evidence
-                        ChatExecutionTerminalDisposition.Cancelled
+                    PreProviderSettlement.settle journal state.key accepted ChatExecutionTerminalDisposition.Cancelled
 
                 let completed = completedLifecycleSettlement state settled
-                scope.RevokeManualIntervention state.Key
+                scope.RevokeManualIntervention state.key
                 return completed
             | _ -> return state
         }
@@ -228,13 +224,7 @@ type SessionRecoveryHost
             :> Task
 
     let publishNoAuthorizedDisposition (request: PreProviderResumeRequest) =
-        let state =
-            currentState
-                { Key = request.ExecutionKey
-                  Evidence = request.AcceptedEvidence
-                  ProviderStarted = None
-                  TerminalEvidence = None
-                  Lifecycle = ChatExecutionLifecycle.Accepted }
+        let state = currentState (ChatExecutionState.Accepted request.AcceptedEvidence)
 
         scope.PublishManualChatIntervention
             { ExecutionState = state
@@ -271,12 +261,14 @@ type SessionRecoveryHost
     let sessionDrained (sessionId: SessionId) =
         (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
         |> ChatExecutionProjection.current
-        |> List.filter (fun state -> state.Key.SessionId = sessionId)
+        |> List.filter (fun state -> state.key.SessionId = sessionId)
         |> List.forall (fun state ->
-            match state.Lifecycle, ModelRouting.observePhysicalResource state.Key with
-            | ChatExecutionLifecycle.Terminal _, PhysicalResourceObservation.ResourceAbsent _
-            | ChatExecutionLifecycle.Terminal _, PhysicalResourceObservation.ResourceReleased _ -> true
-            | _ -> false)
+            state.terminalDisposition.IsSome
+            && (match ModelRouting.observePhysicalResource state.key with
+                | PhysicalResourceObservation.ResourceAbsent _
+                | PhysicalResourceObservation.ResourceReleased _ -> true
+                | PhysicalResourceObservation.ResourceHeld _
+                | PhysicalResourceObservation.ResourceUnknown _ -> false))
 
     let takeDrainWaiter (sessionId: SessionId) =
         lock drainGate (fun () ->
@@ -296,7 +288,7 @@ type SessionRecoveryHost
     let sessionsToPulse (event: ChatExecutionRecoveryLifecycleEvent) =
         match eventKey event with
         | Some key -> [ key.SessionId ]
-        | None -> statesFor event |> List.map (fun state -> state.Key.SessionId) |> List.distinct
+        | None -> statesFor event |> List.map (fun state -> state.key.SessionId) |> List.distinct
 
     let recoverState (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
         task {
@@ -306,7 +298,7 @@ type SessionRecoveryHost
             let evidence =
                 { ExecutionState = current
                   ProviderObservation = provider
-                  ResourceObservation = ModelRouting.observePhysicalResource current.Key
+                  ResourceObservation = ModelRouting.observePhysicalResource current.key
                   PersistenceCommitment = persistenceCommitment ()
                   FailureDecisionEvidence = failureEvidence event current }
 
@@ -344,8 +336,8 @@ type SessionRecoveryHost
                 (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
                 |> ChatExecutionProjection.current
                 |> List.choose (fun state ->
-                    if state.Key.SessionId = sessionId then
-                        Some state.Key
+                    if state.key.SessionId = sessionId then
+                        Some state.key
                     else
                         None)
 

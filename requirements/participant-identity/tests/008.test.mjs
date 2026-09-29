@@ -604,9 +604,42 @@ export const predictorConfiguration = () => {
 `,
   'utf8',
 )
-const binding = await import('../../../dist/OpenCode/Host/SessionBindingSurface.js')
 const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+const persona = await import('../../../dist/Participant/Persona/Surface.js')
+const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
 await routing.initialize()
+const H = (value) => `H(${value})`
+const rootProfile = (session, physical, agent) => {
+  const resolved = persona.resolveParticipantIdentityAtRoot(agent)
+  assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
+  const result = authority.createAuthorityRoot(
+    H,
+    'runtime-pid008-dispatch',
+    session,
+    'HumanRoot',
+    physical,
+    {
+      kind: 'RootSelection',
+      ownerSession: null,
+      ownerLogicalRun: null,
+      ownerAuthorityRoot: null,
+      participantIdentity: {
+        participant: resolved.identity.name,
+        role: resolved.identity.role,
+        persona: resolved.identity.persona,
+        personaCatalogVersion: resolved.identity.catalogVersion,
+        origin: resolved.identity.origin,
+      },
+    },
+  )
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.value
+}
+const inheritedSeed = (child, owner) => {
+  const result = authority.issueInheritedIdentitySeed(child, owner)
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  return result.value
+}
 const modelFor = (_participant) => ({ providerID: 'test', modelID: 'deep', variant: 'high' })
 const assertPrepared = (result, participant) => {
   assert.equal(result.ok, true, result.error)
@@ -657,87 +690,54 @@ after(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-test('WHAT[participant-identity-008] root_requires_external_participant_proof_then_model_is_scheduler_owned', async () => {
-  const root = 'ses_binding_root'
-  const model = modelFor('engineer')
+test('WHAT[participant-identity-008] root_dispatch_uses_the_external_participant_and_stays_model_free', async () => {
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
 
-  const unproven = binding.prepareUserFacing(root, 'engineer', false, model)
-  assert.equal(unproven.ok, false)
-  assert.match(unproven.error, /no observed user binding/i)
+  await withExecutablePlugin(async (_hooks, _directory, _createdIds, runtime) => {
+    const session = 'ses_pid008_root'
+    const profile = rootProfile(session, `root-${session}`, 'engineer')
+    const captured = []
+    const port = {
+      SubscribeTerminal: () => ({ Dispose: () => {} }),
+      SendPrompt: async (sessionId, text, options) => {
+        captured.push({ session: sessionId, agent: options.Agent ?? null, model: options.Model ?? null })
+        return dispatch.admittedWithReceipt('accepted-pid008')
+      },
+    }
 
-  binding.observeUserFacingAgent(root, 'engineer')
-  assertPrepared(binding.prepareUserFacing(root, 'engineer', false, model), 'engineer')
-  const first = await admitPhysicalExecution(root, 'engineer', 'engineer')
-
-  const temporary = binding.prepareUserFacing(root, 'engineer', true, modelFor('engineer'))
-  assertPrepared(temporary, 'engineer')
-  const second = await admitPhysicalExecution(`${root}-override`, 'engineer', 'engineer')
-
-  // Fresh physical retries keep the same fixed participant+Role even as the
-  // scheduler hands out a new routing target admission.
-  assert.equal(second.exact.participant, first.exact.participant)
-  assert.equal(second.exact.role, first.exact.role)
-  assert.deepEqual(second.target, first.target)
-
-  // A preserve request cannot use a foreign override as a new base.
-  assertPrepared(binding.prepareUserFacing(root, 'engineer', false, model), 'engineer')
-  await admitPhysicalExecution(`${root}-restored`, 'engineer', 'engineer')
-
-  const foreign = binding.prepareManaged(root, 'devops', true, modelFor('devops'))
-  assert.equal(foreign.ok, false)
-  assert.match(foreign.error, /must equal authority participant/i)
-
-  binding.observeUserFacingAgent(root, 'devops')
-  assertPrepared(binding.prepareUserFacing(root, 'devops', false, modelFor('devops')), 'devops')
-  await admitPhysicalExecution(`${root}-switched`, 'devops', 'devops')
-
-  binding.drop(root)
+    const sent = await dispatch.sendContinuation(
+      port,
+      runtime.journal,
+      session,
+      'root work under the external participant',
+      'ManagerGuard',
+      profile,
+      'Await',
+    )
+    assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+    assert.deepEqual(
+      captured,
+      [{ session, agent: 'engineer', model: null }],
+      'dispatch projects the authority profile participant and takes no model',
+    )
+  })
 })
-test('WHAT[participant-identity-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only', async () => {
-  const parent = 'ses_parent'
-  const child = 'ses_child'
-  const created = binding.bindChild(parent, child, 'blogger')
-  assert.equal(created.ok, true, created.error)
+test('WHAT[participant-identity-008] an_inherited_seed_carries_the_owner_participant_whatever_child_name_is_asked', () => {
+  const session = 'ses_pid008_foreign'
+  const profile = rootProfile(session, `root-${session}`, 'manager')
 
-  assertPrepared(binding.prepareManaged(child, 'blogger', false, modelFor('blogger')), 'blogger')
-  await admitPhysicalExecution(child, 'blogger', 'blogger')
-
-  const peer = binding.prepareManaged(child, 'blogger', true, modelFor('blogger'))
-  assertPrepared(peer, 'blogger')
-  await admitPhysicalExecution(`${child}-peer`, 'blogger', 'blogger')
-
-  const foreign = binding.prepareManaged(child, 'engineer', true, modelFor('engineer'))
-  assert.equal(foreign.ok, false)
-  assert.match(foreign.error, /must equal authority participant/i)
-
-  binding.drop(child)
+  for (const childName of ['devops', 'engineer', 'blogger', 'orchestrator']) {
+    const seed = inheritedSeed(childName, profile)
+    assert.equal(
+      seed.participantIdentity.name,
+      profile.identitySeed.participantIdentity.name,
+      `child '${childName}' must inherit the owner participant, never name its own`,
+    )
+    assert.equal(authority.validateInheritedIdentitySeed(profile, seed).ok, true)
+  }
 })
-test('WHAT[participant-identity-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
-  const parent = 'ses_variant_parent'
-  const child = 'ses_variant_exact'
-  assert.equal(binding.bindChild(parent, child, 'devops').ok, true)
 
-  const physicalId = 'msg-variant-exact'
-  const expected = modelFor('devops')
-  const admission = await acquireLease(child, physicalId, 'devops', 'devops')
-  const target = admission.exact.target
-  assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
-  assert.deepEqual(routing.commitSharedExecutionAdmission(admission.lease, admission.exact), { kind: 'Applied' })
-
-  binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'devops', expected)
-  assert.equal(binding.beginProviderAttempt(child, physicalId, 'prompt-variant-exact').ok, true)
-
-  const valid = binding.validateObservedProvider(child, 'devops', expected)
-  assert.equal(valid.ok, true)
-  assert.equal(valid.value, true)
-
-  const drift = binding.validateObservedProvider(child, 'devops', { ...expected, variant: 'default' })
-  assert.equal(drift.ok, false)
-  assert.match(drift.error, /model\/reasoning drift/i)
-  assert.match(drift.error, /test\/deep\[high\] -> test\/deep\[default\]/)
-
-  binding.drop(child)
-})
 }
 
 {

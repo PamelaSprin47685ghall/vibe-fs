@@ -182,14 +182,6 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'OpenCode/Host/SessionBindingSurface.js',
-    owner: 'participant-identity',
-    laws: ['PID-008'],
-    source: 'src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'Context/Companion/Blogger/TomlSurface.js',
     owner: 'provider-projection',
     laws: ['PROVIDER-PROJECTION-009'],

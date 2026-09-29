@@ -75,16 +75,20 @@ module SessionRecoveryHostSurface =
         | ChatExecutionTerminalDisposition.Failed -> "Failed"
 
     let private lifecycleView (state: ChatExecutionState) : obj =
-        match state.Lifecycle with
-        | ChatExecutionLifecycle.Accepted ->
+        match state with
+        | ChatExecutionState.Accepted _ ->
             box
                 {| phase = "Accepted"
                    disposition = null |}
-        | ChatExecutionLifecycle.ProviderStarted ->
+        | ChatExecutionState.Started _ ->
             box
                 {| phase = "ProviderStarted"
                    disposition = null |}
-        | ChatExecutionLifecycle.Terminal disposition ->
+        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+            box
+                {| phase = "Terminal"
+                   disposition = dispositionName (PreStartOutcome.disposition outcome) |}
+        | ChatExecutionState.EndedAfterStart(_, disposition) ->
             box
                 {| phase = "Terminal"
                    disposition = dispositionName disposition |}
@@ -97,8 +101,8 @@ module SessionRecoveryHostSurface =
                observation = observationName request.ProviderObservation
                lifecycle = lifecycle?phase
                disposition = lifecycle?disposition
-               sessionId = SessionId.value request.ExecutionState.Key.SessionId
-               physicalUserMessageId = PhysicalUserMessageId.value request.ExecutionState.Key.PhysicalUserMessageId |}
+               sessionId = SessionId.value request.ExecutionState.key.SessionId
+               physicalUserMessageId = PhysicalUserMessageId.value request.ExecutionState.key.PhysicalUserMessageId |}
 
     let private manualsOf (scope: PluginRecoveryScope) : obj =
         scope.ManualChatInterventions() |> Array.map manualView |> box

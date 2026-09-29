@@ -15,9 +15,9 @@ module ChatExecutionFactFold =
     let private unsupportedSchema schemaVersion : Result<'value, FoldRejection> =
         FoldRejection.reject "ChatExecution" (sprintf "UnsupportedSchema: expected 1, received %d" schemaVersion)
 
-    let private replace execution projection =
+    let private replace (execution: ChatExecutionState) projection =
         { projection with
-            ByKey = Map.add execution.Key execution projection.ByKey }
+            ByKey = Map.add execution.key execution projection.ByKey }
 
     let private validateAcceptedKey (key: ChatExecutionKey) (evidence: AcceptedChatExecutionEvidence) =
         if evidence.SessionId <> key.SessionId then
@@ -29,17 +29,8 @@ module ChatExecutionFactFold =
 
     let private admitAccepted key evidence projection =
         match ChatExecutionProjection.byKey key projection with
-        | None ->
-            Ok(
-                replace
-                    { Key = key
-                      Evidence = evidence
-                      ProviderStarted = None
-                      TerminalEvidence = None
-                      Lifecycle = ChatExecutionLifecycle.Accepted }
-                    projection
-            )
-        | Some current when current.Evidence = evidence -> Ok projection
+        | None -> Ok(replace (ChatExecutionState.Accepted evidence) projection)
+        | Some current when current.acceptedEvidence = evidence -> Ok projection
         | Some _ -> invalidFact "Accepted conflicts with the execution's established evidence"
 
     let private executionOrInvalid reason key projection =
@@ -53,54 +44,50 @@ module ChatExecutionFactFold =
         | None -> projection
 
     let private advanceProviderStarted current evidence =
-        match current.Lifecycle with
-        | ChatExecutionLifecycle.Terminal _ -> invalidFact "ProviderStarted cannot follow a Terminal fact"
-        | ChatExecutionLifecycle.Accepted when current.Evidence = evidence.Accepted ->
-            Ok(
-                Some
-                    { current with
-                        ProviderStarted = Some evidence
-                        Lifecycle = ChatExecutionLifecycle.ProviderStarted }
-            )
-        | ChatExecutionLifecycle.ProviderStarted when current.ProviderStarted = Some evidence -> Ok None
-        | ChatExecutionLifecycle.Accepted
-        | ChatExecutionLifecycle.ProviderStarted ->
+        match current with
+        | ChatExecutionState.EndedBeforeStart _
+        | ChatExecutionState.EndedAfterStart _ -> invalidFact "ProviderStarted cannot follow a Terminal fact"
+        | ChatExecutionState.Accepted accepted when accepted = evidence.Accepted ->
+            Ok(Some(ChatExecutionState.Started evidence))
+        | ChatExecutionState.Started established when established = evidence -> Ok None
+        | ChatExecutionState.Accepted _
+        | ChatExecutionState.Started _ ->
             invalidFact "ProviderStarted evidence does not match Accepted evidence or established provider run"
 
     let private settleTerminal current evidence disposition =
-        match current.Lifecycle, evidence with
-        | ChatExecutionLifecycle.Accepted, ChatExecutionTerminalEvidence.PreProvider accepted when
-            current.Evidence = accepted
-            && disposition <> ChatExecutionTerminalDisposition.Completed
+        match current, evidence with
+        | ChatExecutionState.Accepted accepted, ChatExecutionTerminalEvidence.PreProvider acceptedEvidence when
+            accepted = acceptedEvidence
+            && PreStartOutcome.ofDisposition disposition |> Option.isSome
             ->
-            Ok(
-                Some
-                    { current with
-                        TerminalEvidence = Some evidence
-                        Lifecycle = ChatExecutionLifecycle.Terminal disposition }
-            )
-        | ChatExecutionLifecycle.Accepted, ChatExecutionTerminalEvidence.PreProvider _ ->
+            let outcome = PreStartOutcome.ofDisposition disposition |> Option.get
+
+            Ok(Some(ChatExecutionState.EndedBeforeStart(accepted, outcome)))
+        | ChatExecutionState.Accepted _, ChatExecutionTerminalEvidence.PreProvider _ ->
             invalidFact "Pre-provider Terminal evidence mismatches Accepted or attempts Completed"
-        | ChatExecutionLifecycle.Accepted, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
+        | ChatExecutionState.Accepted _, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
             invalidFact "After-provider Terminal has no preceding ProviderStarted fact"
-        | ChatExecutionLifecycle.ProviderStarted, ChatExecutionTerminalEvidence.AfterProviderStart started when
-            current.ProviderStarted = Some started
+        | ChatExecutionState.Started established, ChatExecutionTerminalEvidence.AfterProviderStart started when
+            established = started
             ->
-            Ok(
-                Some
-                    { current with
-                        TerminalEvidence = Some evidence
-                        Lifecycle = ChatExecutionLifecycle.Terminal disposition }
-            )
-        | ChatExecutionLifecycle.ProviderStarted, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
+            Ok(Some(ChatExecutionState.EndedAfterStart(established, disposition)))
+        | ChatExecutionState.Started _, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
             invalidFact "Terminal evidence does not match ProviderStarted evidence"
-        | ChatExecutionLifecycle.ProviderStarted, ChatExecutionTerminalEvidence.PreProvider _ ->
+        | ChatExecutionState.Started _, ChatExecutionTerminalEvidence.PreProvider _ ->
             invalidFact "Pre-provider Terminal cannot follow ProviderStarted"
-        | ChatExecutionLifecycle.Terminal established, _ when
-            established = disposition && current.TerminalEvidence = Some evidence
+        | ChatExecutionState.EndedBeforeStart(establishedAccepted, establishedOutcome),
+          ChatExecutionTerminalEvidence.PreProvider acceptedEvidence when
+            establishedAccepted = acceptedEvidence
+            && PreStartOutcome.disposition establishedOutcome = disposition
             ->
             Ok None
-        | ChatExecutionLifecycle.Terminal _, _ ->
+        | ChatExecutionState.EndedAfterStart(establishedStarted, establishedDisposition),
+          ChatExecutionTerminalEvidence.AfterProviderStart started when
+            establishedStarted = started && establishedDisposition = disposition
+            ->
+            Ok None
+        | ChatExecutionState.EndedBeforeStart _, _
+        | ChatExecutionState.EndedAfterStart _, _ ->
             invalidFact "Terminal conflicts with the execution's established evidence or disposition"
 
     let private validateTerminalEvidence =

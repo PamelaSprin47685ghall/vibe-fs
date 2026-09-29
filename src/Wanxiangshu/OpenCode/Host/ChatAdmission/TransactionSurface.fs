@@ -73,40 +73,18 @@ module TransactionSurface =
         (stateLabel: string)
         (evidence: AcceptedChatExecutionEvidence)
         : ChatExecutionState option =
-        let lifecycle =
-            match stateLabel with
-            | "None" -> None
-            | "Accepted" -> Some ChatExecutionLifecycle.Accepted
-            | "ProviderStarted" -> Some ChatExecutionLifecycle.ProviderStarted
-            | "Terminal" -> Some(ChatExecutionLifecycle.Terminal ChatExecutionTerminalDisposition.Completed)
-            | value -> invalidArg "state" $"unknown transaction state '{value}'"
+        let started =
+            { Accepted = evidence
+              ProviderRun = ProviderRunIdentity.create "provider-transaction"
+              RequestKind = ProviderRequestKind.WorkMain
+              ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
 
-        lifecycle
-        |> Option.map (fun current ->
-            let providerStarted =
-                match current with
-                | ChatExecutionLifecycle.ProviderStarted
-                | ChatExecutionLifecycle.Terminal _ ->
-                    Some
-                        { Accepted = evidence
-                          ProviderRun = ProviderRunIdentity.create "provider-transaction"
-                          RequestKind = ProviderRequestKind.WorkMain
-                          ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
-                | ChatExecutionLifecycle.Accepted -> None
-
-            let terminalEvidence =
-                match current, providerStarted with
-                | ChatExecutionLifecycle.Terminal _, Some started ->
-                    Some(ChatExecutionTerminalEvidence.AfterProviderStart started)
-                | _ -> None
-
-            { Key =
-                { SessionId = evidence.SessionId
-                  PhysicalUserMessageId = evidence.PhysicalUserMessageId }
-              Evidence = evidence
-              ProviderStarted = providerStarted
-              TerminalEvidence = terminalEvidence
-              Lifecycle = current })
+        match stateLabel with
+        | "None" -> None
+        | "Accepted" -> Some(ChatExecutionState.Accepted evidence)
+        | "ProviderStarted" -> Some(ChatExecutionState.Started started)
+        | "Terminal" -> Some(ChatExecutionState.EndedAfterStart(started, ChatExecutionTerminalDisposition.Completed))
+        | value -> invalidArg "state" $"unknown transaction state '{value}'"
 
     let private stepLabel =
         function
@@ -238,13 +216,7 @@ module TransactionSurface =
                                         )
                                     )
                             | _ ->
-                                state <-
-                                    Some
-                                        { Key = key
-                                          Evidence = acceptedEvidence
-                                          ProviderStarted = None
-                                          TerminalEvidence = None
-                                          Lifecycle = ChatExecutionLifecycle.Accepted }
+                                state <- Some(ChatExecutionState.Accepted acceptedEvidence)
 
                                 return Ok()
                         } }
@@ -440,14 +412,7 @@ module TransactionSurface =
                        releaseCount = releaseCount
                        providerCount = 0
                        crashed = crashed
-                       durableLifecycle =
-                        state
-                        |> Option.map (fun current ->
-                            match current.Lifecycle with
-                            | ChatExecutionLifecycle.Accepted -> "Accepted"
-                            | ChatExecutionLifecycle.ProviderStarted -> "ProviderStarted"
-                            | ChatExecutionLifecycle.Terminal _ -> "Terminal")
-                        |> Option.defaultValue "None"
+                       durableLifecycle = state |> Option.map _.lifecycleName |> Option.defaultValue "None"
                        admission =
                         {| activeCapacity = activeCapacity
 
@@ -623,13 +588,7 @@ module TransactionSurface =
             let state = ChatExecutionProjection.byKey key projection
 
             let disposition =
-                state
-                |> Option.bind (fun execution ->
-                    match execution.Lifecycle with
-                    | ChatExecutionLifecycle.Terminal value -> Some value
-                    | _ -> None)
-                |> Option.map string
-                |> Option.toObj
+                state |> Option.bind _.terminalDisposition |> Option.map string |> Option.toObj
 
             let classification =
                 match transactionResult with
@@ -647,10 +606,7 @@ module TransactionSurface =
                         {| sessionId = SessionId.value key.SessionId
                            physicalUserMessageId = PhysicalUserMessageId.value key.PhysicalUserMessageId |}
                        facts = serializedFacts
-                       admission =
-                        {| activeCapacity = activeCapacity
-                           providerBinding =
-                            SessionExecutionBinding.exactExecutionBindingCount key.SessionId key.PhysicalUserMessageId |}
+                       admission = {| activeCapacity = activeCapacity |}
                        acceptedFactCount =
                         facts
                         |> Seq.filter (function

@@ -174,11 +174,11 @@ module ProviderRecoveryWorkflow =
             { SessionId = sessionId
               PhysicalUserMessageId = physicalUserMessageId }
         |> Option.bind (fun execution ->
-            match execution.ProviderStarted with
+            match execution.startedEvidence with
             | Some started -> Some started.RequestKind
             | None when SessionAssociationProjection.isSatellite sessionId projection.AgentProjections.Associations ->
                 None
-            | None -> Some(AttemptPlanner.ordinaryRequestKind execution.Evidence.Origin))
+            | None -> Some(AttemptPlanner.ordinaryRequestKind execution.origin))
 
     let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
         let session =
@@ -525,7 +525,7 @@ module ProviderRecoveryWorkflow =
             |> ChatExecutionProjection.byKey
                 { SessionId = sessionId
                   PhysicalUserMessageId = physicalUserMessageId }
-            |> Option.bind (fun execution -> execution.ProviderStarted)
+            |> Option.bind _.startedEvidence
             |> Option.map (fun started -> started.ProviderRun)
 
         kind = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt

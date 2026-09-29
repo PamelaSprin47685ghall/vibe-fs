@@ -55,7 +55,7 @@ module ProviderLifecycle =
         : Result<ProviderRequestKind option, ProviderStartObservationError<'bindingError>> =
         match
             SessionAssociationProjection.tryMainSessionOf
-                execution.Evidence.SessionId
+                execution.acceptedEvidence.SessionId
                 projection.AgentProjections.Associations
         with
         | None -> Ok None
@@ -64,9 +64,9 @@ module ProviderLifecycle =
                 let openRequest =
                     AgentProjection.tryFind mainSessionId projection.AgentProjections
                     |> Option.bind (fun session -> session.BloggerCycles)
-                    |> Option.bind (BloggerCycleProjection.tryOpenByBlogger execution.Evidence.SessionId)
+                    |> Option.bind (BloggerCycleProjection.tryOpenByBlogger execution.acceptedEvidence.SessionId)
 
-                match openRequest, execution.ProviderStarted |> Option.map (fun started -> started.RequestKind) with
+                match openRequest, execution.startedEvidence |> Option.map (fun started -> started.RequestKind) with
                 | Some request, _ ->
                     return!
                         OpenBloggerRequest.providerRequestKind request
@@ -74,14 +74,10 @@ module ProviderLifecycle =
                         |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
                 | None, Some(ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash as established) ->
                     return Some established
-                | None, None when
-                    (match execution.Lifecycle with
-                     | ChatExecutionLifecycle.Terminal _ -> true
-                     | _ -> false)
-                    ->
-                    return None
+                | None, None when execution.terminalDisposition.IsSome -> return None
                 | None, _ ->
-                    return! Error(ProviderStartObservationError.BloggerRequestMissing execution.Evidence.SessionId)
+                    return!
+                        Error(ProviderStartObservationError.BloggerRequestMissing execution.acceptedEvidence.SessionId)
             }
 
     let private freezeOrdinaryPlan<'bindingError>
@@ -96,7 +92,7 @@ module ProviderLifecycle =
                 |> ChatExecutionProjection.byKey key
                 |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
 
-            let accepted = execution.Evidence
+            let accepted = execution.acceptedEvidence
             let! bloggerKind = bloggerRequestKind projection execution
 
             let requestKind =
@@ -141,10 +137,6 @@ module ProviderLifecycle =
         task {
             match projectionSessionIdOpt, journal with
             | None, _ -> return Ok()
-            | Some sessionText, _ when
-                not (SessionExecutionBinding.requiresProviderBindingProof (SessionId.create sessionText))
-                ->
-                return Ok()
             | Some _, None -> return Error ProviderStartObservationError.DurableJournalUnavailable
             | Some sessionText, Some durable ->
                 let sessionId = SessionId.create sessionText
@@ -171,15 +163,15 @@ module ProviderLifecycle =
             |> fun projection -> projection.AgentProjections.ChatExecutions
             |> ChatExecutionProjection.byKey key
 
-        match execution |> Option.map _.Lifecycle, execution |> Option.bind _.ProviderStarted with
-        | Some(ChatExecutionLifecycle.Terminal _), _ ->
+        match execution with
+        | Some state when state.terminalDisposition.IsSome ->
             Task.FromResult(Error(ProviderStartObservationError.AcceptedExecutionAlreadyTerminal key))
-        | _, Some _ -> Task.FromResult(Ok false)
-        | _, None ->
+        | Some state when state.startedEvidence.IsSome -> Task.FromResult(Ok false)
+        | _ ->
             taskResult {
                 let! acceptedEvidence =
                     execution
-                    |> Option.map _.Evidence
+                    |> Option.map _.acceptedEvidence
                     |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
 
                 let! plan =

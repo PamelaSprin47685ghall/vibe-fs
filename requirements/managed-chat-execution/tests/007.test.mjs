@@ -220,10 +220,7 @@ test('WHAT[managed-chat-execution-007] each typed pre-provider failure settles t
     })
     assert.equal(result.acceptedFactCount, 1)
     assert.equal(result.providerEffectCount, 0)
-    assert.deepEqual(result.admission, {
-      activeCapacity: 0,
-      providerBinding: 0,
-    })
+    assert.deepEqual(result.admission, { activeCapacity: 0 })
     assert.equal(result.failure.kind, failure)
     assert.ok(['Recoverable', 'Permanent'].includes(result.failure.classification))
   }
@@ -245,7 +242,7 @@ test('WHAT[managed-chat-execution-007] rejects hostile legacy AGENT-028 membrane
   assert.equal(projected.ok, true)
   assert.equal(projected.status.disposition, 'Rejected')
   assert.equal(result.admission.activeCapacity, 0)
-  assert.equal(result.admission.providerBinding, 0)
+  assert.equal(result.admission.activeCapacity, 0)
   assert.equal(result.providerEffectCount, 0)
 })
 test('WHAT[managed-chat-execution-007] detects missing exact pre-provider release', async () => {

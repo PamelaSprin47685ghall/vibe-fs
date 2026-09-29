@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+## Unreleased — PROMPT-006 执行绑定去层化收尾（P1–P6）
+
+- **删除 Host 侧平行执行身份/模型权威（PROMPT-006 全类根因）**：`SessionExecutionBinding` 的进程本地身份表（`agents`/`parents`/`internalRoots`/`hostAuxiliaryChildren`/`acceptedPromptBindings`/`providerAttemptBindings`/`persistentDevOpsModels`）与 JS 测试面 `SessionBindingSurface` 全部删除。模块只保留两件事：durable `Accepted` 证据查询（`isManagedExecution`）与 transform 的 provider-step 门（`beginPhysicalProviderAttemptForTransform`）。原 24 处 `PROMPT-006` 报错（"no accepted execution binding"/"no frozen agent binding"/agent drift from cache 等）随平行表一起消失；`chat.params` 只剩 4 处基于 exact 证据的 fail-closed（agent/model 漂移、缺 lease、缺观察）。
+- **工具边界改为 exact run→physical**：`ModelRouting` 新增 `providerStepIdentityByRun`，只在权威 Host start observation（assistant `message.updated` 的 `parentID`）与 `EndProviderStep` 写入，`ReleaseExecution`/`ReleasePhysicalExecution` 随执行退休清除；`ToolRegistry.providerToolBoundary` 用 `tryProviderStepIdentity` 解析本 run 的 physical，不再读 session-current 绑定副本。
+- **chat.params 三态判定**：durable `Accepted` + committed lease → 校验漂移并投影 temperature；durable `Accepted` 无 lease → fail closed；无 durable `Accepted` → 完全交给 Host（Host compaction/title/auxiliary 不再误报）。
+- **发送端 model-free + 死参数删除**：`SessionBindingIntent` 从 `OpenCodePromptOptions` 与全部调用方删除；`prepareManagedPrompt`/`prepareUserFacingPrompt`/`participantAgent` 链删除。
+- **父边 durable 化**：`HostSignalBootstrap.durableParentOf` 直接读 `HandleByChildSession` + `SessionAssociationProjection`，不再有可被重启清掉的父边缓存。
+- **`ChatExecutionState` 改为互斥 union**（`Accepted | Started | EndedBeforeStart | EndedAfterStart`）："ProviderStarted 无 started evidence"、"Terminal 无 terminal evidence"、"pre-start Completed" 不可表示；durable wire 格式不变。
+- 测试迁移：`bindManagedChild` 改为追加真实 durable `Execution.HandleLinked`；crash-021/host-006/host-033/ia-011/pid-008/office-007/ipp-013/behavior-diagnosis-006/emr-010 全部迁到 durable 证据出口；`providerBinding` 观察字段（第二表计数）删除，改为 `exactLeaseCommitted`。
+
 ## Unreleased — Manager 循环 clean cutover
 
 - **修复 Blogger 同伴每个新请求的首个 provider step 自杀，覆盖材料永久断流、主会话前缀替换不再前移（context-compression-024 / dispatch-protocol-006 / capability-enforcement-021）**：实机 2026-09-28 00:58:03 与 07:27:19，主会话派发 Blogger 请求后，同伴 run 在调 provider 之前就被插件自己 cancel（journal：`ChatExecution Terminal Cancelled/PreProvider` 早于宿主 `cancel` 15 ms），flight 一直被占，后续材料全走 `SkippedInFlight`，不再有 `BlogObservationCommitted`，K 窗口 cutoff 不前移，主会话 raw 历史涨到 1 MiB 上限报 400。三层根因叠加：

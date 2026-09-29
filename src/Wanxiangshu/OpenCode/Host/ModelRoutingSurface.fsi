@@ -73,6 +73,11 @@ module ModelRoutingSurface =
 
     val tryReadExecution: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> obj
 
+    val rememberProviderStepIdentity:
+        runtime: obj -> sessionId: string -> physicalUserMessageId: string -> providerRun: string -> unit
+
+    val tryProviderStepIdentity: runtime: obj -> providerRun: string -> obj
+
     val bindDevopsTarget: runtime: obj -> sessionId: string -> target: obj -> unit
     val boundDevopsTarget: runtime: obj -> sessionId: string -> obj
     val seedDevOpsModelTarget: runtime: obj -> sessionId: string -> target: string -> unit

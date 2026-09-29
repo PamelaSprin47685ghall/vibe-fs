@@ -371,7 +371,7 @@ export const runFlightInterleaving = async (schedule, { dir, opened, durable }) 
 
     const admission = routing.admissionSnapshot(capacityRuntime, K, PHYS)
     assert.equal(admission.activeCapacity, routing.snapshotOccupied(capacityRuntime).length)
-    assert.equal(admission.providerBinding, 0)
+    assert.equal(admission.exactLeaseCommitted, false)
 
     const committed = executionEvidence(K, PHYS)
     const committedLifecycle = [

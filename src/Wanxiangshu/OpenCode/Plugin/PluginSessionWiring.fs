@@ -72,9 +72,7 @@ module PluginSessionWiring =
             |> Map.iter (fun sessionId sessionProj ->
                 sessionProj.PromptAuthority
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                |> Option.iter (fun profile ->
-                    let agent = profile.SelectedAgent
-                    SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                |> Option.iter (fun _ ->
                     scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
                     ProviderLanguageBinding.ensureRoot sessionId |> ignore))
 

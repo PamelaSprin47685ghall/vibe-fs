@@ -62,7 +62,6 @@ test('WHAT[interaction-authority-011] PROMPT_011_logical_run_id_is_stable_and_in
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const binding = await import("../../../dist/OpenCode/Host/SessionBindingSurface.js");
 const chatParams = await import("../../../dist/OpenCode/Host/ChatParamsSurface.js");
 const { default: plugin } = await import("../../../dist/OpenCode/Plugin/Plugin.js");
 const { execFileSync } = await import("node:child_process");
@@ -135,23 +134,37 @@ const admitExecution = async (hooks, sessionID, messageID) => {
 }
 
 
-test('WHAT[interaction-authority-011] CHAT_PARAMS_managed_provider_run_without_committed_lease_fails_closed', () => {
-  const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
-  const rejected = chatParams.apply(
-    {
-      sessionID: 'ses_chat_params_child',
-      messageID: 'msg-chat-params-unleased',
-      agent: 'engineer',
-      model: { providerID: 'anthropic', id: 'fast-haiku' },
-    },
-    output,
-  )
-  assert.equal(rejected.ok, false)
-  assert.match(rejected.error, /no committed execution lease for physical user message 'msg-chat-params-unleased'/)
-  assert.equal(output.model.modelID, 'fast-haiku')
+test('WHAT[interaction-authority-011] CHAT_PARAMS_managed_provider_run_without_committed_lease_fails_closed', async () => {
+  const { withExecutablePlugin, bindManagedChild } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses_chat_params_child'
+    const messageID = 'msg-chat-params-unleased'
+    await bindManagedChild(runtime, 'ses_chat_params_parent', sessionID, 'engineer')
+
+    // Durable acceptance alone: the Dispatcher writes Accepted evidence with no
+    // model capacity, so no committed lease exists for this exact key.
+    const accepted = await dispatch.acceptManagedExternal(runtime.journal, sessionID, messageID, 'engineer')
+    assert.equal(accepted.ok, true, JSON.stringify(accepted))
+
+    const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
+    const rejected = chatParams.applyWith(
+      runtime.journal,
+      {
+        sessionID,
+        messageID,
+        agent: 'engineer',
+        model: { providerID: 'anthropic', id: 'fast-haiku' },
+      },
+      output,
+    )
+    assert.equal(rejected.ok, false)
+    assert.match(rejected.error, /no committed execution lease for physical user message 'msg-chat-params-unleased'/)
+    assert.equal(output.model.modelID, 'fast-haiku')
+  })
 })
-test('WHAT[interaction-authority-011] CHAT_PARAMS_unbound_Host_auxiliary_child_does_not_claim_managed_execution', () => {
-  binding.observeHostAuxiliaryChild('ses_chat_params_title')
+test('WHAT[interaction-authority-011] CHAT_PARAMS_an_unaccepted_message_does_not_claim_managed_execution', () => {
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const observed = chatParams.apply(
     { sessionID: 'ses_chat_params_title', agent: 'coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
@@ -190,7 +203,6 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_admitted_lease_validates_witho
     assert.equal(observed.temperature, 1)
     assert.equal(output.model.modelID, leaseModel.modelID)
   } finally {
-    binding.drop('ses_chat_params_admitted')
     if (hooks) await hooks.dispose()
     process.env.HOME = previousHome
     environment.dispose()
@@ -224,7 +236,6 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_uses_the_resolved_provider_mod
     assert.equal(observed.ok, false)
     assert.match(observed.error, /model\/reasoning drift/i)
   } finally {
-    binding.drop('ses_chat_params_resolved')
     if (hooks) await hooks.dispose()
     process.env.HOME = previousHome
     environment.dispose()
@@ -271,7 +282,6 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_accepts_the_real_provider_mode
     assert.equal(inputModel.variants.high.temperature, 1)
     assert.equal(inputModel.options.temperature, 1)
   } finally {
-    binding.drop('ses_chat_params_real_shape')
     if (hooks) await hooks.dispose()
     process.env.HOME = previousHome
     environment.dispose()
@@ -313,7 +323,6 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_leaves_temperature_untouched_w
     assert.equal(output.options.temperature, undefined)
     assert.equal(inputModel.variants.none.temperature, undefined)
   } finally {
-    binding.drop('ses_chat_params_temperature_off')
     if (hooks) await hooks.dispose()
     process.env.HOME = previousHome
     environment.dispose()

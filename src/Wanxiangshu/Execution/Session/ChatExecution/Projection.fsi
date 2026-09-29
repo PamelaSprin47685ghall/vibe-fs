@@ -1,17 +1,31 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
-[<RequireQualifiedAccess>]
-type ChatExecutionLifecycle =
-    | Accepted
-    | ProviderStarted
-    | Terminal of ChatExecutionTerminalDisposition
+open Wanxiangshu.Interaction.Authority
 
+[<RequireQualifiedAccess>]
+type PreStartOutcome =
+    | Cancelled
+    | Rejected
+    | Failed
+
+[<RequireQualifiedAccess>]
+module PreStartOutcome =
+    val disposition: outcome: PreStartOutcome -> ChatExecutionTerminalDisposition
+    val ofDisposition: disposition: ChatExecutionTerminalDisposition -> PreStartOutcome option
+
+[<RequireQualifiedAccess>]
 type ChatExecutionState =
-    { Key: ChatExecutionKey
-      Evidence: AcceptedChatExecutionEvidence
-      ProviderStarted: ProviderStartedEvidence option
-      TerminalEvidence: ChatExecutionTerminalEvidence option
-      Lifecycle: ChatExecutionLifecycle }
+    | Accepted of AcceptedChatExecutionEvidence
+    | Started of ProviderStartedEvidence
+    | EndedBeforeStart of AcceptedChatExecutionEvidence * PreStartOutcome
+    | EndedAfterStart of ProviderStartedEvidence * ChatExecutionTerminalDisposition
+
+    member key: ChatExecutionKey
+    member acceptedEvidence: AcceptedChatExecutionEvidence
+    member startedEvidence: ProviderStartedEvidence option
+    member terminalDisposition: ChatExecutionTerminalDisposition option
+    member lifecycleName: string
+    member origin: PromptOrigin
 
 type ChatExecutionProjectionState =
     { ByKey: Map<ChatExecutionKey, ChatExecutionState> }

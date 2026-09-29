@@ -5,11 +5,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 
-[<RequireQualifiedAccess>]
-type SessionBindingIntent =
-    | Preserve
-    | ExplicitExecutionOverride
-
 /// What a detached prompt_async's eventual transport verdict means for the
 /// dispatch owner. OwnedSettled: the caller-visible path (sendTask or a
 /// synchronous throw) already produced an outcome — the observer must not
@@ -36,7 +31,6 @@ type OpenCodePromptOptions =
         Directory: string option
         Metadata: obj option
         Tools: Map<string, bool> option
-        BindingIntent: SessionBindingIntent
         /// Out-of-band listener for the eventual detached enqueue result. None
         /// when the caller's returned sendTask settles the send itself.
         DetachedListener: DetachedSendListener option
