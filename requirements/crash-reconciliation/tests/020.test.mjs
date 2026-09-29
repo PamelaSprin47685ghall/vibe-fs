@@ -15,11 +15,12 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
 
 // WHAT[crash-reconciliation-020]: the interrupted child run must be reset before
 // the road can hand work to that child again. Restarting the work stays the
-// manager's explicit decision (017/018/020 forbid automatic replay), but the
-// durable bookkeeping has to let the reset happen: the child's logical run is
-// closed (next handoff roots a fresh AgentOwnerRoot, the transcript stays) and
-// the parent's handle is settled as a Cancelled completion (join gets an
-// explicit outcome instead of waiting on a run that will never finish).
+// manager's explicit decision (017/018/020 forbid automatic replay). That reset
+// belongs to the Load Phase alone (`ChildWorkRecovery`, covered below): no
+// in-process terminal may close a child's logical run, because a live owner can
+// still owe that exact run a continuation — the degeneration guard closes its
+// own interrupt and immediately sends the rewrite on the same run
+// (managed-session-lifecycle-018, degeneration-guard-009).
 {
   const { default: assert } = await import('node:assert/strict')
   const { default: test } = await import('node:test')
@@ -30,8 +31,15 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
   const Origin = await import(`${root}/Interaction/Authority/Origin.js`)
   const Identity = await import(`${root}/Participant/Persona/Identity.js`)
   const Seed = await import(`${root}/Interaction/Authority/IdentitySeed.js`)
-  const Bridge = await import(`${root}/Composition/Durable/DelegationProjectionBridge.js`)
-  const ChatExecution = await import(`${root}/Execution/Session/ChatExecution/Facts.js`)
+  const journalSurface = await import(`${root}/Persistence/Journal/Surface.js`)
+  const FoundationIdentity = await import(`${root}/Foundation/Identity.js`)
+  const chatExecution = await import(`${root}/Composition/Durable/ChatExecutionJournal.js`)
+  const chatExecutionFacts = await import(`${root}/Execution/Session/ChatExecution/Facts.js`)
+  const ProviderRequestKind = await import(`${root}/Participant/Provider/Attempt/RequestKind.js`)
+  const ProjectionChoice = await import(`${root}/Context/Prefix/Candidate.js`)
+  const fs = await import('node:fs')
+  const os = await import('node:os')
+  const nodePath = await import('node:path')
   const DelegationFacts = await import(`${root}/Execution/Delegation/Facts.js`)
   const Roles = await import(`${root}/Foundation/Roles.js`)
   const Fact = await import(`${root}/Composition/Durable/Fact.js`)
@@ -49,26 +57,41 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
       Origin: new Identity.PersonaOrigin(1, []),
     }).fields[0]
 
-  const interruptedChild = () => {
-    const owner = participantIdentity('manager', Roles.Role.Manager, 'Operator')
-    const seed = Seed.PromptIdentitySeedModule_inheritFromOwner(
+  // Compiler representation (Result tag / DU fields) is not product semantics, so
+  // it is read through one local accessor pair instead of poked at each call site.
+  const foldedOk = (result) => result.tag === 0
+  const foldedValue = (result) => result.fields[0]
+
+  // The exact durable state a live host leaves behind for a child work run:
+  // rooted AgentOwnerRoot authority plus the parent's durable handle. Identities
+  // are the production typed ones, because the projection's maps are keyed by
+  // them — a string key would silently miss the very entries under test.
+  const sessionId = () => FoundationIdentity.SessionIdModule_create(childSessionId)
+  const parentId = () => FoundationIdentity.SessionIdModule_create(parentSessionId)
+  const logicalRunId = () => FoundationIdentity.LogicalRunIdModule_create('lr-devops')
+  const authorityRootId = () => FoundationIdentity.AuthorityRootUserMessageIdModule_create('msg-devops-root')
+  const physicalUserMessageId = () => FoundationIdentity.PhysicalUserMessageIdModule_create('msg-devops-run-1')
+
+  const childIdentitySeed = () =>
+    Seed.PromptIdentitySeedModule_inheritFromOwner(
       'devops',
-      parentSessionId,
-      'lr-owner',
-      'msg-owner-root',
-      owner,
+      FoundationIdentity.SessionIdModule_create(parentSessionId),
+      FoundationIdentity.LogicalRunIdModule_create('lr-owner'),
+      FoundationIdentity.AuthorityRootUserMessageIdModule_create('msg-owner-root'),
+      participantIdentity('manager', Roles.Role.Manager, 'Operator'),
     ).fields[0]
 
+  const interruptedChild = () => {
     const profile = Model.createAuthorityExecutionProfileFromSeed(
-      childSessionId,
-      'lr-devops',
-      'msg-devops-root',
+      sessionId(),
+      logicalRunId(),
+      authorityRootId(),
       Origin.PromptRootAuthorityKind.AgentOwnerRoot,
-      seed,
+      childIdentitySeed(),
     ).fields[0]
 
     const withChild = Projection.AgentProjection_update(
-      childSessionId,
+      sessionId(),
       (session) => {
         session.PromptAuthority = { ActiveLogicalRun: profile }
         return session
@@ -84,8 +107,8 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
         new Fact.AgentFact(3, [
           new DelegationFacts.ExecutionFactCases(0, [
             {
-              ParentSessionId: parentSessionId,
-              ChildSessionId: childSessionId,
+              ParentSessionId: parentId(),
+              ChildSessionId: sessionId(),
               Handle: handleId,
               TargetAgent: 'devops',
               Byname: 'devops',
@@ -96,61 +119,118 @@ test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logi
         ]),
       ]),
     )
+    assert.ok(foldedOk(linked), 'the child root and handle link must fold')
 
-    assert.equal(linked.tag, 0, 'the handle link must fold')
-    return linked.fields[0].AgentProjections
+    return foldedValue(linked).AgentProjections
   }
 
-  const terminalFact = (disposition) =>
-    new ChatExecution.ChatExecutionFactCases(2, [
-      {
-        SchemaVersion: 1,
-        Key: { SessionId: childSessionId, PhysicalUserMessageId: 'msg-devops-1' },
-        Evidence: new ChatExecution.ChatExecutionTerminalEvidence(1, [null]),
-        Disposition: disposition,
-      },
-    ])
+  const childState = (projection) => {
+    const found = projection.Sessions.get(sessionId())
+    assert.ok(found, 'the child session must be present in the projection')
+    return found
+  }
 
-  test('WHAT[crash-reconciliation-020] CRASH_020_interrupted_child_run_is_reset_for_the_next_handoff', () => {
-    const before = interruptedChild()
-    assert.ok(before.Sessions.get(childSessionId).PromptAuthority.ActiveLogicalRun, 'precondition: the child holds a run')
+  const parentHandle = (projection) => {
+    const parent = projection.Sessions.get(parentId())
+    assert.ok(parent, 'the parent session must be present in the projection')
+    const handle = parent.Handles.Handles.get(handleId)
+    assert.ok(handle, 'the parent must hold the devops handle')
+    return handle
+  }
 
-    const settled = Bridge.settleUncompletedChildRun(
-      before,
-      terminalFact(ChatExecution.ChatExecutionTerminalDisposition.Cancelled),
+  // The exact durable lifecycle an in-process interrupt produces:
+  // Accepted -> ProviderStarted -> Terminal(non-Completed). Driven through the
+  // production fold with production classes, so the projection the fold yields
+  // is the one every downstream owner (the guard's own continuation included)
+  // reads afterwards.
+  const acceptedEvidence = () =>
+    new chatExecutionFacts.AcceptedChatExecutionEvidence(
+      sessionId(),
+      logicalRunId(),
+      authorityRootId(),
+      Origin.PromptRootAuthorityKind.AgentOwnerRoot,
+      childIdentitySeed(),
+      physicalUserMessageId(),
+      new Origin.PromptOrigin(0, [Origin.PromptRootAuthorityKind.AgentOwnerRoot]),
     )
 
-    const child = settled.Sessions.get(childSessionId)
-    assert.equal(
-      child.PromptAuthority.ActiveLogicalRun ?? null,
-      null,
-      'the interrupted child run must close so the next handoff roots a fresh AgentOwnerRoot',
-    )
-    assert.equal(child.PromptAuthority.PendingClaims.size, 0, 'run-scoped continuation resources are discarded')
-    assert.ok(
-      settled.Sessions.get(childSessionId).Handles === settled.Sessions.get(childSessionId).Handles,
-      'the child transcript itself stays untouched',
+  const providerStartedEvidence = () =>
+    new chatExecutionFacts.ProviderStartedEvidence(
+      acceptedEvidence(),
+      FoundationIdentity.ProviderRunIdentityModule_create('msg-devops-provider-run'),
+      ProviderRequestKind.ProviderRequestKind.WorkMain,
+      new ProjectionChoice.XProjectionChoice(0, []),
     )
 
-    const handle = settled.Sessions.get(parentSessionId).Handles.Handles.get(handleId)
-    assert.equal(handle.Lifecycle.tag, 1, 'the parent handle must reach CompletedAwaitingJoin')
-    assert.equal(
-      handle.Lifecycle.fields[0].Kind,
-      DelegationFacts.HandleCompletionKind.Cancelled,
-      'join must receive an explicit Cancelled outcome instead of waiting forever',
-    )
+  const appendChatExecution = (projection, disposition) => {
+    const key = new chatExecutionFacts.ChatExecutionKey(sessionId(), physicalUserMessageId())
+
+    const facts = [
+      new chatExecutionFacts.ChatExecutionFactCases(0, [
+        { SchemaVersion: 1, Key: key, Evidence: acceptedEvidence() },
+      ]),
+      new chatExecutionFacts.ChatExecutionFactCases(1, [
+        { SchemaVersion: 1, Key: key, Evidence: providerStartedEvidence() },
+      ]),
+      new chatExecutionFacts.ChatExecutionFactCases(2, [
+        {
+          SchemaVersion: 1,
+          Key: key,
+          Evidence: new chatExecutionFacts.ChatExecutionTerminalEvidence(1, [providerStartedEvidence()]),
+          Disposition: chatExecutionFacts.ChatExecutionTerminalDisposition[disposition],
+        },
+      ]),
+    ]
+
+    let current = { ...Fold.empty, AgentProjections: projection }
+
+    for (const fact of facts) {
+      const folded = Fold.foldFact(current, new Fact.Fact(1, [new Fact.AgentFact(13, [fact])]))
+      assert.ok(foldedOk(folded), 'the provider lifecycle fact must fold')
+      current = foldedValue(folded)
+    }
+
+    return current.AgentProjections
+  }
+
+  test('WHAT[crash-reconciliation-020] CRASH_020_in_process_interrupt_never_closes_the_child_run', async () => {
+    // WHAT[managed-session-lifecycle-018]: an attempt observation is not authority
+    // to close a logical run. The degeneration guard closes the interrupted
+    // attempt and then continues ON THE SAME RUN (degeneration-guard-009 /
+    // interaction-authority-012). While the fold closed that run on any
+    // non-Completed terminal, the guard's own interrupt left the continuation it
+    // was about to send with no active authority profile: the rewrite was
+    // silently dropped and the session deadlocked with nothing left to wake it.
+    //
+    // The terminal below is the exact fact a guard interrupt produces, so this
+    // asserts the projection an in-process owner depends on.
+    for (const disposition of ['Cancelled', 'Rejected', 'Failed']) {
+      const before = interruptedChild()
+      assert.ok(childState(before).PromptAuthority.ActiveLogicalRun, 'precondition: the child holds a run')
+
+      const after = await appendChatExecution(before, disposition)
+
+      assert.ok(
+        childState(after).PromptAuthority.ActiveLogicalRun,
+        `a ${disposition} terminal from an in-process owner must leave the child run open for its continuation`,
+      )
+
+      assert.ok(
+        foldedOk(parentHandle(after).Lifecycle),
+        'the handle stays Active: only the Load Phase settles a child the runtime lost',
+      )
+    }
   })
 
-  test('WHAT[crash-reconciliation-020] CRASH_020_completed_child_run_is_left_to_its_own_completion_path', () => {
+  test('WHAT[crash-reconciliation-020] CRASH_020_completed_child_run_is_left_to_its_own_completion_path', async () => {
     const before = interruptedChild()
-    const settled = Bridge.settleUncompletedChildRun(
-      before,
-      terminalFact(ChatExecution.ChatExecutionTerminalDisposition.Completed),
-    )
+    const after = await appendChatExecution(before, 'Completed')
 
-    const handle = settled.Sessions.get(parentSessionId).Handles.Handles.get(handleId)
-    assert.equal(handle.Lifecycle.tag, 0, 'a completed child run keeps its Active handle for the real completion')
-    assert.ok(settled.Sessions.get(childSessionId).PromptAuthority.ActiveLogicalRun, 'and its authority stays open')
+    assert.ok(
+      foldedOk(parentHandle(after).Lifecycle),
+      'a completed child run keeps its Active handle for the real completion',
+    )
+    assert.ok(childState(after).PromptAuthority.ActiveLogicalRun, 'and its authority stays open')
   })
 }
 

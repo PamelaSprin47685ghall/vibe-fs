@@ -192,3 +192,75 @@ test('WHAT[degeneration-guard-009] LOOP_008_guard_has_no_fallback_or_nudge_recov
   assert.doesNotMatch(ordinarySource, /continueAfterLoopKill/)
   assert.doesNotMatch(fallbackSource, /continueAfterLoopKill|LoopContinue/)
 })
+
+test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported_and_leaves_the_guard_reusable', async () => {
+  // The rewrite the guard owes the interrupted run can fail on the way out (the
+  // run it belonged to was closed, the Host refused admission, the transport
+  // died). degeneration-guard-009 requires that failure to surface as a guard
+  // continuation failure — never as a silent no-op that leaves the turn with no
+  // successor. And because the anomaly is consumed by then, the sensor must come
+  // back clean: the next repetition is a fresh interruption instead of a session
+  // wedged on an anomaly nobody owns any more.
+  const diagnostics = []
+  const attempts = []
+  let attempt = 0
+
+  const sensor = createSensor({
+    owned: ['ses_retry'],
+    abort: () => ({ ok: true }),
+    continue: () => {
+      attempt += 1
+      attempts.push(attempt)
+
+      return attempt === 1 ? { ok: false, error: 'no active authority profile' } : { ok: true }
+    },
+    diagnostic: (operation, fields) => diagnostics.push({ operation, fields, fields_json: JSON.stringify(fields ?? '') }),
+  })
+
+  loopSensor.observe(sensor, loopSensor.textDelta('ses_retry', repetitiveText(), 'msg_retry_1'))
+  await wait()
+
+  const interrupted = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_1')
+  assert.notEqual(interrupted, null, 'the interrupt is owned work that can be awaited')
+  await interrupted
+
+  // The reconciled TurnAborted consumes the armed anomaly, which is what starts
+  // the guard's own continuation (degeneration-guard-009).
+  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_1'), {
+    cause: 'DegenerationGuard',
+    anomaly: 'TooRepetitive',
+  })
+
+  const continued = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_1')
+  assert.notEqual(continued, null, 'the guard continuation is owned work that can be awaited')
+  await continued
+  await wait()
+
+  assert.deepEqual(attempts, [1], 'the guard tried to continue exactly once')
+
+  const reported = diagnostics.filter((entry) => entry.operation === 'degeneration-guard')
+  assert.ok(
+    reported.some((entry) => entry.fields_json.includes('failed')),
+    'a failed continuation must be reported, not swallowed',
+  )
+
+  assert.equal(
+    loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_1'),
+    null,
+    'a failed continuation must not leave a phantom active task behind',
+  )
+
+  // The consumed anomaly must not wedge the session: a second repetition still
+  // gets a fresh interrupt instead of waiting on an anomaly from the first one.
+  loopSensor.observe(sensor, loopSensor.textDelta('ses_retry', repetitiveText(), 'msg_retry_2'))
+  await wait()
+
+  const secondInterrupt = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_2')
+  assert.notEqual(secondInterrupt, null, 'the sensor must still interrupt after a failed continuation')
+  await secondInterrupt
+  assert.deepEqual(
+    loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_2'),
+    { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' },
+    'the second repetition carries its own cause instead of reusing the stale one',
+  )
+})
