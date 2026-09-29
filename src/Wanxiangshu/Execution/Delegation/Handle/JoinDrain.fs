@@ -208,6 +208,18 @@ module JoinDrain =
         | LegacyFalseAbort _ -> rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
         | Invalid _ -> Task.FromResult None
 
+    let private consumeMissingBody
+        (durable: AgentJournalPort)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        (agentId: string)
+        (completedAt: DateTimeOffset)
+        : Task<Result<RunCompletion, ForkError> option> =
+        match record.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled } ->
+            tryConsumeCancelledCompletion durable parentId record completedAt
+        | _ -> Task.FromResult(missingBodyOutcome agentId record.Lifecycle)
+
     let private afterReadBody
         (durable: AgentJournalPort)
         (parentId: SessionId)
@@ -218,11 +230,7 @@ module JoinDrain =
         : Task<Result<RunCompletion, ForkError> option> =
         match readResult with
         | Error err -> Task.FromResult(Some(Error(ForkError.NotFound err)))
-        | Ok(None, _, _) ->
-            match record.Lifecycle with
-            | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled } ->
-                tryConsumeCancelledCompletion durable parentId record completedAt
-            | _ -> Task.FromResult(missingBodyOutcome agentId record.Lifecycle)
+        | Ok(None, _, _) -> consumeMissingBody durable parentId record agentId completedAt
         | Ok(Some body, Some blobRef, Some blobDigest) ->
             afterDecodeBody durable parentId record agentId blobRef blobDigest body completedAt
         | Ok(Some _, _, _) ->
