@@ -445,6 +445,22 @@ module SessionExecutionBinding =
         | Some _, None -> Error "PROMPT-006: managed provider attempt has no physical user message id"
         | Some agent, Some physical -> bindExternalExecutionLease sessionId physical agent
 
+    let private fallbackExternalAttempt sessionId physicalUserMessageId (key: PromptKey) =
+        match beginExternalProviderAttempt sessionId physicalUserMessageId with
+        | Ok() -> Ok()
+        | Error _ ->
+            Error(
+                sprintf
+                    "PROMPT-006: provider attempt for PromptKey %s has no accepted execution binding"
+                    (PromptKey.value key)
+            )
+
+    let private tryFallbackProviderAttempt sessionId physicalUserMessageId key (bindingResult: Result<unit, string>) =
+        match bindingResult with
+        | Ok() -> Ok()
+        | Error mismatch when mismatch.Contains("changed physical user message") -> Error mismatch
+        | Error _ -> fallbackExternalAttempt sessionId physicalUserMessageId key
+
     let beginProviderAttempt
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId option)
@@ -455,18 +471,8 @@ module SessionExecutionBinding =
         match promptKey with
         | None -> beginExternalProviderAttempt sessionId physicalUserMessageId
         | Some key ->
-            match useAcceptedPromptBinding sessionId physicalUserMessageId key with
-            | Ok() -> Ok()
-            | Error mismatch when mismatch.Contains("changed physical user message") -> Error mismatch
-            | Error _ ->
-                match beginExternalProviderAttempt sessionId physicalUserMessageId with
-                | Ok() -> Ok()
-                | Error _ ->
-                    Error(
-                        sprintf
-                            "PROMPT-006: provider attempt for PromptKey %s has no accepted execution binding"
-                            (PromptKey.value key)
-                    )
+            useAcceptedPromptBinding sessionId physicalUserMessageId key
+            |> tryFallbackProviderAttempt sessionId physicalUserMessageId key
 
     let currentProviderModel (sessionId: SessionId) : OpencodeModel option =
         lock gate (fun () ->
