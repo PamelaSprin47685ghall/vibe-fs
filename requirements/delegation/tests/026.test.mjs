@@ -131,6 +131,28 @@ test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_
     rmSync(directory, { recursive: true, force: true })
   }
 })
+test('WHAT[delegation-026] IDLE_ROAD_DEVOPS_COMPANION_does_not_block_join_with_hang', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-idle-devops-'))
+  const owner = 'manager-idle-devops'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    // 1. Manager calls horizon which automatically binds the companion devops session
+    const horizonResult = await forkTool.executeHorizon(runtime, owner)
+    assert.match(horizonResult, /devops/)
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
+
+    // 2. devops is idle (never received any prompt or active run)
+    // Join must NOT hang waiting on the idle devops handle; it must report NothingToJoin immediately
+    const joinPromise = forkTool.executeJoin(runtime, owner)
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
+    const joinResult = await Promise.race([joinPromise, timeout])
+    assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 }
 
 test.todo('WHAT[delegation-026] actual admission and checkpoint fault cuts preserve exact durable claim and effect truth without replay or durable program counters (GAP-153)')
