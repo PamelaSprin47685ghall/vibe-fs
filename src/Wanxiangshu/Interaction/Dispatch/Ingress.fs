@@ -19,4 +19,16 @@ module PromptIngress =
             | Some _, None -> Some PromptAuthority.empty
             | None, _ -> None
 
-        ChatAdmissionIntent.resolve message { Authority = authority }
+        // interaction-authority-009: When host message omits explicit agent,
+        // Ingress boundary projects active participant to admit as HumanMessage continuation
+        let enrichedMessage =
+            match message.ExplicitAgent, message.PromptKey, authority with
+            | None, None, Some proj ->
+                match proj.ActiveLogicalRun with
+                | Some activeRun when activeRun.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
+                    { message with
+                        ExplicitAgent = Some activeRun.SelectedAgent }
+                | _ -> message
+            | _ -> message
+
+        ChatAdmissionIntent.resolve enrichedMessage { Authority = authority }

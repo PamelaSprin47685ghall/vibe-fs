@@ -110,3 +110,25 @@ test('WHAT[interaction-authority-015] matching external user ingress continues w
     assert.deepEqual(after.pendingClaims, before.pendingClaims)
   })
 })
+
+test('WHAT[interaction-authority-015] external user message without explicit agent continues active run via ingress projection (§009)', async () => {
+  await withJournal('external-omitted-agent', async (handle) => {
+    const active = await acceptOwner(handle, 'ses-omitted-agent')
+    const before = dispatch.projectionObservation(handle, 'ses-omitted-agent')
+
+    // Host user message without explicit agent (null)
+    const ingress = await dispatch.acceptManagedExternal(
+      handle,
+      'ses-omitted-agent',
+      'msg-omitted-agent',
+      null,
+    )
+    const after = dispatch.projectionObservation(handle, 'ses-omitted-agent')
+
+    assert.equal(ingress.ok, true, ingress.error)
+    assert.equal(ingress.origin, 'HumanMessage')
+    assert.equal(ingress.participant, 'manager')
+    assert.equal(ingress.role, 'manager')
+    assert.deepEqual(after.activeLogicalRun, active)
+  })
+})
