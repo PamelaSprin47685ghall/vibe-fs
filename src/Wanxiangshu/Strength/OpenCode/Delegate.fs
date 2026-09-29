@@ -112,6 +112,11 @@ module StrengthDelegate =
           IsRootWork: bool
           DurableProjection: StrengthProjection }
 
+    let private hasPrefixProbeChoice (choice: Wanxiangshu.Context.Prefix.XProjectionChoice) : bool =
+        match choice with
+        | Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe _ -> true
+        | Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch -> false
+
     let private planEvidence
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (owner: SessionId)
@@ -119,11 +124,7 @@ module StrengthDelegate =
         =
         match tryAttemptPlan owner target with
         | Some plan ->
-            let hasPrefixProbe =
-                match plan.Profile.ProjectionChoice with
-                | Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe _ -> true
-                | Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch -> false
-
+            let hasPrefixProbe = hasPrefixProbeChoice plan.Profile.ProjectionChoice
             plan.Profile.RequestKind, hasPrefixProbe
         | None -> ProviderRequestKind.WorkMain, false
 
@@ -152,6 +153,27 @@ module StrengthDelegate =
             )
         | _ -> Error "Strength ports are not fully bound"
 
+    let private tryResolvePhysicalUserMessage (rawMessages: obj list) : Result<PhysicalUserMessageId, string> =
+        match ProviderWireCapture.lastUserMessageId rawMessages with
+        | Some physical -> Ok physical
+        | None -> Error "owner transform has no physical user message"
+
+    let private tryResolveAssistantRun
+        (physical: PhysicalUserMessageId)
+        (messages: 'M list)
+        : Result<ProviderRunIdentity, string> =
+        match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
+        | Ok assistant -> Ok(ProviderRunIdentity.create assistant.Id)
+        | Error _ -> Error "owner provider run is not uniquely bound"
+
+    let private tryResolveAuthorityProfile
+        (owner: SessionId)
+        (projections: ProjectionSet)
+        : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+        match PromptAuthorityProjectionQueries.activeProfile owner projections.AgentProjections with
+        | Some authority -> Ok authority
+        | None -> Error "owner has no active authority profile"
+
     let private resolveSurface
         (bound: BoundPorts * SessionId)
         (strengthScope: PluginStrengthScope)
@@ -163,51 +185,151 @@ module StrengthDelegate =
         taskResult {
             let ports, owner = bound
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+            let! physical = tryResolvePhysicalUserMessage rawMessages
+            let! messages = ports.Snapshots.GetMessages owner
+            let! target = tryResolveAssistantRun physical messages
+            let projections = AgentJournal.snapshot ports.Durable
+            let! authority = tryResolveAuthorityProfile owner projections
+            let requestKind, hasPrefixProbe = planEvidence tryAttemptPlan owner target
 
-            match ProviderWireCapture.lastUserMessageId rawMessages with
-            | None -> return! Error "owner transform has no physical user message"
-            | Some physical ->
-                let! messages = ports.Snapshots.GetMessages owner
+            let attached =
+                syncDelegateRuntime
+                |> Option.bind (fun sd -> sd.TryFindDelegateOwner owner)
+                |> Option.isSome
 
-                match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
-                | Error _ -> return! Error "owner provider run is not uniquely bound"
-                | Ok assistant ->
-                    let target = ProviderRunIdentity.create assistant.Id
-                    let projections = AgentJournal.snapshot ports.Durable
+            let wire = ProviderWireCapture.decodeMessageView rawMessages
 
-                    match PromptAuthorityProjectionQueries.activeProfile owner projections.AgentProjections with
-                    | None -> return! Error "owner has no active authority profile"
-                    | Some authority ->
-                        let requestKind, hasPrefixProbe = planEvidence tryAttemptPlan owner target
-
-                        let attached =
-                            syncDelegateRuntime
-                            |> Option.bind (fun sd -> sd.TryFindDelegateOwner owner)
-                            |> Option.isSome
-
-                        let wire = ProviderWireCapture.decodeMessageView rawMessages
-
-                        return
-                            { Owner = owner
-                              Target = target
-                              Authority = authority
-                              Projections = projections
-                              RawMessages = rawMessages
-                              Output = output
-                              Ports = ports
-                              Wire = wire
-                              AnchorDigest = wireAnchorDigest rawMessages
-                              SourcePhysicalUserMessageId = physical
-                              RequestKind = requestKind
-                              HasPrefixProbe = hasPrefixProbe
-                              IsRootWork =
-                                authority.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                                && rootWork owner projections.AgentProjections.Associations
-                                && not attached
-                              DurableProjection = durableStrength }
+            return
+                { Owner = owner
+                  Target = target
+                  Authority = authority
+                  Projections = projections
+                  RawMessages = rawMessages
+                  Output = output
+                  Ports = ports
+                  Wire = wire
+                  AnchorDigest = wireAnchorDigest rawMessages
+                  SourcePhysicalUserMessageId = physical
+                  RequestKind = requestKind
+                  HasPrefixProbe = hasPrefixProbe
+                  IsRootWork =
+                    authority.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
+                    && rootWork owner projections.AgentProjections.Associations
+                    && not attached
+                  DurableProjection = durableStrength }
         }
 
     // ---- source batch evidence -------------------------------------------------
+
+    let private isToolPartCompleted (part: obj) : bool =
+        let state = ProviderWireDecode.readField part "state"
+
+        if isNull state then
+            false
+        else
+            let status = if isNull state?status then "" else string state?status
+            let hasInput =
+                not (isNull state?input)
+                || not (isNull part?args)
+                || not (isNull part?arguments)
+            let hasOutput =
+                not (isNull state?output)
+                || not (isNull state?result)
+                || not (isNull state?content)
+
+            status = "completed" && hasInput && hasOutput
+
+    let private tryExtractToolCallArgs (state: obj) (part: obj) : string option =
+        if not (isNull state) && not (isNull state?input) then
+            Some(emitJsExpr state?input "JSON.stringify($0)")
+        elif not (isNull part?args) then
+            Some(emitJsExpr part?args "JSON.stringify($0)")
+        elif not (isNull part?arguments) then
+            Some(emitJsExpr part?arguments "JSON.stringify($0)")
+        else
+            None
+
+    let private tryExtractToolCall (part: obj) : (ToolCallId * string) option =
+        let state = ProviderWireDecode.readField part "state"
+
+        let callId =
+            ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ]
+            |> Option.map ToolCallId.create
+
+        let args = tryExtractToolCallArgs state part
+
+        match callId, args with
+        | Some cid, Some a -> Some(cid, a)
+        | _ -> None
+
+    let private validateExtractedToolCalls
+        (expectedCount: int)
+        (calls: (ToolCallId * string) list)
+        : (ToolCallId * string) list option =
+        let ids = calls |> List.map fst
+        if calls.Length = expectedCount && Set.count (Set.ofList ids) = ids.Length then
+            Some calls
+        else
+            None
+
+    let private tryExtractUniqueCalls (toolParts: obj list) : (ToolCallId * string) list option =
+        if List.forall isToolPartCompleted toolParts then
+            let calls = toolParts |> List.choose tryExtractToolCall
+            validateExtractedToolCalls toolParts.Length calls
+        else
+            None
+
+    let private tryExtractRawAssistantBatch (assistant: obj) : (ToolCallId * string) list option =
+        let parts = ProviderWireDecode.rawPartsOf assistant
+
+        let toolParts =
+            parts
+            |> List.filter (fun part ->
+                let kind =
+                    ProviderWireDecode.firstString part [ "type" ]
+                    |> Option.defaultValue ""
+                    |> fun s -> s.ToLowerInvariant()
+
+                kind = "tool" || kind = "tool-call" || kind = "tool_call")
+
+        if List.isEmpty toolParts then
+            None
+        else
+            tryExtractUniqueCalls toolParts
+
+    let private extractWireToolCalls (parts: ProviderProjection.ProviderWirePart list) : (ToolCallId * string) list =
+        parts
+        |> List.choose (function
+            | ProviderProjection.WireToolCall(callId, _, arguments) -> Some(callId, arguments)
+            | _ -> None)
+
+    let private tryExtractWireAssistantCalls
+        (message: ProviderProjection.ProviderWireMessage)
+        : (ToolCallId * string) list option =
+        if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
+            None
+        else
+            let calls = extractWireToolCalls message.Parts
+            if List.isEmpty calls then None else Some calls
+
+    let private matchBatchWithTailCalls
+        (wireMessages: ProviderProjection.ProviderWireMessage list)
+        (tailCalls: (ToolCallId * string) list)
+        : (ToolCallId * string) list option =
+        match List.tryLast (StrengthBatchCollector.collectCompleteBatches wireMessages) with
+        | Some batch ->
+            let batchArgs = batch.Exchanges |> List.map (fun exchange -> exchange.CanonicalArguments)
+            let callArgs = tailCalls |> List.map snd
+            if batchArgs = callArgs then Some tailCalls else None
+        | None -> None
+
+    let private tryExtractWireCompletedBatch
+        (wire: ProviderProjection.ProviderWireProjection)
+        : (ToolCallId * string) list option =
+        let assistantBatches = wire.Messages |> List.choose tryExtractWireAssistantCalls
+        match assistantBatches with
+        | [] -> None
+        | batches -> matchBatchWithTailCalls wire.Messages (List.last batches)
 
     /// Resolves the completed source batch of the tail assistant message.
     /// Supports both:
@@ -232,153 +354,56 @@ module StrengthDelegate =
                 else
                     None)
             |> List.tryLast
-            |> Option.bind (fun assistant ->
-                let parts = ProviderWireDecode.rawPartsOf assistant
-
-                let toolParts =
-                    parts
-                    |> List.filter (fun part ->
-                        let kind =
-                            ProviderWireDecode.firstString part [ "type" ]
-                            |> Option.defaultValue ""
-                            |> fun s -> s.ToLowerInvariant()
-
-                        kind = "tool" || kind = "tool-call" || kind = "tool_call")
-
-                if List.isEmpty toolParts then
-                    None
-                else
-                    let isCompleted (part: obj) =
-                        let state = ProviderWireDecode.readField part "state"
-
-                        if isNull state then
-                            false
-                        else
-                            let status = if isNull state?status then "" else string state?status
-
-                            if status = "completed" then
-                                let hasInput =
-                                    not (isNull state?input)
-                                    || not (isNull part?args)
-                                    || not (isNull part?arguments)
-
-                                let hasOutput =
-                                    not (isNull state?output)
-                                    || not (isNull state?result)
-                                    || not (isNull state?content)
-
-                                hasInput && hasOutput
-                            else
-                                false
-
-                    if List.forall isCompleted toolParts then
-                        let calls =
-                            toolParts
-                            |> List.choose (fun part ->
-                                let state = ProviderWireDecode.readField part "state"
-
-                                let callId =
-                                    ProviderWireDecode.firstString part [ "callID"; "callId"; "id" ]
-                                    |> Option.map ToolCallId.create
-
-                                let args =
-                                    if not (isNull state) && not (isNull state?input) then
-                                        Some(emitJsExpr state?input "JSON.stringify($0)")
-                                    elif not (isNull part?args) then
-                                        Some(emitJsExpr part?args "JSON.stringify($0)")
-                                    elif not (isNull part?arguments) then
-                                        Some(emitJsExpr part?arguments "JSON.stringify($0)")
-                                    else
-                                        None
-
-                                match callId, args with
-                                | Some cid, Some a -> Some(cid, a)
-                                | _ -> None)
-
-                        if calls.Length = toolParts.Length then
-                            let ids = calls |> List.map fst
-
-                            if Set.count (Set.ofList ids) = ids.Length then
-                                Some calls
-                            else
-                                None
-                        else
-                            None
-                    else
-                        None)
+            |> Option.bind tryExtractRawAssistantBatch
 
         match fromRaw with
         | Some calls -> Some calls
-        | None ->
-            let assistantBatches =
-                wire.Messages
-                |> List.choose (fun message ->
-                    if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
-                        let calls =
-                            message.Parts
-                            |> List.choose (function
-                                | ProviderProjection.WireToolCall(callId, _, arguments) -> Some(callId, arguments)
-                                | _ -> None)
+        | None -> tryExtractWireCompletedBatch wire
 
-                        if List.isEmpty calls then None else Some calls
-                    else
-                        None)
+    // ---- call budget parsing ---------------------------------------------------
 
-            match assistantBatches with
-            | [] -> None
-            | batches ->
-                let tailCalls = List.last batches
+    let private tryParseCallArguments (callId: ToolCallId) (arguments: string) : Result<obj, string> =
+        try
+            Ok(emitJsExpr arguments "JSON.parse($0)")
+        with _ ->
+            Error(sprintf "delegation arguments of call %s are not valid JSON" (ToolCallId.value callId))
 
-                match List.tryLast (StrengthBatchCollector.collectCompleteBatches wire.Messages) with
-                | None -> None
-                | Some batch ->
-                    let batchArgs =
-                        batch.Exchanges |> List.map (fun exchange -> exchange.CanonicalArguments)
+    let private tryExtractRawRounds (callId: ToolCallId) (value: obj) : Result<obj, string> =
+        let raw = value?delegate_readonly_rounds
+        if isNull raw then
+            Error(sprintf "delegate_readonly_rounds is absent for call %s" (ToolCallId.value callId))
+        else
+            Ok raw
 
-                    let callArgs = tailCalls |> List.map snd
-                    if batchArgs = callArgs then Some tailCalls else None
+    let private tryUnboxRoundsNumber (callId: ToolCallId) (raw: obj) : Result<float, string> =
+        try
+            Ok(unbox<float> raw)
+        with _ ->
+            Error(sprintf "delegate_readonly_rounds of call %s is not a number" (ToolCallId.value callId))
+
+    let private validateRoundsNumber (callId: ToolCallId) (number: float) : Result<int, string> =
+        if Double.IsNaN number || Double.IsInfinity number || number < 0.0 || number <> floor number then
+            Error(
+                sprintf
+                    "delegate_readonly_rounds of call %s is not a non-negative integer"
+                    (ToolCallId.value callId)
+            )
+        elif number > float Int32.MaxValue then
+            Error(sprintf "delegate_readonly_rounds of call %s is out of range" (ToolCallId.value callId))
+        else
+            Ok(int number)
 
     /// DELEGATE-002: the batch budget is one integer per call, validated exactly
     /// as written. Missing, null, string, boolean, fractional, negative or
     /// out-of-range values are a call-argument error: the batch never starts and
     /// the value is never silently normalized to zero.
     let private budgetOfCall (callId: ToolCallId) (arguments: string) : Result<int, string> =
-        let parsed =
-            try
-                Ok(emitJsExpr arguments "JSON.parse($0)")
-            with _ ->
-                Error(sprintf "delegation arguments of call %s are not valid JSON" (ToolCallId.value callId))
-
-        match parsed with
-        | Error reason -> Error reason
-        | Ok value ->
-            let raw = value?delegate_readonly_rounds
-
-            if isNull raw then
-                Error(sprintf "delegate_readonly_rounds is absent for call %s" (ToolCallId.value callId))
-            else
-                let asNumber =
-                    try
-                        Ok(unbox<float> raw)
-                    with _ ->
-                        Error(sprintf "delegate_readonly_rounds of call %s is not a number" (ToolCallId.value callId))
-
-                match asNumber with
-                | Error reason -> Error reason
-                | Ok number when
-                    Double.IsNaN number
-                    || Double.IsInfinity number
-                    || number < 0.0
-                    || number <> floor number
-                    ->
-                    Error(
-                        sprintf
-                            "delegate_readonly_rounds of call %s is not a non-negative integer"
-                            (ToolCallId.value callId)
-                    )
-                | Ok number when number > float Int32.MaxValue ->
-                    Error(sprintf "delegate_readonly_rounds of call %s is out of range" (ToolCallId.value callId))
-                | Ok number -> Ok(int number)
+        result {
+            let! value = tryParseCallArguments callId arguments
+            let! raw = tryExtractRawRounds callId value
+            let! number = tryUnboxRoundsNumber callId raw
+            return! validateRoundsNumber callId number
+        }
 
     let private batchBudgetOfCalls (calls: (ToolCallId * string) list) : Result<ReadonlyRoundBudget, string> =
         let rec loop remaining acc =
@@ -397,110 +422,197 @@ module StrengthDelegate =
         | Captured of DelegationRequest
         | Skipped of reason: string
 
+    let private checkCaptureEligibility (surface: OwnerSurface) : Result<unit, string> =
+        if surface.RequestKind <> ProviderRequestKind.WorkMain then
+            Error "not-work-main"
+        elif surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
+            Error "not-root-owner-work"
+        else
+            Ok()
+
+    let private tryResolveSourceCalls (surface: OwnerSurface) : Result<(ToolCallId * string) list, string> =
+        match resolveCompletedSourceBatch surface.RawMessages surface.Wire with
+        | Some calls -> Ok calls
+        | None -> Error "no-completed-source-batch"
+
+    let private tryResolveCaptureCallsAndBudget
+        (surface: OwnerSurface)
+        : Result<(ToolCallId * string) list * ReadonlyRoundBudget, string> =
+        result {
+            let! calls = tryResolveSourceCalls surface
+            let! budget = batchBudgetOfCalls calls
+            return calls, budget
+        }
+
+    let private buildDelegationRequest
+        (surface: OwnerSurface)
+        (calls: (ToolCallId * string) list)
+        (budget: ReadonlyRoundBudget)
+        : DelegationRequest =
+        let ownerLogicalRun =
+            { LogicalRunId = surface.Authority.LogicalRunId
+              AuthorityRootUserMessageId = surface.Authority.AuthorityRootUserMessageId }
+
+        let decisionId =
+            Delegation.deriveDecisionId HostDigest.sha256Hex contractRevision ownerLogicalRun surface.Target
+
+        let sourceToolCallIds = calls |> List.map fst
+
+        { DecisionId = decisionId
+          OwnerSessionId = surface.Owner
+          OwnerLogicalRun = ownerLogicalRun
+          SourcePhysicalUserMessageId = surface.SourcePhysicalUserMessageId
+          SourceProviderRun = surface.Target
+          SourceToolCallIds = sourceToolCallIds
+          RequestedRounds = budget
+          ContractRevision = contractRevision }
+
+    [<RequireQualifiedAccess>]
+    type private CaptureDisposition =
+        | Replay of DelegationRequest
+        | Conflict
+        | Fresh of DelegationRequest
+
+    let private evaluateCaptureDisposition
+        (durableProjection: StrengthProjection)
+        (request: DelegationRequest)
+        : CaptureDisposition =
+        match StrengthProjection.tryCandidate request.DecisionId durableProjection with
+        | Some existing when Delegation.sameRequest existing.Request request ->
+            CaptureDisposition.Replay existing.Request
+        | Some _ -> CaptureDisposition.Conflict
+        | None -> CaptureDisposition.Fresh request
+
+    let private tryAdmitDelegationRequest
+        (surface: OwnerSurface)
+        (predictorConfigured: bool)
+        (request: DelegationRequest)
+        : Result<DelegationAdmitted, string> =
+        let opportunity =
+            { OwnerSessionId = surface.Owner
+              OwnerLogicalRun = request.OwnerLogicalRun
+              SourcePhysicalUserMessageId = surface.SourcePhysicalUserMessageId
+              SourceProviderRun = surface.Target
+              SourceToolCallIds = request.SourceToolCallIds
+              RequestedRounds = Some request.RequestedRounds
+              ContractRevision = contractRevision
+              IsRootWork = surface.IsRootWork
+              RequestKind = surface.RequestKind
+              CanonicalRole = surface.Authority.CanonicalRole
+              HasPrefixProbe = surface.HasPrefixProbe
+              IsReplicaOrInternalLeaf = not surface.IsRootWork
+              IsInteractionRepair = surface.RequestKind = ProviderRequestKind.InteractionRepair
+              IsExplicitRecoveryBranch = false
+              OwnerCancelled = false
+              TargetProviderRunBound = true
+              EventStoreHealthy = true
+              HostBoundaryHealthy = true
+              ProcessFuseHealthy = true
+              OwnerLogicalRunSuperseded = false
+              PendingRequested = true
+              PredictorConfigured = predictorConfigured }
+
+        StrengthPolicy.tryRequest HostDigest.sha256Hex opportunity
+
+    let private handleCaptureAppendOutcome
+        (strengthScope: PluginStrengthScope)
+        (admitted: DelegationAdmitted)
+        (appendResult: StrengthDurableAppend)
+        : CaptureOutcome =
+        match appendResult with
+        | StrengthDurableAppend.Applied -> CaptureOutcome.Captured admitted
+        | StrengthDurableAppend.SemanticRejected reason ->
+            failClosed strengthScope ("Strength DelegationRequested rejected: " + reason)
+        | StrengthDurableAppend.StorageInvalid reason ->
+            failClosed strengthScope ("Strength DelegationRequested storage invalid: " + reason)
+        | StrengthDurableAppend.StorageFailed reason ->
+            failClosed strengthScope ("Strength DelegationRequested append failed: " + reason)
+
+    let private persistNewDelegationRequest
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (predictorConfigured: bool)
+        (request: DelegationRequest)
+        : Task<CaptureOutcome> =
+        task {
+            match tryAdmitDelegationRequest surface predictorConfigured request with
+            | Error reason -> return CaptureOutcome.Skipped reason
+            | Ok admitted ->
+                let! appendResult =
+                    surface.Ports.Durability.Append(
+                        StrengthEvents.requested
+                            admitted.DecisionId
+                            admitted.OwnerSessionId
+                            admitted.OwnerLogicalRun
+                            admitted.SourcePhysicalUserMessageId
+                            admitted.SourceProviderRun
+                            admitted.SourceToolCallIds
+                            admitted.RequestedRounds
+                            admitted.ContractRevision
+                    )
+
+                return handleCaptureAppendOutcome strengthScope admitted appendResult
+        }
+
+    let private executeCaptureRequest
+        (strengthScope: PluginStrengthScope)
+        (predictorConfigured: bool)
+        (surface: OwnerSurface)
+        (request: DelegationRequest)
+        : Task<CaptureOutcome> =
+        match evaluateCaptureDisposition surface.DurableProjection request with
+        | CaptureDisposition.Replay existing -> Task.FromResult(CaptureOutcome.Captured existing)
+        | CaptureDisposition.Conflict -> Task.FromResult(CaptureOutcome.Skipped "delegation-request-conflict")
+        | CaptureDisposition.Fresh freshRequest ->
+            persistNewDelegationRequest strengthScope surface predictorConfigured freshRequest
+
+    let private planCaptureRequest (surface: OwnerSurface) : Result<DelegationRequest, string> =
+        result {
+            do! checkCaptureEligibility surface
+            let! calls, budget = tryResolveCaptureCallsAndBudget surface
+            return buildDelegationRequest surface calls budget
+        }
+
     let private captureOnSurface
         (strengthScope: PluginStrengthScope)
         (predictorConfigured: bool)
         (surface: OwnerSurface)
         : Task<CaptureOutcome> =
+        match planCaptureRequest surface with
+        | Error reason -> Task.FromResult(CaptureOutcome.Skipped reason)
+        | Ok request -> executeCaptureRequest strengthScope predictorConfigured surface request
+
+    let private loadDurableProjectionOrThrow
+        (ports: BoundPorts)
+        (strengthScope: PluginStrengthScope)
+        (phaseName: string)
+        : Task<StrengthProjection> =
         task {
-            // DELEGATE-2: authorization forms only for a legal ordinary
-            // WorkMain continuation of a real fresh owner response; a
-            // Replica or internal leaf run can never be a source.
-            if surface.RequestKind <> ProviderRequestKind.WorkMain then
-                return CaptureOutcome.Skipped "not-work-main"
-            elif surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
-                return CaptureOutcome.Skipped "not-root-owner-work"
-            else
-                match resolveCompletedSourceBatch surface.RawMessages surface.Wire with
-                | None -> return CaptureOutcome.Skipped "no-completed-source-batch"
-                | Some calls ->
-                    match batchBudgetOfCalls calls with
-                    | Error reason -> return CaptureOutcome.Skipped reason
-                    | Ok budget ->
-                        let ownerLogicalRun =
-                            { LogicalRunId = surface.Authority.LogicalRunId
-                              AuthorityRootUserMessageId = surface.Authority.AuthorityRootUserMessageId }
+            match! ports.Durability.LoadProjection() with
+            | Ok durableStrength -> return durableStrength
+            | Error reason ->
+                return
+                    failClosed
+                        strengthScope
+                        (sprintf "Strength %s cannot prove EventStore health: %s" phaseName reason)
+        }
 
-                        let decisionId =
-                            Delegation.deriveDecisionId
-                                HostDigest.sha256Hex
-                                contractRevision
-                                ownerLogicalRun
-                                surface.Target
-
-                        let sourceToolCallIds = calls |> List.map fst
-
-                        let request =
-                            { DecisionId = decisionId
-                              OwnerSessionId = surface.Owner
-                              OwnerLogicalRun = ownerLogicalRun
-                              SourcePhysicalUserMessageId = surface.SourcePhysicalUserMessageId
-                              SourceProviderRun = surface.Target
-                              SourceToolCallIds = sourceToolCallIds
-                              RequestedRounds = budget
-                              ContractRevision = contractRevision }
-
-                        // Same-source idempotence and conflict against canonical
-                        // Current: re-recording the identical request is a no-op;
-                        // any change to N, the call set or the authority conflicts.
-                        match StrengthProjection.tryCandidate decisionId surface.DurableProjection with
-                        | Some existing when Delegation.sameRequest existing.Request request ->
-                            return CaptureOutcome.Captured existing.Request
-                        | Some _ -> return CaptureOutcome.Skipped "delegation-request-conflict"
-                        | None ->
-                            let opportunity =
-                                { OwnerSessionId = surface.Owner
-                                  OwnerLogicalRun = ownerLogicalRun
-                                  SourcePhysicalUserMessageId = surface.SourcePhysicalUserMessageId
-                                  SourceProviderRun = surface.Target
-                                  SourceToolCallIds = sourceToolCallIds
-                                  RequestedRounds = Some budget
-                                  ContractRevision = contractRevision
-                                  IsRootWork = surface.IsRootWork
-                                  RequestKind = surface.RequestKind
-                                  CanonicalRole = surface.Authority.CanonicalRole
-                                  HasPrefixProbe = surface.HasPrefixProbe
-                                  IsReplicaOrInternalLeaf = not surface.IsRootWork
-                                  IsInteractionRepair = surface.RequestKind = ProviderRequestKind.InteractionRepair
-                                  IsExplicitRecoveryBranch = false
-                                  OwnerCancelled = false
-                                  TargetProviderRunBound = true
-                                  EventStoreHealthy = true
-                                  HostBoundaryHealthy = true
-                                  ProcessFuseHealthy = true
-                                  OwnerLogicalRunSuperseded = false
-                                  PendingRequested = true
-                                  PredictorConfigured = predictorConfigured }
-
-                            match StrengthPolicy.tryRequest HostDigest.sha256Hex opportunity with
-                            | Error reason -> return CaptureOutcome.Skipped reason
-                            | Ok admitted ->
-                                match!
-                                    surface.Ports.Durability.Append(
-                                        StrengthEvents.requested
-                                            admitted.DecisionId
-                                            admitted.OwnerSessionId
-                                            admitted.OwnerLogicalRun
-                                            admitted.SourcePhysicalUserMessageId
-                                            admitted.SourceProviderRun
-                                            admitted.SourceToolCallIds
-                                            admitted.RequestedRounds
-                                            admitted.ContractRevision
-                                    )
-                                with
-                                | StrengthDurableAppend.Applied -> return CaptureOutcome.Captured admitted
-                                | StrengthDurableAppend.SemanticRejected reason ->
-                                    return failClosed strengthScope ("Strength DelegationRequested rejected: " + reason)
-                                | StrengthDurableAppend.StorageInvalid reason ->
-                                    return
-                                        failClosed
-                                            strengthScope
-                                            ("Strength DelegationRequested storage invalid: " + reason)
-                                | StrengthDurableAppend.StorageFailed reason ->
-                                    return
-                                        failClosed
-                                            strengthScope
-                                            ("Strength DelegationRequested append failed: " + reason)
+    let private tryExecuteCaptureOnBound
+        (bound: BoundPorts * SessionId)
+        (strengthScope: PluginStrengthScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
+        (predictorConfigured: bool)
+        (output: obj)
+        : Task<CaptureOutcome> =
+        task {
+            let ports, _ = bound
+            let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "capture"
+            match!
+                resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
+            with
+            | Error reason -> return CaptureOutcome.Skipped reason
+            | Ok resolved -> return! captureOnSurface strengthScope predictorConfigured resolved
         }
 
     let tryCapture
@@ -516,21 +628,17 @@ module StrengthDelegate =
         task {
             match tryBind journal snapshotPort strengthDurability strengthScope output with
             | Error reason -> return CaptureOutcome.Skipped reason
+            | Ok _ when strengthScope.StrengthFuseReason |> Option.isSome ->
+                return CaptureOutcome.Skipped "strength-fuse-tripped"
             | Ok bound ->
-                if strengthScope.StrengthFuseReason |> Option.isSome then
-                    return CaptureOutcome.Skipped "strength-fuse-tripped"
-                else
-                    let ports, _ = bound
-
-                    match! ports.Durability.LoadProjection() with
-                    | Error reason ->
-                        return failClosed strengthScope ("Strength capture cannot prove EventStore health: " + reason)
-                    | Ok durableStrength ->
-                        match!
-                            resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
-                        with
-                        | Error reason -> return CaptureOutcome.Skipped reason
-                        | Ok resolved -> return! captureOnSurface strengthScope predictorConfigured resolved
+                return!
+                    tryExecuteCaptureOnBound
+                        bound
+                        strengthScope
+                        tryAttemptPlan
+                        syncDelegateRuntime
+                        predictorConfigured
+                        output
         }
 
     // ---- phase two: start / consume --------------------------------------------
@@ -552,6 +660,18 @@ module StrengthDelegate =
             | StrengthDurableAppend.StorageFailed reason ->
                 return failClosed strengthScope ("Strength DelegationClosed append failed: " + reason)
         }
+
+    let private renderCandidateOrThrow
+        (strengthScope: PluginStrengthScope)
+        (owner: SessionId)
+        (target: ProviderRunIdentity)
+        (decisionId: StrengthDecisionId)
+        (bundle: StrengthFrameBundle)
+        (output: obj)
+        : unit =
+        match renderCandidate owner target decisionId bundle output with
+        | Ok() -> ()
+        | Error error -> failClosed strengthScope ("Strength Candidate render failed closed: " + error)
 
     let private publishAndRender
         (strengthScope: PluginStrengthScope)
@@ -575,10 +695,57 @@ module StrengthDelegate =
                 return failClosed strengthScope ("Strength Prepared storage invalid: " + error)
             | StrengthPreparedPublish.Rejected _ -> return ()
             | StrengthPreparedPublish.Published ->
-                match renderCandidate surface.Owner surface.Target decisionId bundle surface.Output with
-                | Ok() -> return ()
-                | Error error -> return failClosed strengthScope ("Strength Candidate render failed closed: " + error)
+                renderCandidateOrThrow strengthScope surface.Owner surface.Target decisionId bundle surface.Output
+                return ()
         }
+
+    let private verifyPreparedAnchor
+        (strengthScope: PluginStrengthScope)
+        (rawMessages: obj list)
+        (expectedDigest: string)
+        : unit =
+        if wireAnchorDigest rawMessages <> expectedDigest then
+            failClosed
+                strengthScope
+                "Strength Prepared recovery anchor digest changed before target consumption"
+
+    let private consumePreparedBundle
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (prepared: StrengthPreparedCandidate)
+        : Task<unit> =
+        task {
+            verifyPreparedAnchor strengthScope surface.RawMessages prepared.AnchorDigest
+            match! surface.Ports.Durability.LoadFrameBundle prepared with
+            | Error error ->
+                return failClosed strengthScope ("Strength Prepared frame load failed: " + error)
+            | Ok bundle ->
+                renderCandidateOrThrow strengthScope surface.Owner surface.Target prepared.DecisionId bundle surface.Output
+        }
+
+    let private consumePreparedCandidate
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (preparedOpt: StrengthPreparedCandidate option)
+        : Task<unit> =
+        match preparedOpt with
+        | Some prepared -> consumePreparedBundle strengthScope surface prepared
+        | None -> Task.FromResult()
+
+    let private consumeBoundCandidate
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (bindingOpt: StrengthBinding option)
+        : Task<unit> =
+        match bindingOpt with
+        | Some binding when not (surface.Ports.Runtime.IsReplica binding.ReplicaSessionId) ->
+            appendClosed
+                strengthScope
+                surface
+                binding.DecisionId
+                DelegationClosedFrom.Bound
+                DelegationClosedReason.RecoveryAbandoned
+        | _ -> Task.FromResult()
 
     /// DELEGATE-7/10: the target run already owns a durable decision. A Prepared
     /// candidate re-renders the exact same material without re-running the
@@ -589,50 +756,140 @@ module StrengthDelegate =
         (surface: OwnerSurface)
         (view: StrengthDelegationView)
         : Task<unit> =
-        task {
-            match view.State with
-            | StrengthCandidateState.Prepared ->
-                match view.Prepared with
-                | Some prepared ->
-                    if wireAnchorDigest surface.RawMessages <> prepared.AnchorDigest then
-                        return
-                            failClosed
-                                strengthScope
-                                "Strength Prepared recovery anchor digest changed before target consumption"
-                    else
-                        match! surface.Ports.Durability.LoadFrameBundle prepared with
-                        | Error error ->
-                            return failClosed strengthScope ("Strength Prepared frame load failed: " + error)
-                        | Ok bundle ->
-                            match
-                                renderCandidate surface.Owner surface.Target prepared.DecisionId bundle surface.Output
-                            with
-                            | Ok() -> return ()
-                            | Error error ->
-                                return failClosed strengthScope ("Strength Candidate render failed closed: " + error)
-                | None -> return ()
-            | StrengthCandidateState.Bound ->
-                match view.Binding with
-                | Some binding ->
-                    if surface.Ports.Runtime.IsReplica binding.ReplicaSessionId then
-                        return ()
-                    else
-                        do!
-                            appendClosed
-                                strengthScope
-                                surface
-                                binding.DecisionId
-                                DelegationClosedFrom.Bound
-                                DelegationClosedReason.RecoveryAbandoned
+        match view.State with
+        | StrengthCandidateState.Prepared -> consumePreparedCandidate strengthScope surface view.Prepared
+        | StrengthCandidateState.Bound -> consumeBoundCandidate strengthScope surface view.Binding
+        | StrengthCandidateState.Promoted
+        | StrengthCandidateState.Traced
+        | StrengthCandidateState.Closed _
+        | StrengthCandidateState.Abandoned
+        | StrengthCandidateState.Requested -> Task.FromResult()
 
-                        return ()
-                | None -> return ()
-            | StrengthCandidateState.Promoted
-            | StrengthCandidateState.Traced
-            | StrengthCandidateState.Closed _
-            | StrengthCandidateState.Abandoned
-            | StrengthCandidateState.Requested -> return ()
+    let private tryBuildBundleOrThrow
+        (strengthScope: PluginStrengthScope)
+        (batches: StrengthFrameBatch list)
+        : StrengthFrameBundle =
+        match StrengthFrame.tryBuild HostDigest.sha256Hex batches with
+        | Ok bundle -> bundle
+        | Error error -> failClosed strengthScope (sprintf "Strength Replica bundle invalid: %A" error)
+
+    let private handleReplicaCompletion
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (decisionId: StrengthDecisionId)
+        (completed: StrengthReplicaCompletion)
+        : Task<unit> =
+        match completed.Terminal with
+        | StrengthReplicaTerminal.InvalidFrame reason ->
+            failClosed strengthScope ("Strength Replica invalid frame: " + reason)
+        | _ when List.isEmpty completed.Batches ->
+            appendClosed
+                strengthScope
+                surface
+                decisionId
+                DelegationClosedFrom.Bound
+                DelegationClosedReason.NoMaterial
+        | _ ->
+            let bundle = tryBuildBundleOrThrow strengthScope completed.Batches
+            publishAndRender strengthScope surface decisionId bundle completed.ReplicaSessionId
+
+    let private executeBoundReplica
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (decisionId: StrengthDecisionId)
+        (preparation: ReplicaPreparation)
+        : Task<unit> =
+        task {
+            match! surface.Ports.Runtime.SendPreparedPrompt preparation.ReplicaSessionId with
+            | Error _ ->
+                return!
+                    appendClosed
+                        strengthScope
+                        surface
+                        decisionId
+                        DelegationClosedFrom.Bound
+                        DelegationClosedReason.CannotContinue
+            | Ok() ->
+                let! completed = preparation.Completion
+                return! handleReplicaCompletion strengthScope surface decisionId completed
         }
+
+    let private appendBoundAndExecute
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (request: DelegationRequest)
+        (preparation: ReplicaPreparation)
+        : Task<unit> =
+        task {
+            match!
+                surface.Ports.Durability.Append(
+                    StrengthEvents.bound
+                        request.DecisionId
+                        surface.Target
+                        preparation.ReplicaSessionId
+                        surface.AnchorDigest
+                )
+            with
+            | StrengthDurableAppend.SemanticRejected reason ->
+                do! surface.Ports.Runtime.CancelOwner surface.Owner
+                return! failClosed strengthScope ("Strength DelegationBound rejected: " + reason)
+            | StrengthDurableAppend.StorageInvalid reason ->
+                do! surface.Ports.Runtime.CancelOwner surface.Owner
+                return! failClosed strengthScope ("Strength DelegationBound storage invalid: " + reason)
+            | StrengthDurableAppend.StorageFailed reason ->
+                do! surface.Ports.Runtime.CancelOwner surface.Owner
+                return! failClosed strengthScope ("Strength DelegationBound append failed: " + reason)
+            | StrengthDurableAppend.Applied ->
+                return! executeBoundReplica strengthScope surface request.DecisionId preparation
+        }
+
+    let private startWithMirror
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (request: DelegationRequest)
+        (replicaAgent: string)
+        (replicaMirror: ProviderProjection.ProviderWireMessage list)
+        : Task<unit> =
+        task {
+            match!
+                surface.Ports.Runtime.PrepareReplicaStart(
+                    surface.Owner,
+                    request.DecisionId,
+                    surface.Target,
+                    request.RequestedRounds,
+                    replicaAgent,
+                    replicaMirror,
+                    surface.AnchorDigest
+                )
+            with
+            | Error _ ->
+                return!
+                    appendClosed
+                        strengthScope
+                        surface
+                        request.DecisionId
+                        DelegationClosedFrom.Requested
+                        DelegationClosedReason.CannotContinue
+            | Ok preparation ->
+                return! appendBoundAndExecute strengthScope surface request preparation
+        }
+
+    let private prepareAndStartReplica
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (request: DelegationRequest)
+        : Task<unit> =
+        let replicaAgent = Roles.roleLabel surface.Authority.CanonicalRole
+        let mirrorResult =
+            StrengthFrame.tryLocalizeMirror
+                HostDigest.sha256Hex
+                request.DecisionId
+                surface.AnchorDigest
+                surface.Wire.Messages
+
+        match mirrorResult with
+        | Error _ -> Task.FromResult()
+        | Ok replicaMirror -> startWithMirror strengthScope surface request replicaAgent replicaMirror
 
     let private startRequest
         (strengthScope: PluginStrengthScope)
@@ -640,142 +897,34 @@ module StrengthDelegate =
         (surface: OwnerSurface)
         (request: DelegationRequest)
         : Task<unit> =
-        task {
-            if
-                request.OwnerLogicalRun.AuthorityRootUserMessageId
-                <> surface.Authority.AuthorityRootUserMessageId
-            then
-                do!
-                    appendClosed
-                        strengthScope
-                        surface
-                        request.DecisionId
-                        DelegationClosedFrom.Requested
-                        DelegationClosedReason.Superseded
-
-                return ()
-            elif strengthScope.StrengthFuseReason |> Option.isSome then
-                return! failClosed strengthScope "Strength fuse is tripped; delegation is closed for this process"
-            elif not predictorConfigured then
-                do!
-                    appendClosed
-                        strengthScope
-                        surface
-                        request.DecisionId
-                        DelegationClosedFrom.Requested
-                        DelegationClosedReason.CannotContinue
-
-                return ()
-            elif not (Set.contains surface.Authority.CanonicalRole StrengthPolicy.eligibleRoles) then
-                do!
-                    appendClosed
-                        strengthScope
-                        surface
-                        request.DecisionId
-                        DelegationClosedFrom.Requested
-                        DelegationClosedReason.CannotContinue
-
-                return ()
-            else
-                let replicaAgent = Roles.roleLabel surface.Authority.CanonicalRole
-
-                match
-                    StrengthFrame.tryLocalizeMirror
-                        HostDigest.sha256Hex
-                        request.DecisionId
-                        surface.AnchorDigest
-                        surface.Wire.Messages
-                with
-                | Error _ -> return ()
-                | Ok replicaMirror ->
-                    match!
-                        surface.Ports.Runtime.PrepareReplicaStart(
-                            surface.Owner,
-                            request.DecisionId,
-                            surface.Target,
-                            request.RequestedRounds,
-                            replicaAgent,
-                            replicaMirror,
-                            surface.AnchorDigest
-                        )
-                    with
-                    | Error _ ->
-                        do!
-                            appendClosed
-                                strengthScope
-                                surface
-                                request.DecisionId
-                                DelegationClosedFrom.Requested
-                                DelegationClosedReason.CannotContinue
-
-                        return ()
-                    | Ok preparation ->
-                        // DELEGATE-6.2: the empty child exists and carries internal
-                        // identity, but no prompt was sent and no model capacity was
-                        // reserved. Persist DelegationBound before any send; on a
-                        // write failure clean the empty child through CancelOwner.
-                        match!
-                            surface.Ports.Durability.Append(
-                                StrengthEvents.bound
-                                    request.DecisionId
-                                    surface.Target
-                                    preparation.ReplicaSessionId
-                                    surface.AnchorDigest
-                            )
-                        with
-                        | StrengthDurableAppend.SemanticRejected reason ->
-                            do! surface.Ports.Runtime.CancelOwner surface.Owner
-                            return! failClosed strengthScope ("Strength DelegationBound rejected: " + reason)
-                        | StrengthDurableAppend.StorageInvalid reason ->
-                            do! surface.Ports.Runtime.CancelOwner surface.Owner
-                            return! failClosed strengthScope ("Strength DelegationBound storage invalid: " + reason)
-                        | StrengthDurableAppend.StorageFailed reason ->
-                            do! surface.Ports.Runtime.CancelOwner surface.Owner
-                            return! failClosed strengthScope ("Strength DelegationBound append failed: " + reason)
-                        | StrengthDurableAppend.Applied ->
-                            match! surface.Ports.Runtime.SendPreparedPrompt preparation.ReplicaSessionId with
-                            | Error _ ->
-                                do!
-                                    appendClosed
-                                        strengthScope
-                                        surface
-                                        request.DecisionId
-                                        DelegationClosedFrom.Bound
-                                        DelegationClosedReason.CannotContinue
-
-                                return ()
-                            | Ok() ->
-                                let! completed = preparation.Completion
-
-                                match completed.Terminal with
-                                | StrengthReplicaTerminal.InvalidFrame reason ->
-                                    return! failClosed strengthScope ("Strength Replica invalid frame: " + reason)
-                                | _ when List.isEmpty completed.Batches ->
-                                    do!
-                                        appendClosed
-                                            strengthScope
-                                            surface
-                                            request.DecisionId
-                                            DelegationClosedFrom.Bound
-                                            DelegationClosedReason.NoMaterial
-
-                                    return ()
-                                | _ ->
-                                    match StrengthFrame.tryBuild HostDigest.sha256Hex completed.Batches with
-                                    | Error error ->
-                                        return!
-                                            failClosed
-                                                strengthScope
-                                                (sprintf "Strength Replica bundle invalid: %A" error)
-                                    | Ok bundle ->
-                                        return!
-                                            publishAndRender
-                                                strengthScope
-                                                surface
-                                                request.DecisionId
-                                                bundle
-                                                completed.ReplicaSessionId
-        }
+        if
+            request.OwnerLogicalRun.AuthorityRootUserMessageId
+            <> surface.Authority.AuthorityRootUserMessageId
+        then
+            appendClosed
+                strengthScope
+                surface
+                request.DecisionId
+                DelegationClosedFrom.Requested
+                DelegationClosedReason.Superseded
+        elif strengthScope.StrengthFuseReason |> Option.isSome then
+            failClosed strengthScope "Strength fuse is tripped; delegation is closed for this process"
+        elif not predictorConfigured then
+            appendClosed
+                strengthScope
+                surface
+                request.DecisionId
+                DelegationClosedFrom.Requested
+                DelegationClosedReason.CannotContinue
+        elif not (Set.contains surface.Authority.CanonicalRole StrengthPolicy.eligibleRoles) then
+            appendClosed
+                strengthScope
+                surface
+                request.DecisionId
+                DelegationClosedFrom.Requested
+                DelegationClosedReason.CannotContinue
+        else
+            prepareAndStartReplica strengthScope surface request
 
     /// DELEGATE-10: recovery reads the pending request from persisted facts. A
     /// new user input or authority replacement closes the old request; the
@@ -801,6 +950,57 @@ module StrengthDelegate =
             | view :: _ -> return! startRequest strengthScope predictorConfigured surface view.Request
         }
 
+    [<RequireQualifiedAccess>]
+    type private SurfaceApplication =
+        | Skip
+        | ConsumeBound of StrengthDelegationView
+        | StartPending
+
+    let private decideTargetAction
+        (target: ProviderRunIdentity)
+        (durable: StrengthProjection)
+        : SurfaceApplication =
+        match StrengthProjection.tryDecisionForTarget target durable with
+        | None -> SurfaceApplication.StartPending
+        | Some decisionId ->
+            StrengthProjection.tryCandidate decisionId durable
+            |> Option.map SurfaceApplication.ConsumeBound
+            |> Option.defaultValue SurfaceApplication.Skip
+
+    let private planSurfaceApplication (surface: OwnerSurface) : SurfaceApplication =
+        if surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
+            SurfaceApplication.Skip
+        else
+            decideTargetAction surface.Target surface.DurableProjection
+
+    let private applyOnSurface
+        (strengthScope: PluginStrengthScope)
+        (predictorConfigured: bool)
+        (surface: OwnerSurface)
+        : Task<unit> =
+        match planSurfaceApplication surface with
+        | SurfaceApplication.Skip -> Task.FromResult()
+        | SurfaceApplication.ConsumeBound view -> consumeBoundDecision strengthScope surface view
+        | SurfaceApplication.StartPending -> startPendingRequest strengthScope predictorConfigured surface
+
+    let private executeApplyOnBound
+        (bound: BoundPorts * SessionId)
+        (strengthScope: PluginStrengthScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
+        (predictorConfigured: bool)
+        (output: obj)
+        : Task<unit> =
+        task {
+            let ports, _ = bound
+            let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "start"
+            match!
+                resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
+            with
+            | Error _ -> return ()
+            | Ok surface -> return! applyOnSurface strengthScope predictorConfigured surface
+        }
+
     let tryApply
         (snapshotPort: ISessionSnapshotPort option)
         (journal: AgentJournal option)
@@ -811,28 +1011,13 @@ module StrengthDelegate =
         (predictorConfigured: bool)
         (output: obj)
         : Task<unit> =
-        task {
-            match tryBind journal snapshotPort strengthDurability strengthScope output with
-            | Error _ -> return ()
-            | Ok bound ->
-                let ports, _ = bound
-
-                match! ports.Durability.LoadProjection() with
-                | Error reason ->
-                    return failClosed strengthScope ("Strength start cannot prove EventStore health: " + reason)
-                | Ok durableStrength ->
-                    match!
-                        resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
-                    with
-                    | Error _ -> return ()
-                    | Ok surface ->
-                        if surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
-                            return ()
-                        else
-                            match StrengthProjection.tryDecisionForTarget surface.Target surface.DurableProjection with
-                            | Some decisionId ->
-                                match StrengthProjection.tryCandidate decisionId surface.DurableProjection with
-                                | Some view -> return! consumeBoundDecision strengthScope surface view
-                                | None -> return ()
-                            | None -> return! startPendingRequest strengthScope predictorConfigured surface
-        }
+        match tryBind journal snapshotPort strengthDurability strengthScope output with
+        | Error _ -> Task.FromResult()
+        | Ok bound ->
+            executeApplyOnBound
+                bound
+                strengthScope
+                tryAttemptPlan
+                syncDelegateRuntime
+                predictorConfigured
+                output
