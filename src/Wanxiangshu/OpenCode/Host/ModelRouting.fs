@@ -149,20 +149,23 @@ module ModelRouting =
         | NotConfigured
         | ConfigurationInvalid of reason: string
 
+    let private matchPredictorState (value: obj) : PredictorConfiguration =
+        match string value?state with
+        | "configured" -> PredictorConfiguration.Configured
+        | "unconfigured" -> PredictorConfiguration.NotConfigured
+        | "invalid" ->
+            let reason = if isNull value?reason then "" else string value?reason
+            PredictorConfiguration.ConfigurationInvalid reason
+        | other ->
+            PredictorConfiguration.ConfigurationInvalid(
+                sprintf "predictor configuration query returned unknown state %s" other
+            )
+
     let private predictorConfigurationOf (value: obj) : PredictorConfiguration =
         if isNull value then
             PredictorConfiguration.ConfigurationInvalid "predictor configuration query returned no result"
         else
-            match string value?state with
-            | "configured" -> PredictorConfiguration.Configured
-            | "unconfigured" -> PredictorConfiguration.NotConfigured
-            | "invalid" ->
-                let reason = if isNull value?reason then "" else string value?reason
-                PredictorConfiguration.ConfigurationInvalid reason
-            | other ->
-                PredictorConfiguration.ConfigurationInvalid(
-                    sprintf "predictor configuration query returned unknown state %s" other
-                )
+            matchPredictorState value
 
     /// Read-only existence query owned by the same MJS model configuration:
     /// absent Predictor slot or empty candidates are not configured; valid
@@ -302,9 +305,20 @@ module ModelRouting =
                           Reasoning = reasoning.Trim() })
 
     let sameTarget (expected: ModelRoutingTarget) (observed: OpencodeModel) =
-        match ofOpenCodeModel observed with
-        | Some actual -> actual = expected
-        | None -> false
+        if String.IsNullOrWhiteSpace observed.providerID || String.IsNullOrWhiteSpace observed.modelID then
+            false
+        else
+            let obsModel = observed.providerID.Trim() + "/" + observed.modelID.Trim()
+            let obsReasoning = observed.variant |> Option.bind (fun v -> if String.IsNullOrWhiteSpace v then None else Some(v.Trim())) |> Option.defaultValue ""
+            let expectedModel = expected.Model.Trim()
+            let expectedReasoning = expected.Reasoning.Trim()
+            let modelMatch = String.Equals(obsModel, expectedModel, StringComparison.OrdinalIgnoreCase)
+            let reasoningMatch =
+                if String.IsNullOrWhiteSpace expectedReasoning then
+                    String.IsNullOrWhiteSpace obsReasoning
+                else
+                    String.Equals(obsReasoning, expectedReasoning, StringComparison.OrdinalIgnoreCase)
+            modelMatch && reasoningMatch
 
     /// A SessionId is a reusable container. Model occupancy belongs to the exact
     /// physical user material that caused the provider execution, never to the
@@ -427,17 +441,19 @@ module ModelRouting =
             | true, lease when lease.PhysicalUserMessageId.IsSome && lease.Purpose = purpose -> Some lease.Target
             | _ -> None
 
+        let recordLeasePurposeEntry sessionId physical purpose =
+            let existing =
+                match leasePurposeBySession.TryGetValue sessionId with
+                | true, entries -> entries
+                | false, _ -> []
+
+            leasePurposeBySession.[sessionId] <- (physical, purpose) :: existing
+
         /// Record the purpose of an admitted physical execution. Reservations carry
         /// no physical identity yet; their adoption records the real one.
         let rememberLeasePurpose sessionId (lease: ExecutionLease) =
             match lease.PhysicalUserMessageId with
-            | Some physical ->
-                let existing =
-                    match leasePurposeBySession.TryGetValue sessionId with
-                    | true, entries -> entries
-                    | false, _ -> []
-
-                leasePurposeBySession.[sessionId] <- (physical, lease.Purpose) :: existing
+            | Some physical -> recordLeasePurposeEntry sessionId physical lease.Purpose
             | None -> ()
 
         /// Purpose of a possibly stale admitted physical execution. An unknown
@@ -572,6 +588,23 @@ module ModelRouting =
             activeBySession.[demand.SessionId] <- lease
             rememberLeasePurpose demand.SessionId lease
 
+        let enforceDevopsBindingNormal sessionId role target =
+            match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
+            | true, (true, bound) when
+                bound <> target
+                && exactTargetAvailable role bound (running ()) ModelExecutionPurpose.Normal
+                ->
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
+                        bound.Model
+                        bound.Reasoning
+                        target.Model
+                        target.Reasoning
+                )
+            | true, _ -> boundDevopsTargetBySession.[sessionId] <- target
+            | _ -> ()
+
         /// The fixed DevOps target binding belongs to the owner execution only
         /// (execution-model-routing-019). A readonly-delegate execution is a new
         /// physical execution: it must neither inherit nor overwrite the binding.
@@ -583,22 +616,7 @@ module ModelRouting =
             =
             match purpose with
             | ModelExecutionPurpose.ReadonlyDelegate -> ()
-            | ModelExecutionPurpose.Normal ->
-                match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
-                | true, (true, bound) when
-                    bound <> target
-                    && exactTargetAvailable role bound (running ()) ModelExecutionPurpose.Normal
-                    ->
-                    invalidOp (
-                        sprintf
-                            "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
-                            bound.Model
-                            bound.Reasoning
-                            target.Model
-                            target.Reasoning
-                    )
-                | true, _ -> boundDevopsTargetBySession.[sessionId] <- target
-                | _ -> ()
+            | ModelExecutionPurpose.Normal -> enforceDevopsBindingNormal sessionId role target
 
         let tryGetBoundDevopsTarget (sessionId: string) (role: Role) =
             match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
@@ -1360,6 +1378,23 @@ module ModelRouting =
                     cacheKeyOpt |> Option.iter (fun k -> activeProviderStepTasks.[k] <- t)
                     t)
 
+        let enforceStaleObservedBinding (observed: ExecutionAdmissionExactIdentity) =
+            match staleLeasePurpose observed.SessionId observed.PhysicalUserMessageId with
+            | Some purpose ->
+                enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target purpose
+            | None ->
+                enforceImmutableDevopsBinding
+                    observed.SessionId
+                    observed.Role
+                    observed.Target
+                    ModelExecutionPurpose.Normal
+
+        let enforceObservedBinding (observed: ExecutionAdmissionExactIdentity) =
+            match activeBySession.TryGetValue observed.SessionId with
+            | true, active when active.PhysicalUserMessageId = Some observed.PhysicalUserMessageId ->
+                enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target active.Purpose
+            | _ -> enforceStaleObservedBinding observed
+
         member _.AcquireExecutionAdmission
             (
                 sessionId: string,
@@ -1387,26 +1422,7 @@ module ModelRouting =
             /// the road, not to the currently active physical execution, and the
             /// commit itself settles as a stale fence outcome when the lease no
             /// longer matches.
-            let enforceBinding () =
-                match activeBySession.TryGetValue observed.SessionId with
-                | true, active when active.PhysicalUserMessageId = Some observed.PhysicalUserMessageId ->
-                    enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target active.Purpose
-                | _ ->
-                    // A stale or superseded commit has no live lease: the
-                    // remembered purpose of the admitted execution keeps the
-                    // readonly-delegate exemption total, and an unknown execution
-                    // is treated as an ordinary owner execution.
-                    match staleLeasePurpose observed.SessionId observed.PhysicalUserMessageId with
-                    | Some purpose ->
-                        enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target purpose
-                    | None ->
-                        enforceImmutableDevopsBinding
-                            observed.SessionId
-                            observed.Role
-                            observed.Target
-                            ModelExecutionPurpose.Normal
-
-            lock gate enforceBinding
+            lock gate (fun () -> enforceObservedBinding observed)
             admissionOwner.Commit(lease, observed)
 
         member _.ReleaseExecutionAdmissionBeforeProvider

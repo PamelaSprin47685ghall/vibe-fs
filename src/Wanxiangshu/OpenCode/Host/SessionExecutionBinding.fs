@@ -95,10 +95,24 @@ module SessionExecutionBinding =
                 Some parent)
         |> Option.flatten
 
+    let private nonEmpty (value: string) =
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(value.Trim())
+
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
-        left.providerID = right.providerID
-        && left.modelID = right.modelID
-        && left.variant = right.variant
+        let sameProvider = String.Equals(left.providerID.Trim(), right.providerID.Trim(), StringComparison.OrdinalIgnoreCase)
+        let sameModelId = String.Equals(left.modelID.Trim(), right.modelID.Trim(), StringComparison.OrdinalIgnoreCase)
+        let leftVar = left.variant |> Option.bind nonEmpty
+        let rightVar = right.variant |> Option.bind nonEmpty
+        let sameVariant =
+            match leftVar, rightVar with
+            | None, None -> true
+            | Some l, Some r -> String.Equals(l, r, StringComparison.OrdinalIgnoreCase)
+            | _ -> false
+        sameProvider && sameModelId && sameVariant
+
 
     let private modelText (model: OpencodeModel) =
         sprintf "%s/%s[%s]" model.providerID model.modelID (model.variant |> Option.defaultValue "<missing>")
@@ -131,12 +145,6 @@ module SessionExecutionBinding =
 
     let verifyDevOpsModel (sessionId: SessionId) (model: OpencodeModel) : unit =
         lock gate (fun () -> verifyDevOpsModelLocked (SessionId.value sessionId) model)
-
-    let private nonEmpty (value: string) =
-        if String.IsNullOrWhiteSpace value then
-            None
-        else
-            Some(value.Trim())
 
     let private promptBindingKey (sessionId: SessionId) (promptKey: PromptKey) =
         SessionId.value sessionId + "\u001f" + PromptKey.value promptKey
@@ -234,18 +242,27 @@ module SessionExecutionBinding =
     let isInternalRoot (sessionId: SessionId) =
         lock gate (fun () -> internalRoots.Contains(SessionId.value sessionId))
 
+    let private tryResolveDurableParent (key: string) : SessionId option =
+        match durableParentOf key with
+        | Some parent ->
+            parents.[key] <- parent
+            Some(SessionId.create parent)
+        | None -> None
+
+    let private tryResolveDurableAgent (key: string) : string option =
+        match durableChildEvidence |> Option.bind (fun resolve -> resolve key) with
+        | Some(_, agent) when not (String.IsNullOrWhiteSpace agent) ->
+            agents.[key] <- agent
+            Some agent
+        | _ -> None
+
     let tryParent (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
 
             match parents.TryGetValue key with
             | true, value -> Some(SessionId.create value)
-            | false, _ ->
-                match durableParentOf key with
-                | Some parent ->
-                    parents.[key] <- parent
-                    Some(SessionId.create parent)
-                | None -> None)
+            | false, _ -> tryResolveDurableParent key)
 
     let tryAgent (sessionId: SessionId) =
         lock gate (fun () ->
@@ -253,12 +270,7 @@ module SessionExecutionBinding =
 
             match agents.TryGetValue key with
             | true, value -> Some value
-            | false, _ ->
-                match durableChildEvidence |> Option.bind (fun resolve -> resolve key) with
-                | Some(_, agent) when not (String.IsNullOrWhiteSpace agent) ->
-                    agents.[key] <- agent
-                    Some agent
-                | _ -> None)
+            | false, _ -> tryResolveDurableAgent key)
 
     /// A Host-owned auxiliary child (for example title generation) is observed from
     /// a public session.created parent edge but has no Wanxiangshu execution agent.
@@ -960,9 +972,14 @@ module SessionExecutionBinding =
         let observedAgent = if isNull agent then "" else agent.Trim()
 
         match providerExpectation sessionId with
-        | ProviderExpectation.ExactAttempt expected -> validateExactAttempt sessionId expected observedAgent model
+        | ProviderExpectation.ExactAttempt expected ->
+            validateExactAttempt sessionId expected observedAgent model
         | ProviderExpectation.ManagedWithoutAttempt ->
-            Error "PROMPT-006: managed provider run has no exact physical execution binding"
+            match tryAgent sessionId with
+            | Some expectedAgent when not (String.Equals(expectedAgent.Trim(), observedAgent, StringComparison.OrdinalIgnoreCase)) ->
+                Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expectedAgent observedAgent)
+            | _ ->
+                Error "PROMPT-006: managed provider run has no exact physical execution binding"
         | ProviderExpectation.Unbound -> Ok false
 
     let participantAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =
