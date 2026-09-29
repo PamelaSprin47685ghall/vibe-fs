@@ -49,7 +49,8 @@ test('WHAT[managed-chat-execution-013] queue full and cancellation cross no bind
       'AcquireLease',
       'TerminalizeAccepted',
     ])
-      assert.equal(result.hostCount, 0)
+    assert.equal(result.bindCount, 0)
+    assert.equal(result.hostCount, 0)
     assert.equal(result.commitCount, 0)
     assert.equal(result.releaseCount, 0)
     assert.equal(result.providerCount, 0)
@@ -215,6 +216,7 @@ test('WHAT[managed-chat-execution-013] pre-provider cancellation settlement revo
     assert.equal(settled.sessionId, sessionId)
     assert.equal(settled.physicalUserMessageId, physicalId)
   })
+})
 }
 
 {
@@ -261,6 +263,4 @@ test('WHAT[managed-chat-execution-013] concurrent admissions of one exact key me
   const flightSpan = bootstrap.slice(flightStart, flightEnd)
   assert.doesNotMatch(flightSpan, /let!|do!|await/, 'no capacity waiting may happen while the lock is held')
 })
-}
-)
 }
