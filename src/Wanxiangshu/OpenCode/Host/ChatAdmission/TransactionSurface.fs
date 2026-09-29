@@ -115,11 +115,9 @@ module TransactionSurface =
         | ChatAdmissionTransactionStep.AcceptedWitness -> "AcceptedWitness"
         | ChatAdmissionTransactionStep.AcquireLease -> "AcquireLease"
         | ChatAdmissionTransactionStep.LeaseTarget -> "LeaseTarget"
-        | ChatAdmissionTransactionStep.BindExecution -> "BindExecution"
         | ChatAdmissionTransactionStep.ProjectHost -> "ProjectHost"
         | ChatAdmissionTransactionStep.CommitLease -> "CommitLease"
         | ChatAdmissionTransactionStep.TerminalizeAccepted -> "TerminalizeAccepted"
-        | ChatAdmissionTransactionStep.UnbindExecution -> "UnbindExecution"
         | ChatAdmissionTransactionStep.ReleaseBeforeProvider -> "ReleaseBeforeProvider"
         | ChatAdmissionTransactionStep.Settled -> "Settled"
 
@@ -152,10 +150,6 @@ module TransactionSurface =
         | ChatAdmissionTransactionError.PreProviderSettlementFailed _ -> box {| kind = "PreProviderSettlementFailed" |}
         | ChatAdmissionTransactionError.PreProviderSettlementBoundaryFailed _ ->
             box {| kind = "PreProviderSettlementBoundaryFailed" |}
-        | ChatAdmissionTransactionError.PreProviderUnbindBoundaryFailed(_, release) ->
-            box
-                {| kind = "PreProviderUnbindBoundaryFailed"
-                   release = releaseLabel release |}
         | ChatAdmissionTransactionError.LeaseAcquisitionFailed _ -> box {| kind = "LeaseAcquisitionFailed" |}
         | ChatAdmissionTransactionError.LeaseTargetFailed(_, release) ->
             box
@@ -168,10 +162,6 @@ module TransactionSurface =
         | ChatAdmissionTransactionError.LeaseTargetProjectionFailed(_, release) ->
             box
                 {| kind = "LeaseTargetProjectionFailed"
-                   release = releaseLabel release |}
-        | ChatAdmissionTransactionError.BindingFailed(_, release) ->
-            box
-                {| kind = "BindingFailed"
                    release = releaseLabel release |}
         | ChatAdmissionTransactionError.HostProjectionFailed(_, release) ->
             box
