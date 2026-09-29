@@ -88,6 +88,55 @@ test('WHAT[verification-system-021] a failing suite preserves its container fail
   assert.deepEqual(summary.failures.map(({ name }) => name), ['fail'])
 })
 
+test('WHAT[verification-system-021] shared registration sources retain each entry ownership and repeated container verdicts count once', () => {
+  const state = createRunState()
+  state.applyEvent(verdict('shared helper', 'test:pass', { entryFile: '/test/first.mjs', testId: 1 }))
+  state.applyEvent(verdict('shared helper', 'test:fail', { entryFile: '/test/second.mjs', testId: 1 }))
+  const container = verdict('suite', 'test:fail', {
+    entryFile: '/test/second.mjs', testId: 2, details: { type: 'suite', error: { message: 'child failed' } },
+  })
+  state.applyEvent(container)
+  state.applyEvent(container)
+  const summary = state.summarize()
+  assert.deepEqual(counts(summary), { passed: 1, failed: 1, skipped: 0, todo: 0, cancelled: 0 })
+  assert.equal(summary.files, 2)
+  assert.equal(summary.containerFailures, 1)
+  assert.equal(summary.failures[0].file, '/test/second.mjs')
+  assert.equal(summary.failures[0].sourceFile, '/test/a.mjs')
+  assert.equal(summary.containerFailureDetails[0].error.message, 'child failed')
+})
+
+test('WHAT[verification-system-021] the real concurrent runner keeps shared helper tests under their own entry files', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'entry-ownership-'))
+  try {
+    writeFileSync(join(directory, 'helper.mjs'), "import test from 'node:test'\ntest('shared helper', () => {})\n")
+    const entries = [join(directory, 'first.fixture.mjs'), join(directory, 'second.fixture.mjs')]
+    for (const entry of entries) writeFileSync(entry, "import './helper.mjs'\n")
+    const child = spawn(process.execPath, [NODE_TEST_INNER, ...entries], {
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...childEnv, NODE_TEST_CONCURRENCY: '2' },
+    })
+    const messages = []
+    let diagnostics = ''
+    child.stdout.resume()
+    child.stderr.on('data', (chunk) => { diagnostics += chunk })
+    child.on('message', (message) => messages.push(message))
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 0, diagnostics)
+    const summary = messages.find(({ type }) => type === 'runner:summary').data
+    assert.equal(summary.passed, 2)
+    assert.equal(summary.files, 2)
+    assert.equal(summary.filesCompleted, 2)
+    assert.equal(summary.containerFailures, 0)
+    assert.deepEqual(summary.byFile.map(({ file, passed }) => ({ file, passed })).sort((a, b) => a.file.localeCompare(b.file)),
+      entries.map((file) => ({ file, passed: 1 })))
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[verification-system-021] a leaf completion cannot stand for completion of its file', () => {
   const complete = (name, file = fixture) => ({ type: 'test:complete', data: { name, file } })
   assert.equal(isFileCompletionEvent(complete('leaf')), false)

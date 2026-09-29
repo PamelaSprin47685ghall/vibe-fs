@@ -79,10 +79,10 @@ module ModelRouting =
             lenderSessionId: string option ->
                 ModelRoutingTarget option
 
-        member TryReadExecution:
-            sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
+        member TryReadExecution: sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
 
         member BindDevopsTarget: sessionId: string * target: ModelRoutingTarget -> unit
+        member SeedBoundDevOpsModel: sessionId: string * value: string -> unit
         member BoundDevopsTarget: sessionId: string -> ModelRoutingTarget option
 
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome

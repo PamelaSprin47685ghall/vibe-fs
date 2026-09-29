@@ -816,8 +816,7 @@ type StrengthReplicaRuntime
                 complete (StrengthReplicaTerminal.Failed error) admitted
                 do! abortReplica admitted
                 return Error error
-            | Ok _ ->
-                return! sendPreparedPrompt state identitySeed admitted replicaSessionId
+            | Ok _ -> return! sendPreparedPrompt state identitySeed admitted replicaSessionId
         }
 
     let sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId =

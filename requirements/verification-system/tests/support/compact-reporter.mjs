@@ -80,10 +80,13 @@ export function createCompactReporter(options = {}) {
     const summary = summarize(state)
 
     // Always print failures if any
-    if (summary.failures.length > 0) {
+    const failures = [...summary.failures, ...summary.containerFailureDetails]
+    if (failures.length > 0) {
       err.write('\n✖ failing tests:\n\n')
-      for (const f of summary.failures) {
-        const loc = f.file ? `test at ${f.file}${f.line ? `:${f.line}:${f.column || 1}` : ''}\n` : ''
+      for (const f of failures) {
+        const sourceFile = f.sourceFile || f.file
+        if (f.file && f.file !== sourceFile) err.write(`test entry ${f.file}\n`)
+        const loc = sourceFile ? `test at ${sourceFile}${f.line ? `:${f.line}:${f.column || 1}` : ''}\n` : ''
         err.write(`${loc}✖ ${f.name} (${f.durationMs.toFixed(3)}ms)\n`)
         const errObj = f.error?.cause ?? f.error
         if (errObj) {
@@ -103,6 +106,7 @@ export function createCompactReporter(options = {}) {
       (summary.skipped > 0 ? `, ${summary.skipped} skipped` : '') +
       (summary.todo > 0 ? `, ${summary.todo} todo` : '') +
       (summary.cancelled > 0 ? `, ${summary.cancelled} cancelled` : '') +
+      (summary.containerFailures > 0 ? `, ${summary.containerFailures} failed containers` : '') +
       ` (${(summary.wallMs / 1000).toFixed(2)}s wall, ${(summary.sumTestMs / 1000).toFixed(2)}s test time)\n`
     err.write(summaryText)
     for (const item of summary.exclusions) {

@@ -6,7 +6,7 @@ module WorkspaceEventStoreSurface =
     let acquire (commonDir: string) : obj =
         WorkspaceEventStore.acquire commonDir |> box
 
-    let allHeadsCount (store: obj) : int =
-        (unbox<IEventStore> store).AllHeads() |> List.length
+    let activate (store: obj) : unit =
+        (unbox<IEventStore> store).TryCurrent "Journal" |> ignore
 
     let release (commonDir: string) : unit = WorkspaceEventStore.release commonDir

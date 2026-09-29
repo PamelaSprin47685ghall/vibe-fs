@@ -75,7 +75,7 @@ integrationTest('WHAT[managed-chat-execution-009] abrupt process exit retains ex
     assert.equal(crashed.status, 86, crashed.stderr || crashed.stdout)
     assert.deepEqual(readMarker(beforeMarker), {
       status: { accepted: true, providerStarted: false, terminal: false },
-      bindingCount: 1,
+      bindingCount: 0,
       decoy: {
         status: { accepted: false, providerStarted: false, terminal: false },
         bindingCount: 0,

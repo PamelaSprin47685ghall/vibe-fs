@@ -1,80 +1,87 @@
+import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as binding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
+import { recovery, fold, link, admittedFission, canonical, id } from './support/load-projection.mjs'
 
-{
-const { default: assert } = await import('node:assert/strict')
-const { default: test } = await import('node:test')
-const root = '../../../dist'
-const Fold = await import(`${root}/Composition/Durable/Fold.js`)
-const Lookup = await import(`${root}/Execution/Delegation/DurableChildLookup.js`)
-const Recovery = await import(`${root}/OpenCode/Host/SessionBindingRecovery.js`)
-const BindingSurface = await import(`${root}/OpenCode/Host/SessionBindingSurface.js`)
-const FissionRuntime = await import(`${root}/Execution/Fission/Runtime.js`)
-const DelegationFacts = await import(`${root}/Execution/Delegation/Facts.js`)
-const Roles = await import(`${root}/Foundation/Roles.js`)
-const Identity = await import(`${root}/Foundation/Identity.js`)
-const Fact = await import(`${root}/Composition/Durable/Fact.js`)
-
-const sessionId = (value) => Identity.SessionIdModule_create(value)
-const raw = (value) => (typeof value === 'string' ? value : Identity.SessionIdModule_value(value))
-
-// WHAT[crash-reconciliation-021]: the in-process registries are a cache of what
-// this process currently drives. Existence is answered by the durable projection,
-// and a cache miss resolves on demand instead of answering "unknown".
-const projectWithChild = () => {
-  const linked = Fold.foldFact(
-    Fold.empty,
-    new Fact.Fact(1, [
-      new Fact.AgentFact(3, [
-        new DelegationFacts.ExecutionFactCases(0, [
-          {
-            ParentSessionId: sessionId('ses-road-root'),
-            ChildSessionId: sessionId('ses-engineer-child'),
-            Handle: new Identity.HandleId(0, [Identity.AgentHandleIdModule_create('w3ci5f')]),
-            TargetAgent: 'engineer',
-            Byname: 'decision-record-readonly',
-            CanonicalRole: Roles.Role.Engineer,
-            Ownership: DelegationFacts.HandleOwnership.DurableParentHandle,
-          },
-        ]),
-      ]),
-    ]),
-  )
-
-  assert.equal(Fold.isOk(linked), true, 'the handle link must fold')
-  return Fold.unwrap(linked).AgentProjections
-}
-
-test('WHAT[crash-reconciliation-021] CRASH_021_durable_lookup_answers_without_any_process_registration', () => {
-  const projections = projectWithChild()
-  const handles = projections.Sessions.get(sessionId('ses-road-root')).Handles
-
-  assert.equal(raw(Lookup.byHandleId(handles, 'w3ci5f')[0]), 'ses-engineer-child')
-  assert.equal(raw(Lookup.byByname(handles, 'decision-record-readonly')[0]), 'ses-engineer-child')
-  assert.equal(Lookup.byHandleId(handles, 'unknown') ?? null, null)
+test('WHAT[crash-reconciliation-021] durable handles answer by id and byname without process registration', () => {
+  const state = recovery.create()
+  link(state)
+  const expected = { session: 'child', role: 'Engineer', agent: 'engineer' }
+  assert.deepEqual(recovery.lookupChild(state, 'parent', 'work', false), expected)
+  assert.deepEqual(recovery.lookupChild(state, 'parent', 'review-change', true), expected)
+  assert.equal(recovery.lookupChild(state, 'parent', 'unknown', false), null)
+  assert.equal(recovery.lookupChild(state, 'other-parent', 'work', false), null)
 })
 
-test('WHAT[crash-reconciliation-021] CRASH_021_binding_cache_miss_resolves_from_durable_evidence', () => {
-  const projections = projectWithChild()
-
-  BindingSurface.drop('ses-engineer-child')
-  Recovery.installFrom(() => projections)
-
-  assert.equal(BindingSurface.tryParent('ses-engineer-child'), 'ses-road-root')
-  assert.equal(BindingSurface.tryAgent('ses-engineer-child'), 'engineer')
+test('WHAT[crash-reconciliation-021] a binding cache miss resolves the latest durable TargetAgent rather than the logical byname', () => {
+  for (const agent of ['engineer', 'devops']) {
+    const state = recovery.create()
+    binding.drop('child')
+    recovery.installResolvers(state)
+    try {
+      assert.equal(binding.tryParent('child'), '')
+      assert.equal(binding.tryAgent('child'), '')
+      link(state, { agent })
+      assert.deepEqual(recovery.bindingEvidence(state, 'child'), { parent: 'parent', agent })
+      assert.equal(binding.tryParent('child'), 'parent')
+      assert.equal(binding.tryAgent('child'), agent)
+      binding.drop('child')
+      assert.equal(binding.tryAgent('child'), agent)
+    } finally {
+      recovery.clearResolvers()
+      binding.drop('child')
+    }
+  }
 })
 
-test('WHAT[crash-reconciliation-021] CRASH_021_fission_lane_cache_miss_resolves_from_durable_evidence', () => {
-  const lane = sessionId('ses-fission-lane')
-
-  FissionRuntime.FissionRuntime_installDurableLaneEvidence((laneSessionId) =>
-    raw(laneSessionId) === 'ses-fission-lane'
-      ? { GroupId: 'group-1', OwnerSessionId: sessionId('ses-owner'), LaneIndex: 0, LaneCount: 2 }
-      : null,
-  )
-
-  const binding = FissionRuntime.FissionRuntime_tryLane(lane)
-
-  assert.ok(binding, 'a cache miss must resolve from durable evidence')
-  assert.equal(raw(binding.OwnerSessionId), 'ses-owner')
+test('WHAT[crash-reconciliation-021] a hidden Host-owned leaf yields no parent-visible execution binding', () => {
+  const state = recovery.create()
+  link(state, { ownership: 'HostOwnedHidden' })
+  assert.equal(recovery.bindingEvidence(state, 'child'), null)
 })
-}
+
+test('WHAT[crash-reconciliation-021] a Companion binding cache miss resolves its durable main session and Blogger agent', () => {
+  const state = recovery.create()
+  const companion = 'ses-blogger-companion'
+  binding.drop(companion)
+  recovery.installResolvers(state)
+  try {
+    assert.equal(binding.tryParent(companion), '')
+    assert.equal(binding.tryAgent(companion), '')
+    assert.equal(recovery.bindingEvidence(state, companion), null)
+    fold(state, canonical('Companion', 'CompanionBloggerLinked', {
+      SessionId: id('SessionId', 'parent'),
+      BloggerSessionId: id('SessionId', companion),
+      BloggerAgent: 'blogger',
+    }))
+    assert.deepEqual(recovery.bindingEvidence(state, companion), { parent: 'parent', agent: 'blogger' })
+    assert.equal(binding.tryParent(companion), 'parent')
+    assert.equal(binding.tryAgent(companion), 'blogger')
+    binding.drop(companion)
+    assert.equal(binding.tryParent(companion), 'parent')
+    assert.equal(binding.tryAgent(companion), 'blogger')
+  } finally {
+    recovery.clearResolvers()
+    binding.drop(companion)
+  }
+})
+
+test('WHAT[crash-reconciliation-021] a Fission lane cache miss resolves the folded owner and slot without pre-registration', () => {
+  const state = recovery.create()
+  recovery.clearLane('lane-0')
+  recovery.clearLane('lane-1')
+  recovery.installResolvers(state)
+  try {
+    assert.equal(recovery.lane('lane-0'), null)
+    fold(state, admittedFission())
+    assert.deepEqual(recovery.lane('lane-0'), { group: 'group', owner: 'owner', index: 0, count: 2 })
+    assert.deepEqual(recovery.lane('lane-1'), { group: 'group', owner: 'owner', index: 1, count: 2 })
+    assert.equal(recovery.lane('unknown-lane'), null)
+  } finally {
+    recovery.clearResolvers()
+    recovery.clearLane('lane-0')
+    recovery.clearLane('lane-1')
+  }
+})
+
+test.todo('WHAT[crash-reconciliation-021] actual reuse, placement and await entry points all resolve durable children after an OS restart without registry prewarming (GAP-149)')

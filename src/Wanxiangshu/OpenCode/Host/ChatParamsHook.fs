@@ -109,55 +109,54 @@ module ChatParamsHook =
             { SessionId = sessionId
               PhysicalUserMessageId = physicalUserMessageId }
 
-        match ModelRouting.tryReadExecution key with
-        | None ->
-            invalidOp (
-                sprintf
-                    "PROMPT-006: managed provider run '%s' for session '%s' has no committed execution lease for physical user message '%s'"
-                    agent
-                    (SessionId.value sessionId)
-                    (PhysicalUserMessageId.value physicalUserMessageId)
-            )
-        | Some lease ->
-            let expectedParticipant = lease.Identity.Participant
-
-            if not (String.Equals(expectedParticipant, agent, StringComparison.Ordinal)) then
+        let lease =
+            ModelRouting.tryReadExecution key
+            |> Option.defaultWith (fun () ->
                 invalidOp (
                     sprintf
-                        "PROMPT-006: provider agent drift for physical user message '%s' (%s -> %s)"
-                        (PhysicalUserMessageId.value physicalUserMessageId)
-                        expectedParticipant
-                        agent
-                )
-            elif not (ModelRouting.sameTarget lease.Identity.Target model) then
-                let expected = ModelRouting.toOpenCodeModel lease.Identity.Target
-
-                invalidOp (
-                    sprintf
-                        "PROMPT-006: provider model/reasoning drift for physical user message '%s' (%s/%s[%s] -> %s/%s[%s])"
-                        (PhysicalUserMessageId.value physicalUserMessageId)
-                        expected.providerID
-                        expected.modelID
-                        (expected.variant |> Option.defaultValue "<missing>")
-                        model.providerID
-                        model.modelID
-                        (model.variant |> Option.defaultValue "<missing>")
-                )
-
-    let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
-        match currentModel input with
-        | None ->
-            invalidOp (sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent)
-        | Some model ->
-            match tryPhysicalUserMessageId input with
-            | None ->
-                invalidOp (
-                    sprintf
-                        "PROMPT-006: managed provider run '%s' for session '%s' has no physical user message id"
+                        "PROMPT-006: managed provider run '%s' for session '%s' has no committed execution lease for physical user message '%s'"
                         agent
                         (SessionId.value sessionId)
-                )
-            | Some physical -> validateObservedProvider sessionId physical agent model
+                        (PhysicalUserMessageId.value physicalUserMessageId)
+                ))
+
+        let expectedParticipant = lease.Identity.Participant
+
+        if not (String.Equals(expectedParticipant, agent, StringComparison.Ordinal)) then
+            invalidOp (
+                sprintf
+                    "PROMPT-006: provider agent drift for physical user message '%s' (%s -> %s)"
+                    (PhysicalUserMessageId.value physicalUserMessageId)
+                    expectedParticipant
+                    agent
+            )
+        elif not (ModelRouting.sameTarget lease.Identity.Target model) then
+            let expected = ModelRouting.toOpenCodeModel lease.Identity.Target
+
+            invalidOp (
+                sprintf
+                    "PROMPT-006: provider model/reasoning drift for physical user message '%s' (%s/%s[%s] -> %s/%s[%s])"
+                    (PhysicalUserMessageId.value physicalUserMessageId)
+                    expected.providerID
+                    expected.modelID
+                    (expected.variant |> Option.defaultValue "<missing>")
+                    model.providerID
+                    model.modelID
+                    (model.variant |> Option.defaultValue "<missing>")
+            )
+
+    let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
+        match currentModel input, tryPhysicalUserMessageId input with
+        | None, _ ->
+            invalidOp (sprintf "PROMPT-006: managed provider run '%s' has no observable provider/model binding" agent)
+        | Some _, None ->
+            invalidOp (
+                sprintf
+                    "PROMPT-006: managed provider run '%s' for session '%s' has no physical user message id"
+                    agent
+                    (SessionId.value sessionId)
+            )
+        | Some model, Some physical -> validateObservedProvider sessionId physical agent model
 
     let private validateSessionAndAgent sessionText agent =
         if String.IsNullOrWhiteSpace sessionText || not (isManagedName agent) then

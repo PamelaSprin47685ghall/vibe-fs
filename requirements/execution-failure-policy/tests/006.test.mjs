@@ -22,7 +22,10 @@ test('WHAT[execution-failure-policy-006] actual pre-provider settlement commits 
     logicalRunId: 'logical-fatal-settlement', authorityRootUserMessageId: 'root-fatal-settlement',
     providerRun: 'provider-fatal-settlement', identitySeed: { participantIdentity: { selectedAgent: 'engineer' } },
   }, 'FatalMembraneInput', 'Exact')
-  assert.deepEqual(result.trace.slice(-3), ['TerminalizeAccepted', 'UnbindExecution', 'ReleaseBeforeProvider'])
+  assert.deepEqual(result.trace, [
+    'ResolveState', 'Accept', 'AcceptedWitness', 'AcquireLease', 'LeaseTarget',
+    'ProjectHost', 'TerminalizeAccepted', 'ReleaseBeforeProvider',
+  ])
   assert.deepEqual(result.admission, { activeCapacity: 0, providerBinding: 0 })
   assert.equal(result.providerEffectCount, 0)
 })

@@ -110,6 +110,24 @@ module ProviderLifecycle =
             return accepted, pending
         }
 
+    let private freezePhysicalPlan durable freezeAttemptPlan sessionId physicalUserMessageId =
+        match physicalUserMessageId with
+        | None -> Ok()
+        | Some physical ->
+            let key =
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physical }
+
+            result {
+                let! _, ordinaryPlan = freezeOrdinaryPlan durable key
+
+                do!
+                    freezeAttemptPlan sessionId physical ordinaryPlan
+                    |> Result.mapError ProviderStartObservationError.AttemptPlanFreezeFailed
+
+                return ()
+            }
+
     /// Freeze the exact request plan for the provider attempt the transform is
     /// building. The plan is addressed by the physical user message observed in
     /// this request; a missing durable Accepted execution is a hard rejection,
@@ -136,23 +154,7 @@ module ProviderLifecycle =
 
                 let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
 
-                match physicalUserMessageId with
-                | None -> return Ok()
-                | Some physical ->
-                    let key =
-                        { SessionId = sessionId
-                          PhysicalUserMessageId = physical }
-
-                    return
-                        result {
-                            let! _, ordinaryPlan = freezeOrdinaryPlan durable key
-
-                            do!
-                                freezeAttemptPlan sessionId physical ordinaryPlan
-                                |> Result.mapError ProviderStartObservationError.AttemptPlanFreezeFailed
-
-                            return ()
-                        }
+                return freezePhysicalPlan durable freezeAttemptPlan sessionId physicalUserMessageId
         }
 
     let private persistObservedProviderStart

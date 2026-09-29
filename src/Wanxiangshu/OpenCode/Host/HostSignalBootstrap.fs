@@ -627,47 +627,65 @@ module HostSignalBootstrap =
             // table holds no identity, persists nothing, never keeps a lock
             // across capacity waiting, and no same-key serial work waits on it.
             let admissionInFlight =
-                Dictionary<ChatExecutionKey, Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>>()
+                Dictionary<
+                    ChatExecutionKey,
+                    Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
+                 >()
+
+            let admissionFlight createTransaction managed key output =
+                lock admissionInFlight (fun () ->
+                    match admissionInFlight.TryGetValue key with
+                    | true, existing -> existing
+                    | false, _ ->
+                        let ports = createTransaction (ModelRouting.projectHostModel output)
+                        let started = ChatAdmissionTransaction.execute ports managed
+                        admissionInFlight.[key] <- started
+                        started)
+
+            let removeAdmissionFlight key flight =
+                lock admissionInFlight (fun () ->
+                    match admissionInFlight.TryGetValue key with
+                    | true, registered when obj.ReferenceEquals(registered, flight) ->
+                        admissionInFlight.Remove(key) |> ignore
+                    | _ -> ())
+
+            let projectCommittedAdmission key output =
+                let lease =
+                    ModelRouting.tryReadExecution key
+                    |> Option.defaultWith (fun () -> invalidOp "managed admission has no exact committed lease")
+
+                ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel lease.Identity.Target)
+                |> Result.defaultWith raise
+
+            let completeAdmission intent output result =
+                match result with
+                | Ok(ChatAdmissionTransactionOutcome.Settled witness) ->
+                    let evidence = ManagedChatAcceptanceWitness.evidence witness
+
+                    let key =
+                        { SessionId = evidence.SessionId
+                          PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+
+                    projectCommittedAdmission key output
+                    continueManagedChatMessage intent output
+                | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
+                | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
 
             let admitManagedChatMessage durable createTransaction intent output =
+                let managed =
+                    ChatAdmissionIntent.tryManaged intent
+                    |> Option.defaultWith (fun () ->
+                        invalidArg "intent" "managed chat transaction requires a managed intent")
+
+                let key = ChatAdmissionIntent.managedKey managed
+                let flight = admissionFlight createTransaction managed key output
+
                 task {
-                    let key =
-                        match executionKey intent with
-                        | Some exact -> exact
-                        | None -> invalidArg "intent" "managed chat transaction requires a managed intent"
-
-                    let flight: Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =
-                        lock admissionInFlight (fun () ->
-                            match admissionInFlight.TryGetValue key with
-                            | true, existing -> existing
-                            | false, _ ->
-                                let ports = createTransaction (ModelRouting.projectHostModel output)
-
-                                let managedIntent =
-                                    match ChatAdmissionIntent.tryManaged intent with
-                                    | Some managed -> managed
-                                    | None ->
-                                        invalidArg "intent" "managed chat transaction requires a managed intent"
-
-                                let started =
-                                    ChatAdmissionTransaction.execute
-                                        ports
-                                        managedIntent
-
-                                admissionInFlight.[key] <- started
-                                started)
-
                     try
-                        match! flight with
-                        | Ok(ChatAdmissionTransactionOutcome.Settled _) -> continueManagedChatMessage intent output
-                        | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
-                        | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
+                        let! result = flight
+                        completeAdmission intent output result
                     finally
-                        lock admissionInFlight (fun () ->
-                            match admissionInFlight.TryGetValue key with
-                            | true, registered when obj.ReferenceEquals(registered, flight) ->
-                                admissionInFlight.Remove(key) |> ignore
-                            | _ -> ())
+                        removeAdmissionFlight key flight
                 }
 
             let rejectedChatMessage failure =
@@ -704,8 +722,7 @@ module HostSignalBootstrap =
 
                         // Decode once; routing and physical authority consume
                         // the same frozen claim and identity evidence.
-                        let decoded =
-                            PromptIngressCodec.decodeWith input output
+                        let decoded = PromptIngressCodec.decodeWith input output
 
                         let intent =
                             match decoded.SessionId with

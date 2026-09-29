@@ -11,6 +11,13 @@ const rule = (overrides = {}) => ({
   lexicalOrder: overrides.lexicalOrder ?? 1,
 })
 
+test('WHAT[behavior-diagnosis-003] identical bodies under distinct identities pass structural validation', () => {
+  const rules = [rule({ name: 'first-context', lexicalOrder: 1 }), rule({ name: 'second-context', lexicalOrder: 2 })]
+  const result = enforcer.validate(1, rules)
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.value, rules)
+})
+
 test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_accepts_one_rule', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'f1', lexicalOrder: 1 }),

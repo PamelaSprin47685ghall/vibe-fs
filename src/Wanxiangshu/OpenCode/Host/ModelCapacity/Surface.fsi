@@ -17,5 +17,4 @@ type internal ExecutionCapacityOwner =
     member ReleasePhysical: sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome
     member LifecycleName: lease: ExecutionAdmissionLease -> Result<string, ExecutionAdmissionRejection>
 
-    member TryReadCommittedLease:
-        sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
+    member TryReadCommittedLease: sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option

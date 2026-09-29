@@ -315,7 +315,11 @@ module TransactionSurface =
                     fun _ ->
                         hostCount <- hostCount + 1
 
-                        if failurePoint = "ProjectHost" || failurePoint = "BindExecution" || failurePoint = "ReleaseBeforeProvider" then
+                        if
+                            failurePoint = "ProjectHost"
+                            || failurePoint = "BindExecution"
+                            || failurePoint = "ReleaseBeforeProvider"
+                        then
                             Error(InvalidOperationException "injected Host projection failure")
                         else
                             hostProjected <- true
@@ -575,6 +579,7 @@ module TransactionSurface =
                           ExplicitAgent = AcceptedChatExecutionEvidence.participant acceptedEvidence
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
+
             let ports: ChatAdmissionTransactionPorts =
                 { Accept = accept
                   Acquire =
@@ -593,7 +598,11 @@ module TransactionSurface =
                   LeaseTarget = fun _ -> Ok target
                   ProjectHost =
                     fun _ ->
-                        if failureKind = "ProjectionError" || failureKind = "ExecutionBindingError" || failureKind = "FatalMembraneInput" then
+                        if
+                            failureKind = "ProjectionError"
+                            || failureKind = "ExecutionBindingError"
+                            || failureKind = "FatalMembraneInput"
+                        then
                             Error(InvalidOperationException "injected pre-provider projection failure")
                         else
                             Ok()
@@ -609,11 +618,7 @@ module TransactionSurface =
 
             let current = ChatExecutionProjection.byKey key projection
 
-            let! transactionResult =
-                ChatAdmissionTransaction.executeWith
-                    (stepLabel >> trace.Add)
-                    ports
-                    managed
+            let! transactionResult = ChatAdmissionTransaction.executeWith (stepLabel >> trace.Add) ports managed
 
             let state = ChatExecutionProjection.byKey key projection
 

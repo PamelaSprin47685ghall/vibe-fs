@@ -127,8 +127,7 @@ module ProviderProjectionSurface =
     let private optionString value = Option.toObj value
 
     let decodeIngress (input: obj) (output: obj) : obj =
-        let decoded =
-            PromptIngressCodec.decodeWith input output
+        let decoded = PromptIngressCodec.decodeWith input output
 
         let physicalUserMessageId =
             decoded.PhysicalUserMessageId |> Option.map PhysicalUserMessageId.value

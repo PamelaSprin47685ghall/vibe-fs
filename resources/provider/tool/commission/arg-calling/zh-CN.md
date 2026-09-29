@@ -1,5 +1,6 @@
 创建新道路时要托付的 Manager persona。
 
-按 persona 与 reasoning depth 选择 Coordinator / Lead；它们不是不同的 Office。
+传入 lead：负责道路的推进方向、工作协调与完成判断的 Manager。
+这一 persona 不改变 Office 权限。
 
 仅在按 name 继续已有道路时省略。

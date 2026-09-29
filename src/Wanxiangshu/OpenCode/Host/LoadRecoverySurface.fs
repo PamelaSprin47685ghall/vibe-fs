@@ -84,23 +84,6 @@ module LoadRecoverySurface =
                joinable = HandleProjection.joinable handles |> List.length
                horizonVisible = HandleProjection.horizonVisible handles |> List.length |}
 
-    let settleChatTerminal (state: obj) (factJson: string) : obj =
-        let handle = stateOf state
-
-        match FactCodec.deserializeFact factJson with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok(Fact.Agent(AgentFact.ChatExecution(ChatExecutionFactCases.Terminal _ as fact))) ->
-            handle.Projection <-
-                { handle.Projection with
-                    AgentProjections =
-                        DelegationProjectionBridge.settleUncompletedChildRun handle.Projection.AgentProjections fact }
-
-            box {| ok = true; error = "" |}
-        | Ok _ ->
-            box
-                {| ok = false
-                   error = "expected a chat execution terminal fact" |}
-
     let lookupChild (state: obj) (parent: string) (key: string) (byName: bool) : obj =
         let handles = handlesOf state parent
 

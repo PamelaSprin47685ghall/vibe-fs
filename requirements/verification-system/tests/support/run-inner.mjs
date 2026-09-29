@@ -5,7 +5,7 @@
 //
 // ── what is deliberately NOT changed here ───────────────────────────────────
 //
-// `run({ concurrency })` preserves process isolation without confusing two scopes:
+// One run per entry preserves ownership; bounded workers provide process parallelism:
 //
 //   explicit leaf timeout  a leaf that declares a timeout is failed and forgotten
 //   file process           may contain many healthy leaves and has no leaf-sized total budget
@@ -21,11 +21,11 @@
 // which kills healthy multi-test files and fans hundreds of listeners out from one signal.
 // It runs node:test files that load the compiled distribution under dist/.
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
+import { availableParallelism, tmpdir } from 'node:os'
+import { PassThrough } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { finished } from 'node:stream/promises'
 
 import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
@@ -48,25 +48,137 @@ import { parseConcurrency } from '../../../../scripts/lib/concurrency-cap.mjs'
 export function drainTestStream({ stream, send = (message) => process.send?.(message) }) {
   return new Promise((res) => {
     let settled = false
+    const fail = (err) => {
+      if (settled) return
+      settled = true
+      send?.({
+        type: 'runner:error',
+        data: { name: err?.name ?? 'StreamError', message: err?.message ?? String(err), stack: err?.stack },
+      })
+      res({ drained: false, error: err })
+    }
     stream.on('end', () => {
       if (settled) return
       settled = true
       res({ drained: true, error: null })
     })
-    stream.on('error', (err) => {
-      if (settled) return
-      settled = true
-      send?.({
-        type: 'runner:error',
-        data: {
-          name: err?.name ?? 'StreamError',
-          message: err?.message ?? String(err),
-          stack: err?.stack,
-        },
-      })
-      res({ drained: false, error: err })
-    })
+    stream.on('error', fail)
+    stream.on('close', () => fail(new Error('test stream closed before completion')))
   })
+}
+
+export async function reportTestStream({ stream, reporter, send }) {
+  const drained = drainTestStream({ stream, send })
+  let reporterError = null
+  try {
+    for await (const chunk of reporter(stream)) process.stdout.write(chunk)
+  } catch (error) {
+    reporterError = error
+    stream.destroy(error)
+  }
+  const outcome = await drained
+  if (!reporterError || outcome.error === reporterError) return outcome
+  send?.({ type: 'runner:error', data: { name: reporterError.name, message: reporterError.message } })
+  return { drained: false, error: reporterError }
+}
+
+export function bindTestEntry(event, entryFile) {
+  if (!event?.data || typeof event.data !== 'object' || Array.isArray(event.data)) {
+    throw new TypeError('Test event data must be an object')
+  }
+  const planned = resolve(entryFile)
+  const actual = event.data.entryFile
+  if (actual !== undefined && (typeof actual !== 'string' || actual.length === 0)) {
+    throw new TypeError('Test event entryFile must be a nonempty path when provided')
+  }
+  if (actual !== undefined && resolve(actual) !== planned && realpathSync(actual) !== realpathSync(planned)) {
+    throw new Error(`Test event entry mismatch: expected ${planned}, received ${actual}`)
+  }
+  return { ...event, data: { ...event.data, entryFile: planned } }
+}
+
+export async function runTestFiles({
+  files, concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY),
+  send = (message) => process.send?.(message), stdout = process.stdout, stderr = process.stderr,
+}) {
+  const fileLimit = parseConcurrency(concurrency)
+  const workerCount = Math.min(files.length,
+    fileLimit === true ? Math.max(availableParallelism() - 1, 1) : fileLimit)
+  const startedAt = performance.now()
+  const runState = createRunState()
+  const output = new PassThrough({ objectMode: true })
+  const active = new Set()
+  const errors = new Set()
+  const reportError = (error) => {
+    if (errors.has(error)) return
+    errors.add(error)
+    send({ type: 'runner:error', data: {
+      name: error?.name ?? 'StreamError', message: error?.message ?? String(error), stack: error?.stack,
+    } })
+    console.error(`run-inner: stream error: ${error?.message ?? error}`)
+    for (const controller of active) controller.abort(error)
+    output.destroy(error)
+  }
+  const reporterFinished = reportTestStream({
+    stream: output,
+    reporter: createCompactReporter({ state: runState, stdout, stderr }),
+    send: (message) => { if (message.type === 'runner:error') reportError(new Error(message.data.message)) },
+  }).then((outcome) => { if (outcome.error) reportError(outcome.error) })
+  const eventTypes = [
+    'test:start', 'test:pass', 'test:fail', 'test:complete',
+    'test:diagnostic', 'test:stderr', 'test:stdout',
+  ]
+  const runFile = async (file) => {
+    const controller = new AbortController()
+    active.add(controller)
+    try {
+      const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal })
+      const drained = drainTestStream({ stream, send() {} })
+      const attributed = new WeakMap()
+      const attribute = (event) => {
+        if (!attributed.has(event.data)) attributed.set(event.data, bindTestEntry(event, file).data)
+        return { ...event, data: attributed.get(event.data) }
+      }
+      for (const type of eventTypes) {
+        stream.on(type, (data) => {
+          if (errors.size > 0) return
+          try {
+            const event = attribute({ type, data })
+            applyEvent(runState, event)
+            send({ type, data: {
+              name: data?.name, file: data?.file, entryFile: event.data.entryFile,
+              testId: data?.testId, line: data?.line, column: data?.column,
+              nesting: data?.nesting, durationMs: data?.details?.duration_ms,
+            } })
+          } catch (error) { reportError(error) }
+        })
+      }
+      try {
+        for await (const event of stream) {
+          if (errors.size > 0 || !eventTypes.includes(event.type)) continue
+          await new Promise((accept, reject) => {
+            output.write(attribute(event), (error) => error ? reject(error) : accept())
+          })
+        }
+      } catch (error) { reportError(error) }
+      const completion = await drained
+      if (!completion.drained) reportError(completion.error)
+    } finally { active.delete(controller) }
+  }
+  const pending = files[Symbol.iterator]()
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    for (let next = pending.next(); !next.done && errors.size === 0; next = pending.next()) {
+      try { await runFile(next.value) } catch (error) { reportError(error) }
+    }
+  }))
+  if (errors.size === 0) {
+    output.end({ type: 'test:summary', data: { duration_ms: performance.now() - startedAt } })
+  }
+  await reporterFinished
+  if (errors.size > 0) return false
+  send({ type: 'runner:summary', data: summarize(runState) })
+  send({ type: 'inner:drained' })
+  return true
 }
 
 async function main() {
@@ -122,77 +234,7 @@ export const predictorConfiguration = () => {
     process.exit(2)
   }
 
-  // Default: full in-process parallelism (one dist load). Unit-runner renew probes
-  // must force serial slices so wall time exceeds silence (concurrency collapses total).
-  // Concurrency probe 待测.
-  const concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY)
-
-  const stream = run({
-    files,
-    concurrency,
-  })
-
-  const runState = createRunState()
-
-  // Every event, not just verdicts. The classifier in `verdict-feed.mjs` decides what renews; sending
-  // only the blocking kinds would move that decision into this file and leave the parent unable to
-  // report background progress in its dump.
-  for (const type of [
-    'test:start',
-    'test:pass',
-    'test:fail',
-    'test:complete',
-    'test:diagnostic',
-    'test:stderr',
-    'test:stdout',
-    'test:summary',
-  ]) {
-    stream.on(type, (data) => {
-      applyEvent(runState, { type, data })
-
-      if (type !== 'test:summary') {
-        process.send?.({
-          type,
-          data: {
-            name: data?.name,
-            file: data?.file,
-            nesting: data?.nesting,
-            // Duration rides along with the verdict so the parent can report the tier's timing
-            // distribution. One number per verdict, measured by node:test — the alternative was a
-            // second timing mechanism in the parent for something already measured here.
-            durationMs: data?.details?.duration_ms,
-          },
-        })
-      }
-    })
-  }
-
-  const compactReporter = createCompactReporter({ state: runState })
-  const composedStream = stream.compose(compactReporter)
-  composedStream.pipe(process.stdout)
-
-  const { drained: streamDrained, error: streamError } = await drainTestStream({
-    stream,
-    send: (message) => process.send?.(message),
-  })
-
-  // 等待 reporter stream 完全写完
-  try {
-    await finished(composedStream)
-  } catch {}
-
-  if (streamError) {
-    console.error(`run-inner: stream error: ${streamError?.message ?? streamError}`)
-    process.exitCode = 1
-  }
-
-  if (streamDrained && !streamError) {
-    process.send?.({
-      type: 'runner:summary',
-      data: summarize(runState),
-    })
-    process.send?.({ type: 'inner:drained' })
-  }
+  if (!await runTestFiles({ files })) process.exitCode = 1
 }
 
 if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
