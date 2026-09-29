@@ -44,7 +44,14 @@ module ProjectionMessageEdit =
 
     let private syntheticHead (syntheticId: string) (memory: string) =
         createObj
-            [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
+            [ "info",
+              box (
+                  createObj
+                      [ "id", box syntheticId
+                        "role", box "user"
+                        "synthetic", box true
+                        "source", box "companion-memory" ]
+              )
               "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
 
     /// Replace stable Host rows with one synthetic message.

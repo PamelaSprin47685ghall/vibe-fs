@@ -148,6 +148,27 @@ module ProviderWireCapture =
                 { Role = message.Role
                   Parts = message.Parts |> List.map (fun part -> part.WirePart) }) }
 
+    /// A plugin-synthesized row (XWire companion memory head, Enforcer repair,
+    /// Companion projection rebuild) is not a Host physical user message. Its id
+    /// is a content digest, not a Host message identity; admitting it as
+    /// PhysicalUserMessageId would look up a ChatExecution that was never
+    /// accepted under that key and fail closed with AcceptedExecutionMissing
+    /// (HOST-BOUNDARY-008). Synthetic rows are marked `info.synthetic = true`
+    /// or carry a plugin `info.source`; Host physical rows carry neither.
+    let isSyntheticMessage (rawObj: obj) : bool =
+        let info = ProviderWireDecode.infoObject rawObj
+
+        let flag =
+            not (isNull info)
+            && emitJsExpr (info, "synthetic") "$1 in Object($0) && $0[$1] === true"
+
+        let pluginSource =
+            not (isNull info)
+            && ProviderWireDecode.firstString info [ "source" ]
+            |> Option.exists (fun source -> source <> "physical-delta")
+
+        flag || pluginSource
+
     /// The last `role=user` message's wire address in a transform output.
     ///
     /// REVIEW-010's seal binds to the physical user message this request answers
@@ -160,7 +181,7 @@ module ProviderWireCapture =
         rawMessages
         |> List.choose (fun raw ->
             match decodeMessage raw with
-            | Some message when message.Role = "user" ->
+            | Some message when message.Role = "user" && not (isSyntheticMessage raw) ->
                 ProviderWireDecode.hostMessageId raw |> Option.map PhysicalUserMessageId.create
             | _ -> None)
         |> List.tryLast
