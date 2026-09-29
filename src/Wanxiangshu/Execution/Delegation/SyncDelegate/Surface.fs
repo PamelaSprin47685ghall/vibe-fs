@@ -439,6 +439,18 @@ module SyncDelegateSurface =
         else
             Error(sprintf "unknown role: %s" value)
 
+    let private syncInvocationRole (value: string) : Result<SyncDelegateRole, string> =
+        if String.IsNullOrWhiteSpace value then
+            Error "role is required"
+        elif value.Equals("Coder", StringComparison.OrdinalIgnoreCase) then
+            Error "retired sync delegate role: Coder"
+        elif value.Equals("Inspector", StringComparison.OrdinalIgnoreCase) then
+            Error "retired sync delegate role: Inspector"
+        elif value.Equals("Engineer", StringComparison.OrdinalIgnoreCase) then
+            Ok SyncDelegateRole.Engineer
+        else
+            Error(sprintf "unknown role: %s" value)
+
     let private outcomeOf (value: string) : Result<ReconcileProgram.TurnOutcome, string> =
         match value with
         | "TurnCompleted" -> Ok(ReconcileProgram.TurnCompleted)
@@ -780,7 +792,7 @@ module SyncDelegateSurface =
         task {
             let harness = unbox<Harness> value
 
-            match roleOf role with
+            match syncInvocationRole role with
             | Error error -> return box {| ok = false; error = error |}
             | Ok role ->
                 let! result = harness.Runtime.Invoke(SessionId.value (harness.OwnerSession owner), role, question)
@@ -1225,7 +1237,7 @@ module SyncDelegateSurface =
         task {
             let harness = unbox<Harness> value
 
-            match roleOf role with
+            match syncInvocationRole role with
             | Error error -> return box {| kind = "Error"; error = error |}
             | Ok role ->
                 let batch =

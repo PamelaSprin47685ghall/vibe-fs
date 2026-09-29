@@ -236,13 +236,23 @@ module HostForkJoin =
         | Done result -> Task.FromResult result
         | Retry -> retry ()
 
-    let private handleNotRetired (record: HandleRecord) =
+    let private handleHasJoinableOutcome (record: HandleRecord) =
         match record.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin _
+        | HandleLifecycle.Abandoned _ -> true
+        | HandleLifecycle.Active
         | HandleLifecycle.Retired -> false
-        | _ -> true
+
+    let private agentHasPendingRun (runtime: HostForkRuntime) (handle: HandleId) =
+        match HandleId.tryAgent handle with
+        | Some handleId ->
+            let agentId = AgentHandleId.value handleId
+            lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+        | None -> false
 
     let private handleIsActiveJoinTarget (runtime: HostForkRuntime) (record: HandleRecord) =
-        currentProcessHandle runtime record && handleNotRetired record
+        currentProcessHandle runtime record
+        && (handleHasJoinableOutcome record || agentHasPendingRun runtime record.Handle)
 
     let private journalHasActiveJoinHandles (runtime: HostForkRuntime) (durable: AgentJournal) =
         AgentJournal.handleProjection durable runtime.ParentId
@@ -423,7 +433,7 @@ module HostForkJoin =
         AgentJournal.handleProjection durable runtime.ParentId
         |> fun projection ->
             projection.Handles
-            |> Map.exists (fun _ record -> allowed record && handleNotRetired record)
+            |> Map.exists (fun _ record -> allowed record && handleIsActiveJoinTarget runtime record)
 
     let private tryDrainFissionLane
         (runtime: HostForkRuntime)
