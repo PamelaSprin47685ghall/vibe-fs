@@ -253,14 +253,11 @@ module PluginHostInterop =
         | ChatAdmissionTransactionError.PreProviderSettlementFailed failure -> settlementFailure failure
         | ChatAdmissionTransactionError.PreProviderSettlementBoundaryFailed _ ->
             ExecutionFailure.AcceptanceUnknown, HookSettlementEvidence.SettlementIncomplete
-        | ChatAdmissionTransactionError.PreProviderUnbindBoundaryFailed _ ->
-            ExecutionFailure.LocalInvariant, HookSettlementEvidence.SettlementIncomplete
         | ChatAdmissionTransactionError.LeaseAcquisitionFailed _ ->
             ExecutionFailure.LocalInvariant, HookSettlementEvidence.ExactSettlementComplete
         | ChatAdmissionTransactionError.LeaseTargetFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetBoundaryFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetProjectionFailed(_, release)
-        | ChatAdmissionTransactionError.BindingFailed(_, release)
         | ChatAdmissionTransactionError.HostProjectionFailed(_, release)
         | ChatAdmissionTransactionError.LeaseCommitFailed(_, release)
         | ChatAdmissionTransactionError.LeaseCommitBoundaryFailed(_, release) ->

@@ -592,7 +592,7 @@ module TransactionSurface =
                             activeCapacity <- 1
                             Task.FromResult(Ok(ExecutionAdmissionAcquisition.Admitted lease))
                   LeaseTarget = fun _ -> Ok target
-                                    ProjectHost =
+                  ProjectHost =
                     fun _ ->
                         if failureKind = "ProjectionError" || failureKind = "ExecutionBindingError" || failureKind = "FatalMembraneInput" then
                             Error(InvalidOperationException "injected pre-provider projection failure")
