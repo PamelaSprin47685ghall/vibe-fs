@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { integrationNodeTestSteps, selectIntegrationSteps } from './support/integration-node-test-steps.mjs'
+import { discoverIntegrationTests, discoverRepositoryIntegrationTests } from './support/discover-suite-tests.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -26,16 +26,15 @@ function assertRealEntry(fixtureRoot, command) {
   assert.ok(existsSync(resolve(ROOT, relative(fixtureRoot, command))), `real entry missing: ${command}`)
 }
 
-test('WHAT[verification-system-017] integration groups do not overlap and release includes every group', () => {
-  const all = integrationNodeTestSteps(ROOT)
-  const files = all.flatMap((step) => step.files)
+test('WHAT[verification-system-017] repository and package entries own distinct real integration suites', () => {
+  const repositoryFiles = discoverRepositoryIntegrationTests(ROOT)
+  const packageFiles = discoverIntegrationTests(join(ROOT, 'requirements/distribution/tests'))
+  const files = [...repositoryFiles, ...packageFiles]
+  assert.ok(repositoryFiles.length > 0)
+  assert.ok(packageFiles.length > 0)
   assert.equal(new Set(files).size, files.length)
-  assert.ok(all.every((step) => step.files.length > 0 && step.label.length > 0))
-  const daily = selectIntegrationSteps(ROOT, { releaseOnly: false })
-  const release = selectIntegrationSteps(ROOT, { releaseOnly: true })
-  assert.deepEqual(release, all)
-  assert.deepEqual(daily, all.filter((step) => !step.releaseOnly))
-  assert.ok(!daily.some((step) => step.label === 'compiler-canary'))
+  assert.ok(files.every((file) => existsSync(file)))
+  assert.ok(repositoryFiles.every((file) => !file.startsWith(join(ROOT, 'requirements/distribution/'))))
 })
 
 function createMemorySink() {

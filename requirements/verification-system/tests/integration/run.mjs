@@ -1,12 +1,12 @@
 // requirements/verification-system/tests/integration/run.mjs — sole integration child/warmup orchestrator.
 
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { WATCHDOG_TIMEOUT_MS, PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
+import { discoverRepositoryIntegrationTests } from '../support/discover-suite-tests.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
@@ -30,22 +30,6 @@ const suiteStarted = Date.now()
 let okGroups = 0
 const failedGroups = []
 
-// Cold opencode binary on a fresh machine / GHA pays multi-second first-launch cost.
-// Warm once before any step that may spawn Host or load Host-adjacent paths.
-{
-  const warm = spawnSync(process.execPath, [path.join(root, 'scripts/warmup-opencode.mjs')], {
-    cwd: root,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    encoding: 'utf8',
-    env: process.env,
-  })
-  if (warm.status !== 0) {
-    console.error(`✗ integration: opencode warmup (exit ${warm.status ?? 1})`)
-    console.error(tailLines(`${warm.stdout ?? ''}\n${warm.stderr ?? ''}`))
-    process.exit(warm.status === null ? 1 : warm.status)
-  }
-}
-
 const INTEGRATION_PER_TEST_TIMEOUT_MS = Math.max(
   Number(process.env.PER_TEST_TIMEOUT_MS) || 0,
   15_000,
@@ -62,27 +46,7 @@ const childSteps = [
   },
 ]
 
-// Suites are discovered dynamically across all requirement packages' top-level tests/*.test.mjs.
-// Distribution is excluded here because it runs via its own child step package/run.mjs.
-const requirementsDir = path.join(root, 'requirements')
-const suites = readdirSync(requirementsDir, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && entry.name !== 'distribution')
-  .sort((a, b) => a.name.localeCompare(b.name))
-  .flatMap((entry) => {
-    const testsDir = path.join(requirementsDir, entry.name, 'tests')
-    try {
-      return readdirSync(testsDir)
-        .filter((name) => name.endsWith('.test.mjs'))
-        .sort()
-        .map((name) => path.join(testsDir, name))
-        .filter((file) => {
-          const text = readFileSync(file, 'utf8')
-          return text.includes('integrationTest') || text.includes('WXS_TIER_INTEGRATION')
-        })
-    } catch {
-      return []
-    }
-  })
+const suites = discoverRepositoryIntegrationTests(root)
 
 const isDryRun = process.argv.includes('--dry-run') || process.argv.includes('--print')
 if (isDryRun) {
@@ -93,6 +57,21 @@ if (isDryRun) {
   }
   for (const step of childSteps) console.log(`  child: ${step.label}`)
   process.exit(0)
+}
+
+// Warm once before any step that may spawn Host or load Host-adjacent paths.
+{
+  const warm = spawnSync(process.execPath, [path.join(root, 'scripts/warmup-opencode.mjs')], {
+    cwd: root,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    encoding: 'utf8',
+    env: process.env,
+  })
+  if (warm.status !== 0) {
+    console.error(`✗ integration: opencode warmup (exit ${warm.status ?? 1})`)
+    console.error(tailLines(`${warm.stdout ?? ''}\n${warm.stderr ?? ''}`))
+    process.exit(warm.status === null ? 1 : warm.status)
+  }
 }
 
 if (suites.length > 0) {

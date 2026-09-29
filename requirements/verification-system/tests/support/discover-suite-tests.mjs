@@ -1,30 +1,36 @@
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { testDeclarations } from '../../../requirement-system/tests/support/structure.mjs'
 
 /**
  * Deterministic discovery of `*.test.mjs` files directly inside a suite
  * directory. Non-test files (including any `run.mjs`) and subdirectories are
  * excluded; results are sorted so ordering is reproducible.
  *
- * VERIFICATION-SYSTEM-009: this is the single source of truth for which
- * child-owned suite tests exist. Both the child runner (which executes them)
- * and the parent integration entry (which delegates them and fail-closes on
- * drift) consume the same discovered set, so coverage and execution cannot
- * diverge — an added `*.test.mjs` is picked up automatically by both, and a
- * missing/stale/duplicate child test makes the parent entry go red.
+ * A required suite directory must exist and be readable; errors propagate.
  *
  * @param {string} dir absolute directory to scan (flat; non-recursive)
  * @param {{ testSuffix?: string }} [opts]
  * @returns {string[]} sorted bare filenames (e.g. `['contents.test.mjs', ...]`)
  */
 export function discoverSuiteTests(dir, { testSuffix = '.test.mjs' } = {}) {
-  let entries
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return []
-  }
+  const entries = readdirSync(dir, { withFileTypes: true })
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(testSuffix))
     .map((entry) => entry.name)
     .sort()
+}
+
+export function discoverIntegrationTests(dir) {
+  return discoverSuiteTests(dir)
+    .map((name) => join(dir, name))
+    .filter((file) => testDeclarations(readFileSync(file, 'utf8')).some(({ kind }) => kind === 'integrationTest'))
+}
+
+export function discoverRepositoryIntegrationTests(root) {
+  const requirements = join(root, 'requirements')
+  return readdirSync(requirements, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !['distribution', 'proposals'].includes(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => discoverIntegrationTests(join(requirements, entry.name, 'tests')))
 }

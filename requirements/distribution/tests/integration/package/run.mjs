@@ -1,35 +1,31 @@
-// requirements/distribution/tests/integration/package/run.mjs — package integration under 3s silence.
+// requirements/distribution/tests/integration/package/run.mjs — package integration supervision.
 //
 //   node tests/integration/package/run.mjs
 // Requires dist/ built (node scripts/build.mjs) before pack/install/import checks.
 //
-// Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary.
 // Workspace layout and distribution checks: merged into a single supervision call.
 
-import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { HARNESS_CASE_SILENCE_MS } from '../../../../verification-system/tests/e2e/support/time-budget.js'
 import { superviseNodeTest } from '../../../../verification-system/tests/e2e/support/supervise-node-test.mjs'
+import { discoverIntegrationTests } from '../../../../verification-system/tests/support/discover-suite-tests.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const testsDir = path.resolve(here, '../..')
 
-// Suites are discovered, not hardcoded, so an added or renamed *.test.mjs
-// with integration tests is supervised automatically and cannot drift.
-const suites = readdirSync(testsDir)
-  .filter((name) => name.endsWith('.test.mjs'))
-  .sort()
-  .map((name) => path.join(testsDir, name))
-  .filter((file) => {
-    const text = readFileSync(file, 'utf8')
-    return text.includes('integrationTest') || text.includes('WXS_TIER_INTEGRATION')
-  })
+const suites = discoverIntegrationTests(testsDir)
 
 if (suites.length === 0) {
   console.error(`package integration: no integration suites discovered in ${testsDir}`)
   process.exit(1)
+}
+
+if (process.argv.includes('--dry-run') || process.argv.includes('--print')) {
+  console.log('package integration: dry run')
+  const root = path.resolve(here, '../../../../..')
+  for (const file of suites) console.log(`    ${path.relative(root, file).split(path.sep).join('/')}`)
+  process.exit(0)
 }
 
 console.log(`\n=== package integration (${suites.length} suites) ===`)

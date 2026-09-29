@@ -73,7 +73,6 @@ const { default: path } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 const { assessIntegrationEntryCoverage } = await import("./support/integration-entry-coverage.mjs");
 const { discoverSuiteTests } = await import("./support/discover-suite-tests.mjs");
-const { integrationNodeTestSteps, selectIntegrationSteps } = await import("./support/integration-node-test-steps.mjs");
 const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 const assess = (discoveredTests, wiredTests, childOwnedTests = []) =>
