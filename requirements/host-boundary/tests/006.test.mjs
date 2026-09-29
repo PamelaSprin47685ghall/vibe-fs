@@ -154,6 +154,35 @@ test('WHAT[host-boundary-006] HOST-006_terminal_listener_refcounts_do_not_share_
   assert.equal(observed.afterAllDisposeFatal, false)
   assert.deepEqual(observed.sends, [])
 })
+test('WHAT[host-boundary-006] HOST-006_querying_agent_does_not_clear_accepted_prompt_binding', async () => {
+  const session = 'ses_binding_base_agent_side_effect'
+  binding.drop(session)
+  binding.observeUserFacingAgent(session, 'engineer')
+  const leasedModel = await modelFromLease(session, 'physical-1', 'engineer', 'engineer', undefined)
+  binding.acceptPromptExecution(session, 'prompt-1', 'physical-1', 'engineer', leasedModel)
+
+  // Trigger user-facing preparation
+  const queried = binding.prepareUserFacing(session, 'engineer', false, leasedModel)
+  assert.equal(queried.ok, true, queried.error)
+
+  // Verify prompt binding was not destroyed
+  const began = binding.beginProviderAttempt(session, 'physical-1', 'prompt-1')
+  assert.equal(began.ok, true, began.error)
+})
+test('WHAT[host-boundary-006] HOST-006_active_lease_allows_fallback_continuation_when_prompt_key_unregistered', async () => {
+  const session = 'ses_binding_fallback_continuation'
+  binding.drop(session)
+  const leasedModel = await modelFromLease(session, 'physical-cont', 'engineer', 'engineer', undefined)
+  binding.observeUserFacingAgent(session, 'engineer')
+
+  // Begin provider attempt with an unregistered internal continuation prompt key
+  const began = binding.beginProviderAttempt(session, 'physical-cont', 'prompt-internal-nudge-1')
+  assert.equal(began.ok, true, began.error)
+
+  const allowed = binding.validateObservedProvider(session, 'engineer', leasedModel)
+  assert.equal(allowed.ok, true, allowed.error)
+  assert.equal(allowed.value, true)
+})
 }
 
 {

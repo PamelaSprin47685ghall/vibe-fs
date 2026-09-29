@@ -397,8 +397,6 @@ module SessionExecutionBinding =
 
     let private baseAgent sessionKey =
         lock gate (fun () ->
-            clearAcceptedPromptBindingsForSession sessionKey
-
             match agents.TryGetValue sessionKey with
             | true, agent -> Some agent
             | false, _ -> None)
@@ -456,7 +454,19 @@ module SessionExecutionBinding =
 
         match promptKey with
         | None -> beginExternalProviderAttempt sessionId physicalUserMessageId
-        | Some key -> useAcceptedPromptBinding sessionId physicalUserMessageId key
+        | Some key ->
+            match useAcceptedPromptBinding sessionId physicalUserMessageId key with
+            | Ok() -> Ok()
+            | Error mismatch when mismatch.Contains("changed physical user message") -> Error mismatch
+            | Error _ ->
+                match beginExternalProviderAttempt sessionId physicalUserMessageId with
+                | Ok() -> Ok()
+                | Error _ ->
+                    Error(
+                        sprintf
+                            "PROMPT-006: provider attempt for PromptKey %s has no accepted execution binding"
+                            (PromptKey.value key)
+                    )
 
     let currentProviderModel (sessionId: SessionId) : OpencodeModel option =
         lock gate (fun () ->
