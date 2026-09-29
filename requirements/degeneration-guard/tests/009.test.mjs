@@ -264,3 +264,5 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
     'the second repetition carries its own cause instead of reusing the stale one',
   )
 })
+
+test.todo('WHAT[degeneration-guard-009] actual dispatch preserves accepted unknown and definitely refused continuation outcomes and owned-work cancellation (GAP-145)')

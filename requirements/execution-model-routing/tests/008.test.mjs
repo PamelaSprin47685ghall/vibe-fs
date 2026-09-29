@@ -64,3 +64,38 @@ test('WHAT[execution-model-routing-008] SPEC_INV_fast_and_deep_physical_model_eq
   assert.doesNotMatch(policy, /ModelBindingsDistinct|model-bindings-not-distinct/)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const { withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+
+// execution-model-routing-008: distinct current roles may hold the same physical target.
+test('WHAT[execution-model-routing-008] EMR_008_distinct_current_roles_may_hold_the_same_physical_target', async () => {
+  const sameTarget = { model: 'provider/shared', reasoning: 'none' }
+  const runtime = routing.createRuntime(() => sameTarget)
+  for (const role of ['engineer', 'devops', 'manager', 'orchestrator', 'blogger']) {
+    const acquired = await routing.acquireExecutionAdmission(runtime, role, `msg-${role}`, role, role, null, 'normal')
+    assert.equal(acquired.kind, 'Acquired')
+    assert.deepEqual(routing.executionAdmissionTarget(runtime, acquired.lease), sameTarget)
+  }
+  assert.deepEqual(routing.snapshotOccupied(runtime), Array.from({ length: 5 }, () => sameTarget))
+  for (const role of ['engineer', 'devops', 'manager', 'orchestrator', 'blogger']) {
+    routing.releasePhysicalExecution(runtime, role, `msg-${role}`)
+  }
+})
+
+// execution-model-routing-008: the live plugin ignores both a configured Host
+// agent model and an incoming message model; chat.message owns the projection.
+test('WHAT[execution-model-routing-008] EMR_008_actual_plugin_ignores_configured_host_agent_model_and_incoming_message_model', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    const output = { message: {
+      id: 'msg-config-precedence', role: 'user', sessionID: 'ses-config-precedence', agent: 'engineer',
+      model: { providerID: 'host', modelID: 'override-attempt' },
+    }, parts: [] }
+    await hooks['chat.message']({ sessionID: 'ses-config-precedence', messageID: 'msg-config-precedence', agent: 'engineer' }, output)
+    assert.deepEqual({ ...output.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
+  })
+})
+}

@@ -181,3 +181,27 @@ test('WHAT[feature-ablation-002] ABL_002_station_15_borrows_delegation_facts', (
     assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
   })
 })
+
+test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ablated', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.strengthForcedOff(), true)
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_primary_agent_admission_follows_the_selected_profile', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsPrimaryAgent('manager'), false, 'station-05 must reject manager when relay-incumbency is ablated')
+    assert.equal(Ablation.allowsPrimaryAgent('orchestrator'), false, 'station-05 must reject orchestrator when change-integration is ablated')
+    assert.equal(Ablation.allowsPrimaryAgent('browser'), false, 'browser must be fail-closed false')
+    assert.equal(Ablation.allowsPrimaryAgent('inquiry'), false, 'inquiry must be false when epistemic-reasoning is ablated')
+  })
+
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'production']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsPrimaryAgent('manager'), true, 'production must allow manager')
+    assert.equal(Ablation.allowsPrimaryAgent('orchestrator'), true, 'production must allow orchestrator')
+    assert.equal(Ablation.allowsPrimaryAgent('browser'), false, 'browser must remain false in production')
+  })
+})

@@ -376,6 +376,33 @@ test('WHAT[execution-failure-policy-002] every phase and failure yields exactly 
         assert.equal(typeof decision.breaker.kind, 'string')
         assert.equal(typeof decision.capacitySettlement.kind, 'string')
         assert.equal(typeof decision.fatality.kind, 'string')
+        switch (decision.resolution) {
+          case 'RetryFreshAttempt':
+            assert.ok(decision.authorization)
+            assert.equal(decision.executionKey, null)
+            assert.equal(decision.terminalDisposition, null)
+            assert.equal(decision.fatality.kind, 'NoFatality')
+            break
+          case 'TerminalizeAcceptedPreProvider':
+          case 'TerminalizeProviderStarted':
+            assert.equal(decision.authorization, null)
+            assert.deepEqual(decision.executionKey, executionKey)
+            assert.ok(['Cancelled', 'Rejected', 'Failed'].includes(decision.terminalDisposition))
+            assert.equal(phase, decision.resolution === 'TerminalizeAcceptedPreProvider' ? 'AcceptedBeforeProvider' : 'ProviderStarted')
+            break
+          case 'AwaitAcceptanceReconciliation':
+            assert.equal(decision.authorization, null)
+            assert.deepEqual(decision.executionKey, executionKey)
+            assert.equal(decision.terminalDisposition, null)
+            break
+          case 'PreserveCurrentFact':
+            assert.equal(decision.authorization, null)
+            assert.equal(decision.executionKey, null)
+            assert.equal(decision.terminalDisposition, null)
+            break
+          default:
+            assert.fail(`unrecognized resolution: ${decision.resolution}`)
+        }
       }
     }
   }
