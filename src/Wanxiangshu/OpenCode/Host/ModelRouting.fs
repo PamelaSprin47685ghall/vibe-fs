@@ -304,6 +304,12 @@ module ModelRouting =
                         { Model = model.providerID.Trim() + "/" + model.modelID.Trim()
                           Reasoning = reasoning.Trim() })
 
+    let private matchReasoning (expectedReasoning: string) (obsReasoning: string) =
+        if String.IsNullOrWhiteSpace expectedReasoning then
+            String.IsNullOrWhiteSpace obsReasoning
+        else
+            String.Equals(obsReasoning, expectedReasoning, StringComparison.OrdinalIgnoreCase)
+
     let sameTarget (expected: ModelRoutingTarget) (observed: OpencodeModel) =
         if String.IsNullOrWhiteSpace observed.providerID || String.IsNullOrWhiteSpace observed.modelID then
             false
@@ -313,11 +319,7 @@ module ModelRouting =
             let expectedModel = expected.Model.Trim()
             let expectedReasoning = expected.Reasoning.Trim()
             let modelMatch = String.Equals(obsModel, expectedModel, StringComparison.OrdinalIgnoreCase)
-            let reasoningMatch =
-                if String.IsNullOrWhiteSpace expectedReasoning then
-                    String.IsNullOrWhiteSpace obsReasoning
-                else
-                    String.Equals(obsReasoning, expectedReasoning, StringComparison.OrdinalIgnoreCase)
+            let reasoningMatch = matchReasoning expectedReasoning obsReasoning
             modelMatch && reasoningMatch
 
     /// A SessionId is a reusable container. Model occupancy belongs to the exact

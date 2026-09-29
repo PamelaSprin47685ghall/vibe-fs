@@ -145,22 +145,79 @@ module DelegationHistoryMigration =
           TracedEndExclusive = payload.TracedEndExclusive
           MaterialPayloads = refs }
 
+    let private tryDecodePayload preparedOrPromoted envelopeJson eventType =
+        match Decode.fromString preparedOrPromoted envelopeJson with
+        | Ok(eventId, streamId, refs, payload) ->
+            Some(toEnvelope eventType eventId streamId payload (refs |> List.toArray))
+        | Error _ -> None
+
+    let private decodeLegacyPayload eventType envelopeJson =
+        match eventType with
+        | "StrengthCandidatePrepared" -> tryDecodePayload preparedEnvelopeDecoder envelopeJson eventType
+        | "StrengthCandidatePromoted" -> tryDecodePayload promotedEnvelopeDecoder envelopeJson eventType
+        | "StrengthFramesTraced" -> tryDecodePayload tracedEnvelopeDecoder envelopeJson eventType
+        | "StrengthCandidateAbandoned" -> tryDecodePayload abandonedEnvelopeDecoder envelopeJson eventType
+        | _ -> None
+
     let readLegacyEnvelope (envelopeJson: string) : LegacyEnvelope option =
         match Decode.fromString envelopeDecoder envelopeJson with
         | Error _ -> None
-        | Ok(_, _, eventType) ->
-            let read preparedOrPromoted =
-                match Decode.fromString preparedOrPromoted envelopeJson with
-                | Ok(eventId, streamId, refs, payload) ->
-                    Some(toEnvelope eventType eventId streamId payload (refs |> List.toArray))
-                | Error _ -> None
+        | Ok(_, _, eventType) -> decodeLegacyPayload eventType envelopeJson
 
-            match eventType with
-            | "StrengthCandidatePrepared" -> read preparedEnvelopeDecoder
-            | "StrengthCandidatePromoted" -> read promotedEnvelopeDecoder
-            | "StrengthFramesTraced" -> read tracedEnvelopeDecoder
-            | "StrengthCandidateAbandoned" -> read abandonedEnvelopeDecoder
-            | _ -> None
+    let private resolveTracedBounds (traced: LegacyEnvelope option) =
+        match traced with
+        | Some value -> value.TracedStartInclusive, value.TracedEndExclusive
+        | None -> None, None
+
+    let private planPreparedImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) tracedStart tracedEnd =
+        match promoted with
+        | Some _ ->
+            { baseFact with
+                OutcomeKind = "adopted"
+                TargetProviderRun = envelope.TargetProviderRun
+                FrameDigest = envelope.FrameDigest
+                ByteLength = envelope.ByteLength
+                MaterialPayloads = envelope.MaterialPayloads
+                TracedStartInclusive = tracedStart
+                TracedEndExclusive = tracedEnd }
+        | None ->
+            { baseFact with
+                RelinquishReason = Some "prepared-without-promotion"
+                TargetProviderRun = envelope.TargetProviderRun }
+
+    let private planTracedImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) preparedByteLength =
+        match promoted with
+        | Some promotedEnvelope ->
+            { baseFact with
+                OutcomeKind = "adopted"
+                TargetProviderRun = promotedEnvelope.TargetProviderRun
+                FrameDigest = promotedEnvelope.FrameDigest
+                ByteLength = preparedByteLength
+                MaterialPayloads = promotedEnvelope.MaterialPayloads
+                TracedStartInclusive = envelope.TracedStartInclusive
+                TracedEndExclusive = envelope.TracedEndExclusive }
+        | None -> failwith "legacy FramesTraced without its Promoted material inside the retained window"
+
+    let private planEnvelopeImport baseFact (envelope: LegacyEnvelope) (promoted: LegacyEnvelope option) preparedByteLength tracedStart tracedEnd =
+        match envelope.EventType with
+        | "StrengthCandidatePrepared" ->
+            planPreparedImport baseFact envelope promoted tracedStart tracedEnd
+        | "StrengthCandidatePromoted" ->
+            { baseFact with
+                OutcomeKind = "adopted"
+                TargetProviderRun = envelope.TargetProviderRun
+                FrameDigest = envelope.FrameDigest
+                ByteLength = preparedByteLength
+                MaterialPayloads = envelope.MaterialPayloads
+                TracedStartInclusive = tracedStart
+                TracedEndExclusive = tracedEnd }
+        | "StrengthFramesTraced" ->
+            planTracedImport baseFact envelope promoted preparedByteLength
+        | "StrengthCandidateAbandoned" ->
+            { baseFact with
+                RelinquishReason = Some "abandoned-before-promotion"
+                TargetProviderRun = envelope.TargetProviderRun }
+        | other -> failwith (sprintf "unexpected legacy envelope type: %s" other)
 
     let planDecision
         (sha256: string -> string)
@@ -192,10 +249,7 @@ module DelegationHistoryMigration =
             let preparedByteLength =
                 prepared |> Option.bind (fun envelope -> envelope.ByteLength)
 
-            let tracedStart, tracedEnd =
-                match traced with
-                | Some value -> value.TracedStartInclusive, value.TracedEndExclusive
-                | None -> None, None
+            let tracedStart, tracedEnd = resolveTracedBounds traced
 
             let import (envelope: LegacyEnvelope) : ImportFact =
                 let baseFact =
@@ -213,48 +267,7 @@ module DelegationHistoryMigration =
                       MaterialPayloads = [||]
                       RelinquishReason = None }
 
-                match envelope.EventType with
-                | "StrengthCandidatePrepared" ->
-                    match promoted with
-                    | Some _ ->
-                        { baseFact with
-                            OutcomeKind = "adopted"
-                            TargetProviderRun = envelope.TargetProviderRun
-                            FrameDigest = envelope.FrameDigest
-                            ByteLength = envelope.ByteLength
-                            MaterialPayloads = envelope.MaterialPayloads
-                            TracedStartInclusive = tracedStart
-                            TracedEndExclusive = tracedEnd }
-                    | None ->
-                        { baseFact with
-                            RelinquishReason = Some "prepared-without-promotion"
-                            TargetProviderRun = envelope.TargetProviderRun }
-                | "StrengthCandidatePromoted" ->
-                    { baseFact with
-                        OutcomeKind = "adopted"
-                        TargetProviderRun = envelope.TargetProviderRun
-                        FrameDigest = envelope.FrameDigest
-                        ByteLength = preparedByteLength
-                        MaterialPayloads = envelope.MaterialPayloads
-                        TracedStartInclusive = tracedStart
-                        TracedEndExclusive = tracedEnd }
-                | "StrengthFramesTraced" ->
-                    match promoted with
-                    | Some promotedEnvelope ->
-                        { baseFact with
-                            OutcomeKind = "adopted"
-                            TargetProviderRun = promotedEnvelope.TargetProviderRun
-                            FrameDigest = promotedEnvelope.FrameDigest
-                            ByteLength = preparedByteLength
-                            MaterialPayloads = promotedEnvelope.MaterialPayloads
-                            TracedStartInclusive = envelope.TracedStartInclusive
-                            TracedEndExclusive = envelope.TracedEndExclusive }
-                    | None -> failwith "legacy FramesTraced without its Promoted material inside the retained window"
-                | "StrengthCandidateAbandoned" ->
-                    { baseFact with
-                        RelinquishReason = Some "abandoned-before-promotion"
-                        TargetProviderRun = envelope.TargetProviderRun }
-                | other -> failwith (sprintf "unexpected legacy envelope type: %s" other)
+                planEnvelopeImport baseFact envelope promoted preparedByteLength tracedStart tracedEnd
 
             envelopes |> Array.map import
 

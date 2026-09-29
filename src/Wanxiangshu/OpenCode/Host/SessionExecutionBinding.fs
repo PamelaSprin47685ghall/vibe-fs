@@ -968,6 +968,13 @@ module SessionExecutionBinding =
         else
             validateNonDriftAttempt sessionId expected observedAgent model
 
+    let private validateManagedWithoutAttempt (sessionId: SessionId) (observedAgent: string) =
+        match tryAgent sessionId with
+        | Some expectedAgent when not (String.Equals(expectedAgent.Trim(), observedAgent, StringComparison.OrdinalIgnoreCase)) ->
+            Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expectedAgent observedAgent)
+        | _ ->
+            Error "PROMPT-006: managed provider run has no exact physical execution binding"
+
     let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         let observedAgent = if isNull agent then "" else agent.Trim()
 
@@ -975,11 +982,7 @@ module SessionExecutionBinding =
         | ProviderExpectation.ExactAttempt expected ->
             validateExactAttempt sessionId expected observedAgent model
         | ProviderExpectation.ManagedWithoutAttempt ->
-            match tryAgent sessionId with
-            | Some expectedAgent when not (String.Equals(expectedAgent.Trim(), observedAgent, StringComparison.OrdinalIgnoreCase)) ->
-                Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expectedAgent observedAgent)
-            | _ ->
-                Error "PROMPT-006: managed provider run has no exact physical execution binding"
+            validateManagedWithoutAttempt sessionId observedAgent
         | ProviderExpectation.Unbound -> Ok false
 
     let participantAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =

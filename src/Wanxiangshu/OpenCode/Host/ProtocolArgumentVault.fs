@@ -69,41 +69,51 @@ module ProtocolArgumentVault =
     /// Snapshot the protocol fields from raw tool arguments. Returns None when
     /// no protocol field is present; a call that never carried the protocol
     /// needs no vault entry.
+    let private tryReadField (args: obj) (fieldName: string) =
+        if hasOwn args fieldName then
+            Some(args?(fieldName))
+        else
+            None
+
+    let private toSnapshot (contract: obj option) (rounds: obj option) (note: obj option) =
+        match contract, rounds, note with
+        | None, None, None -> None
+        | _ ->
+            Some
+                { Contract = contract
+                  ReadonlyRounds = rounds
+                  SelfNote = note }
+
+    /// Read-only snapshot of business protocol fields. Returns None when
+    /// no protocol field is present; a call that never carried the protocol
+    /// needs no vault entry.
     let snapshotOfArguments (args: obj) : Snapshot option =
         if isNull args then
             None
         else
-            let contract =
-                if hasOwn args contractField then
-                    Some(args?(contractField))
-                else
-                    None
-
-            let rounds =
-                if hasOwn args roundsField then
-                    Some(args?(roundsField))
-                else
-                    None
-
-            let note =
-                if hasOwn args noteField then
-                    Some(args?(noteField))
-                else
-                    None
-
-            match contract, rounds, note with
-            | None, None, None -> None
-            | _ ->
-                Some
-                    { Contract = contract
-                      ReadonlyRounds = rounds
-                      SelfNote = note }
+            let contract = tryReadField args contractField
+            let rounds = tryReadField args roundsField
+            let note = tryReadField args noteField
+            toSnapshot contract rounds note
 
     /// Pure merge decision: the arguments object the wire should carry.
     /// Business arguments are copied verbatim in their original order; protocol
     /// fields are appended only when missing or different. Returns the same
     /// reference when everything is already in place, so repeated transforms
     /// are idempotent and touch nothing.
+    let private applyPendingFields (current: obj) (fields: (string * obj) list) =
+        let merged = shallowCopy current
+
+        for field, value in fields do
+            merged?(field) <- value
+
+        merged
+
+    let private mergePendingFields (current: obj) (pending: (string * obj) list) =
+        match pending with
+        | [] -> current
+        | fields -> applyPendingFields current fields
+
     let restoreArguments (snapshot: Snapshot) (current: obj) : obj =
         if isNull current then
             current
@@ -125,12 +135,4 @@ module ProtocolArgumentVault =
                   then
                       yield noteField, snapshot.SelfNote.Value ]
 
-            match pending with
-            | [] -> current
-            | fields ->
-                let merged = shallowCopy current
-
-                for field, value in fields do
-                    merged?(field) <- value
-
-                merged
+            mergePendingFields current pending

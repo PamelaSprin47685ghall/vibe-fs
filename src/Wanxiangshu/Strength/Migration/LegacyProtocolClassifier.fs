@@ -46,6 +46,18 @@ module LegacyProtocolClassifier =
     let private budgetDecoder =
         Decode.object (fun get -> get.Optional.Field "budget" Decode.string)
 
+    let private decodeAndClassifyValue (payload: JsonValue) =
+        match Decode.fromValue "$" budgetDecoder payload with
+        | Ok budget when isLegacyBudget budget ->
+            LegacyProtocolVerdict.LegacyStrength "legacy StrengthCandidatePrepared carries tier budget string"
+        | _ -> LegacyProtocolVerdict.CurrentProtocol
+
+    let private decodeAndClassifyJson (payloadJson: string) =
+        match Decode.fromString budgetDecoder payloadJson with
+        | Ok budget when isLegacyBudget budget ->
+            LegacyProtocolVerdict.LegacyStrength "legacy StrengthCandidatePrepared carries tier budget string"
+        | _ -> LegacyProtocolVerdict.CurrentProtocol
+
     /// Definitive legacy evidence in a Prepared payload is the tier budget
     /// string the current protocol removed. The candidate type name alone is
     /// not evidence: the current protocol reuses it.
@@ -57,19 +69,13 @@ module LegacyProtocolClassifier =
         elif eventType <> "StrengthCandidatePrepared" then
             LegacyProtocolVerdict.CurrentProtocol
         else
-            match Decode.fromValue "$" budgetDecoder payload with
-            | Ok budget when isLegacyBudget budget ->
-                LegacyProtocolVerdict.LegacyStrength "legacy StrengthCandidatePrepared carries tier budget string"
-            | _ -> LegacyProtocolVerdict.CurrentProtocol
+            decodeAndClassifyValue payload
 
     let private classifyEnvelopeJsonVerdict (eventType: string) (payloadJson: string) : LegacyProtocolVerdict =
         if eventType <> "StrengthCandidatePrepared" then
             classifyPayload eventType (unbox<JsonValue> null)
         else
-            match Decode.fromString budgetDecoder payloadJson with
-            | Ok budget when isLegacyBudget budget ->
-                LegacyProtocolVerdict.LegacyStrength "legacy StrengthCandidatePrepared carries tier budget string"
-            | _ -> LegacyProtocolVerdict.CurrentProtocol
+            decodeAndClassifyJson payloadJson
 
     /// The JS-native boundary form: the payload arrives as canonical JSON text.
     let classifyEnvelopeJson (eventType: string) (payloadJson: string) : LegacyClassification =

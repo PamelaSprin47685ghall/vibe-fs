@@ -87,6 +87,19 @@ module ReadonlyDelegationContract =
 
     /// JS 边界先检查原生 number、有限值、整数和范围，再构造 F# 类型。
     /// 绝不使用 parseInt、字符串强转或 truthy 判断代替验证。
+    let private createRoundBudget (numeric: float) =
+        match ReadonlyRoundBudget.tryCreate (int numeric) with
+        | Ok budget -> Ok budget
+        | Error message -> Error message
+
+    let private validateNumericBudget (numeric: float) =
+        if numeric < 0.0 then
+            Error "delegate_readonly_rounds-negative"
+        elif numeric > 2147483647.0 then
+            Error "delegate_readonly_rounds-out-of-range"
+        else
+            createRoundBudget numeric
+
     let tryReadonlyRoundBudget (value: obj) : Result<ReadonlyRoundBudget, string> =
         if isUndefinedValue value then
             Error "delegate_readonly_rounds-missing"
@@ -100,15 +113,7 @@ module ReadonlyDelegationContract =
             Error "delegate_readonly_rounds-not-integer"
         else
             let numeric = unbox<float> value
-
-            if numeric < 0.0 then
-                Error "delegate_readonly_rounds-negative"
-            elif numeric > 2147483647.0 then
-                Error "delegate_readonly_rounds-out-of-range"
-            else
-                match ReadonlyRoundBudget.tryCreate (int numeric) with
-                | Ok budget -> Ok budget
-                | Error message -> Error message
+            validateNumericBudget numeric
 
     /// self_note 缺失（JS undefined，即属性不存在）合法；出现时只接受
     /// 字符串（含空串）；null、数字、布尔、对象、数组一律拒绝，不强转；
@@ -125,12 +130,14 @@ module ReadonlyDelegationContract =
             let conf = descriptor?configurable
             not (isNull conf) && unbox<bool> conf
 
+    let private ensureFieldDeleted (args: obj) (field: string) =
+        let deleted = deleteProperty args field
+        if not deleted then
+            throwTypeError (sprintf "Tool arguments cannot hide the readonly delegation field %s" field)
+
     let private deleteProtocolField (args: obj) (field: string) : unit =
         if not (isNull (getOwnPropertyDescriptor args field)) then
-            let deleted = deleteProperty args field
-
-            if not deleted then
-                throwTypeError (sprintf "Tool arguments cannot hide the readonly delegation field %s" field)
+            ensureFieldDeleted args field
 
     let private deleteProtocolFields (args: obj) : unit =
         try
@@ -344,6 +351,31 @@ module ReadonlyDelegationContract =
     /// The Effect schema is never modified — the Host decodes the real
     /// arguments with it, and `tool.execute.before` hides the protocol fields
     /// before that decode.
+    let private applyToolDecoration (toolOutput: obj) (toolId: string) (hasJsonSchema: bool) (jsonSchema: obj) (parameters: obj) =
+        if hasJsonSchema then
+            decorateRootSchema jsonSchema toolId
+        elif parametersHoldSchemaView parameters then
+            decorateRootSchema parameters toolId
+            toolOutput?jsonSchema <- parameters
+        else
+            let rendered = ToolSchemaJson.providerSchema parameters
+            decorateRootSchema rendered toolId
+            toolOutput?jsonSchema <- rendered
+
+        appendCollaborationDescription toolOutput
+
+    let private decorateToolParameters (toolOutput: obj) (toolId: string) =
+        let jsonSchema = toolOutput?jsonSchema
+        let parameters = toolOutput?parameters
+        let hasJsonSchema = not (isNull jsonSchema) && isPlainObject jsonSchema
+
+        if not hasJsonSchema && not (isPlainObject parameters) then
+            raise (
+                InvalidOperationException(sprintf "Tool %s parameters schema is not a valid object schema" toolId)
+            )
+
+        applyToolDecoration toolOutput toolId hasJsonSchema jsonSchema parameters
+
     let private decorateToolDefinition (toolInput: obj) (toolOutput: obj) : unit =
         let toolId =
             if isNull toolInput?toolID then
@@ -356,26 +388,7 @@ module ReadonlyDelegationContract =
         // has no consumer, and publishing the protocol fields into it would
         // leak them onto the error path. Skip it entirely.
         if toolId <> "invalid" then
-            let jsonSchema = toolOutput?jsonSchema
-            let parameters = toolOutput?parameters
-            let hasJsonSchema = not (isNull jsonSchema) && isPlainObject jsonSchema
-
-            if not hasJsonSchema && not (isPlainObject parameters) then
-                raise (
-                    InvalidOperationException(sprintf "Tool %s parameters schema is not a valid object schema" toolId)
-                )
-
-            if hasJsonSchema then
-                decorateRootSchema jsonSchema toolId
-            elif parametersHoldSchemaView parameters then
-                decorateRootSchema parameters toolId
-                toolOutput?jsonSchema <- parameters
-            else
-                let rendered = ToolSchemaJson.providerSchema parameters
-                decorateRootSchema rendered toolId
-                toolOutput?jsonSchema <- rendered
-
-            appendCollaborationDescription toolOutput
+            decorateToolParameters toolOutput toolId
 
     let decorateDefinition (toolInput: obj) (toolOutput: obj) : unit =
         if not (isNull toolInput) && not (isNull toolOutput) then
