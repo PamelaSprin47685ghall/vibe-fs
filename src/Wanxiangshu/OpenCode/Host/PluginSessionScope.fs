@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -164,27 +165,32 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup). Always drops
     /// session identity.
-    member this.ClearSession(sessionId: string) =
-        match this.Companions.TryGetValue sessionId with
-        | true, companion ->
-            this.Companions.Remove sessionId |> ignore
-            (companion :> IDisposable).Dispose()
-        | false, _ -> ()
+    member this.ClearSession(sessionId: string) : Task =
+        task {
+            match this.Companions.TryGetValue sessionId with
+            | true, companion ->
+                this.Companions.Remove sessionId |> ignore
+                (companion :> IDisposable).Dispose()
+            | false, _ -> ()
 
-        this.OwnedSessions.Remove sessionId |> ignore
-        this.ModelRoutingSessions.Remove sessionId |> ignore
-        this.SessionParents.Remove sessionId |> ignore
-        this.SettleSessionExecutions sessionId |> ignore
-        SessionExecutionBinding.drop (SessionId.create sessionId)
-        this.SessionDirectories.Remove sessionId |> ignore
-        let sid = SessionId.create sessionId
+            this.OwnedSessions.Remove sessionId |> ignore
+            this.ModelRoutingSessions.Remove sessionId |> ignore
+            this.SessionParents.Remove sessionId |> ignore
+            // managed-chat-execution-010: session delete must await each admitted
+            // execution's durable terminal and exact capacity release, so this is
+            // a do! rather than a detached settle.
+            do! this.SettleSessionExecutions sessionId
 
-        this.DropSessionIdentity sessionId
+            this.SessionDirectories.Remove sessionId |> ignore
+            let sid = SessionId.create sessionId
 
-        // HOST-004 Q-10: a deleted session's idle permits die forever.
-        this.Quiescence.DropSession sid
-        // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
-        this.JoinInterrupts.ClearSession sid
+            this.DropSessionIdentity sessionId
+
+            // HOST-004 Q-10: a deleted session's idle permits die forever.
+            this.Quiescence.DropSession sid
+            // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
+            this.JoinInterrupts.ClearSession sid
+        }
 
     /// Plugin dispose releases every companion host and every routing demand/lease
     /// this instance touched. The process-shared allocator remains alive for sibling
@@ -202,7 +208,6 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
 
         for sessionId in routed do
             this.SettleSessionExecutions sessionId |> ignore
-            SessionExecutionBinding.drop (SessionId.create sessionId)
 
         this.ModelRoutingSessions.Clear()
         this.OwnedSessions.Clear()

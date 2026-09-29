@@ -386,7 +386,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
             // deleted, cancel the linked Blogger's parked waiter + request slots too.
             let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
-            sessions.ClearSession sessionId
+            // managed-chat-execution-010: a session delete may not be declared
+            // drained until this scope's unfinished executions carry a durable
+            // terminal and their exact capacity is back, so ClearSession is awaited.
+            do! sessions.ClearSession sessionId
             recovery.ClearSession sessionId
 
             for cleanup in List.rev sessionCleanups do
@@ -461,6 +464,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             let! runtimeFailure = captureTaskFailure (disposeRuntimeOwner (this.TakeRuntimeOwner()))
             remember runtimeFailure
 
+            // sessions.Dispose() keeps process-teardown best-effort semantics: it
+            // starts settleSessionExecutions for every routed session without awaiting
+            // them. Nothing between here and the journal release below guarantees those
+            // appends land; a losing append raises Diagnostic.fatal rather than passing
+            // silently, and whatever stays unfinished is then converged or turned into
+            // an explicit manual intervention by SessionRecoveryHost on the next start.
+            // Unlike DisposeSession this is not a logical session delete, so
+            // managed-chat-execution-010's drain wait does not apply to this path.
             remember (captureSyncFailure (fun () -> sessions.Dispose()))
             remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
             syncDelegateRuntime <- None

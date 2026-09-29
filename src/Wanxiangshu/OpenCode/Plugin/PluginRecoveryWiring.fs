@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -43,7 +44,25 @@ module PluginRecoveryWiring =
                 | Some target ->
                     projection.Handles
                     |> Option.bind (HandleProjection.tryFindByByname "devops")
-                    |> Option.iter (fun handle -> ModelRouting.seedBoundDevOpsModel handle.ChildSessionId target)
+                    |> Option.iter (fun handle ->
+                        // The seeding failure surfaces only at scope disposal, so the
+                        // exception must carry the road, the DevOps child session and
+                        // the raw target to stay diagnosable after the drain.
+                        try
+                            ModelRouting.seedBoundDevOpsModel handle.ChildSessionId target
+                        with ex ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf
+                                        "execution-model-routing-019: seeding the fixed DevOps target failed (road session %s, devops session %s, target '%s'): %s"
+                                        (SessionId.value sessionId)
+                                        (SessionId.value handle.ChildSessionId)
+                                        target
+                                        ex.Message
+                                    ,
+                                    ex
+                                )
+                            ))
                 | None -> ()
             | None -> ()
 

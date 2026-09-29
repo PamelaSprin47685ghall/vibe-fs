@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation.Identity
@@ -51,8 +52,12 @@ type PluginSessionScope =
     /// Drops the provider-language identity for this session idempotently.
     member DropSessionIdentity: sessionId: string -> unit
 
-    /// Session deletion drops every per-instance registry entry for this session.
-    member ClearSession: sessionId: string -> unit
+    /// Session deletion drops every per-instance registry entry for this session
+    /// and awaits this scope's exact execution settlement before returning:
+    /// managed-chat-execution-010 requires session delete to finish durable terminal
+    /// plus exact capacity release for every admitted execution in the scope before
+    /// the lifecycle may be declared drained.
+    member ClearSession: sessionId: string -> Task
 
     /// Plugin dispose releases every companion host and every routing demand/lease.
     member Dispose: unit -> unit

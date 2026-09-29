@@ -749,6 +749,13 @@ module ModelRoutingSurface =
     let bindDevopsTarget (runtime: obj) (sessionId: string) (target: obj) : unit =
         (runtimeOf runtime).BindDevopsTarget(sessionId, targetOf target)
 
+    /// Seed the fixed DevOps target from a durable road's 'provider/model:reasoning'
+    /// string. Decoding is fail-closed and the write reuses the same binding path a
+    /// Normal admission uses, so this surface is the road-recovery entry point and
+    /// the observable form of execution-model-routing-019.
+    let seedDevOpsModelTarget (runtime: obj) (sessionId: string) (target: string) : unit =
+        ModelRouting.seedBoundDevOpsModel (SessionId.create sessionId) target
+
     let boundDevopsTarget (runtime: obj) (sessionId: string) : obj =
         (runtimeOf runtime).BoundDevopsTarget(sessionId)
         |> Option.map targetObject

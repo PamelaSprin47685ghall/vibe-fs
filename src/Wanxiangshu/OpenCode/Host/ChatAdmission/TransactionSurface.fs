@@ -564,7 +564,7 @@ module TransactionSurface =
                               LogicalRunId = Some acceptedEvidence.LogicalRunId
                               AuthorityRootUserMessageId = Some acceptedEvidence.AuthorityRootUserMessageId
                               IdentitySeed = acceptedEvidence.IdentitySeed
-                              PayloadDigest = "plugin-replay"
+                              PayloadDigest = "prompt-plugin-replay"
                               Receipt = None
                               ClaimedAtRuntimeStartCount = 0 }
                           Origin = acceptedEvidence.Origin
@@ -575,7 +575,6 @@ module TransactionSurface =
                           ExplicitAgent = AcceptedChatExecutionEvidence.participant acceptedEvidence
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
-
             let ports: ChatAdmissionTransactionPorts =
                 { Accept = accept
                   Acquire =

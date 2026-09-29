@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
+const templateUrl = new URL('../../../resources/wanxiangshu.mjs', import.meta.url)
+
 const firstTarget = { model: 'provider/first', reasoning: 'high' }
 const changedTarget = { model: 'other/changed', reasoning: 'none' }
 const acquire = (runtime, physical) => routing.beginExecutionAdmission(runtime, 'devops-session', physical, 'devops', 'devops', null)
@@ -54,3 +56,56 @@ test('WHAT[execution-model-routing-019] changed scheduler cannot overwrite a pre
 })
 
 test.todo('WHAT[execution-model-routing-019] fixed road binding persists across real restart and physical-session replacement without model drift (GAP-129)')
+
+test('WHAT[execution-model-routing-019] durable DevOps target seeding is fail-closed and idempotent', async () => {
+  const { default: route } = await import(`${templateUrl.href}?test=${Date.now()}`)
+  const runtime = routing.createRuntime(route)
+  const fixedTarget = { model: 'provider/fixed-devops', reasoning: 'high' }
+
+  // 1. A road's durable target seeds the binding, and the binding reads back exactly that target.
+  // Red if seeding stops writing (returns null), writes a different target, or silently skips a well-formed road target.
+  routing.seedDevOpsModelTarget(runtime, 'ses_seed_bound', 'provider/fixed-devops:high')
+  assert.deepEqual(
+    routing.boundDevopsTarget(runtime, 'ses_seed_bound'),
+    fixedTarget,
+    'a seeded road target must be readable as the fixed DevOps target',
+  )
+
+  // 2. Reseeding the identical target is an idempotent no-op.
+  // Red if a repeat seed throws (duplicate rejection) or drifts the stored target.
+  routing.seedDevOpsModelTarget(runtime, 'ses_seed_bound', 'provider/fixed-devops:high')
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'ses_seed_bound'), fixedTarget, 'repeat seed of the same target must stay idempotent')
+
+  // 3. A conflicting target is refused, and the refusal must not overwrite the fixed binding.
+  // Red if the immutability guard is weakened so a later seed silently replaces the target.
+  assert.throws(
+    () => routing.seedDevOpsModelTarget(runtime, 'ses_seed_bound', 'provider/other-model:low'),
+    /DevOps model binding is immutable/,
+    'a conflicting seed must be refused',
+  )
+  assert.deepEqual(
+    routing.boundDevopsTarget(runtime, 'ses_seed_bound'),
+    fixedTarget,
+    'a refused reseed must leave the fixed target untouched',
+  )
+
+  // 4. Malformed durable targets are refused, and refuse without seeding anything.
+  // Red if the parser is loosened (default reasoning, non-qualified model, blank reasoning) or if a failed parse still writes a partial binding.
+  assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', ''), /durable DevOps model target/)
+  assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'provider/fixed-devops'), /durable DevOps model target/)
+  assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'noslashmodel:high'), /provider\/model/)
+  assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'provider/fixed-devops:'), /reasoning/)
+  assert.equal(
+    routing.boundDevopsTarget(runtime, 'ses_seed_malformed'),
+    null,
+    'a malformed target must not seed any binding',
+  )
+
+  // 5. A session with no seeded target has no binding.
+  // Red if the query returns a default/guessed target, or if bindings are prewarmed for unknown sessions.
+  assert.equal(
+    routing.boundDevopsTarget(runtime, 'ses_never_seeded'),
+    null,
+    'a session without a seeded target must have no binding',
+  )
+})
