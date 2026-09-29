@@ -99,7 +99,9 @@ module ChatAdmissionIntent =
         | ManagedIntent.ActiveHumanContinuation evidence -> evidence.Key
         | ManagedIntent.PendingPrompt evidence -> evidence.Key
 
-    let private isHostInternal (message: DecodedMessage) : bool =
+    /// Host-internal (compaction / synthetic) classification, shared by
+    /// the intent resolver and the read-side Host hooks.
+    let isHostInternal (message: DecodedMessage) : bool =
         message.IsHostCompaction || message.IsHostSynthetic
 
     let private hostInternal (message: DecodedMessage) : Decision =

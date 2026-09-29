@@ -76,6 +76,7 @@ module ChatAdmissionIntent =
     val tryManaged: decision: Decision -> ManagedIntent option
     val ofManaged: managed: ManagedIntent -> Decision
     val managedKey: managed: ManagedIntent -> ChatExecutionKey
+    val isHostInternal: message: DecodedMessage -> bool
 
     val resolve: message: DecodedMessage -> snapshot: DurableSnapshot -> Decision
     val describeRejection: rejection: Rejection -> string

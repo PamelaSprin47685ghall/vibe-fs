@@ -41,7 +41,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 /// owned sessions, companions, verdicts, nudges,
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
-type PluginSessionScope() =
+type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal option) =
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、Companions 等）保持
     // per-instance。
@@ -92,6 +92,42 @@ type PluginSessionScope() =
             // sessionId may itself be a Blogger child being deleted.
             [ sessionId ]
 
+    /// P5: settle this session's unfinished durable executions before the
+    /// process-local caches die. Accepted-only executions take the pre-provider
+    /// settlement path; provider-started ones take the terminal path; both reuse
+    /// the existing durable writers and write Cancelled. Committed leases are
+    /// then released by exact key, never by the session-wide release.
+    member private this.SettleSessionExecutions(sessionId: string) =
+        match journal with
+        | None -> ()
+        | Some durable ->
+            let sid = SessionId.create sessionId
+
+            AgentJournal.snapshot durable
+            |> fun projection -> projection.AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.nonTerminal
+            |> List.filter (fun execution -> execution.Key.SessionId = sid)
+            |> List.iter (fun execution ->
+                match execution.ProviderStarted with
+                | Some started ->
+                    Wanxiangshu.Composition.Durable.ManagedChatProviderLifecycle.terminal
+                        durable
+                        execution.Key
+                        started
+                        ChatExecutionTerminalDisposition.Cancelled
+                    |> ignore
+                | None ->
+                    Wanxiangshu.Composition.Durable.PreProviderSettlement.settle
+                        durable
+                        execution.Key
+                        execution.Evidence
+                        ChatExecutionTerminalDisposition.Cancelled
+                    |> ignore)
+
+            ModelRouting.releasePhysicalExecution
+                sid
+                |> ignore
+
     /// Drops the provider-language identity for this session idempotently.
     member _.DropSessionIdentity(sessionId: string) =
         let sid = SessionId.create sessionId
@@ -110,6 +146,7 @@ type PluginSessionScope() =
         this.OwnedSessions.Remove sessionId |> ignore
         this.ModelRoutingSessions.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
+        this.SettleSessionExecutions sessionId
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
@@ -136,6 +173,7 @@ type PluginSessionScope() =
             |> Seq.toArray
 
         for sessionId in routed do
+            this.SettleSessionExecutions sessionId
             SessionExecutionBinding.drop (SessionId.create sessionId)
 
         this.ModelRoutingSessions.Clear()

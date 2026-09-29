@@ -4,6 +4,33 @@ import test from 'node:test'
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+
+test('WHAT[interaction-authority-008] HostInternal_companion_carrier_marks_internal', () => {
+  assert.equal(intent.hostInternal({}), false)
+  assert.equal(intent.hostInternal({ hostCompaction: false, hostSynthetic: false }), false)
+  assert.equal(intent.hostInternal({ hostCompaction: true }), true)
+  assert.equal(intent.hostInternal({ hostSynthetic: true }), true)
+  assert.equal(intent.hostInternal({ hostCompaction: false, hostSynthetic: true }), true)
+  assert.equal(intent.hostInternal({ hostCompaction: true, hostSynthetic: true }), true)
+})
+
+test('WHAT[interaction-authority-008] HostInternal_raw_compaction_and_synthetic_carriers', async () => {
+  const wire = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js")
+  const flags = (envelope) => {
+    const decoded = wire.decodeIngress({}, envelope)
+    return { hostCompaction: decoded.isHostCompaction, hostSynthetic: decoded.isHostSynthetic }
+  }
+  assert.equal(intent.hostInternal(flags({ parts: [{ type: 'compaction' }] })), true)
+  assert.equal(intent.hostInternal(flags({ message: { summary: true } })), true)
+  assert.equal(intent.hostInternal(flags({ message: { agent: 'compaction' } })), true)
+  assert.equal(intent.hostInternal(flags({ message: { mode: 'compaction' } })), true)
+  assert.equal(intent.hostInternal(flags({ parts: [{ synthetic: true }] })), true)
+  assert.equal(intent.hostInternal(flags({ parts: [{ synthetic: true }, { synthetic: true }] })), true)
+  assert.equal(intent.hostInternal(flags({ parts: [{ type: 'text', text: 'a' }, { synthetic: true }] })), false)
+  assert.equal(intent.hostInternal(flags({ parts: [{ synthetic: true }, {}] })), false)
+  assert.equal(intent.hostInternal(flags({ message: { mode: 'chat' } })), false)
+  assert.equal(intent.hostInternal(flags({})), false)
+})
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 
 const hash = (value) => `H(${value})`

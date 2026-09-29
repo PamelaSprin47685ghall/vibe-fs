@@ -18,7 +18,7 @@ open Wanxiangshu.Persistence.Journal
 /// physical resources, display caches, or bounded per-call deduplication.
 type PluginRuntimeScope(journal: AgentJournal option) =
     let blogger = PluginBloggerScope()
-    let sessions = PluginSessionScope()
+    let sessions = PluginSessionScope(journal)
     let recovery = PluginRecoveryScope(journal)
     // DSL-MUTABLE: resource — session cleanup hook list registered by composition
     let mutable sessionCleanups: (string -> unit) list = []

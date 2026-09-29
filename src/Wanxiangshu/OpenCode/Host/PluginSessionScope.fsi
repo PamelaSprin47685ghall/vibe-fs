@@ -11,7 +11,7 @@ open Wanxiangshu.Foundation.Identity
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope =
-    new: unit -> PluginSessionScope
+    new: journal: Wanxiangshu.Persistence.Journal.AgentJournal option -> PluginSessionScope
 
     /// Cross-instance session directory map alias.
     member SessionDirectories: Dictionary<string, string>

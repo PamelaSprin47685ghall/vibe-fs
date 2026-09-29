@@ -203,6 +203,9 @@ module ChatAdmissionIntentSurface =
         | ChatAdmissionIntent.Rejection.PromptClaimOriginNotAdmissible _ -> "PromptClaimOriginNotAdmissible"
         | ChatAdmissionIntent.Rejection.UnknownOriginWhileActive -> "UnknownOriginWhileActive"
 
+    let hostInternal (message: obj) : bool =
+        ChatAdmissionIntent.isHostInternal (decodedMessage message)
+
     let resolve (message: obj) (durableSnapshot: obj) : obj =
         let decoded = decodedMessage message
 

@@ -573,7 +573,7 @@ module FissionTool =
     let private abortLanePort (scope: ToolRuntimeScope) (laneId: SessionId) =
         task {
             FissionRuntime.unbindLane laneId
-            SessionExecutionBinding.drop laneId
+            ModelRouting.cancelUnacquiredExecution laneId |> ignore
             let! _ = scope.Sessions.AbortSession laneId
             return ()
         }
