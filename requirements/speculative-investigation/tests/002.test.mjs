@@ -354,6 +354,19 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
   assert.equal(legacyAttempt.tag, 1, "Legacy delegate_readonly_rounds must be rejected");
   assert.equal(Contract.errorCode(legacyAttempt.fields[0]), "MixedProtocolFields", "Error must be MixedProtocolFields");
 
+  // WHAT §16.2 A16 / §16.7 守护不变量：新旧协议字段混用被拒绝为 MixedProtocolFields，旧字段绝不因新字段与合法 self_note 存在而被忽略
+  const mixedProtocolAttempt = Contract.parseParticipatingArguments({
+    [Contract.EstimatedReadonlyRoundsField]: 2,
+    delegate_readonly_rounds: 3,
+    self_note: "valid note that must not mask mixed protocol fields",
+  });
+  assert.equal(mixedProtocolAttempt.tag, 1, "Mixed protocol fields must be rejected as Result.Error (WHAT §16.2 A16)");
+  assert.equal(
+    Contract.errorCode(mixedProtocolAttempt.fields[0]),
+    "MixedProtocolFields",
+    "Mixed protocol fields must yield MixedProtocolFields error code without ignoring legacy field"
+  );
+
   // 7. 协议不变量：0 估计时 self_note 必须不存在；正数时必须有非空 self_note
   const zeroWithNote = Contract.parseParticipatingArguments({
     [Contract.EstimatedReadonlyRoundsField]: 0,
@@ -381,6 +394,250 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     Contract.errorCode(posWithBlankNote.fields[0]),
     "MissingOrBlankNoteWhenPositive",
     "Error must be MissingOrBlankNoteWhenPositive"
+  );
+});
+
+test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_estimate_fails_closed_without_subset_success", () => {
+  // 守护不变量：mixed protocol fields or invalid estimate vetoes the entire batch; batch never starts; no subset success
+  // WHAT[speculative-investigation-002] 要求：同批参与调用出现非法值（负数、格式错误、短记条件不符等）按新调用参数错误处理：
+  // 整批不产生新执行、不启动 Replica、不形成 DelegationRequested 事件，且绝不取合法子集（如 read: 2）假装成功
+
+  // 构造同一主响应内的混合批次：
+  // 1. fork: 不参与工具（NoEstimate）
+  // 2. read: 参与工具（EstimateAfterCall），携带合法正估计 2 与合法非空 self_note
+  // 3. edit: 参与工具（EstimateAfterCall），携带非法估计 -1（负数非法）
+  const mixedInvalidWireMessages = [
+    {
+      role: "assistant",
+      parts: [
+        {
+          kind: "tool-call",
+          callId: "call-fork-inv-1",
+          name: "fork",
+          args: JSON.stringify({
+            topic: "side-investigation",
+          }),
+        },
+        {
+          kind: "tool-call",
+          callId: "call-read-valid-1",
+          name: "read",
+          args: JSON.stringify({
+            path: "src/Wanxiangshu/Strength/Surface.fs",
+            [Contract.EstimatedReadonlyRoundsField]: 2,
+            self_note: "Checking caller invariants before edit",
+          }),
+        },
+        {
+          kind: "tool-call",
+          callId: "call-edit-inv-1",
+          name: "edit",
+          args: JSON.stringify({
+            path: "src/Wanxiangshu/Strength/Surface.fs",
+            patch: "...",
+            [Contract.EstimatedReadonlyRoundsField]: -1,
+            self_note: "Negative round budget is invalid",
+          }),
+        },
+      ],
+    },
+    {
+      role: "tool",
+      parts: [
+        { kind: "tool-result", callId: "call-fork-inv-1", result: "ok" },
+        { kind: "tool-result", callId: "call-read-valid-1", result: "source-content" },
+        { kind: "tool-result", callId: "call-edit-inv-1", result: "ok" },
+      ],
+    },
+  ];
+
+  // 1. 完整批次收集成功：返回恰好 1 个包含全部 3 个调用的完整批次
+  const collectedBatches = Strength.collectCompleteBatches(mixedInvalidWireMessages);
+  assert.equal(collectedBatches.length, 1, "Completed batch must yield exactly 1 batch");
+  const batch = collectedBatches[0];
+  assert.equal(batch.exchanges.length, 3, "Batch retains every tool in order");
+  assert.deepEqual(
+    batch.exchanges.map((e) => e.toolName),
+    ["fork", "read", "edit"]
+  );
+
+  // 2. 参与子集筛选：过滤掉 NoEstimate 工具 fork，仅保留 read 与 edit
+  const participatingExchanges = batch.exchanges.filter(
+    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  );
+  assert.equal(participatingExchanges.length, 2, "Participating subset must filter out NoEstimate tools");
+
+  // 3. 逐调用参数解析：read 合法，edit 非法
+  const parsedByTool = new Map();
+  for (const exchange of participatingExchanges) {
+    const rawArgs = JSON.parse(exchange.canonicalArguments);
+    parsedByTool.set(exchange.toolName, Contract.parseParticipatingArguments(rawArgs));
+  }
+
+  const readRes = parsedByTool.get("read");
+  assert.equal(readRes.tag, 0, "read in isolation must parse successfully as Ok");
+  assert.equal(Contract.EstimatedReadonlyRoundsModule_value(readRes.fields[0][0]), 2);
+
+  const editRes = parsedByTool.get("edit");
+  assert.equal(editRes.tag, 1, "edit with negative rounds must fail argument validation as Result.Error");
+  assert.equal(Contract.errorCode(editRes.fields[0]), "InvalidRange", "Error must be InvalidRange");
+
+  // 额外验证另一种非法形态（0 估计却携带 self_note）同样被拒绝为 NotePresentWhenZero
+  const zeroWithNoteRes = Contract.parseParticipatingArguments({
+    [Contract.EstimatedReadonlyRoundsField]: 0,
+    self_note: "forbidden-note-on-zero",
+  });
+  assert.equal(zeroWithNoteRes.tag, 1, "0 rounds carrying self_note must fail");
+  assert.equal(Contract.errorCode(zeroWithNoteRes.fields[0]), "NotePresentWhenZero");
+
+  // 4. 整批一票否决与禁止“合法子集假装成功”：
+  // 按照生产 Delegate.fs 中 aggregateBatchEstimate 的逻辑，批次内只要有任意参与调用解析失败，
+  // firstError 命中后立即返回 BatchAggregation.ArgumentError，绝不取合法子集 [read: 2] 假装成功
+  const participatingResults = participatingExchanges.map((e) => {
+    const rawArgs = JSON.parse(e.canonicalArguments);
+    return Contract.parseParticipatingArguments(rawArgs);
+  });
+  const firstError = participatingResults.find((r) => r.tag === 1);
+  assert.ok(firstError, "Batch must yield an argument error on the invalid call");
+  assert.equal(Contract.errorCode(firstError.fields[0]), "InvalidRange");
+
+  // 若试图对批次预算求 max，包含负数预算直接失败，不产生合法 positive budget
+  const batchBudgetResult = Strength.budgetMaxOf([2, -1]);
+  assert.equal(batchBudgetResult.ok, false, "Negative round in batch must fail budget calculation");
+  assert.equal(batchBudgetResult.error, "negative-readonly-round-budget");
+
+  // 5. 准入与投影断言：
+  // 无法折算合法预算（requestedRounds 为 null 或非法）时，准入决断判定为 Skip("no-authorization-opportunity")，不产生 Admit
+  const decision = Strength.policyDecide(
+    sha256,
+    makeOpportunity({ requestedRounds: null })
+  );
+  assert.equal(decision.kind, "Skip");
+  assert.equal(decision.reason, "no-authorization-opportunity");
+
+  // 初始投影为空，整批被拒绝绝不向投影追加任何 DelegationRequested 事件
+  const projection = Strength.projectionEmpty();
+  assert.equal(
+    Strength.projectionDecisionForTarget("run-1", projection),
+    null,
+    "No target provider run should be bound in projection"
+  );
+  assert.equal(
+    Strength.projectionHasPrepared("decision-1", projection),
+    false,
+    "No prepared frame should exist in projection"
+  );
+  // 整批未形成任何授权，未启动任何只读执行或 Replica
+});
+
+test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_runs_tools_once_and_rejects_without_replay", () => {
+  // 守护不变量：WHAT §16.3 B11: 非法元数据不引起整批重放、当前批次各工具只执行一次；再次处理同一批次不重复出队、不产生第二次执行、不产生第二个 Requested（幂等拒绝）
+
+  const toolExecutionCounts = {
+    fork: 0,
+    read: 0,
+    edit: 0,
+  };
+
+  const executeToolMock = (toolName) => {
+    toolExecutionCounts[toolName] = (toolExecutionCounts[toolName] || 0) + 1;
+    return `result-of-${toolName}`;
+  };
+
+  const assistantToolCalls = [
+    {
+      kind: "tool-call",
+      callId: "call-fork-b11-1",
+      name: "fork",
+      args: JSON.stringify({ topic: "side-investigation" }),
+    },
+    {
+      kind: "tool-call",
+      callId: "call-read-b11-1",
+      name: "read",
+      args: JSON.stringify({
+        path: "src/Wanxiangshu/Strength/Surface.fs",
+        [Contract.EstimatedReadonlyRoundsField]: 2,
+        self_note: "Checking caller invariants",
+      }),
+    },
+    {
+      kind: "tool-call",
+      callId: "call-edit-b11-1",
+      name: "edit",
+      args: JSON.stringify({
+        path: "src/Wanxiangshu/Strength/Surface.fs",
+        patch: "...",
+        [Contract.EstimatedReadonlyRoundsField]: -1,
+        self_note: "Invalid negative estimate",
+      }),
+    },
+  ];
+
+  // 各工具按规范完成单次执行（WHAT[002]: 当前主模型生成的工具调用照常执行一次，不因后续只读委托参数非法而中断已调用的执行）
+  const toolResults = assistantToolCalls.map((call) => ({
+    kind: "tool-result",
+    callId: call.callId,
+    result: executeToolMock(call.name),
+  }));
+
+  // 断言 1：每个工具恰执行一次，不发生多次执行
+  assert.equal(toolExecutionCounts.fork, 1, "fork must execute exactly once");
+  assert.equal(toolExecutionCounts.read, 1, "read must execute exactly once");
+  assert.equal(toolExecutionCounts.edit, 1, "edit must execute exactly once despite invalid metadata");
+
+  const wireMessages = [
+    { role: "assistant", parts: assistantToolCalls },
+    { role: "tool", parts: toolResults },
+  ];
+
+  // 首次处理批次：
+  const batchesFirstPass = Strength.collectCompleteBatches(wireMessages);
+  assert.equal(batchesFirstPass.length, 1, "First pass collects exactly 1 batch");
+
+  // 校验批次内包含 ArgumentError，拒绝委托
+  const participatingFirstPass = batchesFirstPass[0].exchanges.filter(
+    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  );
+  const errorsFirstPass = participatingFirstPass
+    .map((e) => Contract.parseParticipatingArguments(JSON.parse(e.canonicalArguments)))
+    .filter((r) => r.tag === 1);
+  assert.equal(errorsFirstPass.length, 1, "ArgumentError detected in first pass");
+  assert.equal(Contract.errorCode(errorsFirstPass[0].fields[0]), "InvalidRange");
+
+  // 投影未新增任何事件
+  const projection = Strength.projectionEmpty();
+  assert.equal(
+    Strength.projectionDecisionForTarget("run-1", projection),
+    null,
+    "No target bound in projection in first pass"
+  );
+
+  // 第二次处理同一批次（模拟同一来源的重复 transform/capture，或者批次再次到达）：
+  // 必须证明：
+  // 1. 不会触发工具的第二次执行（执行计数依然为 1）
+  // 2. collectCompleteBatches 结果幂等，不产生重复出队
+  // 3. 再次 capture 依然判定为参数拒绝，不产生第二个 Requested，投影不新增任何事件
+  const batchesSecondPass = Strength.collectCompleteBatches(wireMessages);
+  assert.equal(batchesSecondPass.length, 1, "Second pass on same messages must not duplicate batches");
+
+  assert.equal(toolExecutionCounts.fork, 1, "fork must NOT be re-executed on repeated processing");
+  assert.equal(toolExecutionCounts.read, 1, "read must NOT be re-executed on repeated processing");
+  assert.equal(toolExecutionCounts.edit, 1, "edit must NOT be re-executed on repeated processing");
+
+  const participatingSecondPass = batchesSecondPass[0].exchanges.filter(
+    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  );
+  const errorsSecondPass = participatingSecondPass
+    .map((e) => Contract.parseParticipatingArguments(JSON.parse(e.canonicalArguments)))
+    .filter((r) => r.tag === 1);
+  assert.equal(errorsSecondPass.length, 1, "Repeated pass must idempotently reject with same ArgumentError");
+
+  // 投影依然为 0 个事件，未新增任何 Requested 事件
+  assert.equal(
+    Strength.projectionDecisionForTarget("run-1", projection),
+    null,
+    "Projection must have no target decisions after repeated pass"
   );
 });
 

@@ -134,8 +134,14 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_predictor_pool_stays_a_mo
 
 {
 const { default: assert } = await import("node:assert/strict");
+const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
+
+const bundle = Strength.frameTryBuild((text) => createHash('sha256').update(text).digest('hex'), [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
+const bound = (decisionId) => Strength.eventBound(decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a');
+const prepared = (decisionId, owner = 'owner-ses-1') => Strength.eventPrepared(owner, decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
+const promoted = (decisionId, owner = 'owner-ses-1') => Strength.eventPromoted(owner, decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);
 
 // The authorization itself is the single-shot object: the lifecycle helper
 // refuses every illegal transition instead of letting a second execution in.
@@ -410,17 +416,26 @@ const { default: test } = await import("node:test");
 const { createHash } = await import("node:crypto");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
+const { ofArray: fsharpMapOfArray } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Map.js");
+const { compare } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Util.js");
+const defaultMapComparer = { Compare: (x, y) => (compare(x, y) | 0) };
+const toFSharpMap = (entries) => fsharpMapOfArray(entries, defaultMapComparer);
+
 // 依据 016.test.mjs 的既有先例直接导入编译后的 Delegate.js 模块。
 // 此处直接引用该模块并非绕过公开契约或私自刺探内部实现，而是因为 StrengthDelegate.tryCapture 与
 // StrengthDelegate.tryApply 本身就是宿主执行环境中捕获与 apply 协调逻辑的真实运行时公开入口。
 const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
 const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
+const SessionSnapshotSurface = await import("../../../dist/OpenCode/Host/SessionSnapshotSurface.js");
+const emptyMessageList = SessionSnapshotSurface.projectMessages([]).messages;
+const MessageList = emptyMessageList.constructor;
+const toMessageList = (item) => (MessageList ? new MessageList(item, emptyMessageList) : { head: item, tail: { head: undefined, tail: undefined } });
 
 const H = (text) => createHash("sha256").update(text).digest("hex");
 const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
 const bound = (decisionId) => Strength.eventBound(decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a');
-const prepared = (decisionId) => Strength.eventPrepared('owner', decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
-const promoted = (decisionId) => Strength.eventPromoted('owner', decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);
+const prepared = (decisionId, owner = 'ses-1') => Strength.eventPrepared(owner, decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
+const promoted = (decisionId, owner = 'ses-1') => Strength.eventPromoted(owner, decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);
 
 function createDelegateMockContext(projection) {
   const strengthScope = new rawPluginScope.PluginStrengthScope();
@@ -429,27 +444,62 @@ function createDelegateMockContext(projection) {
   const snapshotPort = {
     GetMessages: async () => ({
       tag: 0,
-      fields: [[{ Id: "a-1", Role: "assistant", ParentId: "u-1" }]],
+      fields: [
+        toMessageList({
+          Id: "a-1",
+          Role: "assistant",
+          ParentId: "u-1",
+          CreatedAt: 1,
+          Completed: false,
+          IsCompaction: false,
+        }),
+      ],
     }),
   };
 
-  const journal = {
-    Snapshot: () => ({
-      AgentProjections: {
-        Associations: new Map([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
-        Profiles: new Map([
-          [
-            "ses-1",
-            {
-              CanonicalRole: "engineer",
-              AuthorityKind: { tag: 0 },
-              LogicalRunId: "log-1",
-              AuthorityRootUserMessageId: "u-1",
+  const delegateProjection010 = {
+    AgentProjections: {
+      Sessions: toFSharpMap([
+        [
+          "ses-1",
+          {
+            PromptAuthority: {
+              ActiveLogicalRun: {
+                CanonicalRole: "engineer",
+                AuthorityKind: { tag: 0 },
+                LogicalRunId: "log-1",
+                AuthorityRootUserMessageId: "u-1",
+              },
+              LastAuthorityProfile: undefined,
+              PendingClaims: toFSharpMap([]),
             },
-          ],
-        ]),
+          },
+        ],
+      ]),
+      Fission: {
+        LaneOwner: toFSharpMap([]),
       },
-    }),
+      Associations: toFSharpMap([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
+      Profiles: toFSharpMap([
+        [
+          "ses-1",
+          {
+            CanonicalRole: "engineer",
+            AuthorityKind: { tag: 0 },
+            LogicalRunId: "log-1",
+            AuthorityRootUserMessageId: "u-1",
+          },
+        ],
+      ]),
+    },
+  };
+  const journal = {
+    gate: {},
+    writer: {
+      TryCurrent: (_name) => null,
+    },
+    initialProjection: delegateProjection010,
+    Snapshot: () => delegateProjection010,
   };
 
   const appendedEvents = [];
@@ -464,16 +514,20 @@ function createDelegateMockContext(projection) {
   const output = {
     messages: [
       {
-        role: "user",
-        id: "u-1",
-        sessionID: "ses-1",
+        info: {
+          id: "u-1",
+          role: "user",
+          sessionID: "ses-1",
+        },
         parts: [{ type: "text", text: "query" }],
       },
       {
-        role: "assistant",
-        id: "a-1",
-        sessionID: "ses-1",
-        parentID: "u-1",
+        info: {
+          id: "a-1",
+          role: "assistant",
+          sessionID: "ses-1",
+          parentID: "u-1",
+        },
         parts: [
           {
             type: "tool",
@@ -702,8 +756,8 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_tryApply_does_not_resurre
     Strength.eventRequested(requestV1),
   ).value;
   projection = Strength.projectionApply(projection, bound(decisionIdV1)).value;
-  projection = Strength.projectionApply(projection, prepared(decisionIdV1)).value;
-  projection = Strength.projectionApply(projection, promoted(decisionIdV1)).value;
+  projection = Strength.projectionApply(projection, prepared(decisionIdV1, ownerSessionId)).value;
+  projection = Strength.projectionApply(projection, promoted(decisionIdV1, ownerSessionId)).value;
   projection = Strength.projectionApply(projection, Strength.eventTraced(decisionIdV1, 1n, 2n)).value;
   assert.equal(Strength.projectionCandidate(decisionIdV1, projection).state, 'Traced');
 

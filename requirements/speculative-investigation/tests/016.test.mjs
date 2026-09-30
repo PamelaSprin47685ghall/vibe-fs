@@ -3,6 +3,10 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
+const { ofArray: fsharpMapOfArray } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Map.js");
+const { compare } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Util.js");
+const defaultMapComparer = { Compare: (x, y) => (compare(x, y) | 0) };
+const toFSharpMap = (entries) => fsharpMapOfArray(entries, defaultMapComparer);
 const rawContract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
 const rawBudget = await import("../../../dist/Strength/Budget.js");
 const rawReadonlyContract = await import("../../../dist/OpenCode/Host/ReadonlyDelegationContract.js");
@@ -13,6 +17,11 @@ const rawPluginHooks = await import("../../../dist/OpenCode/Plugin/PluginHooks.j
 const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
 const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
 const rawModelRoutingSurface = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const rawProtocolArgumentVault = await import("../../../dist/OpenCode/Host/ProtocolArgumentVault.js");
+const SessionSnapshotSurface = await import("../../../dist/OpenCode/Host/SessionSnapshotSurface.js");
+const emptyMessageList = SessionSnapshotSurface.projectMessages([]).messages;
+const MessageList = emptyMessageList.constructor;
+const toMessageList = (item) => (MessageList ? new MessageList(item, emptyMessageList) : { head: item, tail: { head: undefined, tail: undefined } });
 const ModelRoutingSurface = rawModelRoutingSurface;
 const fs = await import("node:fs");
 const path = await import("node:path");
@@ -444,7 +453,7 @@ test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive
     Journal: null,
     WorkspaceDirectory: null,
     Input: null,
-    ProtocolArgumentVault: null,
+    ProtocolArgumentVault: rawProtocolArgumentVault.create(),
   };
   const host = {
     Wired: { ChatMessageHook: () => () => {}, ObserveEvent: () => {} },
@@ -560,7 +569,7 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
       Journal: null,
       WorkspaceDirectory: null,
       Input: null,
-      ProtocolArgumentVault: null,
+      ProtocolArgumentVault: rawProtocolArgumentVault.create(),
     };
     const host = {
       Wired: {
@@ -604,16 +613,20 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
     const output = {
       messages: [
         {
-          role: "user",
-          id: "u-1",
-          sessionID: "ses-1",
+          info: {
+            id: "u-1",
+            role: "user",
+            sessionID: "ses-1",
+          },
           parts: [{ type: "text", text: "query" }],
         },
         {
-          role: "assistant",
-          id: "a-1",
-          sessionID: "ses-1",
-          parentID: "u-1",
+          info: {
+            id: "a-1",
+            role: "assistant",
+            sessionID: "ses-1",
+            parentID: "u-1",
+          },
           parts: [
             {
               type: "tool",
@@ -633,26 +646,61 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
     const snapshotPort = {
       GetMessages: async () => ({
         tag: 0,
-        fields: [[{ Id: "a-1", Role: "assistant", ParentId: "u-1" }]],
+        fields: [
+          toMessageList({
+            Id: "a-1",
+            Role: "assistant",
+            ParentId: "u-1",
+            CreatedAt: 1,
+            Completed: false,
+            IsCompaction: false,
+          }),
+        ],
       }),
     };
-    const journal = {
-      Snapshot: () => ({
-        AgentProjections: {
-          Associations: new Map([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
-          Profiles: new Map([
-            [
-              "ses-1",
-              {
-                CanonicalRole: "engineer",
-                AuthorityKind: { tag: 0 },
-                LogicalRunId: "log-1",
-                AuthorityRootUserMessageId: "u-1",
+    const delegateProjection016_1 = {
+      AgentProjections: {
+        Sessions: toFSharpMap([
+          [
+            "ses-1",
+            {
+              PromptAuthority: {
+                ActiveLogicalRun: {
+                  CanonicalRole: "engineer",
+                  AuthorityKind: { tag: 0 },
+                  LogicalRunId: "log-1",
+                  AuthorityRootUserMessageId: "u-1",
+                },
+                LastAuthorityProfile: undefined,
+                PendingClaims: toFSharpMap([]),
               },
-            ],
-          ]),
+            },
+          ],
+        ]),
+        Fission: {
+          LaneOwner: toFSharpMap([]),
         },
-      }),
+        Associations: toFSharpMap([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
+        Profiles: toFSharpMap([
+          [
+            "ses-1",
+            {
+              CanonicalRole: "engineer",
+              AuthorityKind: { tag: 0 },
+              LogicalRunId: "log-1",
+              AuthorityRootUserMessageId: "u-1",
+            },
+          ],
+        ]),
+      },
+    };
+    const journal = {
+      gate: {},
+      writer: {
+        TryCurrent: (_name) => null,
+      },
+      initialProjection: delegateProjection016_1,
+      Snapshot: () => delegateProjection016_1,
     };
     const durability = {
       LoadProjection: async () => ({ tag: 0, fields: [{ ByDecision: new Map() }] }),
@@ -730,26 +778,61 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
   const snapshotPort = {
     GetMessages: async () => ({
       tag: 0,
-      fields: [[{ Id: "a-missing-1", Role: "assistant", ParentId: "u-missing-1" }]],
+      fields: [
+        toMessageList({
+          Id: "a-missing-1",
+          Role: "assistant",
+          ParentId: "u-missing-1",
+          CreatedAt: 1,
+          Completed: false,
+          IsCompaction: false,
+        }),
+      ],
     }),
   };
-  const journal = {
-    Snapshot: () => ({
-      AgentProjections: {
-        Associations: new Map([["ses-m", [{ tag: 0 }, { tag: 0 }]]]),
-        Profiles: new Map([
-          [
-            "ses-m",
-            {
-              CanonicalRole: "engineer",
-              AuthorityKind: { tag: 0 },
-              LogicalRunId: "log-m",
-              AuthorityRootUserMessageId: "u-missing-1",
+  const delegateProjection016_2 = {
+    AgentProjections: {
+      Sessions: toFSharpMap([
+        [
+          "ses-m",
+          {
+            PromptAuthority: {
+              ActiveLogicalRun: {
+                CanonicalRole: "engineer",
+                AuthorityKind: { tag: 0 },
+                LogicalRunId: "log-m",
+                AuthorityRootUserMessageId: "u-missing-1",
+              },
+              LastAuthorityProfile: undefined,
+              PendingClaims: toFSharpMap([]),
             },
-          ],
-        ]),
+          },
+        ],
+      ]),
+      Fission: {
+        LaneOwner: toFSharpMap([]),
       },
-    }),
+      Associations: toFSharpMap([["ses-m", [{ tag: 0 }, { tag: 0 }]]]),
+      Profiles: toFSharpMap([
+        [
+          "ses-m",
+          {
+            CanonicalRole: "engineer",
+            AuthorityKind: { tag: 0 },
+            LogicalRunId: "log-m",
+            AuthorityRootUserMessageId: "u-missing-1",
+          },
+        ],
+      ]),
+    },
+  };
+  const journal = {
+    gate: {},
+    writer: {
+      TryCurrent: (_name) => null,
+    },
+    initialProjection: delegateProjection016_2,
+    Snapshot: () => delegateProjection016_2,
   };
   const durability = {
     LoadProjection: async () => ({ tag: 0, fields: [{ ByDecision: new Map() }] }),
@@ -760,16 +843,20 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
   const outputMissingParticipating = {
     messages: [
       {
-        role: "user",
-        id: "u-missing-1",
-        sessionID: "ses-m",
+        info: {
+          id: "u-missing-1",
+          role: "user",
+          sessionID: "ses-m",
+        },
         parts: [{ type: "text", text: "check file" }],
       },
       {
-        role: "assistant",
-        id: "a-missing-1",
-        sessionID: "ses-m",
-        parentID: "u-missing-1",
+        info: {
+          id: "a-missing-1",
+          role: "assistant",
+          sessionID: "ses-m",
+          parentID: "u-missing-1",
+        },
         parts: [
           {
             type: "tool",
@@ -821,16 +908,20 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
   const outputMissingNonParticipating = {
     messages: [
       {
-        role: "user",
-        id: "u-missing-1",
-        sessionID: "ses-m",
+        info: {
+          id: "u-missing-1",
+          role: "user",
+          sessionID: "ses-m",
+        },
         parts: [{ type: "text", text: "log note" }],
       },
       {
-        role: "assistant",
-        id: "a-missing-1",
-        sessionID: "ses-m",
-        parentID: "u-missing-1",
+        info: {
+          id: "a-missing-1",
+          role: "assistant",
+          sessionID: "ses-m",
+          parentID: "u-missing-1",
+        },
         parts: [
           {
             type: "tool",
