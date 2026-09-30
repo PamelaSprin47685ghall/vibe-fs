@@ -41,7 +41,7 @@ type StrengthMirrorError =
 
 module StrengthFrame =
 
-    let private allowedTools = set [ "read"; "glob"; "grep" ]
+    let private allowedTools = set [ "read"; "glob"; "grep"; "js-predictor" ]
 
     let isAllowedTool (toolName: string) =
         not (String.IsNullOrWhiteSpace toolName)

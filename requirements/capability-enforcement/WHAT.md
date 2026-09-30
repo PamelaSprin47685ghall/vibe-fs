@@ -16,9 +16,9 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 
 
 同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`orchestrator`/`engineer`/`devops`/`blogger`/`bookkeeper`/`predictor`)，不再有 `fast-`/`deep-` 前缀。
 
-## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep}
+## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep} 与只读 js-predictor
 
-用于投机调查的 `StrengthReplica` 仅保留 `{Read; Glob; Grep}` 只读能力面。其运行时工具映射在 deny 全部工具后精准放行此三项，其余修改与执行工具在副本内全部 fail-closed。
+用于投机调查的 `StrengthReplica` 仅保留 `{Read; Glob; Grep}` 只读能力面，以及唯一专用的只读 JS 编程面 `js-predictor`。其运行时工具映射在 deny 全部工具后精准放行此四项（read, glob, grep, js-predictor），其余修改与执行工具（包括 write, edit, run, fork, join 以及角色特权 js-* 面）在副本内全部 fail-closed。
 
 ## [006] internal-only participants/actions 不进无资格 participant 的工具面
 

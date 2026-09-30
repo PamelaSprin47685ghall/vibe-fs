@@ -20,9 +20,13 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only
   assert.equal(good.value.batches.length, 2)
   assert.match(good.value.digest, /^H\(/)
   assert.ok(good.value.byteLength > 0)
-  const write = Strength.frameTryBuild(H, [batch(1, [exchange('write', '{}', 'ok')])])
-  assert.equal(write.ok, false)
-  assert.equal(write.error, 'UnsupportedTool')
+  const withJsPredictor = Strength.frameTryBuild(H, [
+    batch(1, [exchange('js-predictor', '{"program":"..."}', 'readonly result')]),
+  ])
+  assert.equal(withJsPredictor.ok, true)
+  const writeOnly = Strength.frameTryBuild(H, [batch(1, [exchange('write', '{}', 'ok')])])
+  assert.equal(writeOnly.ok, false)
+  assert.equal(writeOnly.error, 'UnsupportedTool')
   const empty = Strength.frameTryBuild(H, [batch(1, [])])
   assert.equal(empty.ok, false)
   assert.equal(empty.error, 'EmptyBatch')

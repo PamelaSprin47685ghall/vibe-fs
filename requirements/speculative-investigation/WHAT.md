@@ -42,13 +42,14 @@
 
 模型目标经明确的只读委托用途，由唯一 MJS 调度权威从 Predictor 模型池选择；participant 与 Role 不改写，用途不从工具参数、用户文本、模型自述或角色名推导。Predictor 与 owner 配成相同模型是合法状态，不因模型名相同而关闭。
 
-同伴只能调用本仓已有 `read/glob/grep`；其可见工具 schema 与底层执行门禁同源。尝试写入、调用非白名单工具、借 fork/MCP/通用 JS 工具绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
+同伴只能调用本仓已有 `read`、`glob`、`grep` 以及唯一专用的只读 JS 编程面 `js-predictor`（能力严格限定为 {Read, Glob, Grep}）；其模型可见工具 schema 与底层执行门禁同源。尝试写入、调用非白名单工具、借 fork/MCP/通用 JS 工具（如 `js-engineer`、`js-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
 
 删除副本必须填 0 的假条件：同伴在共享 schema 下按同一事实性含义填写，防递归靠真实身份（Replica 身份在准入端无权发出新委托），不靠填写约定。同伴填写的正数、推理文本与未执行计划不产生嵌套委托。
 
 ## [005] 真实完整交换与 digest：无专属字节上限
 
 回传给主模型的只有同伴真实的只读工具交换：每个候选帧保留 request batch 边界、原始调用顺序、原始 arguments、真实执行结果与内容 digest，call/result 严格一对一配对。同伴的纯文本、reasoning、未执行计划与总结不进入主模型上下文；纯文本输出是提前结束信号，不是待主模型采信的研究报告。
+来源整批可能包含非只读调用；Frame 构造必须过滤保留其中的只读交换（read/glob/grep/js-predictor），而不是直接因整批混入非只读工具而拒绝整个帧（UnsupportedTool）。若过滤后合法只读交换为空，则按无材料（NoMaterial）正常处理。
 
 新字段随真实 arguments 保存。不存在 Delegate 专属的字节、token、短记长度或批次大小上限，不存在按长度丢弃、保留小前缀、"过大退回零步"或等价替身规则；超过任何历史大小的完整交换仍可构建、持久化、映射与恢复。
 

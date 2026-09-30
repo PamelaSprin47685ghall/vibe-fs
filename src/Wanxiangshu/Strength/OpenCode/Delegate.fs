@@ -1031,7 +1031,17 @@ module StrengthDelegate =
                 surface.Wire.Messages
 
         match mirrorResult with
-        | Error _ -> Task.FromResult()
+        | Error err ->
+            Diagnostic.emit
+                "strength-mirror-localization-failed"
+                [ "session_id", SessionId.value surface.Owner; "result", sprintf "%A" err ]
+
+            appendClosed
+                strengthScope
+                surface
+                request.DecisionId
+                DelegationClosedFrom.Requested
+                DelegationClosedReason.CannotContinue
         | Ok replicaMirror -> startWithMirror strengthScope surface request replicaAgent replicaMirror
 
     let private startRequest

@@ -1183,6 +1183,16 @@ export async function bindDelegationReplicas(scenario, ctx) {
         DELEGATE_PREDICTOR_MODEL,
         `DELEGATE 9.2: replica ${id} must run exactly on the configured Predictor target (saw ${requestModel(request)})`,
       );
+      // Assert replica provider request carries only allowed readonly tools
+      if (Array.isArray(request?.tools) && request.tools.length > 0) {
+        const toolNames = request.tools.map((t) => t?.function?.name ?? t?.name).filter(Boolean);
+        const disallowed = ['write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'js-engineer', 'js-devops', 'js-manager'];
+        for (const disallowedTool of disallowed) {
+          assert.ok(!toolNames.includes(disallowedTool), `replica ${id} must never carry ${disallowedTool}`);
+        }
+        const allowedSet = new Set(['read', 'glob', 'grep', 'js-predictor']);
+        assert.ok(toolNames.every((t) => allowedSet.has(t)), `replica ${id} tools must be subset of {read, glob, grep, js-predictor}, got: ${toolNames.join(', ')}`);
+      }
     }
   }
 

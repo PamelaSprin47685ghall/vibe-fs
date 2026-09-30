@@ -202,3 +202,15 @@ module JsToolSpec =
 
                         return JsToolsResult.render outcome
                 } }
+
+    /// Build a ToolSpec for the dedicated js-predictor surface with PrivateAttachment admission.
+    let createWithAdmission
+        (factory: HostToolFactory)
+        (surface: JsSurface)
+        (admission: ToolAdmission)
+        (workspaceRoot: string)
+        (persistence: IJsTransactionPersistence option)
+        (fileAccessObservation: (HostToolContext -> string list -> string list -> Task<unit>) option)
+        : ToolSpec =
+        let spec = create factory surface workspaceRoot persistence fileAccessObservation
+        { spec with Admission = admission }

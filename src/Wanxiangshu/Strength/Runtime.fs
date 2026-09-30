@@ -44,12 +44,13 @@ module StrengthReplicaTools =
         PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.StrengthReplica
 
     /// Host PromptInput.tools becomes a session permission ruleset. `* = false`
-    /// is required: merely enabling read/glob/grep would leave the role's broad
-    /// agent permissions visible. Map ordering is canonical and puts the wildcard
-    /// before the three specific allows, so Host's last-match permission rule lets
-    /// only these tools through.
+    /// is required: the replica holds exactly one tool, and a wildcard allow
+    /// would leave the owner role's broad agent permissions visible. The wildcard
+    /// comes before the single specific allow so Host's last-match permission rule
+    /// lets exactly `js-predictor` through and nothing else -- the replica has no
+    /// read/glob/grep; all investigation goes through the readonly JS surface.
     let exactReadonlyHostToolMap =
-        Map.ofList [ "*", false; "glob", true; "grep", true; "read", true ]
+        Map.ofList [ "*", false; "js-predictor", true ]
 
     let isExactReadonly (capabilities: Set<ToolPermission>) =
         capabilities = set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]

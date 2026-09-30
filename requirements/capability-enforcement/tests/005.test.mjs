@@ -2,19 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { capabilities, exactReadonlyHostToolMap, isAllowedTool } from '../../../dist/Strength/Surface.js'
 
-test('WHAT[capability-enforcement-005] replica projections and tool policy allow only the three read-only operations', () => {
+test('WHAT[capability-enforcement-005] replica projections and tool policy allow only read-only operations and js-predictor', () => {
   assert.deepEqual(exactReadonlyHostToolMap, [
     { tool: '*', allowed: false },
-    { tool: 'glob', allowed: true },
-    { tool: 'grep', allowed: true },
-    { tool: 'read', allowed: true },
+    { tool: 'js-predictor', allowed: true },
   ])
   for (const role of ['engineer', 'devops']) {
     assert.deepEqual(capabilities(role), ['Glob', 'Grep', 'Read'])
   }
   assert.deepEqual(capabilities('manager'), [])
-  for (const tool of ['read', 'glob', 'grep']) assert.equal(isAllowedTool(tool), true, tool)
-  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
+  for (const tool of ['read', 'glob', 'grep', 'js-predictor']) assert.equal(isAllowedTool(tool), true, tool)
+  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown', 'js-engineer', 'js-devops', 'js-manager']) {
     assert.equal(isAllowedTool(tool), false, tool)
   }
 })
@@ -31,6 +29,8 @@ test('WHAT[capability-enforcement-005] H12_replica_context_with_positive_estimat
     { tool: 'join', args: { session: 'ses-1', estimated_readonly_rounds: 1, self_note: 'join session' } },
     { tool: 'mcp__filesystem__write_file', args: { path: '/tmp/test', estimated_readonly_rounds: 1, self_note: 'mcp write' } },
     { tool: 'js-engineer', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
+    { tool: 'js-devops', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
+    { tool: 'js-manager', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
     { tool: 'bash', args: { command: 'echo 1', estimated_readonly_rounds: 1, self_note: 'bash run' } },
   ]
 
@@ -49,10 +49,14 @@ test('WHAT[capability-enforcement-005] H12_replica_context_with_positive_estimat
     assert.equal(isPermittedByHostGate(call.tool), false, `tool ${call.tool} must be denied by exactReadonlyHostToolMap`)
   }
 
-  // Allowed read-only tool triad remains strictly {read, glob, grep}
-  for (const tool of ['read', 'glob', 'grep']) {
+  // The projection whitelist stays read/glob/grep/js-predictor, but the replica's own
+  // session gate admits exactly one callable tool: js-predictor.
+  for (const tool of ['read', 'glob', 'grep', 'js-predictor']) {
     assert.equal(isAllowedTool(tool), true)
-    assert.equal(isPermittedByHostGate(tool), true)
+  }
+  assert.equal(isPermittedByHostGate('js-predictor'), true)
+  for (const tool of ['read', 'glob', 'grep']) {
+    assert.equal(isPermittedByHostGate(tool), false, `${tool} is not callable by the replica`)
   }
 })
 
@@ -75,11 +79,9 @@ test('WHAT[capability-enforcement-005] H13_source_batch_participating_edit_or_ru
     assert.deepEqual(capabilities(role), ['Glob', 'Grep', 'Read'])
   }
 
-  // exactReadonlyHostToolMap remains the exact 4-rule canonical map
+  // exactReadonlyHostToolMap is exactly the wildcard deny plus the single readonly JS surface
   assert.deepEqual(exactReadonlyHostToolMap, [
     { tool: '*', allowed: false },
-    { tool: 'glob', allowed: true },
-    { tool: 'grep', allowed: true },
-    { tool: 'read', allowed: true },
+    { tool: 'js-predictor', allowed: true },
   ])
 })
