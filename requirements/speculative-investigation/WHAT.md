@@ -38,7 +38,7 @@
 
 ## [004] 同伴：同一 owner 身份的只读内部执行
 
-同伴以 `InternalLeaf × Attached(owner, StrengthReplica)` 构造，继承 owner 的 participant、Role、Persona、provenance/version 与会话语言。每个 owner 恰有一个**常驻**只读副本会话：该会话随 owner 存活而被复用，不随单个决策结束而终止或重建，因此 provider 侧看到同一会话并复用其前缀缓存；常驻会话占用一份 provider 容量，直到 owner 结束才释放。每次新决策把该会话的消息基线整份替换为本决策的 mirror，旧决策的上下文不因会话复用而残留。变化的是执行用途、模型目标、可见工具集合与短期控制权，不是"扮演另一个人"。
+同伴以 `InternalLeaf × Attached(owner, StrengthReplica)` 构造，继承 owner 的 participant、Role、Persona、provenance/version 与会话语言。每个 owner 恰有一个**常驻**只读副本会话：该会话随 owner 存活而被复用，不随单个决策结束而终止或重建，因此 provider 侧看到同一会话并复用其前缀缓存；常驻会话占用一份 provider 容量，直到 owner 结束才释放。常驻会话的消息双向同步、只增不替换：新决策不重发已镜像的前缀，只把 owner 自上一位点以来新增的 delta 追加进常驻会话（`mirror(N) ⊕ replicaTurn(N) ⊕ mainDelta(N→N+1) ⊕ …`）；位点作为持久投射随 `DelegationBound` 记录，故前缀在 provider 侧保持稳定并被缓存复用。变化的是执行用途、模型目标、可见工具集合与短期控制权，不是"扮演另一个人"。
 
 模型目标经明确的只读委托用途，由唯一 MJS 调度权威从 Predictor 模型池选择；participant 与 Role 不改写，用途不从工具参数、用户文本、模型自述或角色名推导。Predictor 与 owner 配成相同模型是合法状态，不因模型名相同而关闭。
 
@@ -93,7 +93,7 @@ Delegate 不新增压缩阈值，不主动"压到可以委托为止"，不禁用
 
 同批多个正数调用的短记按原始调用顺序各自保留；只对整数取 max，不对短记取 max、不挑选最大预算对应的那一条、不合并成提示段、不丢失其他调用的短记。
 
-当前候选在冻结之后产生，严禁反射回生成它的同伴会话。常驻会话的 transcript 不复用旧决策的语义上下文：每个新决策以自身 mirror 替换基线，旧决策内容不参与本决策。
+当前候选在冻结之后产生，严禁反射回生成它的同伴会话。常驻会话的 transcript 不复用旧决策的语义上下文：新决策只追加 owner 自位点以来的 delta，不重发已镜像前缀；旧决策的产物不作为本决策的输入。
 
 短记是未执行展望，不是已证实的事实，也不扩大权限；常规压缩使其不再可见时，不通过专属通道重新注入。
 

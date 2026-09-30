@@ -316,6 +316,8 @@ Strength/Migration/LegacyProtocolClassifier.fsi
 Strength/Migration/LegacyProtocolClassifier.fs
 Strength/Replica/BatchCollector.fsi
 Strength/Replica/BatchCollector.fs
+Strength/Replica/TwinBijection.fsi
+Strength/Replica/TwinBijection.fs
 Host/Contract/ToolResultBound.fsi
 Host/Contract/ToolResultBound.fs
 Host/Contract/CompactionPolicySurface.fsi

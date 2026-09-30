@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Strength.Projection
 
+open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -55,11 +56,16 @@ module StrengthProjectionIntent =
 
     let private key (decisionId: StrengthDecisionId) = StrengthDecisionId.value decisionId
 
+    /// The owner's final request for this decision, as the replica's message base.
+    /// It carries no decision identity on purpose: the twin replaces the part of
+    /// its own history that maps to the owner with the owner's current version of
+    /// that part, never a decision-scoped snapshot. The MAPPING back into the
+    /// replica's own vocabulary is positional and is applied by the replica
+    /// transform, which is the only place that can see both histories.
     let projectionMirror
-        (decisionId: StrengthDecisionId)
         (localizedRows: ProjectionMessageRow list)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
-        Ok(ProjectionIntent.replaceMessageBase (key decisionId) localizedRows)
+        Ok(ProjectionIntent.replaceMessageBase "strength-mirror-base" localizedRows)
 
     let private digestMatches (sha256: string -> string) (bundle: StrengthFrameBundle) =
         sha256 (StrengthFrame.canonicalText bundle.Batches) = bundle.Digest

@@ -28,6 +28,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-frame-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-replica-core.fsproj"/>
+    <Compile Include="Strength/Replica/TwinBijection.fsi"/>
+    <Compile Include="Strength/Replica/TwinBijection.fs"/>
     <Compile Include="Strength/Replica/Transform.fsi"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
     <Compile Include="Strength/Replica/Runtime.fsi"/>

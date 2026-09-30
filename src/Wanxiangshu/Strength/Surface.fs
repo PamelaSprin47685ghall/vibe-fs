@@ -284,9 +284,7 @@ module StrengthSurface =
                    error = projectionIntentErrorName error |}
 
     let projectionMirror (value: obj) : obj =
-        StrengthProjectionIntent.projectionMirror
-            (StrengthDecisionId.create (textOf value?decisionId))
-            (projectionMessageRowsOf value?rows)
+        StrengthProjectionIntent.projectionMirror (projectionMessageRowsOf value?rows)
         |> projectionIntentResultToJs
 
     /// Owner-facing display name for one projected exchange: the replica calls

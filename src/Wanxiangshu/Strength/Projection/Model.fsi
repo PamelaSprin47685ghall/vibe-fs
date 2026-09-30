@@ -39,10 +39,11 @@ type StrengthProjectionIntentError =
 
 [<RequireQualifiedAccess>]
 module StrengthProjectionIntent =
+    /// The owner's final request for this decision, used as the replica's message base.
     val projectionMirror:
-        decisionId: StrengthDecisionId ->
         localizedRows: ProjectionMessageRow list ->
             Result<ProjectionIntent, StrengthProjectionIntentError>
+
 
     val candidate:
         sha256: (string -> string) ->

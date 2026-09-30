@@ -415,19 +415,43 @@ module StrengthReplicaTransform =
         | [] -> Ok None
         | _ -> StrengthFrame.tryBuild sha256 batches |> Result.map Some
 
+    /// The main <-> predictor bijection is a class, not a local derivation:
+    /// see TwinBijection.restore for the statement and its properties.
+    /// The twin's request for this decision.
+    ///
+    ///   R_n = sigma(C_{n-1}, main_n)
+    ///
+    /// sigma walks the two histories together: the owner's tool exchanges are
+    /// re-emitted at their owner positions, and the replica's OWN speech is
+    /// restored in the gaps the child recorded. Speech is the material main never
+    /// receives (the projection emits calls and results only), and its position is
+    /// knowable solely from the child — which is exactly why it must come from
+    /// there and not from main. Dropping it, or appending it at the end, would make
+    /// the provider see a different sequence than the one it cached.
+    ///
+    /// Byte stability: while the owner's sealed region is unchanged the owner's
+    /// messages re-emit identically and the child's speech keeps its gaps, so
+    /// R_{n-1} stays a prefix of R_n up to the first position main actually
+    /// rewrote. A fresh child has no exchanges and no speech, so the request is the
+    /// owner transcript alone — today's behaviour, byte for byte.
     let private replicaIntents
         (sha256: string -> string)
         (binding: StrengthReplicaBinding)
+        (childMessages: ProviderProjection.WireMessage list)
         (frame: StrengthFrameBundle option)
         : Result<ProjectionIntent list, StrengthProjectionIntentError> =
         result {
+            let owner = binding.LocalizedMirrorMessages
+
+            let aligned = TwinBijection.restore childMessages owner
+
             let! mirror =
-                binding.LocalizedMirrorMessages
+                aligned
                 |> List.map (fun message ->
                     { Message = message
                       HostMessageId = None
                       HostIsPhysical = false })
-                |> StrengthProjectionIntent.projectionMirror binding.DecisionId
+                |> StrengthProjectionIntent.projectionMirror
 
             match frame with
             | None -> return [ mirror ]
@@ -491,6 +515,7 @@ module StrengthReplicaTransform =
         (sessionIdText: string)
         (output: obj)
         (currentWire: ProviderProjection.ProviderWireProjection)
+        (childMessages: ProviderProjection.WireMessage list)
         (frame: StrengthFrameBundle option)
         (batches: StrengthRequestBatch list)
         (runtime: StrengthRuntime)
@@ -500,7 +525,7 @@ module StrengthReplicaTransform =
         let planned =
             result {
                 let! intents =
-                    replicaIntents sha256 binding frame
+                    replicaIntents sha256 binding childMessages frame
                     |> Result.mapError (sprintf "projection-intent-refused:%A")
 
                 return!
@@ -521,6 +546,7 @@ module StrengthReplicaTransform =
         (sessionIdText: string)
         (output: obj)
         (currentWire: ProviderProjection.ProviderWireProjection)
+        (childMessages: ProviderProjection.WireMessage list)
         (batches: StrengthRequestBatch list)
         (runtime: StrengthRuntime)
         (sessions: ISessionHostPort)
@@ -535,6 +561,7 @@ module StrengthReplicaTransform =
                 sessionIdText
                 output
                 currentWire
+                childMessages
                 frame
                 batches
                 runtime
@@ -551,6 +578,7 @@ module StrengthReplicaTransform =
         (sessionIdText: string)
         (output: obj)
         (currentWire: ProviderProjection.ProviderWireProjection)
+        (childMessages: ProviderProjection.WireMessage list)
         (batches: StrengthRequestBatch list)
         (outboundRequest: bool)
         (runtime: StrengthRuntime)
@@ -566,7 +594,7 @@ module StrengthReplicaTransform =
         if not admitted then
             retireWith runtime sessions replicaSessionId "provider-request-budget-reached" batches
         else
-            applyUnderBudget sha256 binding sessionIdText output currentWire batches runtime sessions replicaSessionId
+            applyUnderBudget sha256 binding sessionIdText output currentWire childMessages batches runtime sessions replicaSessionId
 
     let private applyWithBinding
         (sha256: string -> string)
@@ -583,6 +611,10 @@ module StrengthReplicaTransform =
             let currentWire = ProviderWireCapture.decodeMessageView rawMessages
             let batches = batchesForReplica rawMessages currentWire
 
+            // The child's own history; the alignment decides which parts of it are
+            // the replica's own material.
+            let childMessages = currentWire.Messages
+
             return!
                 applyBatches
                     sha256
@@ -590,6 +622,7 @@ module StrengthReplicaTransform =
                     sessionIdText
                     output
                     currentWire
+                    childMessages
                     batches
                     outboundRequest
                     runtime

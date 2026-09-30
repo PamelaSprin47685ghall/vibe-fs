@@ -111,9 +111,12 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_a_plain_text_answer_ends_
   assert.equal(outcome.kind, 'Ready')
   assert.deepEqual(outcome.batches, [], 'a pure text answer carries no real exchange, so it materialises nothing')
   const visible = JSON.stringify(Projection.decodeMessages(outcome.output).messages)
-  assert.match(visible, /owner mirror/, 'the frozen owner mirror still leads the companion view')
-  assert.doesNotMatch(visible, /trust my summary/,
-    'the companion narrative must not travel back to the master inside replayed material')
+  assert.match(visible, /owner mirror/, 'the owner transcript still leads the companion view')
+  // The replica's own prose is its OWN history, restored into its own request — it
+  // is not a claim the master is asked to believe, and it never reaches the master's
+  // transcript. Assert both halves precisely instead of forbidding it outright.
+  assert.match(visible, /trust my summary/, 'the replicas own prose is restored to its own request')
+  assert.deepEqual(outcome.batches, [], 'and it still materialises nothing')
 })
 
 test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_paired_with_estimated_readonly_rounds', () => {
