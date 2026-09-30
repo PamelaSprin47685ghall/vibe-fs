@@ -33,9 +33,6 @@ module ReadonlyDelegationContract =
     [<Emit("typeof $0 === 'number'")>]
     let private isNumberValue (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'string'")>]
-    let private isStringValue (value: obj) : bool = jsNative
-
     [<Emit("typeof $0 === 'undefined'")>]
     let private isUndefinedValue (value: obj) : bool = jsNative
 
@@ -136,14 +133,6 @@ module ReadonlyDelegationContract =
         else
             let numeric = unbox<float> value
             validateNumericBudget numeric
-
-    /// self_note 缺失（JS undefined，即属性不存在）合法；出现时只接受
-    /// 字符串（含空串）；null、数字、布尔、对象、数组一律拒绝，不强转；
-    /// 不自动填充；不做“必须以我/I 开头”的正则门禁。
-    let trySelfNote (value: obj) : Result<string option, string> =
-        if isUndefinedValue value then Ok None
-        elif isStringValue value then Ok(Some(string value))
-        else Error "self_note-not-string"
 
     let private descriptorConfigurableOrAbsent (descriptor: obj) : bool =
         if isNull descriptor then

@@ -49,8 +49,3 @@ module ReadonlyDelegationContract =
     /// parseInt, string coercion, truthiness, truncation, rounding or
     /// clamping.
     val tryReadonlyRoundBudget: value: obj -> Result<ReadonlyRoundBudget, string>
-
-    /// Validates self_note at the JS boundary: absent is valid (Ok None),
-    /// a string (including the empty string) is Ok(Some _), and every other
-    /// type is rejected. No coercion, no auto-fill, no regex prefix gate.
-    val trySelfNote: value: obj -> Result<string option, string>

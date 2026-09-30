@@ -389,6 +389,11 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
         )
         assert.ok(schemaOutputZh.description.includes("调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"))
         assert.equal(schemaOutputZh.description.includes("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."), false)
+        if (previousLanguage === undefined) {
+          delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+        } else {
+          process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+        }
 
         // Per-tool verification: a non-participating tool (e.g. join) and unreviewed tool gain zero increment
         const joinOutput = {
@@ -703,6 +708,68 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_an
         durableRequestedEvents(directory),
         [],
         'an in-flight source batch (calls without every result paired) must never be authorized',
+      )
+    })
+  } finally {
+    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+  }
+})
+
+// WHAT[002] / DELEGATE 10.3: when the wire contains both an earlier complete
+// batch and a later incomplete batch carrying calls with identical tool name
+// and arguments whose results have not arrived yet, source resolution must not
+// misidentify the incomplete trailing batch as a completed source.
+test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_to_misidentify_incomplete_trailing_batch_matching_earlier_batch', async () => {
+  globalThis.__wanxiangshu_test_predictor_state = 'configured'
+  try {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const sessionId = 'ses-delegate-tail-mismatch'
+      const physical = 'user-mismatch-1'
+      await acceptAuthorityRoot(runtime, sessionId, 'engineer', physical)
+      const admission = userMessage(physical, sessionId, [hostText('inspect the file')])
+      await hooks['chat.message']({ sessionID: sessionId, messageID: physical, agent: 'engineer' }, { message: admission, parts: admission.parts })
+
+      // Earlier complete batch with budget 1
+      const run1 = 'run-complete-1'
+      const call1 = 'call-complete-1'
+      const seedUser1 = userMessage(physical, sessionId, [hostText('inspect the file')])
+      const seedAssistant1 = assistantMessage(run1, sessionId, physical, [budgetCall(call1, 1)])
+
+      // Later incomplete batch with identical tool name and arguments, but different call ID and pending result
+      const run2 = 'run-inflight-2'
+      const call2 = 'call-inflight-2'
+      const physical2 = 'user-mismatch-2'
+      const admission2 = userMessage(physical2, sessionId, [hostText('inspect the file again')])
+      await hooks['chat.message']({ sessionID: sessionId, messageID: physical2, agent: 'engineer' }, { message: admission2, parts: admission2.parts })
+      const seedUser2 = userMessage(physical2, sessionId, [hostText('inspect the file again')])
+      const seedAssistant2 = assistantMessage(run2, sessionId, physical2, [pendingCall(call2, 1)])
+
+      runtime.pushHostMessage(sessionId, seedUser1)
+      runtime.pushHostMessage(sessionId, seedAssistant1)
+      runtime.pushHostMessage(sessionId, seedUser2)
+      runtime.pushHostMessage(sessionId, seedAssistant2)
+
+      const messages = [seedUser1, seedAssistant1, seedUser2, seedAssistant2]
+
+      // Drive 1: establishes root association, authorizes nothing
+      await withTimeout(
+        hooks['experimental.chat.messages.transform']({}, { messages }),
+        'trailing mismatch test drive 1 hung',
+      )
+      assert.deepEqual(durableRequestedEvents(directory), [], 'drive 1 authorizes nothing')
+
+      // Drive 2: the trailing assistant batch is incomplete (result not arrived),
+      // even though its tool name and arguments match the earlier completed batch.
+      // Source capture must not misidentify the incomplete batch as completed,
+      // and must not fall back to the earlier batch.
+      await withTimeout(
+        hooks['experimental.chat.messages.transform']({}, { messages }),
+        'trailing mismatch test drive 2 hung',
+      )
+      assert.deepEqual(
+        durableRequestedEvents(directory),
+        [],
+        'an incomplete trailing assistant batch with duplicate call arguments must not be captured as completed source',
       )
     })
   } finally {

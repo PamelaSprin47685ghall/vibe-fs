@@ -339,12 +339,89 @@ module StrengthDelegate =
             let calls = extractWireToolCalls message.Parts
             if List.isEmpty calls then None else Some calls
 
+    let private isWireRequestBoundary (message: ProviderProjection.WireMessage) =
+        String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+        || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
+
+    let private wireResultParts (message: ProviderProjection.WireMessage) =
+        message.Parts
+        |> List.choose (function
+            | ProviderProjection.WireToolResult(callId, result) -> Some(callId, result)
+            | _ -> None)
+
+    let private addWireResult
+        (callIds: Set<string>)
+        (state: Result<Map<string, string>, unit>)
+        ((callId, result): ToolCallId * string)
+        : Result<Map<string, string>, unit> =
+        state
+        |> Result.bind (fun current ->
+            let key = ToolCallId.value callId
+
+            if not (Set.contains key callIds) || Map.containsKey key current then
+                Error()
+            else
+                Ok(Map.add key result current))
+
+    let private collectNextWireResults
+        (all: ProviderProjection.WireMessage array)
+        (callIds: Set<string>)
+        (index: int)
+        (results: Map<string, string>)
+        : Result<Map<string, string>, unit> =
+        wireResultParts all.[index] |> List.fold (addWireResult callIds) (Ok results)
+
+    let private collectWireResults
+        (all: ProviderProjection.WireMessage array)
+        (callIds: Set<string>)
+        (startIndex: int)
+        : Result<Map<string, string> * int, unit> =
+        let rec loop index results =
+            if index >= all.Length || isWireRequestBoundary all.[index] then
+                Ok(results, index)
+            else
+                collectNextWireResults all callIds index results
+                |> Result.bind (fun current -> loop (index + 1) current)
+
+        loop startIndex Map.empty
+
+    let private collectWireCompletedBatches
+        (messages: ProviderProjection.WireMessage list)
+        : SourceToolCall list list =
+        let all = List.toArray messages
+
+        let rec loop index collected =
+            if index >= all.Length then
+                List.rev collected
+            else
+                let message = all.[index]
+
+                if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
+                    loop (index + 1) collected
+                else
+                    let calls = extractWireToolCalls message.Parts
+
+                    if List.isEmpty calls then
+                        List.rev collected
+                    else
+                        let callIds = calls |> List.map (fun call -> ToolCallId.value call.CallId) |> Set.ofList
+
+                        match collectWireResults all callIds (index + 1) with
+                        | Error() -> List.rev collected
+                        | Ok(results, _) when Map.count results <> List.length calls -> List.rev collected
+                        | Ok(_, nextIndex) -> loop nextIndex (calls :: collected)
+
+        loop 0 []
+
     let private matchBatchWithTailCalls
         (wireMessages: ProviderProjection.WireMessage list)
         (tailCalls: SourceToolCall list)
         : SourceToolCall list option =
-        match List.tryLast (StrengthBatchCollector.collectCompleteBatches wireMessages) with
-        | Some batch ->
+        let completeBatches = StrengthBatchCollector.collectCompleteBatches wireMessages
+        let completedCallBatches = collectWireCompletedBatches wireMessages
+
+        match List.tryLast completeBatches, List.tryLast completedCallBatches with
+        | Some batch, Some completedCalls ->
             let batchSignatures =
                 batch.Exchanges
                 |> List.map (fun exchange -> exchange.ToolName, exchange.CanonicalArguments)
@@ -353,11 +430,11 @@ module StrengthDelegate =
                 tailCalls
                 |> List.map (fun call -> call.ToolName, call.CanonicalArguments)
 
-            if batchSignatures = callSignatures then
+            if batchSignatures = callSignatures && completedCalls = tailCalls then
                 Some tailCalls
             else
                 None
-        | None -> None
+        | _ -> None
 
     let private tryExtractWireCompletedBatch
         (wire: ProviderProjection.ProviderWireProjection)
