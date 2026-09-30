@@ -79,8 +79,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable loopSensor: ILoopSensor option = None
     // DSL-MUTABLE: resource — message-visibility hub attachment slot
     let mutable messageVisibility: MessageVisibilityHub option = None
-    // DSL-MUTABLE: resource — satellite runtime attachment slot
-    let mutable satelliteRuntime: SatelliteRuntime option = None
+    // DSL-MUTABLE: resource — the ONE attachment lease registry shared by every kind
+    let mutable attachmentRegistry: AttachmentLeaseRegistry option = None
+    // DSL-MUTABLE: resource — Companion kind adapter over that registry
+    let mutable companionLeases: CompanionLeaseRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
     // DSL-MUTABLE: resource — event-driven managed chat recovery owner
@@ -153,12 +155,21 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member _.Recovery = recovery
 
-    member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
+    /// The single lifecycle owner's registry: one instance per plugin, attached by
+    /// Host composition and shared by every AttachmentKind adapter.
+    member _.AttachAttachmentRegistry(registry: AttachmentLeaseRegistry) = attachmentRegistry <- Some registry
 
-    member _.Satellites =
-        match satelliteRuntime with
+    member _.AttachmentRegistry =
+        match attachmentRegistry with
+        | Some registry -> registry
+        | None -> invalidOp "AttachmentLeaseRegistry has not been attached"
+
+    member _.AttachCompanionLeases(runtime: CompanionLeaseRuntime) = companionLeases <- Some runtime
+
+    member _.CompanionLeases =
+        match companionLeases with
         | Some runtime -> runtime
-        | None -> invalidOp "SatelliteRuntime has not been attached"
+        | None -> invalidOp "CompanionLeaseRuntime has not been attached"
 
     member _.AttachSyncDelegateRuntime(runtime: SyncDelegateRuntime) = syncDelegateRuntime <- Some runtime
 

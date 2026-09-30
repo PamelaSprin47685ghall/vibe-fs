@@ -5,7 +5,7 @@ open Wanxiangshu.Foundation.Identity
 /// HOST-008: orthogonal session ownership — ExecutionClass × Ownership.
 ///
 /// Long-lived association is no longer a single `SatelliteKind` axis. Dedicated
-/// SyncInspector/SyncCoder are Work+Attached (MAY hold a Companion); Companion /
+/// SyncInspector/SyncCoder/SyncEngineer are Work+Attached (MAY hold a Companion); Companion /
 /// Bookkeeper / StrengthReplica are InternalLeaf+Attached. StrengthReplica is
 /// NEVER a `SatelliteKind` case.
 /// HOST-008: whether the session is ordinary work or an internal leaf.
@@ -20,6 +20,8 @@ type AttachmentKind =
     | Companion
     | SyncInspector
     | SyncCoder
+    /// EXEC-026: the Engineer role's dedicated attachment identity.
+    | SyncEngineer
     | Bookkeeper of transactionId: string
     /// Short-lived decision-local InternalLeaf replica attachment.
     /// Not a SatelliteKind case — Universal AttachmentKind ownership only.

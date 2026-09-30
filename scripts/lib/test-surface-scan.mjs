@@ -1496,8 +1496,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Session/Attachment/AttachmentSurface.js',
     owner: 'managed-session-lifecycle',
-    laws: ['MANAGED-SESSION-001', 'MANAGED-SESSION-005', 'CRASH-019'],
-    lawOwners: { 'CRASH-019': 'crash-reconciliation' },
+    laws: ['MANAGED-SESSION-001', 'MANAGED-SESSION-005'],
     source: 'src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs',
     representation: 'json',
     kind: 'pure',

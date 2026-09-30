@@ -15,7 +15,7 @@ module CompanionTransform =
     val allowsBloggerCompanionForAgentName: agentName: string -> bool
 
     val coordinateBloggerContext:
-        satellites: SatelliteRuntime ->
+        satellites: CompanionLeaseRuntime ->
         bloggerHost: IBloggerRuntimeHost ->
         companion: CompanionHost ->
         journal: AgentJournal option ->
@@ -26,7 +26,7 @@ module CompanionTransform =
     val handleCompanionTransform:
         companions: Dictionary<string, CompanionHost> ->
         gate: obj ->
-        satellites: SatelliteRuntime ->
+        satellites: CompanionLeaseRuntime ->
         bloggerHost: IBloggerRuntimeHost ->
         sessionPort: ISessionHostPort ->
         journal: AgentJournal option ->
@@ -39,7 +39,7 @@ module CompanionTransform =
     val applyCompanionForOrdinaryMaterial:
         companions: Dictionary<string, CompanionHost> ->
         gate: obj ->
-        satellites: SatelliteRuntime ->
+        satellites: CompanionLeaseRuntime ->
         bloggerHost: IBloggerRuntimeHost ->
         sessionPort: ISessionHostPort ->
         journal: AgentJournal option ->

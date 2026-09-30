@@ -15,7 +15,7 @@ test('WHAT[session-ontology-002] Root and Attached project mutually exclusive ow
   assert.deepEqual(association.ownershipRoot, {
     kind: 'Root', owner: null, attachment: null, transactionId: null,
   })
-  for (const kind of ['SyncInspector', 'SyncCoder']) {
+  for (const kind of ['SyncInspector', 'SyncCoder', 'SyncEngineer']) {
     assert.deepEqual(association.ownershipAttached('owner', kind), {
       kind: 'Attached', owner: 'owner', attachment: kind, transactionId: null,
     })

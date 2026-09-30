@@ -18,8 +18,8 @@
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fsi"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
-    <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fsi"/>
-    <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="Execution/Session/Attachment/CompanionLeaseRuntime.fsi"/>
+    <Compile Include="Execution/Session/Attachment/CompanionLeaseRuntime.fs"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
   </ItemGroup>

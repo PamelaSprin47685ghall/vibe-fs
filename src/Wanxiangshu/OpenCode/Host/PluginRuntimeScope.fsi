@@ -42,9 +42,14 @@ type PluginRuntimeScope =
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member Recovery: PluginRecoveryScope
 
-    member AttachSatelliteRuntime: runtime: SatelliteRuntime -> unit
+    /// The single lifecycle owner's registry, shared by every AttachmentKind adapter.
+    member AttachAttachmentRegistry: registry: AttachmentLeaseRegistry -> unit
 
-    member Satellites: SatelliteRuntime
+    member AttachmentRegistry: AttachmentLeaseRegistry
+
+    member AttachCompanionLeases: runtime: CompanionLeaseRuntime -> unit
+
+    member CompanionLeases: CompanionLeaseRuntime
 
     member AttachSyncDelegateRuntime: runtime: SyncDelegateRuntime -> unit
 

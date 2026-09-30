@@ -3,7 +3,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import * as attachment from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
 import * as delegate from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
 const scenario = async mode => {
@@ -11,12 +10,6 @@ const scenario = async mode => {
   try { return await delegate.managedChildReconciliationScenario(directory, mode) }
   finally { await rm(directory, { recursive: true, force: true }) }
 }
-
-test('WHAT[crash-reconciliation-015] attachment classifier distinguishes missing matching and conflicting physical evidence', () => {
-  assert.deepEqual(attachment.classifyObservation('missing'), { observation: 'missing', decision: 'Create', children: [] })
-  assert.deepEqual(attachment.classifyObservation('matching'), { observation: 'matching', decision: 'Adopt', children: ['host-child-existing'] })
-  assert.deepEqual(attachment.classifyObservation('conflicting'), { observation: 'conflicting', decision: 'RejectConflict', children: ['host-child-existing', 'host-child-conflict'] })
-})
 
 test('WHAT[crash-reconciliation-015] actual delegate adapter reuses unique exact children creates missing ones and refuses ambiguous or failed queries', async () => {
   const adopted = await scenario('matching')

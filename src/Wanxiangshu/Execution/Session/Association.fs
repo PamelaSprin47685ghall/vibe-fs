@@ -15,7 +15,7 @@ open Wanxiangshu.Foundation.Identity
 /// whether a given id is somebody's Y.
 ///
 /// Long-lived ownership is `SessionExecutionClass` × `SessionOwnership` /
-/// `AttachmentKind` in `Wanxiangshu.Foundation`. Dedicated SyncInspector/SyncCoder are
+/// `AttachmentKind` in `Wanxiangshu.Foundation`. Dedicated SyncInspector/SyncCoder/SyncEngineer are
 /// Work+Attached and must not be stuffed into `SatelliteKind`. See
 /// `SessionOwnershipClassification` and `SyncDelegateAssociationHints`.
 [<RequireQualifiedAccess>]
@@ -257,7 +257,7 @@ module SessionAssociationProjection =
 /// View over durable `SessionAssociation` → `SessionExecutionClass` × `SessionOwnership`.
 ///
 /// Additive only: does not change `SessionAssociation` fields or FactCodec.
-/// Dedicated SyncInspector/SyncCoder are not represented on this durable record;
+/// Dedicated SyncInspector/SyncCoder/SyncEngineer are not represented on this durable record;
 /// use `SyncDelegateAssociationHints` when registering them as Work+Attached.
 module SessionOwnershipClassification =
 
@@ -267,7 +267,7 @@ module SessionOwnershipClassification =
     /// Map one durable association entry onto the orthogonal ExecutionClass × Ownership view.
     ///
     /// - WorkSession → Work × Root. `ParentSessionId` may still be set for fork
-    ///   children; that alone does not prove SyncInspector/SyncCoder Attached
+    ///   children; that alone does not prove SyncInspector/SyncCoder/SyncEngineer Attached
     ///   ownership, so we do not invent `Attached(_, Sync*)` here. Callers that
     ///   know the SyncDelegate role should use `SyncDelegateAssociationHints`.
     /// - Satellite Companion → InternalLeaf × Attached(owner, Companion).
@@ -311,4 +311,5 @@ module StrengthReplicaAssociationHints =
         | AttachmentKind.Companion
         | AttachmentKind.SyncInspector
         | AttachmentKind.SyncCoder
+        | AttachmentKind.SyncEngineer
         | AttachmentKind.Bookkeeper _ -> false

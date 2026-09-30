@@ -192,6 +192,8 @@ Execution/Session/Ownership.fsi
 Execution/Session/Ownership.fs
 Execution/Session/SyncDelegateRole.fsi
 Execution/Session/SyncDelegateRole.fs
+Execution/Session/Attachment/AttachmentLeaseCore.fsi
+Execution/Session/Attachment/AttachmentLeaseCore.fs
 Execution/Delegation/SyncDelegate/Model.fsi
 Execution/Delegation/SyncDelegate/Model.fs
 Execution/Delegation/HandoffIdentity.fsi
@@ -702,8 +704,6 @@ Execution/Session/Attachment/ReuseScope.fsi
 Execution/Session/Attachment/ReuseScope.fs
 Execution/Session/Attachment/AttachedRuntime.fsi
 Execution/Session/Attachment/AttachedRuntime.fs
-Execution/Session/Attachment/AttachmentSurface.fsi
-Execution/Session/Attachment/AttachmentSurface.fs
 Strength/Runtime.fsi
 Strength/Runtime.fs
 Execution/Delegation/Fork/Recovery.fsi
@@ -928,6 +928,10 @@ OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
 OpenCode/Host/SessionHostPort.fsi
 OpenCode/Host/SessionHostPort.fs
+Execution/Session/Attachment/CompanionLeaseRuntime.fsi
+Execution/Session/Attachment/CompanionLeaseRuntime.fs
+Execution/Session/Attachment/AttachmentSurface.fsi
+Execution/Session/Attachment/AttachmentSurface.fs
 OpenCode/Host/SessionRuntimeOwner.fsi
 OpenCode/Host/SessionRuntimeOwner.fs
 OpenCode/Host/Sessions.fsi
@@ -952,8 +956,6 @@ Repository/Investigation/WarmStartSurface.fsi
 Repository/Investigation/WarmStartSurface.fs
 Strength/OpenCode/Replay.fsi
 Strength/OpenCode/Replay.fs
-Execution/Session/Attachment/SatelliteRuntime.fsi
-Execution/Session/Attachment/SatelliteRuntime.fs
 OpenCode/Host/SatelliteSurface.fsi
 OpenCode/Host/SatelliteSurface.fs
 Interaction/Dispatch/JournalPort.fsi

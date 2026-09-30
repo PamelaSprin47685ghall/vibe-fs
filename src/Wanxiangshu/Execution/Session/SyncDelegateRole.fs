@@ -11,4 +11,4 @@ module SyncDelegateRole =
         match role with
         | SyncDelegateRole.Inspector -> AttachmentKind.SyncInspector
         | SyncDelegateRole.Coder -> AttachmentKind.SyncCoder
-        | SyncDelegateRole.Engineer -> AttachmentKind.SyncInspector
+        | SyncDelegateRole.Engineer -> AttachmentKind.SyncEngineer

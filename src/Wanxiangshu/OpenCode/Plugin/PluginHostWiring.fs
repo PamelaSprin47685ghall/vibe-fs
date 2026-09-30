@@ -138,7 +138,16 @@ module PluginHostWiring =
                     | None -> BookkeeperRuntime.resetRuntime ()
 
                     scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
-                    scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
+
+                    // managed-session-lifecycle-001: ONE attachment lease registry per
+                    // plugin instance, attached before any kind adapter so every
+                    // AttachmentKind registers through the same lifecycle owner. The
+                    // Companion kind's adapter lives with it, so a plugin whose
+                    // companion step runs before the session wiring (or without a
+                    // durable journal) still has one lifecycle owner rather than an
+                    // unattached scope slot.
+                    scope.AttachAttachmentRegistry(AttachmentLeaseRegistry())
+                    scope.AttachCompanionLeases(CompanionLeaseRuntime(sessionPort, scope.AttachmentRegistry))
 
                     for KeyValue(childId, parentId) in scope.Sessions.SessionParents do
                         scope.Sessions.OwnedSessions.Add childId |> ignore

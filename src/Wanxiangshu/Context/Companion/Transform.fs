@@ -46,7 +46,7 @@ module CompanionTransform =
     let private ensureCompanion
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -107,7 +107,7 @@ module CompanionTransform =
         |> List.forall allowsBloggerCompanionForAgentName
 
     let coordinateBloggerContext
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (companion: CompanionHost)
         (journal: AgentJournal option)
@@ -116,7 +116,7 @@ module CompanionTransform =
         BloggerCoordinator.onMainContext bloggerHost companion journal context
 
     let private updateMaterializedBlogger
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (companion: CompanionHost)
         (journal: AgentJournal option)
@@ -153,7 +153,7 @@ module CompanionTransform =
     let private transformNonSatellite
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -217,7 +217,7 @@ module CompanionTransform =
     let private processSession
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -256,7 +256,7 @@ module CompanionTransform =
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -314,7 +314,7 @@ module CompanionTransform =
     let applyCompanionForOrdinaryMaterial
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (satellites: SatelliteRuntime)
+        (satellites: CompanionLeaseRuntime)
         (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)

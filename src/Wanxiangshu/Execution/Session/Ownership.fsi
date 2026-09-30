@@ -12,6 +12,8 @@ type AttachmentKind =
     | Companion
     | SyncInspector
     | SyncCoder
+    /// EXEC-026: the Engineer role's dedicated attachment identity.
+    | SyncEngineer
     | Bookkeeper of transactionId: string
     | StrengthReplica
 

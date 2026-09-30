@@ -619,7 +619,7 @@ module PluginTransforms =
                 CompanionTransform.applyCompanionForOrdinaryMaterial
                     scope.Sessions.Companions
                     scope.Sessions.CompanionGate
-                    scope.Satellites
+                    scope.CompanionLeases
                     scope.BloggerRuntimeHost
                     sessionPort
                     journal

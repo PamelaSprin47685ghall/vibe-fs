@@ -616,7 +616,7 @@ module StrengthSurface =
         box
             {| satelliteCases = [| "Companion" |]
                hasReplicaSatellite = false
-               attachmentCases = [| "Companion"; "SyncInspector"; "SyncCoder"; "Bookkeeper"; "StrengthReplica" |]
+               attachmentCases = [| "Companion"; "SyncInspector"; "SyncCoder"; "SyncEngineer"; "Bookkeeper"; "StrengthReplica" |]
                executionClass =
                 match StrengthReplicaAssociationHints.executionClass with
                 | SessionExecutionClass.InternalLeaf -> "InternalLeaf"

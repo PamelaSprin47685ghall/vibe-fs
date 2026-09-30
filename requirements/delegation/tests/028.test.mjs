@@ -107,7 +107,11 @@ const ADAPTER_RATCHET = new Map([
   // into a module-internal SyncDelegateInternals module (namespace-scoped files
   // cannot hold bare top-level `let`); ratchet raised one slot to hold the
   // same dependency surface.
-  ['delegation-recovery-runtime', 47],
+  // 48 on 2026-09-30 — managed-session-lifecycle-001: SyncDelegate's Runtime.fs
+  // now consumes AttachedRuntime.fs (the Sync kind's adapter over AttachmentLeaseCore),
+  // which itself consumes AttachmentLeaseCore.fs; the two files join this adapter
+  // closure, one slot above the previous 47.
+  ['delegation-recovery-runtime', 48],
 ])
 
 test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
