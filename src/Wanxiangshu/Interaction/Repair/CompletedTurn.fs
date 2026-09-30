@@ -131,23 +131,9 @@ module CompletedTurnClassifier =
                 )
             )
 
-    /// provider-attempt-recovery-008: unusable formal content (empty / XML-only) is content damage, not
-    /// a provider request failure. Such a turn earns at most one bounded
-    /// Interaction Repair and never advances the failure budget.
+    /// Content validity alone cannot prove a provider failure.
     let formalContentUnusable (parts: MessagePart array) : bool =
         TerminalValidity.check (partsText parts) |> Result.isError
-
-    /// An errored attempt whose formal content is unusable stays repairable;
-    /// only an attempt with usable content is a provider failure terminal.
-    let private classifyErroredContent (reason: string) (parts: MessagePart array) : obj =
-        match TerminalValidity.check (partsText parts) with
-        | Ok() -> box (ReconcileProgram.TurnFailed reason)
-        | Error rejection ->
-            box (
-                ReconcileProgram.TurnNeedsContinuation(
-                    sprintf "%s with %s" reason (TerminalValidity.describe rejection)
-                )
-            )
 
     /// Returns either a publishable `TurnOutcome` or a private `SnapshotObservation`.
     /// Heterogeneous `obj` so finish=None stays instanceof SnapshotObservation in JS
@@ -160,11 +146,11 @@ module CompletedTurnClassifier =
         : obj =
         match isAbortErrorName errorName, completed && Option.isSome errorName, finish with
         | true, _, _ -> box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
-        | false, true, _ -> classifyErroredContent (defaultArg errorName "assistant completed with error") parts
+        | false, true, _ -> box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error"))
         | false, false, Some value when value.Equals("aborted", StringComparison.OrdinalIgnoreCase) ->
             box (ReconcileProgram.TurnAborted("finish=aborted"))
         | false, false, Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
-            classifyErroredContent (defaultArg errorName "assistant finish=error") parts
+            box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error"))
         | false, false, Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
             classifyStopped parts
         | false, false, Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->

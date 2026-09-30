@@ -103,6 +103,6 @@ DevOps 的固定绑定由道路初始化确立，其模型配置与 Persona 在�
 
 `missing-final-report` 与 `interaction-repair` 对 `ProviderRetryAttempt` continuation 的抑制，只在该 continuation 自身的 attempt 尚未终结时成立：观测仍为 `TurnUnknown`（finish=None）或 `TurnInProgress`（tool-calls）且没有已落地的 exact terminal 时，idle/reconcile 必须保持等待，禁止并发 nudge 抢夺该 attempt 正在生成的响应。
 
-该 attempt 一旦终结，抑制立即失效：稳定 terminal 观测（`TurnCompleted`、`TurnFailed`、`TurnAborted`，以及 `TurnNeedsContinuation` 的全部来源——`length`、空/XML-only `stop`、completed-with-error）或 exact durable `ChatExecution` Terminal 任一成立，本次 `ProviderRunIdentity` 就按 [019] 重新获得 nudge 资格；gate 未满足时，此后每个新的合法 terminal occasion 都必须重新获得资格。两类终结证据相互独立，先到者即解除抑制，不等待另一侧追平。
+该 attempt 一旦终结，抑制立即失效：稳定 terminal 观测（`TurnCompleted`、`TurnFailed`、`TurnAborted`，以及 `TurnNeedsContinuation` 的来源——`length`、没有 provider error 的空/XML-only `stop`）或 exact durable `ChatExecution` Terminal 任一成立，本次 `ProviderRunIdentity` 就按 [019] 重新获得 nudge 资格；gate 未满足时，此后每个新的合法 terminal occasion 都必须重新获得资格。两类终结证据相互独立，先到者即解除抑制，不等待另一侧追平。解除抑制不改变结局归属：completed-with-error 属于 `TurnFailed`，即使输出为空也必须等待 exact typed failure，由 provider recovery 处理，不得转成 missing-final-report。
 
 抑制判据只能是 attempt 的在途/终结状态，严禁使用 durable physical 身份、continuation kind、Session/LogicalRun 或 ledger 条目本身的存在作为永久压制条件：凡凭“该 physical 曾被接受为 ProviderRetryAttempt”压掉后续 fresh terminal 的实现均为 RED。同一 exact terminal occasion 的重复观测仍由既有 publish/dedupe 幂等吸收，不因解除抑制而重复发送。

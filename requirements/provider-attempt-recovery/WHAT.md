@@ -34,7 +34,9 @@ Reject a failure record whose count is not the valid successor, exceeds the budg
 
 ## [008] Unusable content is not provider failure
 
-An empty or XML-only terminal never advances the provider-failure budget. Every repairable role, including Manager, must reach bounded Interaction Repair, at most once; an unfinished turn must not be silently dropped.
+An empty or XML-only terminal without confirmed provider-error evidence never advances the provider-failure budget. Every repairable role, including Manager, must reach bounded Interaction Repair, at most once; an unfinished turn must not be silently dropped.
+
+An errored assistant terminal remains a failed attempt even when its formal output is empty or XML-only. If idle arrives before the exact typed failure observation, reconciliation waits rather than publishing a content-repair occasion. The matching failure observation owns budget accounting and the fresh LWR retry; content validity cannot downgrade it to Interaction Repair.
 
 ## [009] Host retries are not domain failures
 

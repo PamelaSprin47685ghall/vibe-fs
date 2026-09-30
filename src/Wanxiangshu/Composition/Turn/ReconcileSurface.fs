@@ -589,6 +589,95 @@ module ReconcileSurface =
             return formatObserved snapshotReads observed
         }
 
+    let providerErrorIdleRaceScenario (rawMessage: obj) : Task<obj> =
+        task {
+            let terminalEvent =
+                box
+                    {| ``type`` = "message.updated"
+                       properties = {| info = rawMessage?info |} |}
+
+            let terminal =
+                HostEventCodec.tryDecodeExactProviderTerminal terminalEvent
+                |> Option.defaultWith (fun () -> invalidArg "rawMessage" "exact provider terminal required")
+
+            let message =
+                SessionSnapshotPort.projectMessage rawMessage
+                |> Option.defaultWith (fun () -> invalidArg "rawMessage" "Host message required")
+
+            let physical = terminal.PhysicalUserMessageId
+            let session = terminal.SessionId
+            let store = TurnBinding.Store()
+            store.BindUserMessage(session, physical)
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        Task.FromResult(
+                            Ok
+                                [ schedulerMessage
+                                      (PhysicalUserMessageId.value physical)
+                                      "user"
+                                      None
+                                      None
+                                      None
+                                      false
+                                      [||]
+                                  message ]
+                        ) }
+
+            // DSL-MUTABLE: algorithm-scratch — capture actual pass deliveries and seals.
+            let deliveries = ResizeArray<ReconciledTurnContext>()
+            let mutable maps = ReconcileProgram.publishMapsEmpty ()
+            let quiescence = SessionQuiescenceGate()
+            quiescence.BeginProviderAttempt session
+
+            let run wake =
+                ReconcilePass.run
+                    snapshot
+                    (fun _ _ -> true)
+                    (fun _ -> false)
+                    (fun _ -> maps)
+                    (fun _ updated -> maps <- updated)
+                    wake
+                    (fun _ _ -> Task.FromResult(()) :> Task)
+                    (fun context ->
+                        deliveries.Add context
+                        Task.FromResult(()) :> Task)
+                    (store.ActiveRunBinding session)
+                    session
+                    0
+
+            do! run (ReconcileProgram.ReconcileWake.IdleWake(quiescence.ObserveIdle session))
+            let idleDeliveries = deliveries.Count
+
+            let failure =
+                match terminal.Outcome with
+                | HostProviderTerminalOutcome.ProviderFailure failure -> failure
+                | _ -> invalidArg "rawMessage" "provider failure required"
+
+            do!
+                run (
+                    ReconcileProgram.ReconcileWake.FailureWake(
+                        Some physical,
+                        failure,
+                        "exact-provider-terminal",
+                        ReconcileProgram.FailureWakeSource.ExactAssistantProjection
+                    )
+                )
+
+            return
+                box
+                    {| idleDeliveries = idleDeliveries
+                       deliveries = deliveries.Count
+                       terminal = formatObserved 0 (deliveries |> Seq.tryLast)
+                       failure =
+                        deliveries
+                        |> Seq.tryLast
+                        |> Option.bind _.Failure
+                        |> Option.map string
+                        |> Option.defaultValue "" |}
+        }
+
     /// R17 dist-backed resource bound: same-session burst against the real
     /// Scheduler. First snapshot read blocks on a manual gate while thousands
     /// of same-session kicks/projection edges arrive, StopAndDrain is issued

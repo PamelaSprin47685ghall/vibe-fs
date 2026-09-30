@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — provider 错误不再被空输出修复抢走
+
+- 修复 `CompletedTurnClassifier` 将 `completed + error + 空/XML-only 输出` 降级为 `TurnNeedsContinuation` 的错误。错误终态现在始终是 `TurnFailed`：先到的 idle 等待 exact typed failure，不再发送 `missing-final-report`；确切失败观察仍由原有 provider recovery 记账、派发 fresh `ProviderRetryAttempt` 并重新选择可用的 LWR 前缀。无 provider error 的空/XML-only `stop` 仍走内容修复，operator abort 仍为取消。
+- 现场证据：`../wanxiang` 的 DevOps 会话 `ses_f0dca4962ffeQSTPc5KnX6V0tZ` 在连续 400 超限期间记录了 210 次 `InteractionRepair`，却只有 8 次 `FailureRecorded` / `ProviderRetryAttempt`。repair 反复携带 cutoff=450 的旧 probe；最后一次真正的 provider retry 才选到 Blogger 已证明的 cutoff=656。修复不按 400 文案分支，不引入容量估算、非法截断或新会话兜底。
+- 回归覆盖空输出、reasoning-only、XML-only、partial answer、error finish、正常内容修复及取消边界；新增真实 `ReconcilePass.run` 的 idle 先到、exact provider terminal 后到回归。修改前回归失败为 `TurnNeedsContinuation`；修改后，用数据库中本次报错的原始 assistant message 离线重放，idle 交付 0 次，exact failure 交付 1 次 `TurnFailed / ProviderTransient`，不携带 idle repair 权限。
+- 定向验证：相关 12 个测试文件 90 通过、0 失败、5 TODO；构建通过。用真实 400 消息继续驱动 retry policy、生产 LWR candidate 物化与 Host-id prefix replacement 的离线 smoke，覆盖历史确实移除，Opening 与当前回合原样保留。扩展套件 630 项中 563 通过、20 失败、47 TODO；失败集中在未修改的 Chronicle 旧文案断言、Blogger flight/capacity 交错及 ingress provenance 测试。仓库 check 另报 184 项，未定位到本次修改文件；不宣称全仓门禁绿。
+
 ## Unreleased — F# 控制金字塔债务清零
 
 - **`fsharp-control-pyramid` 从 42 项降为 0，baseline 清空为 `{ "version": 1, "files": {} }`**：13 个文件逐处按 `structured-workflow-004` 提取具名 helper 或改用组合子消除 `depth>=2` decision，不再依赖按文件记账的 ratchet。`Batching.fs`（10）把 charge 渲染、消息替换、pending 取走各自成函数；`Delegate.fs`（8）把 wire 批次扫描收成 `wireBatchStep` 单步 Result、把预算聚合收成 `ofRounds`/`ofParsedResults`/`parseCall`；`InvestigationEstimateContract.fs`（8）拆出 `validateNumber`/`validateNoteText` 与中英文文案表；`Send.fs`（4）拆出 `persistSubmittedFact`/`admissionVerdict`/`settleAdmittedReceipt`，try 只包一层。
