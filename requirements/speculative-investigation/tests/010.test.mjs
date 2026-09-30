@@ -415,6 +415,8 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { createHash } = await import("node:crypto");
 const Strength = await import("../../../dist/Strength/Surface.js");
+const { SessionIdModule_create, LogicalRunIdModule_create, AuthorityRootUserMessageIdModule_create } = await import("../../../dist/Foundation/Identity.js");
+const { PromptRootAuthorityKind } = await import("../../../dist/Interaction/Authority/Origin.js");
 
 const { ofArray: fsharpMapOfArray } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Map.js");
 const { compare } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Util.js");
@@ -439,7 +441,12 @@ const promoted = (decisionId, owner = 'ses-1') => Strength.eventPromoted(owner, 
 
 function createDelegateMockContext(projection) {
   const strengthScope = new rawPluginScope.PluginStrengthScope();
-  strengthScope.AttachStrengthReplicaRuntime({});
+  strengthScope.AttachStrengthReplicaRuntime({
+    liveRegistry: {
+      gate: {},
+      byReplica: new Map(),
+    },
+  });
 
   const snapshotPort = {
     GetMessages: async () => ({
@@ -457,18 +464,25 @@ function createDelegateMockContext(projection) {
     }),
   };
 
+  const sessionId = SessionIdModule_create("ses-1");
+  const logicalRunId = LogicalRunIdModule_create("log-1");
+  const authorityRootUserMessageId = AuthorityRootUserMessageIdModule_create("u-1");
   const delegateProjection010 = {
     AgentProjections: {
       Sessions: toFSharpMap([
         [
-          "ses-1",
+          sessionId,
           {
             PromptAuthority: {
               ActiveLogicalRun: {
                 CanonicalRole: "engineer",
-                AuthorityKind: { tag: 0 },
-                LogicalRunId: "log-1",
-                AuthorityRootUserMessageId: "u-1",
+                AuthorityKind: PromptRootAuthorityKind.HumanRoot,
+                LogicalRunId: logicalRunId,
+                AuthorityRootUserMessageId: authorityRootUserMessageId,
+                StoredSessionId: sessionId,
+                StoredLogicalRunId: logicalRunId,
+                StoredAuthorityRootUserMessageId: authorityRootUserMessageId,
+                StoredAuthorityKind: PromptRootAuthorityKind.HumanRoot,
               },
               LastAuthorityProfile: undefined,
               PendingClaims: toFSharpMap([]),
@@ -479,15 +493,15 @@ function createDelegateMockContext(projection) {
       Fission: {
         LaneOwner: toFSharpMap([]),
       },
-      Associations: toFSharpMap([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
+      Associations: toFSharpMap([[sessionId, Object.assign([{ tag: 0 }, { tag: 0 }], { Kind: { tag: 0 }, ParentSessionId: undefined })]]),
       Profiles: toFSharpMap([
         [
-          "ses-1",
+          sessionId,
           {
             CanonicalRole: "engineer",
             AuthorityKind: { tag: 0 },
-            LogicalRunId: "log-1",
-            AuthorityRootUserMessageId: "u-1",
+            LogicalRunId: logicalRunId,
+            AuthorityRootUserMessageId: authorityRootUserMessageId,
           },
         ],
       ]),
@@ -502,9 +516,23 @@ function createDelegateMockContext(projection) {
     Snapshot: () => delegateProjection010,
   };
 
+  const innerProjection = (projection && projection.projection) ? projection.projection : projection;
+  const durableStrengthProjection = {
+    ...innerProjection,
+    ByDecision: (innerProjection && innerProjection.ByDecision && typeof innerProjection.ByDecision.tree !== "undefined")
+      ? innerProjection.ByDecision
+      : toFSharpMap([]),
+    ByTargetRun: (innerProjection && innerProjection.ByTargetRun && typeof innerProjection.ByTargetRun.comparer !== "undefined")
+      ? innerProjection.ByTargetRun
+      : toFSharpMap([]),
+    ImportedHistory: (innerProjection && innerProjection.ImportedHistory && typeof innerProjection.ImportedHistory.tree !== "undefined")
+      ? innerProjection.ImportedHistory
+      : toFSharpMap([]),
+  };
+
   const appendedEvents = [];
   const durability = {
-    LoadProjection: async () => ({ tag: 0, fields: [projection] }),
+    LoadProjection: async () => ({ tag: 0, fields: [durableStrengthProjection] }),
     Append: async (event) => {
       appendedEvents.push(event);
       return { tag: 0 };
@@ -671,7 +699,7 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_apply_explicitly_closes_m
 
   // 断言该事件与 Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue') 完全一致
   const expectedClosedEvent = Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue');
-  assert.deepEqual(closedEvent, expectedClosedEvent);
+  assert.deepEqual(closedEvent, expectedClosedEvent.event);
 });
 
 test('WHAT[speculative-investigation-010] STRENGTH_010_tryCapture_skips_when_source_is_already_terminal', async () => {

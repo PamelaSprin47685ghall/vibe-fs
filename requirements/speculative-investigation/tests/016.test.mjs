@@ -5,6 +5,8 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { ofArray: fsharpMapOfArray } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Map.js");
 const { compare } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Util.js");
+const { SessionIdModule_create, LogicalRunIdModule_create, AuthorityRootUserMessageIdModule_create } = await import("../../../dist/Foundation/Identity.js");
+const { PromptRootAuthorityKind } = await import("../../../dist/Interaction/Authority/Origin.js");
 const defaultMapComparer = { Compare: (x, y) => (compare(x, y) | 0) };
 const toFSharpMap = (entries) => fsharpMapOfArray(entries, defaultMapComparer);
 const rawContract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
@@ -609,7 +611,12 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
   // Consumer 3: 来源批次端 (StrengthDelegate.tryCapture -> aggregateBatchEstimate)
   async function checkBatchReadsEstimate(toolName) {
     const strengthScope = new rawPluginScope.PluginStrengthScope();
-    strengthScope.AttachStrengthReplicaRuntime({});
+    strengthScope.AttachStrengthReplicaRuntime({
+      liveRegistry: {
+        gate: {},
+        byReplica: new Map(),
+      },
+    });
     const output = {
       messages: [
         {
@@ -658,18 +665,25 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
         ],
       }),
     };
+    const sessionId1 = SessionIdModule_create("ses-1");
+    const logicalRunId1 = LogicalRunIdModule_create("log-1");
+    const authorityRootUserMessageId1 = AuthorityRootUserMessageIdModule_create("u-1");
     const delegateProjection016_1 = {
       AgentProjections: {
         Sessions: toFSharpMap([
           [
-            "ses-1",
+            sessionId1,
             {
               PromptAuthority: {
                 ActiveLogicalRun: {
                   CanonicalRole: "engineer",
-                  AuthorityKind: { tag: 0 },
-                  LogicalRunId: "log-1",
-                  AuthorityRootUserMessageId: "u-1",
+                  AuthorityKind: PromptRootAuthorityKind.HumanRoot,
+                  LogicalRunId: logicalRunId1,
+                  AuthorityRootUserMessageId: authorityRootUserMessageId1,
+                  StoredSessionId: sessionId1,
+                  StoredLogicalRunId: logicalRunId1,
+                  StoredAuthorityRootUserMessageId: authorityRootUserMessageId1,
+                  StoredAuthorityKind: PromptRootAuthorityKind.HumanRoot,
                 },
                 LastAuthorityProfile: undefined,
                 PendingClaims: toFSharpMap([]),
@@ -680,15 +694,15 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
         Fission: {
           LaneOwner: toFSharpMap([]),
         },
-        Associations: toFSharpMap([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
+        Associations: toFSharpMap([[sessionId1, Object.assign([{ tag: 0 }, { tag: 0 }], { Kind: { tag: 0 }, ParentSessionId: undefined })]]),
         Profiles: toFSharpMap([
           [
-            "ses-1",
+            sessionId1,
             {
               CanonicalRole: "engineer",
               AuthorityKind: { tag: 0 },
-              LogicalRunId: "log-1",
-              AuthorityRootUserMessageId: "u-1",
+              LogicalRunId: logicalRunId1,
+              AuthorityRootUserMessageId: authorityRootUserMessageId1,
             },
           ],
         ]),
@@ -722,7 +736,7 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
     // aggregateBatchEstimate identifies it as an estimate call; with 0 rounds it returns EstimatedZero ("estimated-zero")
     // If not participating (NoEstimate or Unreviewed):
     // aggregateBatchEstimate filters it out -> empty estimateCalls -> returns NoEstimateOpportunity ("no-estimate-opportunity")
-    return outcome?.fields?.[0] !== "no-estimate-opportunity";
+    return outcome?.fields?.[0] === "estimated-zero";
   }
 
   // Representative set: at least one participating (read), one explicit NoEstimate (chronicle),
@@ -773,7 +787,12 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
 
 test('WHAT[speculative-investigation-016] source batch capture rejects participating call with missing estimate as ArgumentError instead of no-estimate-opportunity', async () => {
   const strengthScope = new rawPluginScope.PluginStrengthScope();
-  strengthScope.AttachStrengthReplicaRuntime({});
+  strengthScope.AttachStrengthReplicaRuntime({
+    liveRegistry: {
+      gate: {},
+      byReplica: new Map(),
+    },
+  });
 
   const snapshotPort = {
     GetMessages: async () => ({
@@ -790,18 +809,25 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
       ],
     }),
   };
+  const sessionIdM = SessionIdModule_create("ses-m");
+  const logicalRunIdM = LogicalRunIdModule_create("log-m");
+  const authorityRootUserMessageIdM = AuthorityRootUserMessageIdModule_create("u-missing-1");
   const delegateProjection016_2 = {
     AgentProjections: {
       Sessions: toFSharpMap([
         [
-          "ses-m",
+          sessionIdM,
           {
             PromptAuthority: {
               ActiveLogicalRun: {
                 CanonicalRole: "engineer",
-                AuthorityKind: { tag: 0 },
-                LogicalRunId: "log-m",
-                AuthorityRootUserMessageId: "u-missing-1",
+                AuthorityKind: PromptRootAuthorityKind.HumanRoot,
+                LogicalRunId: logicalRunIdM,
+                AuthorityRootUserMessageId: authorityRootUserMessageIdM,
+                StoredSessionId: sessionIdM,
+                StoredLogicalRunId: logicalRunIdM,
+                StoredAuthorityRootUserMessageId: authorityRootUserMessageIdM,
+                StoredAuthorityKind: PromptRootAuthorityKind.HumanRoot,
               },
               LastAuthorityProfile: undefined,
               PendingClaims: toFSharpMap([]),
@@ -812,15 +838,15 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
       Fission: {
         LaneOwner: toFSharpMap([]),
       },
-      Associations: toFSharpMap([["ses-m", [{ tag: 0 }, { tag: 0 }]]]),
+      Associations: toFSharpMap([[sessionIdM, Object.assign([{ tag: 0 }, { tag: 0 }], { Kind: { tag: 0 }, ParentSessionId: undefined })]]),
       Profiles: toFSharpMap([
         [
-          "ses-m",
+          sessionIdM,
           {
             CanonicalRole: "engineer",
             AuthorityKind: { tag: 0 },
-            LogicalRunId: "log-m",
-            AuthorityRootUserMessageId: "u-missing-1",
+            LogicalRunId: logicalRunIdM,
+            AuthorityRootUserMessageId: authorityRootUserMessageIdM,
           },
         ],
       ]),
