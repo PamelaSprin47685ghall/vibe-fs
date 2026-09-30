@@ -16,31 +16,22 @@ open Wanxiangshu.Foundation.Identity
 module ProjectionMessageEdit =
 
     let private rawPartCallId (part: obj) =
-        ProviderWireDecode.firstString part [ "callID"; "callId"; "toolCallId"; "id" ]
+        ProviderWireDecode.firstString part [ "toolCallId"; "callID"; "callId"; "id" ]
 
-    /// The cognitive tool whose results follow the latest-only rule.
-    ///
-    /// `todowrite` used to hold an unbounded retention exemption: every one of its
-    /// rounds survived prefix replacement forever, which is exactly the accumulation
-    /// the refactor removes. The exemption is now the K-window the prefix owner
-    /// already computes, so this predicate exists only to recognise the tool, never
-    /// to grant retention.
-    let private isAssumePart (part: obj) =
+    let private isAssumeCallPart (part: obj) =
         ProviderWireDecode.firstString part [ "tool"; "name" ]
         |> Option.exists (fun tool -> String.Equals(tool, "assume", StringComparison.OrdinalIgnoreCase))
 
-    /// Messages whose tool call belongs to `retainedCallIds`, matched by exact call
-    /// identity — never by text. A result payload replaced with a tombstone still
-    /// names its own call, which is what keeps the call/result pairing intact while
-    /// the payload alone changes.
-    let private messagesForCalls (covered: obj list) (retainedCallIds: Set<string>) =
-        covered
-        |> List.filter (fun message ->
-            let parts = ProviderWireDecode.rawPartsOf message
+    let private assumeCallIds (rawMessages: obj list) =
+        rawMessages
+        |> List.collect ProviderWireDecode.rawPartsOf
+        |> List.choose (fun part -> if isAssumeCallPart part then rawPartCallId part else None)
+        |> Set.ofList
 
-            parts
-            |> List.choose rawPartCallId
-            |> List.exists (fun callId -> Set.contains callId retainedCallIds))
+    let private messageCarriesAnyCall (callIds: Set<string>) (message: obj) =
+        ProviderWireDecode.rawPartsOf message
+        |> List.choose rawPartCallId
+        |> List.exists (fun callId -> Set.contains callId callIds)
 
     let private syntheticHead (syntheticId: string) (memory: string) =
         createObj
@@ -66,24 +57,14 @@ module ProjectionMessageEdit =
         (insertAfterHostMessageId: string option)
         (syntheticMessageId: string)
         (memory: string)
-        (retainedAssumeCallIds: Set<string>)
         : obj list =
         let coveredIds = coveredHostMessageIds |> Set.ofList
-
-        let covered =
-            rawMessages
-            |> List.filter (fun message ->
-                ProviderWireDecode.hostMessageId message
-                |> Option.exists (fun messageId -> Set.contains messageId coveredIds))
-
-        let retainedCoveredIds =
-            messagesForCalls covered retainedAssumeCallIds
-            |> List.choose ProviderWireDecode.hostMessageId
-            |> Set.ofList
+        let retainedAssumeCallIds = assumeCallIds rawMessages
 
         let survivesReplacement message =
             match ProviderWireDecode.hostMessageId message with
-            | Some messageId when Set.contains messageId coveredIds -> Set.contains messageId retainedCoveredIds
+            | Some messageId when Set.contains messageId coveredIds ->
+                messageCarriesAnyCall retainedAssumeCallIds message
             | _ -> true
 
         let surviving = rawMessages |> List.filter survivesReplacement

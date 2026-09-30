@@ -20,7 +20,6 @@ open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type SessionAgentProjection =
@@ -48,12 +47,9 @@ type AgentProjectionSet =
         HandleByChildSession: Map<SessionId, HandleRecord>
         Fission: FissionProjectionState
         ChatExecutions: ChatExecutionProjectionState
-        Cognition: Map<string, CognitiveProjection>
-        /// context-compression-028: the committed phases each session still keeps raw,
-        /// oldest first, bounded by the frozen window depth. Keyed by session because the
-        /// prefix owner asks "what does this session's provider history keep raw", while
-        /// `Cognition` answers the owner-scoped question "what canvas is current".
-        PhaseCommits: Map<SessionId, PhaseWindow.PhaseCommitWindow>
+        /// Successful native todowrite checkpoints still on the raw side of the
+        /// committed prefix, with the per-call retainCheckpoints value.
+        TodoCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         DelegationCompletedHandoffs: Map<string, int64>
         Attention: AttentionProjectionState
         Concern: ConcernProjectionState

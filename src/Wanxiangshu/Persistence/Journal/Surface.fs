@@ -154,7 +154,24 @@ module JournalSurface =
             |> List.map (fun (sessionId, _) -> SessionId.value sessionId)
             |> List.toArray
 
-        box {| sessions = sessions |}
+        let todoCheckpoints =
+            projection.AgentProjections.TodoCheckpoints
+            |> Map.toList
+            |> List.map (fun (sessionId, window) ->
+                box
+                    {| sessionId = SessionId.value sessionId
+                       checkpoints =
+                        window.Checkpoints
+                        |> List.map (fun checkpoint ->
+                            box
+                                {| callId = ToolCallId.value checkpoint.ToolCallId
+                                   retainCheckpoints = checkpoint.RetainCheckpoints |})
+                        |> List.toArray |})
+            |> List.toArray
+
+        box
+            {| sessions = sessions
+               todoCheckpoints = todoCheckpoints |}
 
     let private journalOrError (writer: IJournalWriter) (init: Envelope) (projection: ProjectionSet) : obj =
         match AgentJournal.createFromProjection writer projection with

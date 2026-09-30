@@ -1,21 +1,32 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as sink from '../../../dist/Participant/Cognition/TodoSinkSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-const rows = [
-  {content: '重复内容', status: 'pending', priority: 'low'},
-  {content: '重复内容', status: 'completed', priority: 'high'},
-  {content: '  前后空格\r\n第二行  ', status: 'cancelled', priority: 'medium'},
-]
+integrationTest('WHAT[obligation-ledger-002] empty and duplicate native todo lists pass through unchanged', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'obligation-native-replacement'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
-test('WHAT[obligation-ledger-002] actual sink preserves duplicate rows exact text and declared order', () => {
-  assert.deepEqual(sink.projectArgs({update: '.', todos: rows}), {ok: true, todos: rows})
-  const reversed = [...rows].reverse()
-  assert.deepEqual(sink.projectArgs({update: '.', todos: reversed}), {ok: true, todos: reversed})
+    const examples = [
+      [],
+      [
+        { content: '重复内容', status: 'pending', priority: 'low' },
+        { content: '重复内容', status: 'completed', priority: 'high' },
+      ],
+    ]
+
+    for (let index = 0; index < examples.length; index += 1) {
+      const todos = examples[index]
+      const args = { todos, retainCheckpoints: 1 }
+      await hooks['tool.execute.before'](
+        { tool: 'todowrite', sessionID, callID: 'todo-native-' + index },
+        { args },
+      )
+      assert.equal(args.todos, todos)
+      assert.deepEqual(args.todos, todos)
+    }
+  })
 })
 
-test('WHAT[obligation-ledger-002] explicit empty todos produces an empty Host replacement', () => {
-  assert.deepEqual(sink.projectArgs({update: '.', todos: []}), {ok: true, todos: []})
-})
-
-test.todo('WHAT[obligation-ledger-002] the installed Host replaces and clears only the current owner session UI')
+test.todo('WHAT[obligation-ledger-002] installed OpenCode native executor replaces and clears only the current session TodoTable')

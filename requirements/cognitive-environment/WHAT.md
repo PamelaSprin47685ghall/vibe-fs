@@ -65,10 +65,10 @@ Manager assessment 的提示由 Role Law、Quality Ledger（八维准则）与�
 ## [013] Pair Hint 是 canonical craft payload
 
 结对提示（Pair Programming Hint）是标准的技能注入负载，统一承载以下核心工作原则：
-- 使用统一的中文（或对应绑定语言）思考纪律。在采取任何动作或调用工具前，必须向同伴明确解释清楚而绝不能暗自琢磨，围绕三条核心思考逐项说明：1. 从用户的原始需求，为什么自以为的当务之急反而是不重要的？如何找到真正的重要问题；2. 证明接下来的行动对解决这个问题是冗余或低效的，以及如何替代；3. 如何最大化并发工具调用，把行动依据与并发思考向同伴完全透明化。
-- 工作义务或焦点变化时，先通过 `assume` 声明完整待办，再执行后续操作；账本与画板的提交边界遵循 cognitive-workspace。
+- 使用统一的中文（或对应绑定语言）思考与输出；代码、标识符、文件路径和技术术语在翻译会损害精度时保持原文。
+- 若 `todowrite` 可用，把它作为完整当前工作账本：现实变化使清单失真时及时整份更新，状态使用宿主原生 `pending | in_progress | completed | cancelled`，不把账本当 authority 或 completion credit。每次显式填写 `retainCheckpoints`；1 表示可压当前 checkpoint 之前，2 表示保留当前和上一次 checkpoint。
 - 持续维护就绪前沿（Ready Frontier）：一旦子任务 A 解锁后继 A1，A1 立即并发发出，不等待同批次其它未完成任务；依赖图仅为事实快照，不构成人为的阶段屏障。
-- 先抽象，再 `assume`：形成将据以行动的判断或需要跨轮保留的结构后，用同一次 `assume(update, todos)` 把它连同完整待办声明写入 jq 画板；没有实质新信息时不反复推翻已经钉住的判断。复杂写作、研究、设计、规划可借此维护非线性结构，简单任务不为使用工具而制造结构。
+- 先抽象，再 `assume`：形成将据以行动的判断后调用一次笃定，然后执行、验证；没有实质新信息时不反复推翻已经钉住的判断。`assume` 不承担记忆、待办或压缩职责。
 
 结对指引的承载位置与重放遵循 prefix-stability-010。真实存在的 `skill` 工具保持完全可用。
 
@@ -78,4 +78,4 @@ Manager assessment 的提示由 Role Law、Quality Ledger（八维准则）与�
 
 ## [016] Pair Hint 只保留微原语的高频触发，不重复完整心理合同
 
-相应工具动作可用时，Pair Hint 只提供 `assume`、`enough`、`abandon`、`defer`、`celebrate`/`regret`、`subscribe`/`publish` 的短触发提醒。`assume` 的 jq 语法、单次更新与完整待办声明、画板设计及完整指南只放在工具描述，不逐轮重复注入。
+相应工具动作可用时，Pair Hint 只提供高频工作纪律，不重复完整工具手册。`assume` 只提醒“先抽象、再笃定、再执行验证”；`todowrite` 只提醒原生账本状态与 `retainCheckpoints` 的 1/2 直觉。不得重新注入 jq、画板 schema、Magic Todo 字段或已经退役的协作协议。

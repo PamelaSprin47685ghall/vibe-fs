@@ -36,7 +36,7 @@ module ObligationJournalSurface =
         box
             {| ok = false
                error =
-                "appendMagicTodo is retired (obligation-ledger-007); the cognitive workspace commits through AgentFact.Cognition" |}
+                "appendMagicTodo is retired (obligation-ledger-007); Host-native todowrite owns the list and successful calls append TodoCheckpointCommitted only for context compression" |}
 
     /// Retired alongside the projection it would have returned.
     let snapshotMagicTodo (handle: JournalHandle) : obj =

@@ -13,10 +13,24 @@ open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 module Fact =
+    type LegacyAssumePhaseCommitted =
+        { OwnerKey: string
+          SessionId: SessionId
+          IncumbencyId: string
+          ToolCallId: ToolCallId
+          Ordinal: int64
+          InputDigest: string
+          PredecessorOrdinal: int64 option
+          SnapshotRef: BlobRef
+          SnapshotDigest: BlobDigest
+          RendererVersion: string }
+
+    [<RequireQualifiedAccess>]
+    type LegacyCognitionFact = AssumePhaseCommitted of LegacyAssumePhaseCommitted
+
     type RuntimeFact =
         | RuntimeStarted of
             {| RuntimeId: RuntimeId
@@ -39,7 +53,7 @@ module Fact =
         | Concern of ConcernFactCases
         | InstitutionalLearning of InstitutionalLearningFactCases
         | ChatExecution of ChatExecutionFactCases
-        | Cognition of AssumeFactCases.T
+        | Cognition of LegacyCognitionFact
 
     type Fact =
         | Runtime of RuntimeFact

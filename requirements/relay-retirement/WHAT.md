@@ -22,7 +22,7 @@ Suicide 前须提交八维 assessment；尚未提交时返回先调用 review �
 
 Continue 保持 Road 的 LogicalRun 开放，并将退休时快照交给后继，可不同于评审快照。Accepted 仅接受属于本任、有效且匹配评审/退休快照的证书；两类 authority revision 均须等于当前 revision。CleanupBlocked 的通过任期可在清理后重试 Accepted。证书有效时禁止后继，显式失效后可普通重开。
 
-退休出清本任义务，新任按最新物理世界与输入建立自己的义务；同一 session 的认知画板仍按 cognitive-workspace-001 保留，不因保留画板而继承旧任义务。
+退休出清本任义务，新任按最新物理世界与输入建立自己的义务。系统不再维护同 session 持久认知画板；历史上下文是否 raw/LWR 由 context-compression 的 todowrite checkpoint 决定，不构成义务继承。
 
 ## [008] 物理中断边界
 

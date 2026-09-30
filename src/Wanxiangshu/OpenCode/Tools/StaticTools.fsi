@@ -7,6 +7,7 @@ module StaticTools =
     val toolNames: p: ToolPermission -> string list
     val toolName: p: ToolPermission -> string
     val jsToolName: role: Role -> string
+    val cognitiveUtilityRoleAllowed: role: Role -> bool
     val knownToolNames: string list
     val requestToolMap: allowed: Set<ToolPermission> -> Map<string, bool>
     val permissionObj: role: Role -> obj

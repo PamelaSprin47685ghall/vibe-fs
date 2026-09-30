@@ -1,0 +1,1 @@
+Replace the current todo list with the complete latest list, and choose how many recent todowrite checkpoints should remain as raw context. The list records current work state; it grants no authority and does not prove that work or verification is complete. Update it when reality changes, and do not resubmit an unchanged list merely for form.

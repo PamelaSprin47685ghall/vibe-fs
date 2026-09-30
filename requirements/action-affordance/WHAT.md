@@ -63,10 +63,8 @@
 
 描述必须准确表达可见操作纪律，不泄露专职 Reviewer、隐式会话、终止 barrier 等隐藏编排。双语资源与语义锚点遵守 provider-language。
 
-## [014] assume 画板契约
+## [014] assume 是独立的笃定动作
 
-`assume` 必填 `update: string` 与 `todos: array`：update 是以当前画板为 `.` 的标准 jq 程序；todos 是含 content、status 及可选 priority 的完整待办声明。只改待办时使用 `update = "."`，不增加 query 或 mode 参数。
+`assume` 只接受必填 `assumption: string`，表示调用方已经完成抽象、接下来将据此行动的当前判断。它不求证、不持久化工作记忆、不维护画板、不写待办、不触发上下文压缩，也不授予任何权限。
 
-画板按物理 session 独享并跨 Life、suicide 与退休保留；更新须恰好输出一个 JSON value，失败不改变画板、todos、阶段或 epoch。成功原子提交画板与 todos，返回完整画板并整份替换宿主待办显示；隔离、幂等与耐久边界遵循 cognitive-workspace，待办呈现遵循 obligation-ledger。
-
-不提供 selector、vars、revision 或预定义领域字段/动作；JSON 根结构由调用方创建和迁移。描述须解释非线性重构、jq 用法、推荐用法与常见陷阱，并保留“先抽象→钉住→执行→验证；无新信息不反复改判”的纪律，适用于工作假设和认知结构。
+成功返回固定的笃定提示，不回显 `assumption`，避免把同一句判断再塞回上下文。描述保留“先抽象→笃定→执行→验证；只有新增证据才重开判断”的纪律，但不得把该纪律扩张成持久记忆或事实证明。

@@ -14,12 +14,29 @@ open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Host
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Durable routing vocabulary. Concrete fact families live with their semantic
 /// owners; this module only joins them into the journal's outer dispatch.
 module Fact =
+
+    /// Read-only compatibility shape for journals written while assume owned a
+    /// persistent canvas. New code has no constructor or write path for it; fold
+    /// treats it as a historical tombstone.
+    type LegacyAssumePhaseCommitted =
+        { OwnerKey: string
+          SessionId: SessionId
+          IncumbencyId: string
+          ToolCallId: ToolCallId
+          Ordinal: int64
+          InputDigest: string
+          PredecessorOrdinal: int64 option
+          SnapshotRef: BlobRef
+          SnapshotDigest: BlobDigest
+          RendererVersion: string }
+
+    [<RequireQualifiedAccess>]
+    type LegacyCognitionFact = AssumePhaseCommitted of LegacyAssumePhaseCommitted
 
     type RuntimeFact =
         | RuntimeStarted of
@@ -45,7 +62,7 @@ module Fact =
         | Concern of ConcernFactCases
         | InstitutionalLearning of InstitutionalLearningFactCases
         | ChatExecution of ChatExecutionFactCases
-        | Cognition of AssumeFactCases.T
+        | Cognition of LegacyCognitionFact
 
     type Fact =
         | Runtime of RuntimeFact

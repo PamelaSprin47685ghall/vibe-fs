@@ -319,28 +319,44 @@ module PrefixSurface =
                 {| kind = "KeepFrom"
                    cutoffExclusive = cutoff |}
 
-    /// context-compression-028: the window in force when the owner opens.
-    let defaultK: int = Wanxiangshu.Context.Prefix.PhaseWindow.defaultK
+    let private checkpointOfJs (item: obj) : Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint =
+        { ToolCallId = ToolCallId.create (string item?callId)
+          RetainCheckpoints = int item?retainCheckpoints }
 
-    /// One committed phase admitted into the bounded window; identity order is the
-    /// commit order and the result is trimmed to `k`.
-    let appendPhase (k: int) (callId: string) (window: string array) : string array =
-        let committed = if isNull window then [] else Array.toList window
+    let private checkpointToJs (checkpoint: Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint) : obj =
+        box
+            {| callId = ToolCallId.value checkpoint.ToolCallId
+               retainCheckpoints = checkpoint.RetainCheckpoints |}
 
-        let next =
-            Wanxiangshu.Context.Prefix.PhaseWindow.emptyWindow
-            |> fun start ->
+    /// Append one successful todowrite checkpoint. The window is not trimmed by K;
+    /// only a committed prefix rebase can make older checkpoints unrecoverable.
+    let appendCheckpoint (callId: string) (retainCheckpoints: int) (window: obj array) : obj =
+        let committed =
+            { Wanxiangshu.Context.Prefix.PhaseWindow.Checkpoints =
+                (if isNull window then [] else Array.toList window) |> List.map checkpointOfJs }
+
+        match
+            Wanxiangshu.Context.Prefix.PhaseWindow.appendCheckpoint
+                (ToolCallId.create callId)
+                retainCheckpoints
                 committed
-                |> List.fold
-                    (fun acc item -> Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase k (ToolCallId.create item) acc)
-                    start
-            |> Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase k (ToolCallId.create callId)
-
-        next.PhaseCallIds |> List.map ToolCallId.value |> List.toArray
+        with
+        | Ok next ->
+            box
+                {| ok = true
+                   value = next.Checkpoints |> List.map checkpointToJs |> List.toArray
+                   error = null |}
+        | Error reason ->
+            box
+                {| ok = false
+                   value = [||]
+                   error = reason |}
 
     /// The window's desire, with `turnByCallId[i]` the canonical turn of
     /// `window[i]` (null = no addressable turn in the current generation).
-    let desiredCutoffOfWindow (window: string array) (turnByCallId: obj array) : obj =
+    let desiredCutoffOfWindow (window: obj array) (turnByCallId: obj array) : obj =
+        let checkpointRows = if isNull window then [||] else window
+
         let turns =
             if isNull turnByCallId then
                 []
@@ -348,12 +364,11 @@ module PrefixSurface =
                 Array.toList turnByCallId
 
         let committed =
-            { Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCallIds =
-                (if isNull window then [] else Array.toList window)
-                |> List.map ToolCallId.create }
+            { Wanxiangshu.Context.Prefix.PhaseWindow.Checkpoints =
+                Array.toList checkpointRows |> List.map checkpointOfJs }
 
         let turnOf (callId: ToolCallId) =
-            Array.tryFindIndex (fun item -> item = ToolCallId.value callId) window
+            Array.tryFindIndex (fun item -> string item?callId = ToolCallId.value callId) checkpointRows
             |> Option.bind (fun position ->
                 if position < List.length turns then
                     let value = List.item position turns
@@ -367,6 +382,28 @@ module PrefixSurface =
             box
                 {| kind = "KeepFrom"
                    cutoffExclusive = cutoff |}
+
+    let pruneCheckpointWindow (window: obj array) (turnByCallId: obj array) (cutoffExclusive: int) : obj array =
+        let checkpointRows = if isNull window then [||] else window
+        let turns = if isNull turnByCallId then [||] else turnByCallId
+
+        let committed =
+            { Wanxiangshu.Context.Prefix.PhaseWindow.Checkpoints =
+                Array.toList checkpointRows |> List.map checkpointOfJs }
+
+        let turnOf (callId: ToolCallId) =
+            Array.tryFindIndex (fun item -> string item?callId = ToolCallId.value callId) checkpointRows
+            |> Option.bind (fun position ->
+                if position < turns.Length then
+                    let value = turns[position]
+                    if isNullish value then None else Some(unbox<int> value)
+                else
+                    None)
+
+        let pruned =
+            Wanxiangshu.Context.Prefix.PhaseWindow.pruneBefore turnOf cutoffExclusive committed
+
+        pruned.Checkpoints |> List.map checkpointToJs |> List.toArray
 
     let validateK (k: int) : obj =
         match Wanxiangshu.Context.Prefix.PhaseWindow.validateK k with

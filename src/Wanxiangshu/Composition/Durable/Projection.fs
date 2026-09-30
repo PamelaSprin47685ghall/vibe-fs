@@ -20,7 +20,6 @@ open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Bounded projections one session owns (PERSIST-008).
@@ -91,12 +90,11 @@ type AgentProjectionSet =
         Fission: FissionProjectionState
         /// Exact durable managed-chat executions, keyed by physical user message.
         ChatExecutions: ChatExecutionProjectionState
-        Cognition: Map<string, CognitiveProjection>
-        /// context-compression-028: the committed phases each session still keeps raw,
-        /// oldest first, bounded by the frozen window depth. Keyed by session because the
-        /// prefix owner asks "what does this session's provider history keep raw", while
-        /// `Cognition` answers the owner-scoped question "what canvas is current".
-        PhaseCommits: Map<SessionId, PhaseWindow.PhaseCommitWindow>
+        /// context-compression-028: successful native todowrite checkpoints that
+        /// are still on the raw side of the committed prefix. Each checkpoint
+        /// carries the K chosen on that call; a committed rebase prunes only
+        /// checkpoints it has actually crossed.
+        TodoCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         /// Canonical per-Life Magic Todo checkpoint projection.
         /// delegation-024: last parent XTrace cursor physically handed to each reusable
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
@@ -140,8 +138,7 @@ module AgentProjection =
           ChatExecutions = ChatExecutionProjection.empty
           DelegationCompletedHandoffs = Map.empty
           Attention = AttentionProjection.empty
-          Cognition = Map.empty
-          PhaseCommits = Map.empty
+          TodoCheckpoints = Map.empty
           Concern = ConcernProjection.empty
           InstitutionalLearning = InstitutionalLearningProjection.empty
           RuntimeStartCount = 0 }

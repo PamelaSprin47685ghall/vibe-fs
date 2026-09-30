@@ -2,21 +2,15 @@
  * manager-tool-surface-evidence.mjs — production Manager tool-surface evidence.
  *
  * The Manager provider surface is observed on the wire the Host actually sent: which
- * tools were advertised, on the Manager session, and whether the retired ledger tool
- * (`todowrite`) ever came back. Nothing here reads the SDK's shape or the scenario's
+ * tools were advertised on the Manager session. Nothing here reads the SDK's shape or the scenario's
  * expectation: `requests` holds requests as they arrived.
  *
  * ── why the wrapper-plugin membrane canary is gone ──────────────────────────
  *
- * This module used to ship a test-only outer plugin that wrapped the production plugin
- * and recorded the `todowrite` membrane (definition decoration, before-rewritten args,
- * non-enumerable V1 compatibility view, after-hook enrichment, frozen ToolPart status)
- * into artifacts. That membrane no longer exists: the session cognitive write entry is
- * the plain `assume` tool (`OpenCode/Tools/AssumeTool.fs`), which decodes `update` and
- * `todos` and renders the committed canvas itself — no provider-arg rewriting and no
- * after-hook result enrichment to observe. Keeping the wrapper would assert a retired
- * product behavior, so the surface claim is now proven by wire evidence alone
- * (host-boundary-019 owns its own membrane carriers).
+ * The old Magic Todo membrane is gone. The Host-native `todowrite` remains the
+ * physical executor; production only decorates its provider schema with
+ * `retainCheckpoints` and strips that protocol field before execution. The
+ * independent `assume` tool is stateless.
  */
 
 const extractToolNamesFromRequest = (request) => {
@@ -80,16 +74,14 @@ export const collectManagerProviderToolEvidence = (scenario, opts = {}) => {
     requestCount: chatRequests.length,
     unionTools,
     assumeAdvertised: unionTools.includes('assume'),
-    // Recorded, never asserted as a sum: the retired ledger tool must be absent.
     todowriteAdvertised: unionTools.includes('todowrite'),
     samples: chatRequests.slice(0, 8),
   };
 };
 
 /**
- * Assert the Manager wire surface is the production one. `assume` is the session
- * cognitive write entry, the Manager spine is present, and the retired `todowrite`
- * ledger never appears.
+ * Assert the Manager wire surface is the production one: independent `assume`,
+ * Host-native `todowrite`, and the Manager spine.
  *
  * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null }} [opts]
  */
@@ -103,12 +95,12 @@ export const assertManagerToolSurface = (opts = {}) => {
       `MANAGER_TOOL_SURFACE: Manager provider wire must advertise the production assume cognitive surface: ${JSON.stringify(wire)}`,
     );
   }
-  if (wire.todowriteAdvertised) {
+  if (!wire.todowriteAdvertised) {
     throw new Error(
-      `MANAGER_TOOL_SURFACE: Manager provider wire must not advertise the retired todowrite ledger: ${JSON.stringify(wire)}`,
+      `MANAGER_TOOL_SURFACE: Manager provider wire must advertise native todowrite: ${JSON.stringify(wire)}`,
     );
   }
-  for (const required of ['fork', 'horizon', 'join', 'resume', 'assume', 'suicide']) {
+  for (const required of ['fork', 'horizon', 'join', 'resume', 'assume', 'suicide', 'todowrite']) {
     if (!wire.unionTools.includes(required)) {
       throw new Error(`MANAGER_TOOL_SURFACE: missing Manager tool ${required}`);
     }

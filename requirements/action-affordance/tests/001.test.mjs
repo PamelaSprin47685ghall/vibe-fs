@@ -10,7 +10,7 @@ integrationTest('WHAT[action-affordance-001] actual registered tool descriptors 
       assert.equal(typeof tool.description, 'string', name)
       assert.ok(tool.description.trim().length > 0, name)
     }
-    for (const argument of ['update', 'todos']) {
+    for (const argument of ['assumption']) {
       assert.ok(hooks.tool.assume.args[argument].description?.trim().length > 0, argument)
     }
   })

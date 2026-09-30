@@ -163,8 +163,8 @@ module AgentJournalPortAdapter =
                         { XTrace = s.XTrace
                           Blog = s.Blog
                           PrefixEpoch = s.PrefixEpoch
-                          PhaseCommits =
-                            projections.PhaseCommits
+                          TodoCheckpoints =
+                            projections.TodoCheckpoints
                             |> Map.tryFind sessionId
                             |> Option.defaultValue PhaseWindow.emptyWindow })
 

@@ -30,20 +30,16 @@ test('WHAT[prefix-stability-009] prefix replacement removes covered history by s
   assert.equal(projected[1], raw[1], 'request-local presentation must survive as the same Host object')
   assert.equal(projected[2], raw[3], 'live history must survive as the same Host object')
 })
-test('WHAT[prefix-stability-009] stable identity replacement keeps the retained cognitive rounds and drops ordinary covered history', () => {
-  // context-compression-020 (revised): retention now comes from the caller's K-window
-  // verdict, not from an unbounded per-tool-name exemption. The retired `todowrite`
-  // exemption kept every ledger round raw forever; here a cognitive round is retained
-  // because the caller declared it inside the window.
+test('WHAT[prefix-stability-009] stable identity replacement grants no per-tool raw-history exemption', () => {
   const raw = [
     {
-      info: { id: 'assume-call-msg', role: 'assistant' },
-      parts: [{ type: 'tool-call', tool: 'assume', callID: 'assume-call-1', args: { update: '.' } }],
+      info: { id: 'todo-call-msg', role: 'assistant' },
+      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { todos: [], retainCheckpoints: 1 } }],
     },
     textMessage('request-local', 'assistant', 'request-local presentation only'),
     {
-      info: { id: 'assume-result-msg', role: 'tool' },
-      parts: [{ type: 'tool-result', callID: 'assume-call-1', result: { ok: true } }],
+      info: { id: 'todo-result-msg', role: 'tool' },
+      parts: [{ type: 'tool-result', callID: 'todo-call-1', result: { ok: true } }],
     },
     textMessage('covered-ordinary', 'assistant', 'replace me'),
     textMessage('live-u', 'user', 'live request'),
@@ -51,21 +47,18 @@ test('WHAT[prefix-stability-009] stable identity replacement keeps the retained 
 
   const projected = xwire.replacePrefixByHostIds(
     raw,
-    ['assume-call-msg', 'assume-result-msg', 'covered-ordinary'],
+    ['todo-call-msg', 'todo-result-msg', 'covered-ordinary'],
     null,
     'y-prefix',
     'compressed canonical X',
-    ['assume-call-1'],
   )
 
   assert.deepEqual(
     projected.map(item => item.info.id),
-    ['y-prefix', 'assume-call-msg', 'request-local', 'assume-result-msg', 'live-u'],
+    ['y-prefix', 'request-local', 'live-u'],
   )
-  assert.equal(projected[1], raw[0])
-  assert.equal(projected[2], raw[1])
-  assert.equal(projected[3], raw[2])
-  assert.equal(projected[4], raw[4])
+  assert.equal(projected[1], raw[1])
+  assert.equal(projected[2], raw[4])
 })
 test('WHAT[prefix-stability-009] transport suppression removes only exact stale Host ids', () => {
   const retryMessage = (id, text) => ({
@@ -196,7 +189,14 @@ test('WHAT[prefix-stability-009] actual candidate pipeline rejects changed cover
     sessionId: 'ses-prefix-proof', prefixEpoch: 4, frameEpoch: 2,
     currentProjection, coverableCutoff: 2, requestCutoff: 2,
     coveredDigest: xwire.coveredPrefixDigest(currentProjection, 2),
-    frames: [{ kind: 'Entry', ref: 'frame-ref', digest: sha256(frame), coveredFrom: 0, coveredThrough: 2 }],
+    frames: [{
+      kind: 'Entry',
+      ref: 'frame-ref',
+      digest: sha256(frame),
+      coveredFrom: 0,
+      coveredThrough: 2,
+      cutoff: 2,
+    }],
     port: {
       readBlob: async (ref) => {
         assert.equal(ref, 'frame-ref')

@@ -48,4 +48,4 @@ test('WHAT[work-record-009] renderer retains tool call and result when explicitl
   assert.equal(rendered.includes('Recent work'), false)
 })
 
-test.todo('WHAT[work-record-009] GAP-109 contract adaptation: reconcile the original BlindPlan T1 interval with cognitive-workspace and context-compression-017/028 before claiming an actual Opening freeze; the first Assume is not automatically an Opening boundary')
+test.todo('WHAT[work-record-009] GAP-109 contract adaptation: reconcile the original BlindPlan T1 interval with context-compression-017/028 before claiming an actual Opening freeze; the first todowrite checkpoint is not automatically an Opening boundary')
