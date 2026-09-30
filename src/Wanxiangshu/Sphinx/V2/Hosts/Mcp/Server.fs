@@ -37,7 +37,10 @@ module Mcp =
     let private constructEmpty (constructor: obj) : obj = jsNative
 
     [<Emit("$0.string().describe($1)")>]
-    let private zString (description: string) : obj = jsNative
+    let private zStringOf (z: obj) (description: string) : obj = jsNative
+
+    /// A zod string schema carrying a human description.
+    let private zString (description: string) : obj = zStringOf zod description
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
