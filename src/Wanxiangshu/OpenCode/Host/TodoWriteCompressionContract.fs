@@ -132,6 +132,25 @@ module TodoWriteCompressionContract =
               "minimum", box 1
               "description", box (ProviderProse.render language Path.RetainCheckpoints Map.empty) ]
 
+    /// host-boundary-032: repeated decoration of the same definition must be
+    /// idempotent. A property this contract itself placed (same shape, same
+    /// rendered description for the resolved language) is the same decoration,
+    /// not a conflict; anything else is a foreign definition and fails loudly.
+    /// The description is accepted in either provider language: the same
+    /// definition can be decorated once with no session (global preference)
+    /// and again with a session that resolves the other language, and that is
+    /// still this contract's own property, not a foreign conflict.
+    let private isOwnRetainCheckpointsProperty (value: obj) : bool =
+        not (isNull value)
+        && isPlainObject value
+        && string value?``type`` = "integer"
+        && unbox<float> value?minimum = 1.0
+        && (let description = string value?description
+
+            description = ProviderProse.render ProviderLanguage.English Path.RetainCheckpoints Map.empty
+            || description
+               = ProviderProse.render ProviderLanguage.SimplifiedChinese Path.RetainCheckpoints Map.empty)
+
     let private appendRequired (required: obj array) =
         if required |> Array.exists (fun item -> string item = field) then
             required
@@ -149,10 +168,10 @@ module TodoWriteCompressionContract =
 
         let existing = properties?(field)
 
-        if not (isNull existing) then
+        if isNull existing then
+            properties?(field) <- integerProperty language
+        elif not (isOwnRetainCheckpointsProperty existing) then
             raise (InvalidOperationException(sprintf "Tool %s already defines %s" toolId field))
-
-        properties?(field) <- integerProperty language
 
         let required = schema?required
 

@@ -67,6 +67,62 @@ integrationTest('WHAT[action-affordance-014] native todowrite keeps its todos sc
   })
 })
 
+integrationTest('WHAT[action-affordance-014] repeated todowrite decoration is idempotent while a foreign retainCheckpoints still fails loudly', async () => {
+  await withPlugin(async (hooks) => {
+    const output = {
+      description: 'Native todo writer',
+      parameters: {
+        type: 'object',
+        properties: { todos: { type: 'array', items: { type: 'object' } } },
+        required: ['todos'],
+      },
+    }
+
+    await hooks['tool.definition']({ toolID: 'todowrite' }, output)
+    const firstSnapshot = structuredClone(output)
+
+    // The Host re-triggers tool.definition for every provider request; a second
+    // and third pass over the very same definition must be a no-op, not a
+    // "Tool todowrite already defines retainCheckpoints" fatal.
+    await hooks['tool.definition']({ toolID: 'todowrite' }, output)
+    await hooks['tool.definition']({ toolID: 'todowrite' }, output)
+
+    assert.deepEqual(output, firstSnapshot, 'repeated todowrite decoration must be idempotent')
+    const schema = output.jsonSchema ?? output.parameters
+    assert.equal(schema.required.filter((x) => x === 'retainCheckpoints').length, 1)
+
+    // A definition that already carries a foreign retainCheckpoints is a real
+    // conflict and must fail loudly instead of silently keeping the wrong shape.
+    // The plugin hook wrapper surfaces the failure as a plain { message, ... }
+    // object rather than an Error instance, so assert on the message field.
+    // A definition that already carries a foreign retainCheckpoints is a real
+    // conflict and must fail loudly instead of silently keeping the wrong shape.
+    // The plugin hook wrapper surfaces the failure as a plain { message, ... }
+    // object rather than an Error instance, so catch and read the message.
+    let foreignFailure
+    try {
+      await hooks['tool.definition'](
+        { toolID: 'todowrite' },
+        {
+          description: 'Foreign writer',
+          parameters: {
+            type: 'object',
+            properties: { todos: { type: 'array' }, retainCheckpoints: { type: 'string' } },
+            required: ['todos'],
+          },
+        },
+      )
+    } catch (error) {
+      foreignFailure = error
+    }
+    assert.ok(foreignFailure, 'a foreign retainCheckpoints definition must fail loudly')
+    assert.match(
+      String(foreignFailure?.message ?? foreignFailure),
+      /already defines retainCheckpoints/,
+    )
+  })
+})
+
 integrationTest('WHAT[action-affordance-014] todowrite hides retainCheckpoints from the native executor and restores it in the after hook', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'native-todo-checkpoint'
