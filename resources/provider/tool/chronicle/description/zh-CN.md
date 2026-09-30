@@ -8,8 +8,9 @@
 
 charge → occurrence → settlement → consequence → tip
 
-前四个内容字段必须各自提供不同信息。不要总结工具步骤，不要把同一句话换四种说法，
-也不要制造材料并未获得的闭环。tip 必填：必须从 {{rule_count}} 个 Rulebook
+前四个内容字段各写一句完整的话，并且必须各自提供不同信息。它们随后会按固定顺序、
+不带字段名地连成一个自然段，作为真正的 Chronicle 正文。不要总结工具步骤，不要把
+同一句话换四种说法，也不要制造材料并未获得的闭环。tip 必填：必须从 {{rule_count}} 个 Rulebook
 TipNames 中恰好选择一个，表示这次具体转折携带的可复用 lesson。
 
 成功返回表示 Chronicle 接受了这次转折。它不安排工作、不授予 authority，也不证明

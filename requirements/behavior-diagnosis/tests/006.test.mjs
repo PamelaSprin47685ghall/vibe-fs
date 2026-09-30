@@ -69,18 +69,25 @@ test('WHAT[behavior-diagnosis-006] legacy entry is recovery-only and cannot mix 
   assert.match(mixed.error, /cannot be mixed/)
 })
 
-test('WHAT[behavior-diagnosis-006] structured cycle renders a stable causal spine', () => {
+test('WHAT[behavior-diagnosis-006] structured cycle renders one natural paragraph without field labels', () => {
   const cycle = enforcer.canonicalCycle(structured())
   assert.equal(
     cycle.mergedText,
-    [
-      'charge:\nResolve the exact boundary.',
-      'occurrence:\nA decisive state transition happened.',
-      'settlement:\nThe boundary is now established.',
-      'consequence:\nLater work can rely on that boundary.',
-    ].join('\n\n'),
+    'Resolve the exact boundary. A decisive state transition happened. The boundary is now established. Later work can rely on that boundary.',
   )
+  assert.doesNotMatch(cycle.mergedText, /charge:|occurrence:|settlement:|consequence:|\n/)
   assert.equal(cycle.mergedEvidence, '')
+})
+
+test('WHAT[behavior-diagnosis-006] structured cycle collapses internal line breaks before joining the paragraph', () => {
+  const cycle = enforcer.canonicalCycle(structured({
+    occurrence: 'A decisive state\ntransition happened.',
+    settlement: 'The boundary\r\nis now established.',
+  }))
+  assert.equal(
+    cycle.mergedText,
+    'Resolve the exact boundary. A decisive state transition happened. The boundary is now established. Later work can rely on that boundary.',
+  )
 })
 
 test('WHAT[behavior-diagnosis-006] real chronicle provider schema exposes five described fields and no entry', async () => {

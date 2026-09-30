@@ -23,12 +23,14 @@ module EnforcerCycle =
           CanonicalTip: EnforcerTip
           MergedEvidence: string }
 
+    let private oneLine (text: string) =
+        text.Split([| ' '; '\t'; '\r'; '\n' |], System.StringSplitOptions.RemoveEmptyEntries)
+        |> String.concat " "
+
     let private renderStructured (record: ChronicleRecord) =
-        [ "charge:\n" + record.Charge
-          "occurrence:\n" + record.Occurrence
-          "settlement:\n" + record.Settlement
-          "consequence:\n" + record.Consequence ]
-        |> String.concat "\n\n"
+        [ record.Charge; record.Occurrence; record.Settlement; record.Consequence ]
+        |> List.map oneLine
+        |> String.concat " "
 
     let ofCall (call: CanonicalBlogCall) : CanonicalCycle =
         match call.Content with

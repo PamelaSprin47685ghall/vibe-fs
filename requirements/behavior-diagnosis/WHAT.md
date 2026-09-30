@@ -22,7 +22,9 @@ built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入
 
 ## [006] chronicle 五字段合同与 NoLiveCycle 协议结果
 
-当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence` 与 `tip`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”；`tip` 必须可归一到 TipName。缺失或空白的任一内容字段均不得形成有效 cycle；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。
+当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence` 与 `tip`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”，并应各自写成一条可独立阅读的完整句子；`tip` 必须可归一到 TipName。缺失或空白的任一内容字段均不得形成有效 cycle；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。
+
+四个结构字段只约束 provider 输入，不作为 Chronicle 正文的小标题。形成 durable frame / LWR 文本时，系统按 `charge → occurrence → settlement → consequence` 固定顺序，把每个字段内部换行折叠为空格，再用单个空格连接为一个自然段；正文不得包含字段名标签或人为分段。
 
 升级前已经落在 Host transcript 中的 `entry/text/evidence` 只保留为 recovery 兼容：仅当新四字段全部缺席时才可按 legacy call 解码；新旧协议字段混用必须拒绝。新 tool schema 不再暴露 `entry`、`text` 或 `evidence`。
 

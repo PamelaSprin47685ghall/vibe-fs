@@ -52,7 +52,9 @@ Choose exactly one Rulebook TipName. The tip is the abstraction; the other four
 fields describe this concrete turn.
 
 Each field must earn its place. Do not write four paraphrases of the same
-sentence. A strong record lets a later reader recover why the work mattered,
+sentence. Write one complete sentence per content field; the four sentences are
+persisted without their field labels as one natural Chronicle paragraph. A strong
+record lets a later reader recover why the work mattered,
 what actually happened, what can now be treated as true, and why the future
 path changed.
 

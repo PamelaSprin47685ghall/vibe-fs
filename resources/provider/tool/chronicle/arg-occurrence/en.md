@@ -1,1 +1,1 @@
-What materially happened: the decisive discovery, change, failure, decision, verification, or external event. Record the semantic occurrence, not the sequence of tools used to observe it.
+One complete sentence stating what materially happened: the decisive discovery, change, failure, decision, verification, or external event. Record the semantic occurrence, not the sequence of tools used to observe it.
