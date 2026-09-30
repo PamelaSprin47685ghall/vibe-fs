@@ -233,6 +233,8 @@ const pendingCall = (callId, rounds) => ({
   },
 })
 
+const toolMessage = (id, sessionId, parts) => ({ info: { id, role: 'tool', sessionID: sessionId }, parts })
+
 // The unified EventStore keeps writer NDJSON files under the workspace Git
 // common directory; a DelegationRequested is a canonical JSON line whose
 // event_type names the fact. Reading the durable line is the observation:
@@ -729,27 +731,24 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_to
       const admission = userMessage(physical, sessionId, [hostText('inspect the file')])
       await hooks['chat.message']({ sessionID: sessionId, messageID: physical, agent: 'engineer' }, { message: admission, parts: admission.parts })
 
-      // Earlier complete batch with budget 1
+      // Earlier complete batch with budget 1: assistant pendingCall + tool-result message
       const run1 = 'run-complete-1'
       const call1 = 'call-complete-1'
       const seedUser1 = userMessage(physical, sessionId, [hostText('inspect the file')])
-      const seedAssistant1 = assistantMessage(run1, sessionId, physical, [budgetCall(call1, 1)])
+      const seedAssistant1 = assistantMessage(run1, sessionId, physical, [pendingCall(call1, 1)])
+      const seedTool1 = toolMessage('tool-complete-1', sessionId, [{ type: 'tool-result', callID: call1, result: 'alpha' }])
 
       // Later incomplete batch with identical tool name and arguments, but different call ID and pending result
       const run2 = 'run-inflight-2'
       const call2 = 'call-inflight-2'
-      const physical2 = 'user-mismatch-2'
-      const admission2 = userMessage(physical2, sessionId, [hostText('inspect the file again')])
-      await hooks['chat.message']({ sessionID: sessionId, messageID: physical2, agent: 'engineer' }, { message: admission2, parts: admission2.parts })
-      const seedUser2 = userMessage(physical2, sessionId, [hostText('inspect the file again')])
-      const seedAssistant2 = assistantMessage(run2, sessionId, physical2, [pendingCall(call2, 1)])
+      const seedAssistant2 = assistantMessage(run2, sessionId, physical, [pendingCall(call2, 1)])
 
       runtime.pushHostMessage(sessionId, seedUser1)
       runtime.pushHostMessage(sessionId, seedAssistant1)
-      runtime.pushHostMessage(sessionId, seedUser2)
+      runtime.pushHostMessage(sessionId, seedTool1)
       runtime.pushHostMessage(sessionId, seedAssistant2)
 
-      const messages = [seedUser1, seedAssistant1, seedUser2, seedAssistant2]
+      const messages = [seedUser1, seedAssistant1, seedTool1, seedAssistant2]
 
       // Drive 1: establishes root association, authorizes nothing
       await withTimeout(
