@@ -535,29 +535,16 @@ module PromptAuthority =
         SystemPromptId.create (Roles.roleLabel role)
 
     /// STRENGTH-004 / PROMPT-008: the request-specific authority is exact, not
-    /// inferred by intersecting the ordinary role surface. Inquiry is eligible
-    /// even though its ordinary WorkMain surface delegates reads through Inspector;
-    /// Browser is intentionally ineligible despite having readonly tools.
+    /// inferred by intersecting the ordinary role surface. All active roles in
+    /// Roles.all carry exact readonly capabilities under StrengthReplica.
     let private strengthReplicaReadonly =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
-    let private strengthReplicaEligibleRole =
-        function
-        | Role.Engineer
-        | Role.Coder
-        | Role.Inspector
-        | Role.DevOps
-        | Role.Inquiry -> true
-        | Role.Manager
-        | Role.Orchestrator
-        | Role.Browser
-        | Role.Distiller
-        | Role.Blogger -> false
-
     let private strengthReplicaCapabilities (role: Role) : Set<ToolPermission> =
-        match strengthReplicaEligibleRole role with
-        | true -> strengthReplicaReadonly
-        | false -> Set.empty
+        if List.contains role Roles.all then
+            strengthReplicaReadonly
+        else
+            Set.empty
 
     /// AGENT-007: ordinary requests use role permissions; StrengthReplica uses
     /// its own narrower request contract and fails closed for every ineligible role.

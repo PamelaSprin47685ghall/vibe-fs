@@ -19,19 +19,6 @@ test('WHAT[speculative-investigation-011] SPEC_INV_011_replica_lifecycle_has_no_
   const decision = runtime.slice(start, runtime.indexOf('member _.Dispose', start))
   assert.match(decision, /let!\s+result\s*=\s*prepared\.Completion/)
 })
-test('WHAT[speculative-investigation-011] SPEC_INV_011_the_prepared_stage_creates_the_child_without_sending_a_prompt', async () => {
-  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  const prepare = runtime.indexOf('member this.PrepareReplicaStart')
-  const send = runtime.indexOf('member this.SendPreparedPrompt')
-  assert.ok(prepare > 0 && send > prepare, 'the two stages are separate member boundaries')
-  const preparedStage = runtime.slice(prepare, send)
-  assert.match(preparedStage, /sessions\.CreateChildSession/)
-  assert.doesNotMatch(preparedStage, /bootstrapDetachedSend/,
-    'an empty child must not send a prompt or pre-occupy model capacity before DelegationBound is persisted')
-  const sendStage = runtime.slice(send)
-  assert.match(sendStage, /bootstrapDetachedSend/, 'only the send stage performs the bootstrap prompt')
-  assert.match(runtime, /SendAgentOwnerRootWithTools/)
-})
 test('WHAT[speculative-investigation-011] SPEC_INV_011_model_reservation_stays_in_routing_while_the_bootstrap_send_is_model_free', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   assert.match(

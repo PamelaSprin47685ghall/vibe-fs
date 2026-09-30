@@ -16,5 +16,25 @@ four ways, or manufacture closure. tip is required:
 choose exactly one of the {{rule_count}} Rulebook TipNames for the reusable
 lesson this concrete transition teaches.
 
+Use precise, sharp, self-contained language. State concrete entities, protocols,
+conditions, breakpoints, observable effects, and conclusions directly. Do not
+wrap facts in “after analysis,” “we found,” “it is now clear,” “we conclusively
+established,” or generic “further work is needed” prose. When a conclusion
+depends on evidence, occurrence itself should carry the shortest evidence chain
+instead of merely claiming that a problem was found. The four sentences should
+read like a technical determination, not a status report.
+
+Make it read like a verdict backed by evidence, never a soft diary entry. Every
+sentence should be falsifiable and independently checkable. Concrete components,
+wire formats, state transitions, predicates, and observed effects provide force;
+adjectives such as “definitive,” “complete,” or “obvious” do not.
+
+evidence is optional and is not a fifth prose sentence. Use it only for the
+smallest decisive verbatim excerpt from raw code/data/wire/log/source material.
+Never paraphrase evidence and never dump a large block. The system appends the
+excerpt once at the paragraph end as `[...]`, escaping embedded line breaks so
+the bracket remains on one line. Omit evidence when the four-sentence verdict
+already stands without a literal exhibit.
+
 A successful return means the Chronicle accepted this transition. It does not
 schedule work, grant authority, or prove more than the supplied evidence earned.

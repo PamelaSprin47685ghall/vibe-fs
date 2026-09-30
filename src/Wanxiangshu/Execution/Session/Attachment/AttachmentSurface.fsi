@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Session.Attachment
 open System.Threading.Tasks
 
 module AttachmentSurface =
-    val classifyObservation: observation: string -> obj
 
     val createOwner: unit -> obj
 
@@ -23,4 +22,6 @@ module AttachmentSurface =
     val scenario:
         owner: string -> role: string -> firstAgent: string -> secondAgent: string -> retainBinding: bool -> Task<obj>
 
-    val reconciliationScenario: observation: string -> Task<obj>
+    /// managed-session-lifecycle-001 (GAP-133): every AttachmentKind established
+    /// through the ONE lifecycle owner and read back from the shared registry.
+    val everyKindScenario: owner: string -> Task<obj>

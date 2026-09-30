@@ -1,11 +1,17 @@
 namespace Wanxiangshu.Execution.Session.Attachment
 
+open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 
-/// JS-native boundary for the attached-session owner. The runtime and callback
-/// resources stay opaque; callers receive only binding snapshots.
+/// JS-native boundary for the attached-session owner. The lease registry and every
+/// kind adapter stay opaque; callers observe binding snapshots or drive the ONE
+/// lifecycle owner through controlled ports.
 module AttachmentSurface =
     let private roleOf =
         function
@@ -75,27 +81,6 @@ module AttachmentSurface =
 
     let clear (runtime: obj) : unit =
         (runtime :?> AttachedSessionRuntime).Clear()
-
-    let classifyObservation (observation: string) : obj =
-        let existing = SessionId.create "host-child-existing"
-
-        let evidence =
-            match observation with
-            | "missing" -> AttachedChildObservation.Missing
-            | "matching" -> AttachedChildObservation.Matching existing
-            | _ -> AttachedChildObservation.Conflicting [ existing; SessionId.create "host-child-conflict" ]
-
-        let decision, children =
-            match AttachedChildObservation.decide evidence with
-            | AttachedChildDecision.Create -> "Create", [||]
-            | AttachedChildDecision.Adopt childId -> "Adopt", [| SessionId.value childId |]
-            | AttachedChildDecision.RejectConflict childIds ->
-                "RejectConflict", childIds |> List.map SessionId.value |> List.toArray
-
-        box
-            {| observation = observation
-               decision = decision
-               children = children |}
 
     let scenario
         (owner: string)
@@ -183,72 +168,242 @@ module AttachmentSurface =
                            created = next.Value |}
         }
 
-    let reconciliationScenario (observation: string) : Task<obj> =
+    /// managed-session-lifecycle-001 (GAP-133): drive every AttachmentKind through the
+    /// ONE lifecycle owner against one controlled Host, and read from the shared
+    /// registry which `(owner, kind)` holds each child. Companion, SyncInspector,
+    /// SyncCoder and StrengthReplica are all established by the same core — the first
+    /// three through their kind adapters, the replica through the core directly — with
+    /// one registry recording them all, so an attachment kind is only ever parameters
+    /// and terminal policy.
+    let everyKindScenario (owner: string) : Task<obj> =
         task {
-            let owner = SessionId.create "owner"
-            let agent = "inspector"
-            let existing = SessionId.create "host-child-existing"
-            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
-            let createdCount = ref 0
-            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
-            let observedCount = ref 0
-            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
-            let registeredCount = ref 0
-            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
-            let boundCount = ref 0
-            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
-            let readyCount = ref 0
+            // DSL-MUTABLE: algorithm-scratch — controlled Host child allocation
+            let children = ResizeArray<SessionId>()
+            // DSL-MUTABLE: algorithm-scratch — durable link/close journal
+            let linked = ResizeArray<string array>()
+            let closed = ResizeArray<string>()
 
-            let runtime =
-                AttachedSessionRuntime(registerParent = (fun _ _ -> registeredCount.Value <- registeredCount.Value + 1))
+            let ownerId = SessionId.create owner
+            let registry = AttachmentLeaseRegistry()
+            let sync = AttachedSessionRuntime(registry = registry)
 
-            let observeChild (_: SessionId) (_: ReuseScopeId) (_: SyncDelegateRole) (_: string) =
-                observedCount.Value <- observedCount.Value + 1
+            let host: ISessionHostPort =
+                { new ISessionHostPort with
+                    member _.SubscribeTerminal(_, _) =
+                        { new IDisposable with
+                            member _.Dispose() = () }
 
-                match observation with
-                | "missing" -> Task.FromResult(Ok AttachedChildObservation.Missing)
-                | "matching" -> Task.FromResult(Ok(AttachedChildObservation.Matching existing))
-                | "conflicting" ->
-                    Task.FromResult(
-                        Ok(AttachedChildObservation.Conflicting [ existing; SessionId.create "host-child-conflict" ])
+                    member _.SubscribeFutureTerminal(_, _) =
+                        { new IDisposable with
+                            member _.Dispose() = () }
+
+                    member _.SendPrompt(_, _, _) =
+                        Task.FromResult(Unchecked.defaultof<_>)
+
+                    member _.AbortSession _ = Task.FromResult(Ok())
+                    member _.InterruptAttempt _ = Task.FromResult(Ok())
+                    member _.IsManagedChild _ = true
+                    member _.AbortChildren _ = Task.FromResult()
+                    member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
+                    member _.TryGetParentSession _ = Task.FromResult(Ok None)
+
+                    member _.CreateChildSession(_, _) =
+                        let id = SessionId.create (sprintf "child-%d" (children.Count + 1))
+                        children.Add id
+                        Task.FromResult(Ok id)
+
+                    // The Host reports the children it really allocated, with the
+                    // Companion kind's exact agent+title, so a hinted reuse is a real
+                    // reuse rather than a replacement.
+                    member _.ListChildren parent =
+                        Task.FromResult(
+                            Ok(
+                                children
+                                |> Seq.filter (fun child -> child = ownerId || SessionId.value parent = SessionId.value ownerId)
+                                |> Seq.map (fun child ->
+                                    { SessionId = child
+                                      ParentSessionId = Some ownerId
+                                      Agent = Some "blogger"
+                                      Title = Some "Companion" })
+                                |> Seq.toList
+                            )
+                        )
+
+                    member _.FamilyRootOf _ = ownerId }
+
+            let companion = CompanionLeaseRuntime(host, registry)
+
+            // The Sync kind's own ports: its observation decision is this kind's
+            // exactness rule, its factory is this kind's child shape.
+            // DSL-MUTABLE: algorithm-scratch — the child each Sync kind already
+            // established in this scenario (its durable association)
+            let syncChildren = Dictionary<string, SessionId>()
+
+            let syncObserve (_: SessionId) (_: ReuseScopeId) (role: SyncDelegateRole) (agent: string) =
+                let key = sprintf "%s/%s" agent (SyncDelegate.roleLabel role)
+
+                Task.FromResult(
+                    Ok(
+                        match syncChildren.TryGetValue key with
+                        | true, child -> AttachedChildObservation.Matching child
+                        | false, _ -> AttachedChildObservation.Missing
                     )
-                | _ -> Task.FromResult(Error "host child query failed")
-
-            let createChild (_: SessionId) (_: ReuseScopeId) (_: SyncDelegateRole) (_: string) (_: string option) =
-                createdCount.Value <- createdCount.Value + 1
-                Task.FromResult(Ok(SessionId.create "host-child-created"))
-
-            let bindChild (_: SessionId) (_: SessionId) (_: string) =
-                boundCount.Value <- boundCount.Value + 1
-
-            let onReady (_: SessionId) (_: string) =
-                readyCount.Value <- readyCount.Value + 1
-
-            let! outcome =
-                runtime.GetOrCreate(
-                    owner,
-                    SyncDelegateRole.Inspector,
-                    agent,
-                    None,
-                    observeChild,
-                    createChild,
-                    bindChild,
-                    onReady
                 )
 
-            let child, error =
-                match outcome with
-                | Ok(childId, _) -> SessionId.value childId, ""
-                | Error detail -> "", detail
+            let syncCreate (_: SessionId) (_: ReuseScopeId) (role: SyncDelegateRole) (agent: string) (_: string option) =
+                let id = SessionId.create (sprintf "sync-child-%d" (children.Count + 1))
+                children.Add id
+                syncChildren.[sprintf "%s/%s" agent (SyncDelegate.roleLabel role)] <- id
+                Task.FromResult(Ok id)
+
+            let noBind (_: SessionId) (_: SessionId) (_: string) = ()
+            let noReady (_: SessionId) (_: string) = ()
+
+            let! syncInspector =
+                sync.GetOrCreate(
+                    ownerId,
+                    SyncDelegateRole.Inspector,
+                    "inspector",
+                    None,
+                    syncObserve,
+                    syncCreate,
+                    noBind,
+                    noReady
+                )
+
+            let! syncCoder =
+                sync.GetOrCreate(ownerId, SyncDelegateRole.Coder, "coder", None, syncObserve, syncCreate, noBind, noReady)
+
+            let! companionLease =
+                companion.Ensure(
+                    ownerId,
+                    { Kind = SatelliteKind.Companion
+                      Agent = "blogger"
+                      Title = "Companion"
+                      Directory = None
+                      RestoredSessionId = None
+                      Link =
+                        fun o c a ->
+                            linked.Add [| SessionId.value o; SessionId.value c; a |]
+                            Task.FromResult(Ok())
+                      Close =
+                        fun o ->
+                            closed.Add(SessionId.value o)
+                            Task.FromResult(Ok()) }
+                )
+
+            // The read-only replica kind: one resident child per owner, established by
+            // the same core and recorded in the same registry.
+            // DSL-MUTABLE: algorithm-scratch — the resident replica child of each owner
+            let residentReplica = Dictionary<string, SessionId>()
+
+            let replicaOperations =
+                { AttachmentLeaseCore.Operations.ListChildren = fun _ -> Task.FromResult(Ok [])
+                  AttachmentLeaseCore.Operations.CreateChild =
+                    fun ownerText _ _ ->
+                        // STRENGTH-004: one resident child per owner.
+                        match residentReplica.TryGetValue ownerText with
+                        | true, existing -> Task.FromResult(Ok(SessionId.value existing))
+                        | false, _ ->
+                            let id = SessionId.create (sprintf "%s-replica" ownerText)
+                            children.Add id
+                            residentReplica.[ownerText] <- id
+                            Task.FromResult(Ok(SessionId.value id))
+                  AttachmentLeaseCore.Operations.AbortChild = fun _ -> Task.FromResult(Ok())
+                  AttachmentLeaseCore.Operations.Link = fun _ _ _ -> Task.FromResult(Ok())
+                  AttachmentLeaseCore.Operations.Close = fun _ -> Task.FromResult(Ok()) }
+
+            let replicaSpec: AttachmentLeaseCore.Spec =
+                { Kind = AttachmentKind.StrengthReplica
+                  Agent = "engineer"
+                  Title = "engineer"
+                  Directory = None
+                  RestoreHint = None }
+
+            let! replicaResult = AttachmentLeaseCore.ensure replicaOperations ownerId replicaSpec
+            let! replicaAgain = AttachmentLeaseCore.ensure replicaOperations ownerId replicaSpec
+
+            replicaResult
+            |> Result.iter (fun lease -> registry.Bind(ownerId, AttachmentKind.StrengthReplica, lease))
+
+            let childOf =
+                function
+                | Ok(child: SessionId, _) -> Some(SessionId.value child)
+                | _ -> None
+
+            let inspectorChild = childOf syncInspector
+            let coderChild = childOf syncCoder
+
+            let companionChild =
+                companionLease |> Result.map (fun l -> SessionId.value l.SessionId) |> Result.toOption
+
+            let replicaChild = replicaResult |> Result.map (fun l -> l.SessionId) |> Result.toOption
+
+            let bindingOf child =
+                registry.TryFindByChild(SessionId.create child)
+                |> List.map (fun (boundOwner, kind) -> SessionId.value boundOwner, AttachmentLeaseCore.kindKey kind)
+
+            let bindings =
+                [ inspectorChild; coderChild; companionChild; replicaChild ]
+                |> List.choose id
+                |> List.map (fun child -> bindingOf child |> List.toArray)
+                |> List.toArray
+
+            // Scope isolation: a different scope is a different owner and sees nothing.
+            let otherScope = ReuseScopeId.create "other-owner"
+
+            // Reuse must answer with the agent bound at create time (Sync) and must
+            // not mint a second child (Companion).
+            let! coderReuse =
+                sync.GetOrCreate(ownerId, SyncDelegateRole.Coder, "different-agent", None, syncObserve, syncCreate, noBind, noReady)
+
+            let! companionReuse =
+                companion.Ensure(
+                    ownerId,
+                    { Kind = SatelliteKind.Companion
+                      Agent = "blogger"
+                      Title = "Companion"
+                      Directory = None
+                      // The Companion host always passes the durable association it
+                      // holds; that hint is what makes this a reuse.
+                      RestoredSessionId = companionChild |> Option.map SessionId.create
+                      Link = (fun _ _ _ -> Task.FromResult(Ok()))
+                      Close = (fun _ -> Task.FromResult(Ok())) }
+                )
 
             return
                 box
-                    {| observation = observation
-                       observed = observedCount.Value
-                       created = createdCount.Value
-                       registered = registeredCount.Value
-                       bound = boundCount.Value
-                       ready = readyCount.Value
-                       child = child
-                       error = error |}
+                    {| owner = owner
+                       inspectorChild = Option.defaultValue "" inspectorChild
+                       coderChild = Option.defaultValue "" coderChild
+                       companionChild = Option.defaultValue "" companionChild
+                       replicaChild = Option.defaultValue "" replicaChild
+                       bindings = bindings
+                       children = children |> Seq.map SessionId.value |> Seq.toArray
+                       companionOrigin =
+                        companionLease
+                        |> Result.map (fun l -> sprintf "%A" l.Origin)
+                        |> Result.defaultValue "Error"
+                       companionReuseOrigin =
+                        companionReuse
+                        |> Result.map (fun l -> sprintf "%A" l.Origin)
+                        |> Result.defaultValue "Error"
+                       companionReuseChild =
+                        companionReuse
+                        |> Result.map (fun l -> SessionId.value l.SessionId)
+                        |> Result.defaultValue ""
+                       companionReuseLinked = linked.Count
+                       companionClosedCount = closed.Count
+                       coderReuseChild = coderReuse |> Result.map (fst >> SessionId.value) |> Result.defaultValue ""
+                       coderReuseAgent = coderReuse |> Result.map snd |> Result.defaultValue ""
+                       syncInspectorScopeChild =
+                        sync.TryFindByScope(ReuseScope.ofSession ownerId, SyncDelegateRole.Inspector)
+                        |> Option.map SessionId.value
+                        |> Option.defaultValue ""
+                       otherScopeChild =
+                        sync.TryFindByScope(otherScope, SyncDelegateRole.Inspector)
+                        |> Option.map SessionId.value
+                        |> Option.defaultValue ""
+                       replicaResidentStable = replicaAgain |> Result.map (fun l -> l.SessionId) |> Result.defaultValue ""
+                       registrySize = registry.Snapshot() |> List.length |}
         }

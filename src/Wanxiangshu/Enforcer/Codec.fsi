@@ -6,7 +6,8 @@ module EnforcerCodec =
         { Charge: string
           Occurrence: string
           Settlement: string
-          Consequence: string }
+          Consequence: string
+          Evidence: string option }
 
     [<RequireQualifiedAccess>]
     type ChronicleContent =
@@ -36,7 +37,16 @@ module EnforcerCodec =
     val MissingChronicleContentError: string = "missing required chronicle content"
 
     [<Literal>]
-    val MixedChronicleProtocolError: string = "structured chronicle fields cannot be mixed with legacy entry/text/evidence"
+    val MixedChronicleProtocolError: string = "structured chronicle fields cannot be mixed with legacy entry/text"
+
+    [<Literal>]
+    val InvalidEvidenceError: string = "optional argument evidence must be a string"
+
+    [<Literal>]
+    val EvidenceTooLongError: string = "optional argument evidence exceeds 1024 characters"
+
+    [<Literal>]
+    val MaxInlineEvidenceChars: int = 1024
 
     val decodeCall: Wanxiangshu.Enforcer.EnforcerRule list -> Map<string, obj> -> Result<CanonicalBlogCall, string>
     val hasValidText: CanonicalBlogCall -> bool

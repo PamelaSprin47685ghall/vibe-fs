@@ -18,6 +18,22 @@ test('WHAT[cognitive-environment-015] BLOGGER_CHRONICLE_TEXT_has_exact_bilingual
   )
 })
 
+test('WHAT[cognitive-environment-015] Blogger prose discipline rejects status-report wrappers and demands self-contained evidence', () => {
+  const zh = readFileSync(join(root, 'resources/provider/role/blogger/zh-CN.md'), 'utf8')
+  const en = readFileSync(join(root, 'resources/provider/role/blogger/en.md'), 'utf8')
+
+  assert.match(zh, /经过分析/)
+  assert.match(zh, /最短证据链/)
+  assert.match(zh, /自包含/)
+  assert.match(zh, /技术判词|判词/)
+  assert.match(zh, /可证伪/)
+  assert.match(en, /after reviewing/)
+  assert.match(en, /shortest evidence chain/)
+  assert.match(en, /self-contained/)
+  assert.match(en, /verdict backed by evidence/)
+  assert.match(en, /falsifiable/)
+})
+
 test('WHAT[cognitive-environment-015] BLOGGER_CHRONICLE_TEXT_is_companion_only_ephemeral_assistant_text_injection', () => {
   assert.match(bloggerSource, /SessionAssociationProjection\.isCompanion/)
   assert.match(bloggerSource, /"type", box "text"/)

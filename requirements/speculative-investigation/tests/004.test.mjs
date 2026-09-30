@@ -12,10 +12,7 @@ const allowedTools = ['read', 'glob', 'grep', 'js-predictor']
 // tools and short-term control. It never creates a second persona.
 test('WHAT[speculative-investigation-004] STRENGTH_004_every_role_only_ever_receives_readonly_host_tools', () => {
   for (const role of ['Engineer', 'DevOps', 'Orchestrator', 'Blogger', 'Manager']) {
-    const tools = Strength.capabilities(role)
-    for (const tool of tools) {
-      assert.ok(exactReadonly.includes(tool), `${role} must not receive ${tool}`)
-    }
+    assert.deepEqual(Strength.capabilities(role), exactReadonly, `${role} receives exactly the readonly capability set`)
   }
   for (const tool of allowedTools) {
     assert.equal(Strength.isAllowedTool(tool), true)
@@ -126,10 +123,14 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_unknown_r
 })
 test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_roles_without_readonly_capabilities', () => {
   const runtime = Strength.runtimeCreate()
-  for (const role of ['Manager', 'Orchestrator', 'Blogger']) {
+  for (const role of ['Coder', 'Inspector', 'Browser', 'Inquiry', 'Distiller']) {
     const result = Strength.runtimeRegister(runtime, binding('owner', `replica-${role}`, `d-${role}`, 1, role))
     assert.equal(result.ok, false)
     assert.equal(result.error, 'RoleIneligible')
+  }
+  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'DevOps', 'Blogger']) {
+    const result = Strength.runtimeRegister(runtime, binding(`owner-${role}`, `replica-${role}`, `d-${role}`, 1, role))
+    assert.equal(result.ok, true, `${role} role is eligible for StrengthReplica with exact readonly capabilities`)
   }
 })
 
@@ -203,19 +204,10 @@ const {
 } = await import("../../../dist/Participant/Provider/LanguageSurface.js");
 const { withPreference } = await import("../../provider-language/tests/support/language-fixtures.mjs");
 
-const replicaConstraintZh = "继续当前任务的只读查证，只使用当前可见且获准的工具。信息足够，或下一步需要写入、执行命令、向用户确认、给出结论或作出关键判断时，直接结束，不为继续调用而增加调查。对话里的 self_note 是先前对未来查证的展望，不是已经证实的结论，也不扩大权限。"
-const replicaConstraintEn = "Continue the current task's read-only investigation using only the available, permitted tools. Stop when the evidence is sufficient or the next step requires a change, a command, user clarification, a conclusion, or a consequential judgment. Do not invent work to keep calling tools. A self_note in the conversation is an earlier outlook for investigation, not a verified conclusion or permission to do more."
-
- // Replica additional execution constraint injection and language binding
-test('WHAT[speculative-investigation-004] replica_readonly_constraint_surface_exports_exact_bilingual_replica_constraints', () => {
-  assert.equal(replicaConstraintFor('SimplifiedChinese'), replicaConstraintZh)
-  assert.equal(replicaConstraintFor('English'), replicaConstraintEn)
-})
-
 test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_system_transform_injects_language_bound_execution_constraint', async () => {
   for (const [preference, language, expectedConstraint] of [
-    ['zh-CN', 'SimplifiedChinese', replicaConstraintZh],
-    ['en', 'English', replicaConstraintEn],
+    ['zh-CN', 'SimplifiedChinese', replicaConstraintFor('SimplifiedChinese')],
+    ['en', 'English', replicaConstraintFor('English')],
   ]) {
     await withPreference(preference, async () => {
       clearAllForTests()
@@ -226,6 +218,8 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_sy
       const initialSystem = ['Role system segment', 'Host-owned foreign segment']
       const output = await transformReplicaSystem(session, 'Engineer', initialSystem)
 
+      assert.deepEqual(initialSystem, ['Role system segment', 'Host-owned foreign segment', expectedConstraint],
+        'the Host retains its original system array; the execution constraint must reach that buffer')
  // Injected existence: output.system contains the expected constraint
       assert.ok(Array.isArray(output.system))
       assert.equal(output.system.length, 3)
@@ -254,8 +248,8 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_non_replic
       const output = await transformRoleSystem(session, 'Engineer', initialSystem)
 
  // Non-replica session must NOT have any replica constraint injected
-      assert.equal(output.system.includes(replicaConstraintZh), false)
-      assert.equal(output.system.includes(replicaConstraintEn), false)
+      assert.equal(output.system.includes(replicaConstraintFor('SimplifiedChinese')), false)
+      assert.equal(output.system.includes(replicaConstraintFor('English')), false)
       assert.equal(output.system.length, 2)
     })
   }
@@ -263,8 +257,8 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_non_replic
 
 test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_system_transform_repairs_constraint_when_session_language_changes', async () => {
   for (const [initial, language, changed, otherLanguage, oldConstraint, newConstraint] of [
-    ['en', 'English', 'zh-CN', 'SimplifiedChinese', replicaConstraintEn, replicaConstraintZh],
-    ['zh-CN', 'SimplifiedChinese', 'en', 'English', replicaConstraintZh, replicaConstraintEn],
+    ['en', 'English', 'zh-CN', 'SimplifiedChinese', replicaConstraintFor('English'), replicaConstraintFor('SimplifiedChinese')],
+    ['zh-CN', 'SimplifiedChinese', 'en', 'English', replicaConstraintFor('SimplifiedChinese'), replicaConstraintFor('English')],
   ]) {
     clearAllForTests()
     const session = `replica-repair-${language}`

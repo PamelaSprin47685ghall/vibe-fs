@@ -170,4 +170,4 @@ module ProviderLanguageSurface =
         }
 
     let replicaConstraintFor (language: string) : string =
-        Wanxiangshu.OpenCode.ProviderSystemTransform.replicaConstraintFor (languageOf language)
+        ProviderProse.render (languageOf language) "delegation/readonly-investigation" Map.empty

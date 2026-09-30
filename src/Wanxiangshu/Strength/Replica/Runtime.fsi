@@ -70,9 +70,8 @@ type StrengthReplicaRuntime =
         mirrorSemanticDigest: string ->
             Task<Result<StrengthReplicaPreparation, string>>
 
-    /// DELEGATE-6.2 start stage: acquire the model lease, admit the bootstrap
-    /// outbound request and send the prompt. Idempotent on an already-admitted
-    /// bootstrap; never re-sends it as a free extra request.
+    /// DELEGATE-6.2 start stage: claim the bootstrap once, acquire the model
+    /// lease and send. Provider request budget is consumed by the outbound transform.
     member SendPreparedPrompt: replicaSessionId: SessionId -> Task<Result<unit, string>>
 
     member AttachLiveDecision: binding: StrengthReplicaBinding -> Result<Task<StrengthReplicaOutcome>, string>

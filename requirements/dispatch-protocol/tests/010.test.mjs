@@ -280,3 +280,43 @@ test('WHAT[dispatch-protocol-010] DP_010_send_without_session_agent_cache_succee
 }
 
 test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root and all actual synthetic send producers leave model selection to admission (GAP-136)')
+
+{
+const assert = (await import('node:assert/strict')).default
+const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+const { withJournal, acceptOwner, hostPort } = await import('./support/authority.mjs')
+
+for (const [participant, tools] of [
+  ['manager', [['*', false], ['js-predictor', true]]],
+  ['blogger', undefined],
+]) {
+  test(`WHAT[dispatch-protocol-010] managed ${participant} assignments retain the accepted run and tool boundary across journal reopen`, async () => {
+    await withJournal(`assignment-${participant}`, async (handle, reopen) => {
+      const seed = authority.issueInheritedIdentitySeed(participant, await acceptOwner(handle))
+      assert.equal(seed.ok, true, seed.error)
+      const port = hostPort(async () => dispatch.admittedWithReceipt('accepted-assignment'))
+      const first = await dispatch.sendManagedAssignment(port, handle, 'child', 'Investigate the current work.', seed.value, tools)
+      assert.equal(first.ok, true, first.error)
+      const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'child', first.key, 'assignment-root')
+      assert.equal(accepted.ok, true, accepted.error)
+      handle = await reopen()
+
+      const second = await dispatch.sendManagedAssignment(port, handle, 'child', 'Investigate the next work.', { kind: 'InvalidSeed' }, tools)
+      assert.equal(second.ok, true, second.error)
+      const continued = await dispatch.acceptManagedPromptClaim(handle, 'child', 'assignment-next', second.key, participant)
+      assert.equal(continued.ok, true, JSON.stringify(continued.error))
+      const profile = dispatch.projectionObservation(handle, 'child').activeLogicalRun
+      assert.equal(profile.logicalRun, accepted.profile.logicalRun)
+      assert.equal(profile.authorityRoot, 'assignment-root')
+      assert.equal(profile.participantIdentity.participant, participant)
+      assert.notEqual(first.key, second.key)
+      for (const sent of [first, second]) {
+        assert.equal(sent.observation.agent, participant)
+        assert.equal(sent.observation.model, null)
+        assert.deepEqual(sent.observation.tools, tools ?? null)
+      }
+    })
+  })
+}
+}

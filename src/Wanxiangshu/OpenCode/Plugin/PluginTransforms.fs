@@ -112,8 +112,7 @@ module PluginTransforms =
           ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          CaptureReadonlyDelegation: obj -> Task<unit>
-          ApplyReadonlyDelegation: obj -> Task<unit>
+          CaptureAndStartReadonlyDelegation: obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
@@ -426,35 +425,8 @@ module PluginTransforms =
                         (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
-        let captureReadonlyDelegation outObj =
-            task {
-                match!
-                    StrengthDelegate.tryCapture
-                        snapshotOpt
-                        journal
-                        strengthDurability
-                        boot.StrengthScope
-                        scope.TryAttemptPlan
-                        scope.SyncDelegateRuntime
-                        (predictorConfigured ())
-                        outObj
-                with
-                | StrengthDelegate.CaptureOutcome.Captured request ->
-                    Diagnostic.emit
-                        "strength-delegation-requested"
-                        [ "session_id", SessionId.value request.OwnerSessionId
-                          "decision_id", StrengthDecisionId.value request.DecisionId
-                          "requested_rounds", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
-                | StrengthDelegate.CaptureOutcome.Skipped reason ->
-                    let sessionId =
-                        ProviderWireDecode.projectionSessionIdFromMessages outObj
-                        |> Option.defaultValue ""
-
-                    Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
-            }
-
-        let applyReadonlyDelegation outObj =
-            StrengthDelegate.tryApply
+        let captureAndStartReadonlyDelegation outObj =
+            StrengthDelegate.tryCaptureAndStart
                 snapshotOpt
                 journal
                 strengthDurability
@@ -615,7 +587,7 @@ module PluginTransforms =
                 CompanionTransform.applyCompanionForOrdinaryMaterial
                     scope.Sessions.Companions
                     scope.Sessions.CompanionGate
-                    scope.Satellites
+                    scope.CompanionLeases
                     scope.BloggerRuntimeHost
                     sessionPort
                     journal
@@ -663,8 +635,7 @@ module PluginTransforms =
                             outObj
                 }
 
-          CaptureReadonlyDelegation = captureReadonlyDelegation
-          ApplyReadonlyDelegation = applyReadonlyDelegation
+          CaptureAndStartReadonlyDelegation = captureAndStartReadonlyDelegation
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -763,13 +734,6 @@ module PluginTransforms =
             // this the capture never sees the budget the model signed.
             do! caps.RestoreProtocolArguments outObj
 
-            // 4.5 StrengthDelegate.tryCapture — freeze the explicit authorization
-            // from the real completed owner batch and persist DelegationRequested
-            // here, before any compaction or message replacement downstream can
-            // lose batch metadata (DELEGATE-6/7.1). The start phase runs at step
-            // 12 and reads the pending request back from canonical Current.
-            do! caps.CaptureReadonlyDelegation outObj
-
             // 5. XTraceCapture.captureObservedMessagesWithReceipt
             let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
 
@@ -797,10 +761,6 @@ module PluginTransforms =
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
             if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 12. StrengthDelegate.tryApply — start and consume the pending
-                // explicit authorization on a legal ordinary continuation only.
-                do! caps.ApplyReadonlyDelegation outObj
-
                 // 13. PairProgrammingThoughtTransform.maybeInjectGuideline
                 do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
 
@@ -815,6 +775,13 @@ module PluginTransforms =
 
             // 16. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
+
+            // 17. StrengthDelegate.tryCaptureAndStart — capture and start in ONE
+            // call on the FINAL outgoing request. This replaces the old two-phase
+            // hand-off (4.5 early capture + 12 late start on a subsequent request),
+            // which stranded 44 of 201 decisions whenever a subsequent request
+            // carried a tentative cold prefix or switched logical runs.
+            do! caps.CaptureAndStartReadonlyDelegation outObj
 
             ()
         }

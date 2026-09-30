@@ -82,6 +82,7 @@ module AssociationSurface =
         | AttachmentKind.Companion -> "Companion", null
         | AttachmentKind.SyncInspector -> "SyncInspector", null
         | AttachmentKind.SyncCoder -> "SyncCoder", null
+        | AttachmentKind.SyncEngineer -> "SyncEngineer", null
         | AttachmentKind.Bookkeeper transactionId -> "Bookkeeper", box transactionId
         | AttachmentKind.StrengthReplica -> "StrengthReplica", null
 
@@ -197,6 +198,7 @@ module AssociationSurface =
             match attachment with
             | "SyncInspector" -> AttachmentKind.SyncInspector
             | "SyncCoder" -> AttachmentKind.SyncCoder
+            | "SyncEngineer" -> AttachmentKind.SyncEngineer
             | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
             | "StrengthReplica" -> AttachmentKind.StrengthReplica
             | _ -> AttachmentKind.Companion
@@ -208,6 +210,7 @@ module AssociationSurface =
             match kind with
             | "SyncInspector" -> AttachmentKind.SyncInspector
             | "SyncCoder" -> AttachmentKind.SyncCoder
+            | "SyncEngineer" -> AttachmentKind.SyncEngineer
             | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
             | "StrengthReplica" -> AttachmentKind.StrengthReplica
             | _ -> AttachmentKind.Companion

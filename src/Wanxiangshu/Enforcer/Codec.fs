@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Enforcer
 
+open System
+
 /// docs/what/enforcer.md ENFORCER-020…026：`blog` tip v2 codec.
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.
@@ -10,7 +12,8 @@ module EnforcerCodec =
         { Charge: string
           Occurrence: string
           Settlement: string
-          Consequence: string }
+          Consequence: string
+          Evidence: string option }
 
     [<RequireQualifiedAccess>]
     type ChronicleContent =
@@ -43,7 +46,16 @@ module EnforcerCodec =
 
     [<Literal>]
     let MixedChronicleProtocolError =
-        "structured chronicle fields cannot be mixed with legacy entry/text/evidence"
+        "structured chronicle fields cannot be mixed with legacy entry/text"
+
+    [<Literal>]
+    let InvalidEvidenceError = "optional argument evidence must be a string"
+
+    [<Literal>]
+    let EvidenceTooLongError = "optional argument evidence exceeds 1024 characters"
+
+    [<Literal>]
+    let MaxInlineEvidenceChars = 1024
 
     /// ENFORCER-022：Chronicle 字符串字段统一抽取（trim；空 → None）。
     let private tryStringArg (rawArgs: Map<string, obj>) (key: string) : string option =
@@ -84,10 +96,19 @@ module EnforcerCodec =
     let private structuredFieldNames =
         [ "charge"; "occurrence"; "settlement"; "consequence" ]
 
-    let private legacyFieldNames = [ "entry"; "text"; "evidence" ]
+    let private legacyFieldNames = [ "entry"; "text" ]
 
     let private hasAnyField names (rawArgs: Map<string, obj>) =
         names |> List.exists (fun name -> Map.containsKey name rawArgs)
+
+    let private decodeEvidence (rawArgs: Map<string, obj>) : Result<string option, string> =
+        match Map.tryFind "evidence" rawArgs with
+        | None
+        | Some null -> Ok None
+        | Some(:? string as evidence) when String.IsNullOrWhiteSpace evidence -> Ok None
+        | Some(:? string as evidence) when evidence.Length <= MaxInlineEvidenceChars -> Ok(Some evidence)
+        | Some(:? string) -> Error EvidenceTooLongError
+        | Some _ -> Error InvalidEvidenceError
 
     let private decodeStructured (rawArgs: Map<string, obj>) : Result<ChronicleContent, string> =
         match
@@ -97,13 +118,14 @@ module EnforcerCodec =
             tryStringArg rawArgs "consequence"
         with
         | Some charge, Some occurrence, Some settlement, Some consequence ->
-            Ok(
+            decodeEvidence rawArgs
+            |> Result.map (fun evidence ->
                 ChronicleContent.Structured
                     { Charge = charge
                       Occurrence = occurrence
                       Settlement = settlement
-                      Consequence = consequence }
-            )
+                      Consequence = consequence
+                      Evidence = evidence })
         | None, _, _, _ -> Error MissingChargeError
         | _, None, _, _ -> Error MissingOccurrenceError
         | _, _, None, _ -> Error MissingSettlementError
@@ -130,9 +152,10 @@ module EnforcerCodec =
     /// ENFORCER-020/021/023：解析一个 blog 调用。
     ///
     /// 缺 tip / tip 非 string / 未知 field → Error。
-    /// 新协议必须完整提供 charge/occurrence/settlement/consequence。
-    /// entry/text/evidence 仅保留为升级前 transcript 的 legacy recovery 兼容，
-    /// 且不得与新协议混用。其它 property 忽略（ENFORCER-024）。不默认 tip。
+    /// 新协议必须完整提供 charge/occurrence/settlement/consequence，可选 evidence。
+    /// entry/text 仅作为升级前 transcript 的 legacy recovery 身份，且不得与
+    /// structured fields 混用；legacy evidence 仍可随旧 entry/text 解码。
+    /// 其它 property 忽略（ENFORCER-024）。不默认 tip。
     let decodeCall (rules: EnforcerRule list) (rawArgs: Map<string, obj>) : Result<CanonicalBlogCall, string> =
         match Map.tryFind "tip" rawArgs with
         | None -> Error MissingTipError

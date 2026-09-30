@@ -1,187 +1,187 @@
 namespace Wanxiangshu.Execution.Session.Attachment
 
 open System
-open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type private AttachedRuntimePlan =
-    | Reuse of SessionId * string
-    | Attach of AttachedChildDecision
-
-type private ObserveAttachedChild =
+/// The SyncDelegate kind's observation of its owner's children. The kind decides
+/// exactness and ambiguity; the core only ever sees a decided list.
+type ObserveAttachedChild =
     SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
 
-type private CreateAttachedChild =
+/// The SyncDelegate kind's child factory, in this kind's own vocabulary.
+type CreateAttachedChild =
     SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> string option -> Task<Result<SessionId, string>>
 
-[<RequireQualifiedAccess>]
-type private AttachedFlightClaim =
-    | Follow of Task<Result<SessionId * string, string>>
-    | Own of TaskCompletionSource<Result<SessionId * string, string>>
-
-/// HOST-008 / EXEC-026: in-process bindings for Work+Attached SyncDelegate sessions.
-/// Keyed by `(OwnerReuseScopeId, SyncDelegateRole)` — at most one live dedicated Session.
-/// Does not use SatelliteRuntime / SatelliteKind (those remain Companion only).
-type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?isUsable: SessionId -> bool) =
-    let gate = obj ()
-    /// DSL-cross-callback-proof: physical resource — reusable dedicated child identity binding
-    // DSL-MUTABLE: resource — attached session binding registry by scope+role
-    let bindings = Dictionary<string, SessionId * string>()
-
-    /// DSL-cross-callback-proof: physical single-flight — the entire Host
-    /// observe/create/adopt/bind transaction is shared by exact scope+role.
-    // DSL-MUTABLE: resource — in-flight attached reconciliation by scope+role
-    let flights =
-        Dictionary<string, TaskCompletionSource<Result<SessionId * string, string>>>()
-
+/// EXEC-026 / HOST-008: the SyncDelegate kind's adapter onto the ONE attachment
+/// mechanism (`AttachmentLeaseCore` + `AttachmentLeaseRegistry`). It supplies only
+/// this kind's parameters — the exact agent+title child observation, the child
+/// factory, the publish hooks and its key axis — and owns no lifecycle of its own:
+/// creation, recovery, replacement, single-flight and binding all happen in the core.
+///
+/// Key axis. `(OwnerReuseScopeId, SyncDelegateRole)` remains the lookup the port
+/// exposes. `ReuseScope.ofSession` is the identity wrap of a SessionId value, so a
+/// scope id and its owner share one value and the registry's owner axis carries the
+/// scope. The role axis is carried by the kind: `SyncDelegateRole.toAttachmentKind`
+/// is the codebase's declared SyncDelegate attachment identity (the durable
+/// association surface uses the same mapping), and each role has its own kind —
+/// `SyncCoder`, `SyncInspector`, `SyncEngineer` — so one scope's roles never share a
+/// binding.
+type AttachedSessionRuntime
+    (?registry: AttachmentLeaseRegistry, ?registerParent: SessionId -> SessionId -> unit, ?isUsable: SessionId -> bool)
+    =
+    let leases = defaultArg registry (AttachmentLeaseRegistry())
     let register = defaultArg registerParent (fun _ _ -> ())
     let usable = defaultArg isUsable (fun _ -> true)
+    let kindOf (role: SyncDelegateRole) = SyncDelegateRole.toAttachmentKind role
 
-    let roleLabel = SyncDelegate.roleLabel
+    /// Sync's exactness (agent AND title) is applied by this kind's own observation
+    /// before the core sees anything, so the projection into the core's `Child`
+    /// vocabulary carries this deterministic marker as its title and the `Spec` uses
+    /// the same value. The core's second check therefore agrees by construction
+    /// instead of re-reading a Host title the observation already compared.
+    let observedTitleMarker = ""
 
-    let bindingKey (scope: ReuseScopeId) (role: SyncDelegateRole) =
-        ReuseScopeId.value scope + "\u001f" + roleLabel role
+    /// The kinds this port owns, so a clear never touches another kind's bindings in
+    /// a shared registry.
+    let ownKinds =
+        [ AttachmentKind.SyncInspector; AttachmentKind.SyncCoder; AttachmentKind.SyncEngineer ]
 
-    let tryGetLocked (scope: ReuseScopeId) (role: SyncDelegateRole) =
-        match bindings.TryGetValue(bindingKey scope role) with
-        | true, (sessionId, agent) when usable sessionId -> Some(sessionId, agent)
-        | true, _ -> None
-        | false, _ -> None
+    let leaseValue (lease: AttachmentLeaseCore.Lease) =
+        let child = SessionId.create lease.SessionId
 
-    let collectPlan
+        if usable child then Some(child, lease.Agent) else None
+
+    let bound (owner: SessionId, role: SyncDelegateRole) =
+        leases.TryFind(owner, kindOf role) |> Option.bind leaseValue
+
+    /// This kind's decision, expressed as the core's restore hint. An exact unique
+    /// match is the linked child; no match is no link; an ambiguous observation is
+    /// this kind's refusal, naming every candidate.
+    let decideHint (observed: Result<AttachedChildObservation, string>) : Result<string option, string> =
+        match observed with
+        | Error error -> Error error
+        | Ok(AttachedChildObservation.Matching childId) -> Ok(Some(SessionId.value childId))
+        | Ok AttachedChildObservation.Missing -> Ok None
+        | Ok(AttachedChildObservation.Conflicting children) ->
+            Error(
+                sprintf
+                    "sync delegate child observation conflicted: %s"
+                    (children |> List.map SessionId.value |> String.concat ", ")
+            )
+
+    /// The single-flight cell is cleared whatever the establish does, so a failed
+    /// ensure never becomes a poisoned flight.
+    let ensureAndClearFlight (owner: SessionId) (kind: AttachmentKind) (work: unit -> Task<Result<AttachmentLeaseCore.Lease, string>>) =
+        task {
+            try
+                return! work ()
+            finally
+                leases.FinishEnsure(owner, kind)
+        }
+
+    /// The kind's ports for one establish attempt. `owner` is the real owner, so the
+    /// Host-facing operations act on it while the registry keys by scope value.
+    let operations
+        (owner: SessionId)
         (scope: ReuseScopeId)
         (role: SyncDelegateRole)
-        (existing: (SessionId * string) option)
-        (ownerSessionId: SessionId)
         (agentName: string)
-        (observeChild: ObserveAttachedChild)
-        =
-        taskResult {
-            match existing with
-            | Some(sessionId, boundAgent) -> return AttachedRuntimePlan.Reuse(sessionId, boundAgent)
-            | None ->
-                let! observation = observeChild ownerSessionId scope role agentName
-                return AttachedRuntimePlan.Attach(AttachedChildObservation.decide observation)
-        }
-
-    let finishFlight key (flight: TaskCompletionSource<Result<SessionId * string, string>>) =
-        lock gate (fun () ->
-            match flights.TryGetValue key with
-            | true, current when obj.ReferenceEquals(current, flight) -> flights.Remove key |> ignore
-            | _ -> ())
-
-    let claimFlight key =
-        lock gate (fun () ->
-            match flights.TryGetValue key with
-            | true, current -> AttachedFlightClaim.Follow current.Task
-            | false, _ ->
-                let created =
-                    TaskCompletionSource<Result<SessionId * string, string>>(
-                        TaskCreationOptions.RunContinuationsAsynchronously
+        (matched: SessionId option)
+        (createChild: CreateAttachedChild)
+        (bindChild: SessionId -> SessionId -> string -> unit)
+        (onReady: SessionId -> string -> unit)
+        : AttachmentLeaseCore.Operations =
+        { ListChildren =
+            fun _ ->
+                // The kind's decision, projected into the core's child vocabulary.
+                // A conflicting observation never reaches here: `ensure` refused it
+                // before building the operations.
+                Task.FromResult(
+                    Ok(
+                        matched
+                        |> Option.map (fun childId ->
+                            [ { AttachmentLeaseCore.Child.SessionId = SessionId.value childId
+                                AttachmentLeaseCore.Child.Agent = Some agentName
+                                AttachmentLeaseCore.Child.Title = Some observedTitleMarker } ])
+                        |> Option.defaultValue []
                     )
+                )
+          CreateChild =
+            fun _ _ directory ->
+                task {
+                    match! createChild owner scope role agentName directory with
+                    | Ok child -> return Ok(SessionId.value child)
+                    | Error error -> return Error error
+                }
+          /// Sync's link is infallible (unit publish hooks only), so the core never
+          /// reaches a fresh-lease abort here; a dedicated child is only ended at
+          /// its scope close (managed-session-lifecycle [004]/[014]).
+          AbortChild = fun _ -> Task.FromResult(Ok())
+          Link =
+            fun _ child agent ->
+                let childId = SessionId.create child
+                register owner childId
+                bindChild owner childId agent
+                onReady childId agent
+                Task.FromResult(Ok())
+          /// Sync keeps no durable link to close: the association is the in-memory
+          /// binding, and the registry drop is what releases it.
+          Close = fun _ -> Task.FromResult(Ok()) }
 
-                flights.Add(key, created)
-                AttachedFlightClaim.Own created)
-
-    let reconcile
-        key
-        scope
-        role
-        ownerSessionId
-        agentName
-        directory
+    let ensure
+        (owner: SessionId)
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        (directory: string option)
         (observeChild: ObserveAttachedChild)
         (createChild: CreateAttachedChild)
-        bindChild
-        onReady
-        =
-        taskResult {
-            let existing = lock gate (fun () -> tryGetLocked scope role)
-            let! plan = collectPlan scope role existing ownerSessionId agentName observeChild
+        (bindChild: SessionId -> SessionId -> string -> unit)
+        (onReady: SessionId -> string -> unit)
+        : Task<Result<SessionId * string, string>> =
+        let kind = kindOf role
 
-            let bindReady childId =
-                register ownerSessionId childId
-                bindChild ownerSessionId childId agentName
-                onReady childId agentName
-                lock gate (fun () -> bindings.[key] <- (childId, agentName))
-                childId, agentName
+        let start () =
+            task {
+                // The kind's observation IS its durable association: an exact unique
+                // match is the linked child (Reused), no match creates a fresh one.
+                // Handing the match to the core as its restore hint is what preserves
+                // Sync's adopt rule now that the core, like every other kind, refuses
+                // to adopt an unassociated child (managed-session-lifecycle [003]).
+                let! observed = observeChild owner scope role agentName
 
-            match plan with
-            | AttachedRuntimePlan.Reuse(sessionId, boundAgent) -> return sessionId, boundAgent
-            | AttachedRuntimePlan.Attach AttachedChildDecision.Create ->
-                let! childId = createChild ownerSessionId scope role agentName directory
-                return bindReady childId
-            | AttachedRuntimePlan.Attach(AttachedChildDecision.Adopt childId) -> return bindReady childId
-            | AttachedRuntimePlan.Attach(AttachedChildDecision.RejectConflict children) ->
-                return!
-                    children
-                    |> List.map SessionId.value
-                    |> String.concat ", "
-                    |> sprintf "sync delegate child observation conflicted: %s"
-                    |> Error
-                    |> Task.FromResult
-        }
+                match decideHint observed with
+                | Error error -> return Error error
+                | Ok hint ->
+                    let spec: AttachmentLeaseCore.Spec =
+                        { Kind = kind
+                          Agent = agentName
+                          Title = observedTitleMarker
+                          Directory = directory
+                          RestoreHint = hint }
 
-    let completeOwnedFlight (flight: TaskCompletionSource<Result<SessionId * string, string>>) work =
+                    return!
+                        ensureAndClearFlight
+                            owner
+                            kind
+                            (fun () ->
+                                AttachmentLeaseCore.ensure
+                                    (operations owner scope role agentName (hint |> Option.map SessionId.create) createChild bindChild onReady)
+                                    owner
+                                    spec)
+            }
+
         task {
-            try
-                let! result = work ()
-                flight.SetResult result
-                return result
-            with ex ->
-                flight.SetException ex
-                return raise ex
+            match! leases.Ensure(owner, kind, start) with
+            | Error error -> return Error error
+            | Ok lease ->
+                leases.Bind(owner, kind, lease)
+                return Ok(SessionId.create lease.SessionId, lease.Agent)
         }
-
-    let runOwnedFlight key (flight: TaskCompletionSource<Result<SessionId * string, string>>) work =
-        task {
-            try
-                return! completeOwnedFlight flight work
-            finally
-                finishFlight key flight
-        }
-
-    member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
-        let scope = ReuseScope.ofSession ownerSessionId
-        lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
-
-    member _.TryFindByScope(scope: ReuseScopeId, role: SyncDelegateRole) : SessionId option =
-        lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
-
-    member _.TryFindOwner(delegateSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
-        let suffix = "\u001f" + roleLabel role
-
-        lock gate (fun () ->
-            bindings
-            |> Seq.tryPick (fun binding ->
-                let delegateId, _ = binding.Value
-
-                if
-                    delegateId = delegateSessionId
-                    && binding.Key.EndsWith(suffix, StringComparison.Ordinal)
-                then
-                    Some(SessionId.create (binding.Key.Substring(0, binding.Key.Length - suffix.Length)))
-                else
-                    None))
-
-    member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
-        let scope = ReuseScope.ofSession ownerSessionId
-        lock gate (fun () -> bindings.Remove(bindingKey scope role))
-
-    member _.RemoveByDelegateSession(delegateSessionId: SessionId) : bool =
-        lock gate (fun () ->
-            let doomed =
-                bindings
-                |> Seq.tryFind (fun kv -> fst kv.Value = delegateSessionId)
-                |> Option.map (fun kv -> kv.Key)
-
-            match doomed with
-            | None -> false
-            | Some key -> bindings.Remove key)
 
     /// Reuse an existing compatible binding, or create a Work child and bind it.
     /// `createChild ownerSessionId agentName directory` must CreateChildSession as a
@@ -200,16 +200,49 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
             bindChild: SessionId -> SessionId -> string -> unit,
             onReady: SessionId -> string -> unit
         ) : Task<Result<SessionId * string, string>> =
-        let scope = ReuseScope.ofSession ownerSessionId
-        let key = bindingKey scope role
+        match bound (ownerSessionId, role) with
+        | Some pair -> Task.FromResult(Ok pair)
+        | None ->
+            ensure
+                ownerSessionId
+                (ReuseScope.ofSession ownerSessionId)
+                role
+                agentName
+                directory
+                observeChild
+                createChild
+                bindChild
+                onReady
 
-        match claimFlight key with
-        | AttachedFlightClaim.Follow flight -> flight
-        | AttachedFlightClaim.Own flight ->
-            runOwnedFlight key flight (fun () ->
-                reconcile key scope role ownerSessionId agentName directory observeChild createChild bindChild onReady)
+    member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
+        bound (ownerSessionId, role) |> Option.map fst
 
-    member _.Clear() = lock gate (fun () -> bindings.Clear())
+    /// The scope axis of this port. `ReuseScope.ofSession` is an identity wrap of the
+    /// owner value, so the scope lookup is the owner lookup; two different scopes are
+    /// two different owners and stay isolated.
+    member _.TryFindByScope(scope: ReuseScopeId, role: SyncDelegateRole) : SessionId option =
+        bound (SessionId.create (ReuseScopeId.value scope), role) |> Option.map fst
+
+    member _.TryFindOwner(delegateSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
+        let kind = kindOf role
+
+        leases.TryFindByChild(delegateSessionId)
+        |> List.tryPick (fun (owner, boundKind) -> if boundKind = kind then Some owner else None)
+
+    member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
+        leases.Remove(ownerSessionId, kindOf role)
+
+    member _.RemoveByDelegateSession(delegateSessionId: SessionId) : bool =
+        match leases.RemoveByChild(delegateSessionId) with
+        | [] -> false
+        | _ -> true
+
+    member _.Clear() =
+        // Only this port's kinds: a shared registry still holds every other kind's
+        // bindings after the Sync runtime is disposed.
+        leases.Snapshot()
+        |> List.filter (fun (_, kind) -> ownKinds |> List.contains kind)
+        |> List.iter (fun (owner, kind) -> leases.Remove(owner, kind) |> ignore)
 
     interface IAttachedSessionPort with
         member this.TryFind(ownerSessionId, role) = this.TryFind(ownerSessionId, role)

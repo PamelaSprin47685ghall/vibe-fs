@@ -8,7 +8,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required charge/occurrence/settlement/consequence + required tip.
+/// Provider schema: required charge/occurrence/settlement/consequence + optional evidence + required tip.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
@@ -27,6 +27,9 @@ module ChronicleTool =
 
         [<Literal>]
         let ArgConsequence = "tool/chronicle/arg-consequence"
+
+        [<Literal>]
+        let ArgEvidence = "tool/chronicle/arg-evidence"
 
         [<Literal>]
         let ArgTip = "tool/chronicle/arg-tip"
@@ -109,8 +112,14 @@ module ChronicleTool =
             | Ok _ -> true
             | Error _ -> false)
 
+    let private evidenceValid (args: HostToolArguments) =
+        let evidence = args.Text "evidence"
+
+        String.IsNullOrWhiteSpace evidence
+        || evidence.Length <= EnforcerCodec.MaxInlineEvidenceChars
+
     let private executeValidChronicle language (args: HostToolArguments) : string =
-        if allContentFieldsValid args then
+        if allContentFieldsValid args && evidenceValid args then
             resultForTip language (args.Text "tip")
         else
             nothingToRemember language
@@ -170,6 +179,10 @@ module ChronicleTool =
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgSettlement Map.empty) factory
               "consequence",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgConsequence Map.empty) factory
+              "evidence",
+              ToolHostCodec.optionalStringSchemaDescribed
+                  (ProviderProse.render language Path.ArgEvidence Map.empty)
+                  factory
               "tip",
               ToolHostCodec.enumSchemaDescribed fields (ProviderProse.render language Path.ArgTip Map.empty) factory ]
           Admission = admission bloggerHost

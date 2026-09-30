@@ -1,1 +1,2 @@
-One complete sentence stating what materially happened: the decisive discovery, change, failure, decision, verification, or external event. Record the semantic occurrence, not the sequence of tools used to observe it.
+One sharp, self-contained sentence carrying the shortest evidence chain or real mutation that turned the case. Prefer “A emits X; B accepts only Y; X is dropped at Z”: name entities, conditions, and effects directly, with no “after reviewing we found” wrapper and no tool-call narrative.
+This sentence bears the burden of proof: if it does not contain enough evidence to support settlement, settlement is not earned.

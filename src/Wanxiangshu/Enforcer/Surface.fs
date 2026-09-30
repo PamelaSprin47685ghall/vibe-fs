@@ -65,6 +65,7 @@ module EnforcerSurface =
                   "occurrence", box record.Occurrence
                   "settlement", box record.Settlement
                   "consequence", box record.Consequence
+                  "evidence", record.Evidence |> Option.map box |> Option.defaultValue null
                   "tip", tipToJs call.Tip ]
         | EnforcerCodec.ChronicleContent.Legacy(text, evidence) ->
             createObj

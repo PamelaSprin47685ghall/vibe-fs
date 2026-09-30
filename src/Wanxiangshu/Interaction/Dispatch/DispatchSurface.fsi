@@ -41,6 +41,15 @@ module DispatchSurface =
     val sendAgentOwnerRootAwait:
         port: obj -> handle: JournalHandle -> session: string -> text: string -> identitySeed: obj -> Task<obj>
 
+    val sendManagedAssignment:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        identitySeed: obj ->
+        tools: (string * bool) array option ->
+            Task<obj>
+
     val sendContinuation:
         port: obj ->
         handle: JournalHandle ->

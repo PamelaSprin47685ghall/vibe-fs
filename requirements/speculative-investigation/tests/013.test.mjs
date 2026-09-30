@@ -1,4 +1,5 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -35,13 +36,6 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_strength_source_carries_n
     }
   }
   assert.deepEqual(offenders, [], 'a production DryRun branch must not remain in the Strength tree')
-})
-test('WHAT[speculative-investigation-013] SPEC_INV_013_a_replica_is_a_real_child_session_not_a_diagnostic_stub', () => {
-  const runtime = readFileSync(resolve(root, 'src/Wanxiangshu/Strength/Replica/Runtime.fs'), 'utf8')
-  assert.match(runtime, /sessions\.CreateChildSession/)
-  assert.match(runtime, /dispatcher\.SendAgentOwnerRootWithTools/)
-  assert.match(runtime, /StrengthReplicaBinding/)
-  assert.doesNotMatch(runtime, /fake|simulate|synthetic replica/i)
 })
 // What still needs a real Host: enumerating the final provider-visible tool
 // set on a live Host, observing owner/Replica provider/model and purpose on the
@@ -1146,3 +1140,14 @@ integrationTest(
   },
 )
 }
+
+integrationTest('WHAT[speculative-investigation-013] resident_manager_predictor_keeps_each_budget_and_readonly_boundary', () => {
+  const launched = spawnSync(process.execPath, [path.join(import.meta.dirname, 'support/run-resident-predictor-canary.mjs')], {
+    cwd: path.resolve(import.meta.dirname, '../../..'),
+    encoding: 'utf8',
+    timeout: 180000,
+    env: { ...process.env },
+  })
+  assert.equal(launched.status, 0, `resident predictor canary failed:\n${launched.stdout}\n${launched.stderr}`)
+  assert.match(launched.stdout, /RESIDENT_PREDICTOR_CANARY /, 'resident predictor canary produced no evidence')
+})

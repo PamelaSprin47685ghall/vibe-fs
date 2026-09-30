@@ -20,13 +20,15 @@
 
 built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入 live Rulebook：正文非空且 TipName / RuleId / FieldName 恒等。每条 institutional BIRTH 必须同时提供完整双语（English 与 zh-CN）的 EnforcerText 与 MainText；缺失任一语言则准入失败。投影层按 provider 语言选择对应正文，无跨语言 fallback。
 
-## [006] chronicle 五字段合同与 NoLiveCycle 协议结果
+## [006] chronicle 结构化判词合同与 NoLiveCycle 协议结果
 
-当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence` 与 `tip`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”，并应各自写成一条可独立阅读的完整句子；`tip` 必须可归一到 TipName。缺失或空白的任一内容字段均不得形成有效 cycle；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。
+当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence` 与 `tip`，并可选提供 `evidence`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”，并应各自写成一条可独立阅读的完整判词；`tip` 必须可归一到 TipName。缺失或空白的任一必填内容字段均不得形成有效 cycle；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。
 
-四个结构字段只约束 provider 输入，不作为 Chronicle 正文的小标题。形成 durable frame / LWR 文本时，系统按 `charge → occurrence → settlement → consequence` 固定顺序，把每个字段内部换行折叠为空格，再用单个空格连接为一个自然段；正文不得包含字段名标签或人为分段。
+`evidence` 只允许作为最小决定性**原文摘录**：可摘 code、data、wire、log 或其它 raw source，必须保持摘录原文，不得改写、总结或搬运大段上下文；没有实质增强判词的原文证物就省略。它必须是 string，空白等价于省略，长度不得超过 1024 字符。
 
-升级前已经落在 Host transcript 中的 `entry/text/evidence` 只保留为 recovery 兼容：仅当新四字段全部缺席时才可按 legacy call 解码；新旧协议字段混用必须拒绝。新 tool schema 不再暴露 `entry`、`text` 或 `evidence`。
+四个结构字段只约束 provider 输入，不作为 Chronicle 正文的小标题。形成 durable frame / LWR 文本时，系统按 `charge → occurrence → settlement → consequence` 固定顺序，把每个字段内部换行折叠为空格，再用单个空格连接为一个自然段；正文不得包含字段名标签或人为分段。若存在 evidence，则仅在自然段末尾追加一次 ` [...]`。evidence 内部真实的 CR/LF/TAB/Unicode line separator 必须编码成字面转义，括号内部不得出现真实换行。
+
+evidence **不得**另写独立 evidence blob：所有新 materialize 的 Chronicle cycle 都令 `MergedEvidence` 为空，证物只存在于同一个 Chronicle frame 的段尾 `[...]`。升级前已经落在 Host transcript 中的 `entry/text` 只保留为 recovery 身份；仅当新四字段全部缺席时才可按 legacy call 解码，旧调用随带的 legacy evidence 可以被识别但不会重新落盘。新旧内容协议字段混用必须拒绝；新 tool schema 不再暴露 `entry` 或 `text`。
 
 若物理工具调用到达时不存在存活的 Blogger cycle，宿主层必须产生封闭的 `NoLiveCycle` 协议结果并终止过时 session，仅在最外层工具适配器编码为宿主异常。
 
@@ -48,7 +50,7 @@ built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入
 
 ## [011] fail-closed 内容硬界约束
 
-单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：新协议的四个内容字段先按固定顺序渲染为 canonical Chronicle text，渲染后的 UTF-8 文本不得超过 512 KiB。新协议不产生独立 evidence blob。仅为升级前 transcript 保留的 legacy `evidence` 仍受 128 KiB UTF-8 上限约束。阈值、UTF-8 字节计数结果与拒绝分支必须由 Cycle model 的单一纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制常量或判定公式。硬界属于安全防线，严禁演化为业务层面的启发式评分参数。
+单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：新协议四句正文与可选 inline evidence 先渲染为同一 canonical Chronicle text，渲染后的 UTF-8 文本不得超过 512 KiB；其中 inline evidence 在 decode 时另有 1024 字符硬上限。所有新 cycle 的独立 evidence 通道为空，不得产生 EvidenceRef。历史兼容代码仍能识别旧 evidence 字段与旧 durable EvidenceRef，但不会把 legacy evidence 重新物化为新 blob。阈值、计量结果与拒绝分支必须由 owner 的纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制业务判定公式。硬界属于安全防线，严禁演化为启发式评分参数。
 
 ## [012] BlogObservationCommitted 是唯一原子 cycle 事实
 
@@ -72,7 +74,7 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 
 ## [017] 无效 cycle 的有界协议修复与 AABB 状态恢复
 
-未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tip、新四字段任一缺失/空白、或新旧 chronicle 协议混用）进入有界协议修复流程：
+未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tip、新四字段任一缺失/空白、evidence 非 string/超长、或新旧 chronicle 内容协议混用）进入有界协议修复流程：
 1. 首发 Nudge 必须且仅能由处于完全静止的 idle terminal 发起，禁止在 transform 阶段发送。
 2. 每个 `BloggerRequestId` 至多获得一次 Nudge 修复机会；同一 terminal run 重放保持幂等。
 3. 纯文本 terminal 不得依赖后续 transform 唤醒，由 `SessionIdle` 触发专用 nudge。

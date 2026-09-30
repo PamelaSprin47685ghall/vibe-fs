@@ -19,7 +19,7 @@ type CompanionHost =
         ?restoredBloggerId: string *
         ?journal: AgentJournal *
         ?bloggerDirectory: string *
-        ?satelliteRuntime: SatelliteRuntime ->
+        ?satelliteRuntime: CompanionLeaseRuntime ->
             CompanionHost
 
     member EnsureBloggerAsync: unit -> Task<SessionId>

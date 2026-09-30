@@ -14,7 +14,7 @@ test('WHAT[managed-session-lifecycle-003] actual satellite owner reuses an exact
 test('WHAT[managed-session-lifecycle-003] conflicting association and failed Host query refuse recovery without creating children', async () => {
   const conflict = await satellites.SatelliteSurface_scenario(true, true, true, false)
   assert.equal(conflict.ok, false)
-  assert.match(conflict.error, /Conflicting companion satellite recovery/)
+  assert.match(conflict.error, /Conflicting companion recovery for work: child blogger-1 has a different agent or title/)
   assert.deepEqual(conflict.created, [])
   assert.deepEqual(conflict.linked, [])
   const queryError = await satellites.SatelliteSurface_scenario(false, false, false, true)

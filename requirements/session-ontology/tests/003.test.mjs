@@ -4,7 +4,7 @@ import * as association from '../../../dist/Execution/Session/AssociationSurface
 
 test('WHAT[session-ontology-003] dedicated classification uses production role-to-attachment rules', () => {
   assert.equal(association.dedicatedExecutionClass, 'Work')
-  for (const [role, attachment] of [['Inspector', 'SyncInspector'], ['Coder', 'SyncCoder'], ['Engineer', 'SyncInspector']]) {
+  for (const [role, attachment] of [['Inspector', 'SyncInspector'], ['Coder', 'SyncCoder'], ['Engineer', 'SyncEngineer']]) {
     assert.deepEqual(association.dedicatedOwnership('owner', role), {
       kind: 'Attached', owner: 'owner', attachment, transactionId: null,
     })

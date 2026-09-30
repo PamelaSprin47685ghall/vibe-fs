@@ -7,4 +7,8 @@ a new occurrence, and do not invent closure that the old frames never earned.
 Write one complete sentence in each content field so the rewritten record becomes
 one smooth paragraph when the field labels are removed.
 Choose exactly one tip for the lesson carried by the rewritten record.
+During squash, remove process framing, emphasis, and context-dependent referents;
+retain only entities, evidence, conclusions, and constraints that still stand alone.
+If the old material contains a decisive literal exhibit, retain only the smallest
+verbatim excerpt in optional evidence; never carry a large raw block through squash.
 Output no ordinary assistant prose.

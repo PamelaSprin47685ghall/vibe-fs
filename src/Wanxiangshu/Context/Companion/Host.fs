@@ -127,8 +127,8 @@ module private CompanionHostDecisions =
                 return Error ex
         }
 
-    let ensureViaSatellite
-        (runtime: SatelliteRuntime)
+    let ensureViaLease
+        (runtime: CompanionLeaseRuntime)
         (durable: ICompanionDurablePort option)
         (recordLinked: SessionId -> unit)
         (primaryId: SessionId)
@@ -156,9 +156,9 @@ module private CompanionHostDecisions =
 
             match outcome with
             | Error error ->
-                // SatelliteRuntime caches successful leases, but a failed ensure
-                // must never become a permanent poisoned single-flight. The next
-                // material/retry is allowed to re-observe Host + durable state.
+                // A failed ensure must never become a permanent poisoned
+                // single-flight. The next material/retry is allowed to re-observe
+                // Host + durable state.
                 runtime.Invalidate(primaryId, SatelliteKind.Companion)
                 onFailed ()
                 return raise (InvalidOperationException error)
@@ -199,7 +199,7 @@ module private CompanionHostDecisions =
         }
 
     let startEnsureBlogger
-        (satelliteRuntime: SatelliteRuntime option)
+        (satelliteRuntime: CompanionLeaseRuntime option)
         (sessions: ISessionHostPort)
         (durable: ICompanionDurablePort option)
         (recordLinked: SessionId -> unit)
@@ -214,7 +214,7 @@ module private CompanionHostDecisions =
         : Task<SessionId> =
         match satelliteRuntime with
         | Some runtime ->
-            ensureViaSatellite
+            ensureViaLease
                 runtime
                 durable
                 recordLinked
@@ -240,7 +240,7 @@ module private CompanionHostDecisions =
                 onFailed
 
     let retireBlogger
-        (satelliteRuntime: SatelliteRuntime option)
+        (satelliteRuntime: CompanionLeaseRuntime option)
         (sessions: ISessionHostPort)
         (durable: ICompanionDurablePort option)
         (primaryId: SessionId)
@@ -282,7 +282,7 @@ type CompanionHost
         ?restoredBloggerId: string,
         ?journal: AgentJournal,
         ?bloggerDirectory: string,
-        ?satelliteRuntime: SatelliteRuntime
+        ?satelliteRuntime: CompanionLeaseRuntime
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()

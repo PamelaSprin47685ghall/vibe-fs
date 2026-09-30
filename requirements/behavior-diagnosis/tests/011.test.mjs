@@ -44,7 +44,7 @@ test('WHAT[behavior-diagnosis-011] ENFORCER_043_canonical_text_over_512KiB_fails
   assert.match(result.error, /MaxBlogTextBytes=524288/)
 })
 
-test('WHAT[behavior-diagnosis-011] ENFORCER_043_canonical_evidence_over_128KiB_fails_closed', () => {
+test('WHAT[behavior-diagnosis-011] ENFORCER_043_legacy_evidence_compatibility_bound_remains_128KiB', () => {
   const result = enforcer.validateBounds('work', 'b'.repeat(MAX_EVIDENCE_BYTES + 1))
   assert.equal(result.ok, false)
   assert.match(result.error, /MaxEvidenceBytes=131072/)
@@ -60,7 +60,7 @@ test('WHAT[behavior-diagnosis-011] ENFORCER_042_bound_constants_match_utf8_byte_
   assert.equal(enforcer.validateBounds('界'.repeat(Math.floor(MAX_BLOG_TEXT_BYTES / 3) + 1), undefined).ok, false)
 })
 
-test('WHAT[behavior-diagnosis-011] multibyte text and evidence accept the exact byte boundary and refuse one byte more', () => {
+test('WHAT[behavior-diagnosis-011] current text and legacy evidence compatibility bounds remain byte-exact', () => {
   for (const [limit, field] of [[MAX_BLOG_TEXT_BYTES, 'text'], [MAX_EVIDENCE_BYTES, 'evidence']]) {
     const content = '界'.repeat(Math.floor(limit / 3)) + 'x'.repeat(limit % 3)
     assert.equal(Buffer.byteLength(content, 'utf8'), limit)

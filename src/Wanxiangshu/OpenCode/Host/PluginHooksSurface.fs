@@ -108,7 +108,9 @@ module PluginHooksSurface =
             let scope = new PluginRuntimeScope(None)
             let durable = AgentJournalCompanionPort handle.Journal :> ICompanionDurablePort
             let sessionPort = DispatchSurface.sessionPort port
-            let satellites = SatelliteRuntime(sessionPort)
+            // managed-session-lifecycle-001: one lease registry for this isolated
+            // scope's Companion kind.
+            let satellites = CompanionLeaseRuntime(sessionPort, AttachmentLeaseRegistry())
 
             let host =
                 new CompanionHost(

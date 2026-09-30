@@ -10,5 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
     <Compile Include="Execution/Session/SyncDelegateRole.fsi"/>
     <Compile Include="Execution/Session/SyncDelegateRole.fs"/>
+    <Compile Include="Execution/Session/Attachment/AttachmentLeaseCore.fsi"/>
+    <Compile Include="Execution/Session/Attachment/AttachmentLeaseCore.fs"/>
   </ItemGroup>
 </Project>

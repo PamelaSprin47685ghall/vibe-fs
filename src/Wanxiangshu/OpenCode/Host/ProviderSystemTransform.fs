@@ -14,17 +14,10 @@ open Wanxiangshu.Resources
 module ProviderSystemTransform =
 
     [<Literal>]
-    let replicaConstraintZh =
-        "继续当前任务的只读查证，只使用当前可见且获准的工具。信息足够，或下一步需要写入、执行命令、向用户确认、给出结论或作出关键判断时，直接结束，不为继续调用而增加调查。对话里的 self_note 是先前对未来查证的展望，不是已经证实的结论，也不扩大权限。"
+    let private ReadonlyInvestigationPath = "delegation/readonly-investigation"
 
-    [<Literal>]
-    let replicaConstraintEn =
-        "Continue the current task's read-only investigation using only the available, permitted tools. Stop when the evidence is sufficient or the next step requires a change, a command, user clarification, a conclusion, or a consequential judgment. Do not invent work to keep calling tools. A self_note in the conversation is an earlier outlook for investigation, not a verified conclusion or permission to do more."
-
-    let replicaConstraintFor lang =
-        match lang with
-        | ProviderLanguage.SimplifiedChinese -> replicaConstraintZh
-        | ProviderLanguage.English -> replicaConstraintEn
+    let private replicaConstraintFor lang =
+        ProviderProse.render lang ReadonlyInvestigationPath Map.empty
 
     let private canonical (text: string) = if isNull text then "" else text.Trim()
 
@@ -32,20 +25,27 @@ module ProviderSystemTransform =
         let c = canonical text
         c = expectedZh || c = expectedEn
 
-    let private applyReplicaConstraint (lang: ProviderLanguage) (output: obj) =
-        let currentSystem = unbox<string array> output?system
-        let expectedZh = canonical replicaConstraintZh
-        let expectedEn = canonical replicaConstraintEn
-        let nextConstraint = replicaConstraintFor lang
+    let private applyReplicaConstraint (lang: ProviderLanguage) (currentSystem: string array) =
+        let zhConstraint = replicaConstraintFor ProviderLanguage.SimplifiedChinese
+        let enConstraint = replicaConstraintFor ProviderLanguage.English
+        let expectedZh = canonical zhConstraint
+        let expectedEn = canonical enConstraint
+
+        let nextConstraint =
+            match lang with
+            | ProviderLanguage.SimplifiedChinese -> zhConstraint
+            | ProviderLanguage.English -> enConstraint
+
         let isConstraintLine = isReplicaConstraintLine expectedZh expectedEn
         let hasConstraint = currentSystem |> Array.exists isConstraintLine
 
         if hasConstraint then
-            output?system <-
-                currentSystem
-                |> Array.map (fun text -> if isConstraintLine text then nextConstraint else text)
+            currentSystem
+            |> Array.iteri (fun index text ->
+                if isConstraintLine text then
+                    currentSystem.[index] <- nextConstraint)
         else
-            output?system <- Array.append currentSystem [| nextConstraint |]
+            emitJsExpr (currentSystem, nextConstraint) "$0.push($1)" |> ignore
 
     /// Only active roles own a projected segment; retired identities are
     /// decoded for history but never rewrite a live system prompt.
@@ -128,7 +128,7 @@ module ProviderSystemTransform =
         | Some r -> Some r
         | None -> activeRoles |> List.tryFind (fun r -> roleMatchesSystem r system)
 
-    let private replaceBookkeeperSystem lang sessionText output system =
+    let private replaceBookkeeperSystem lang sessionText (system: string array) =
         let oldPromptEn = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
 
         let oldPromptZh =
@@ -145,12 +145,16 @@ module ProviderSystemTransform =
 
         if BookkeeperRuntime.isAttached sessionText || matchesBookkeeper then
             let nextPrompt = PromptResources.loadBookkeeperSystemFor lang
-            output?system <- system |> Array.map (chooseBookkeeperPrompt expectedEn expectedZh nextPrompt)
+
+            system
+            |> Array.iteri (fun index text ->
+                system.[index] <- chooseBookkeeperPrompt expectedEn expectedZh nextPrompt text)
+
             true
         else
             false
 
-    let private replaceRoleSystem (role: SessionId -> Role option) sid lang output system =
+    let private replaceRoleSystem (role: SessionId -> Role option) sid lang (system: string array) =
         match tryDeduceRole role sid system with
         | None -> ()
         | Some r ->
@@ -175,32 +179,26 @@ module ProviderSystemTransform =
             let expectedCur = canonical currentPrompt
             let expectedInstalled = canonical installedPrompt
 
-            output?system <-
-                system
-                |> Array.map (chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt)
+            system
+            |> Array.iteri (fun index text ->
+                system.[index] <- chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt text)
 
-    let private transformSystem
-        (role: SessionId -> Role option)
-        (isReplica: SessionId -> bool)
-        sessionText
-        output
-        system
-        =
+    let private transformSystem (role: SessionId -> Role option) (isReplica: SessionId -> bool) sessionText system =
         let sid = SessionId.create sessionText
         let lang = ProviderLanguageBinding.ensureRoot sid
 
-        if replaceBookkeeperSystem lang sessionText output system then
+        if replaceBookkeeperSystem lang sessionText system then
             ()
         else
-            replaceRoleSystem role sid lang output system
+            replaceRoleSystem role sid lang system
 
         if isReplica sid then
-            applyReplicaConstraint lang output
+            applyReplicaConstraint lang system
 
     let createWith (role: SessionId -> Role option) (isReplica: SessionId -> bool) : obj -> obj -> Task<unit> =
         fun input output ->
             task {
                 match sessionTransformInput input output with
                 | None -> ()
-                | Some(sessionText, system) -> transformSystem role isReplica sessionText output system
+                | Some(sessionText, system) -> transformSystem role isReplica sessionText system
             }

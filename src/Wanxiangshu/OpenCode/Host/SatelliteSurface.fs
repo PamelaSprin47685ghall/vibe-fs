@@ -92,7 +92,7 @@ module SatelliteSurface =
     let scenario (linked: bool) (physical: bool) (conflict: bool) (queryError: bool) : Task<obj> =
         task {
             let port = SatelliteSessionPort(physical, conflict, queryError)
-            let runtime = SatelliteRuntime(port)
+            let runtime = CompanionLeaseRuntime(port, AttachmentLeaseRegistry())
             let! outcome = runtime.Ensure(SessionId.create "work", spec port linked)
 
             return
@@ -117,7 +117,7 @@ module SatelliteSurface =
     let concurrent () : Task<obj> =
         task {
             let port = SatelliteSessionPort(false, false, false)
-            let runtime = SatelliteRuntime(port)
+            let runtime = CompanionLeaseRuntime(port, AttachmentLeaseRegistry())
             let first = runtime.Ensure(SessionId.create "work", spec port false)
             let second = runtime.Ensure(SessionId.create "work", spec port false)
             let! outcomes = promiseAll [| first; second |]
