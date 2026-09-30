@@ -1,5 +1,9 @@
 # Changelog — 版本历史
 
+## Unreleased — Pair Programming 指引七条纪律真理版本
+
+- `resources/provider/host/pair-programming-guideline/zh-CN.md` 重写为七条编号纪律（使用中文、小步快跑、不要吝賂、进度更新、极高并发、超越常识、善于内省）；`en.md` 按该真理版本忠实重写，语言纪律按绑定语言镜像（英文版要求全程英文）。cognitive-environment WHAT 013/016 与 tests/013、016 锚点同步：`ready frontier` 改为就绪前沿、`先抽象，再笃定` 改为分析与抽象后钉住反常识判断，并新增 en 版七条纪律结构断言。
+
 ## [Unreleased]
 
 - speculative-investigation / host-boundary [进行中 / 未验证]: 规范切换到 DELEGATE_REVISE.md 新合同（代码与测试尚待 DevOps 运行验证）。
