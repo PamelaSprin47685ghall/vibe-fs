@@ -8,13 +8,28 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required `entry` + required `tip`; no legacy blog/text alias.
+/// Provider schema: required charge/occurrence/settlement/consequence + required tip.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
         let Description = "tool/chronicle/description"
+
+        [<Literal>]
+        let ArgCharge = "tool/chronicle/arg-charge"
+
+        [<Literal>]
+        let ArgOccurrence = "tool/chronicle/arg-occurrence"
+
+        [<Literal>]
+        let ArgSettlement = "tool/chronicle/arg-settlement"
+
+        [<Literal>]
+        let ArgConsequence = "tool/chronicle/arg-consequence"
+
+        [<Literal>]
+        let ArgTip = "tool/chronicle/arg-tip"
 
         [<Literal>]
         let Remembered = "tool/chronicle/remembered"
@@ -87,10 +102,18 @@ module ChronicleTool =
             |> Option.map (fun _ -> remembered language)
             |> Option.defaultValue (missingTip language)
 
-    let private executeValidEntry language (args: HostToolArguments) : string =
-        match tryCanonicalText (args.Text "entry") with
-        | Error _ -> nothingToRemember language
-        | Ok _ -> resultForTip language (args.Text "tip")
+    let private allContentFieldsValid (args: HostToolArguments) =
+        [ "charge"; "occurrence"; "settlement"; "consequence" ]
+        |> List.forall (fun name ->
+            match tryCanonicalText (args.Text name) with
+            | Ok _ -> true
+            | Error _ -> false)
+
+    let private executeValidChronicle language (args: HostToolArguments) : string =
+        if allContentFieldsValid args then
+            resultForTip language (args.Text "tip")
+        else
+            nothingToRemember language
 
     let private executeChronicle
         (terminateSession: string * string -> System.Threading.Tasks.Task<Result<unit, string>>)
@@ -102,7 +125,7 @@ module ChronicleTool =
         task {
             let execution =
                 match tryCurrentRequest bloggerHost ctx.SessionId with
-                | Some _ -> ChronicleExecution.decide true (executeValidEntry language args)
+                | Some _ -> ChronicleExecution.decide true (executeValidChronicle language args)
                 | None -> ChronicleExecution.decide false ""
 
             match execution with
@@ -134,11 +157,21 @@ module ChronicleTool =
                 Path.Description
                 (Map [ "rule_count", string ruleCount ])
 
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "chronicle"
           Description = catalogDescription
           Arguments =
-            [ "entry", ToolHostCodec.stringSchema factory
-              "tip", ToolHostCodec.enumSchema fields factory ]
+            [ "charge",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgCharge Map.empty) factory
+              "occurrence",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgOccurrence Map.empty) factory
+              "settlement",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgSettlement Map.empty) factory
+              "consequence",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgConsequence Map.empty) factory
+              "tip",
+              ToolHostCodec.enumSchemaDescribed fields (ProviderProse.render language Path.ArgTip Map.empty) factory ]
           Admission = admission bloggerHost
           Execute =
             fun args ctx ->

@@ -1,1 +1,1 @@
-A lesson is required.
+Choose exactly one Rulebook lesson for this transition.

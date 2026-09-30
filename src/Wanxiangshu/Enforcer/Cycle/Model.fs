@@ -23,10 +23,23 @@ module EnforcerCycle =
           CanonicalTip: EnforcerTip
           MergedEvidence: string }
 
+    let private renderStructured (record: ChronicleRecord) =
+        [ "charge:\n" + record.Charge
+          "occurrence:\n" + record.Occurrence
+          "settlement:\n" + record.Settlement
+          "consequence:\n" + record.Consequence ]
+        |> String.concat "\n\n"
+
     let ofCall (call: CanonicalBlogCall) : CanonicalCycle =
-        { MergedText = call.Text |> Option.defaultValue ""
-          CanonicalTip = call.Tip
-          MergedEvidence = call.Evidence |> Option.defaultValue "" }
+        match call.Content with
+        | ChronicleContent.Structured record ->
+            { MergedText = renderStructured record
+              CanonicalTip = call.Tip
+              MergedEvidence = "" }
+        | ChronicleContent.Legacy(text, evidence) ->
+            { MergedText = text
+              CanonicalTip = call.Tip
+              MergedEvidence = evidence |> Option.defaultValue "" }
 
     let isValidCycle (cycle: CanonicalCycle) : bool = cycle.MergedText.Trim().Length > 0
 

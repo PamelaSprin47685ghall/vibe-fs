@@ -1,14 +1,16 @@
-记录一个已经发生、并且改变了继续前进道路的 occurrence。
+记录一次耐久的状态转折：它已经改变当前 participant 接下来能够诚实相信什么，
+或能够诚实做什么。
 
-当一次改变、失败、决定、发现、后果或未决条件，改变了接下来能够诚实去做的事时，
-使用 chronicle。
+转折既可以发生在认识上（查明、排除、收窄、验证），也可以发生在现实世界中
+（源码、进程、分支、外部状态或其它真实条件被改变）。
 
-记录发生了什么，而不是它是怎样被观察到的。
-一次搜索、一次读取或一次工具调用，并不因为产出了观察就成为 occurrence。
+填写一条完整因果主干：
 
-entry 是这段 occurrence 的散文。
-tip 必填：必须恰好是 {{rule_count}} 个 rulebook TipNames 之一，命名它教会当前
-participant 的教训。
+charge → occurrence → settlement → consequence → tip
 
-成功的返回意味着 Chronicle 记住了这次 occurrence。
-它不安排工作，也不判断是否接受。
+前四个内容字段必须各自提供不同信息。不要总结工具步骤，不要把同一句话换四种说法，
+也不要制造材料并未获得的闭环。tip 必填：必须从 {{rule_count}} 个 Rulebook
+TipNames 中恰好选择一个，表示这次具体转折携带的可复用 lesson。
+
+成功返回表示 Chronicle 接受了这次转折。它不安排工作、不授予 authority，也不证明
+超过所给证据能够支持的事实。

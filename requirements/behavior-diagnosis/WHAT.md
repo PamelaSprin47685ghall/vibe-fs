@@ -20,9 +20,13 @@
 
 built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入 live Rulebook：正文非空且 TipName / RuleId / FieldName 恒等。每条 institutional BIRTH 必须同时提供完整双语（English 与 zh-CN）的 EnforcerText 与 MainText；缺失任一语言则准入失败。投影层按 provider 语言选择对应正文，无跨语言 fallback。
 
-## [006] chronicle 工具参数合同与 NoLiveCycle 协议结果
+## [006] chronicle 五字段合同与 NoLiveCycle 协议结果
 
-`chronicle` 工具调用中 `entry`（trim 后非空文本）与 `tip`（可归一到 TipName）为语义必需；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。若物理工具调用到达时不存在存活的 Blogger cycle，宿主层必须产生封闭的 `NoLiveCycle` 协议结果并终止过时 session，仅在最外层工具适配器编码为宿主异常。
+当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence` 与 `tip`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”；`tip` 必须可归一到 TipName。缺失或空白的任一内容字段均不得形成有效 cycle；缺少 tip、空 tip 或非 string tip 必须稳定返回错误面。
+
+升级前已经落在 Host transcript 中的 `entry/text/evidence` 只保留为 recovery 兼容：仅当新四字段全部缺席时才可按 legacy call 解码；新旧协议字段混用必须拒绝。新 tool schema 不再暴露 `entry`、`text` 或 `evidence`。
+
+若物理工具调用到达时不存在存活的 Blogger cycle，宿主层必须产生封闭的 `NoLiveCycle` 协议结果并终止过时 session，仅在最外层工具适配器编码为宿主异常。
 
 ## [007] tip 确定性最近映射与无未知分支
 
@@ -42,7 +46,7 @@ built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入
 
 ## [011] fail-closed 内容硬界约束
 
-单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：规范化日志文本不得超过 512 KiB UTF-8 字节；证据字段不得超过 128 KiB UTF-8 字节。阈值、UTF-8 字节计数结果与拒绝分支必须由 Cycle model 的单一纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制常量或判定公式。硬界属于安全防线，严禁演化为业务层面的启发式评分参数。
+单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：新协议的四个内容字段先按固定顺序渲染为 canonical Chronicle text，渲染后的 UTF-8 文本不得超过 512 KiB。新协议不产生独立 evidence blob。仅为升级前 transcript 保留的 legacy `evidence` 仍受 128 KiB UTF-8 上限约束。阈值、UTF-8 字节计数结果与拒绝分支必须由 Cycle model 的单一纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制常量或判定公式。硬界属于安全防线，严禁演化为业务层面的启发式评分参数。
 
 ## [012] BlogObservationCommitted 是唯一原子 cycle 事实
 
@@ -66,7 +70,7 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 
 ## [017] 无效 cycle 的有界协议修复与 AABB 状态恢复
 
-未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tip、空 entry）进入有界协议修复流程：
+未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tip、新四字段任一缺失/空白、或新旧 chronicle 协议混用）进入有界协议修复流程：
 1. 首发 Nudge 必须且仅能由处于完全静止的 idle terminal 发起，禁止在 transform 阶段发送。
 2. 每个 `BloggerRequestId` 至多获得一次 Nudge 修复机会；同一 terminal run 重放保持幂等。
 3. 纯文本 terminal 不得依赖后续 transform 唤醒，由 `SessionIdle` 触发专用 nudge。

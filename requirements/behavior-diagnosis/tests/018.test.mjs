@@ -7,7 +7,13 @@ test('WHAT[behavior-diagnosis-018] packaged enum decoding and Main lookup agree 
   assert.deepEqual(enforcer.fieldNames(), rules.map((rule) => rule.fieldName))
   for (const rule of rules) {
     assert.deepEqual(enforcer.tryFindByField(rule.fieldName), rule)
-    const decoded = enforcer.decodeCall({ tip: rule.fieldName, text: 'valid entry' })
+    const decoded = enforcer.decodeCall({
+      charge: 'Resolve one concrete uncertainty.',
+      occurrence: 'A meaningful transition happened.',
+      settlement: 'The new state is established.',
+      consequence: 'The future path changed.',
+      tip: rule.fieldName,
+    })
     assert.equal(decoded.ok, true)
     assert.equal(decoded.value.tip.ruleId, rule.ruleId)
   }

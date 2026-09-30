@@ -1,0 +1,1 @@
+What is now established because of the occurrence. Distinguish knowledge from mere activity, changed state from verified state, and clearly name anything that remains unresolved instead of manufacturing closure.

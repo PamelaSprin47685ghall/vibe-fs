@@ -671,7 +671,17 @@ test('WHAT[behavior-diagnosis-017] actual decoder ignores malformed messages and
 test('WHAT[behavior-diagnosis-017] actual decoder consumes only completed chronicle calls with valid tip evidence', () => {
   for (const part of [
     null, call({ tool: 'blog' }), call({ type: 'text' }),
-    call({ state: { status: 'completed', input: { entry: 'work' } } }),
+    call({
+      state: {
+        status: 'completed',
+        input: {
+          charge: 'Resolve one concrete uncertainty.',
+          occurrence: 'A meaningful transition happened.',
+          settlement: 'The transition is established.',
+          consequence: 'The road changed.',
+        },
+      },
+    }),
     ...['pending', 'running', 'error', 'unknown', undefined].map((status) => call({ state: { status, input: call().state.input } })),
   ]) {
     const result = decode([part])

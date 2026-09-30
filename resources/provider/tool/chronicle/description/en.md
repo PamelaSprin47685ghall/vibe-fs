@@ -1,16 +1,18 @@
-Record one occurrence that has already happened and that changed the
-continuing road.
+Record one durable state transition that changed what the current participant
+could honestly believe or do next.
 
-Use chronicle when a change, failure, decision, discovery, consequence, or
-unresolved condition altered what could honestly be done next.
+A transition may be epistemic (something was discovered, ruled out, narrowed,
+or verified) or physical (source, process, branch, external state, or another
+real-world condition was changed).
 
-Record what happened, not how it was observed.
-A search, a read, or a tool invocation is not the occurrence merely because
-it produced the observation.
+Fill one causal spine:
 
-entry is the occurrence in prose.
-tip is required: exactly one of {{rule_count}} rulebook TipNames, naming the
-lesson it taught the current participant.
+charge → occurrence → settlement → consequence → tip
 
-A successful return means the Chronicle remembers this occurrence.
-It does not schedule work or judge acceptance.
+The four content fields must carry different information. Do not summarize tool
+steps, repeat one sentence four ways, or manufacture closure. tip is required:
+choose exactly one of the {{rule_count}} Rulebook TipNames for the reusable
+lesson this concrete transition teaches.
+
+A successful return means the Chronicle accepted this transition. It does not
+schedule work, grant authority, or prove more than the supplied evidence earned.

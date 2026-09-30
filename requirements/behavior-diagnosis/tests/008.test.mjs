@@ -29,14 +29,17 @@ const firstRule = () => enforcer.tryFindByField(firstField())
 test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ignored', () => {
   const field = firstField()
   const result = enforcer.decodeCall({
-    text: 'entry',
+    charge: 'Resolve one concrete uncertainty.',
+    occurrence: 'The decisive fact was established.',
+    settlement: 'The uncertainty is now settled.',
+    consequence: 'The future path now rests on that fact.',
     tip: field,
     'primitive-obsession': 7,
     some_other_number: 3,
   })
   assert.equal(result.ok, true)
   assert.equal(result.value.tip.fieldName, field)
-  assert.equal(result.value.evidence, null)
+  assert.equal(result.value.evidence, undefined)
 })
 }
 
@@ -216,7 +219,13 @@ const cycleRecord = (n, field) => ({
 })
 
 test('WHAT[behavior-diagnosis-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
-  const sample = enforcer.decodeCall({ text: 'x', tip: fields[0] })
+  const sample = enforcer.decodeCall({
+    charge: 'Resolve one concrete uncertainty.',
+    occurrence: 'A meaningful transition happened.',
+    settlement: 'The resulting state is established.',
+    consequence: 'The continuing road changed.',
+    tip: fields[0],
+  })
   assert.equal(sample.ok, true)
   assert.equal(typeof sample.value.tip.ruleId, 'string')
   assert.equal(sample.value.tip.fieldName in Object.fromEntries(fields.map((f) => [f, true])), true)

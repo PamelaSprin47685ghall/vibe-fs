@@ -1,1 +1,1 @@
-There is no occurrence here to remember.
+No complete state transition was supplied, so the Chronicle recorded nothing.

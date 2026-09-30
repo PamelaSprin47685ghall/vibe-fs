@@ -91,5 +91,14 @@ export const chroniclePart = (callID, tip, text) => ({
   type: 'tool',
   tool: 'chronicle',
   callID,
-  state: { status: 'completed', input: { tip, entry: text } },
+  state: {
+    status: 'completed',
+    input: {
+      charge: 'Preserve the material change carried by this Blogger turn.',
+      occurrence: text,
+      settlement: 'The supplied occurrence is now part of the durable work record.',
+      consequence: 'Later context may rely on this record after raw history is compressed.',
+      tip,
+    },
+  },
 })

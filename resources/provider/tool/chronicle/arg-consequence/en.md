@@ -1,0 +1,1 @@
+How the settlement changes the continuing road: what became possible, impossible, unnecessary, invalid, still blocked, or newly required by reality. Describe the changed action space; do not issue a todo or command another office.

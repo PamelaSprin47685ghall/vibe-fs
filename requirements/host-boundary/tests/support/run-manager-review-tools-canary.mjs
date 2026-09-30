@@ -185,7 +185,11 @@ const provider = await startHttpServer(async (request, response) => {
         const tip = chronicle.function?.parameters?.properties?.tip?.enum?.[0];
         assert.equal(typeof tip, 'string', 'Blogger wire must publish a legal chronicle tip');
         sendSSE(response, buildToolCallChunks(`chronicle_${providerRequests.length}`, 'chronicle', JSON.stringify({
-          entry: 'The Manager canary inspected its tool contract.', tip,
+          charge: 'Preserve the canary observation that matters after this sidecar turn.',
+          occurrence: 'The Manager canary inspected its tool contract.',
+          settlement: 'The inspected contract is represented in the current canary record.',
+          consequence: 'The sidecar can finish without inventing additional work.',
+          tip,
         }), 1));
         return;
       }

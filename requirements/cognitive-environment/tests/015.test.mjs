@@ -11,10 +11,10 @@ const transformsSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugi
 const bloggerSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs'), 'utf8')
 
 test('WHAT[cognitive-environment-015] BLOGGER_CHRONICLE_TEXT_has_exact_bilingual_craft', () => {
-  assert.match(bloggerSource, /对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。/)
+  assert.match(bloggerSource, /直接把材料提炼成 charge、occurrence、settlement、consequence，并调用 chronicle/)
   assert.match(
     bloggerSource,
-    /For simple bookkeeping requests, there is no need to trigger thinking at all\. Let me call the chronicle tool directly\./,
+    /Distill the material into charge, occurrence, settlement, and consequence, then call chronicle directly\./,
   )
 })
 

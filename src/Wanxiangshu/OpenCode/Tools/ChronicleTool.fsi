@@ -3,13 +3,28 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required `entry` + required `tip`; no legacy blog/text alias.
+/// Provider schema: required charge/occurrence/settlement/consequence + required tip.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
         val Description: string = "tool/chronicle/description"
+
+        [<Literal>]
+        val ArgCharge: string = "tool/chronicle/arg-charge"
+
+        [<Literal>]
+        val ArgOccurrence: string = "tool/chronicle/arg-occurrence"
+
+        [<Literal>]
+        val ArgSettlement: string = "tool/chronicle/arg-settlement"
+
+        [<Literal>]
+        val ArgConsequence: string = "tool/chronicle/arg-consequence"
+
+        [<Literal>]
+        val ArgTip: string = "tool/chronicle/arg-tip"
 
         [<Literal>]
         val Remembered: string = "tool/chronicle/remembered"

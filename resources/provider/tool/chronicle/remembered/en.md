@@ -1,1 +1,1 @@
-The Chronicle remembers this.
+The Chronicle recorded this transition.

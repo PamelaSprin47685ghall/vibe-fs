@@ -14,9 +14,10 @@ module BloggerChronicleText =
 
     let private bloggerChronicleText (language: ProviderLanguage) =
         match language with
-        | ProviderLanguage.SimplifiedChinese -> "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
+        | ProviderLanguage.SimplifiedChinese ->
+            "这是一轮记账，不需要额外展开长篇推理。直接把材料提炼成 charge、occurrence、settlement、consequence，并调用 chronicle。"
         | ProviderLanguage.English ->
-            "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
+            "This is a bookkeeping turn; no extra long-form reasoning is needed. Distill the material into charge, occurrence, settlement, and consequence, then call chronicle directly."
 
     let private bloggerChronicleTextModelPrefixes: string list = [ "step-3.5-flash" ]
 

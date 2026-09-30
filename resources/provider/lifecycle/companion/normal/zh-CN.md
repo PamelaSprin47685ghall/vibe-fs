@@ -1,3 +1,6 @@
-现在调用 chronicle 工具恰好一次，写出稠密的工作日志续写。
-把续写放在 `entry` 中，将必填 tip 设为目录中的一个字段，并且不要
-输出普通助手散文。
+现在恰好调用一次 chronicle。把这段工作真正建立的状态转折完整写入五个必填字段：
+charge、occurrence、settlement、consequence 与 tip。
+
+不要写 transcript 摘要，也不要把同一句话换四种说法。occurrence 写真正发生的事，
+settlement 写现在已经成立的状态，consequence 写后续道路因此怎样改变。
+不要输出普通助手散文。

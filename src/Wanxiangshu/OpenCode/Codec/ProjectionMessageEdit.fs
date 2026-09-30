@@ -33,6 +33,22 @@ module ProjectionMessageEdit =
         |> List.choose rawPartCallId
         |> List.exists (fun callId -> Set.contains callId callIds)
 
+    let private isSyntheticMessage (message: obj) =
+        let info = ProviderWireDecode.infoObject message
+        let synthetic = ProviderWireDecode.readField info "synthetic"
+        let source = ProviderWireDecode.firstString info [ "source" ]
+
+        (not (isNull synthetic) && unbox<bool> synthetic)
+        || source = Some "companion-memory"
+
+    let private isPhysicalUserMessage (message: obj) =
+        let info = ProviderWireDecode.infoObject message
+
+        ProviderWireDecode.firstString info [ "role" ]
+        |> Option.exists (fun role ->
+            String.Equals(role, "user", StringComparison.OrdinalIgnoreCase)
+            && not (isSyntheticMessage message))
+
     let private syntheticHead (syntheticId: string) (memory: string) =
         createObj
             [ "info",
@@ -64,7 +80,8 @@ module ProjectionMessageEdit =
         let survivesReplacement message =
             match ProviderWireDecode.hostMessageId message with
             | Some messageId when Set.contains messageId coveredIds ->
-                messageCarriesAnyCall retainedAssumeCallIds message
+                isPhysicalUserMessage message
+                || messageCarriesAnyCall retainedAssumeCallIds message
             | _ -> true
 
         let surviving = rawMessages |> List.filter survivesReplacement

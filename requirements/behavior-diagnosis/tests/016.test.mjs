@@ -109,6 +109,13 @@ const TIP_X = 'primitive-obsession'
 const TIP_Y = 'ignored-tdd'
 const WORK_LOG_A = readFileSync(join(FIXTURES, 'observation-a-work-log.txt'), 'utf8').trim()
 const WORK_LOG_B = readFileSync(join(FIXTURES, 'observation-b-work-log.txt'), 'utf8').trim()
+const structuredCall = (occurrence, tip) => ({
+  charge: 'Preserve the meaningful transition represented by this historical observation.',
+  occurrence,
+  settlement: 'The observation remains part of the durable paired history.',
+  consequence: 'Later selection may compare new material against this established transition.',
+  tip,
+})
 const NEW_MATERIAL_SIMILAR_TO_A = `[[new_work_to_record]]
 assistant = "Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。"
 `
@@ -210,10 +217,10 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_002_observations_a_and_b_c
     ],
   )
 
-  const decodedX = enforcer.decodeCall({ text: WORK_LOG_A, tip: TIP_X })
+  const decodedX = enforcer.decodeCall(structuredCall(WORK_LOG_A, TIP_X))
   assert.equal(decodedX.ok, true)
   assert.equal(decodedX.value.tip.fieldName, TIP_X)
-  const decodedY = enforcer.decodeCall({ text: WORK_LOG_B, tip: TIP_Y })
+  const decodedY = enforcer.decodeCall(structuredCall(WORK_LOG_B, TIP_Y))
   assert.equal(decodedY.ok, true)
   assert.equal(decodedY.value.tip.fieldName, TIP_Y)
 })
@@ -267,7 +274,7 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_ti
   assert.equal(plan.messages.at(-1).isPhysical, true)
   assert.ok(plan.messages.at(-1).text.includes(NEW_MATERIAL_SIMILAR_TO_A))
 
-  const stillSelectable = enforcer.decodeCall({ text: 'candidate continuation for similar material', tip: TIP_X })
+  const stillSelectable = enforcer.decodeCall(structuredCall('candidate continuation for similar material', TIP_X))
   assert.equal(stillSelectable.ok, true, 'catalog must still admit tip X for a possible true repeat')
 })
 test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_004_history_visibility_is_proved_without_a_true_repeat_oracle', () => {

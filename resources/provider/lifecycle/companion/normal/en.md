@@ -1,3 +1,8 @@
-Write the dense work-log continuation now by calling the chronicle tool exactly once.
-Put the continuation in `entry`, set required tip to one catalog field, and do not
-output ordinary assistant prose.
+Call the chronicle tool exactly once now. Record the meaningful state transition
+established by this work in all five required fields:
+charge, occurrence, settlement, consequence, and tip.
+
+Do not write a transcript summary. Do not repeat one sentence across the four
+content fields. Use occurrence for what materially happened, settlement for what
+is now established, and consequence for how the continuing road changed.
+Output no ordinary assistant prose.

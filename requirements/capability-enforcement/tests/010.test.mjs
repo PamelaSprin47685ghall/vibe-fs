@@ -391,7 +391,7 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
       fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       resume: ['name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
-      chronicle: ['entry', 'tip'],
+      chronicle: ['charge', 'occurrence', 'settlement', 'consequence', 'tip'],
       'bash-honeypot': [],
       assume: ['assumption'],
       enough: ['decision'],

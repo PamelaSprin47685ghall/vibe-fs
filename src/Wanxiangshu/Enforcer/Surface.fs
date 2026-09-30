@@ -58,10 +58,19 @@ module EnforcerSurface =
                lexicalOrder = tip.LexicalOrder |}
 
     let private callToJs (call: EnforcerCodec.CanonicalBlogCall) : obj =
-        box
-            {| text = call.Text |> Option.toObj
-               evidence = call.Evidence |> Option.toObj
-               tip = tipToJs call.Tip |}
+        match call.Content with
+        | EnforcerCodec.ChronicleContent.Structured record ->
+            createObj
+                [ "charge", box record.Charge
+                  "occurrence", box record.Occurrence
+                  "settlement", box record.Settlement
+                  "consequence", box record.Consequence
+                  "tip", tipToJs call.Tip ]
+        | EnforcerCodec.ChronicleContent.Legacy(text, evidence) ->
+            createObj
+                [ "text", box text
+                  "evidence", evidence |> Option.map box |> Option.defaultValue null
+                  "tip", tipToJs call.Tip ]
 
     let private cycleToJs (cycle: EnforcerCycle.CanonicalCycle) : obj =
         box
@@ -121,16 +130,8 @@ module EnforcerSurface =
             elif isNullish rawTip?fieldName then rawTip
             else rawTip?fieldName
 
-        let decoded =
-            EnforcerCodec.decodeCall
-                (rulebook ())
-                (rawArgs (
-                    box
-                        {| entry = value?text
-                           text = value?text
-                           tip = tip
-                           evidence = value?evidence |}
-                ))
+        let args = rawArgs value |> Map.add "tip" tip
+        let decoded = EnforcerCodec.decodeCall (rulebook ()) args
 
         match decoded with
         | Ok call -> EnforcerCodec.hasValidText call

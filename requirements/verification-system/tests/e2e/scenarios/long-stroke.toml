@@ -357,7 +357,7 @@ internal = true
 user = "# Protocol repair"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Protocol repair.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Protocol repair.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
 # A Continue retirement opens the next iteration on the same session: system, tools
 # and root authority stay fixed, the predecessor's history is retained in order, and
@@ -683,172 +683,172 @@ internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Long stroke.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Long stroke continued.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke continued.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 2.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 2.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 3.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 3.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 4.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 4.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 5.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 5.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 6.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 6.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 7.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 7.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 8.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 8.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 9.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 9.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 10.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 10.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 11.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 11.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 12.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 12.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 13.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 13.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 14.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 14.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 15.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 15.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 16.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 16.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 17.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 17.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 18.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 18.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 19.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 19.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 20.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 20.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 21.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 21.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 22.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 22.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 23.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 23.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 24.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 24.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 25.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 25.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 26.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 26.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 27.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 27.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 28.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 28.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 29.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 29.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 30.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 30.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 31.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 31.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 32.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 32.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 33.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 33.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 34.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 34.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 35.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 35.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 36.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 36.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 37.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 37.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 38.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 38.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 39.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 39.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 40.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 40.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 41.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 41.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 42.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 42.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 43.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 43.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 44.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 44.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 45.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 45.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 46.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 46.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 47.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 47.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 48.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 48.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 49.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 49.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 50.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 50.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 51.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 51.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 52.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 52.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 53.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 53.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 54.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 54.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { entry = "Blogger cycle 55.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 55.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
 
 
 [[epoch]]

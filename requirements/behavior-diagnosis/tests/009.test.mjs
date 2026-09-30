@@ -7,7 +7,17 @@ test('WHAT[behavior-diagnosis-009] actual cycle decoder accepts one completed ca
   assert.equal(single.decodedCalls, 1)
   assert.deepEqual(single.decision, {
     ok: true,
-    value: { text: 'work', evidence: 'proof', ruleId: 'primitive-obsession', toolCallIds: ['call-1'] },
+    value: {
+      text: [
+        'charge:\nresolve the current question',
+        'occurrence:\nwork',
+        'settlement:\nresult settled',
+        'consequence:\ncontinue on the settled path',
+      ].join('\n\n'),
+      evidence: '',
+      ruleId: 'primitive-obsession',
+      toolCallIds: ['call-1'],
+    },
   })
   for (const parts of [[], [call(), call({ callID: 'call-2' })]]) {
     assert.equal(decode(parts).decision.ok, false)

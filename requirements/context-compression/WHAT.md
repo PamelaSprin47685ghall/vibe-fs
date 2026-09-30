@@ -64,9 +64,11 @@ Blogger 处于 busy 状态、请求失败、结果为空或为纯 XML 时，严�
 
 Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产物，严禁使用 RawGap。CoverableTurnCutoffExclusive 仅在完整 Host turn 边界推进。
 
-## [017] 只有真实 Opening 构成不可压缩 floor
+## [017] 所有真实用户消息永久 raw；Opening floor 独立保留
 
-真实 Opening 消息永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。same-session FrozenRecordPrefix 必须采用 `includeOpening=false`；其 canonical WorkRecord 仍保存 Opening 事实，但 provider write-back 必须通过 XTrace stable Host identity 明确保留 raw Opening，而不是把 Opening 复制进 Y memory 后删除原消息。Manager 是否已到 T1 不得改变压缩 floor；pre-T1 与 post-T1 普通工作历史一视同仁，Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`，其中 `Life.WorkRecordStart` 仅表示真实 Opening 之后的首个 XTrace 位置，不再扩张到动态 XTrace head 或 BlindPlan T1 commitment 边界。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
+任何真实 Host `role=user` 消息都不得被 Y/LWR 改写、删除或重编码；只要 prefix replacement 覆盖到它，就必须把原始 Host message 原封不动保留。该规则适用于整个会话，不只第一条消息。LWR 自己生成的 `synthetic=true` / `source=companion-memory` user-role 消息不是用户输入，不享受该豁免，后续 rebase 可以正常替换。
+
+真实 Opening 仍保留自己的生命周期 floor 语义：same-session FrozenRecordPrefix 必须采用 `includeOpening=false`；其 canonical WorkRecord 仍保存 Opening 事实，Blogger 的 effectiveStart 仍取 `max(RecordCoverage, Life.WorkRecordStart)`。但 provider write-back 保留首条 Opening 的根本理由不再是“它排在第一条”，而是：若它是真实用户消息，就由本条用户消息规则永久 raw；若还有其它真实用户消息，它们也同样永久 raw。Manager 是否已到 T1 不得改变该边界；pre-T1 与 post-T1 普通 assistant/tool 历史一视同仁。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
 
 ## [018] Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 只等待事件
 
@@ -80,7 +82,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## [020] `todowrite` 是 checkpoint，不享有永久 raw 豁免
 
-成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因当前 `retainCheckpoints` 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，未来更大的 K 也不得把它恢复出来。真实 Opening 仍按 [017] 永久 raw。
+成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因当前 `retainCheckpoints` 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，未来更大的 K 也不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
 
 ## [021] Y retry 由失败会话当场拥有，禁止等待未来 X material
 

@@ -24,7 +24,12 @@ const interruptedBlog = (id, callId) =>
         state: {
           status: 'error',
           error: 'Tool execution aborted',
-          input: { text: 'was writing' },
+          input: {
+            charge: 'Record the interrupted Blogger transition.',
+            occurrence: 'The chronicle call was interrupted before completion.',
+            settlement: 'No Chronicle transition was committed.',
+            consequence: 'Recovery must classify interruption without inventing a failed record.',
+          },
           metadata: { interrupted: true },
           time: { start: 1, end: 2 },
         },
@@ -44,7 +49,12 @@ const erroredBlog = (id, callId) =>
         state: {
           status: 'error',
           error: 'blog tool crashed',
-          input: { text: 'was writing' },
+          input: {
+            charge: 'Record the Blogger transition.',
+            occurrence: 'The chronicle tool ended in an ordinary error.',
+            settlement: 'No successful Chronicle transition was committed.',
+            consequence: 'Recovery may classify this as a tool error rather than interruption residue.',
+          },
           time: { start: 1, end: 2 },
         },
       },
