@@ -792,7 +792,9 @@ type StrengthReplicaRuntime
         // the residency slot cleared, so the next decision for that owner builds
         // a fresh child instead of trusting a stale id.
         match liveRegistry.ReleaseResidentByReplica sessionId with
-        | Some owner -> releaseLease sessionId; ignore owner
+        | Some owner ->
+            releaseLease sessionId
+            ignore owner
         | None -> ()
 
         retireOrphanLiveBinding sessionId

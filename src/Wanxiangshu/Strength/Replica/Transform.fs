@@ -393,7 +393,9 @@ module StrengthReplicaTransform =
             if List.isEmpty allowedExchanges then
                 None
             else
-                Some { batch with Exchanges = allowedExchanges })
+                Some
+                    { batch with
+                        Exchanges = allowedExchanges })
 
     let private batchesForReplica (rawMessages: obj list) (currentWire: ProviderProjection.ProviderWireProjection) =
         let wireBatches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
@@ -594,7 +596,17 @@ module StrengthReplicaTransform =
         if not admitted then
             retireWith runtime sessions replicaSessionId "provider-request-budget-reached" batches
         else
-            applyUnderBudget sha256 binding sessionIdText output currentWire childMessages batches runtime sessions replicaSessionId
+            applyUnderBudget
+                sha256
+                binding
+                sessionIdText
+                output
+                currentWire
+                childMessages
+                batches
+                runtime
+                sessions
+                replicaSessionId
 
     let private applyWithBinding
         (sha256: string -> string)

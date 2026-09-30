@@ -199,6 +199,7 @@ module PluginHooksSurface =
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
         let jsArgs = getJsArguments ()
+
         let target =
             if jsArgs.Length = 1 && isPlainObject jsArgs[0] then
                 jsArgs[0]
@@ -208,18 +209,15 @@ module PluginHooksSurface =
                 createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
 
         match InvestigationEstimateContract.parseParticipatingArguments target with
-        | Ok (rounds, _) ->
+        | Ok(rounds, _) ->
             let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
+
             let noteVal =
-                if rawRounds = 0 then
-                    null
-                elif hasOwn target "self_note" then
-                    target?self_note
-                else
-                    null
-            box
-                {| ok = true
-                   note = noteVal |}
+                if rawRounds = 0 then null
+                elif hasOwn target "self_note" then target?self_note
+                else null
+
+            box {| ok = true; note = noteVal |}
         | Error err ->
             box
                 {| ok = false

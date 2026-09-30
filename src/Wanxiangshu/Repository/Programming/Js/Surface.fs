@@ -86,6 +86,7 @@ module JsToolGenerator =
         let roleName = "predictor"
         let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ]
         let members = membersFor jsCapabilities
+
         { ToolName = toolNameFor roleName
           RoleName = roleName
           Capabilities = jsCapabilities

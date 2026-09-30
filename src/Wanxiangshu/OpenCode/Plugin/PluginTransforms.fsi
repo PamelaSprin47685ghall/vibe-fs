@@ -19,7 +19,7 @@ module PluginTransforms =
             BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
             BindSessionStartedAt: string option -> Task<DateTimeOffset option>
             ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-    /// host-boundary-032 / restore the protocol fields
+            /// host-boundary-032 / restore the protocol fields
             /// the Host persisted away into the provider-facing request.
             RestoreProtocolArguments: obj -> Task<unit>
             ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>

@@ -263,7 +263,7 @@ module PluginHooks =
                 | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
                 | None -> ToolRuntimeScope.emptyManagerFacts
 
-    // the only enablement condition for explicit
+            // the only enablement condition for explicit
             // read-only delegation is that a Predictor model is configured.
             // The read-only configuration existence query is owned by
             // ModelRouting (ModelRouting.sharedPredictorConfiguration, loaded
@@ -453,7 +453,7 @@ module PluginHooks =
                 if ManagerReviewTools.isReviewTool toolName then
                     assertReviewPermitted toolName (toolField toolInput "sessionID")
 
-    // host-boundary-032: snapshot the protocol
+            // host-boundary-032: snapshot the protocol
             // fields the model actually produced, before either contract family
             // hides them. The Host persists the stripped arguments, so the
             // provider transform restores the fields into the request from this
@@ -598,7 +598,7 @@ module PluginHooks =
                     then
                         ManagerReviewContract.hide toolOutput?args
 
-    // host-boundary-032: narrow hide to participating tools only when predictor is configured.
+                    // host-boundary-032: narrow hide to participating tools only when predictor is configured.
                     // Non-participating and unreviewed tools are untouched, leaving their own business
                     // arguments intact. Unconfigured predictor leaves all tools untouched.
                     if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then

@@ -977,11 +977,14 @@ module StrengthSurface =
         (projection: obj)
         : obj =
         let owner = SessionId.create ownerSessionId
+
         let logicalRun =
             { LogicalRunId = LogicalRunId.create logicalRunId
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+
         let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
         let providerRun = ProviderRunIdentity.create sourceProviderRun
+
         match
             StrengthProjection.tryCandidateBySource
                 owner
@@ -1002,11 +1005,14 @@ module StrengthSurface =
         (projection: obj)
         : obj =
         let owner = SessionId.create ownerSessionId
+
         let logicalRun =
             { LogicalRunId = LogicalRunId.create logicalRunId
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+
         let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
         let providerRun = ProviderRunIdentity.create sourceProviderRun
+
         match
             StrengthProjection.tryCandidateBySource
                 owner
@@ -1023,8 +1029,7 @@ module StrengthSurface =
             | StrengthCandidateState.Bound
             | StrengthCandidateState.Prepared
             | StrengthCandidateState.Promoted
-            | StrengthCandidateState.Traced ->
-                box (ReadonlyRoundBudget.value view.Request.RequestedRounds)
+            | StrengthCandidateState.Traced -> box (ReadonlyRoundBudget.value view.Request.RequestedRounds)
             | StrengthCandidateState.Abandoned -> null
         | None -> null
 

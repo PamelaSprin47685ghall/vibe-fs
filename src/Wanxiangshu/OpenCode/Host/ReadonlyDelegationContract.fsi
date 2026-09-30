@@ -22,7 +22,7 @@ module ReadonlyDelegationContract =
     /// accepted only when identical to this protocol; a conflicting
     /// property, a non-array required, or a root schema that cannot be
     /// legally extended fails loudly instead of publishing a partial
-    /// protocol. The stable bilingual outlook prose 
+    /// protocol. The stable bilingual outlook prose
     /// is appended once to the tool description, selected by the existing
     /// ProviderLanguageBinding preference; it never carries remaining
     /// rounds, random identifiers, prices or timestamps.

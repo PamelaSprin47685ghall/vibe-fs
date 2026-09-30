@@ -49,8 +49,7 @@ module StrengthReplicaTools =
     /// comes before the single specific allow so Host's last-match permission rule
     /// lets exactly `js-predictor` through and nothing else -- the replica has no
     /// read/glob/grep; all investigation goes through the readonly JS surface.
-    let exactReadonlyHostToolMap =
-        Map.ofList [ "*", false; "js-predictor", true ]
+    let exactReadonlyHostToolMap = Map.ofList [ "*", false; "js-predictor", true ]
 
     let isExactReadonly (capabilities: Set<ToolPermission>) =
         capabilities = set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
@@ -127,7 +126,10 @@ type StrengthRuntime() =
             let owner =
                 residentByOwner
                 |> Seq.tryPick (fun entry ->
-                    if SessionId.value entry.Value = target then Some entry.Key else None)
+                    if SessionId.value entry.Value = target then
+                        Some entry.Key
+                    else
+                        None)
 
             match owner with
             | Some ownerKey ->

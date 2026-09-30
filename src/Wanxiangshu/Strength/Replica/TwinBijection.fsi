@@ -15,13 +15,18 @@ module TwinBijection =
 
     /// Restore the replica's speech into the child-recorded gaps. Never refuses,
     /// never drops speech; the owner skeleton keeps its order and its count.
-    val restore: child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> ProviderProjection.WireMessage list
+    val restore:
+        child: ProviderProjection.WireMessage list ->
+        owner: ProviderProjection.WireMessage list ->
+            ProviderProjection.WireMessage list
 
     /// The owner's own call sequence survives restoration unchanged.
-    val preservesOwnerOrder: child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> bool
+    val preservesOwnerOrder:
+        child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> bool
 
     /// No message is fabricated: the result is drawn only from owner or child speech.
-    val introducesNothing: child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> bool
+    val introducesNothing:
+        child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> bool
 
     /// Restoration never reduces the number of speech messages.
     val dropsNoSpeech: child: ProviderProjection.WireMessage list -> owner: ProviderProjection.WireMessage list -> bool
@@ -42,9 +47,6 @@ module TwinBijectionSurface =
     val preservesOwnerOrder: child: obj array -> owner: obj array -> bool
     val introducesNothing: child: obj array -> owner: obj array -> bool
     val dropsNoSpeech: child: obj array -> owner: obj array -> bool
+
     val extensionIsPrefix:
-        childBefore: obj array ->
-        ownerBefore: obj array ->
-        childAfter: obj array ->
-        ownerAfter: obj array ->
-            bool
+        childBefore: obj array -> ownerBefore: obj array -> childAfter: obj array -> ownerAfter: obj array -> bool

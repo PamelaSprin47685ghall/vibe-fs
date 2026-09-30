@@ -41,8 +41,7 @@ type StrengthProjectionIntentError =
 module StrengthProjectionIntent =
     /// The owner's final request for this decision, used as the replica's message base.
     val projectionMirror:
-        localizedRows: ProjectionMessageRow list ->
-            Result<ProjectionIntent, StrengthProjectionIntentError>
+        localizedRows: ProjectionMessageRow list -> Result<ProjectionIntent, StrengthProjectionIntentError>
 
 
     val candidate:
@@ -98,6 +97,7 @@ type StrengthProjectionError =
 module StrengthProjection =
     val empty: StrengthProjection
     val tryCandidate: decisionId: StrengthDecisionId -> projection: StrengthProjection -> StrengthDelegationView option
+
     val tryCandidateBySource:
         ownerSessionId: SessionId ->
         ownerLogicalRun: OwnerLogicalRunIdentity ->
@@ -105,6 +105,7 @@ module StrengthProjection =
         sourceProviderRun: ProviderRunIdentity ->
         projection: StrengthProjection ->
             StrengthDelegationView option
+
     val hasPrepared: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
     val isPromoted: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
 
