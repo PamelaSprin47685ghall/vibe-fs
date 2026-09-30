@@ -21,6 +21,15 @@ const requestValue = {
   contractRevision: 2,
 }
 
+const opportunity = {
+  isRootWork: true, requestKind: 'work-main', canonicalRole: 'engineer', ownerSessionId: 'owner',
+  ownerLogicalRun: ['logical-1', 'authority-root-1'], sourcePhysicalUserMessageId: 'user-1',
+  sourceProviderRun: 'run-1', sourceToolCallIds: ['call-1'], requestedRounds: 1, contractRevision: 2,
+  hasPrefixProbe: false, isReplicaOrInternalLeaf: false, isInteractionRepair: false, isExplicitRecoveryBranch: false,
+  ownerCancelled: false, targetProviderRunBound: true, eventStoreHealthy: true, hostBoundaryHealthy: true,
+  processFuseHealthy: true, ownerLogicalRunSuperseded: false, pendingRequested: true, predictorConfigured: true,
+}
+
 test('WHAT[speculative-investigation-012] STRENGTH_012_the_delegation_carries_no_trust_score_or_rating_field', () => {
   let projection = Strength.projectionEmpty()
   const applied = Strength.projectionApply(projection, Strength.eventRequested(requestValue))
@@ -81,15 +90,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_candidate_and_promoted_se
   }
 })
 
-const opportunity = {
-  isRootWork: true, requestKind: 'work-main', canonicalRole: 'engineer', ownerSessionId: 'owner',
-  ownerLogicalRun: ['logical-1', 'authority-root-1'], sourcePhysicalUserMessageId: 'user-1',
-  sourceProviderRun: 'run-1', sourceToolCallIds: ['call-1'], requestedRounds: 1, contractRevision: 2,
-  hasPrefixProbe: false, isReplicaOrInternalLeaf: false, isInteractionRepair: false, isExplicitRecoveryBranch: false,
-  ownerCancelled: false, targetProviderRunBound: true, eventStoreHealthy: true, hostBoundaryHealthy: true,
-  processFuseHealthy: true, ownerLogicalRunSuperseded: false, pendingRequested: true, predictorConfigured: true,
-}
-
 test('WHAT[speculative-investigation-012] STRENGTH_012_a_plain_text_answer_ends_early_and_never_becomes_material', async () => {
   // WHAT[012]: the companion's prose, reasoning and summary are never returned;
   // a pure text answer is an early-end signal, not material the master is asked
@@ -130,7 +130,9 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
   assert.equal(resZero.tag, 0, '0 rounds omitting self_note must succeed')
   assert.equal(resZero.fields[0][1], undefined, 'parsed note must be undefined/None')
 
-  const helperZero = PluginHooksSurface.readonlyDelegationSelfNoteOf(0)
+  const helperZero = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    estimated_readonly_rounds: 0,
+  })
   assert.deepEqual(helperZero, { ok: true, note: null })
 
   // 2. Zero rounds with self_note present: rejected as NotePresentWhenZero (tag 3)
@@ -140,9 +142,10 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
       self_note: badNote,
     })
     assert.equal(res.tag, 1, `0 rounds with self_note=${JSON.stringify(badNote)} must fail`)
-    assert.equal(res.fields[0].tag, 3, 'error must be NotePresentWhenZero (tag 3)')
-
-    const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf(0, badNote)
+    const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+      estimated_readonly_rounds: 0,
+      self_note: badNote,
+    })
     assert.deepEqual(helperRes, { ok: false, error: 'NotePresentWhenZero' })
   }
 
@@ -159,7 +162,10 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     assert.equal(res.tag, 0, `positive rounds with note "${goodNote}" must succeed`)
     assert.equal(res.fields[0][1], goodNote, 'original note string must be preserved verbatim')
 
-    const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf(2, goodNote)
+    const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+      estimated_readonly_rounds: 2,
+      self_note: goodNote,
+    })
     assert.deepEqual(helperRes, { ok: true, note: goodNote })
   }
 
@@ -169,8 +175,9 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     estimated_readonly_rounds: 2,
   })
   assert.equal(resMissing.tag, 1, 'positive rounds missing self_note must fail')
-  assert.equal(resMissing.fields[0].tag, 4, 'error must be MissingOrBlankNoteWhenPositive (tag 4)')
-  assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf(2), {
+  assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    estimated_readonly_rounds: 2,
+  }), {
     ok: false,
     error: 'MissingOrBlankNoteWhenPositive',
   })
@@ -182,8 +189,10 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
       self_note: blankNote,
     })
     assert.equal(res.tag, 1, `positive rounds with blank self_note=${JSON.stringify(blankNote)} must fail`)
-    assert.equal(res.fields[0].tag, 4, 'error must be MissingOrBlankNoteWhenPositive (tag 4)')
-    assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf(2, blankNote), {
+    assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
+      estimated_readonly_rounds: 2,
+      self_note: blankNote,
+    }), {
       ok: false,
       error: 'MissingOrBlankNoteWhenPositive',
     })
@@ -196,21 +205,24 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
       self_note: nonString,
     })
     assert.equal(res.tag, 1, `positive rounds with non-string self_note=${JSON.stringify(nonString)} must fail`)
-    assert.equal(res.fields[0].tag, 5, 'error must be NoteNotString (tag 5)')
-    assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf(2, nonString), {
+    assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
+      estimated_readonly_rounds: 2,
+      self_note: nonString,
+    }), {
       ok: false,
       error: 'NoteNotString',
     })
   }
 
-  // 6. Sentinel: mixing legacy field delegate_readonly_rounds is rejected as MixedProtocolFields (tag 6)
+  // 6. Sentinel: mixing legacy field delegate_readonly_rounds is rejected as MixedProtocolFields
   for (const mixedArgs of [
     { delegate_readonly_rounds: 2, self_note: 'note' },
     { estimated_readonly_rounds: 2, delegate_readonly_rounds: 2, self_note: 'note' },
   ]) {
     const res = InvestigationEstimateContract.parseParticipatingArguments(mixedArgs)
     assert.equal(res.tag, 1, 'mixing legacy field delegate_readonly_rounds must fail')
-    assert.equal(res.fields[0].tag, 6, 'error must be MixedProtocolFields (tag 6)')
+    const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf(mixedArgs)
+    assert.deepEqual(helperRes, { ok: false, error: 'MixedProtocolFields' })
   }
 
   // Recorded call evidence stays verbatim and forms complete batch

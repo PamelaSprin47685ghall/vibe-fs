@@ -6,6 +6,8 @@ const { default: test } = await import("node:test");
 const rawContract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
 const rawBudget = await import("../../../dist/Strength/Budget.js");
 const rawReadonlyContract = await import("../../../dist/OpenCode/Host/ReadonlyDelegationContract.js");
+const rawPluginHooksSurface = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
+const PluginHooksSurface = rawPluginHooksSurface;
 const rawStaticTools = await import("../../../dist/OpenCode/Tools/StaticTools.js");
 const rawPluginHooks = await import("../../../dist/OpenCode/Plugin/PluginHooks.js");
 const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
@@ -117,6 +119,8 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   });
   assert.equal(resEmpty.tag, 1, 'should fail');
   assert.equal(resEmpty.fields[0].tag, 3, 'NotePresentWhenZero tag is 3');
+  assert.equal(Contract.describeArgumentErrorZh(resEmpty.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
+  assert.equal(Contract.describeArgumentErrorEn(resEmpty.fields[0]), 'self_note must be omitted when estimated_readonly_rounds is 0');
 
   // whitespace
   const resWs = Contract.parseParticipatingArguments({
@@ -125,6 +129,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   });
   assert.equal(resWs.tag, 1);
   assert.equal(resWs.fields[0].tag, 3);
+  assert.equal(Contract.describeArgumentErrorZh(resWs.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
 
   // null
   const resNull = Contract.parseParticipatingArguments({
@@ -133,6 +138,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   });
   assert.equal(resNull.tag, 1);
   assert.equal(resNull.fields[0].tag, 3);
+  assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
 
   // own-property with undefined value
   const objWithUndef = { estimated_readonly_rounds: 0 };
@@ -140,6 +146,14 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   const resUndef = Contract.parseParticipatingArguments(objWithUndef);
   assert.equal(resUndef.tag, 1);
   assert.equal(resUndef.fields[0].tag, 3, 'own-property undefined must be rejected as NotePresentWhenZero');
+  assert.equal(Contract.describeArgumentErrorZh(resUndef.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
+  assert.equal(Contract.describeArgumentErrorEn(resUndef.fields[0]), 'self_note must be omitted when estimated_readonly_rounds is 0');
+
+  // Surface helper verification per DELEGATE_REVISE.md §4.1:
+  // "真实 JSON 中省略属性与提供 null 不等价。直接 JS 单元测试还应覆盖“自有属性存在但值为 undefined”；
+  // 本稿按出现了字段处理，零值时拒绝。校验存在性用 own-property 证据，不用 value == null 混淆。"
+  const helperUndef = PluginHooksSurface.readonlyDelegationSelfNoteOf(objWithUndef);
+  assert.deepEqual(helperUndef, { ok: false, error: 'NotePresentWhenZero' });
 });
 
 test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank or non-string self_note', () => {
@@ -149,6 +163,8 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resMissing.tag, 1);
   assert.equal(resMissing.fields[0].tag, 4, 'MissingOrBlankNoteWhenPositive tag is 4');
+  assert.equal(Contract.describeArgumentErrorZh(resMissing.fields[0]), '正数估计需要非空的后续查证展望');
+  assert.equal(Contract.describeArgumentErrorEn(resMissing.fields[0]), 'A positive estimate requires a non-empty self_note outlook');
 
   // empty string note
   const resEmpty = Contract.parseParticipatingArguments({
@@ -157,6 +173,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resEmpty.tag, 1);
   assert.equal(resEmpty.fields[0].tag, 4);
+  assert.equal(Contract.describeArgumentErrorZh(resEmpty.fields[0]), '正数估计需要非空的后续查证展望');
 
   // blank whitespace note
   const resBlank = Contract.parseParticipatingArguments({
@@ -165,6 +182,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resBlank.tag, 1);
   assert.equal(resBlank.fields[0].tag, 4);
+  assert.equal(Contract.describeArgumentErrorZh(resBlank.fields[0]), '正数估计需要非空的后续查证展望');
 
   // non-string note: number
   const resNum = Contract.parseParticipatingArguments({
@@ -173,6 +191,8 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resNum.tag, 1);
   assert.equal(resNum.fields[0].tag, 5, 'NoteNotString tag is 5');
+  assert.equal(Contract.describeArgumentErrorZh(resNum.fields[0]), 'self_note 必须为字符串类型');
+  assert.equal(Contract.describeArgumentErrorEn(resNum.fields[0]), 'self_note must be a string');
 
   // non-string note: boolean
   const resBool = Contract.parseParticipatingArguments({
@@ -181,6 +201,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resBool.tag, 1);
   assert.equal(resBool.fields[0].tag, 5);
+  assert.equal(Contract.describeArgumentErrorZh(resBool.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: object
   const resObj = Contract.parseParticipatingArguments({
@@ -189,6 +210,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resObj.tag, 1);
   assert.equal(resObj.fields[0].tag, 5);
+  assert.equal(Contract.describeArgumentErrorZh(resObj.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: array
   const resArr = Contract.parseParticipatingArguments({
@@ -197,6 +219,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resArr.tag, 1);
   assert.equal(resArr.fields[0].tag, 5);
+  assert.equal(Contract.describeArgumentErrorZh(resArr.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: null
   const resNull = Contract.parseParticipatingArguments({
@@ -205,6 +228,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
   });
   assert.equal(resNull.tag, 1);
   assert.equal(resNull.fields[0].tag, 5);
+  assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'self_note 必须为字符串类型');
 });
 
 test('WHAT[speculative-investigation-016] native number checks and range validation reject invalid values', () => {
@@ -214,6 +238,8 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resNeg.tag, 1);
   assert.equal(resNeg.fields[0].tag, 2, 'InvalidRange tag is 2');
+  assert.equal(Contract.describeArgumentErrorZh(resNeg.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
+  assert.equal(Contract.describeArgumentErrorEn(resNeg.fields[0]), 'estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647');
 
   // fractional / float
   const resFloat = Contract.parseParticipatingArguments({
@@ -222,6 +248,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resFloat.tag, 1);
   assert.equal(resFloat.fields[0].tag, 2);
+  assert.equal(Contract.describeArgumentErrorZh(resFloat.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // out of range (> 2147483647)
   const resOverflow = Contract.parseParticipatingArguments({
@@ -230,6 +257,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resOverflow.tag, 1);
   assert.equal(resOverflow.fields[0].tag, 2);
+  assert.equal(Contract.describeArgumentErrorZh(resOverflow.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // string number (no string coercion)
   const resStr = Contract.parseParticipatingArguments({
@@ -238,6 +266,8 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resStr.tag, 1);
   assert.equal(resStr.fields[0].tag, 1, 'WrongNumberType tag is 1');
+  assert.equal(Contract.describeArgumentErrorZh(resStr.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
+  assert.equal(Contract.describeArgumentErrorEn(resStr.fields[0]), 'estimated_readonly_rounds must be a number');
 
   // boolean
   const resBool = Contract.parseParticipatingArguments({
@@ -246,6 +276,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resBool.tag, 1);
   assert.equal(resBool.fields[0].tag, 1);
+  assert.equal(Contract.describeArgumentErrorZh(resBool.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // array
   const resArr = Contract.parseParticipatingArguments({
@@ -254,6 +285,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resArr.tag, 1);
   assert.equal(resArr.fields[0].tag, 1);
+  assert.equal(Contract.describeArgumentErrorZh(resArr.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // object
   const resObj = Contract.parseParticipatingArguments({
@@ -262,6 +294,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resObj.tag, 1);
   assert.equal(resObj.fields[0].tag, 1);
+  assert.equal(Contract.describeArgumentErrorZh(resObj.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // NaN
   const resNaN = Contract.parseParticipatingArguments({
@@ -270,6 +303,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resNaN.tag, 1);
   assert.equal(resNaN.fields[0].tag, 2);
+  assert.equal(Contract.describeArgumentErrorZh(resNaN.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // Infinity
   const resInf = Contract.parseParticipatingArguments({
@@ -278,6 +312,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resInf.tag, 1);
   assert.equal(resInf.fields[0].tag, 2);
+  assert.equal(Contract.describeArgumentErrorZh(resInf.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // null
   const resNull = Contract.parseParticipatingArguments({
@@ -286,11 +321,14 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
   });
   assert.equal(resNull.tag, 1);
   assert.equal(resNull.fields[0].tag, 1);
+  assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // missing
   const resMissing = Contract.parseParticipatingArguments({});
   assert.equal(resMissing.tag, 1);
   assert.equal(resMissing.fields[0].tag, 0, 'MissingEstimate tag is 0');
+  assert.equal(Contract.describeArgumentErrorZh(resMissing.fields[0]), '必须提供 estimated_readonly_rounds 估计字段');
+  assert.equal(Contract.describeArgumentErrorEn(resMissing.fields[0]), 'The estimated_readonly_rounds field must be provided');
 });
 
 test('WHAT[speculative-investigation-016] protocol field mixing and legacy field rejection', () => {
@@ -301,6 +339,8 @@ test('WHAT[speculative-investigation-016] protocol field mixing and legacy field
   });
   assert.equal(resLegacy.tag, 1);
   assert.equal(resLegacy.fields[0].tag, 6, 'MixedProtocolFields tag is 6');
+  assert.equal(Contract.describeArgumentErrorZh(resLegacy.fields[0]), '不得携带旧协议字段 delegate_readonly_rounds');
+  assert.equal(Contract.describeArgumentErrorEn(resLegacy.fields[0]), 'The legacy delegate_readonly_rounds field must not be used');
 
   // Both legacy and new fields
   const resBoth = Contract.parseParticipatingArguments({
@@ -310,6 +350,8 @@ test('WHAT[speculative-investigation-016] protocol field mixing and legacy field
   });
   assert.equal(resBoth.tag, 1);
   assert.equal(resBoth.fields[0].tag, 6);
+  assert.equal(Contract.describeArgumentErrorZh(resBoth.fields[0]), '不得携带旧协议字段 delegate_readonly_rounds');
+  assert.equal(Contract.describeArgumentErrorEn(resBoth.fields[0]), 'The legacy delegate_readonly_rounds field must not be used');
 });
 
 test('WHAT[speculative-investigation-016] invalid argument container (not a plain object) is rejected', () => {
@@ -317,6 +359,133 @@ test('WHAT[speculative-investigation-016] invalid argument container (not a plai
     const res = Contract.parseParticipatingArguments(bad);
     assert.equal(res.tag, 1);
     assert.equal(res.fields[0].tag, 7, 'InvalidArgumentObject tag is 7');
+    assert.equal(Contract.describeArgumentErrorZh(res.fields[0]), '工具参数必须为合法的普通对象');
+    assert.equal(Contract.describeArgumentErrorEn(res.fields[0]), 'Tool arguments must be a valid plain object');
+  }
+});
+
+test('WHAT[speculative-investigation-016] 8 error categories map to bilingual input rule explanations preserving distinctiveness', () => {
+  const expectedZh = [
+    '必须提供 estimated_readonly_rounds 估计字段',
+    'estimated_readonly_rounds 必须为数字类型',
+    'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数',
+    'estimated_readonly_rounds 为 0 时必须省略 self_note',
+    '正数估计需要非空的后续查证展望',
+    'self_note 必须为字符串类型',
+    '不得携带旧协议字段 delegate_readonly_rounds',
+    '工具参数必须为合法的普通对象',
+  ];
+  const expectedEn = [
+    'The estimated_readonly_rounds field must be provided',
+    'estimated_readonly_rounds must be a number',
+    'estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647',
+    'self_note must be omitted when estimated_readonly_rounds is 0',
+    'A positive estimate requires a non-empty self_note outlook',
+    'self_note must be a string',
+    'The legacy delegate_readonly_rounds field must not be used',
+    'Tool arguments must be a valid plain object',
+  ];
+
+  for (let tag = 0; tag < 8; tag++) {
+    const errorObj = { tag };
+    assert.equal(Contract.describeArgumentErrorZh(errorObj), expectedZh[tag]);
+    assert.equal(Contract.describeArgumentErrorEn(errorObj), expectedEn[tag]);
+  }
+
+  // Ensure all 8 Chinese and English messages are distinct
+  assert.equal(new Set(expectedZh).size, 8, 'all 8 Chinese error messages must be distinct');
+  assert.equal(new Set(expectedEn).size, 8, 'all 8 English error messages must be distinct');
+});
+
+test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive error explaining input rule instead of raw enum %A', async () => {
+  const boot = {
+    Scope: { RecordCompactionSettingGap: () => {}, DisposeAsync: async () => {}, Sessions: { SessionParents: new Map(), Companions: new Map() } },
+    Journal: null,
+    WorkspaceDirectory: null,
+    Input: null,
+    ProtocolArgumentVault: null,
+  };
+  const host = {
+    Wired: { ChatMessageHook: () => () => {}, ObserveEvent: () => {} },
+    SessionPort: null,
+    SnapshotOpt: null,
+    EventPort: null,
+  };
+  const hooks = await rawPluginHooks.create(boot, host, async () => {});
+  const toolBefore = hooks['tool.execute.before'];
+
+  // Case 1: When Predictor is configured, participating tools are unconditionally validated
+  globalThis.__wanxiangshu_test_predictor_state = 'configured';
+  try {
+    // 1a: zero estimate carrying self_note is rejected with descriptive message
+    await assert.rejects(
+      async () => {
+        await toolBefore(
+          { tool: 'read', sessionID: 'ses-test-err', callID: 'call-err' },
+          { args: { filePath: 'test.fs', estimated_readonly_rounds: 0, self_note: 'bad note' } }
+        );
+      },
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.ok(err.message.includes('Invalid investigation estimate arguments:'));
+        assert.ok(
+          err.message.includes('estimated_readonly_rounds 为 0 时必须省略 self_note') ||
+          err.message.includes('self_note must be omitted when estimated_readonly_rounds is 0')
+        );
+        assert.ok(!err.message.includes('NotePresentWhenZero'), 'error must not leak raw F# enum name NotePresentWhenZero');
+        return true;
+      },
+      'toolBefore must throw descriptive error instead of raw enum'
+    );
+
+    // 1b: completely omitted estimated_readonly_rounds for participating tool is rejected as MissingEstimate
+    await assert.rejects(
+      async () => {
+        await toolBefore(
+          { tool: 'read', sessionID: 'ses-test-missing', callID: 'call-missing' },
+          { args: { filePath: 'test.fs' } }
+        );
+      },
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.ok(err.message.includes('Invalid investigation estimate arguments:'));
+        assert.ok(
+          err.message.includes('必须提供 estimated_readonly_rounds 估计字段') ||
+          err.message.includes('The estimated_readonly_rounds field must be provided')
+        );
+        assert.ok(!err.message.includes('MissingEstimate'), 'error must not leak raw F# enum name MissingEstimate');
+        return true;
+      },
+      'toolBefore must reject completely omitted estimated_readonly_rounds for participating tool'
+    );
+  } finally {
+    delete globalThis.__wanxiangshu_test_predictor_state;
+  }
+
+  // Case 2: When Predictor is unconfigured, toolBefore does NOT validate or hide, args pass through intact
+  globalThis.__wanxiangshu_test_predictor_state = 'unconfigured';
+  try {
+    const unconfiguredOutput = {
+      args: { filePath: 'test.fs', estimated_readonly_rounds: 0, self_note: 'bad note' },
+    };
+    // Must NOT reject even with invalid protocol fields because Predictor is not configured
+    await toolBefore(
+      { tool: 'read', sessionID: 'ses-unconf', callID: 'call-unconf' },
+      unconfiguredOutput
+    );
+    // Protocol fields must NOT be hidden
+    assert.equal(unconfiguredOutput.args.estimated_readonly_rounds, 0);
+    assert.equal(unconfiguredOutput.args.self_note, 'bad note');
+
+    // Missing estimate also passes through cleanly without validation error
+    const missingOutput = { args: { filePath: 'test.fs' } };
+    await toolBefore(
+      { tool: 'read', sessionID: 'ses-unconf-2', callID: 'call-unconf-2' },
+      missingOutput
+    );
+    assert.equal(missingOutput.args.filePath, 'test.fs');
+  } finally {
+    delete globalThis.__wanxiangshu_test_predictor_state;
   }
 });
 
@@ -340,7 +509,7 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
   }
 
   // Consumer 2: 调用边界端 (PluginHooks toolBefore parameter stripping/hiding)
-  async function checkBoundaryParticipates(toolName) {
+  async function checkBoundaryParticipates(toolName, predictorConfigured = true) {
     const boot = {
       Scope: {
         RecordCompactionSettingGap: () => {},
@@ -370,10 +539,21 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
         estimated_readonly_rounds: 0,
       },
     };
-    await toolBefore({ tool: toolName, sessionID: "ses-test", callID: "call-test" }, beforeOutput);
-    // Participating tools have estimated_readonly_rounds hidden from the business view.
-    // Non-participating and unreviewed tools leave arguments intact.
-    return !("estimated_readonly_rounds" in beforeOutput.args);
+
+    if (predictorConfigured) {
+      globalThis.__wanxiangshu_test_predictor_state = "configured";
+    } else {
+      globalThis.__wanxiangshu_test_predictor_state = "unconfigured";
+    }
+
+    try {
+      await toolBefore({ tool: toolName, sessionID: "ses-test", callID: "call-test" }, beforeOutput);
+      // Under configured predictor: participating tools have estimated_readonly_rounds hidden.
+      // Under unconfigured predictor or non-participating tools: arguments are untouched.
+      return !("estimated_readonly_rounds" in beforeOutput.args);
+    } finally {
+      delete globalThis.__wanxiangshu_test_predictor_state;
+    }
   }
 
   // Consumer 3: 来源批次端 (StrengthDelegate.tryCapture -> aggregateBatchEstimate)
@@ -467,7 +647,8 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
 
   for (const { name, expected } of representativeCases) {
     const schemaAdds = checkSchemaDecoratesTool(name);
-    const boundaryParticipates = await checkBoundaryParticipates(name);
+    // Boundary with Predictor configured: participating tools hide estimated_readonly_rounds
+    const boundaryParticipates = await checkBoundaryParticipates(name, true);
     const batchReads = await checkBatchReadsEstimate(name);
 
     assert.equal(
@@ -478,7 +659,7 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
     assert.equal(
       boundaryParticipates,
       expected,
-      `Boundary hook for ${name} must yield ${expected}, got ${boundaryParticipates}`
+      `Boundary hook (configured) for ${name} must yield ${expected}, got ${boundaryParticipates}`
     );
     assert.equal(
       batchReads,
@@ -488,9 +669,161 @@ test('WHAT[speculative-investigation-016] single-source behavioral consistency a
     assert.equal(
       schemaAdds === boundaryParticipates && boundaryParticipates === batchReads,
       true,
-      `All three consumers must yield identical conclusions for tool '${name}'`
+      `All three consumers must yield identical conclusions for tool '${name}' when Predictor is configured`
+    );
+
+    // Baseline when Predictor is UNCONFIGURED: boundary must NEVER hide arguments for any tool
+    const boundaryUnconfigured = await checkBoundaryParticipates(name, false);
+    assert.equal(
+      boundaryUnconfigured,
+      false,
+      `Boundary hook (unconfigured) for ${name} must NOT hide arguments (got ${boundaryUnconfigured})`
     );
   }
+});
+
+test('WHAT[speculative-investigation-016] source batch capture rejects participating call with missing estimate as ArgumentError instead of no-estimate-opportunity', async () => {
+  const strengthScope = new rawPluginScope.PluginStrengthScope();
+  strengthScope.AttachStrengthReplicaRuntime({});
+
+  const snapshotPort = {
+    GetMessages: async () => ({
+      tag: 0,
+      fields: [[{ Id: "a-missing-1", Role: "assistant", ParentId: "u-missing-1" }]],
+    }),
+  };
+  const journal = {
+    Snapshot: () => ({
+      AgentProjections: {
+        Associations: new Map([["ses-m", [{ tag: 0 }, { tag: 0 }]]]),
+        Profiles: new Map([
+          [
+            "ses-m",
+            {
+              CanonicalRole: "engineer",
+              AuthorityKind: { tag: 0 },
+              LogicalRunId: "log-m",
+              AuthorityRootUserMessageId: "u-missing-1",
+            },
+          ],
+        ]),
+      },
+    }),
+  };
+  const durability = {
+    LoadProjection: async () => ({ tag: 0, fields: [{ ByDecision: new Map() }] }),
+    Append: async () => ({ tag: 0 }),
+  };
+
+  // Case 1: Participating tool ('read') completely omits estimated_readonly_rounds
+  const outputMissingParticipating = {
+    messages: [
+      {
+        role: "user",
+        id: "u-missing-1",
+        sessionID: "ses-m",
+        parts: [{ type: "text", text: "check file" }],
+      },
+      {
+        role: "assistant",
+        id: "a-missing-1",
+        sessionID: "ses-m",
+        parentID: "u-missing-1",
+        parts: [
+          {
+            type: "tool",
+            tool: "read",
+            callID: "call-read-missing",
+            state: {
+              status: "completed",
+              input: { filePath: "src/file.fs" }, // completely omitted estimated_readonly_rounds!
+              output: "let x = 1",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const outcomeParticipating = await rawDelegate.tryCapture(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    outputMissingParticipating
+  );
+
+  // Must fail as an ArgumentError rejection, NOT silently degrade to no-estimate-opportunity or estimated-zero
+  assert.equal(outcomeParticipating?.tag, 1, 'outcome must be Skipped');
+  const participatingReason = outcomeParticipating?.fields?.[0];
+  assert.ok(typeof participatingReason === 'string', 'skipped reason must be a string');
+  assert.notEqual(
+    participatingReason,
+    'no-estimate-opportunity',
+    'participating call with missing estimate must not silently degrade to no-estimate-opportunity'
+  );
+  assert.notEqual(
+    participatingReason,
+    'estimated-zero',
+    'participating call with missing estimate must not become estimated-zero'
+  );
+  assert.ok(
+    participatingReason.includes('rejected:') &&
+    (participatingReason.includes('estimated_readonly_rounds') || participatingReason.includes('MissingEstimate')),
+    `rejected reason must explain missing estimate: ${participatingReason}`
+  );
+
+  // Case 2: Non-participating tool ('chronicle') completely omits estimated_readonly_rounds
+  const outputMissingNonParticipating = {
+    messages: [
+      {
+        role: "user",
+        id: "u-missing-1",
+        sessionID: "ses-m",
+        parts: [{ type: "text", text: "log note" }],
+      },
+      {
+        role: "assistant",
+        id: "a-missing-1",
+        sessionID: "ses-m",
+        parentID: "u-missing-1",
+        parts: [
+          {
+            type: "tool",
+            tool: "chronicle",
+            callID: "call-chronicle-1",
+            state: {
+              status: "completed",
+              input: { note: "some note" },
+              output: "logged",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const outcomeNonParticipating = await rawDelegate.tryCapture(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    outputMissingNonParticipating
+  );
+
+  // Non-participating tool is filtered out of estimateCalls -> evaluates to no-estimate-opportunity
+  assert.equal(outcomeNonParticipating?.tag, 1, 'outcome must be Skipped');
+  assert.equal(
+    outcomeNonParticipating?.fields?.[0],
+    'no-estimate-opportunity',
+    'non-participating tool call must evaluate to no-estimate-opportunity'
+  );
 });
 
 test('WHAT[speculative-investigation-016] mechanical inventory of unreviewed tools against known tool surface', () => {

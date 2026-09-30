@@ -186,26 +186,29 @@ module PluginHooksSurface =
                    rounds = ReadonlyRoundBudget.value budget |}
         | Error message -> box {| ok = false; error = message |}
 
-    [<Emit("arguments.length > 1")>]
-    let private hasSecondArg () : bool = jsNative
-
-    [<Emit("arguments[1]")>]
-    let private getSecondArg () : obj = jsNative
+    [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
+    let private hasOwn (target: obj) (key: string) : bool = jsNative
 
     /// DELEGATE_REVISE.md 7.1/7.2: self_note validation as a JS-native result:
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
-    let readonlyDelegationSelfNoteOf (rounds: obj) : obj =
-        let hasNote = hasSecondArg ()
-        let args: obj = createEmpty
-        args?(InvestigationEstimateContract.EstimatedReadonlyRoundsField) <- rounds
-        if hasNote then
-            args?self_note <- getSecondArg ()
-        match InvestigationEstimateContract.parseParticipatingArguments args with
-        | Ok (_, noteOpt) ->
+    let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
+        match InvestigationEstimateContract.parseParticipatingArguments arguments with
+        | Ok (rounds, _) ->
+            let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
+            let noteVal =
+                if rawRounds = 0 then
+                    null
+                elif hasOwn arguments "self_note" then
+                    arguments?self_note
+                else
+                    null
             box
                 {| ok = true
-                   note = Option.toObj noteOpt |}
-        | Error err -> box {| ok = false; error = sprintf "%A" err |}
+                   note = noteVal |}
+        | Error err ->
+            box
+                {| ok = false
+                   error = InvestigationEstimateContract.errorCode err |}
 
     /// Production tool.execute.before calls the same hide: the business
     /// argument view drops both protocol fields while provider evidence keeps

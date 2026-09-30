@@ -1343,6 +1343,31 @@ const toolFunctionShape = (tool) => {
  * the Host actually sent. Missing field, note promoted to required, note text
  * gone, or history stripped each fails with the offending tool named.
  */
+export const INVESTIGATION_OUTLOOK_MARKERS = Object.freeze({
+  en: 'Investigation outlook:',
+  zh: '调查展望：',
+});
+
+/**
+ * Pure evaluator for participating tool investigation outlook description marker.
+ * Returns the matching marker string or null if neither marker is present.
+ * Strictly avoids falling back to the full description, preventing misleading
+ * legacy-narrative false alarms when decorations fail or are stripped.
+ *
+ * @param {string} description
+ * @returns {'Investigation outlook:' | '调查展望：' | null}
+ */
+export function matchInvestigationOutlookMarker(description) {
+  if (typeof description !== 'string') return null;
+  if (description.includes(INVESTIGATION_OUTLOOK_MARKERS.en)) {
+    return INVESTIGATION_OUTLOOK_MARKERS.en;
+  }
+  if (description.includes(INVESTIGATION_OUTLOOK_MARKERS.zh)) {
+    return INVESTIGATION_OUTLOOK_MARKERS.zh;
+  }
+  return null;
+}
+
 export async function assertDelegationProtocolSurface(scenario) {
   const requests = scenario.provider.requests ?? [];
   const sessionOf = (request) => request?.sessionID ?? request?.sessionId;
@@ -1412,6 +1437,22 @@ export async function assertDelegationProtocolSurface(scenario) {
           description.includes('estimated_readonly_rounds'),
           `DELEGATE 7.3: participating tool ${name} must carry the investigation outlook note`,
         );
+        const marker = matchInvestigationOutlookMarker(description);
+        assert.ok(
+          marker !== null,
+          `DELEGATE 7.3: participating tool ${name} description is missing investigation outlook marker, indicating decoration path failed or was stripped; actual prefix: ${description.slice(0, 200)}`,
+        );
+        const incrementalDescription = description.slice(description.indexOf(marker));
+        const incrementalProse = [
+          incrementalDescription,
+          properties.estimated_readonly_rounds?.description ?? '',
+          properties.self_note?.description ?? '',
+        ].join('\n');
+        assert.equal(
+          /companion|trust|retain control|同伴|信任|保留控制权/i.test(incrementalProse),
+          false,
+          `DELEGATE 7.3: participating tool ${name} incremental prose must not reintroduce legacy companion/trust narrative`,
+        );
       } else {
         assert.equal(
           properties.estimated_readonly_rounds,
@@ -1478,6 +1519,7 @@ export async function assertDelegationProtocolSurface(scenario) {
     for (const message of request?.messages ?? []) {
       if (message?.role !== 'assistant' || !Array.isArray(message?.tool_calls)) continue;
       for (const call of message.tool_calls) {
+        const name = toolNameOfCall(call);
         const args = call?.function?.arguments ?? call?.arguments;
         if (typeof args !== 'string') continue;
         let parsed = null;
@@ -1486,13 +1528,59 @@ export async function assertDelegationProtocolSurface(scenario) {
         } catch {
           continue;
         }
-        if (typeof parsed?.estimated_readonly_rounds !== 'number') continue;
-        const rounds = parsed.estimated_readonly_rounds;
-        const hasNoteProp = Object.hasOwn(parsed, 'self_note');
-        if (rounds > 0 && typeof parsed?.self_note === 'string' && parsed.self_note.trim().length > 0) {
-          retainedWithNote = true;
-        } else if (rounds === 0 && !hasNoteProp) {
-          noteLessExecuted = true;
+        if (!parsed || typeof parsed !== 'object') continue;
+
+        if (!PARTICIPATING_TOOLS.has(name)) {
+          assert.equal(
+            Object.hasOwn(parsed, 'estimated_readonly_rounds'),
+            false,
+            `DELEGATE 5.3: non-participating tool call ${name} must not carry estimated_readonly_rounds`,
+          );
+          assert.equal(
+            Object.hasOwn(parsed, 'self_note'),
+            false,
+            `DELEGATE 5.3: non-participating tool call ${name} must not carry self_note`,
+          );
+          continue;
+        }
+
+        if (Object.hasOwn(parsed, 'estimated_readonly_rounds')) {
+          assert.equal(
+            typeof parsed.estimated_readonly_rounds,
+            'number',
+            `DELEGATE 5.2: participating tool call ${name} estimated_readonly_rounds must be number`,
+          );
+          const rounds = parsed.estimated_readonly_rounds;
+          const hasNoteProp = Object.hasOwn(parsed, 'self_note');
+          if (rounds === 0) {
+            assert.equal(
+              hasNoteProp,
+              false,
+              `DELEGATE 4.1: participating tool call ${name} with estimated_readonly_rounds === 0 must omit self_note`,
+            );
+            noteLessExecuted = true;
+          } else if (rounds > 0) {
+            assert.equal(
+              typeof parsed.self_note,
+              'string',
+              `DELEGATE E5: participating tool call ${name} with positive estimated_readonly_rounds must carry string self_note`,
+            );
+            assert.ok(
+              parsed.self_note.trim().length > 0,
+              `DELEGATE E5: participating tool call ${name} with positive estimated_readonly_rounds must carry non-empty self_note`,
+            );
+            retainedWithNote = true;
+          } else {
+            assert.fail(
+              `DELEGATE 5.2: participating tool call ${name} estimated_readonly_rounds must be non-negative (got ${rounds})`,
+            );
+          }
+        } else {
+          assert.equal(
+            Object.hasOwn(parsed, 'self_note'),
+            false,
+            `DELEGATE 5.2: participating tool call ${name} must not carry self_note without estimated_readonly_rounds`,
+          );
         }
       }
     }

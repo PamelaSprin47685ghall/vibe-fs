@@ -18,12 +18,15 @@
  * Prints one JSON summary on stdout; the wrapping test asserts on it.
  */
 
+import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { classifyTool } from '../../../../dist/Strength/InvestigationEstimateContract.js'
+import { knownToolNames } from '../../../../dist/OpenCode/Tools/StaticTools.js'
 import { ProcessHost } from '../../../verification-system/tests/e2e/support/process-host.js'
 import { initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import {
@@ -51,10 +54,25 @@ const CALL_ID = 'call_read_delegated_0'
 const BUDGET = 2
 const SELF_NOTE = 'checking the canary fixture'
 
-const PARTICIPATING_TOOLS = new Set([
+const PARTICIPATING_TOOLS = new Set(
+  Array.from(knownToolNames).filter((name) => classifyTool(name).tag === 0),
+)
+
+const EXPECTED_PARTICIPATING_NAMES = [
   'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run',
-])
+]
+
+assert.equal(
+  PARTICIPATING_TOOLS.size,
+  12,
+  `expected exactly 12 participating tools from classifyTool, got ${PARTICIPATING_TOOLS.size}`,
+)
+assert.deepEqual(
+  [...PARTICIPATING_TOOLS].sort(),
+  [...EXPECTED_PARTICIPATING_NAMES].sort(),
+  'participating tools derived from classifyTool must exactly match the 12 canonical tools',
+)
 
 const isTitleRequest = (body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : []

@@ -2,12 +2,14 @@
 
 ## [Unreleased]
 
-- speculative-investigation / host-boundary: 切换到 DELEGATE_REVISE.md 新合同。
-  - 将面向模型的意图性字段 `delegate_readonly_rounds` 重构为事实性连续只读轮数估计 `estimated_readonly_rounds`（0..2147483647 原生整数）。
-  - 将 `self_note` 明确为条件参数：估计大于 0 时必须提供非空白未来展望；估计为 0 时必须完全省略。
-  - 实施严格的逐工具判定（第 5.2 节 12 个参与工具装饰，未参与工具无任何增量）。
-  - 彻底剔除执行意图与信任叙事；同伴防递归完全由真实身份边界保证，去除副本必须填 0 的虚假约定。
-  - 跨版本按真实来源防重，旧历史保持 append-only 不改写，古老 K1/K2 材料与本次协议修订边界清晰分离。
+- speculative-investigation / host-boundary [进行中 / 未验证]: 规范切换到 DELEGATE_REVISE.md 新合同（代码与测试尚待 DevOps 运行验证）。
+  - **共享合同与协议修订版 2**：新增 `src/Wanxiangshu/Strength/InvestigationEstimateContract.fs`，将面向模型的意图性字段 `delegate_readonly_rounds` clean-break 重构为事实性连续只读轮数估计 `estimated_readonly_rounds`（0..2147483647 原生整数）。
+  - **条件性调查展望**：`self_note` 明确为条件参数——估计大于 0 时必须提供一至三句非空白未来展望；估计为 0 时必须完全省略。提供与规则解释文案彻底解耦的机器稳定标识（`NotePresentWhenZero`、`MissingOrBlankNoteWhenPositive` 等）。
+  - **逐工具判定矩阵**：严格按工具操作性质判定（全系统 12 个参与工具装饰，28 个不参与工具无任何增量）。
+  - **身份边界与历史防重**：彻底剔除执行意图与信任叙事；同伴防递归完全由真实身份边界保证，去除副本必须填 0 的虚假约定；旧字段 clean-break 废止，运行时拒绝旧字段与新旧混用，历史落盘事件原样保留不重写；古老 K1/K2 迁移工具保持契约修订版 1，当前运行时采用修订版 2。
+  - **负资产清理与教训**：
+    1. 彻底删除纸糊门禁 `scripts/checks/test-source-read-gate.mjs` 三件套。教训：该门禁仅对静态路径做 `allowMap.has(relPath)` 查表，从不核对测试运行时真实读取路径；单行正则完全漏检多行 `path.join` 写法；白名单中 33 项记录大面积超额登记。抓不住真实反例、靠超额豁免制造虚假安全感的门禁比没有更糟。
+    2. 堵死 `requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs` 约 L1415-1424 的降级断言分支。教训：原实现在两个协议标记皆缺失时，退化为拿整段工具描述当增量文本做负向断言，将“描述装饰丢失”伪装成“描述包含旧叙事”，使排查者顺着报错永远查不到真因；现改为严格断言标记存在，标记缺失立即亮红。
 
 
 ## Unreleased — PROMPT-006 执行绑定去层化收尾（P1–P6）

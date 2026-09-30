@@ -750,9 +750,12 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
       required: ['path'],
     },
   }
+  // ReadonlyDelegationContract 内部使用 F# invalidOp (InvalidOperationException) 抛出异常，
+  // 经 Fable 编译后为纯 JavaScript Error 对象，未提供如 .code 等结构化错误码。
+  // 因此此处保留正则表达式精确匹配自然语言异常文案，作为当前在宿主边界能够区分不同 Schema 拒绝原因的唯一起效判定信号。
   assert.throws(
     () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', budgetConflict),
-    /conflicting estimated_readonly_rounds/,
+    /^Tool read defines a conflicting estimated_readonly_rounds property that differs from the readonly delegation protocol$/,
     'a same-name property that differs from the protocol must fail, not be overwritten',
   )
 
@@ -769,27 +772,29 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
   }
   assert.throws(
     () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', noteConflict),
-    /conflicting self_note/,
+    /^Tool read defines a conflicting self_note property that differs from the readonly delegation protocol$/,
     'a same-name note that differs from the protocol must fail',
   )
 
+  // 匹配自然语言散文断言 required 非数组：同样因底层抛出无错误码的标准 Error，正则散文匹配是唯一可用信号
   const badRequired = {
     description: 'D',
     parameters: { type: 'object', properties: { path: { type: 'string' } }, required: 'path' },
   }
   assert.throws(
     () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', badRequired),
-    /required/,
+    /^Tool read parameters schema required field is not an array$/,
     'a non-array required must fail loudly instead of publishing a partial protocol',
   )
 
+  // 匹配自然语言散文断言 properties 缺失：同样因底层抛出无错误码的标准 Error，正则散文匹配是唯一可用信号
   const missingProperties = {
     description: 'D',
     parameters: { type: 'object' },
   }
   assert.throws(
     () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', missingProperties),
-    /properties/,
+    /^Tool read parameters schema missing object properties$/,
     'a root schema that cannot be legally extended must fail loudly',
   )
 })
@@ -1209,7 +1214,7 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
         async () => {
           await hooks['tool.definition']({ toolID: 'read' }, output)
         },
-        (error) => error != null,
+        /execution-model-routing: Predictor model configuration is invalid: predictor candidates must be \[model, reasoning\] pairs/,
         'invalid Predictor configuration must fail closed on the tool.definition hook',
       )
       assert.equal(
@@ -1751,4 +1756,581 @@ test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_bus
       'business keys must keep their order before the appended protocol key',
     )
   })
+})
+
+test('WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_tool_before_for_participating_tools', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-c39'
+    await openIncumbency(runtime, sessionID)
+
+    // 1. 参与工具（read）仅携带旧字段 delegate_readonly_rounds 时，必须在 tool.execute.before 真实路径触发 MixedProtocolFields 拒绝
+    await assert.rejects(
+      async () => {
+        await hooks['tool.execute.before'](
+          { tool: 'read', sessionID, callID: 'call-c39-legacy-only' },
+          { args: { path: 'src/App.fs', delegate_readonly_rounds: 2 } },
+        )
+      },
+      /Invalid investigation estimate arguments: (不得携带旧协议字段 delegate_readonly_rounds|The legacy delegate_readonly_rounds field must not be used)/,
+      'participating tool with legacy delegate_readonly_rounds must be rejected on tool.execute.before',
+    )
+
+    // 2. 参与工具同时携带新旧字段（混合字段）时，同样在 tool.execute.before 真实路径抛出异常拒绝
+    await assert.rejects(
+      async () => {
+        await hooks['tool.execute.before'](
+          { tool: 'read', sessionID, callID: 'call-c39-mixed' },
+          {
+            args: {
+              path: 'src/App.fs',
+              estimated_readonly_rounds: 1,
+              self_note: 'investigate',
+              delegate_readonly_rounds: 2,
+            },
+          },
+        )
+      },
+      /Invalid investigation estimate arguments: (不得携带旧协议字段 delegate_readonly_rounds|The legacy delegate_readonly_rounds field must not be used)/,
+      'participating tool with mixed protocol fields must be rejected on tool.execute.before',
+    )
+
+    // 3. 非参与工具（如 join）携带同名旧字段时，属于 no-op 路径，tool.execute.before 不得抛错且字段保持透传
+    const nonParticipatingOutput = { args: { id: 'part-c39', delegate_readonly_rounds: 2 } }
+    await hooks['tool.execute.before'](
+      { tool: 'join', sessionID, callID: 'call-c39-join' },
+      nonParticipatingOutput,
+    )
+    assert.equal(
+      nonParticipatingOutput.args.delegate_readonly_rounds,
+      2,
+      'non-participating tool must pass through legacy field untouched without throwing',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-c40'
+    await openIncumbency(runtime, sessionID)
+
+    // 负向 1：非评审工具 read 意外携带 contract（同时携带合法的只读估计字段）
+    // sanitizeSnapshot 必须将 Contract 清洗为 None，因此只有只读估计字段能进入 vault，contract 绝不进入 vault。
+    // 在后续 transform 恢复 provider 历史时，contract 字段必须保持不存在（undefined），不被恢复。
+    const readCallID = 'call-c40-read'
+    const readBeforeOutput = {
+      args: {
+        path: 'src/App.fs',
+        contract: 'unexpected-contract-on-read',
+        estimated_readonly_rounds: 2,
+        self_note: 'note-c40',
+      },
+    }
+
+    await hooks['tool.execute.before'](
+      { tool: 'read', sessionID, callID: readCallID },
+      readBeforeOutput,
+    )
+
+    // 若 read 仅携带 contract 而没有任何只读估计字段，sanitizeSnapshot 将三项全部清洗为 None，commitRecordedSnapshot 直接跳过，完全不入 vault
+    const readOnlyContractCallID = 'call-c40-read-only-contract'
+    const readOnlyContractOutput = {
+      args: {
+        path: 'src/Lib.fs',
+        contract: 'unexpected-contract-only',
+      },
+    }
+    await hooks['tool.execute.before'](
+      { tool: 'read', sessionID, callID: readOnlyContractCallID },
+      readOnlyContractOutput,
+    )
+
+    // 负向 2：非参与工具（如 review / join）若携带 estimated_readonly_rounds / self_note
+    // sanitizeSnapshot 根据 classifyTool = NoEstimate，将其 ReadonlyRounds 与 SelfNote 均清洗为 None。
+    // 注：在当前实现中，ManagerReviewTools.isReviewTool 仅硬编码为 js-manager（而 js-manager 在 classifyTool 中恰好亦属于参与工具）。
+    // 工具 'review' 在 classifyTool 中虽名为 review 但属于 NoEstimate，且在 ManagerReviewTools 中不属于 review 工具。
+    // 当非参与工具被调用并携带协议字段时，sanitizeSnapshot 将其过滤，三项均为 None，不进 vault，后续 transform 亦绝不写入/改写历史。
+    const nonParticipatingCallID = 'call-c40-non-participating'
+    const nonParticipatingOutput = {
+      args: {
+        id: 'review-target-1',
+        contract: 'some-contract',
+        estimated_readonly_rounds: 3,
+        self_note: 'should-not-be-vaulted',
+      },
+    }
+    await hooks['tool.execute.before'](
+      { tool: 'review', sessionID, callID: nonParticipatingCallID },
+      nonParticipatingOutput,
+    )
+
+    // 模拟构建下游恢复前的持久化消息历史
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c40', sessionID },
+          parts: [
+            {
+              type: 'tool',
+              tool: 'read',
+              callID: readCallID,
+              state: { status: 'completed', input: { path: 'src/App.fs' }, output: 'ok' },
+            },
+            {
+              type: 'tool',
+              tool: 'read',
+              callID: readOnlyContractCallID,
+              state: { status: 'completed', input: { path: 'src/Lib.fs' }, output: 'ok' },
+            },
+            {
+              type: 'tool',
+              tool: 'review',
+              callID: nonParticipatingCallID,
+              state: { status: 'completed', input: { id: 'review-target-1' }, output: 'ok' },
+            },
+          ],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    const restoredRead = transformed.messages[0].parts[0].state.input
+    assert.equal(
+      restoredRead.contract,
+      undefined,
+      'non-review tool read unexpected contract must be sanitized to None and never restored from vault',
+    )
+    assert.equal(
+      restoredRead.estimated_readonly_rounds,
+      2,
+      'participating tool estimate must be restored normally from vault',
+    )
+    assert.equal(
+      restoredRead.self_note,
+      'note-c40',
+      'participating tool note must be restored normally from vault',
+    )
+
+    const restoredReadOnlyContract = transformed.messages[0].parts[1].state.input
+    assert.equal(
+      restoredReadOnlyContract.contract,
+      undefined,
+      'read tool carrying only contract must have empty vault entry and never restore contract',
+    )
+
+    const restoredNonParticipating = transformed.messages[0].parts[2].state.input
+    assert.equal(
+      restoredNonParticipating.estimated_readonly_rounds,
+      undefined,
+      'non-participating tool estimate must never be recorded into vault or restored into wire history',
+    )
+    assert.equal(
+      restoredNonParticipating.self_note,
+      undefined,
+      'non-participating tool note must never be recorded into vault or restored into wire history',
+    )
+    assert.equal(
+      restoredNonParticipating.contract,
+      undefined,
+      'tool not recognized as review tool must never have contract recorded into vault or restored',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthrough_and_no_vault', async () => {
+  // Incident 2 回归测试：协议未开启时无操作（no-op）基线与免侵入保证
+  //
+  // 【真实源码依据与独立佐证】
+  // 1. isDelegationActive 门控：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:411-412
+  //      `let isDelegationActive = readonlyDelegationPredictorConfigured () && isParticipatingTool`
+  //    - 工具分类依据：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:409-410
+  //      `let isParticipatingTool = InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall`
+  //    - 独立佐证 A：src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi:18-24 导出的
+  //      `InvestigationToolPolicy.EstimateAfterCall` 与 `classifyTool: toolName: string -> InvestigationToolPolicy`
+  //    - 独立佐证 B：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:277-280 的
+  //      `readonlyDelegationPredictorConfigured ()` 消费 `ModelRouting.sharedPredictorConfiguration ()`，
+  //      当 Predictor 未配置时返回 false（见本测试套件 C28/C32 的实测断言）。
+  // 2. toolBefore 行为守卫：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:414 与 451-452
+  //      参数校验（L414）与参数剥离（L451-452 `ReadonlyDelegationContract.hide toolOutput?args`）
+  //      均由 `isDelegationActive` 强行门控。未配置时为 false，完全跳过校验与 hide。
+  //    - 独立佐证：src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fsi:31-37 明确规定
+  //      非参与工具及未启用状态下保持零增量且参数原样透传。
+  // 3. sanitizeSnapshot 快照清洗：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:331-342
+  //      `let isDelegationActive = readonlyDelegationPredictorConfigured () && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall`
+  //      未配置时 `isDelegationActive` 为 false，`Snapshot.ReadonlyRounds` 与 `Snapshot.SelfNote` 均被强制清洗为 `None`。
+  //    - commitRecordedSnapshot（src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:349-357）检查三项均为 `None`
+  //      时直接跳过 `ProtocolArgumentVault.record`，绝不向私有暂存（Vault）录入任何快照。
+  //    - 独立佐证：src/Wanxiangshu/OpenCode/Host/ProtocolArgumentVault.fs:15-20 之 Snapshot 结构。
+  //
+  // 【当时条件】
+  // Predictor 未配置（globalThis.__wanxiangshu_test_predictor_state 未设置或为 unconfigured）。
+  //
+  // 【本来应该】
+  // 系统处于无操作（no-op）基线：
+  // 1. toolBefore 不校验、不 hide 参与工具参数，漏填估计不报错，携带估计不剥离，业务参数原样透传；
+  // 2. sanitizeSnapshot 将协议字段清洗为 None，不向 Vault 录入任何记录；
+  // 3. experimental.chat.messages.transform 在还原历史时绝不恢复只读协议字段。
+  //
+  // 【实际上发生了什么】
+  // 历史上 toolBefore 曾全局无差别执行 hide；sanitizeSnapshot 曾只按 isReviewTool 过滤，
+  // 导致非参与工具或未配置环境下的协议字段可能逃脱清洗或被非预期篡改。
+  //
+  // 【可区分的 observable】
+  // 1. 未配置时调用参与工具 read（即使漏填 estimated_readonly_rounds）正常执行，不抛 MissingEstimate；
+  // 2. 若入参显式带有 estimated_readonly_rounds 与 self_note，toolBefore 不得对其进行 hide 剥离，输出 args 原样保留；
+  // 3. transform 执行后，消息历史中绝不存在从 vault 恢复的协议字段。
+  //
+  // 【DevOps 物理变异验证路径】
+  // 变异点 A（破坏 toolBefore 未配置门控）：
+  //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:411-412，将 `isDelegationActive` 改为忽略配置：
+  //   `let isDelegationActive = isParticipatingTool`
+  //   预期结果：未配置下对漏填估计的调用（call-c41-read-omitted）将因触发校验抛出 MissingEstimate 异常而飘红，
+  //   对携带估计的调用（call-c41-read-passthrough）将因字段被 hide 导致 passthroughOutput 断言失败飘红。
+  // 变异点 B（破坏 sanitizeSnapshot 未配置门控）：
+  //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:333-335，将 `isDelegationActive` 设为 `true`：
+  //   预期结果：协议字段绕过清洗录入 Vault，下游 transform 错误恢复出字段，导致 restored 断言变红。
+  clearPredictorState()
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c41'
+      await openIncumbency(runtime, sessionID)
+
+      // 观察点 1：未配置时参与工具漏填必填字段，不校验、不抛错，业务参数透传
+      const omittedOutput = { args: { path: 'src/UnconfiguredOmitted.fs' } }
+      await hooks['tool.execute.before'](
+        { tool: 'read', sessionID, callID: 'call-c41-read-omitted' },
+        omittedOutput,
+      )
+      assert.equal(
+        omittedOutput.args.path,
+        'src/UnconfiguredOmitted.fs',
+        'unconfigured predictor must not reject omitted estimate on participating tool',
+      )
+
+      // 观察点 2：未配置时参与工具即使携带估计与短记，toolBefore 绝不 hide，原样透传给下游业务
+      const passthroughOutput = {
+        args: {
+          path: 'src/UnconfiguredPassthrough.fs',
+          estimated_readonly_rounds: 3,
+          self_note: 'unconfigured-note',
+        },
+      }
+      await hooks['tool.execute.before'](
+        { tool: 'read', sessionID, callID: 'call-c41-read-passthrough' },
+        passthroughOutput,
+      )
+      assert.equal(
+        passthroughOutput.args.estimated_readonly_rounds,
+        3,
+        'unconfigured predictor must not hide estimated_readonly_rounds from tool args',
+      )
+      assert.equal(
+        passthroughOutput.args.self_note,
+        'unconfigured-note',
+        'unconfigured predictor must not hide self_note from tool args',
+      )
+
+      // 观察点 3：未配置下绝不录入 vault，历史消息 transform 绝不恢复协议字段
+      const transformed = {
+        messages: [
+          {
+            role: 'assistant',
+            info: { id: 'asst-c41', sessionID },
+            parts: [
+              {
+                type: 'tool',
+                tool: 'read',
+                callID: 'call-c41-read-passthrough',
+                state: {
+                  status: 'completed',
+                  input: { path: 'src/UnconfiguredPassthrough.fs' },
+                  output: 'ok',
+                },
+              },
+            ],
+          },
+        ],
+      }
+
+      await hooks['experimental.chat.messages.transform']({}, transformed)
+      const restored = transformed.messages[0].parts[0].state.input
+      assert.equal(
+        restored.estimated_readonly_rounds,
+        undefined,
+        'unconfigured predictor must never record into vault or restore estimated_readonly_rounds in transform',
+      )
+      assert.equal(
+        restored.self_note,
+        undefined,
+        'unconfigured predictor must never record into vault or restore self_note in transform',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_parameters_from_snapshot', async () => {
+  // Incident 3 回归测试：调用中途撤销配置时 toolAfter 仍同源还原协议参数
+  //
+  // 【真实源码依据与独立佐证】
+  // 1. toolAfter 真实恢复逻辑：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:455-469
+  //      ```fsharp
+  //      let toolAfter (toolInput: obj) (toolOutput: obj) =
+  //          task {
+  //              let toolName = toolField toolInput "tool"
+  //              let isParticipatingTool =
+  //                  InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+  //
+  //              if not (isNull toolInput) && not (isNull toolInput?args) then
+  //                  if isParticipatingTool then
+  //                      ReadonlyDelegationContract.restore toolInput?args
+  //                  ManagerReviewContract.restore toolInput?args
+  //      ```
+  //    - 独立佐证 A：src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi:18-24 导出的
+  //      `InvestigationToolPolicy.EstimateAfterCall` 与 `classifyTool`。
+  //    - 独立佐证 B：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:458-467 内部实读：
+  //      恢复仅依据 `isParticipatingTool`，完全不调用也不受 `readonlyDelegationPredictorConfigured ()` 约束！
+  // 2. ReadonlyDelegationContract.restore 私有 Symbol 恢复机制：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs:17
+  //      `let private savedArgsKey: obj = emitJsExpr () "Symbol('readonly-delegation-args')"`
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs:181-187 (`hideProtocolFields`)
+  //      使用 `defineProperty args savedArgsKey symbolDescriptor` 将原始 descriptor 存入私有 Symbol；
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs:223-228 (`restore`)
+  //      ```fsharp
+  //      let restore (args: obj) : unit =
+  //          if not (isNull args) && isPlainObject args && hasOwn args savedArgsKey then
+  //              restoreProtocolFields args
+  //      ```
+  //    - 独立佐证：src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fsi:39-43 明确保证：
+  //      `val restore: args: obj -> unit`
+  //      "Restores both protocol fields from the private module Symbol on the args object. Idempotent..."
+  //      恢复过程完全基于对象自有私有 Symbol，与任何外部全局配置无关。
+  //
+  // 【当时条件】
+  // 1. toolBefore 执行时 Predictor 为已配置状态（configured）；
+  // 2. 参与工具 read 携带合法的只读估计与短记，toolBefore 成功校验、录入快照并 hide 剥离字段；
+  // 3. 在 toolBefore 之后、toolAfter 之前，Predictor 配置被撤销（变为 unconfigured）；
+  // 4. toolAfter 随后被触发执行。
+  //
+  // 【本来应该】
+  // toolAfter 必须依据当前调用挂在 args 上的私有 Symbol 快照，确定性地将原始 arguments
+  // （含 estimated_readonly_rounds 与 self_note）同源恢复回 args，不依赖撤销后的全局配置。
+  //
+  // 【实际上发生了什么】
+  // 若 toolAfter 在执行恢复时错误引入了全局配置状态判断（例如重读配置发现为 unconfigured），
+  // 就会误跳过恢复逻辑，导致被 hide 剥离的协议字段永久丢失，破坏下游证据链。
+  //
+  // 【可区分的 observable】
+  // 中途撤销配置后，toolAfter 执行完毕时，toolOutput.args 中的 estimated_readonly_rounds (2) 和
+  // self_note ('mid-flight-verification') 是否被完整还原。
+  //
+  // 【DevOps 物理变异验证路径】
+  // 变异点（让 toolAfter 错误依赖运行时配置）：
+  //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:466，将 `if isParticipatingTool then` 改为：
+  //   `if isParticipatingTool && readonlyDelegationPredictorConfigured () then`
+  //   预期结果：由于中途执行了 clearPredictorState()，toolAfter 发现 Predictor 未配置因而跳过恢复，
+  //   导致 toolOutput.args.estimated_readonly_rounds 仍为 undefined，
+  //   断言 assert.equal(toolOutput.args.estimated_readonly_rounds, 2) 必然失败变红。
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c42'
+      await openIncumbency(runtime, sessionID)
+
+      const callID = 'call-c42-read-revocation'
+      const toolInput = { tool: 'read', sessionID, callID }
+      const toolOutput = {
+        args: {
+          path: 'src/MidFlightRevocation.fs',
+          estimated_readonly_rounds: 2,
+          self_note: 'mid-flight-verification',
+        },
+      }
+
+      // Step 1: 在 Predictor 已配置下执行 toolBefore
+      await hooks['tool.execute.before'](toolInput, toolOutput)
+
+      // 验证 toolBefore 已正确 hide 剥离字段
+      assert.equal(
+        toolOutput.args.estimated_readonly_rounds,
+        undefined,
+        'toolBefore must hide estimated_readonly_rounds when predictor is configured',
+      )
+      assert.equal(
+        toolOutput.args.self_note,
+        undefined,
+        'toolBefore must hide self_note when predictor is configured',
+      )
+      assert.equal(
+        toolOutput.args.path,
+        'src/MidFlightRevocation.fs',
+        'business path argument must be preserved intact',
+      )
+
+      // Step 2: 中途撤销 Predictor 配置
+      clearPredictorState()
+
+      // Step 3: 在配置已撤销的状态下执行 toolAfter
+      await hooks['tool.execute.after'](toolInput, toolOutput)
+
+      // Step 4: 断言 toolAfter 必须成功通过私有快照还原原始协议参数
+      assert.equal(
+        toolOutput.args.estimated_readonly_rounds,
+        2,
+        'toolAfter must restore estimated_readonly_rounds from private snapshot even after predictor is revoked mid-flight',
+      )
+      assert.equal(
+        toolOutput.args.self_note,
+        'mid-flight-verification',
+        'toolAfter must restore self_note from private snapshot even after predictor is revoked mid-flight',
+      )
+      assert.equal(
+        toolOutput.args.path,
+        'src/MidFlightRevocation.fs',
+        'business path argument must remain intact after restoration',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_before_business_body', async () => {
+  // Incident 1 回归测试：hasProtocolFields 守卫绕过缺陷变成可执行记忆
+  //
+  // 【当时成立条件】
+  // 1. Predictor 已配置（globalThis.__wanxiangshu_test_predictor_state = 'configured'）；
+  // 2. 被调用的工具经 InvestigationEstimateContract.classifyTool 判定为参与工具（如 'read' 为 EstimateAfterCall）；
+  // 3. 本次调用的 arguments 完全缺失协议字段（既无 estimated_readonly_rounds 也无 self_note，例如仅有 { path: 'src/MissingEstimateRepro.fs' }）。
+  //
+  // 【本该发生什么】
+  // 依据 WHAT[host-boundary-032] 第 148 行与 DELEGATE §9.1 规范：
+  // 参与工具在 Predictor 已配置时必须提供合法的 estimated_readonly_rounds。
+  // 当参数完全缺失协议字段时，必须在工具业务 body 执行之前以参数错误拒绝，
+  // 错误标识为 MissingEstimate（抛出 Invalid investigation estimate arguments: 必须提供...），
+  // 业务 body 零执行，输入参数对象零污染、零改写。
+  //
+  // 【实际发生了什么（生产事故真实原因）】
+  // 历史上 toolBefore 上曾存在一道 `hasProtocolFields` 守卫：
+  // `let hasProtocolFields = hasOwnProperty args "estimated_readonly_rounds" || hasOwnProperty args "self_note"`
+  // 并仅在 `isDelegationActive && hasProtocolFields` 时才进入参数校验分支。
+  // 当调用方完全未传两个协议字段时，`hasProtocolFields` 为 false，整个校验分支被跳过，
+  // MissingEstimate 在生产链路不可达，工具业务 body 被错误放行执行，§9.1 门控失去强制力。
+  //
+  // 【真实源码修复方案与支撑佐证】
+  // 1. 拆除 hasProtocolFields 守卫，改用 isDelegationActive 刚性门控：
+  //    - 源码位置：src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:409-414
+  //      ```fsharp
+  //      let isParticipatingTool =
+  //          InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+  //      let isDelegationActive =
+  //          readonlyDelegationPredictorConfigured () && isParticipatingTool
+  //
+  //      if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
+  //          let args = toolOutput?args
+  //          match InvestigationEstimateContract.parseParticipatingArguments args with
+  //          | Ok _ -> ()
+  //          | Error err ->
+  //              ...
+  //              let explanation = InvestigationEstimateContract.formatArgumentError language err
+  //              invalidOp (sprintf "Invalid investigation estimate arguments: %s" explanation)
+  //      ```
+  // 2. parseParticipatingArguments 严格产生 MissingEstimate：
+  //    - 源码位置：src/Wanxiangshu/Strength/InvestigationEstimateContract.fs:153-154
+  //      `elif not (hasOwn arguments EstimatedReadonlyRoundsField) then Error EstimateArgumentError.MissingEstimate`
+  //    - 错误文案输出：src/Wanxiangshu/Strength/InvestigationEstimateContract.fs:172-173 (zh) 与 190-191 (en)
+  //      "必须提供 estimated_readonly_rounds 估计字段" / "The estimated_readonly_rounds field must be provided"
+  //    - 独立佐证 A：src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi:35-36 导出的 `EstimateArgumentError.MissingEstimate`
+  //    - 独立佐证 B：src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi:46-47 导出的 `parseParticipatingArguments` 签名
+  //    - 独立佐证 C：requirements/host-boundary/WHAT.md [032] 第 148 行参数清理与非法输入 before 阶段拒绝条款。
+  //
+  // 【可区分的 observable】
+  // 1. 参与工具 read 在 Predictor 已配置且 arguments 没有任何协议字段时，调用 hooks['tool.execute.before']
+  //    必须被拒绝（reject），抛出的错误信息精确匹配 MissingEstimate 文案；
+  // 2. 拒绝发生后，toolOutput.args 对象的内容与键结构完全未被改写或污染（业务零副作用）；
+  // 3. 对照组：非参与工具 join 在 Predictor 已配置且缺少协议字段时，toolBefore 属于 no-op 路径，必须正常放行通过、不抛错。
+  //
+  // 【DevOps 物理变异验证路径】
+  // 变异点 1（原样重现 hasProtocolFields 守卫缺陷）：
+  //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:414，在条件中加回协议字段存在性守卫：
+  //   `let hasProtocolFields = hasOwnProperty toolOutput?args "estimated_readonly_rounds" || hasOwnProperty toolOutput?args "self_note"`
+  //   `if isDelegationActive && hasProtocolFields && not (isNull toolOutput) && not (isNull toolOutput?args) then`
+  //   预期结果：当调用 read 时完全未传协议字段，`hasProtocolFields` 为 false 导致校验被跳过，
+  //   `hooks['tool.execute.before']` 将不会抛出异常而成功 resolve，
+  //   导致本测试中的 `await assert.rejects(...)` 失败变红！
+  // 变异点 2（守卫只看 Predictor 配置而不判定是否为参与工具）：
+  //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:411-412：
+  //   `let isDelegationActive = readonlyDelegationPredictorConfigured ()`
+  //   预期结果：非参与工具（如 join）在未带协议字段时也将被强制执行参与工具校验，
+  //   导致对照组 `await hooks['tool.execute.before']({ tool: 'join', ... })` 抛出 MissingEstimate 异常，
+  //   导致本测试中对 join 正常放行的断言失败变红！
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c43'
+      await openIncumbency(runtime, sessionID)
+
+      // 观察点 1：参与工具（read）在 Predictor 配置下完全未传两个协议字段
+      const participatingOutput = {
+        args: {
+          path: 'src/MissingEstimateRepro.fs',
+        },
+      }
+      const originalArgs = structuredClone(participatingOutput.args)
+
+      // 必须在业务 body 之前被 toolBefore 拒绝，且抛出 MissingEstimate 错误
+      await assert.rejects(
+        async () => {
+          await hooks['tool.execute.before'](
+            { tool: 'read', sessionID, callID: 'call-c43-missing-estimate' },
+            participatingOutput,
+          )
+        },
+        /Invalid investigation estimate arguments: (必须提供 estimated_readonly_rounds 估计字段|The estimated_readonly_rounds field must be provided)/,
+        'participating tool missing estimated_readonly_rounds must be rejected on tool.execute.before with MissingEstimate',
+      )
+
+      // 业务 body 零副作用：拒绝发生在业务执行前，且输入对象未被改写或污染
+      assert.deepEqual(
+        participatingOutput.args,
+        originalArgs,
+        'rejected call must leave tool arguments untouched with zero business side effect',
+      )
+
+      // 观察点 2：对照组非参与工具（join）在 Predictor 配置下完全未传协议字段
+      // 必须正常透传放行，不抛出异常，不产生协议增量
+      const nonParticipatingOutput = {
+        args: {
+          taskID: 'task-c43-join',
+        },
+      }
+      await hooks['tool.execute.before'](
+        { tool: 'join', sessionID, callID: 'call-c43-join-passthrough' },
+        nonParticipatingOutput,
+      )
+      assert.equal(
+        nonParticipatingOutput.args.taskID,
+        'task-c43-join',
+        'non-participating tool without protocol fields must pass through untouched without rejection',
+      )
+      assert.equal(
+        'estimated_readonly_rounds' in nonParticipatingOutput.args,
+        false,
+        'non-participating tool must not gain estimated_readonly_rounds',
+      )
+      assert.equal(
+        'self_note' in nonParticipatingOutput.args,
+        false,
+        'non-participating tool must not gain self_note',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
 })

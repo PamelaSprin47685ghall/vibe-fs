@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Strength
 
+open Wanxiangshu.Participant.Provider
+
 /// P2 共享输入合同：推测性调查只读轮次估计与短记成对规范。
 /// 纯逻辑契约，不依赖宿主环境、不读配置、不写事件存储。
 module InvestigationEstimateContract =
@@ -43,3 +45,12 @@ module InvestigationEstimateContract =
     /// 解析成对参数：估计值与非空白短记（当估计大于 0 时）
     val parseParticipatingArguments:
         arguments: obj -> Result<EstimatedReadonlyRounds * string option, EstimateArgumentError>
+
+    /// 面向调用方的规则解释文案（DELEGATE_REVISE §9.7 / §4.1）
+    val describeArgumentError: language: ProviderLanguage -> error: EstimateArgumentError -> string
+    val formatArgumentError: language: ProviderLanguage -> error: EstimateArgumentError -> string
+    val describeArgumentErrorZh: error: EstimateArgumentError -> string
+    val describeArgumentErrorEn: error: EstimateArgumentError -> string
+
+    /// 机器可判的稳定错误标识（非散文文案，严禁使用 Fable 内部反射）
+    val errorCode: error: EstimateArgumentError -> string

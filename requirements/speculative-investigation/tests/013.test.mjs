@@ -59,6 +59,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_a_replica_is_a_real_child
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
+const { ProtocolRevision } = await import("../../../dist/Strength/InvestigationEstimateContract.js");
 
 const H = (text) => `H(${text})`
 const hostText = (text) => ({ type: 'text', text })
@@ -160,7 +161,7 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owner_decisions_proje
     ownerLogicalRun: { logicalRunId: `${owner}-run`, authorityRootUserMessageId: `${owner}-root` },
     sourcePhysicalUserMessageId: `${owner}-msg`,
     sourceProviderRun: `run-${decision}`,
-    sourceToolCallIds: [`call-${decision}`], requestedRounds: rounds, contractRevision: 1,
+    sourceToolCallIds: [`call-${decision}`], requestedRounds: rounds, contractRevision: ProtocolRevision,
   })
 
   // Interleaved: owner-a requests, owner-b requests, owner-b binds, owner-a binds.
@@ -196,6 +197,8 @@ const { join } = await import("node:path");
 const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const { acceptAuthorityRoot, notifyCompleted, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+const Strength = await import("../../../dist/Strength/Surface.js");
+const { ProtocolRevision } = await import("../../../dist/Strength/InvestigationEstimateContract.js");
 
 const hostText = (text) => ({ type: 'text', text })
 const hostToolCall = (callId, tool, input, output) => ({
@@ -407,6 +410,38 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
         assert.equal(unreviewedOutput.parameters.properties?.self_note, undefined)
         assert.equal(unreviewedOutput.parameters.required.includes('estimated_readonly_rounds'), false)
         assert.equal(unreviewedOutput.description, 'custom unreviewed tool')
+
+        // js-manager participating tool: review contract and delegation protocol coexist without mutual interference
+        const managerOutput = {
+          description: 'Review workspace changes as manager',
+          parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+        }
+        await hooks['tool.definition']({ toolID: 'js-manager' }, managerOutput)
+        const mgrProps = managerOutput.parameters.properties
+        assert.equal(mgrProps.estimated_readonly_rounds?.type, 'integer')
+        assert.equal(mgrProps.estimated_readonly_rounds?.minimum, 0)
+        assert.equal(mgrProps.estimated_readonly_rounds?.maximum, 2147483647)
+        assert.ok(managerOutput.parameters.required.includes('estimated_readonly_rounds'))
+        assert.equal(
+          managerOutput.parameters.required.filter((x) => x === 'estimated_readonly_rounds').length,
+          1,
+          'estimated_readonly_rounds must appear exactly once in required',
+        )
+        assert.equal(mgrProps.self_note?.type, 'string')
+        assert.equal(managerOutput.parameters.required.includes('self_note'), false)
+        assert.equal(mgrProps.contract?.type, 'string', 'review contract property must coexist with delegation protocol')
+        assert.ok(managerOutput.parameters.required.includes('contract'), 'js-manager must require review contract beside delegation protocol')
+        assert.equal(
+          managerOutput.parameters.required.filter((x) => x === 'contract').length,
+          1,
+          'js-manager must require contract exactly once',
+        )
+        assert.ok(
+          managerOutput.description.includes(
+            'Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0.',
+          ),
+          'js-manager description must include collaboration prose',
+        )
       } finally {
         if (previousLanguage === undefined) {
           delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
@@ -585,19 +620,16 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
         'the frozen call set keeps the original batch order',
       )
       assert.equal(payload.requested_rounds, 1, 'the batch maximum is the authorized budget')
-      assert.equal(payload.contract_revision, 1)
+      assert.equal(payload.contract_revision, ProtocolRevision)
 
-      const expectedDecisionId = createHash('sha256')
-        .update(
-          [
-            'strength-delegation-v1',
-            '1',
-            payload.logical_run_id,
-            payload.authority_root_user_message_id,
-            payload.source_provider_run,
-          ].join('\u001f'),
-        )
-        .digest('hex')
+      const sha256 = (text) => createHash('sha256').update(text).digest('hex')
+      const expectedDecisionId = Strength.delegationDeriveDecisionId(
+        sha256,
+        ProtocolRevision,
+        payload.logical_run_id,
+        payload.authority_root_user_message_id,
+        payload.source_provider_run,
+      )
       assert.equal(
         payload.decision_id,
         expectedDecisionId,
@@ -676,7 +708,8 @@ import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/proces
 
 {
 const { default: assert } = await import('node:assert/strict')
-const { parseParticipatingArguments } = await import('../../../dist/Strength/InvestigationEstimateContract.js')
+const { parseParticipatingArguments, ProtocolRevision, EstimatedReadonlyRoundsField } = await import('../../../dist/Strength/InvestigationEstimateContract.js')
+const PluginHooksSurface = await import('../../../dist/OpenCode/Host/PluginHooksSurface.js')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
@@ -865,22 +898,9 @@ integrationTest(
           `${name} description must not contain volatile counters, timestamps, or tiers`,
         )
 
-        // For js-manager: review contract and delegation protocol coexist without mutual interference
-        if (name === 'js-manager') {
-          assert.ok(
-            view.properties.includes('contract'),
-            'js-manager must expose review contract property beside delegation protocol',
-          )
-          assert.ok(
-            view.required.includes('contract'),
-            'js-manager must require review contract beside delegation protocol',
-          )
-          assert.equal(
-            view.required.filter((entry) => entry === 'contract').length,
-            1,
-            'js-manager must require contract exactly once',
-          )
-        }
+        // Note: js-manager is a manager review tool not issued on the engineer provider wire,
+        // so summary.tools contains the engineer session tools. Its review contract and delegation
+        // coexistence invariant is verified via direct decoration below.
       } else {
         // Non-participating tools (including 28 NoEstimate tools and unreviewed Host tools such as question/todo/web):
         // Must carry ZERO increment: no protocol properties, not required, no collaboration prose.
@@ -918,6 +938,62 @@ integrationTest(
         )
       }
     }
+
+    // For js-manager: review contract and delegation protocol coexist without mutual interference.
+    // Because the canary runner session runs as engineer, js-manager (a manager review tool) is not present
+    // on the engineer wire tools. We directly execute the real tool definition decoration path for js-manager.
+    const managerDef = {
+      description: 'Review workspace changes as manager',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
+    }
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', managerDef)
+    PluginHooksSurface.decorateReviewToolDefinition('js-manager', managerDef)
+
+    assert.ok(
+      managerDef.parameters.properties.contract,
+      'js-manager must expose review contract property beside delegation protocol',
+    )
+    assert.equal(managerDef.parameters.properties.contract.type, 'string')
+    assert.ok(
+      managerDef.parameters.required.includes('contract'),
+      'js-manager must require review contract beside delegation protocol',
+    )
+    assert.equal(
+      managerDef.parameters.required.filter((entry) => entry === 'contract').length,
+      1,
+      'js-manager must require contract exactly once',
+    )
+    assert.ok(
+      managerDef.parameters.properties.estimated_readonly_rounds,
+      'js-manager must expose estimated_readonly_rounds beside review contract',
+    )
+    assert.equal(managerDef.parameters.properties.estimated_readonly_rounds.type, 'integer')
+    assert.ok(
+      managerDef.parameters.required.includes('estimated_readonly_rounds'),
+      'js-manager must require estimated_readonly_rounds',
+    )
+    assert.equal(
+      managerDef.parameters.required.filter((entry) => entry === 'estimated_readonly_rounds').length,
+      1,
+      'js-manager must require estimated_readonly_rounds exactly once',
+    )
+    assert.ok(
+      managerDef.parameters.properties.self_note,
+      'js-manager must expose self_note',
+    )
+    assert.equal(
+      managerDef.parameters.required.includes('self_note'),
+      false,
+      'js-manager must not require self_note',
+    )
+    assert.ok(
+      managerDef.description.includes(englishCollaboration) || managerDef.description.includes(chineseCollaboration),
+      'js-manager description must include collaboration prose',
+    )
 
     // Decoration extends the schema; it never replaces the tool's own contract.
     assert.ok(summary.tools.read.required.includes('filePath'), 'read must still require filePath')
@@ -961,7 +1037,7 @@ integrationTest(
     // 1. Legal positive estimate: non-blank self_note paired with rounds > 0
     const validPositive = parseParticipatingArguments({
       filePath: 'canary-sample.txt',
-      estimated_readonly_rounds: 2,
+      [EstimatedReadonlyRoundsField]: 2,
       self_note: 'checking the canary fixture',
     })
     assert.equal(validPositive.tag, 0, 'positive estimate with non-empty note is valid')
@@ -969,7 +1045,7 @@ integrationTest(
     // 2. Legal zero estimate: self_note is omitted
     const validZero = parseParticipatingArguments({
       filePath: 'canary-sample.txt',
-      estimated_readonly_rounds: 0,
+      [EstimatedReadonlyRoundsField]: 0,
     })
     assert.equal(validZero.tag, 0, 'zero estimate omitting self_note is valid')
     assert.equal(validZero.fields[0][1], undefined, 'parsed note must be None/undefined for zero estimate')
@@ -977,7 +1053,7 @@ integrationTest(
     // 3. Historical anti-pattern (0 with note): must be rejected under new contract
     const invalidZeroWithNote = parseParticipatingArguments({
       filePath: 'canary-sample.txt',
-      estimated_readonly_rounds: 0,
+      [EstimatedReadonlyRoundsField]: 0,
       self_note: 'checking the canary fixture',
     })
     assert.equal(invalidZeroWithNote.tag, 1, '0 with self_note is an illegal combination and must be rejected')

@@ -333,4 +333,163 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Author
     assert.equal(Strength.lifecycleNeedsRawReplay(23n, traced), false)
   } finally { local.close() }
 })
+
+test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_positive_estimates_never_reaggregates_DelegationRequested', async () => {
+  // Mutation 验证与退化路径说明：
+  // 若 Delegate.fs 中的 resolveCompletedSourceBatch 发生退化，错误地将历史回放中已 Promoted 的 Replica 帧
+  // 当作 owner 当前新鲜完成的来源批次，则 tryCapture 会错误判定为正数估计并追加新的 DelegationRequested。
+  // 本测试证明：owner 历史上回放带有 positive estimated_readonly_rounds 的 Replica 帧后，
+  // transform / tryCapture 决不产生新的 DelegationRequested，且 R02（原参数保真）与 R14（镜像重定位 arguments 不变）成立。
+  const local = createLocalEventStore()
+  try {
+    const durability = Strength.durabilityCreate(local.store)
+    const decision = 'decision-h03'
+    const ownerSessionId = 'owner-h03'
+
+    // 1. 构造包含正数 estimated_readonly_rounds 与合法 self_note 的 Replica 帧
+    const replicaExchanges = [
+      {
+        toolName: 'read',
+        canonicalArguments: JSON.stringify({
+          filePath: 'src/Wanxiangshu/Strength/Runtime.fs',
+          estimated_readonly_rounds: 3,
+          self_note: 'inspect isExactReadonly invariant'
+        }),
+        canonicalResult: 'let isExactReadonly capabilities = ...'
+      },
+      {
+        toolName: 'grep',
+        canonicalArguments: JSON.stringify({
+          pattern: 'exactReadonlyHostToolMap',
+          estimated_readonly_rounds: 2,
+          self_note: 'verify host tool map entries'
+        }),
+        canonicalResult: 'src/Wanxiangshu/Strength/Runtime.fs:51:exactReadonlyHostToolMap'
+      }
+    ]
+
+    const replicaBundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: replicaExchanges }]).value
+    assert.ok(replicaBundle, 'Replica bundle must build successfully')
+
+    // R02: 断言原数值与短记在 frame bundle 中准确恢复
+    const firstExchangeArgs = JSON.parse(replicaBundle.batches[0].exchanges[0].canonicalArguments)
+    assert.equal(firstExchangeArgs.estimated_readonly_rounds, 3)
+    assert.equal(firstExchangeArgs.self_note, 'inspect isExactReadonly invariant')
+    const secondExchangeArgs = JSON.parse(replicaBundle.batches[0].exchanges[1].canonicalArguments)
+    assert.equal(secondExchangeArgs.estimated_readonly_rounds, 2)
+    assert.equal(secondExchangeArgs.self_note, 'verify host tool map entries')
+
+    // 2. 写入授权生命周期事件：Requested -> Bound -> Prepared -> Promoted
+    await append(durability, Strength.eventRequested({
+      decisionId: decision, ownerSessionId: ownerSessionId,
+      ownerLogicalRun: { logicalRunId: 'logical-h03', authorityRootUserMessageId: 'user-h03' },
+      sourcePhysicalUserMessageId: 'user-h03', sourceProviderRun: 'run-h03',
+      sourceToolCallIds: ['call-h03'], requestedRounds: 3, contractRevision: 2,
+    }))
+    await append(durability, Strength.eventBound(decision, 'run-h03', 'replica-h03', 'anchor-h03'))
+
+    const payloadRef = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(replicaBundle))))
+    assert.equal(payloadRef.ok, true)
+    await append(durability, Strength.eventPrepared(ownerSessionId, decision, 'run-h03', 'replica-h03', 'anchor-h03', replicaBundle.digest, replicaBundle.byteLength, [payloadRef.value]))
+    await append(durability, Strength.eventPromoted(ownerSessionId, decision, 'run-h03', replicaBundle.digest, [payloadRef.value]))
+
+    let projection = (await Strength.durabilityLoadProjection(durability)).value
+    assert.equal(Strength.projectionIsPromoted(decision, projection), true)
+
+    // 3. 在 owner 历史上回放该 Replica 帧
+    const baseWire = [
+      message('user', [text('investigate runtime permissions')]),
+      message('assistant', [text('here is the primary plan')]),
+      message('user', [text('continue with verification')])
+    ]
+    const rawResult = Adapter.tryApplyRenderedMessages(ownerSessionId, H, {
+      messages: baseWire,
+      hostMessageIds: ['user-h03', 'run-h03', 'user-h03-cont'],
+      hostIsPhysical: [true, false, true]
+    })
+    assert.equal(rawResult.ok, true)
+    const rawBase = rawResult.value
+
+    const replayPlans = await Strength.lifecycleReplayPlans(ownerSessionId, rawBase.map((v, i) => ({ id: ['user-h03', 'run-h03', 'user-h03-cont'][i] })), replicaBundle, projection)
+    assert.equal(replayPlans.ok, true)
+    assert.equal(replayPlans.value.length, 1)
+
+    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value)
+    assert.equal(replayIntents.ok, true)
+    const replayed = Projection.renderMessagesWithHostIds(snapshot(baseWire), baseWire, replayIntents.value)
+    const written = Adapter.tryApplyRenderedInsertionsPreservingBase(ownerSessionId, H, rawBase, replayed)
+    assert.equal(written.ok, true)
+
+    // R14: 镜像 ID 重定位后，tool call 的 arguments 保持不变
+    const decodedTranscript = Adapter.decodeMessageView(written.value)
+    const toolCallPart = decodedTranscript.messages.flatMap((m) => m.parts).find((p) => p.kind === 'tool-call')
+    assert.ok(toolCallPart, 'Replayed transcript must contain replayed tool-call part')
+    const replayedCallArgs = JSON.parse(toolCallPart.args)
+    assert.equal(replayedCallArgs.estimated_readonly_rounds, 3)
+    assert.equal(replayedCallArgs.self_note, 'inspect isExactReadonly invariant')
+
+    // 4. H03: 在回传历史之后执行 owner 的 transform / tryCapture，断言绝不重新聚合生成新的 DelegationRequested
+    const rawDelegate = await import('../../../dist/Strength/OpenCode/Delegate.js')
+    const rawPluginScope = await import('../../../dist/Strength/OpenCode/PluginScope.js')
+
+    const strengthScope = new rawPluginScope.PluginStrengthScope()
+    strengthScope.AttachStrengthReplicaRuntime({})
+
+    const snapshotPort = {
+      GetMessages: async () => ({
+        tag: 0,
+        fields: [[{ Id: 'run-h03', Role: 'assistant', ParentId: 'user-h03' }]],
+      }),
+    }
+    const journal = {
+      Snapshot: () => ({
+        AgentProjections: {
+          Associations: new Map([[ownerSessionId, [{ tag: 0 }, { tag: 0 }]]]),
+          Profiles: new Map([
+            [
+              ownerSessionId,
+              {
+                CanonicalRole: 'engineer',
+                AuthorityKind: { tag: 0 },
+                LogicalRunId: 'logical-h03',
+                AuthorityRootUserMessageId: 'user-h03',
+              },
+            ],
+          ]),
+        },
+      }),
+    }
+
+    const appendedCaptureEvents = []
+    const captureDurability = {
+      LoadProjection: async () => ({ tag: 0, fields: [projection] }),
+      Append: async (event) => {
+        appendedCaptureEvents.push(event)
+        return { tag: 0 }
+      },
+    }
+
+    const transformOutput = {
+      messages: written.value
+    }
+
+    const captureOutcome = await rawDelegate.tryCapture(
+      snapshotPort,
+      journal,
+      captureDurability,
+      strengthScope,
+      () => null,
+      null,
+      true,
+      transformOutput
+    )
+
+    // 断言：回传历史绝不被识别为新的委托请求来源
+    assert.notEqual(captureOutcome?.tag, 0, 'Replayed Replica history must not produce a Captured outcome')
+    assert.equal(appendedCaptureEvents.length, 0, 'No DelegationRequested event may be appended from replayed history')
+  } finally {
+    local.close()
+  }
+})
+
 }

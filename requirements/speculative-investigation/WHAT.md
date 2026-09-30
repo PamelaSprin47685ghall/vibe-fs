@@ -212,7 +212,7 @@ E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧
    协议字段 `estimated_readonly_rounds` 与条件字段 `self_note` 的解析与校验责任仅归本协议及 12 个参与工具所有；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
 
 8. **三消费端单一判定来源与行为一致性**：
-   逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `read`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。
+   逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `read`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。在协议未开启（未配置 Predictor）时，调用边界端与来源批次端均不拦截、不剥离、不校验任何工具的参数，参数原样透传；在协议开启（已配置 Predictor）时，调用边界端仅对参与工具执行必选校验与剥离隐藏，且对完全缺失估计字段的参与调用无条件按参数错误拒绝，绝不带缺陷放行或静默退化为无估计机会。
 
 9. **已知工具差集清点与未判定候选显式登记**：
    系统通过机械方式清点仓库已知工具名权威来源（`StaticTools.knownToolNames`）与 `classifyTool` 已判定工具名单的差集。任何未判定工具必须显式可见并登记为待审阅候选；门禁严禁 fail-open（空差集无条件放行通过），亦不得在存在差集时未经登记无条件失败，防止新工具加入仓库时通过“未知默认不加”而静默逃避协议审阅。

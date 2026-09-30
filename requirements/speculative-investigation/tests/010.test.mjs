@@ -255,3 +255,217 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_cross_version_same_source
   assert.equal(Strength.projectionCandidate(decisionIdV2, projection.value), null, 'New revision decisionId must not exist as fresh in existing projection')
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { createHash } = await import("node:crypto");
+const Strength = await import("../../../dist/Strength/Surface.js");
+
+// 依据 016.test.mjs 的既有先例直接导入编译后的 Delegate.js 模块。
+// 此处直接引用该模块并非绕过公开契约或私自刺探内部实现，而是因为 StrengthDelegate.tryCapture 与
+// StrengthDelegate.tryApply 本身就是宿主执行环境中捕获与 apply 协调逻辑的真实运行时公开入口。
+const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
+const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
+
+const H = (text) => createHash("sha256").update(text).digest("hex");
+
+function createDelegateMockContext(projection) {
+  const strengthScope = new rawPluginScope.PluginStrengthScope();
+  strengthScope.AttachStrengthReplicaRuntime({});
+
+  const snapshotPort = {
+    GetMessages: async () => ({
+      tag: 0,
+      fields: [[{ Id: "a-1", Role: "assistant", ParentId: "u-1" }]],
+    }),
+  };
+
+  const journal = {
+    Snapshot: () => ({
+      AgentProjections: {
+        Associations: new Map([["ses-1", [{ tag: 0 }, { tag: 0 }]]]),
+        Profiles: new Map([
+          [
+            "ses-1",
+            {
+              CanonicalRole: "engineer",
+              AuthorityKind: { tag: 0 },
+              LogicalRunId: "log-1",
+              AuthorityRootUserMessageId: "u-1",
+            },
+          ],
+        ]),
+      },
+    }),
+  };
+
+  const appendedEvents = [];
+  const durability = {
+    LoadProjection: async () => ({ tag: 0, fields: [projection] }),
+    Append: async (event) => {
+      appendedEvents.push(event);
+      return { tag: 0 };
+    },
+  };
+
+  const output = {
+    messages: [
+      {
+        role: "user",
+        id: "u-1",
+        sessionID: "ses-1",
+        parts: [{ type: "text", text: "query" }],
+      },
+      {
+        role: "assistant",
+        id: "a-1",
+        sessionID: "ses-1",
+        parentID: "u-1",
+        parts: [
+          {
+            type: "tool",
+            tool: "read",
+            callID: "call-1",
+            state: {
+              status: "completed",
+              input: {
+                filePath: "src/file.fs",
+                estimated_readonly_rounds: 2,
+                self_note: "investigate interface",
+              },
+              output: "content",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  return { strengthScope, snapshotPort, journal, durability, appendedEvents, output };
+}
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_capture_quadruple_conflict_skips_without_persisting_request', async () => {
+  // Mutation 验证与退化路径说明：
+  // 若修改 Delegate.fs 中的 evaluateCaptureDisposition，改坏或注释掉 tryFindExistingBySourceQuadruple 查找分支，
+  // 则针对相同四元组 (ownerSessionId, ownerLogicalRun, sourcePhysicalUserMessageId, sourceProviderRun)
+  // 但不同 ContractRevision (v1 vs v2) 的新请求将无法命中 Conflict，错误落入 Fresh 分支，
+  // 从而调用 persistNewDelegationRequest 向 durability 端口追加新事件并返回 Captured。
+  // 本测试断言 outcome 必须为 Skipped 且原因严格等于 "delegation-request-conflict"，
+  // 同时断言 durability.Append 未被调用，从而保证若对应 guard 被破坏测试必定红。
+
+  const ownerSessionId = 'ses-1';
+  const logicalRunId = 'log-1';
+  const authorityRootUserMessageId = 'u-1';
+  const sourcePhysicalUserMessageId = 'u-1';
+  const sourceProviderRun = 'a-1';
+
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  );
+
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  };
+
+  // 预置同四元组但 ContractRevision = 1 的既有投影
+  const projectionApplyResult = Strength.projectionApply(
+    Strength.projectionEmpty(),
+    Strength.eventRequested(requestV1),
+  );
+  assert.equal(projectionApplyResult.ok, true);
+  const projectionV1 = projectionApplyResult.value;
+
+  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
+    createDelegateMockContext(projectionV1);
+
+  // 对当前运行环境 (v2) 走真实捕获入口 tryCapture
+  const outcome = await rawDelegate.tryCapture(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    output,
+  );
+
+  // 断言捕获结果为 Skipped 且原因严格等于 "delegation-request-conflict"
+  assert.equal(outcome?.tag, 1, 'outcome must be Skipped (tag 1)');
+  assert.equal(outcome?.fields?.[0], 'delegation-request-conflict');
+
+  // 断言持久化端口的 Append 未被调用，绝无第二份授权入库
+  assert.equal(appendedEvents.length, 0, 'durability.Append must not be called upon conflict');
+});
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_apply_explicitly_closes_mismatched_contract_revision_request', async () => {
+  // Mutation 验证与退化路径说明：
+  // 若删除或改坏 Delegate.fs 中 startRequest (由 startPendingRequest 触发) 的
+  // "elif request.ContractRevision <> contractRevision then" 分支，
+  // 则持有旧版 ContractRevision (v1) 的 Requested 状态请求在当前 v2 运行时中不会被显式关闭，
+  // 不会向 durability.Append 追加 DelegationClosed 事件，导致旧版本请求悬挂或错误继续。
+  // 本测试断言 durability.Append 必须收到且仅收到一条 DelegationClosed 事件，
+  // 其 From 必须为 Requested，Reason 必须为 CannotContinue。分支一旦被删除，测试必定红。
+
+  const ownerSessionId = 'ses-1';
+  const logicalRunId = 'log-1';
+  const authorityRootUserMessageId = 'u-1';
+  const sourcePhysicalUserMessageId = 'u-1';
+  const sourceProviderRun = 'a-1';
+
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  );
+
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  };
+
+  // 预置 ContractRevision = 1 且状态为 Requested 的请求
+  const projectionApplyResult = Strength.projectionApply(
+    Strength.projectionEmpty(),
+    Strength.eventRequested(requestV1),
+  );
+  assert.equal(projectionApplyResult.ok, true);
+  const projectionV1 = projectionApplyResult.value;
+
+  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
+    createDelegateMockContext(projectionV1);
+
+  // 走真实 apply 入口 tryApply 驱动 startPendingRequest
+  await rawDelegate.tryApply(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    output,
+  );
+
+  // 断言持久化存储收到一条 DelegationClosed
+  assert.equal(appendedEvents.length, 1, 'durability.Append must be called exactly once');
+  const closedEvent = appendedEvents[0];
+
+  // 断言该事件与 Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue') 完全一致
+  const expectedClosedEvent = Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue');
+  assert.deepEqual(closedEvent, expectedClosedEvent);
+});
+}
+

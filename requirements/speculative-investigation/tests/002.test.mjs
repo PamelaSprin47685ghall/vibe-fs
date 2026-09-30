@@ -162,7 +162,7 @@ test("STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_z
     self_note: "Checking invariants",
   });
   assert.equal(negParsed.tag, 1, "negative rounds must be rejected by contract parser");
-  assert.equal(negParsed.fields[0].tag, 2, "error must be InvalidRange (tag 2)");
+  assert.equal(negParsed.fields[0].name, "InvalidRange", "error must be InvalidRange");
 
   const zeroParsed = Contract.parseParticipatingArguments({
     [Contract.EstimatedReadonlyRoundsField]: 0,
@@ -208,7 +208,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
           callId: "call-fork-1",
           name: "fork",
           args: JSON.stringify({
-            lane: "side-investigation",
+            topic: "side-investigation",
             [Contract.EstimatedReadonlyRoundsField]: 10, // 不参与工具带参数也不起效
           }),
         },
@@ -352,7 +352,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     self_note: "old protocol call",
   });
   assert.equal(legacyAttempt.tag, 1, "Legacy delegate_readonly_rounds must be rejected");
-  assert.equal(legacyAttempt.fields[0].tag, 6, "Error must be MixedProtocolFields (tag 6)");
+  assert.equal(legacyAttempt.fields[0].name, "MixedProtocolFields", "Error must be MixedProtocolFields");
 
   // 7. 协议不变量：0 估计时 self_note 必须不存在；正数时必须有非空 self_note
   const zeroWithNote = Contract.parseParticipatingArguments({
@@ -360,16 +360,16 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     self_note: "should-not-be-present",
   });
   assert.equal(zeroWithNote.tag, 1, "0 rounds carrying self_note must fail");
-  assert.equal(zeroWithNote.fields[0].tag, 3, "Error must be NotePresentWhenZero (tag 3)");
+  assert.equal(zeroWithNote.fields[0].name, "NotePresentWhenZero", "Error must be NotePresentWhenZero");
 
   const posWithoutNote = Contract.parseParticipatingArguments({
     [Contract.EstimatedReadonlyRoundsField]: 2,
   });
   assert.equal(posWithoutNote.tag, 1, "positive rounds missing self_note must fail");
   assert.equal(
-    posWithoutNote.fields[0].tag,
-    4,
-    "Error must be MissingOrBlankNoteWhenPositive (tag 4)"
+    posWithoutNote.fields[0].name,
+    "MissingOrBlankNoteWhenPositive",
+    "Error must be MissingOrBlankNoteWhenPositive"
   );
 
   const posWithBlankNote = Contract.parseParticipatingArguments({
@@ -378,9 +378,9 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
   });
   assert.equal(posWithBlankNote.tag, 1, "positive rounds with blank self_note must fail");
   assert.equal(
-    posWithBlankNote.fields[0].tag,
-    4,
-    "Error must be MissingOrBlankNoteWhenPositive (tag 4)"
+    posWithBlankNote.fields[0].name,
+    "MissingOrBlankNoteWhenPositive",
+    "Error must be MissingOrBlankNoteWhenPositive"
   );
 });
 
@@ -489,7 +489,7 @@ test("STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggr
 test("STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols", () => {
   const pluginFsPath = path.join(
     repoRoot,
-    "src/Wanxiangshu/Strength/OpenCode/PluginTransforms.fs"
+    "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
   );
   const pluginFs = fs.readFileSync(pluginFsPath, "utf8");
 

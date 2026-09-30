@@ -330,14 +330,15 @@ module PluginHooks =
             // carries no messageID, so decodeContext would always answer None.
             let sanitizeSnapshot (toolName: string) (snapshot: ProtocolArgumentVault.Snapshot) =
                 let isReview = ManagerReviewTools.isReviewTool toolName
-                let isParticipating =
-                    InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+                let isDelegationActive =
+                    readonlyDelegationPredictorConfigured ()
+                    && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
                 { ProtocolArgumentVault.Snapshot.Contract =
                     (if isReview then snapshot.Contract else None)
                   ProtocolArgumentVault.Snapshot.ReadonlyRounds =
-                    (if isParticipating then snapshot.ReadonlyRounds else None)
+                    (if isDelegationActive then snapshot.ReadonlyRounds else None)
                   ProtocolArgumentVault.Snapshot.SelfNote =
-                    (if isParticipating then snapshot.SelfNote else None) }
+                    (if isDelegationActive then snapshot.SelfNote else None) }
 
             let commitRecordedSnapshot
                 (vault: ProtocolArgumentVault.Vault)
@@ -407,18 +408,23 @@ module PluginHooks =
 
                     let isParticipatingTool =
                         InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+                    let isDelegationActive =
+                        readonlyDelegationPredictorConfigured () && isParticipatingTool
 
-                    if isParticipatingTool && not (isNull toolOutput) && not (isNull toolOutput?args) then
+                    if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
                         let args = toolOutput?args
-                        let hasProtocolFields =
-                            hasOwnProperty args InvestigationEstimateContract.EstimatedReadonlyRoundsField
-                            || hasOwnProperty args "self_note"
-                            || hasOwnProperty args "delegate_readonly_rounds"
-
-                        if hasProtocolFields then
-                            match InvestigationEstimateContract.parseParticipatingArguments args with
-                            | Ok _ -> ()
-                            | Error err -> invalidOp (sprintf "Invalid investigation estimate arguments: %A" err)
+                        match InvestigationEstimateContract.parseParticipatingArguments args with
+                        | Ok _ -> ()
+                        | Error err ->
+                            let sessionText =
+                                if not (isNull toolInput) && not (isNull toolInput?sessionID) then
+                                    string toolInput?sessionID
+                                else
+                                    let ctx = ToolHostCodec.decodeContext toolInput
+                                    ctx.SessionId
+                            let language = ProviderLanguageBinding.forSessionText sessionText
+                            let explanation = InvestigationEstimateContract.formatArgumentError language err
+                            invalidOp (sprintf "Invalid investigation estimate arguments: %s" explanation)
 
                     recordProtocolArgumentVault toolInput toolOutput
 
@@ -439,10 +445,10 @@ module PluginHooks =
                     then
                         ManagerReviewContract.hide toolOutput?args
 
-                    // host-boundary-032 / DELEGATE_REVISE.md: narrow hide to participating tools only.
+                    // host-boundary-032 / DELEGATE_REVISE.md: narrow hide to participating tools only when predictor is configured.
                     // Non-participating and unreviewed tools are untouched, leaving their own business
-                    // arguments intact.
-                    if isParticipatingTool && not (isNull toolOutput) && not (isNull toolOutput?args) then
+                    // arguments intact. Unconfigured predictor leaves all tools untouched.
+                    if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
                         ReadonlyDelegationContract.hide toolOutput?args
                 }
 

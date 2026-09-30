@@ -43,6 +43,8 @@ import {
   HUMANROOT_MANAGER_LOOP_CANARY_PROMPT,
   assertHumanRootManagerLoop,
   retireCompanionForDeletion,
+  INVESTIGATION_OUTLOOK_MARKERS,
+  matchInvestigationOutlookMarker,
 } from './e2e/support/long-stroke-oracles.mjs'
 import { factPayloads } from './e2e/support/journal-observer.js'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
@@ -66,6 +68,80 @@ test('WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog
 
   // Verify that the entry defines the single physical server and single lifecycle contract
   assert.ok(entryPath.endsWith('014.test.mjs'), 'Long Stroke sole entry must be 014.test.mjs')
+})
+
+test('WHAT[verification-system-014] matchInvestigationOutlookMarker correctly identifies outlook markers and never falls back to raw description', () => {
+  // Incident regression: When both markers are missing, the oracle must return null rather than falling
+  // back to the full description. Falling back to the description causes undecorated tools to be fed into
+  // legacy narrative assertions, misreporting a missing decoration as a legacy narrative residue.
+
+  // 1. Both markers missing: must return null, never the description itself
+  const plainToolDescription = 'Read a file or directory from the local filesystem. If the path does not exist, an error is returned.';
+  assert.equal(matchInvestigationOutlookMarker(plainToolDescription), null);
+  assert.notEqual(matchInvestigationOutlookMarker(plainToolDescription), plainToolDescription);
+
+  const emptyDescription = '';
+  assert.equal(matchInvestigationOutlookMarker(emptyDescription), null);
+
+  const nonStringInputs = [null, undefined, 12345, {}, []];
+  for (const input of nonStringInputs) {
+    assert.equal(matchInvestigationOutlookMarker(input), null);
+  }
+
+  // 2. English marker present: returns exact English marker string
+  const enDecoratedDescription =
+    'Read a file from disk.\n\n' +
+    'Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0.';
+  const enMarker = matchInvestigationOutlookMarker(enDecoratedDescription);
+  assert.equal(enMarker, INVESTIGATION_OUTLOOK_MARKERS.en);
+  assert.equal(enMarker, 'Investigation outlook:');
+  const enIncremental = enDecoratedDescription.slice(enDecoratedDescription.indexOf(enMarker));
+  assert.ok(enIncremental.startsWith('Investigation outlook:'));
+
+  // 3. Chinese marker present: returns exact Chinese marker string
+  const zhDecoratedDescription =
+    '从本地文件系统读取文件或目录。\n\n' +
+    '调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。';
+  const zhMarker = matchInvestigationOutlookMarker(zhDecoratedDescription);
+  assert.equal(zhMarker, INVESTIGATION_OUTLOOK_MARKERS.zh);
+  assert.equal(zhMarker, '调查展望：');
+  const zhIncremental = zhDecoratedDescription.slice(zhDecoratedDescription.indexOf(zhMarker));
+  assert.ok(zhIncremental.startsWith('调查展望：'));
+
+  // 4. Invariant: Idempotent decoration appends must not produce multiple marker blocks
+  const enDoubleDecorated =
+    enDecoratedDescription +
+    '\n\nInvestigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch.';
+  const doubleMarker = matchInvestigationOutlookMarker(enDoubleDecorated);
+  assert.equal(doubleMarker, INVESTIGATION_OUTLOOK_MARKERS.en);
+  // Verify that an incremental slice from the first marker can detect non-idempotent duplication
+  const firstIndex = enDoubleDecorated.indexOf(doubleMarker);
+  const secondIndex = enDoubleDecorated.indexOf(doubleMarker, firstIndex + doubleMarker.length);
+  assert.ok(secondIndex > firstIndex, 'Controlled fixture proves second occurrence exists when duplicated');
+
+  // And for a properly decorated tool, the marker block appears exactly once
+  const singleFirstIndex = enDecoratedDescription.indexOf(enMarker);
+  const singleSecondIndex = enDecoratedDescription.indexOf(enMarker, singleFirstIndex + enMarker.length);
+  assert.equal(singleSecondIndex, -1, 'Properly decorated description must have exactly one marker occurrence');
+
+  // 5. Executable Mutation Verification (counterexample showing the test goes RED if reverted to 3-tier fallback):
+  // The buggy 3-tier fallback returned the full description on missing markers:
+  const buggyThreeTierFallback = (desc) =>
+    desc.includes('Investigation outlook:')
+      ? 'Investigation outlook:'
+      : desc.includes('调查展望：')
+        ? '调查展望：'
+        : desc; // The bug: fallback to desc
+
+  // Demonstrating the mutation creates a distinct observable failure:
+  const mutantResult = buggyThreeTierFallback(plainToolDescription);
+  assert.equal(mutantResult, plainToolDescription);
+  // A test asserting strict equality to null strictly rejects the mutated logic:
+  assert.throws(
+    () => assert.equal(mutantResult, null),
+    /AssertionError/,
+    'Reverting to 3-tier fallback must fail the null assertion with an AssertionError',
+  );
 })
 
 test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases', () => {

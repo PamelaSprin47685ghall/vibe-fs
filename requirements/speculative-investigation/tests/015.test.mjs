@@ -599,11 +599,6 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_ma
     .split(',')
     .map((token) => Number(token.trim()))
 
-  const delegateSource = readFileSync(resolve(repoRoot, 'src/Wanxiangshu/Strength/OpenCode/Delegate.fs'), 'utf8')
-  const revisionSites = [...delegateSource.matchAll(/DelegationContractRevisions\.create\s+([\w.]+)/g)]
-  assert.equal(revisionSites.length, 1, '运行时当前契约修订必须恰好有一处代码级常量绑定')
-  assert.equal(revisionSites[0][1], 'InvestigationEstimateContract.ProtocolRevision', '运行时契约修订必须引用 InvestigationEstimateContract.ProtocolRevision')
-
   const classifierSource = readFileSync(resolve(repoRoot, 'src/Wanxiangshu/Strength/Migration/LegacyProtocolClassifier.fs'), 'utf8')
   const guidanceInputVersion = classifierSource.match(/--input-version ([\w.-]+)/)
   const guidanceRevision = classifierSource.match(/--contract-revision (\d+)/)

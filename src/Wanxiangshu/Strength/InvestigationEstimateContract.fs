@@ -2,6 +2,7 @@ namespace Wanxiangshu.Strength
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Participant.Provider
 
 module InvestigationEstimateContract =
 
@@ -163,3 +164,62 @@ module InvestigationEstimateContract =
                 match validateNoteForPositive arguments with
                 | Error err -> Error err
                 | Ok noteOpt -> Ok(EstimatedReadonlyRounds positiveRounds, noteOpt)
+
+    let describeArgumentError (language: ProviderLanguage) (error: EstimateArgumentError) : string =
+        match language with
+        | ProviderLanguage.SimplifiedChinese ->
+            match error with
+            | EstimateArgumentError.MissingEstimate ->
+                "必须提供 estimated_readonly_rounds 估计字段"
+            | EstimateArgumentError.WrongNumberType ->
+                "estimated_readonly_rounds 必须为数字类型"
+            | EstimateArgumentError.InvalidRange ->
+                "estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数"
+            | EstimateArgumentError.NotePresentWhenZero ->
+                "estimated_readonly_rounds 为 0 时必须省略 self_note"
+            | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
+                "正数估计需要非空的后续查证展望"
+            | EstimateArgumentError.NoteNotString ->
+                "self_note 必须为字符串类型"
+            | EstimateArgumentError.MixedProtocolFields ->
+                "不得携带旧协议字段 delegate_readonly_rounds"
+            | EstimateArgumentError.InvalidArgumentObject ->
+                "工具参数必须为合法的普通对象"
+        | ProviderLanguage.English ->
+            match error with
+            | EstimateArgumentError.MissingEstimate ->
+                "The estimated_readonly_rounds field must be provided"
+            | EstimateArgumentError.WrongNumberType ->
+                "estimated_readonly_rounds must be a number"
+            | EstimateArgumentError.InvalidRange ->
+                "estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647"
+            | EstimateArgumentError.NotePresentWhenZero ->
+                "self_note must be omitted when estimated_readonly_rounds is 0"
+            | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
+                "A positive estimate requires a non-empty self_note outlook"
+            | EstimateArgumentError.NoteNotString ->
+                "self_note must be a string"
+            | EstimateArgumentError.MixedProtocolFields ->
+                "The legacy delegate_readonly_rounds field must not be used"
+            | EstimateArgumentError.InvalidArgumentObject ->
+                "Tool arguments must be a valid plain object"
+
+    let formatArgumentError (language: ProviderLanguage) (error: EstimateArgumentError) : string =
+        describeArgumentError language error
+
+    let describeArgumentErrorZh (error: EstimateArgumentError) : string =
+        describeArgumentError ProviderLanguage.SimplifiedChinese error
+
+    let describeArgumentErrorEn (error: EstimateArgumentError) : string =
+        describeArgumentError ProviderLanguage.English error
+
+    let errorCode (error: EstimateArgumentError) : string =
+        match error with
+        | EstimateArgumentError.MissingEstimate -> "MissingEstimate"
+        | EstimateArgumentError.WrongNumberType -> "WrongNumberType"
+        | EstimateArgumentError.InvalidRange -> "InvalidRange"
+        | EstimateArgumentError.NotePresentWhenZero -> "NotePresentWhenZero"
+        | EstimateArgumentError.MissingOrBlankNoteWhenPositive -> "MissingOrBlankNoteWhenPositive"
+        | EstimateArgumentError.NoteNotString -> "NoteNotString"
+        | EstimateArgumentError.MixedProtocolFields -> "MixedProtocolFields"
+        | EstimateArgumentError.InvalidArgumentObject -> "InvalidArgumentObject"

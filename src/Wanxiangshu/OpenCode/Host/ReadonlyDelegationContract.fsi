@@ -42,7 +42,7 @@ module ReadonlyDelegationContract =
     /// TypeError if the object is frozen/non-extensible.
     val restore: args: obj -> unit
 
-    /// Validates the delegate_readonly_rounds value at the JS boundary
+    /// Validates the estimated_readonly_rounds value at the JS boundary
     /// before constructing the F# budget type: only a native finite integer
     /// within [0, 2147483647] is accepted. Missing, null, boolean, string,
     /// non-finite, fractional and out-of-range values are rejected without

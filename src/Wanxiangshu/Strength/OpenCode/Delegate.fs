@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
@@ -411,7 +412,7 @@ module StrengthDelegate =
         | PositiveEstimate of budget: ReadonlyRoundBudget
         | ArgumentError of reason: string
 
-    let private aggregateBatchEstimate (calls: SourceToolCall list) : BatchAggregation =
+    let private aggregateBatchEstimate (language: ProviderLanguage) (calls: SourceToolCall list) : BatchAggregation =
         let estimateCalls =
             calls
             |> List.filter (fun call ->
@@ -431,11 +432,12 @@ module StrengthDelegate =
                         match InvestigationEstimateContract.parseParticipatingArguments parsedObj with
                         | Ok(rounds, _noteOpt) -> Ok rounds
                         | Error err ->
+                            let explanation = InvestigationEstimateContract.formatArgumentError language err
                             Error(
                                 sprintf
-                                    "delegation arguments of call %s rejected: %A"
+                                    "delegation arguments of call %s rejected: %s"
                                     (ToolCallId.value call.CallId)
-                                    err
+                                    explanation
                             ))
 
             let firstError =
@@ -489,8 +491,9 @@ module StrengthDelegate =
         : Result<SourceToolCall list * ReadonlyRoundBudget, string> =
         result {
             let! calls = tryResolveSourceCalls surface
+            let language = ProviderLanguageBinding.forSessionText (SessionId.value surface.Owner)
 
-            match aggregateBatchEstimate calls with
+            match aggregateBatchEstimate language calls with
             | BatchAggregation.PositiveEstimate budget -> return calls, budget
             | BatchAggregation.NoEstimateOpportunity -> return! Error "no-estimate-opportunity"
             | BatchAggregation.EstimatedZero -> return! Error "estimated-zero"
