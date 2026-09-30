@@ -274,16 +274,33 @@ module private StrengthReplicaRuntimeLogic =
         : Task<unit> =
         task {
             try
+                let port = DispatchSessionPort.ofSessionPort sessions
+                let tools = StrengthReplicaTools.exactReadonlyHostToolMap
+                let projection = dispatcher.ProjectionFor replica
+
                 let! sent =
-                    dispatcher.SendAgentOwnerRootWithTools
-                        (DispatchSessionPort.ofSessionPort sessions)
-                        replica
-                        "Continue."
-                        identitySeed
-                        directory
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-                        StrengthReplicaTools.exactReadonlyHostToolMap
+                    match projection.ActiveLogicalRun with
+                    | None ->
+                        dispatcher.SendAgentOwnerRootWithTools
+                            port
+                            replica
+                            "Continue."
+                            identitySeed
+                            directory
+                            PromptDispatcher.AwaitMode.Detached
+                            None
+                            tools
+                    | Some profile ->
+                        dispatcher.SendContinuationWithTools
+                            port
+                            replica
+                            "Continue."
+                            PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                            profile
+                            directory
+                            PromptDispatcher.AwaitMode.Detached
+                            None
+                            tools
 
                 do! applyBootstrapSendResult complete abortReplica state sent
             with ex ->
