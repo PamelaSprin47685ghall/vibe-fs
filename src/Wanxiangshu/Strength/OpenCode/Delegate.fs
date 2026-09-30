@@ -36,8 +36,8 @@ open Wanxiangshu.Strength.Replica
 [<RequireQualifiedAccess>]
 module StrengthDelegate =
 
- /// WHAT-014: stable code-level contract version of the delegation field set.
- /// It never changes with environment, configuration or rollout state.
+    /// WHAT-014: stable code-level contract version of the delegation field set.
+    /// It never changes with environment, configuration or rollout state.
     let private contractRevision =
         DelegationContractRevisions.create InvestigationEstimateContract.ProtocolRevision
 
@@ -221,7 +221,7 @@ module StrengthDelegate =
                   DurableProjection = durableStrength }
         }
 
- // ---- source batch evidence -------------------------------------------------
+    // ---- source batch evidence -------------------------------------------------
 
     let private isToolPartCompleted (part: obj) : bool =
         let state = ProviderWireDecode.readField part "state"
@@ -386,10 +386,10 @@ module StrengthDelegate =
     let private callIdSet (calls: SourceToolCall list) =
         calls |> List.map (fun call -> ToolCallId.value call.CallId) |> Set.ofList
 
- /// One scan step over the wire: a non-assistant message yields an empty
- /// batch and advances; an assistant message with no calls stops the scan;
- /// an assistant message with calls yields its complete batch and the next
- /// index. `Error` means the wire is not a completed batch, so scanning stops.
+    /// One scan step over the wire: a non-assistant message yields an empty
+    /// batch and advances; an assistant message with no calls stops the scan;
+    /// an assistant message with calls yields its complete batch and the next
+    /// index. `Error` means the wire is not a completed batch, so scanning stops.
     let rec private wireBatchStep
         (all: ProviderProjection.WireMessage array)
         (index: int)
@@ -473,10 +473,10 @@ module StrengthDelegate =
         | [] -> None
         | batches -> matchBatchWithTailCalls wire.Messages (List.last batches)
 
- /// Resolves the completed source batch of the tail assistant message.
- /// Supports both:
- /// 1. Host session-shaped tool parts (single assistant message where all tool parts are completed with output)
- /// 2. Wire-level multi-message parts (assistant WireToolCall messages followed by WireToolResult messages)
+    /// Resolves the completed source batch of the tail assistant message.
+    /// Supports both:
+    /// 1. Host session-shaped tool parts (single assistant message where all tool parts are completed with output)
+    /// 2. Wire-level multi-message parts (assistant WireToolCall messages followed by WireToolResult messages)
     let private resolveCompletedSourceBatch
         (rawMessages: obj list)
         (wire: ProviderProjection.ProviderWireProjection)
@@ -502,7 +502,7 @@ module StrengthDelegate =
         | Some calls -> Some calls
         | None -> tryExtractWireCompletedBatch wire
 
- // ---- call budget parsing ---------------------------------------------------
+    // ---- call budget parsing ---------------------------------------------------
 
     let private tryParseCallArguments (callId: ToolCallId) (arguments: string) : Result<obj, string> =
         try
@@ -578,7 +578,7 @@ module StrengthDelegate =
         | [] -> BatchAggregation.NoEstimateOpportunity
         | _ -> estimateCalls |> List.map parseCall |> ofParsedResults
 
- // ---- phase one: capture the authorization ----------------------------------
+    // ---- phase one: capture the authorization ----------------------------------
 
     type CaptureOutcome =
         | Captured of DelegationRequest
@@ -824,7 +824,7 @@ module StrengthDelegate =
                         output
         }
 
- // ---- phase two: start / consume --------------------------------------------
+    // ---- phase two: start / consume --------------------------------------------
 
     let private appendClosed
         (strengthScope: PluginStrengthScope)
@@ -934,10 +934,10 @@ module StrengthDelegate =
                 DelegationClosedReason.RecoveryAbandoned
         | _ -> Task.FromResult()
 
- /// DELEGATE-7/10: the target run already owns a durable decision. A Prepared
- /// candidate re-renders the exact same material without re-running the
- /// readonly tools; a Bound-but-empty execution whose local child is gone
- /// loses this investigation opportunity and closes; settled states wait.
+    /// DELEGATE-7/10: the target run already owns a durable decision. A Prepared
+    /// candidate re-renders the exact same material without re-running the
+    /// readonly tools; a Bound-but-empty execution whose local child is gone
+    /// loses this investigation opportunity and closes; settled states wait.
     let private consumeBoundDecision
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
@@ -980,7 +980,13 @@ module StrengthDelegate =
         : Task<unit> =
         task {
             match! surface.Ports.Runtime.SendPreparedPrompt preparation.ReplicaSessionId with
-            | Error _ ->
+            | Error err ->
+                Diagnostic.emit
+                    "strength-replica-prepare-failed"
+                    [ "session_id", SessionId.value surface.Owner
+                      "replica_session_id", SessionId.value preparation.ReplicaSessionId
+                      "result", err ]
+
                 return!
                     appendClosed
                         strengthScope
@@ -1041,7 +1047,11 @@ module StrengthDelegate =
                     surface.AnchorDigest
                 )
             with
-            | Error _ ->
+            | Error reason ->
+                Diagnostic.emit
+                    "strength-replica-prepare-failed"
+                    [ "session_id", SessionId.value surface.Owner; "result", reason ]
+
                 return!
                     appendClosed
                         strengthScope
@@ -1069,8 +1079,9 @@ module StrengthDelegate =
         match mirrorResult with
         | Error err ->
             Diagnostic.emit
-                "strength-mirror-localization-failed"
-                [ "session_id", SessionId.value surface.Owner; "result", sprintf "%A" err ]
+                "strength-replica-prepare-failed"
+                [ "session_id", SessionId.value surface.Owner
+                  "result", sprintf "mirror-failed: %A" err ]
 
             appendClosed
                 strengthScope
@@ -1099,8 +1110,8 @@ module StrengthDelegate =
         elif strengthScope.StrengthFuseReason |> Option.isSome then
             failClosed strengthScope "Strength fuse is tripped; delegation is closed for this process"
         elif request.ContractRevision <> contractRevision then
- // v1 Requested that was not Bound is explicitly closed
- // upon contract revision upgrade; owner continues normally without launching old protocol child.
+            // v1 Requested that was not Bound is explicitly closed
+            // upon contract revision upgrade; owner continues normally without launching old protocol child.
             appendClosed
                 strengthScope
                 surface
@@ -1108,6 +1119,11 @@ module StrengthDelegate =
                 DelegationClosedFrom.Requested
                 DelegationClosedReason.CannotContinue
         elif not predictorConfigured then
+            Diagnostic.emit
+                "strength-replica-prepare-failed"
+                [ "session_id", SessionId.value surface.Owner
+                  "result", "predictor-not-configured" ]
+
             appendClosed
                 strengthScope
                 surface
@@ -1115,6 +1131,10 @@ module StrengthDelegate =
                 DelegationClosedFrom.Requested
                 DelegationClosedReason.CannotContinue
         elif not (Set.contains surface.Authority.CanonicalRole StrengthPolicy.eligibleRoles) then
+            Diagnostic.emit
+                "strength-replica-prepare-failed"
+                [ "session_id", SessionId.value surface.Owner; "result", "role-not-eligible" ]
+
             appendClosed
                 strengthScope
                 surface
@@ -1124,9 +1144,9 @@ module StrengthDelegate =
         else
             prepareAndStartReplica strengthScope surface request
 
- /// DELEGATE-10: recovery reads the pending request from persisted facts. A
- /// new user input or authority replacement closes the old request; the
- /// request never rescans arbitrary history for a positive budget.
+    /// DELEGATE-10: recovery reads the pending request from persisted facts. A
+    /// new user input or authority replacement closes the old request; the
+    /// request never rescans arbitrary history for a positive budget.
     let private startPendingRequest
         (strengthScope: PluginStrengthScope)
         (predictorConfigured: bool)
@@ -1258,22 +1278,25 @@ module StrengthDelegate =
                 let sessionId =
                     ProviderWireDecode.projectionSessionIdFromMessages output
                     |> Option.defaultValue ""
+
                 Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
                 return ()
             | CaptureOutcome.Captured request ->
                 Diagnostic.emit
                     "strength-delegation-requested"
                     [ "session_id", SessionId.value request.OwnerSessionId
-                      "decision_id", StrengthDecisionId.value request.DecisionId
-                      "requested_rounds", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
+                      "result", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
+
                 match tryBind journal snapshotPort strengthDurability strengthScope output with
                 | Error _ -> return ()
                 | Ok bound ->
                     let! durableStrength = loadDurableProjectionOrThrow (fst bound) strengthScope "start"
-                    match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
+
+                    match!
+                        resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
+                    with
                     | Error _ -> return ()
-                    | Ok surface ->
-                        return! startRequest strengthScope predictorConfigured surface request
+                    | Ok surface -> return! startRequest strengthScope predictorConfigured surface request
         }
 
     let tryApply

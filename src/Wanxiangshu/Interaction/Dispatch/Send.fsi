@@ -89,6 +89,15 @@ module PromptDispatcherSend =
             onAccepted: (PhysicalUserMessageId -> unit) option ->
                 Task<Result<PromptKey, string>>
 
+        member SendManagedAssignment:
+            port: IDispatchSessionPort ->
+            sessionId: SessionId ->
+            text: string ->
+            issueIdentitySeed: (unit -> Result<PromptAuthority.IdentitySeed, string>) ->
+            directory: string option ->
+            tools: Map<string, bool> option ->
+                Task<Result<PromptKey, string>>
+
         member internal SendIdleContinuation:
             port: IDispatchSessionPort ->
             sessionId: SessionId ->

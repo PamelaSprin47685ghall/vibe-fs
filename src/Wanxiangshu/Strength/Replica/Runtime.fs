@@ -75,6 +75,11 @@ type StrengthReplicaPeek =
 /// 1. Registration order: liveRegistry.Register -> claimCollectorOrFail (byReplica insertion).
 /// 2. Retirement order: semantic terminal completes TaskCompletionSource -> physical terminal removes from byReplica and liveRegistry.Retire.
 
+[<RequireQualifiedAccess>]
+type private StrengthReplicaBootstrap =
+    | Pending of PromptAuthority.IdentitySeed
+    | Sent
+
 type private StrengthReplicaDecisionState =
     {
         Owner: SessionId
@@ -84,9 +89,7 @@ type private StrengthReplicaDecisionState =
         /// DELEGATE-5.3: keys of the outbound requests this run really admitted.
         /// Survives Host truncation/compaction because it is owned here.
         AdmittedRequests: Set<StrengthReplicaRequestKey>
-        /// Set in the prepared stage (SendPreparedPrompt consumes it); None for
-        /// an AttachLiveDecision path whose caller already bootstrapped.
-        IdentitySeed: PromptAuthority.IdentitySeed option
+        Bootstrap: StrengthReplicaBootstrap
         SemanticTerminal: StrengthReplicaTerminal option
         Completion: TaskCompletionSource<StrengthReplicaOutcome>
         RequestsAdmitted: int
@@ -116,7 +119,10 @@ module private StrengthReplicaRuntimeLogic =
           DecisionId = binding.DecisionId
           Agent = agent
           AdmittedRequests = Set.empty
-          IdentitySeed = identitySeed
+          Bootstrap =
+            identitySeed
+            |> Option.map StrengthReplicaBootstrap.Pending
+            |> Option.defaultValue StrengthReplicaBootstrap.Sent
           SemanticTerminal = None
           Completion = TaskCompletionSource<StrengthReplicaOutcome>()
           RequestsAdmitted = 0
@@ -276,31 +282,21 @@ module private StrengthReplicaRuntimeLogic =
             try
                 let port = DispatchSessionPort.ofSessionPort sessions
                 let tools = StrengthReplicaTools.exactReadonlyHostToolMap
-                let projection = dispatcher.ProjectionFor replica
+
+                let prompt =
+                    ProviderProse.render
+                        (ProviderProse.languageOf state.Owner)
+                        "delegation/readonly-investigation"
+                        Map.empty
 
                 let! sent =
-                    match projection.ActiveLogicalRun with
-                    | None ->
-                        dispatcher.SendAgentOwnerRootWithTools
-                            port
-                            replica
-                            "Continue."
-                            identitySeed
-                            directory
-                            PromptDispatcher.AwaitMode.Detached
-                            None
-                            tools
-                    | Some profile ->
-                        dispatcher.SendContinuationWithTools
-                            port
-                            replica
-                            "Continue."
-                            PromptAuthority.ContinuationKind.ManagedDelegationAssignment
-                            profile
-                            directory
-                            PromptDispatcher.AwaitMode.Detached
-                            None
-                            tools
+                    dispatcher.SendManagedAssignment
+                        port
+                        replica
+                        prompt
+                        (fun () -> Ok identitySeed)
+                        directory
+                        (Some tools)
 
                 do! applyBootstrapSendResult complete abortReplica state sent
             with ex ->
@@ -334,11 +330,6 @@ module private StrengthReplicaRuntimeLogic =
 
         { ReplicaSessionId = replica
           PriorProviderRun = priorRun }
-
-    /// The bootstrap request has no prior assistant response yet.
-    let bootstrapRequestKey (replica: SessionId) : StrengthReplicaRequestKey =
-        { ReplicaSessionId = replica
-          PriorProviderRun = None }
 
     let private isNonToolPart =
         function
@@ -809,7 +800,9 @@ type StrengthReplicaRuntime
         // the residency slot cleared, so the next decision for that owner builds
         // a fresh child instead of trusting a stale id.
         match liveRegistry.ReleaseResidentByReplica sessionId with
-        | Some owner -> releaseLease sessionId; ignore owner
+        | Some owner ->
+            releaseLease sessionId
+            ignore owner
         | None -> ()
 
         retireOrphanLiveBinding sessionId
@@ -829,10 +822,8 @@ type StrengthReplicaRuntime
         if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
             removeState state
 
-    let sendPreparedPrompt state identitySeed admitted replicaSessionId =
+    let sendPreparedPrompt state identitySeed replicaSessionId =
         task {
-            replaceState state admitted |> ignore
-
             do!
                 StrengthReplicaRuntimeLogic.bootstrapDetachedSend
                     dispatcher
@@ -842,12 +833,12 @@ type StrengthReplicaRuntime
                     directory
                     replicaSessionId
                     identitySeed
-                    admitted
+                    state
 
             return Ok()
         }
 
-    let acquireAndSendBootstrapPrompt state identitySeed admitted replicaSessionId =
+    let acquireAndSendBootstrapPrompt state identitySeed replicaSessionId =
         task {
             match!
                 StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort
@@ -857,38 +848,35 @@ type StrengthReplicaRuntime
                     state.Agent
             with
             | Error error ->
-                complete (StrengthReplicaTerminal.Failed error) admitted
-                do! abortReplica admitted
-                return Error error
-            | Ok _ -> return! sendPreparedPrompt state identitySeed admitted replicaSessionId
-        }
-
-    let sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId =
-        task {
-            if not (liveRegistry.TryAdmitRequest replicaSessionId) then
-                complete StrengthReplicaTerminal.BudgetReached state
+                complete (StrengthReplicaTerminal.Failed error) state
                 do! abortReplica state
-                return Error "StrengthReplica budget reached before the bootstrap request"
-            else
-                return! acquireAndSendBootstrapPrompt state identitySeed admitted replicaSessionId
+                return Error error
+            | Ok _ -> return! sendPreparedPrompt state identitySeed replicaSessionId
         }
-
-    let sendPreparedPromptWithSeed state identitySeed replicaSessionId =
-        match
-            StrengthReplicaRuntimeLogic.admitRequest
-                state
-                (StrengthReplicaRuntimeLogic.bootstrapRequestKey replicaSessionId)
-        with
-        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Rejected ->
-            Task.FromResult(Error "StrengthReplica decision already closed")
-        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Idempotent _ -> Task.FromResult(Ok())
-        | StrengthReplicaRuntimeLogic.ReplicaAdmission.Admitted admitted ->
-            sendPreparedPromptAdmitted state identitySeed admitted replicaSessionId
 
     let sendPreparedPromptForState state replicaSessionId =
-        match state.IdentitySeed with
-        | None -> Task.FromResult(Error "StrengthReplica prepared session has no identity seed")
-        | Some identitySeed -> sendPreparedPromptWithSeed state identitySeed replicaSessionId
+        let claim =
+            lock gate (fun () ->
+                match byReplica.TryGetValue(key replicaSessionId) with
+                | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
+                    if current.SemanticTerminal |> Option.isSome then
+                        Error "StrengthReplica decision already closed"
+                    else
+                        match current.Bootstrap with
+                        | StrengthReplicaBootstrap.Sent -> Ok None
+                        | StrengthReplicaBootstrap.Pending identitySeed ->
+                            let claimed =
+                                { current with
+                                    Bootstrap = StrengthReplicaBootstrap.Sent }
+
+                            byReplica.[key replicaSessionId] <- claimed
+                            Ok(Some(claimed, identitySeed))
+                | _ -> Error "StrengthReplica prepared session is not live")
+
+        match claim with
+        | Error reason -> Task.FromResult(Error reason)
+        | Ok None -> Task.FromResult(Ok())
+        | Ok(Some(claimed, identitySeed)) -> acquireAndSendBootstrapPrompt claimed identitySeed replicaSessionId
 
     member _.IsReplica(sessionId: SessionId) =
         liveRegistry.TryFindByReplica sessionId |> Option.isSome
@@ -1140,13 +1128,9 @@ type StrengthReplicaRuntime
                   Completion = state.Completion.Task }
         }
 
-    /// DELEGATE-6.2: the start stage of a prepared replica. Acquires the model
-    /// lease, admits the bootstrap outbound request and only then sends the
-    /// prompt. Called after the caller persisted DelegationBound. Idempotent:
-    /// an already-admitted bootstrap is not re-sent, so a retry cannot turn into
-    /// a free extra provider request.
+    /// DELEGATE-6.2: claim the bootstrap once, acquire the model lease and send
+    /// after DelegationBound. Only the outbound transform consumes request budget.
     member this.SendPreparedPrompt(replicaSessionId: SessionId) : Task<Result<unit, string>> =
-        // bootstrapDetachedSend occurs in this stage after state and model are admitted.
         match tryState replicaSessionId with
         | None -> Task.FromResult(Error "StrengthReplica prepared session is not live")
         | Some state when state.SemanticTerminal |> Option.isSome ->

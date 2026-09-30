@@ -746,6 +746,42 @@ module PromptDispatcherSend =
                 onAccepted
                 (Some tools)
 
+        member this.SendManagedAssignment
+            (port: IDispatchSessionPort)
+            (sessionId: SessionId)
+            (text: string)
+            (issueIdentitySeed: unit -> Result<PromptAuthority.IdentitySeed, string>)
+            (directory: string option)
+            (tools: Map<string, bool> option)
+            : Task<Result<PromptKey, string>> =
+            match (this.ProjectionFor sessionId).ActiveLogicalRun with
+            | Some profile ->
+                this.SendContinuationWithDigest
+                    port
+                    sessionId
+                    text
+                    (HostDigest.sha256Hex text)
+                    PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                    profile
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+                    tools
+            | None ->
+                match issueIdentitySeed () with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok identitySeed ->
+                    this.SendAgentOwnerRootCore
+                        port
+                        sessionId
+                        text
+                        identitySeed
+                        directory
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                        None
+                        tools
+
         /// provider-attempt-recovery-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///
         /// Its payload digest names the occasion (BloggerRequestId + terminal

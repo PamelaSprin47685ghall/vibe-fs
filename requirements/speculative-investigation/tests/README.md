@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | [001] | 不健康前提、Shadow、嵌套请求的 K0 裁决和默认设置 | 同一次真实 Work 在 Off/K0/熔断与无优化时的行为等价 |
 | [002] | 每个机会前提单独翻转的策略矩阵；未知标签拒绝 | 真正 Work 入口从冻结身份与 target 取得证据；角色白名单有合同冲突 |
-| [003] | Collector 的并发配对、跨 request 边界；真实 transform/coordinator 对所给 transcript 的预算关闭和 AbortSession 调用 | 安装版 Host 到受控 provider 的第 K+1 次外发确实不存在 |
-| [004] | readonly capability、owner attachment、single-flight、坏角色/K0 拒绝；实际 Predictor root 准入及 Fission 拒绝 | 实际启动 Replica 的身份、语言、工具 schema/执行门禁全链 |
+| [003] | Collector 的并发配对、跨 request 边界；真实 transform/coordinator 的预算关闭；真实 Host 中同一常驻副本连续两次委托各发出两轮请求 | 更多预算与故障截断组合的真实网络证明 |
+| [004] | 现行角色的精确 readonly capability、退役角色拒绝、owner attachment、single-flight；Host 原始 system 数组中的双语约束；真实 provider 仅收到 js-predictor | 所有角色、语言及拒绝效果的真实 Host 矩阵 |
 | [005] | Frame 规范化、序号、digest/调用标识；完整 canonical 文本的独立 UTF-8 字节边界；工具交换渲染 | 真实采集结果到 Owner 注入的完整连线 |
 | [006] | 真 EventStore/payload closure、冲突拒绝、关闭重开读取；Prepared 不 replay | 模糊写入时实际 Owner 外发被阻止 |
 | [007] | 消费证据分类、exact target 裁决、失败轮次 Abandoned、Promoted 持久化 | 模糊 Promotion 时实际 continuation 被阻止 |
@@ -16,10 +16,10 @@
 | [010] | 成本公式、预算门槛、控制分组、真实 scope 的 exact-run 计数、会话隔离与重放幂等 | rollout 样本充分性和生产训练流不接纳干预请求 |
 | [011] | scope 熔断 first-wins；真实 coordinator 的取消、删除、释放与不可复活终态 | 无因果终态时真实 Treatment 仍等待；Host Canary 真实兼容性 |
 | [012] | Candidate/Promoted 只插入准确工具交换，保留普通正文中的“replica”等合法内容 | Owner/Replica 真实输入与完整 Host/EventStore 审计字段 |
-| [013] | 真实 coordinator 仅按 exact owner+target 关闭 DryRun，重复终结不重复 abort，Treatment 不被此入口关闭 | 启动后 Owner 不等待真实 Replica，且 Prepared/Promoted 与 Owner 历史零变化 |
+| [013] | 真实 Host 的 Manager 经 js-manager 连续触发两次委托：两个 Bound、同一 resident child、四次 predictor 请求、两条实际工作指令、无裸 Continue；provider system 有只读约束且工具集合精确为 js-predictor | 更长生命周期与崩溃恢复组合 |
 | [014] | 合法 ablation 配置下真实 Strength settings 对 Off/Shadow/DryRun/Treatment 的优先级矩阵 | 不把无效 DAG 的 fallback 当作正常 ablated 场景 |
 
-`Strength.Surface.replicaRuntimeCreate` 使用生产 coordinator，但 CreateChildSession/SendPrompt 是未使用的占位端口；测试使用 `AttachLiveDecision`。它可以证明 attach/turn/transform/delete/dispose，不能证明 StartDecision 或 StartDryRun 启动。`transformApply` 的 abort 端口只记录调用，不证明物理 provider 网络已停止。现有纯策略测试中的历史角色只是受控输入，不代表允许新建旧身份。
+`Strength.Surface.replicaRuntimeCreate` 使用生产 coordinator，但 CreateChildSession/SendPrompt 是未使用的占位端口；测试使用 `AttachLiveDecision`。它可以证明 attach/turn/transform/delete/dispose，不能证明 StartDecision 启动。`transformApply` 的 abort 端口只记录调用，不证明物理 provider 网络已停止。`013.test.mjs` 的 `resident_manager_predictor_keeps_each_budget_and_readonly_boundary` 则启动真实 OpenCode，使用隔离 HTTP provider 观察外发字节和子会话 transcript；该 canary 不使用真实外部模型。现有纯策略测试中的历史角色只是受控输入，不代表允许新建旧身份。
 
 `008` 集成用例确实关闭并重开同一个 EventStore；消费 turn 和 Traced 游标仍由测试提供，不称为真实 provider 或进程 crash 恢复。`006` 单独保留 Prepared 的关闭重开证明。完整字节测试观察生产送入 digest 的 canonical 文本，用 Node UTF-8 计量独立核对；不另造 Frame 算法。
 

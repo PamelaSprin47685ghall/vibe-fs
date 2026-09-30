@@ -7,10 +7,9 @@ test('WHAT[capability-enforcement-005] replica projections and tool policy allow
     { tool: '*', allowed: false },
     { tool: 'js-predictor', allowed: true },
   ])
-  for (const role of ['engineer', 'devops']) {
+  for (const role of ['engineer', 'devops', 'manager', 'orchestrator']) {
     assert.deepEqual(capabilities(role), ['Glob', 'Grep', 'Read'])
   }
-  assert.deepEqual(capabilities('manager'), [])
   for (const tool of ['read', 'glob', 'grep', 'js-predictor']) assert.equal(isAllowedTool(tool), true, tool)
   for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
     assert.equal(isAllowedTool(tool), false, tool)

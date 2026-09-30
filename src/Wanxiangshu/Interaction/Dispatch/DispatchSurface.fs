@@ -50,6 +50,7 @@ module DispatchSurface =
                                        variant = model.variant |> Option.defaultValue null |})
                             |> Option.defaultValue null
                            directory = options.Directory |> Option.defaultValue null
+                           tools = options.Tools |> Option.map Map.toArray |> Option.toObj
                            metadata = options.Metadata |> Option.defaultValue null |}
 
                 emitJsExpr (sendPrompt, SessionId.value sessionId, text, options) "$0($1,$2,$3)"
@@ -310,6 +311,45 @@ module DispatchSurface =
         (identitySeed: obj)
         : Task<obj> =
         sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await port handle session text identitySeed
+
+    let sendManagedAssignment
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        (tools: (string * bool) array option)
+        : Task<obj> =
+        task {
+            let runtime =
+                PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
+            let adapter = PlainSessionPort(port)
+
+            let! result =
+                runtime.SendManagedAssignment
+                    adapter.DispatchPort
+                    (SessionId.create session)
+                    text
+                    (fun () -> identitySeedOf identitySeed)
+                    None
+                    (tools |> Option.map Map.ofArray)
+
+            return
+                match result with
+                | Ok key ->
+                    box
+                        {| ok = true
+                           key = PromptKey.value key
+                           error = null
+                           observation = adapter.LastObservation |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           key = null
+                           error = error
+                           observation = adapter.LastObservation |}
+        }
 
     let private profileOf (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
         let authorityKind =

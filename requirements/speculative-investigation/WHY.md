@@ -68,12 +68,10 @@
 
 ### 为什么 Replica §7.4 执行约束走 system transform 追加，而不走 bootstrap 消息注入？
 
-- **约束**：根据 DELEGATE §7.4，Replica 会话仅承担只读试探调查，必须对 provider 施加物理级强制约束，严禁执行命令、写文件或发起第二层委托。
-- **选择**：在 `ProviderSystemTransform.fs` 中识别存活的 Replica 执行会话，将约束文本作为 system prompt 的附加片段注入。这是物理链路中唯一能稳定且真实到达 Provider 提示词的渠道。
-- **替代方案及其代价**：
-  1. *修改 `StrengthReplicaRuntime.bootstrapDetachedSend` 中的初始消息*：将硬编码的 `"Continue."` 改为携带约束与差使说明的引导文本。这看似将改动局限在 `Strength/Replica/` 目录内最干净，但具有**致命虚假性**。因为在实际物理调度中，`StrengthReplicaTransform.apply` 会在会话就绪后用 `binding.LocalizedMirrorMessages` 整份覆盖物理消息流水；bootstrap 阶段发送给 provider 的文字在真正发起推理时会被彻底冲刷丢弃，provider 根本看不到。
-  2. *在消息投影流水中插入 system 或 user 提示消息*：这会破坏投影 Digest 的严格一致性。而 Digest 是整个系统在多分支、重放与去重机制中的核心地基，篡改投影消息序列会导致重放对账与事件溯源全面断裂。
-- **重新考虑的条件**：若未来 OpenCode 框架重构，将 system 与 messages 两道钩子合二为一，或者 Replica 会话在 `AgentJournal` 中拥有了自包含且不被上层镜像覆盖的权威消息轮廓，方可重新评估将约束直接置于消息体内的方案。
+- **选择**：启动消息与 system 约束都读取 `delegation/readonly-investigation`。前者让子会话显示实际工作指令；后者保证镜像替换消息流水之后，provider 仍能看到只读边界与停点要求。实际工具权限另由精确能力门禁执行。
+- **Host 边界**：OpenCode 保留传入钩子的 `system` 数组，之后仍读取该数组。只赋值 `output.system` 会让单元测试看到新数组，却让 provider 看不到约束；必须原地修改。真实 Host canary 与原始数组回归测试共同验证这一点。
+- **启动与预算分开**：常驻副本已有历史响应，不能把每次启动都记成“无历史响应”的 provider 请求，再让 transform 用真实历史身份重复扣轮数。启动防重发独立认领，轮数只在外发准入处扣除。
+- **角色集合唯一**：旧能力白名单漏掉 Manager，导致准入成功后在 live registration 以 `RoleIneligible` 拒绝。准入与能力都读取 `Roles.all`，不再另列一份名单。
 
 ### 为什么协议版本升级不补专用替换理由码，而是复用 `CannotContinue`？
 

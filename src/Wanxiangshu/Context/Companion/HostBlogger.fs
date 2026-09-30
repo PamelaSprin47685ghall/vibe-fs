@@ -96,34 +96,6 @@ module internal CompanionHostBlogger =
                 invalidOp (sprintf "tryBuildSquashContext staged an unverifiable context: %A" rejection))
 
 
-    let private sendBloggerRoot
-        (deps: BloggerDeps)
-        (childId: SessionId)
-        (prompt: string)
-        (journal: AgentJournal)
-        (dispatcher: PromptDispatcher.Runtime)
-        : Task<Result<PromptKey, string>> =
-        task {
-            match
-                PromptAuthorityProjectionQueries.issueCurrentOwnerIdentitySeed
-                    (AgentJournal.snapshot journal).AgentProjections
-                    deps.PrimaryId
-                    deps.Participant
-            with
-            | Error error -> return Error error
-            | Ok identitySeed ->
-                // PROMPT-007 Detached: Blogger dispatch does not wait for PhysicalAccepted.
-                return!
-                    dispatcher.SendAgentOwnerRoot
-                        (DispatchSessionPort.ofSessionPort deps.Sessions)
-                        childId
-                        prompt
-                        identitySeed
-                        None
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-        }
-
     let private sendClaimedBloggerPrompt
         (deps: BloggerDeps)
         (childId: SessionId)
@@ -132,18 +104,17 @@ module internal CompanionHostBlogger =
         : Task<Result<PromptKey, string>> =
         let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)
 
-        match (dispatcher.ProjectionFor childId).ActiveLogicalRun with
-        | Some profile ->
-            dispatcher.SendContinuation
-                (DispatchSessionPort.ofSessionPort deps.Sessions)
-                childId
-                prompt
-                PromptAuthority.ContinuationKind.ManagedDelegationAssignment
-                profile
-                None
-                PromptDispatcher.AwaitMode.Detached
-                None
-        | None -> sendBloggerRoot deps childId prompt journal dispatcher
+        dispatcher.SendManagedAssignment
+            (DispatchSessionPort.ofSessionPort deps.Sessions)
+            childId
+            prompt
+            (fun () ->
+                PromptAuthorityProjectionQueries.issueCurrentOwnerIdentitySeed
+                    (AgentJournal.snapshot journal).AgentProjections
+                    deps.PrimaryId
+                    deps.Participant)
+            None
+            None
 
     let private sendBloggerPrompt
         (deps: BloggerDeps)
