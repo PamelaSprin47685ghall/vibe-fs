@@ -78,6 +78,7 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
+    'todowrite',
     'read',
     'write',
     'edit',
@@ -109,6 +110,7 @@ const allowList = (config, name) => {
 const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = [
   'assume',
+  'todowrite',
   'enough',
   'abandon',
   'defer',
@@ -306,7 +308,9 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
   assert.equal(rolePredicate('run', 'engineer'), false)
   assert.equal(rolePredicate('run', 'manager'), false)
 })
-test('WHAT[capability-enforcement-002] TOOLSPEC_cognitive_utility_tools_admission', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission', () => {
+  // Native todowrite has no plugin ToolSpec; its role boundary is asserted from
+  // the Host permission matrix in capability-enforcement-006.
   for (const tool of ['assume', 'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']) {
     assert.equal(rolePredicate(tool, 'engineer'), true, `${tool} should be allowed for engineer`)
     assert.equal(rolePredicate(tool, 'devops'), true, `${tool} should be allowed for devops`)

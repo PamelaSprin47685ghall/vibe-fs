@@ -54,7 +54,6 @@ module XWire =
         openingHostMessageId: string option ->
         syntheticMessageId: string ->
         memory: string ->
-        retainedAssumeCallIds: Set<string> ->
             obj list
 
     val suppressHostMessagesByIds: rawMessages: obj list -> hostMessageIds: Set<string> -> obj list

@@ -1,96 +1,103 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as phaseWindow from '../../../dist/Context/Prefix/Surface.js'
+import * as checkpointWindow from '../../../dist/Context/Prefix/Surface.js'
 
-// context-compression-028 pins the K-window formula. The table below is the clause's
-// own worked example: with committed phases A1..AN and Bi the start of Ai's turn, the
-// desired cutoff is Bj for j = max(1, N − K + 1).
 const turnStarts = (n) => Array.from({ length: n }, (_, index) => index + 1)
 
 const cutoffOf = (k, n) => {
-  const decision = phaseWindow.desiredCutoff(k, turnStarts(n))
+  const decision = checkpointWindow.desiredCutoff(k, turnStarts(n))
   return decision.kind === 'KeepFrom' ? decision.cutoffExclusive : null
 }
 
-test('WHAT[context-compression-028] N=0 yields no cutoff and no synthetic phase', () => {
-  for (const k of [1, 2, 5]) {
-    assert.equal(cutoffOf(k, 0), null, `K=${k} must not invent a zero-th assume call`)
-  }
+const append = (window, callId, retainCheckpoints) => {
+  const result = checkpointWindow.appendCheckpoint(callId, retainCheckpoints, window)
+  assert.equal(result.ok, true, result.error ?? '')
+  return result.value
+}
+
+test('WHAT[context-compression-028] no todowrite checkpoint yields no cutoff', () => {
+  for (const k of [1, 2, 5]) assert.equal(cutoffOf(k, 0), null)
 })
 
-test('WHAT[context-compression-028] K=1 keeps only the current phase turn', () => {
+test('WHAT[context-compression-028] K=1 compresses directly before the current todowrite', () => {
   assert.equal(cutoffOf(1, 1), 1)
   assert.equal(cutoffOf(1, 2), 2)
   assert.equal(cutoffOf(1, 3), 3)
   assert.equal(cutoffOf(1, 4), 4)
 })
 
-test('WHAT[context-compression-028] K=2 keeps the previous phase as well', () => {
+test('WHAT[context-compression-028] K=2 compresses before the previous todowrite', () => {
   assert.equal(cutoffOf(2, 1), 1)
   assert.equal(cutoffOf(2, 2), 1)
   assert.equal(cutoffOf(2, 3), 2)
   assert.equal(cutoffOf(2, 4), 3)
 })
 
-test('WHAT[context-compression-028] two commits inside one turn share their boundary', () => {
-  // A2 and A3 land in the same semantic turn, so their Bi is equal: the window keeps
-  // the whole turn instead of cutting a tool call away from its result.
-  const decision = phaseWindow.desiredCutoff(2, [1, 4, 4, 7])
+test('WHAT[context-compression-028] two checkpoints inside one turn share their boundary', () => {
+  const decision = checkpointWindow.desiredCutoff(2, [1, 4, 4, 7])
   assert.equal(decision.kind, 'KeepFrom')
   assert.equal(decision.cutoffExclusive, 4)
 })
 
-test('WHAT[context-compression-028] a non-positive K is refused', () => {
-  assert.equal(phaseWindow.validateK(0).ok, false)
-  assert.equal(phaseWindow.validateK(-1).ok, false)
-  assert.match(phaseWindow.validateK(0).error, /positive integer/)
-  assert.equal(phaseWindow.validateK(1).ok, true)
+test('WHAT[context-compression-028] retainCheckpoints must be positive', () => {
+  assert.equal(checkpointWindow.validateK(0).ok, false)
+  assert.equal(checkpointWindow.validateK(-1).ok, false)
+  assert.match(checkpointWindow.validateK(0).error, /positive integer/)
+  assert.equal(checkpointWindow.validateK(1).ok, true)
 })
 
-test('WHAT[context-compression-028] the frozen default is 2 and is a legal window', () => {
-  assert.equal(phaseWindow.defaultK, 2, 'the owner opens with K = 2 unless something records otherwise')
-  assert.equal(phaseWindow.validateK(phaseWindow.defaultK).ok, true)
-})
-
-test('WHAT[context-compression-028] the bounded window yields the same boundary as the full history', () => {
-  // The projection only ever holds the last K commits, so the formula must agree when
-  // it is handed that window instead of A1..AN: the oldest retained phase IS A_(N-K+1).
-  for (const n of [1, 2, 3, 7]) {
-    for (const k of [1, 2, 3]) {
-      const allTurns = turnStarts(n)
-      const window = allTurns.slice(-k)
-      const decision = phaseWindow.desiredCutoffOfWindow(
-        window.map((_, index) => `call-${index}`),
-        window,
-      )
-      assert.equal(decision.kind, 'KeepFrom')
-      assert.equal(
-        decision.cutoffExclusive,
-        cutoffOf(k, n),
-        `K=${k} N=${n}: the window-sized list must select the same Bj`,
-      )
-    }
-  }
-})
-
-test('WHAT[context-compression-028] the window keeps at most K commits in commit order', () => {
+test('WHAT[context-compression-028] each todowrite chooses its own K without erasing unreplaced checkpoints', () => {
   let window = []
-  for (const callId of ['a', 'b', 'c', 'd']) {
-    window = phaseWindow.appendPhase(2, callId, window)
-  }
-  assert.deepEqual(window, ['c', 'd'], 'only the last K commits stay; order is commit order')
+  window = append(window, 't1', 4)
+  window = append(window, 't2', 1)
 
-  assert.deepEqual(phaseWindow.appendPhase(2, 'a', null), ['a'])
+  assert.deepEqual(
+    window.map((item) => item.callId),
+    ['t1', 't2'],
+    'K=1 expresses a desire; it does not erase checkpoint evidence before rebase commits',
+  )
+
+  window = append(window, 't3', 3)
+  const decision = checkpointWindow.desiredCutoffOfWindow(window, [1, 2, 3])
+  assert.equal(decision.kind, 'KeepFrom')
+  assert.equal(decision.cutoffExclusive, 1, 'T3 K=3 may still keep T1 because no rebase crossed it')
 })
 
-test('WHAT[context-compression-028] a phase with no addressable turn proves no boundary', () => {
-  // The oldest retained phase is the one the cutoff would land on. If its turn is gone
-  // (a voided numbering), folding there would name a boundary the prefix cannot point
-  // to, so the honest answer is "no cutoff" rather than the next phase's turn.
-  const decision = phaseWindow.desiredCutoffOfWindow(['call-old', 'call-live'], [null, 42])
-  assert.equal(decision.kind, 'NoPhases')
+test('WHAT[context-compression-028] committed cutoff prunes old checkpoints so a later huge K cannot restore LWR', () => {
+  let window = []
+  window = append(window, 't1', 4)
+  window = append(window, 't2', 1)
+  window = append(window, 't3', 3)
 
-  const addressable = phaseWindow.desiredCutoffOfWindow(['call-old', 'call-live'], [7, 42])
+  window = checkpointWindow.pruneCheckpointWindow(window, [1, 2, 3], 2)
+  assert.deepEqual(window.map((item) => item.callId), ['t2', 't3'])
+
+  window = append(window, 't4', 100000)
+  const decision = checkpointWindow.desiredCutoffOfWindow(window, [2, 3, 4])
+  assert.equal(decision.kind, 'KeepFrom')
+  assert.equal(decision.cutoffExclusive, 2, 'a large K stops extra compression but cannot return to T1')
+})
+
+test('WHAT[context-compression-028] duplicate call identity is idempotent only for the same K', () => {
+  const first = append([], 'same-call', 2)
+  const replay = checkpointWindow.appendCheckpoint('same-call', 2, first)
+  assert.equal(replay.ok, true)
+  assert.deepEqual(replay.value, first)
+
+  const conflict = checkpointWindow.appendCheckpoint('same-call', 3, first)
+  assert.equal(conflict.ok, false)
+  assert.match(conflict.error, /two retainCheckpoints values/)
+})
+
+test('WHAT[context-compression-028] an unaddressable selected checkpoint proves no boundary', () => {
+  let window = []
+  window = append(window, 'old', 2)
+  window = append(window, 'live', 2)
+
+  const missing = checkpointWindow.desiredCutoffOfWindow(window, [null, 42])
+  assert.equal(missing.kind, 'NoPhases')
+
+  const addressable = checkpointWindow.desiredCutoffOfWindow(window, [7, 42])
   assert.equal(addressable.kind, 'KeepFrom')
-  assert.equal(addressable.cutoffExclusive, 7, 'the oldest retained phase decides, not the newest')
+  assert.equal(addressable.cutoffExclusive, 7)
 })

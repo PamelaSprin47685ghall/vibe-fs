@@ -2,6 +2,8 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -118,6 +120,47 @@ module ContextProjectionBridge =
         Map.tryFind sessionId projection.Sessions
         |> Option.bind (fun session -> session.PrefixEpoch)
 
+    let private checkpointWindowOf (projection: AgentProjectionSet) (sessionId: SessionId) =
+        projection.TodoCheckpoints
+        |> Map.tryFind sessionId
+        |> Option.defaultValue PhaseWindow.emptyWindow
+
+    let private turnOfCheckpoint (projection: AgentProjectionSet) (sessionId: SessionId) (callId: ToolCallId) =
+        AgentProjection.tryFind sessionId projection
+        |> Option.bind (fun session -> session.XTrace)
+        |> Option.bind (XTraceProjection.tryTurnOfToolCallId callId)
+
+    let private setCheckpointWindow
+        (sessionId: SessionId)
+        (window: PhaseWindow.PhaseCommitWindow)
+        (projection: AgentProjectionSet)
+        =
+        let checkpoints =
+            if List.isEmpty window.Checkpoints then
+                Map.remove sessionId projection.TodoCheckpoints
+            else
+                Map.add sessionId window projection.TodoCheckpoints
+
+        { projection with
+            TodoCheckpoints = checkpoints }
+
+    let private appendCheckpoint projection sessionId callId retainCheckpoints =
+        checkpointWindowOf projection sessionId
+        |> PhaseWindow.appendCheckpoint callId retainCheckpoints
+        |> Result.map (fun updated -> setCheckpointWindow sessionId updated projection)
+        |> Result.mapError (fun reason ->
+            { Fact = "TodoCheckpointCommitted"
+              Reason = reason })
+
+    let private pruneCommittedPrefix projection sessionId cutoffExclusive =
+        checkpointWindowOf projection sessionId
+        |> PhaseWindow.pruneBefore (turnOfCheckpoint projection sessionId) cutoffExclusive
+        |> fun updated -> setCheckpointWindow sessionId updated projection
+
+    let private clearCheckpointGeneration projection sessionId =
+        { projection with
+            TodoCheckpoints = Map.remove sessionId projection.TodoCheckpoints }
+
     let private applyChange (projection: AgentProjectionSet) (change: ContextProjectionChange) =
         match change with
         | ContextProjectionChange.BloggerCyclesSet(sessionId, cycles) ->
@@ -153,7 +196,10 @@ module ContextProjectionBridge =
         | ContextProjectionChange.AuxiliaryVisibilityRetired sessionId ->
             ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
 
-    let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
+    let private foldOwned
+        (projection: AgentProjectionSet)
+        (fact: ContextFactCases)
+        : Result<AgentProjectionSet, FoldRejection> =
         match
             ContextFactFold.fold
                 (cyclesOf projection)
@@ -165,3 +211,15 @@ module ContextProjectionBridge =
         | Ok changes -> Ok(List.fold applyChange projection changes)
         | Error rejection ->
             FoldRejection.reject (ContextFoldRejection.fact rejection) (ContextFoldRejection.message rejection)
+
+    let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
+        match fact with
+        | ContextFactCases.TodoCheckpointCommitted payload ->
+            appendCheckpoint projection payload.SessionId payload.ToolCallId payload.RetainCheckpoints
+        | ContextFactCases.PrefixRebaseCommitted payload ->
+            foldOwned projection fact
+            |> Result.map (fun updated -> pruneCommittedPrefix updated payload.SessionId payload.CutoffExclusive)
+        | ContextFactCases.ContextReanchored payload ->
+            foldOwned projection fact
+            |> Result.map (fun updated -> clearCheckpointGeneration updated payload.SessionId)
+        | _ -> foldOwned projection fact

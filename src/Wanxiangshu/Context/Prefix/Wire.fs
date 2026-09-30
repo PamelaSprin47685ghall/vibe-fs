@@ -154,7 +154,6 @@ module XWire =
         (openingHostMessageId: string option)
         (syntheticMessageId: string)
         (memory: string)
-        (retainedAssumeCallIds: Set<string>)
         =
         ProjectionMessageEdit.replacePrefixByHostIds
             rawMessages
@@ -162,7 +161,6 @@ module XWire =
             openingHostMessageId
             syntheticMessageId
             memory
-            retainedAssumeCallIds
 
     let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
         ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
@@ -193,21 +191,15 @@ module XWire =
             return LifecycleWorkRecord.materialize opening frameBodies "" false
         }
 
-    /// context-compression-028: the boundary this session's phase window keeps raw.
-    ///
-    /// The window holds the last `K` committed phases in commit order, so its oldest
-    /// entry is `A_(N−K+1)` — or `A1` while fewer than `K` phases exist — and that
-    /// phase's own semantic turn is where folding may begin. `None` means no phase has
-    /// committed, or none of the retained phases still has an addressable turn in the
-    /// current generation; either way there is no boundary to fold at, so the prefix
-    /// stays as committed.
-    let internal phaseWindowDesire (state: WireSessionState) : int option =
+    /// context-compression-028: the boundary selected by the latest successful
+    /// todowrite checkpoint's retainCheckpoints value.
+    let internal checkpointWindowDesire (state: WireSessionState) : int option =
         let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
         match
             PhaseWindow.desiredCutoffOf
                 (fun callId -> XTraceProjection.tryTurnOfToolCallId callId xTrace)
-                state.PhaseCommits
+                state.TodoCheckpoints
         with
         | PhaseWindowDecision.KeepFrom cutoffExclusive -> Some cutoffExclusive
         | PhaseWindowDecision.NoPhases -> None
@@ -319,12 +311,6 @@ module XWire =
                 openingHostMessageId
                 activation.SyntheticMessageId
                 activation.Memory
-                // CTX-028/029: the phases the window keeps raw survive inside a
-                // replaced prefix. A phase-boundary advance never reaches them (its
-                // cutoff is their own turn start), but recovery may fold past the
-                // window — and the live canvas must never be replaced by a summary of
-                // itself.
-                (state.PhaseCommits.PhaseCallIds |> List.map ToolCallId.value |> Set.ofList)
 
     let private renderPrefixMessages
         (state: WireSessionState)
@@ -694,7 +680,7 @@ module XWire =
         task {
             // Flattened: the F# control-pyramid gate forbids a match inside an arm, so the
             // window desire is bound first and each refusal path returns on its own.
-            let desired = view.State |> Option.bind phaseWindowDesire
+            let desired = view.State |> Option.bind checkpointWindowDesire
 
             match view.State, view.ActiveAuthorityProfile, physical, desired with
             | Some state, Some authority, Some physicalId, Some desiredCutoff ->

@@ -16,4 +16,6 @@
 /src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs*
 /src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs*
 /src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycle.fs*
-/src/Wanxiangshu/Participant/Cognition/**
+/src/Wanxiangshu/OpenCode/Host/TodoWriteCompressionContract.*
+/src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+/src/Wanxiangshu/Context/Companion/Facts.*

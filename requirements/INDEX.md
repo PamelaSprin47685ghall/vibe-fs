@@ -37,7 +37,7 @@
 | `capability-enforcement` | provider 看见的 capability 与 runtime 真能执行的 capability 必须同源且不扩大 office entitlement；Fission 独占 Engineer，DevOps 固有自修无需逐次开关，Fork/Resume 权能分离。 |
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon；Manager 并行来自派出多名 Engineer 而非自身分身。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
-| `cognitive-workspace` | 模型的工作记忆必须有唯一持久画板与唯一写入口；画板是认知结构，不是权限、完成判定或质量证书。 |
+| `cognitive-workspace` | 持久认知画板已退休；只保留负向边界，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
 | `attention-regulation` | participant 必须能显式结束 evidence churn、解除自创心理债、延后非阻塞旁支，而不把这些 speech act 冒充事实或 obligation。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 一个 participant life 必须生活在单一、稳定的自然语言世界中，而 protocol identity 保持语言不变；核心角色双语 Prompt 语义同源一致。 |
@@ -87,7 +87,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办清单只是单向兼容投影；输入有界、整表替换、desired/applied 幂等，且永不反向成为语义权威。 |
+| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件只增加并消费 retainCheckpoints，不维护第二份 todo 真相。 |
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
 | `relay-assessment` | 每任至多一次八维质量评级；Manager 可亲自只读取证或委派只读 Engineer，低分原位接责，工作区变更使旧快照证书失效。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
@@ -152,7 +152,7 @@
 | 17 | `attention-regulation` | 6 | attention-regulation-001 ~ 006 |
 | 18 | `action-affordance` | 14 | action-affordance-001 ~ 014 |
 | 19 | `provider-language` | 13 | provider-language-001 ~ 013 |
-| 20 | `provider-projection` | 14 | provider-projection-001 ~ 014；画板合同见 cognitive-workspace |
+| 20 | `provider-projection` | 14 | provider-projection-001 ~ 014 |
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
 | 22 | `interaction-authority` | 23 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威）、interaction-authority-023（ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效） |
 | 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
@@ -166,8 +166,8 @@
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
 | 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
 | 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
-| 34 | `context-compression` | 29 | context-compression-001 ~ 027、context-compression-028（K 窗口公式与同回合多提交）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外） |
-| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；画板结果退休见 cognitive-workspace |
+| 34 | `context-compression` | 30 | context-compression-001 ~ 027、context-compression-028（逐次 todowrite K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR） |
+| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；todowrite checkpoint 窗口见 context-compression-028 |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 23 | provider-attempt-recovery-001 ~ 023 |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
@@ -228,14 +228,14 @@ process-execution        → time-capability, host-boundary, participant-horizon
 change-integration       → effect-accounting, durable-events, crash-reconciliation
 semantic-trace           → durable-events
 work-record              → semantic-trace, context-compression, participant-horizon
-context-compression      → semantic-trace, provider-projection, cognitive-workspace
+context-compression      → semantic-trace, provider-projection, obligation-ledger
 prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
 execution-failure-policy → 无
 provider-attempt-recovery→ participant-identity, execution-failure-policy, execution-model-routing, interaction-authority, context-compression, prefix-stability
 host-provider-failure-ownership → execution-failure-policy, provider-attempt-recovery, host-boundary
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
-obligation-ledger        → cognitive-workspace
+obligation-ledger        → host-boundary, context-compression
 relay-incumbency         → obligation-ledger, participant-identity, durable-events, interaction-authority
 relay-assessment         → relay-incumbency, obligation-ledger, participant-identity
 relay-retirement         → relay-incumbency, relay-assessment, relay-context-projection, delegation, managed-chat-execution, provider-attempt-recovery

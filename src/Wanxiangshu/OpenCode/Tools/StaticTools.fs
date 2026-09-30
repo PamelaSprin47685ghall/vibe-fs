@@ -42,6 +42,12 @@ module StaticTools =
     let jsToolName (role: Role) : string =
         "js-" + (string role).ToLowerInvariant()
 
+    /// Shared office boundary for lightweight cognitive utilities. Both the
+    /// custom assume tool and the Host-native todowrite surface consume this
+    /// predicate so schema visibility and execution admission cannot drift.
+    let cognitiveUtilityRoleAllowed (role: Role) : bool =
+        role <> Role.Blogger && role <> Role.Distiller
+
     /// JS-001: a role whose capability set includes any filesystem permission
     /// gets its js-* tool allowed in the permission matrix.
     let private hasFsCapability (role: Role) : bool =
@@ -77,6 +83,7 @@ module StaticTools =
           "glob"
           "grep"
           "skill"
+          "todowrite"
           "assume"
           "enough"
           "abandon"
@@ -113,6 +120,7 @@ module StaticTools =
         |> List.map (fun name ->
             name,
             (name = "skill"
+             || name = "todowrite"
              || name = "assume"
              || name = "enough"
              || name = "abandon"
@@ -151,8 +159,8 @@ module StaticTools =
         | true, "run", Role.DevOps -> "allow"
         | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
-        | true, "assume", Role.Blogger -> "deny"
-        | true, "assume", _ -> "allow"
+        | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"
+        | true, ("assume" | "todowrite"), _ -> "allow"
         | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger ->
             "deny"
         | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"

@@ -14,9 +14,9 @@ type WireSessionState =
         XTrace: XTraceProjectionState option
         Blog: BlogProjectionState option
         PrefixEpoch: ActivePrefixEpoch option
-        /// context-compression-028: the committed phases this session still keeps raw.
-        /// Empty means no phase has committed, so there is no window to fold.
-        PhaseCommits: PhaseWindow.PhaseCommitWindow
+        /// Successful todowrite checkpoints still on the raw side of the
+        /// committed prefix.
+        TodoCheckpoints: PhaseWindow.PhaseCommitWindow
     }
 
 /// Single-snapshot view required by Wire for one call.
@@ -28,7 +28,7 @@ type WireSnapshotView =
         ActiveAuthorityProfile: PromptAuthority.AuthorityExecutionProfile option
         ProviderFailureState: ProviderFailureProjection option
         /// context-compression-028: the admission origin recorded for one physical
-        /// request. A phase-boundary attempt plan must freeze the same provenance the
+        /// request. A checkpoint-boundary attempt plan must freeze the same provenance the
         /// request itself carries — guessing it would re-identify the prompt.
         AcceptedOrigin: PhysicalUserMessageId -> PromptAuthority.PromptOrigin option
     }

@@ -9,7 +9,6 @@ open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
@@ -63,48 +62,6 @@ module Fold =
                 projection
             |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 
-    /// One cognitive commit folded into the aggregate index.
-    ///
-    /// Its own function so the family's decision is named rather than nested inside
-    /// the dispatcher: the dispatcher routes, this folds.
-    let private foldCognition (projection: AgentProjectionSet) (cognition: AssumeFactCases.T) =
-        let ownerKey = CognitiveOwner.keyOfFact cognition
-        let current = Map.tryFind ownerKey projection.Cognition
-
-        /// One committed workspace bound into the aggregate index.
-        let bindWorkspace (acc: AgentProjectionSet) (change: CognitiveProjectionChange) =
-            match change with
-            | CognitiveProjectionChange.CognitiveSet(key, workspace) ->
-                { acc with
-                    Cognition = Map.add key workspace acc.Cognition }
-
-        /// context-compression-028: append the admitted phase to the session's window.
-        ///
-        /// Bound to the admission, not to the fact stream: a refused or replayed line
-        /// must leave the window alone, otherwise the prefix would fold at a boundary
-        /// no committed phase opened.
-        let bindPhaseCommit (acc: AgentProjectionSet) =
-            match cognition with
-            | AssumeFactCases.T.AssumePhaseCommitted commit ->
-                let window =
-                    acc.PhaseCommits
-                    |> Map.tryFind commit.SessionId
-                    |> Option.defaultValue PhaseWindow.emptyWindow
-
-                { acc with
-                    PhaseCommits =
-                        Map.add
-                            commit.SessionId
-                            (PhaseWindow.appendPhase PhaseWindow.defaultK commit.ToolCallId window)
-                            acc.PhaseCommits }
-
-        match CognitiveFactFold.fold current cognition with
-        | Ok changes -> Ok(List.fold bindWorkspace projection changes |> bindPhaseCommit)
-        | Error rejection ->
-            Error
-                { Fact = CognitiveFoldRejection.fact rejection
-                  Reason = CognitiveFoldRejection.message rejection }
-
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
@@ -118,7 +75,7 @@ module Fold =
             |> Result.map (fun updated ->
                 { projection with
                     ChatExecutions = updated })
-        | AgentFact.Cognition cognition -> foldCognition projection cognition
+        | AgentFact.Cognition _ -> Ok projection
         | AgentFact.Orchestrator orchestrator ->
             // The Change family fold consumes the journal-owned `ProjectionSet`,
             // so its assembly stays with the dispatcher, downstream of that edge.

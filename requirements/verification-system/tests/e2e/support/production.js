@@ -121,5 +121,4 @@ export const bloggerDocumentWith = (instructions, items) => BloggerModule.render
 
 export const workActivation = () => readProviderDocument('lifecycle/manager/work-activation');
 export const idleEncouragement = () => readProviderDocument('lifecycle/manager/idle-post-t1');
-export const idleEncouragementPreT1 = () => readProviderDocument('lifecycle/manager/idle-pre-t1');
 export const idleEncouragementPostT1 = () => readProviderDocument('lifecycle/manager/idle-post-t1');

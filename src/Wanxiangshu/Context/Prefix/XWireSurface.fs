@@ -205,7 +205,6 @@ module XWireSurface =
         (openingHostMessageId: obj)
         (syntheticMessageId: string)
         (memory: string)
-        (retainedAssumeCallIds: string array)
         : obj array =
         XWire.replacePrefixByHostIds
             (if isNull rawMessages then [] else Array.toList rawMessages)
@@ -219,10 +218,6 @@ module XWireSurface =
                  Some(text openingHostMessageId))
             syntheticMessageId
             memory
-            (if isNull retainedAssumeCallIds then
-                 Set.empty
-             else
-                 set retainedAssumeCallIds)
         |> List.toArray
 
     let suppressHostMessagesByIds (rawMessages: obj array) (hostMessageIds: string array) : obj array =
@@ -891,17 +886,19 @@ module XWireSurface =
                                 | Ok st -> Some st
                                 | Error _ -> None)
                           Blog = Some blogState
-                          PhaseCommits =
-                            (if isNullish input?phaseCallIds then
+                          TodoCheckpoints =
+                            (if isNullish input?todoCheckpoints then
                                  [||]
                              else
-                                 unbox<obj array> input?phaseCallIds)
+                                 unbox<obj array> input?todoCheckpoints)
                             |> Array.fold
-                                (fun window callId ->
-                                    PhaseWindow.appendPhase
-                                        PhaseWindow.defaultK
-                                        (ToolCallId.create (string callId))
-                                        window)
+                                (fun window checkpoint ->
+                                    let callId = ToolCallId.create (string checkpoint?callId)
+                                    let retain = int checkpoint?retainCheckpoints
+
+                                    match PhaseWindow.appendCheckpoint callId retain window with
+                                    | Ok updated -> updated
+                                    | Error reason -> invalidArg "todoCheckpoints" reason)
                                 PhaseWindow.emptyWindow
                           PrefixEpoch =
                             if isNullish input?prefixEpoch then

@@ -25,7 +25,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.cognitive-workspace.participant-cognition-workspace.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>

@@ -81,6 +81,7 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
+    'todowrite',
     'read',
     'write',
     'edit',
@@ -110,7 +111,7 @@ const allowList = (config, name) => {
 
 const HOST_UTILITY_ALLOW = ['skill']
 
-const COGNITIVE_UTILITY_ALLOW = ['assume']
+const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
 
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 

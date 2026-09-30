@@ -100,6 +100,8 @@
     <Compile Include="OpenCode/Host/ToolSchemaJson.fs"/>
     <Compile Include="OpenCode/Host/ReadonlyDelegationContract.fsi"/>
     <Compile Include="OpenCode/Host/ReadonlyDelegationContract.fs"/>
+    <Compile Include="OpenCode/Host/TodoWriteCompressionContract.fsi"/>
+    <Compile Include="OpenCode/Host/TodoWriteCompressionContract.fs"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fsi"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
     <Compile Include="OpenCode/Host/PluginHost.fsi"/>

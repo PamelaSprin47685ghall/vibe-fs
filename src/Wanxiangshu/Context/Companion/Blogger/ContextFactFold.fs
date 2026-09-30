@@ -179,6 +179,12 @@ module ContextFactFold =
                       BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles
                   ) ]
 
+        | ContextFactCases.TodoCheckpointCommitted _ ->
+            // The aggregate context bridge owns the cross-cutting checkpoint
+            // window because it also has the canonical XTrace needed to prune
+            // it after a committed prefix rebase.
+            Ok []
+
         | ContextFactCases.BlogObservationCommitted payload ->
             // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
             let sid = payload.SessionId

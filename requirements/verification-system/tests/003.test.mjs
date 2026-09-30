@@ -104,12 +104,11 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   );
 
   const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide'];
-  // The Manager provider surface: the session cognitive tool is `assume`
-  // (update + todos); the retired `todowrite` is not advertised to any agent.
+  // The Manager provider surface carries independent assume + native todowrite.
   const managerTools = [
     'abandon', 'assume', 'celebrate', 'defer', 'enough',
     'fork', 'horizon', 'join', 'js-manager', 'publish', 'regret', 'resume',
-    'review', 'skill', 'subscribe', 'suicide',
+    'review', 'skill', 'subscribe', 'suicide', 'todowrite',
   ];
   const request = (turn, step) => ({
     messages: [

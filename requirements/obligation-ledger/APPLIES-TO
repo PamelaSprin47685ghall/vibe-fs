@@ -1,13 +1,8 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
 # requirements/obligation-ledger/** is covered implicitly and must not be listed here.
-# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
-/src/Wanxiangshu/Participant/Cognition/TodoSink.fs
-/src/Wanxiangshu/Participant/Cognition/TodoSink.fsi
-/src/Wanxiangshu/Participant/Cognition/TodoSinkSurface.*
-/src/Wanxiangshu/Participant/Cognition/Admission.*
-/src/Wanxiangshu/Participant/Cognition/AdmissionSurface.*
-/src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs
-/src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fsi
-/src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs
-/src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fsi
+/src/Wanxiangshu/OpenCode/Host/TodoWriteCompressionContract.*
+/src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+/src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.*
+/src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.*
+/resources/provider/tool/todowrite/**

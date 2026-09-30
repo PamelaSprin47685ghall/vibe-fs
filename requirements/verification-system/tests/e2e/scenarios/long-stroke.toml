@@ -204,10 +204,8 @@ flow = [
 
   # Iteration #1 starts read-only. One low dimension atomically assigns work,
   # then the current iteration can fork → join; join stays in flight while child held.
-  # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
-  # advertise a builtin todowrite; the session cognitive tool is `assume` (update +
-  # todos), so requiring tools=["todowrite"] here fails toolsGate. The Manager surface
-  # claim is proven from wire evidence at the end of the stroke.
+  # Host evidence advertises independent assume plus the native todowrite surface.
+  # The Manager surface claim is proven from wire evidence at the end of the stroke.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   # The initial HumanRoot prompt and every owner-opened incarnation reuse the same
   # authority-first manager-loop entry; the binder varies review results by durable attempt.
@@ -442,14 +440,14 @@ tools = ["commission", "horizon", "join"]
 
 # AgentOwnerRoot Manager (opening is "#" + orch fork prompt). Fork + join; join
 # stays blocked while holdChild keeps engineer incomplete for user_message wake.
-# tools MUST match the real Manager provider surface (no todowrite — see flow note).
+# The real Manager provider surface includes native todowrite and independent assume.
 [[turn]]
 id = "manager-t1-commitment"
 internal = true
 user = "# The account is not yet ready to entrust."
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
+  respond = { type = "tool-call", tool = "assume", args = { assumption = "Continue the long stroke until publish_proof.txt is verified." } }
 
   [[turn.step]]
   respond = { type = "text", text = "T1 commitment recorded." }
@@ -533,7 +531,7 @@ forbiddenTools = ["commission"]
 
   [[turn.step]]
   runtimeStep = 2
-  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
+  respond = { type = "tool-call", tool = "assume", args = { assumption = "The active Manager life should continue the verified long-stroke route." } }
 
   [[turn.step]]
   runtimeStep = 3
@@ -598,7 +596,7 @@ tools = ["join", "assume", "suicide"]
   [[turn.step]]
   runtimeStep = 0
   optional = true
-  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
+  respond = { type = "tool-call", tool = "assume", args = { assumption = "The reviewed defects remain the current action until the owned work is joined." } }
 
   [[turn.step]]
   runtimeStep = 1

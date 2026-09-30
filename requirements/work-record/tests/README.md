@@ -2,7 +2,7 @@
 
 WHAT 定义记录归属与材料范围；本文说明当前证明，不能新增行为义务。
 
-2026-09-28 合同适配待决：新版 cognitive-workspace 拒绝 planComplete，context-compression-017/028 规定真实 Opening 永久保留、首次 Assume 前的普通探索可折叠；本包 [009]/[013] 仍描述 BlindPlan T1 的原始 Opening 区间。两者的记录材料边界尚需统一，不能把旧 T1 机械替换为首次 Assume，或借压缩许可删除 Opening。009 保留显式构造材料的局部渲染证明与生命周期 TODO，不宣称新协议已满足旧冻结条件。
+合同适配现状：cognitive-workspace 已退休持久画板，context-compression-017/028 规定真实 Opening 永久保留、成功 native todowrite 以逐次 retainCheckpoints 选择普通历史 cutoff；本包 [009]/[013] 仍描述旧 BlindPlan T1 的原始 Opening 区间。不能把旧 T1 机械替换为首次 checkpoint，也不能借压缩许可删除 Opening。009 保留显式构造材料的局部渲染证明与生命周期 TODO。
 
 - 001 的渲染对照只证明同一输入的视图差别；新增真实 journal 提交后 payload 篡改，完整和 bounded materializer 都不得返回缺损记录。
 - 002/004/007/011/016 使用实际 journal、capture、BlogObservation 与 bounded materializer，检查跨 invocation、终态、caller charge 和已知 range。004 新增跨界 frame 反例，仍实际失败并记 TODO，见 GAP-111。

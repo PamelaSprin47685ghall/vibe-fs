@@ -6,7 +6,7 @@
 - 007 核对静态工具目录不复用活跃身份名称；不据此宣称所有名称都是动词。
 - 008 用同一生产检查器接受不同名称、拒绝两个被识别所有者复用同名。该检查只覆盖它可提取的所有者，不证明全系统 Schema、后果或生命周期等价。
 - 009 先让实际 commission Schema 接受 lead、拒绝 coordinator，再检查中英资源不继续宣传旧的 Coordinator / Lead 选择。此回归已先红；不是所有措辞语义正确的通用判别器。
-- 014 对真实 AssumeAdmission 验证 `update + todos`、完整声明及废止参数拒绝；插件用例核对实际 Schema、jq 更新、零/多输出和失败后画板不变、物理 session 隔离。旧 update/query 协议不再适用。当前对象样例不证明 null、混合数组、特殊键的无损交付，也不证明宿主 UI 已消费待办；这些边界分别由 cognitive-workspace、obligation-ledger 负责。插件 fixture 使用临时仓库与隔离配置，不调用外部模型。
+- 014 验证 assume 只有 `assumption`、成功不回显输入且不维护 canvas；同时验证 Host-native todowrite 保留原生 `todos`，只新增必填 `retainCheckpoints`，before 隐藏、after 恢复。插件 fixture 使用临时仓库与隔离配置，不调用外部模型。
 - 原 003—005 的废止工具名称名单和 Role Law 词句不能证明调用描述完整；原 011/012/009 自建 mutant-only 正则也不是实际门禁。这些证明撤下，义务保留为 TODO。双语资源存在性由 provider-language 的实际门禁承担，语义对等仍需审阅。
 
 通过正式构建后，选择本包、requirement-system、迁移来源 capability-enforcement 010 和受影响的 provider-language 检查运行。需启用 integration 才执行真实插件用例；未启用属于跳过。TODO 使正式入口返回非零，不宣称整包已验收。

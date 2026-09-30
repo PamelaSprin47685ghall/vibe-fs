@@ -1,37 +1,39 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import * as admission from '../../../dist/Participant/Cognition/AdmissionSurface.js'
-import * as sink from '../../../dist/Participant/Cognition/TodoSinkSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-const row = {content: '检查实际结果\n保留原文', status: 'in_progress'}
+const rows = [
+  { content: '重复内容', status: 'pending', priority: 'low' },
+  { content: '  前后空格\r\n第二行  ', status: 'completed', priority: 'high' },
+]
 
-test('WHAT[obligation-ledger-001] actual assume admission normalizes only the declared optional priority', () => {
-  assert.deepEqual(admission.tryDecode({update: '.', todos: [row]}), {
-    ok: true, value: {update: '.', todos: [{...row, priority: 'medium'}]},
+integrationTest('WHAT[obligation-ledger-001] plugin strips only retainCheckpoints and leaves native todo rows untouched', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'obligation-native-rows'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    const todos = structuredClone(rows)
+    const args = { todos, retainCheckpoints: 2 }
+
+    await hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID: 'todo-native-1' }, { args })
+
+    assert.equal('retainCheckpoints' in args, false)
+    assert.equal(args.todos, todos, 'the plugin must preserve the exact native todos array object')
+    assert.deepEqual(args.todos, rows)
   })
-  for (const status of ['pending', 'in_progress', 'completed', 'cancelled']) {
-    assert.deepEqual(admission.tryDecode({update: '.', todos: [{...row, status, priority: 'high'}]}), {
-      ok: true, value: {update: '.', todos: [{...row, status, priority: 'high'}]},
-    })
-  }
 })
 
-test('WHAT[obligation-ledger-001] missing and invalid statuses do not become pending by a test adapter default', () => {
-  for (const todos of [[{content: 'task'}], [{...row, status: 'done'}], [{...row, status: 1}], [{status: 'pending'}]]) {
-    const input = {update: '.', todos}
-    assert.equal(admission.tryDecode(input).ok, false)
-    assert.equal(sink.projectArgs(input).ok, false)
-  }
-})
-
-test('WHAT[obligation-ledger-001] retired planning arguments are refused by the real parser', () => {
-  for (const name of ['planComplete', 'workingOn', 'horizon', 'obligations', 'revision']) {
-    assert.equal(admission.rejectsBecause({update: '.', todos: [row], [name]: true}), 'UnknownArgument')
-  }
-})
-
-test('WHAT[obligation-ledger-001] actual sink projects only complete Host rows', () => {
-  assert.deepEqual(sink.projectArgs({update: '.', todos: [row]}), {
-    ok: true, todos: [{...row, priority: 'medium'}],
+integrationTest('WHAT[obligation-ledger-001] provider schema adds no retired planning fields', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    const output = {
+      description: 'native todowrite',
+      parameters: { type: 'object', properties: { todos: { type: 'array' } }, required: ['todos'] },
+    }
+    await hooks['tool.definition']({ toolID: 'todowrite' }, output)
+    const schema = output.jsonSchema ?? output.parameters
+    assert.ok(schema.properties.todos)
+    assert.ok(schema.properties.retainCheckpoints)
+    for (const retired of ['planComplete', 'workingOn', 'obligations', 'horizon', 'revision']) {
+      assert.equal(Object.prototype.hasOwnProperty.call(schema.properties, retired), false)
+    }
   })
 })

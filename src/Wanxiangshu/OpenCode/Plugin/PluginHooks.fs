@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -124,9 +125,10 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
-            // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
-            // executor while this three-hook membrane owns provider schema,
-            // durable checkpoint admission, and accepted-result enrichment.
+            // The Host-native todowrite remains the physical executor. The plugin
+            // owns only its provider-visible compression field and the durable
+            // checkpoint recorded after physical success.
+            let todoCheckpointDepths = Dictionary<string, int>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -286,6 +288,7 @@ module PluginHooks =
                     )
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
+                TodoWriteCompressionContract.decorateDefinition toolInput toolOutput
                 ManagerReviewContract.decorateDefinition toolInput toolOutput
 
                 if readonlyDelegationPredictorConfigured () then
@@ -313,6 +316,135 @@ module PluginHooks =
                     ""
                 else
                     string toolInput?(name)
+
+            let todoCheckpointKey sessionId callId =
+                sessionId + "" + ToolCallId.value callId
+
+            let isTodoWrite toolInput =
+                String.Equals(toolField toolInput "tool", "todowrite", StringComparison.OrdinalIgnoreCase)
+
+            let requireTodoWriteAdmission toolInput =
+                let sessionText = toolField toolInput "sessionID"
+
+                if String.IsNullOrWhiteSpace sessionText then
+                    invalidOp "todowrite requires a session identity"
+
+                match roleFor (SessionId.create sessionText) with
+                | Some role when StaticTools.cognitiveUtilityRoleAllowed role -> ()
+                | Some role -> invalidOp (sprintf "todowrite is not permitted for role %A" role)
+                | None -> invalidOp "todowrite requires an established office role"
+
+            let rememberTodoCheckpointAtKey key retainCheckpoints =
+                match todoCheckpointDepths.TryGetValue key with
+                | true, existing when existing <> retainCheckpoints ->
+                    invalidOp "todowrite call changed retainCheckpoints before completion"
+                | _ -> todoCheckpointDepths[key] <- retainCheckpoints
+
+            let rememberTodoCheckpoint toolInput retainCheckpoints =
+                let sessionText = toolField toolInput "sessionID"
+
+                match ToolHostCodec.hookCallId toolInput with
+                | None -> invalidOp "todowrite requires an exact tool call identity"
+                | Some callId ->
+                    let key = todoCheckpointKey sessionText callId
+                    rememberTodoCheckpointAtKey key retainCheckpoints
+
+            let captureTodoWrite toolInput toolOutput =
+                requireTodoWriteAdmission toolInput
+
+                if Option.isNone journal then
+                    invalidOp "todowrite compression checkpoint requires a durable journal"
+
+                if isNull toolOutput || isNull toolOutput?args then
+                    invalidOp "todowrite before hook requires tool arguments"
+
+                match TodoWriteCompressionContract.captureAndHide toolOutput?args with
+                | Ok retainCheckpoints -> rememberTodoCheckpoint toolInput retainCheckpoints
+                | Error reason -> invalidOp reason
+
+            let captureTodoCheckpoint toolInput toolOutput =
+                if isTodoWrite toolInput then
+                    captureTodoWrite toolInput toolOutput
+
+            let appendTodoCheckpoint durable sessionText callId retainCheckpoints =
+                task {
+                    let fact =
+                        ContextFact.TodoCheckpointCommitted
+                            {| SessionId = SessionId.create sessionText
+                               ToolCallId = callId
+                               RetainCheckpoints = retainCheckpoints |}
+
+                    match!
+                        AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionText)) None fact durable
+                    with
+                    | Ok _ -> ()
+                    | Error failure -> raise (JournalAppendException failure)
+                }
+
+            let eventText (value: obj) =
+                if isNull value then
+                    None
+                else
+                    let text = string value
+                    if String.IsNullOrWhiteSpace text then None else Some text
+
+            let firstFieldText (carrier: obj) names =
+                if isNull carrier then
+                    None
+                else
+                    names |> List.tryPick (fun name -> eventText carrier?(name))
+
+            let todoTerminalObservation rawInput =
+                let raw = HostEventEnvelope.unwrap rawInput
+                let properties = if isNull raw then null else raw?properties
+                let part = if isNull properties then null else properties?part
+                let state = if isNull part then null else part?state
+
+                let sessionId =
+                    HostEventEnvelope.trySessionId raw
+                    |> Option.orElseWith (fun () ->
+                        firstFieldText part [ "sessionID"; "sessionId" ] |> Option.map SessionId.create)
+
+                let tool = firstFieldText part [ "tool"; "name" ]
+                let callId = firstFieldText part [ "callID"; "callId"; "toolCallId" ]
+
+                let status =
+                    firstFieldText state [ "status" ]
+                    |> Option.map (fun value -> value.ToLowerInvariant())
+
+                match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
+                | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
+                    String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase)
+                    && (status = "completed" || status = "error")
+                    ->
+                    Some(SessionId.value sessionId, ToolCallId.create callId, status)
+                | _ -> None
+
+            let takeTodoCheckpoint sessionText callId status =
+                let key = todoCheckpointKey sessionText callId
+
+                match todoCheckpointDepths.TryGetValue key with
+                | true, retainCheckpoints ->
+                    todoCheckpointDepths.Remove key |> ignore
+                    Some(sessionText, callId, status, retainCheckpoints)
+                | false, _ -> None
+
+            let requiredTodoJournal () =
+                journal
+                |> Option.defaultWith (fun () ->
+                    invalidOp "todowrite compression checkpoint requires a durable journal")
+
+            let settleTodoTerminal (sessionText, callId, status, retainCheckpoints) =
+                if status = "completed" then
+                    appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId retainCheckpoints
+                else
+                    Task.FromResult(())
+
+            let settleTodoEvent rawInput =
+                todoTerminalObservation rawInput
+                |> Option.bind (fun (sessionText, callId, status) -> takeTodoCheckpoint sessionText callId status)
+                |> Option.map settleTodoTerminal
+                |> Option.defaultValue (Task.FromResult(()))
 
             let checkManagerReviewPermissions toolName toolInput =
                 if ManagerReviewTools.isReviewTool toolName then
@@ -422,6 +554,8 @@ module PluginHooks =
 
                     recordProtocolArgumentVault toolInput toolOutput
 
+                    captureTodoCheckpoint toolInput toolOutput
+
                     let context = ToolHostCodec.decodeContext toolInput
 
                     // Same hook-shaped call id as the vault above:
@@ -460,6 +594,7 @@ module PluginHooks =
                         if isParticipatingTool then
                             ReadonlyDelegationContract.restore toolInput?args
                         ManagerReviewContract.restore toolInput?args
+                        TodoWriteCompressionContract.restore toolInput?args
 
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after
@@ -518,8 +653,13 @@ module PluginHooks =
             let toolAfterRegistration =
                 registeredHook HookKey.ToolAfter (pairedHook (box toolAfter))
 
-            let event =
-                registeredHook HookKey.Event (unaryHook (box (fun raw -> wired.ObserveEvent raw)))
+            let observeEvent raw =
+                task {
+                    do! settleTodoEvent raw
+                    do! wired.ObserveEvent raw
+                }
+
+            let event = registeredHook HookKey.Event (unaryHook (box observeEvent))
 
             let dispose =
                 let disposeAll () = scope.DisposeAsync()

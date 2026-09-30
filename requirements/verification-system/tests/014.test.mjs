@@ -21,8 +21,8 @@
  * G4R §2 / Exit: one continuous OpenCode lifetime — spawn count must be exactly 1.
  *
  * The Manager tool surface is proven on the wire the sole serve lifetime really sent:
- * the session cognitive write entry `assume` is advertised, the Manager spine is
- * present, and the retired `todowrite` ledger never appears.
+ * the independent `assume` and Host-native `todowrite` entries are advertised
+ * together with the Manager spine.
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'

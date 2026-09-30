@@ -20,7 +20,6 @@ open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -278,7 +277,7 @@ module Envelope =
         Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases> (extra = extra)
 
     let private cognitionFactDecoder =
-        Decode.Auto.generateDecoderCached<AssumeFactCases.T> (extra = extra)
+        Decode.Auto.generateDecoderCached<LegacyCognitionFact> (extra = extra)
 
     let private familyCase decoder wrap =
         Decode.index 1 decoder |> Decode.map wrap
