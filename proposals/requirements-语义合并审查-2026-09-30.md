@@ -22,14 +22,19 @@
 
 **判断**：这些是实质的规范削弱。upstream replay 用旧版覆盖了我们的收紧版。
 
-## 二、语义方向相反的 DIVERGED（最严重）
+## 二、P0 核实更正：Sphinx 只读 Engineer 语义（原判方向相反）
 
-`intra-participant-parallelism/WHAT.md`：
+**更正**：经核实合并前 upstream 版本（`e716d2614`），原报告方向判反。
 
-- **我们版本**：拒绝“Sphinx 内部**只读** Engineer”（禁止任何只读 Engineer 参与并行）
-- **upstream 版本**：拒绝列表**删除**“Sphinx 内部只读 Engineer”，改为“Sphinx 内部**标准** Engineer 遵守相同准入，**不另设只读身份**”
+三版本对比（`intra-participant-parallelism/WHAT.md` [007]）：
 
-**判断**：方向完全相反。我们禁止只读 Engineer，upstream 取消只读身份概念、允许标准 Engineer。这不是丢失，是**语义反转**。需裁决：Sphinx 内部 Engineer 是否应有特殊只读豁免。
+| 版本 | 表述 |
+|---|---|
+| 合并前 upstream（`e716d2614`） | 拒绝列表含“Sphinx 内部**只读** Engineer 均拒绝” |
+| 我们 PR（`f7d13d919`） | 删除该禁令，改“Sphinx 内部**标准** Engineer 遵守相同准入，**不另设只读身份**” |
+| 当前 upstream（`5321fba04`） | 恢复“Sphinx 内部**只读** Engineer 均拒绝” |
+
+**结论**：`42c8f9b9a`（合并前已存在于 upstream）确立“禁止只读 Engineer”；我们 PR 的 `25ff1cd6d` 改成“取消只读”；upstream 保留原语义。Sphinx 部分以 upstream 为权威，**当前 upstream 版本正确，我们的 PR 版本才是偏差**。无需改动。
 
 ## 三、丢失的测试用例（upstream 完全未采纳，ABSENT）
 
@@ -67,11 +72,14 @@
 
 ---
 
-## 处置建议
+## 处置结果（2026-09-30 已执行）
 
-1. **P0 裁决**：`intra-participant-parallelism` 的 Sphinx 只读 Engineer 语义方向相反，需与 upstream 对齐或提交 PR 恢复我们的禁止语义。
-2. **P1 恢复规范收紧**：5 个 WHAT.md 的 ABSENT 收紧条款，建议重新提交（upstream replay 用旧版覆盖）。
-3. **P1 恢复丢失测试**：`cases.mjs` 的 73 行 strict-mock-server 关闭失败注入测试，建议重做（其依赖的 `strict-mock-server.js` 加固也缺失）。
-4. **P2 评估**：`crash-reconciliation/020` 的取消桥测试删除是否可接受（PROMPT-006 重构后取消路径是否仍受覆盖）。
+1. **P0 已核实**：`intra-participant-parallelism` 的 Sphinx 只读 Engineer 语义——upstream 权威（`42c8f9b9a` 禁止只读），当前版本正确，我们的 PR 版本是偏差。**无需改动**。
+2. **P1 规范收紧已恢复**：5 个 WHAT.md 的收紧条款已应用到当前 requirements/（`639049442`）。核实确认：upstream 36 个提交均未触及这 5 个文件，收紧版与其它更新无矛盾。
+3. **P1 丢失测试已恢复**：`cases.mjs` 的 6 个 HTTP 关闭失败注入测试已加回，并恢复严格版 `stopHttpServer`（规则 [005]「严禁吞没异常」要求）。测试「可红」验证通过（严格版 reject、弱化版吞掉）。
+4. **P2 已核实**：`crash-reconciliation/020` 的取消桥测试删除是 upstream 主动重构（`c07b5ca79`），取消语义迁移至 `SessionRecoveryHost.settleAcceptedCancellation`，由 `managed-chat-execution/010,013` 覆盖。**非丢失，无需恢复**。
+5. **P2 已核实**：`behavior-diagnosis/020`、`participant-identity/011` 的删除对应规则（条款 020/011）已不存在于 upstream WHAT.md，删除正确。
 
-本次审查未修改任何 requirements/ 文件。
+验证：`integration/harness` 278 例全过（含恢复的 6 例）；`format-build-test` 的 `check` 失败 171 项全部为 upstream 既有债务（`speculative-investigation` 等），与本次改动无关。
+
+提交：`639049442`（恢复收紧与测试）+ `e3349648f`（merge origin/master），已推送 master。
