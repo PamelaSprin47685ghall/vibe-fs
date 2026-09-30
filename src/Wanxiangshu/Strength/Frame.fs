@@ -41,11 +41,29 @@ type StrengthMirrorError =
 
 module StrengthFrame =
 
-    let private allowedTools = set [ "read"; "glob"; "grep"; "js-predictor" ]
+    /// The read-only evidence the replica is allowed to carry out of the owner's
+    /// batch: the Host-native read-only primitives plus the single dedicated
+    /// readonly JS surface. Anything else in a mixed owner batch is dropped by
+    /// the filter rather than failing the whole frame.
+    let private projectionTools = set [ "read"; "glob"; "grep"; "js-predictor" ]
+
+    /// The names a built frame may actually carry. The replica CALLS
+    /// `js-predictor`, but its exchange is projected back into the owner's
+    /// conversation under the owner's own `js-<role>` name, so the owner sees a
+    /// tool it could have called itself. Those projected names must validate.
+    let private jsSurfaces = Roles.all |> List.map (fun role -> "js-" + Roles.roleLabel role)
+
+    let private allowedTools = Set.union projectionTools (Set.ofList jsSurfaces)
 
     let isAllowedTool (toolName: string) =
         not (String.IsNullOrWhiteSpace toolName)
         && Set.contains (toolName.Trim().ToLowerInvariant()) allowedTools
+
+    /// The subset a mixed owner batch is filtered down to before anything is
+    /// built: only the read-only evidence crosses into the replica.
+    let isProjectionTool (toolName: string) =
+        not (String.IsNullOrWhiteSpace toolName)
+        && Set.contains (toolName.Trim().ToLowerInvariant()) projectionTools
 
     /// Fable-compatible UTF-8 length. .NET Encoding.GetByteCount is not
     /// available in Fable, while UTF-16 String.Length would undercharge non-ASCII

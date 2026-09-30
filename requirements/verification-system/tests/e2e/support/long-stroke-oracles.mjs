@@ -221,10 +221,10 @@ export async function assertJoinWakePath(workDir, label = 'long-stroke') {
  */
 export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   const results = publicToolResults(scenario.provider?.requests, 'join');
-  // Synthetic TOML puts the public consequence in the leading instruction.
-  // A later successful join may legitimately carry an LWR that quotes the
-  // earlier interrupted result; that historical quotation is not a second
-  // interrupted join consequence and must not be classified as one.
+ // Synthetic TOML puts the public consequence in the leading instruction.
+ // A later successful join may legitimately carry an LWR that quotes the
+ // earlier interrupted result; that historical quotation is not a second
+ // interrupted join consequence and must not be classified as one.
   const interrupted = results.filter((text) => text.startsWith('# Something nearer has arrived.\n'));
   assert.ok(
     interrupted.length >= 1,
@@ -286,9 +286,9 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
 
 /** §21 / MANAGED-SESSION-020: serial Engineer charges reuse one physical child session. */
 export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
-  // countFactCase digs to the innermost DU case name (`Published`). Do NOT pass the
-  // waitFact substring `"Orchestrator",["Published"` — that is only for readJournal
-  // line matching; as a case key it never hits factCounts.
+ // countFactCase digs to the innermost DU case name (`Published`). Do NOT pass the
+ // waitFact substring `"Orchestrator",["Published"` — that is only for readJournal
+ // line matching; as a case key it never hits factCounts.
   const published = countFactCase(workDir, 'Published');
   assert.equal(
     published,
@@ -404,8 +404,8 @@ export async function bindManagerLoopSequence(scenario) {
   });
   const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
   const joinOwnedWork = () => ({ type: 'tool-call', tool: 'join', args: {} });
-  // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
-  // Later responses are selected by the new incarnation's audit delivery count.
+ // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
+ // Later responses are selected by the new incarnation's audit delivery count.
   let latestManagerAuditAttempt = 0;
   let managerAssumptionDelivered = false;
   let initialWorkJoined = false;
@@ -438,8 +438,8 @@ export async function bindManagerLoopSequence(scenario) {
             }
           : retire();
     } else if (entry?.id === 'manager-reopened-loop.1') {
-      // A successor incarnation opens no work of its own unless the audit assigned it:
-      // only the repair iteration forks, everything else closes with the declared close.
+ // A successor incarnation opens no work of its own unless the audit assigned it:
+ // only the repair iteration forks, everything else closes with the declared close.
       entry.respond = latestManagerAuditAttempt === 3
         ? {
             type: 'tool-call',
@@ -458,8 +458,8 @@ export async function bindManagerLoopSequence(scenario) {
           ? initialLoopJoin
           : retire();
     } else if (entry?.turnId === 'manager-reopened-loop' && entry.step >= 3) {
-      // The successor's own iteration closes here: the repair work has been harvested by
-      // the join above, and every later cursor of this assess resource is a close.
+ // The successor's own iteration closes here: the repair work has been harvested by
+ // the join above, and every later cursor of this assess resource is a close.
       entry.respond = retire();
     } else if (entry?.id === 'manager-t1-commitment.0') {
       managerAssumptionDelivered = true;
@@ -621,11 +621,11 @@ export async function oracleLongStroke(scenario, ctx) {
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
 
-  // HumanRoot preflow baseline (2 assessments / 2 retirements / 2 openings) is
-  // already proven exact before the main spine; global gte checks above would
-  // pass on preflow alone. Preserve their main-spine meaning by requiring the
-  // current loop itself to own every expected iteration and outcome, not merely
-  // the global journal.
+ // HumanRoot preflow baseline (2 assessments / 2 retirements / 2 openings) is
+ // already proven exact before the main spine; global gte checks above would
+ // pass on preflow alone. Preserve their main-spine meaning by requiring the
+ // current loop itself to own every expected iteration and outcome, not merely
+ // the global journal.
   const currentLoopId = ctx?.childId ?? null;
   if (typeof currentLoopId === 'string' && currentLoopId.length > 0) {
     const loopTransactions = factPayloads(workDir, 'TransactionCommitted')
@@ -656,9 +656,9 @@ export async function oracleLongStroke(scenario, ctx) {
     );
   }
 
-  // Pure-loop removals: an event-only fake continuation (IncumbencyOpened without
-  // a physically observed provider request) must not satisfy managed admission.
-  // The delivery counts below prove every new iteration crossed the provider.
+ // Pure-loop removals: an event-only fake continuation (IncumbencyOpened without
+ // a physically observed provider request) must not satisfy managed admission.
+ // The delivery counts below prove every new iteration crossed the provider.
   assertManagerLoopAuthorityPreserved(scenario, ctx?.childId ?? null);
 
   assert.ok(
@@ -675,11 +675,11 @@ export async function oracleLongStroke(scenario, ctx) {
     1,
     'long-stroke determinism: the initial HumanRoot/authority iteration receives one authority audit',
   );
-  // The four successor iterations (candidate, repair, repaired, rebased) carry the
-  // owner-controlled assess resource as their fresh head, so their audits land on the
-  // assess-resource family (relay-context-projection-001: the successor keeps the
-  // predecessor history and appends its own head instead of restarting from the
-  // trimmed authority turn).
+ // The four successor iterations (candidate, repair, repaired, rebased) carry the
+ // owner-controlled assess resource as their fresh head, so their audits land on the
+ // assess-resource family (relay-context-projection-001: the successor keeps the
+ // predecessor history and appends its own head instead of restarting from the
+ // trimmed authority turn).
   assert.equal(
     scenario.provider.matchCount('manager-reopened-loop.0', ctx?.childId ?? null),
     4,
@@ -850,9 +850,9 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   const baselinePlan = providerPlanOf(requests[0]);
   const baselineUsers = messageTextsByRole(requests[0], 'user');
   assert.ok(baselineUsers.length >= 1, 'manager-loop: initial iteration must carry typed authority user messages');
-  // The ordinal sentence leads the appended resource; the digit is the
-  // successor number, so the anchor stops before it and never has to be
-  // re-pinned per iteration.
+ // The ordinal sentence leads the appended resource; the digit is the
+ // successor number, so the anchor stops before it and never has to be
+ // re-pinned per iteration.
   const assessmentResource = '# You are the ';
   const successorOrdinals = [];
   for (const request of requests) {
@@ -932,11 +932,11 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
   await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
 
-  // The authority-turn family answers the initial iteration only: once the successor
-  // carries the owner-controlled assess resource as its last user message, the
-  // assess-resource family (same review + suicide shape, perfect audit) answers it.
-  // An IncumbencyOpened fact alone is an event-only fake; physically observed
-  // deliveries under the same LogicalRun prove the loop.
+ // The authority-turn family answers the initial iteration only: once the successor
+ // carries the owner-controlled assess resource as its last user message, the
+ // assess-resource family (same review + suicide shape, perfect audit) answers it.
+ // An IncumbencyOpened fact alone is an event-only fake; physically observed
+ // deliveries under the same LogicalRun prove the loop.
   assert.equal(
     scenario.provider.matchCount('humanroot-loop.0'),
     1,
@@ -964,9 +964,9 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
     4,
     `${label}: expected exactly 4 chat requests on the canary session (got ${requests.length})`,
   );
-  // Same physical SessionId on every request: continuations extend the
-  // LogicalRun, they never create a new one. A new session here would be a
-  // cold-boundary violation, not a loop iteration.
+ // Same physical SessionId on every request: continuations extend the
+ // LogicalRun, they never create a new one. A new session here would be a
+ // cold-boundary violation, not a loop iteration.
   for (const request of requests) {
     assert.equal(
       request?.sessionID ?? request?.sessionId ?? null,
@@ -975,14 +975,14 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
     );
   }
 
-  // Pure-loop authority: the next iteration carries the same system/provider
-  // plan and the same typed authority user sequence as the initial iteration.
-  // The next iteration now retains the full predecessor physical history —
-  // the first-iteration review call/result and the suicide call stay in the
-  // provider context, with the owner-controlled assessment resource appended.
-  // ONE reusable humanroot-loop family covers both iterations, so iterations
-  // are never distinguished by prompt text; the assertions below are on
-  // provider-visible message structure only.
+ // Pure-loop authority: the next iteration carries the same system/provider
+ // plan and the same typed authority user sequence as the initial iteration.
+ // The next iteration now retains the full predecessor physical history —
+ // the first-iteration review call/result and the suicide call stay in the
+ // provider context, with the owner-controlled assessment resource appended.
+ // ONE reusable humanroot-loop family covers both iterations, so iterations
+ // are never distinguished by prompt text; the assertions below are on
+ // provider-visible message structure only.
   assertManagerLoopAuthorityPreserved(scenario, sessionId);
   assert.equal(
     hasAssistantOrToolMessages(requests[2]),
@@ -1006,8 +1006,8 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
     );
   }
 
-  // Durable loop behavior: two openings (initial + one after Continue), one
-  // Continue retirement followed by one Accepted; positive counts prove the loop.
+ // Durable loop behavior: two openings (initial + one after Continue), one
+ // Continue retirement followed by one Accepted; positive counts prove the loop.
   const openings = factPayloads(workDir, 'IncumbencyOpened');
   assert.equal(openings.length, 2, `${label}: canary road must open exactly two iterations (got ${openings.length})`);
   const openedIds = incumbencyIdsIn(openings);
@@ -1080,7 +1080,7 @@ const PARTICIPATING_TOOLS = new Set([
 const toolNameOfCall = (call) => call?.function?.name ?? call?.name ?? '';
 
 /**
- * DELEGATE_REVISE §16.7 / §5.2: Extract the factual investigation estimate.
+ * : Extract the factual investigation estimate.
  * Exclusively reads `arguments.estimated_readonly_rounds`.
  * Legacy `arguments.delegate_readonly_rounds` is strictly rejected and never produces an estimate.
  */
@@ -1101,7 +1101,7 @@ const estimateOfCall = (call) => {
   }
   if (!parsed || typeof parsed !== 'object') return null;
 
-  // Negative refusal: legacy field must not be read as budget and is rejected
+ // Negative refusal: legacy field must not be read as budget and is rejected
   if (Object.hasOwn(parsed, 'delegate_readonly_rounds')) {
     return null;
   }
@@ -1111,7 +1111,7 @@ const estimateOfCall = (call) => {
 };
 
 /**
- * DELEGATE_REVISE §16.7: Authenticate owner provider requests by true origin identity.
+ * : Authenticate owner provider requests by true origin identity.
  * An authentic owner opportunity requires:
  *   1. The session is not a Replica (replicas never mint owner opportunities; §11);
  *   2. The request carries a positive estimated_readonly_rounds call in its active/latest
@@ -1164,8 +1164,8 @@ export async function bindDelegationReplicas(scenario, ctx) {
   const replicaIds = bounds
     .map(payloadReplicaSessionId)
     .filter((id) => typeof id === 'string' && id !== '');
-  // Exactly two, not a floor: capture and binding are idempotent per decision, so
-  // a third Bound fact is a repeated delegation (R6).
+ // Exactly two, not a floor: capture and binding are idempotent per decision, so
+ // a third Bound fact is a repeated delegation (R6).
   assert.equal(
     replicaIds.length,
     2,
@@ -1183,7 +1183,7 @@ export async function bindDelegationReplicas(scenario, ctx) {
         DELEGATE_PREDICTOR_MODEL,
         `DELEGATE 9.2: replica ${id} must run exactly on the configured Predictor target (saw ${requestModel(request)})`,
       );
-      // Assert replica provider request carries only allowed readonly tools
+ // Assert replica provider request carries only allowed readonly tools
       if (Array.isArray(request?.tools) && request.tools.length > 0) {
         const toolNames = request.tools.map((t) => t?.function?.name ?? t?.name).filter(Boolean);
         const disallowed = ['write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'js-engineer', 'js-devops', 'js-manager'];
@@ -1196,10 +1196,10 @@ export async function bindDelegationReplicas(scenario, ctx) {
     }
   }
 
-  // The normal-complete decision admitted 2 rounds (round 2 spent on the
-  // plain-text early end); the recovery decision admitted 1 (its N+1 was
-  // refused at the transform gate before any physical send). Compared as a
-  // multiset: durable fact order must not decide which replica is which.
+ // The normal-complete decision admitted 2 rounds (round 2 spent on the
+ // plain-text early end); the recovery decision admitted 1 (its N+1 was
+ // refused at the transform gate before any physical send). Compared as a
+ // multiset: durable fact order must not decide which replica is which.
   const counts = chats.map(({ chats: sessionChats }) => sessionChats.length).sort((left, right) => left - right);
   assert.deepEqual(
     counts,
@@ -1245,10 +1245,10 @@ export async function assertDelegationMaterialOnWire(scenario) {
       `DELEGATE 14.5: owner ${ownerId} must receive the companion's real readonly result in a later provider request`,
     );
   }
-  // R6: bounded delivery. The canary owner walks three chat requests (investigation estimate
-  // call, injected continuation, successor); the recovery owner four (investigation estimate
-  // call, faulted delivery, retried delivery, successor). An unbounded
-  // redelivery loop after injection fails this equality.
+ // R6: bounded delivery. The canary owner walks three chat requests (investigation estimate
+ // call, injected continuation, successor); the recovery owner four (investigation estimate
+ // call, faulted delivery, retried delivery, successor). An unbounded
+ // redelivery loop after injection fails this equality.
   const ownerChatCounts = [...ownerSessions]
     .map((ownerId) => chatRequestsOfSession(requests, ownerId).length)
     .sort((left, right) => left - right);
@@ -1313,13 +1313,13 @@ export async function assertDelegateCapacityOneParentWaits(scenario) {
     const replicaProvider = providerOfModel(replicaModel);
     assert.ok(replicaProvider !== null, `DELEGATE 14.5: replica ${replicaId} model must be provider-qualified (saw ${replicaModel})`);
 
-    // Same provider: the identity axis is unchanged and the purpose axis
-    // picks the Predictor pool, so owner and companion share one provider token.
-    // Deliberately NOT asserted here: model distinctness. DELEGATE 9.2 /
-    // WHAT[014] make Predictor-equals-owner-model a legal state, and pool
-    // identity is decided by purpose, not by the model name. The "companion
-    // used the Predictor target" witness lives in bindDelegationReplicas
-    // (exact target pin) and assertDelegationPurposeOnWire (direct purpose).
+ // Same provider: the identity axis is unchanged and the purpose axis
+ // picks the Predictor pool, so owner and companion share one provider token.
+ // Deliberately NOT asserted here: model distinctness. DELEGATE 9.2 /
+ // WHAT[014] make Predictor-equals-owner-model a legal state, and pool
+ // identity is decided by purpose, not by the model name. The "companion
+ // used the Predictor target" witness lives in bindDelegationReplicas
+ // (exact target pin) and assertDelegationPurposeOnWire (direct purpose).
     for (const ownerId of ownerSessions) {
       const ownerModels = new Set(
         chatRequestsOfSession(requests, ownerId).map((request) => requestModel(request)),
@@ -1333,7 +1333,7 @@ export async function assertDelegateCapacityOneParentWaits(scenario) {
       }
     }
 
-    // Parent waits: no owner request may arrive inside the companion window.
+ // Parent waits: no owner request may arrive inside the companion window.
     for (let index = first; index <= last; index += 1) {
       assert.ok(
         !ownerSessions.has(sessionOf(requests[index])),
@@ -1341,8 +1341,8 @@ export async function assertDelegateCapacityOneParentWaits(scenario) {
       );
     }
 
-    // The delegating owner request — the one carrying the investigation estimate call — is
-    // released by the transform only after the companion window closed.
+ // The delegating owner request — the one carrying the investigation estimate call — is
+ // released by the transform only after the companion window closed.
     for (const ownerId of ownerSessions) {
       const estimateIndex = requests.findIndex(
         (request) => sessionOf(request) === ownerId && isAuthenticOwnerPositiveEstimateRequest(request, replicaSet),
@@ -1425,9 +1425,9 @@ export async function assertDelegationProtocolSurface(scenario) {
   const { owners: ownerSessions } = delegatingOwnerSessions(scenario);
   assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions for the protocol surface');
 
-  // 1 + 3: per-tool assertion across the visible tool surface of a delegating owner's real requests.
-  // Participating tools (5.2) expose estimated_readonly_rounds and conditional self_note;
-  // non-participating tools (5.3) remain unmodified with zero protocol increment.
+ // 1 + 3: per-tool assertion across the visible tool surface of a delegating owner's real requests.
+ // Participating tools (5.2) expose estimated_readonly_rounds and conditional self_note;
+ // non-participating tools (5.3) remain unmodified with zero protocol increment.
   let examinedRequests = 0;
   let examinedTools = 0;
   for (const request of requests) {
@@ -1551,20 +1551,20 @@ export async function assertDelegationProtocolSurface(scenario) {
   assert.ok(examinedRequests > 0, 'DELEGATE 4.1: no delegating owner provider request with a tool surface was observed');
   assert.ok(examinedTools > 0, 'DELEGATE 4.1: the observed owner requests advertised no tools');
 
-  // DELEGATE 4.1 MCP coverage: the world declares a stdio MCP fixture whose
-  // only tool answers tools/list with the fixture's deterministic
-  // description. If the Host connects the fixture and renders its tools
-  // through the same tool.definition hook as built-in and plugin tools, the
-  // MCP tool must appear on the owner wire — and the per-tool loop above then
-  // checks it like any other tool, so a Host that exposes MCP tools WITHOUT
-  // the delegation protocol turns that loop red with the tool named. The
-  // check keys on the fixture description, not on a host naming scheme.
-  //
-  // Boundary (stated, not papered over): tool discovery AFTER
-  // mcp.tools.changed is not asserted here — this scenario has no event-hook
-  // observation and the Host's re-emission behavior is unproven. What IS
-  // proven: a statically connected MCP tool rides the same schema contract as
-  // built-in and plugin tools.
+ // DELEGATE 4.1 MCP coverage: the world declares a stdio MCP fixture whose
+ // only tool answers tools/list with the fixture's deterministic
+ // description. If the Host connects the fixture and renders its tools
+ // through the same tool.definition hook as built-in and plugin tools, the
+ // MCP tool must appear on the owner wire — and the per-tool loop above then
+ // checks it like any other tool, so a Host that exposes MCP tools WITHOUT
+ // the delegation protocol turns that loop red with the tool named. The
+ // check keys on the fixture description, not on a host naming scheme.
+ //
+ // Boundary (stated, not papered over): tool discovery AFTER
+ // mcp.tools.changed is not asserted here — this scenario has no event-hook
+ // observation and the Host's re-emission behavior is unproven. What IS
+ // proven: a statically connected MCP tool rides the same schema contract as
+ // built-in and plugin tools.
   const mcpToolNames = new Set();
   for (const request of requests) {
     if (!ownerSessions.has(sessionOf(request))) continue;
@@ -1579,9 +1579,9 @@ export async function assertDelegationProtocolSurface(scenario) {
       'either the fixture never connected or the Host does not advertise MCP tools to the provider',
   );
 
-  // 2: retention in later histories + legal pairing:
-  // - estimated_readonly_rounds > 0 requires non-empty self_note;
-  // - estimated_readonly_rounds === 0 requires self_note omitted.
+ // 2: retention in later histories + legal pairing:
+ // - estimated_readonly_rounds > 0 requires non-empty self_note;
+ // - estimated_readonly_rounds === 0 requires self_note omitted.
   let retainedWithNote = false;
   let noteLessExecuted = false;
   for (const request of requests) {
@@ -1742,8 +1742,8 @@ export async function assertDelegationSameModelIsLegal(scenario) {
     }
   }
 
-  // The companion's real readonly result still reaches both owners: a
-  // same-model configuration did not silently disable the round trip.
+ // The companion's real readonly result still reaches both owners: a
+ // same-model configuration did not silently disable the round trip.
   for (const ownerId of ownerSessions) {
     const carried = requests.some(
       (request) =>
@@ -1760,8 +1760,8 @@ export async function assertDelegationSameModelIsLegal(scenario) {
     );
   }
 
-  // The protocol surface is still fully decorated: same-model must not
-  // withdraw estimated_readonly_rounds, self_note, or investigation outlook prose.
+ // The protocol surface is still fully decorated: same-model must not
+ // withdraw estimated_readonly_rounds, self_note, or investigation outlook prose.
   await assertDelegationProtocolSurface(scenario);
 
   console.log(
@@ -1814,14 +1814,14 @@ export async function assertDelegationPurposeOnWire(scenario) {
     );
   }
 
-  // The normal branch was exercised too: this world really drove both purposes.
+ // The normal branch was exercised too: this world really drove both purposes.
   assert.ok(
     decisions.some((decision) => decision.purpose !== 'readonly-delegate'),
     'DELEGATE 9.2: the owner branch of the purpose axis must have been exercised',
   );
 
-  // Correlation with the wire: the model every companion request actually ran
-  // equals the model the logged readonly-delegate decisions selected.
+ // Correlation with the wire: the model every companion request actually ran
+ // equals the model the logged readonly-delegate decisions selected.
   const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
   const replicaIds = bounds
     .map(payloadReplicaSessionId)

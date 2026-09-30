@@ -263,7 +263,7 @@ module PluginHooks =
                 | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
                 | None -> ToolRuntimeScope.emptyManagerFacts
 
-            // DELEGATE.md 9.1/9.2: the only enablement condition for explicit
+    // the only enablement condition for explicit
             // read-only delegation is that a Predictor model is configured.
             // The read-only configuration existence query is owned by
             // ModelRouting (ModelRouting.sharedPredictorConfiguration, loaded
@@ -453,7 +453,7 @@ module PluginHooks =
                 if ManagerReviewTools.isReviewTool toolName then
                     assertReviewPermitted toolName (toolField toolInput "sessionID")
 
-            // host-boundary-032 / DELEGATE_REVISE.md: snapshot the protocol
+    // host-boundary-032: snapshot the protocol
             // fields the model actually produced, before either contract family
             // hides them. The Host persists the stripped arguments, so the
             // provider transform restores the fields into the request from this
@@ -465,15 +465,15 @@ module PluginHooks =
             // carries no messageID, so decodeContext would always answer None.
             let sanitizeSnapshot (toolName: string) (snapshot: ProtocolArgumentVault.Snapshot) =
                 let isReview = ManagerReviewTools.isReviewTool toolName
+
                 let isDelegationActive =
                     readonlyDelegationPredictorConfigured ()
                     && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
-                { ProtocolArgumentVault.Snapshot.Contract =
-                    (if isReview then snapshot.Contract else None)
+
+                { ProtocolArgumentVault.Snapshot.Contract = (if isReview then snapshot.Contract else None)
                   ProtocolArgumentVault.Snapshot.ReadonlyRounds =
                     (if isDelegationActive then snapshot.ReadonlyRounds else None)
-                  ProtocolArgumentVault.Snapshot.SelfNote =
-                    (if isDelegationActive then snapshot.SelfNote else None) }
+                  ProtocolArgumentVault.Snapshot.SelfNote = (if isDelegationActive then snapshot.SelfNote else None) }
 
             let commitRecordedSnapshot
                 (vault: ProtocolArgumentVault.Vault)
@@ -528,6 +528,33 @@ module PluginHooks =
                 if not (isNull toolOutput) && not (isNull toolOutput?args) then
                     tryRecordCall boot.ProtocolArgumentVault toolInput toolOutput (ToolHostCodec.hookCallId toolInput)
 
+            let estimateSessionText (toolInput: obj) =
+                if not (isNull toolInput) && not (isNull toolInput?sessionID) then
+                    string toolInput?sessionID
+                else
+                    (ToolHostCodec.decodeContext toolInput).SessionId
+
+            let rejectInvalidEstimateArguments (toolInput: obj) (args: obj) =
+                match InvestigationEstimateContract.parseParticipatingArguments args with
+                | Ok _ -> ()
+                | Error err ->
+                    let language =
+                        ProviderLanguageBinding.forSessionText (estimateSessionText toolInput)
+
+                    let explanation = InvestigationEstimateContract.formatArgumentError language err
+                    invalidOp (sprintf "Invalid investigation estimate arguments: %s" explanation)
+
+            let restoreParticipatingArguments (isParticipatingTool: bool) (args: obj) =
+                if isParticipatingTool then
+                    ReadonlyDelegationContract.restore args
+
+                ManagerReviewContract.restore args
+                TodoWriteCompressionContract.restore args
+
+            let requireDelegationEstimateArguments (toolInput: obj) (toolOutput: obj) =
+                if not (isNull toolOutput) && not (isNull toolOutput?args) then
+                    rejectInvalidEstimateArguments toolInput toolOutput?args
+
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
                     do!
@@ -543,23 +570,12 @@ module PluginHooks =
 
                     let isParticipatingTool =
                         InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+
                     let isDelegationActive =
                         readonlyDelegationPredictorConfigured () && isParticipatingTool
 
-                    if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
-                        let args = toolOutput?args
-                        match InvestigationEstimateContract.parseParticipatingArguments args with
-                        | Ok _ -> ()
-                        | Error err ->
-                            let sessionText =
-                                if not (isNull toolInput) && not (isNull toolInput?sessionID) then
-                                    string toolInput?sessionID
-                                else
-                                    let ctx = ToolHostCodec.decodeContext toolInput
-                                    ctx.SessionId
-                            let language = ProviderLanguageBinding.forSessionText sessionText
-                            let explanation = InvestigationEstimateContract.formatArgumentError language err
-                            invalidOp (sprintf "Invalid investigation estimate arguments: %s" explanation)
+                    if isDelegationActive then
+                        requireDelegationEstimateArguments toolInput toolOutput
 
                     recordProtocolArgumentVault toolInput toolOutput
 
@@ -582,7 +598,7 @@ module PluginHooks =
                     then
                         ManagerReviewContract.hide toolOutput?args
 
-                    // host-boundary-032 / DELEGATE_REVISE.md: narrow hide to participating tools only when predictor is configured.
+    // host-boundary-032: narrow hide to participating tools only when predictor is configured.
                     // Non-participating and unreviewed tools are untouched, leaving their own business
                     // arguments intact. Unconfigured predictor leaves all tools untouched.
                     if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
@@ -592,15 +608,13 @@ module PluginHooks =
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     let toolName = toolField toolInput "tool"
+
                     let isParticipatingTool =
                         InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
 
                     let restoreTarget (target: obj) =
                         if not (isNull target) && not (isNull target?args) then
-                            if isParticipatingTool then
-                                ReadonlyDelegationContract.restore target?args
-                            ManagerReviewContract.restore target?args
-                            TodoWriteCompressionContract.restore target?args
+                            restoreParticipatingArguments isParticipatingTool target?args
 
                     restoreTarget toolInput
                     restoreTarget toolOutput

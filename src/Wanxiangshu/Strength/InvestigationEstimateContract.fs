@@ -111,20 +111,20 @@ module InvestigationEstimateContract =
     [<Emit("Number.isInteger($0)")>]
     let private isJsInteger (value: obj) : bool = jsNative
 
+    /// 检查非负以及是否在 [0, 2147483647]；-0 在 JS 转换为 float 后与 0.0 相等，按 0 处理。
+    let private toEstimateRange (num: float) : Result<int, EstimateArgumentError> =
+        if num < 0.0 || num > 2147483647.0 then
+            Error EstimateArgumentError.InvalidRange
+        else
+            Ok(int (if num = 0.0 then 0.0 else num))
+
     let private validateNumber (raw: obj) : Result<int, EstimateArgumentError> =
         if not (isJsNumber raw) then
             Error EstimateArgumentError.WrongNumberType
         elif not (isJsFinite raw) || not (isJsInteger raw) then
             Error EstimateArgumentError.InvalidRange
         else
-            let num = unbox<float> raw
-            // 检查非负以及是否在 [0, 2147483647]
-            if num < 0.0 || num > 2147483647.0 then
-                Error EstimateArgumentError.InvalidRange
-            else
-                // -0 在 JS 转换为 float 后与 0.0 相等，按 0 处理
-                let intVal = if num = 0.0 then 0 else int num
-                Ok intVal
+            toEstimateRange (unbox<float> raw)
 
     let private validateNoteForZero (args: obj) : Result<string option, EstimateArgumentError> =
         if hasOwn args NoteField then
@@ -132,21 +132,37 @@ module InvestigationEstimateContract =
         else
             Ok None
 
+    let private validateNoteText (rawNote: obj) : Result<string option, EstimateArgumentError> =
+        let noteStr = if isJsString rawNote then string rawNote else ""
+
+        if not (isJsString rawNote) then
+            Error EstimateArgumentError.NoteNotString
+        elif noteStr.Trim().Length = 0 then
+            Error EstimateArgumentError.MissingOrBlankNoteWhenPositive
+        else
+            Ok(Some noteStr)
+
     let private validateNoteForPositive (args: obj) : Result<string option, EstimateArgumentError> =
         if not (hasOwn args NoteField) then
             Error EstimateArgumentError.MissingOrBlankNoteWhenPositive
         else
-            let rawNote = args?(NoteField)
-            if not (isJsString rawNote) then
-                Error EstimateArgumentError.NoteNotString
-            else
-                let noteStr = string rawNote
-                if noteStr.Trim().Length = 0 then
-                    Error EstimateArgumentError.MissingOrBlankNoteWhenPositive
-                else
-                    Ok(Some noteStr)
+            validateNoteText args?(NoteField)
 
-    let parseParticipatingArguments (arguments: obj) : Result<EstimatedReadonlyRounds * string option, EstimateArgumentError> =
+    let private parseRoundsArguments
+        (arguments: obj)
+        : Result<EstimatedReadonlyRounds * string option, EstimateArgumentError> =
+        match validateNumber arguments?(EstimatedReadonlyRoundsField) with
+        | Error err -> Error err
+        | Ok 0 ->
+            validateNoteForZero arguments
+            |> Result.map (fun noteOpt -> EstimatedReadonlyRounds 0, noteOpt)
+        | Ok positiveRounds ->
+            validateNoteForPositive arguments
+            |> Result.map (fun noteOpt -> EstimatedReadonlyRounds positiveRounds, noteOpt)
+
+    let parseParticipatingArguments
+        (arguments: obj)
+        : Result<EstimatedReadonlyRounds * string option, EstimateArgumentError> =
         if not (isPlainObject arguments) then
             Error EstimateArgumentError.InvalidArgumentObject
         elif hasOwn arguments LegacyRoundsField then
@@ -154,56 +170,36 @@ module InvestigationEstimateContract =
         elif not (hasOwn arguments EstimatedReadonlyRoundsField) then
             Error EstimateArgumentError.MissingEstimate
         else
-            let rawRounds = arguments?(EstimatedReadonlyRoundsField)
-            match validateNumber rawRounds with
-            | Error err -> Error err
-            | Ok 0 ->
-                match validateNoteForZero arguments with
-                | Error err -> Error err
-                | Ok noteOpt -> Ok(EstimatedReadonlyRounds 0, noteOpt)
-            | Ok positiveRounds ->
-                match validateNoteForPositive arguments with
-                | Error err -> Error err
-                | Ok noteOpt -> Ok(EstimatedReadonlyRounds positiveRounds, noteOpt)
+            parseRoundsArguments arguments
+
+    let private describeArgumentErrorZhText (error: EstimateArgumentError) : string =
+        match error with
+        | EstimateArgumentError.MissingEstimate -> "必须提供 estimated_readonly_rounds 估计字段"
+        | EstimateArgumentError.WrongNumberType -> "estimated_readonly_rounds 必须为数字类型"
+        | EstimateArgumentError.InvalidRange -> "estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数"
+        | EstimateArgumentError.NotePresentWhenZero -> "estimated_readonly_rounds 为 0 时必须省略 self_note"
+        | EstimateArgumentError.MissingOrBlankNoteWhenPositive -> "正数估计需要非空的后续查证展望"
+        | EstimateArgumentError.NoteNotString -> "self_note 必须为字符串类型"
+        | EstimateArgumentError.MixedProtocolFields -> "不得携带旧协议字段 delegate_readonly_rounds"
+        | EstimateArgumentError.InvalidArgumentObject -> "工具参数必须为合法的普通对象"
+
+    let private describeArgumentErrorEnText (error: EstimateArgumentError) : string =
+        match error with
+        | EstimateArgumentError.MissingEstimate -> "The estimated_readonly_rounds field must be provided"
+        | EstimateArgumentError.WrongNumberType -> "estimated_readonly_rounds must be a number"
+        | EstimateArgumentError.InvalidRange ->
+            "estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647"
+        | EstimateArgumentError.NotePresentWhenZero -> "self_note must be omitted when estimated_readonly_rounds is 0"
+        | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
+            "A positive estimate requires a non-empty self_note outlook"
+        | EstimateArgumentError.NoteNotString -> "self_note must be a string"
+        | EstimateArgumentError.MixedProtocolFields -> "The legacy delegate_readonly_rounds field must not be used"
+        | EstimateArgumentError.InvalidArgumentObject -> "Tool arguments must be a valid plain object"
 
     let describeArgumentError (language: ProviderLanguage) (error: EstimateArgumentError) : string =
         match language with
-        | ProviderLanguage.SimplifiedChinese ->
-            match error with
-            | EstimateArgumentError.MissingEstimate ->
-                "必须提供 estimated_readonly_rounds 估计字段"
-            | EstimateArgumentError.WrongNumberType ->
-                "estimated_readonly_rounds 必须为数字类型"
-            | EstimateArgumentError.InvalidRange ->
-                "estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数"
-            | EstimateArgumentError.NotePresentWhenZero ->
-                "estimated_readonly_rounds 为 0 时必须省略 self_note"
-            | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
-                "正数估计需要非空的后续查证展望"
-            | EstimateArgumentError.NoteNotString ->
-                "self_note 必须为字符串类型"
-            | EstimateArgumentError.MixedProtocolFields ->
-                "不得携带旧协议字段 delegate_readonly_rounds"
-            | EstimateArgumentError.InvalidArgumentObject ->
-                "工具参数必须为合法的普通对象"
-        | ProviderLanguage.English ->
-            match error with
-            | EstimateArgumentError.MissingEstimate ->
-                "The estimated_readonly_rounds field must be provided"
-            | EstimateArgumentError.WrongNumberType ->
-                "estimated_readonly_rounds must be a number"
-            | EstimateArgumentError.InvalidRange ->
-                "estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647"
-            | EstimateArgumentError.NotePresentWhenZero ->
-                "self_note must be omitted when estimated_readonly_rounds is 0"
-            | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
-                "A positive estimate requires a non-empty self_note outlook"
-            | EstimateArgumentError.NoteNotString ->
-                "self_note must be a string"
-            | EstimateArgumentError.MixedProtocolFields ->
-                "The legacy delegate_readonly_rounds field must not be used"
-            | EstimateArgumentError.InvalidArgumentObject ->
-                "Tool arguments must be a valid plain object"
+        | ProviderLanguage.SimplifiedChinese -> describeArgumentErrorZhText error
+        | ProviderLanguage.English -> describeArgumentErrorEnText error
 
     let formatArgumentError (language: ProviderLanguage) (error: EstimateArgumentError) : string =
         describeArgumentError language error

@@ -924,9 +924,8 @@ F# 的模式匹配很强。
 14. baseline：它是债务账本，不是许可证
 ────────────────────────────────────────────────────────────
 
-仓库已有历史 pyramid。
-一次把全仓改完会扩大变更面。
-所以正式 gate 使用 per-file baseline ratchet。
+仓库已清零历史 pyramid：baseline 的 files 为空对象。
+因此任何 depth>=2 decision 都是新增债务，gate 立刻红。
 
 baseline 只记录：
 
@@ -942,9 +941,13 @@ baseline 只记录：
 规则：
 
     新文件从 0 开始。
-    旧文件不能超过自己的 baseline。
+    每个文件当前都是 0，不能超过自己的 baseline。
     修掉债务后 baseline 只能向下改。
     baseline 不能向上改来让 CI 绿。
+
+清零之后 baseline 没有可增加的余地：
+唯一的合法状态是空对象。
+需要记录新的例外，是把它当成一次设计审查，而不是改数字。
 
 查看全部债务：
 
@@ -957,6 +960,9 @@ baseline 只记录：
 snapshot 只打印 JSON。
 它不会改文件。
 它不是“重新生成 baseline”按钮。
+
+清零之后它只会打印空 files。
+若打印出非空计数，说明源码又长出了 pyramid。
 
 正确 baseline 更新流程：
 

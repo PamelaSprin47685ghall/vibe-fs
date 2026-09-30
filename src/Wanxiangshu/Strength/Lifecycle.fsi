@@ -31,6 +31,7 @@ module StrengthLifecycle =
 
     val replayIntents:
         sha256: (string -> string) ->
+        displayName: (string -> string) ->
         plans: StrengthReplayPlan list ->
             Result<ProjectionIntent list, StrengthProjectionIntentError>
 

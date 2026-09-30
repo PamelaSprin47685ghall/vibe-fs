@@ -168,7 +168,7 @@ module PluginHooksSurface =
 
     let secondBloggerEffect (observation: BloggerAdapterObservation) = observation.Second
 
-    /// DELEGATE.md 4.2: run the real read-only delegation schema decoration for
+    /// Run the real read-only delegation schema decoration for
     /// one tool id. Production gates this behind the Predictor configuration
     /// existence query; this surface entry calls the same contract function so
     /// the schema contract, idempotence, conflict rejection and bilingual
@@ -176,7 +176,7 @@ module PluginHooksSurface =
     let decorateReadonlyDelegationToolDefinition (toolID: string) (definition: obj) : unit =
         ReadonlyDelegationContract.decorateDefinition (box {| toolID = toolID |}) definition
 
-    /// DELEGATE.md 3.2: JS-boundary budget validation as a JS-native result:
+    /// JS-boundary budget validation as a JS-native result:
     /// { ok = true; rounds = <int> } or { ok = false; error = <code> }.
     let readonlyDelegationBudgetOf (value: obj) : obj =
         match ReadonlyDelegationContract.tryReadonlyRoundBudget value with
@@ -195,7 +195,7 @@ module PluginHooksSurface =
     [<Emit("Array.prototype.slice.call(arguments)")>]
     let private getJsArguments () : obj array = jsNative
 
-    /// DELEGATE_REVISE.md 7.1/7.2: self_note validation as a JS-native result:
+    /// self_note validation as a JS-native result:
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
         let jsArgs = getJsArguments ()

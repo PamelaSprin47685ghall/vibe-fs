@@ -324,29 +324,12 @@ module StrengthReplicaTransform =
         |> List.choose (fun batch ->
             let allowedExchanges =
                 batch.Exchanges
-                |> List.filter (fun exchange -> StrengthFrame.isAllowedTool exchange.ToolName)
+                |> List.filter (fun exchange -> StrengthFrame.isProjectionTool exchange.ToolName)
 
             if List.isEmpty allowedExchanges then
                 None
             else
                 Some { batch with Exchanges = allowedExchanges })
-
-    /// The replica runs the dedicated readonly `js-predictor` surface, but its
-    /// exchange is projected back into the owner's conversation as the owner's
-    /// own `js-<role>` tool: the owner sees a result it could have produced
-    /// itself, never a tool it cannot call. This happens at frame build, so the
-    /// material digest, the persisted payloads and every later replay all carry
-    /// the projected name consistently.
-    let private projectExchangeName (canonicalRole: Role) (exchange: StrengthToolExchange) =
-        if exchange.ToolName = "js-predictor" then
-            { exchange with ToolName = "js-" + (Roles.roleLabel canonicalRole) }
-        else
-            exchange
-
-    let private projectBatches (canonicalRole: Role) (batches: StrengthRequestBatch list) =
-        batches
-        |> List.map (fun batch ->
-            { batch with Exchanges = batch.Exchanges |> List.map (projectExchangeName canonicalRole) })
 
     let private batchesForReplica (rawMessages: obj list) (currentWire: ProviderProjection.ProviderWireProjection) =
         let wireBatches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
@@ -366,11 +349,7 @@ module StrengthReplicaTransform =
         : Result<StrengthFrameBundle option, StrengthFrameError> =
         match batches with
         | [] -> Ok None
-        | _ ->
-            batches
-            |> projectBatches binding.CanonicalRole
-            |> StrengthFrame.tryBuild sha256
-            |> Result.map Some
+        | _ -> StrengthFrame.tryBuild sha256 batches |> Result.map Some
 
     let private replicaIntents
         (sha256: string -> string)

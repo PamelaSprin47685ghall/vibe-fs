@@ -59,6 +59,8 @@ module StrengthSurface =
 
     val isAllowedTool: tool: string -> bool
 
+    val isProjectionTool: tool: string -> bool
+
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     val systemPromptIdForRole: role: string -> string
 
@@ -249,7 +251,7 @@ module StrengthSurface =
 
     val lifecycleNeedsRawReplay: coveredThrough: obj -> plan: obj -> bool
 
-    val lifecycleReplayIntents: sha256: (string -> string) -> plans: obj array -> obj
+    val lifecycleReplayIntents: sha256: (string -> string) -> plans: obj array -> ownerRole: string -> obj
 
     val scopeCreate: unit -> obj
 

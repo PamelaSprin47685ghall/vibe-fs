@@ -470,9 +470,9 @@ test('WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_an
 })
 
 // ---------------------------------------------------------------------------
-// DELEGATE.md 3.2/3.3/4.2/4.3: explicit read-only delegation protocol.
+// /4.2/4.3: explicit read-only delegation protocol.
 // Production tool.definition decoration is gated behind the Predictor
-// configuration existence query (ModelRouting, DELEGATE.md 9.2); the schema
+// configuration existence query (ModelRouting, ); the schema
 // contract itself is proven through the same registered contract function
 // (PluginHooksSurface.decorateReadonlyDelegationToolDefinition), while the
 // argument-boundary assertions run through the real plugin hooks, where the
@@ -503,7 +503,7 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     assert.ok(
       typeof props.estimated_readonly_rounds.description === 'string' &&
         props.estimated_readonly_rounds.description.includes('consecutive read-only investigation rounds'),
-      'budget must carry the DELEGATE_REVISE.md 7.1 description',
+      'budget must carry the description',
     )
     assert.deepEqual(
       definition.parameters.required,
@@ -515,7 +515,7 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     assert.ok(
       typeof props.self_note.description === 'string' &&
         props.self_note.description.includes('estimated_readonly_rounds is greater than 0'),
-      'self_note must carry the DELEGATE_REVISE.md 7.1 description',
+      'self_note must carry the description',
     )
     assert.equal(
       definition.parameters.required.includes('self_note'),
@@ -800,7 +800,7 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
 })
 
 // ---------------------------------------------------------------------------
-// DELEGATE.md 9.1/9.2 两态门控：ModelRouting.initialize 的 scheduler 是进程
+// 两态门控：ModelRouting.initialize 的 scheduler 是进程
 // 单例（每测试进程只 import 一次），因此两个可观察态由测试自有的动态源驱动
 // ——fixture 在隔离 HOME 下写出的 wanxiangshu.mjs 导出 predictorConfiguration，
 // 读 globalThis 上的测试注入值，不触碰用户真实配置。默认（未注入）即未配置。
@@ -1419,7 +1419,7 @@ integrationTest(
       true,
       'round 2 provider tools must remain stable',
     )
-    // DELEGATE.md 4.1 / 197: 真实 Host canary 必须枚举最终 provider-visible
+ // / 197: 真实 Host canary 必须枚举最终 provider-visible
     // tools。当前 runner 跑未配置态，断言枚举面存在、含内建与插件工具、
     // 且全部工具不带协议字段（无功能基线的 wire 级证明）。
     assert.ok(
@@ -1454,7 +1454,7 @@ integrationTest(
   },
 )
 
-// host-boundary-032 / DELEGATE.md 4.3: the Host persists tool-call input after
+// host-boundary-032 / the Host persists tool-call input after
 // the before hook strips the protocol fields, so the next provider request is
 // built from stripped history. The provider-facing transform restores the
 // vaulted wire originals into that history before any consumer reads it.

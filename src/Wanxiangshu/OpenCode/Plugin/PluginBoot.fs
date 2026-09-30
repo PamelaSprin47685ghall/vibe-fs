@@ -57,7 +57,7 @@ module PluginBoot =
             scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
             scope.AttachScopeDispose(fun () -> strengthScope.Dispose())
 
-            // host-boundary-032 / DELEGATE.md 4.3: the protocol argument vault
+    // host-boundary-032 / the protocol argument vault
             // records tool.execute.before originals so the provider transform
             // can restore them into persisted history. Process-local only;
             // dropped with the scope.

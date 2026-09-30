@@ -28,27 +28,22 @@ module ProviderSystemTransform =
 
     let private canonical (text: string) = if isNull text then "" else text.Trim()
 
+    let private isReplicaConstraintLine (expectedZh: string) (expectedEn: string) (text: string) =
+        let c = canonical text
+        c = expectedZh || c = expectedEn
+
     let private applyReplicaConstraint (lang: ProviderLanguage) (output: obj) =
         let currentSystem = unbox<string array> output?system
         let expectedZh = canonical replicaConstraintZh
         let expectedEn = canonical replicaConstraintEn
         let nextConstraint = replicaConstraintFor lang
-
-        let hasConstraint =
-            currentSystem
-            |> Array.exists (fun text ->
-                let c = canonical text
-                c = expectedZh || c = expectedEn)
+        let isConstraintLine = isReplicaConstraintLine expectedZh expectedEn
+        let hasConstraint = currentSystem |> Array.exists isConstraintLine
 
         if hasConstraint then
             output?system <-
                 currentSystem
-                |> Array.map (fun text ->
-                    let c = canonical text
-                    if c = expectedZh || c = expectedEn then
-                        nextConstraint
-                    else
-                        text)
+                |> Array.map (fun text -> if isConstraintLine text then nextConstraint else text)
         else
             output?system <- Array.append currentSystem [| nextConstraint |]
 

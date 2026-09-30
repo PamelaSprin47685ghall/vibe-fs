@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Strength
 
-/// host-boundary-032 / DELEGATE_REVISE.md: process-local vault of the protocol
+/// host-boundary-032: process-local vault of the protocol
 /// fields exactly as the model produced them on the wire.
 ///
 /// The Host serializes persisted tool-call arguments after tool.execute.before

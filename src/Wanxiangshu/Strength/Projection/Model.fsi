@@ -50,6 +50,7 @@ module StrengthProjectionIntent =
         decisionId: StrengthDecisionId ->
         targetProviderRun: ProviderRunIdentity ->
         currentProviderRun: ProviderRunIdentity ->
+        displayName: (string -> string) ->
         bundle: StrengthFrameBundle ->
             Result<ProjectionIntent, StrengthProjectionIntentError>
 
@@ -59,6 +60,7 @@ module StrengthProjectionIntent =
         decisionId: StrengthDecisionId ->
         beforeMessageIndex: int ->
         isReplicaRequest: bool ->
+        displayName: (string -> string) ->
         bundle: StrengthFrameBundle ->
             Result<ProjectionIntent, StrengthProjectionIntentError>
 

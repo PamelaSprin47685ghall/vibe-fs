@@ -36,8 +36,8 @@ open Wanxiangshu.Strength.Replica
 [<RequireQualifiedAccess>]
 module StrengthDelegate =
 
-    /// WHAT-014: stable code-level contract version of the delegation field set.
-    /// It never changes with environment, configuration or rollout state.
+ /// WHAT-014: stable code-level contract version of the delegation field set.
+ /// It never changes with environment, configuration or rollout state.
     let private contractRevision =
         DelegationContractRevisions.create InvestigationEstimateContract.ProtocolRevision
 
@@ -67,7 +67,7 @@ module StrengthDelegate =
             let wire = ProviderWireCapture.decodeMessageView rawMessages
 
             let! intent =
-                StrengthProjectionIntent.candidate HostDigest.sha256Hex owner decision target target bundle
+                StrengthProjectionIntent.candidate HostDigest.sha256Hex owner decision target target id bundle
                 |> Result.mapError (fun error -> sprintf "Strength Candidate intent refused: %A" error)
 
             let snapshot = { CurrentProjection = ProviderProjection.toSemantic wire }
@@ -221,7 +221,7 @@ module StrengthDelegate =
                   DurableProjection = durableStrength }
         }
 
-    // ---- source batch evidence -------------------------------------------------
+ // ---- source batch evidence -------------------------------------------------
 
     let private isToolPartCompleted (part: obj) : bool =
         let state = ProviderWireDecode.readField part "state"
@@ -330,9 +330,7 @@ module StrengthDelegate =
                           CanonicalArguments = arguments }
             | _ -> None)
 
-    let private tryExtractWireAssistantCalls
-        (message: ProviderProjection.WireMessage)
-        : SourceToolCall list option =
+    let private tryExtractWireAssistantCalls (message: ProviderProjection.WireMessage) : SourceToolCall list option =
         if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
             None
         else
@@ -385,33 +383,75 @@ module StrengthDelegate =
 
         loop startIndex Map.empty
 
-    let private collectWireCompletedBatches
-        (messages: ProviderProjection.WireMessage list)
-        : SourceToolCall list list =
+    let private callIdSet (calls: SourceToolCall list) =
+        calls |> List.map (fun call -> ToolCallId.value call.CallId) |> Set.ofList
+
+ /// One scan step over the wire: a non-assistant message yields an empty
+ /// batch and advances; an assistant message with no calls stops the scan;
+ /// an assistant message with calls yields its complete batch and the next
+ /// index. `Error` means the wire is not a completed batch, so scanning stops.
+    let rec private wireBatchStep
+        (all: ProviderProjection.WireMessage array)
+        (index: int)
+        : Result<SourceToolCall list * int, unit> =
+        let message = all.[index]
+
+        let isAssistant =
+            String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+
+        let calls =
+            if isAssistant then
+                extractWireToolCalls message.Parts
+            else
+                []
+
+        match isAssistant, calls with
+        | false, _ -> Ok([], index + 1)
+        | true, [] -> Error()
+        | true, calls -> completeWireBatch all index calls
+
+    and private completeWireBatch
+        (all: ProviderProjection.WireMessage array)
+        (index: int)
+        (calls: SourceToolCall list)
+        : Result<SourceToolCall list * int, unit> =
+        match collectWireResults all (callIdSet calls) (index + 1) with
+        | Error() -> Error()
+        | Ok(results, _) when Map.count results <> List.length calls -> Error()
+        | Ok(_, nextIndex) -> Ok(calls, nextIndex)
+
+    let private collectWireCompletedBatches (messages: ProviderProjection.WireMessage list) : SourceToolCall list list =
         let all = List.toArray messages
 
         let rec loop index collected =
-            if index >= all.Length then
-                List.rev collected
-            else
-                let message = all.[index]
-
-                if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
-                    loop (index + 1) collected
+            let step =
+                if index >= all.Length then
+                    Error()
                 else
-                    let calls = extractWireToolCalls message.Parts
+                    wireBatchStep all index
 
-                    if List.isEmpty calls then
-                        List.rev collected
-                    else
-                        let callIds = calls |> List.map (fun call -> ToolCallId.value call.CallId) |> Set.ofList
-
-                        match collectWireResults all callIds (index + 1) with
-                        | Error() -> List.rev collected
-                        | Ok(results, _) when Map.count results <> List.length calls -> List.rev collected
-                        | Ok(_, nextIndex) -> loop nextIndex (calls :: collected)
+            match step with
+            | Error() -> List.rev collected
+            | Ok([], nextIndex) -> loop nextIndex collected
+            | Ok(calls, nextIndex) -> loop nextIndex (calls :: collected)
 
         loop 0 []
+
+    let private signaturePair (batch: StrengthRequestBatch) (calls: SourceToolCall list) =
+        let exchanges =
+            batch.Exchanges
+            |> List.map (fun exchange -> exchange.ToolName, exchange.CanonicalArguments)
+
+        let calls = calls |> List.map (fun call -> call.ToolName, call.CanonicalArguments)
+        exchanges, calls
+
+    let private matchesTailCalls
+        (batch: StrengthRequestBatch)
+        (completedCalls: SourceToolCall list)
+        (tailCalls: SourceToolCall list)
+        : bool =
+        let batchSignatures, callSignatures = signaturePair batch tailCalls
+        batchSignatures = callSignatures && completedCalls = tailCalls
 
     let private matchBatchWithTailCalls
         (wireMessages: ProviderProjection.WireMessage list)
@@ -421,19 +461,7 @@ module StrengthDelegate =
         let completedCallBatches = collectWireCompletedBatches wireMessages
 
         match List.tryLast completeBatches, List.tryLast completedCallBatches with
-        | Some batch, Some completedCalls ->
-            let batchSignatures =
-                batch.Exchanges
-                |> List.map (fun exchange -> exchange.ToolName, exchange.CanonicalArguments)
-
-            let callSignatures =
-                tailCalls
-                |> List.map (fun call -> call.ToolName, call.CanonicalArguments)
-
-            if batchSignatures = callSignatures && completedCalls = tailCalls then
-                Some tailCalls
-            else
-                None
+        | Some batch, Some completedCalls when matchesTailCalls batch completedCalls tailCalls -> Some tailCalls
         | _ -> None
 
     let private tryExtractWireCompletedBatch
@@ -445,10 +473,10 @@ module StrengthDelegate =
         | [] -> None
         | batches -> matchBatchWithTailCalls wire.Messages (List.last batches)
 
-    /// Resolves the completed source batch of the tail assistant message.
-    /// Supports both:
-    /// 1. Host session-shaped tool parts (single assistant message where all tool parts are completed with output)
-    /// 2. Wire-level multi-message parts (assistant WireToolCall messages followed by WireToolResult messages)
+ /// Resolves the completed source batch of the tail assistant message.
+ /// Supports both:
+ /// 1. Host session-shaped tool parts (single assistant message where all tool parts are completed with output)
+ /// 2. Wire-level multi-message parts (assistant WireToolCall messages followed by WireToolResult messages)
     let private resolveCompletedSourceBatch
         (rawMessages: obj list)
         (wire: ProviderProjection.ProviderWireProjection)
@@ -474,7 +502,7 @@ module StrengthDelegate =
         | Some calls -> Some calls
         | None -> tryExtractWireCompletedBatch wire
 
-    // ---- call budget parsing ---------------------------------------------------
+ // ---- call budget parsing ---------------------------------------------------
 
     let private tryParseCallArguments (callId: ToolCallId) (arguments: string) : Result<obj, string> =
         try
@@ -490,33 +518,23 @@ module StrengthDelegate =
         | ArgumentError of reason: string
 
     let private aggregateBatchEstimate (language: ProviderLanguage) (calls: SourceToolCall list) : BatchAggregation =
-        let estimateCalls =
-            calls
-            |> List.filter (fun call ->
-                match InvestigationEstimateContract.classifyTool call.ToolName with
-                | InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall -> true
-                | _ -> false)
+        let ofRounds (roundsList: InvestigationEstimateContract.EstimatedReadonlyRounds list) =
+            let maxRounds =
+                roundsList
+                |> List.maxBy InvestigationEstimateContract.EstimatedReadonlyRounds.value
 
-        match estimateCalls with
-        | [] -> BatchAggregation.NoEstimateOpportunity
-        | _ ->
-            let parsedResults =
-                estimateCalls
-                |> List.map (fun call ->
-                    match tryParseCallArguments call.CallId call.CanonicalArguments with
-                    | Error err -> Error err
-                    | Ok parsedObj ->
-                        match InvestigationEstimateContract.parseParticipatingArguments parsedObj with
-                        | Ok(rounds, _noteOpt) -> Ok rounds
-                        | Error err ->
-                            let explanation = InvestigationEstimateContract.formatArgumentError language err
-                            Error(
-                                sprintf
-                                    "delegation arguments of call %s rejected: %s"
-                                    (ToolCallId.value call.CallId)
-                                    explanation
-                            ))
+            let maxValue = InvestigationEstimateContract.EstimatedReadonlyRounds.value maxRounds
 
+            if maxValue = 0 then
+                BatchAggregation.EstimatedZero
+            else
+                BatchAggregation.PositiveEstimate(
+                    InvestigationEstimateContract.EstimatedReadonlyRounds.toExecutionBudget maxRounds
+                )
+
+        let ofParsedResults
+            (parsedResults: Result<InvestigationEstimateContract.EstimatedReadonlyRounds, string> list)
+            =
             let firstError =
                 parsedResults
                 |> List.tryPick (function
@@ -526,25 +544,41 @@ module StrengthDelegate =
             match firstError with
             | Some reason -> BatchAggregation.ArgumentError reason
             | None ->
-                let roundsList =
+                ofRounds (
                     parsedResults
                     |> List.choose (function
                         | Ok rounds -> Some rounds
                         | Error _ -> None)
+                )
 
-                let maxRounds =
-                    roundsList
-                    |> List.maxBy InvestigationEstimateContract.EstimatedReadonlyRounds.value
+        let roundsOfParsedObject
+            (call: SourceToolCall)
+            (parsedObj: obj)
+            : Result<InvestigationEstimateContract.EstimatedReadonlyRounds, string> =
+            match InvestigationEstimateContract.parseParticipatingArguments parsedObj with
+            | Ok(rounds, _noteOpt) -> Ok rounds
+            | Error err ->
+                let explanation = InvestigationEstimateContract.formatArgumentError language err
 
-                let maxValue = InvestigationEstimateContract.EstimatedReadonlyRounds.value maxRounds
+                Error(sprintf "delegation arguments of call %s rejected: %s" (ToolCallId.value call.CallId) explanation)
 
-                if maxValue = 0 then
-                    BatchAggregation.EstimatedZero
-                else
-                    let budget = InvestigationEstimateContract.EstimatedReadonlyRounds.toExecutionBudget maxRounds
-                    BatchAggregation.PositiveEstimate budget
+        let parseCall (call: SourceToolCall) : Result<InvestigationEstimateContract.EstimatedReadonlyRounds, string> =
+            match tryParseCallArguments call.CallId call.CanonicalArguments with
+            | Error err -> Error err
+            | Ok parsedObj -> roundsOfParsedObject call parsedObj
 
-    // ---- phase one: capture the authorization ----------------------------------
+        let estimateCalls =
+            calls
+            |> List.filter (fun call ->
+                match InvestigationEstimateContract.classifyTool call.ToolName with
+                | InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall -> true
+                | _ -> false)
+
+        match estimateCalls with
+        | [] -> BatchAggregation.NoEstimateOpportunity
+        | _ -> estimateCalls |> List.map parseCall |> ofParsedResults
+
+ // ---- phase one: capture the authorization ----------------------------------
 
     type CaptureOutcome =
         | Captured of DelegationRequest
@@ -573,7 +607,9 @@ module StrengthDelegate =
         : Result<SourceToolCall list * ReadonlyRoundBudget, string> =
         result {
             let! calls = tryResolveSourceCalls surface
-            let language = ProviderLanguageBinding.forSessionText (SessionId.value surface.Owner)
+
+            let language =
+                ProviderLanguageBinding.forSessionText (SessionId.value surface.Owner)
 
             match aggregateBatchEstimate language calls with
             | BatchAggregation.PositiveEstimate budget -> return calls, budget
@@ -788,7 +824,7 @@ module StrengthDelegate =
                         output
         }
 
-    // ---- phase two: start / consume --------------------------------------------
+ // ---- phase two: start / consume --------------------------------------------
 
     let private appendClosed
         (strengthScope: PluginStrengthScope)
@@ -898,10 +934,10 @@ module StrengthDelegate =
                 DelegationClosedReason.RecoveryAbandoned
         | _ -> Task.FromResult()
 
-    /// DELEGATE-7/10: the target run already owns a durable decision. A Prepared
-    /// candidate re-renders the exact same material without re-running the
-    /// readonly tools; a Bound-but-empty execution whose local child is gone
-    /// loses this investigation opportunity and closes; settled states wait.
+ /// DELEGATE-7/10: the target run already owns a durable decision. A Prepared
+ /// candidate re-renders the exact same material without re-running the
+ /// readonly tools; a Bound-but-empty execution whose local child is gone
+ /// loses this investigation opportunity and closes; settled states wait.
     let private consumeBoundDecision
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
@@ -1063,8 +1099,8 @@ module StrengthDelegate =
         elif strengthScope.StrengthFuseReason |> Option.isSome then
             failClosed strengthScope "Strength fuse is tripped; delegation is closed for this process"
         elif request.ContractRevision <> contractRevision then
-            // DELEGATE_REVISE §12.4: v1 Requested that was not Bound is explicitly closed
-            // upon contract revision upgrade; owner continues normally without launching old protocol child.
+ // v1 Requested that was not Bound is explicitly closed
+ // upon contract revision upgrade; owner continues normally without launching old protocol child.
             appendClosed
                 strengthScope
                 surface
@@ -1088,9 +1124,9 @@ module StrengthDelegate =
         else
             prepareAndStartReplica strengthScope surface request
 
-    /// DELEGATE-10: recovery reads the pending request from persisted facts. A
-    /// new user input or authority replacement closes the old request; the
-    /// request never rescans arbitrary history for a positive budget.
+ /// DELEGATE-10: recovery reads the pending request from persisted facts. A
+ /// new user input or authority replacement closes the old request; the
+ /// request never rescans arbitrary history for a positive budget.
     let private startPendingRequest
         (strengthScope: PluginStrengthScope)
         (predictorConfigured: bool)

@@ -276,7 +276,7 @@ module PluginTransforms =
                         )
             }
 
-        // DELEGATE.md 9.1/9.2 / speculative-investigation-014: the only
+    // / speculative-investigation-014: the only
         // enablement condition for explicit read-only delegation is that a
         // Predictor model is configured. The read-only configuration
         // existence query is the process-shared
@@ -305,7 +305,7 @@ module PluginTransforms =
                     )
                 )
 
-        // host-boundary-032 / DELEGATE.md 4.3: provider-facing wire-layer
+    // host-boundary-032 / provider-facing wire-layer
         // restore of the protocol fields. The Host persists tool-call input
         // after the before hook stripped the protocol fields, so every later
         // provider request is built from stripped history. The before hook
@@ -471,7 +471,26 @@ module PluginTransforms =
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
             SessionStartedAtLedger.bindSessionStartedAt port clock terminateSession Diagnostic.emit
-          ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
+          ApplyStrengthReplay =
+            // The owner-facing replay must name the projected readonly exchange
+            // with the owner's own `js-<role>` surface. Resolve that role from the
+            // live authority projection for the session being transformed.
+            let ownerRole (sessionId: string) =
+                journal
+                |> Option.bind (fun durable ->
+                    let projections = (AgentJournal.snapshot durable).AgentProjections
+                    let sid = SessionId.create sessionId
+
+                    PromptAuthorityProjectionQueries.activeProfile sid projections
+                    |> Option.orElseWith (fun () ->
+                        PromptAuthorityProjectionQueries.lastAuthorityProfile sid projections))
+                |> Option.map (fun profile -> profile.CanonicalRole)
+
+            StrengthReplay.applyBeforeXTrace
+                journal
+                strengthDurability
+                strengthFailFuse
+                ownerRole
           RestoreProtocolArguments = restoreProtocolArguments
           ApplyRelayProjection =
             fun sidOpt outObj ->
@@ -742,7 +761,7 @@ module PluginTransforms =
             // 4. StrengthReplay.applyBeforeXTrace
             let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
 
-            // 4.4 host-boundary-032 / DELEGATE.md 4.3: restore the protocol
+    // 4.4 host-boundary-032 / restore the protocol
             // fields the Host persisted away into the provider-facing request
             // BEFORE delegation capture (4.5) reads the same history; without
             // this the capture never sees the budget the model signed.
@@ -830,7 +849,7 @@ module PluginTransforms =
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! branches.ReplicaXWire outObj
                     do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
-                    // host-boundary-032 / DELEGATE.md 4.3: same restore on the
+    // host-boundary-032 / same restore on the
                     // Replica branch, before the runtime reads this request.
                     do! caps.RestoreProtocolArguments outObj
                     let! handled = runtime.HandleTransform outObj

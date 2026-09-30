@@ -316,7 +316,7 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Author
     const [plan] = replayPlans.value
     assert.equal(plan.beforeMessageIndex, 1)
 
-    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value)
+    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value, '')
     assert.equal(replayIntents.ok, true)
     const replayed = Projection.renderMessagesWithHostIds(snapshot(baseWire), baseWire, replayIntents.value)
     const written = Adapter.tryApplyRenderedInsertionsPreservingBase('owner', H, rawBase, replayed)
@@ -414,7 +414,7 @@ test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_
     assert.equal(replayPlans.ok, true)
     assert.equal(replayPlans.value.length, 1)
 
-    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value)
+    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value, '')
     assert.equal(replayIntents.ok, true)
     const replayed = Projection.renderMessagesWithHostIds(snapshot(baseWire), baseWire, replayIntents.value)
     const written = Adapter.tryApplyRenderedInsertionsPreservingBase(ownerSessionId, H, rawBase, replayed)

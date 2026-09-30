@@ -187,9 +187,8 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             if AblationGate.factDenied (AblationGate.registry ()) tag then
                 return Error(rejectAblation tag)
             else
-                match! this.AppendEnvelope stream providerRun (Fact.Agent fact) with
-                | Ok(updated, _) -> return Ok updated
-                | Error err -> return Error err
+                let! appended = this.AppendEnvelope stream providerRun (Fact.Agent fact)
+                return appended |> Result.map fst
         }
 
     /// Append a Magic Todo fact and return its durable envelope identity.

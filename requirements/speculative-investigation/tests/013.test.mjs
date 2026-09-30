@@ -302,7 +302,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
 
       // The process-shared Predictor existence query is observed per call, not
       // frozen at plugin construction: tool decoration sees the configured
-      // state and decorates participating tools per DELEGATE_REVISE.md contract.
+ // state and decorates participating tools per contract.
       const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
       try {
         process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'

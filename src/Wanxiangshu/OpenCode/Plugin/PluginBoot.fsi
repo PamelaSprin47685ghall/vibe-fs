@@ -23,7 +23,7 @@ module PluginBoot =
             StrengthFailClosed: string -> unit
             WorkspaceDirectory: string option
             FamilyParent: SessionId -> SessionId option
-            /// host-boundary-032 / DELEGATE.md 4.3: process-local protocol argument
+            /// host-boundary-032 / process-local protocol argument
             /// snapshot store, keyed by (sessionId, callId). Never persisted.
             ProtocolArgumentVault: ProtocolArgumentVault.Vault
         }

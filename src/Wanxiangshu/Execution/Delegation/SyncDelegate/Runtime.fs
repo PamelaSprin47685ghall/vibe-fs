@@ -219,6 +219,32 @@ type SyncDelegateRuntime
 
         Task.FromResult issued
 
+    /// A delegate session with no active physical execution has nothing to
+    /// settle. One that has one gets its exact physical binding fenced before
+    /// the new continuation is sent: bookkeeping first, then best-effort
+    /// interrupt. A failed Host interrupt degrades to today's behaviour (the
+    /// old run's next chat.params fails closed) and must not block the
+    /// delegation itself.
+    let settleInFlightDelegateExecution (sessions: ISessionHostPort) (delegateSession: SessionId) : Task<unit> =
+        task {
+            match ModelRouting.tryActivePhysical (sessionKey delegateSession) with
+            | None -> ()
+            | Some inFlightPhysical ->
+                let physicalId = PhysicalUserMessageId.create inFlightPhysical
+
+                ModelRouting.suppressProviderStep delegateSession physicalId
+                ModelRouting.releasePhysicalExecution delegateSession physicalId |> ignore
+
+                let! outcome = sessions.InterruptAttempt delegateSession
+
+                outcome
+                |> Result.mapError (fun reason ->
+                    Diagnostic.emit
+                        "sync-delegate-interrupt-inflight-failed"
+                        [ "session_id", sessionKey delegateSession; "result", reason ])
+                |> ignore
+        }
+
     let sendDelegatePrompt
         (call: SyncDelegateCall)
         (request: SyncDelegatePromptRequest)
@@ -301,30 +327,7 @@ type SyncDelegateRuntime
                 // executing the old step and fail closed in chat.params
                 // (PROMPT-006), killing this new execution's run too. Settle the old
                 // attempt first — the same retire order the manager loop uses.
-                let delegateKey = SessionId.value call.Delegate
-
-                match ModelRouting.tryActivePhysical delegateKey with
-                | Some inFlightPhysical ->
-                    let physicalId = PhysicalUserMessageId.create inFlightPhysical
-
-                    ModelRouting.suppressProviderStep call.Delegate physicalId
-                    ModelRouting.releasePhysicalExecution call.Delegate physicalId |> ignore
-
-                    // Best-effort: the lease bookkeeping above already fenced the old
-                    // physical out of further provider steps. A failed Host interrupt
-                    // degrades to today's behaviour (the old run's next chat.params
-                    // fails closed); it must not block the delegation itself.
-                    do!
-                        sessions.InterruptAttempt call.Delegate
-                        |> TaskValue.map (fun outcome ->
-                            outcome
-                            |> Result.mapError (fun reason ->
-                                Diagnostic.emit
-                                    "sync-delegate-interrupt-inflight-failed"
-                                    [ "session_id", delegateKey; "result", reason ])
-                            |> ignore
-                            Ok())
-                | None -> ()
+                do! settleInFlightDelegateExecution sessions call.Delegate |> TaskResultCE.ofTask
 
                 let! _ =
                     dispatcher.SendContinuationWithTools

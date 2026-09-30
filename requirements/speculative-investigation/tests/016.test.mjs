@@ -45,7 +45,7 @@ const Budget = {
   },
 };
 
-// execution-model-routing-020 / DELEGATE.md 9.1:
+// execution-model-routing-020 / 
 // Ensure the test process has initialized the ModelRouting scheduler singleton
 // with dynamic predictorConfiguration query, allowing test cases to toggle predictor state
 // via globalThis.__wanxiangshu_test_predictor_state.
@@ -201,7 +201,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   assert.equal(Contract.describeArgumentErrorZh(resUndef.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
   assert.equal(Contract.describeArgumentErrorEn(resUndef.fields[0]), 'self_note must be omitted when estimated_readonly_rounds is 0');
 
-  // Surface helper verification per DELEGATE_REVISE.md §4.1:
+ // Surface helper verification per 
   // "真实 JSON 中省略属性与提供 null 不等价。直接 JS 单元测试还应覆盖“自有属性存在但值为 undefined”；
   // 本稿按出现了字段处理，零值时拒绝。校验存在性用 own-property 证据，不用 value == null 混淆。"
   const helperUndef = PluginHooksSurface.readonlyDelegationSelfNoteOf(objWithUndef);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { capabilities, exactReadonlyHostToolMap, isAllowedTool } from '../../../dist/Strength/Surface.js'
+import { capabilities, exactReadonlyHostToolMap, isAllowedTool, isProjectionTool } from '../../../dist/Strength/Surface.js'
 
 test('WHAT[capability-enforcement-005] replica projections and tool policy allow only read-only operations and js-predictor', () => {
   assert.deepEqual(exactReadonlyHostToolMap, [
@@ -12,8 +12,13 @@ test('WHAT[capability-enforcement-005] replica projections and tool policy allow
   }
   assert.deepEqual(capabilities('manager'), [])
   for (const tool of ['read', 'glob', 'grep', 'js-predictor']) assert.equal(isAllowedTool(tool), true, tool)
-  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown', 'js-engineer', 'js-devops', 'js-manager']) {
+  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
     assert.equal(isAllowedTool(tool), false, tool)
+  }
+  // A non-replica js-<role> surface is never PROJECTED into the replica, even
+  // though its projected name is a legal frame name.
+  for (const tool of ['js-engineer', 'js-devops', 'js-manager']) {
+    assert.equal(isProjectionTool(tool), false, tool)
   }
 })
 
@@ -28,9 +33,8 @@ test('WHAT[capability-enforcement-005] H12_replica_context_with_positive_estimat
     { tool: 'fork', args: { role: 'engineer', estimated_readonly_rounds: 2, self_note: 'sub-task' } },
     { tool: 'join', args: { session: 'ses-1', estimated_readonly_rounds: 1, self_note: 'join session' } },
     { tool: 'mcp__filesystem__write_file', args: { path: '/tmp/test', estimated_readonly_rounds: 1, self_note: 'mcp write' } },
-    { tool: 'js-engineer', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
-    { tool: 'js-devops', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
-    { tool: 'js-manager', args: { program: 'class Js {}', estimated_readonly_rounds: 1, self_note: 'js write' } },
+
+
     { tool: 'bash', args: { command: 'echo 1', estimated_readonly_rounds: 1, self_note: 'bash run' } },
   ]
 

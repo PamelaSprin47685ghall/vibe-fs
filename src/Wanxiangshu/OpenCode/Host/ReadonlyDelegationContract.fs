@@ -7,7 +7,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Strength
 
-/// DELEGATE.md 4.2: explicit read-only delegation schema contract and
+/// The read-only delegation schema contract and
 /// parameter boundary. Schema decoration, budget/note validation, provider
 /// argument evidence preservation and bilingual investigation outlook prose live
 /// here. This module never creates a child session, sends a provider
@@ -63,7 +63,7 @@ module ReadonlyDelegationContract =
     [<Emit("throw new TypeError($0)")>]
     let private throwTypeError (message: string) : unit = jsNative
 
-    // DELEGATE_REVISE.md 7.1/7.2 schema fragments, verbatim.
+    // Schema fragments, verbatim.
     [<Literal>]
     let private readonlyRoundsDescriptionEn =
         "Estimate how many consecutive read-only investigation rounds will still be needed after ALL tool calls in this response have completed, before a substantive change, a command, user clarification, a conclusion, or a consequential judgment that you must make yourself. One round is one model request and may contain several parallel tool calls; do not count the current batch. Routine choices about which reference or file to inspect are part of investigation. Use 0 when no such investigation remains or the next step already reaches one of those boundaries. Give your current best estimate; it need not be exact, and do not add work to match it."
@@ -80,7 +80,7 @@ module ReadonlyDelegationContract =
     let private selfNoteDescriptionZh =
         "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。"
 
-    // DELEGATE_REVISE.md 7.3 short outlook prose, verbatim.
+    // Short outlook prose, verbatim.
     [<Literal>]
     let private englishInvestigationOutlook =
         "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."
@@ -93,7 +93,7 @@ module ReadonlyDelegationContract =
     let private chineseInvestigationOutlookAlt =
         "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数；self_note 在轮数大于 0 时简述下一步核对目标，为 0 时必须省略。"
 
-    // Legacy v1 investigation outlook blocks (DELEGATE.md v1).
+    // Legacy v1 investigation outlook blocks.
     // Kept strictly for internal backward-compatibility stripping in stripInvestigationOutlookBlocks;
     // never published as current model-visible description.
     [<Literal>]

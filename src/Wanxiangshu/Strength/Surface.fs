@@ -289,6 +289,16 @@ module StrengthSurface =
             (projectionMessageRowsOf value?rows)
         |> projectionIntentResultToJs
 
+    /// Owner-facing display name for one projected exchange: the replica calls
+    /// `js-predictor`, but the owner must see its own `js-<role>` surface.
+    let private ownerDisplayNameOf (value: obj) (toolName: string) : string =
+        if isNull value || isNull value?ownerRole then
+            toolName
+        else
+            match Roles.tryParseRole (textOf value?ownerRole) with
+            | Some role when toolName = "js-predictor" -> "js-" + Roles.roleLabel role
+            | _ -> toolName
+
     let candidate (sha256: string -> string) (value: obj) : obj =
         StrengthProjectionIntent.candidate
             sha256
@@ -296,6 +306,7 @@ module StrengthSurface =
             (StrengthDecisionId.create (textOf value?decisionId))
             (ProviderRunIdentity.create (textOf value?targetProviderRun))
             (ProviderRunIdentity.create (textOf value?currentProviderRun))
+            (ownerDisplayNameOf value)
             (bundleOf value?bundle)
         |> projectionIntentResultToJs
 
@@ -306,6 +317,7 @@ module StrengthSurface =
             (StrengthDecisionId.create (textOf value?decisionId))
             (int (textOf value?beforeIndex))
             (unbox<bool> value?isReplicaRequest)
+            (ownerDisplayNameOf value)
             (bundleOf value?bundle)
         |> projectionIntentResultToJs
 
@@ -556,6 +568,8 @@ module StrengthSurface =
     /// ("Read"/"Glob"/"Grep") and the host tool ids ("read"/"glob"/"grep")
     /// answer the same question without a second hand-written name table.
     let isAllowedTool (tool: string) : bool = StrengthFrame.isAllowedTool tool
+
+    let isProjectionTool (tool: string) : bool = StrengthFrame.isProjectionTool tool
 
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     let systemPromptIdForRole (role: string) : string =
@@ -1596,12 +1610,22 @@ module StrengthSurface =
 
         StrengthLifecycle.needsRawReplay covered (planOf plan)
 
-    let lifecycleReplayIntents (sha256: string -> string) (plans: obj array) : obj =
+    let lifecycleReplayIntents (sha256: string -> string) (plans: obj array) (ownerRole: string) : obj =
+        let display =
+            match Roles.tryParseRole ownerRole with
+            | Some role ->
+                fun toolName ->
+                    if toolName = "js-predictor" then
+                        "js-" + Roles.roleLabel role
+                    else
+                        toolName
+            | None -> id
+
         match
             plans
             |> Array.toList
             |> List.map planOf
-            |> StrengthLifecycle.replayIntents sha256
+            |> StrengthLifecycle.replayIntents sha256 display
         with
         | Ok intents ->
             box

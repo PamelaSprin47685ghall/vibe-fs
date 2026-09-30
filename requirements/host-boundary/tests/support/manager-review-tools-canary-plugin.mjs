@@ -163,7 +163,7 @@ export default {
         const isReview = REVIEW_TOOLS.includes(toolName);
         const isControl = CONTROL_TOOLS.includes(toolName);
 
-        // DELEGATE.md 4.1 / spec [013]: the final provider-visible tool set
+ // / spec [013]: the final provider-visible tool set
         // must be enumerated — every definition the host renders through this
         // hook is observed, not only review/control tools.
         if (isReview || isControl) {

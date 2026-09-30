@@ -2,7 +2,7 @@ namespace Wanxiangshu.OpenCode.Host
 
 open Wanxiangshu.Strength
 
-/// DELEGATE.md 4.2: explicit read-only delegation schema contract and
+/// The read-only delegation schema contract and
 /// parameter boundary. Owns schema decoration, budget/note field validation,
 /// provider argument evidence preservation, and the bilingual investigation outlook
 /// prose. It never creates a child session, sends a provider request,
@@ -22,7 +22,7 @@ module ReadonlyDelegationContract =
     /// accepted only when identical to this protocol; a conflicting
     /// property, a non-array required, or a root schema that cannot be
     /// legally extended fails loudly instead of publishing a partial
-    /// protocol. The stable bilingual outlook prose (DELEGATE_REVISE.md 7.3)
+    /// protocol. The stable bilingual outlook prose 
     /// is appended once to the tool description, selected by the existing
     /// ProviderLanguageBinding preference; it never carries remaining
     /// rounds, random identifiers, prices or timestamps.

@@ -12,7 +12,7 @@
 
 ## [Unreleased]
 
-- speculative-investigation / host-boundary: 规范切换到 DELEGATE_REVISE.md 新合同。
+- speculative-investigation / host-boundary: 规范切换到  新合同。
   - **共享合同与协议修订版 2**：新增 `src/Wanxiangshu/Strength/InvestigationEstimateContract.fs`，将面向模型的意图性字段 `delegate_readonly_rounds` clean-break 重构为事实性连续只读轮数估计 `estimated_readonly_rounds`（0..2147483647 原生整数）。
   - **条件性调查展望**：`self_note` 明确为条件参数——估计大于 0 时必须提供一至三句非空白未来展望；估计为 0 时必须完全省略。提供与规则解释文案彻底解耦的机器稳定标识（`NotePresentWhenZero`、`MissingOrBlankNoteWhenPositive` 等）。
   - **逐工具判定矩阵**：严格按工具操作性质判定（全系统 12 个参与工具装饰，28 个不参与工具无任何增量）。

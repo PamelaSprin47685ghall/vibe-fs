@@ -164,6 +164,7 @@ module StrengthLifecycle =
 
     let replayIntents
         (sha256: string -> string)
+        (displayName: string -> string)
         (plans: StrengthReplayPlan list)
         : Result<ProjectionIntent list, StrengthProjectionIntentError> =
         plans
@@ -174,6 +175,7 @@ module StrengthLifecycle =
                 plan.Prepared.DecisionId
                 plan.BeforeMessageIndex
                 false
+                displayName
                 plan.Bundle)
 
     let framePartCount (bundle: StrengthFrameBundle) =

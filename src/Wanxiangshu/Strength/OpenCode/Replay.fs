@@ -35,7 +35,16 @@ module StrengthReplay =
                 |> RecordCoverage.ingestedThrough
                 |> XTraceCursor.sequence))
 
+    /// The owner-facing name for one projected exchange. The replica calls the
+    /// readonly `js-predictor` surface; the owner must instead see the `js-<role>`
+    /// tool it could have called itself. Every other name passes through unchanged.
+    let private ownerDisplayName (ownerRole: Role option) (toolName: string) =
+        match ownerRole with
+        | Some role when toolName = "js-predictor" -> "js-" + Roles.roleLabel role
+        | _ -> toolName
+
     let private applyRenderedPlans
+        (ownerRole: Role option)
         (sessionId: string)
         (outObj: obj)
         (rawMessages: obj list)
@@ -48,7 +57,7 @@ module StrengthReplay =
                 let wire = ProviderWireCapture.decodeMessageView rawMessages
 
                 let! intents =
-                    StrengthLifecycle.replayIntents HostDigest.sha256Hex plans
+                    StrengthLifecycle.replayIntents HostDigest.sha256Hex (ownerDisplayName ownerRole) plans
                     |> Result.mapError (fun error -> sprintf "Strength replay intent refused: %A" error)
 
                 let snapshot = { CurrentProjection = ProviderProjection.toSemantic wire }
@@ -71,6 +80,7 @@ module StrengthReplay =
     let private replayWithDurability
         (journal: AgentJournal option)
         (durability: StrengthDurabilityPort)
+        (ownerRole: Role option)
         (sessionId: string)
         (outObj: obj)
         : Task<Result<StrengthReplayPlan list, string>> =
@@ -94,7 +104,7 @@ module StrengthReplay =
             let plans =
                 plans |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
 
-            return! applyRenderedPlans sessionId outObj rawMessages plans
+            return! applyRenderedPlans ownerRole sessionId outObj rawMessages plans
         }
 
     let private plansOrFailClosed
@@ -111,6 +121,7 @@ module StrengthReplay =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailFuse: string -> unit)
+        (ownerRole: Role option)
         (sessionId: string)
         (outObj: obj)
         : Task<StrengthReplayPlan list> =
@@ -120,7 +131,7 @@ module StrengthReplay =
 
         match strengthDurability with
         | None -> Task.FromResult([])
-        | Some durability -> plansOrFailClosed failClosed (replayWithDurability journal durability sessionId outObj)
+        | Some durability -> plansOrFailClosed failClosed (replayWithDurability journal durability ownerRole sessionId outObj)
 
     /// Replay durable Promoted frames before XTrace. Returns plans that still
     /// need Promoted→Traced close after capture (raw-replayed only).
@@ -128,12 +139,14 @@ module StrengthReplay =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailFuse: string -> unit)
+        (ownerRole: string -> Role option)
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         : Task<StrengthReplayPlan list> =
         task {
             match projectionSessionIdOpt with
-            | Some sessionId -> return! applyForSession journal strengthDurability strengthFailFuse sessionId outObj
+            | Some sessionId ->
+                return! applyForSession journal strengthDurability strengthFailFuse (ownerRole sessionId) sessionId outObj
             | None -> return []
         }
 

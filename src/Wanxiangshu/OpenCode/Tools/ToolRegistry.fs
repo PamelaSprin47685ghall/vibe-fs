@@ -87,8 +87,7 @@ module ToolRegistry =
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
-        | None when specName = "js-predictor" ->
-            Some(ToolAdmission.PrivateAttachment(fun _ -> false))
+        | None when specName = "js-predictor" -> Some(ToolAdmission.PrivateAttachment(fun _ -> false))
         | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
             Some(JsToolSpec.admissionFor (specName.Substring 3))
         | None -> None
@@ -387,19 +386,24 @@ module ToolRegistry =
                     replicaPred (SessionId.create ctx.SessionId)
                 | _ -> false
 
+            /// STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
+            /// STRENGTH-004 / js-predictor: Host-native read/glob/grep never reach
+            /// this gate; js-predictor is the single plugin tool a live replica may
+            /// execute. Every other plugin tool stays denied.
+            let executeReplica args (ctx: HostToolContext) =
+                task {
+                    if spec.Name = "js-predictor" then
+                        return! executeEstablished args ctx
+                    else
+                        return denied ctx Path.DeniedStrength Map.empty
+                }
+
             let executeAfterBoundary args (ctx: HostToolContext) =
                 task {
                     if AblationGate.toolDenied (AblationGate.registry ()) spec.Name then
                         return denied ctx Path.DeniedAblation (Map [ "tool", spec.Name ])
                     elif isStrengthReplica ctx then
-                        // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
-                        // STRENGTH-004 / js-predictor: Host-native read/glob/grep never
-                        // reach this gate; js-predictor is the single plugin tool a live
-                        // replica may execute. Every other plugin tool stays denied.
-                        if spec.Name = "js-predictor" then
-                            return! executeEstablished args ctx
-                        else
-                            return denied ctx Path.DeniedStrength Map.empty
+                        return! executeReplica args ctx
                     else
                         return! executeEstablished args ctx
                 }

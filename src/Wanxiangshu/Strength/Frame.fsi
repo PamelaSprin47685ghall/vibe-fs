@@ -32,6 +32,8 @@ type StrengthMirrorError =
 
 module StrengthFrame =
     val isAllowedTool: toolName: string -> bool
+
+    val isProjectionTool: toolName: string -> bool
     val utf8ByteCount: value: string -> int
     val canonicalText: batches: StrengthRequestBatch list -> string
 

@@ -138,6 +138,28 @@ module SyncDelegateBatching =
     [<Emit("Promise.all($0)")>]
     let private promiseAll (promises: Task<'T> array) : Task<'T array> = jsNative
 
+    /// One charge's rendered tool output: a WorkRecord, the merged canonical
+    /// call, or the failure prose. The three cases are the invocation result's
+    /// own shape, not three separate decisions.
+    let private renderInvocationOutput
+        (language: ProviderLanguage)
+        (result: Result<SyncDelegateInvocationResult, string>)
+        : string =
+        match result with
+        | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) -> tomlObjectWithInstructions [ workRecord ] []
+        | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
+            tomlObjectWithInstructions [ mergedInstruction language canonicalCall ] []
+        | Error err -> tomlObjectWithInstructions [ sprintf "Engineer charge failed: %s" err ] []
+
+    let private resolvePendingInspection (sessionId: string) : DeferredCall list option =
+        lock pendingInspections (fun () ->
+            match pendingInspections.TryGetValue sessionId with
+            | true, list when list.Count > 0 ->
+                let copy = list |> Seq.toList
+                pendingInspections.Remove sessionId |> ignore
+                Some copy
+            | _ -> None)
+
     let stageDeferredInspection
         (sessionId: string)
         (callId: ToolCallId)
@@ -170,91 +192,87 @@ module SyncDelegateBatching =
         (sessionId: string)
         : Task<unit> =
         task {
-            let callsOpt =
-                lock pendingInspections (fun () ->
-                    match pendingInspections.TryGetValue sessionId with
-                    | true, list when list.Count > 0 ->
-                        let copy = list |> Seq.toList
-                        pendingInspections.Remove sessionId |> ignore
-                        Some copy
-                    | _ -> None)
-
-            match callsOpt with
+            match resolvePendingInspection sessionId with
             | None -> ()
             | Some calls ->
                 let callOrder = calls |> List.map (fun c -> c.CallId)
                 let combinedCharge = calls |> List.map (fun c -> c.Charge) |> String.concat "\n"
 
-                let firstCall = List.head calls
+                let invoke (call: DeferredCall) =
+                    let batch =
+                        { ProviderRun = ProviderRunIdentity.create "deferred-batch"
+                          CallOrder = callOrder
+                          CurrentCall = call.CallId }
 
-                let tasks =
-                    calls
-                    |> List.map (fun call ->
-                        let batch =
-                            { ProviderRun = ProviderRunIdentity.create "deferred-batch"
-                              CallOrder = callOrder
-                              CurrentCall = call.CallId }
+                    let preparePrompt () =
+                        Task.FromResult(LlmFacing.instructions (calls |> List.map (fun c -> c.Charge)))
 
-                        let preparePrompt () =
-                            Task.FromResult(LlmFacing.instructions (calls |> List.map (fun c -> c.Charge)))
+                    runtime.InvokeBatchPrepared(
+                        sessionId,
+                        SyncDelegateRole.Engineer,
+                        combinedCharge,
+                        batch,
+                        preparePrompt,
+                        ?expectedToolCalls = call.Estimate
+                    )
 
-                        runtime.InvokeBatchPrepared(
-                            sessionId,
-                            SyncDelegateRole.Engineer,
-                            combinedCharge,
-                            batch,
-                            preparePrompt,
-                            ?expectedToolCalls = call.Estimate
-                        ))
-
+                let tasks = calls |> List.map invoke
                 let! results = promiseAll (List.toArray tasks)
                 let lang = ProviderLanguageBinding.forSessionText sessionId
 
                 lock durableReplacedResults (fun () ->
-                    for i in 0 .. calls.Length - 1 do
-                        let call = calls.[i]
-                        let res = results.[i]
-
-                        let outputText =
-                            match res with
-                            | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
-                                tomlObjectWithInstructions [ workRecord ] []
-                            | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
-                                tomlObjectWithInstructions [ mergedInstruction lang canonicalCall ] []
-                            | Error err -> tomlObjectWithInstructions [ sprintf "Engineer charge failed: %s" err ] []
-
-                        durableReplacedResults.[ToolCallId.value call.CallId] <- outputText)
+                    List.iteri
+                        (fun i call ->
+                            durableReplacedResults.[ToolCallId.value call.CallId] <-
+                                renderInvocationOutput lang results.[i])
+                        calls)
         }
 
+    let private isToolPart (part: obj) =
+        not (isNull part) && string (part?``type``) = "tool"
+
+    let private replacePartStateOutput (part: obj) (replacement: string) =
+        if not (isNull part?state) then
+            part?state?output <- replacement
+
+    let private replaceToolPart (part: obj) =
+        match durableReplacedResults.TryGetValue(string (part?callID)) with
+        | true, replacement -> replacePartStateOutput part replacement
+        | false, _ -> ()
+
+    let private applyToolPart (part: obj) =
+        if isToolPart part then
+            replaceToolPart part
+
+    let private applyPartReplacements (msg: obj) =
+        unbox<obj array> msg?parts |> Array.iter applyToolPart
+
+    let private toolMessageCallId (msg: obj) =
+        if not (isNull msg?tool_call_id) then
+            string msg?tool_call_id
+        elif not (isNull msg?toolCallId) then
+            string msg?toolCallId
+        else
+            ""
+
+    let private applyToolMessageContent (msg: obj) =
+        match durableReplacedResults.TryGetValue(toolMessageCallId msg) with
+        | true, replacement -> msg?content <- replacement
+        | false, _ -> ()
+
+    let private applyMessageReplacements (msg: obj) =
+        if not (isNull msg) && not (isNull msg?parts) then
+            applyPartReplacements msg
+        elif not (isNull msg) && string (msg?role) = "tool" then
+            applyToolMessageContent msg
+
     let applyReplacedResults (messages: obj list) : obj list =
+        let replaceAll () =
+            messages |> List.iter applyMessageReplacements
+            messages
+
         lock durableReplacedResults (fun () ->
             if durableReplacedResults.Count = 0 then
                 messages
             else
-                for msg in messages do
-                    if not (isNull msg) && not (isNull msg?parts) then
-                        let parts = unbox<obj array> msg?parts
-
-                        for part in parts do
-                            if not (isNull part) && string (part?``type``) = "tool" then
-                                let callId = string (part?callID)
-
-                                match durableReplacedResults.TryGetValue callId with
-                                | true, replacement ->
-                                    if not (isNull part?state) then
-                                        part?state?output <- replacement
-                                | false, _ -> ()
-                    elif not (isNull msg) && string (msg?role) = "tool" then
-                        let callId =
-                            if not (isNull msg?tool_call_id) then
-                                string (msg?tool_call_id)
-                            elif not (isNull msg?toolCallId) then
-                                string (msg?toolCallId)
-                            else
-                                ""
-
-                        match durableReplacedResults.TryGetValue callId with
-                        | true, replacement -> msg?content <- replacement
-                        | false, _ -> ()
-
-                messages)
+                replaceAll ())

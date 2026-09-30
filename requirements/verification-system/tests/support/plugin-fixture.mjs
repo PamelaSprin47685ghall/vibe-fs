@@ -59,7 +59,7 @@ export default function route(role, running, previous, purpose) {
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }
 
-// DELEGATE.md 9.1/9.2 + execution-model-routing-020: the read-only Predictor
+// + execution-model-routing-020: the read-only Predictor
 // configuration existence query, mirroring resources/wanxiangshu.mjs. The
 // scheduler is a process singleton (ModelRouting.initialize imports it once
 // per test process and never reloads), so the two observable states are

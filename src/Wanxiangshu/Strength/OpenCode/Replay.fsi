@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Strength.OpenCode
 
+open Wanxiangshu.Foundation
+
 open System.Threading.Tasks
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
@@ -17,6 +19,7 @@ module StrengthReplay =
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
         strengthFailFuse: (string -> unit) ->
+        ownerRole: (string -> Role option) ->
         projectionSessionIdOpt: string option ->
         outObj: obj ->
             Task<StrengthReplayPlan list>

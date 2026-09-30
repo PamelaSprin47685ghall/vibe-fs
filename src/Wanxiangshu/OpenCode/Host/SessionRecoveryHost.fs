@@ -256,12 +256,28 @@ type SessionRecoveryHost
             match current with
             | Some(ChatExecutionState.Accepted accepted) ->
                 let! settled =
-                    PreProviderSettlement.settle journal request.ExecutionKey accepted ChatExecutionTerminalDisposition.Failed
+                    PreProviderSettlement.settle
+                        journal
+                        request.ExecutionKey
+                        accepted
+                        ChatExecutionTerminalDisposition.Failed
 
-                (completedLifecycleSettlement (ChatExecutionState.Accepted accepted) settled) |> ignore
+                (completedLifecycleSettlement (ChatExecutionState.Accepted accepted) settled)
+                |> ignore
+
                 publishNoAuthorizedDisposition request
             | Some _
             | None -> ()
+        }
+
+    /// Resume from an idle sweep: the manual-intervention fact is always
+    /// published; only a sweep also settles the unresolved accepted material.
+    let settleUnresumedFor (event: ChatExecutionRecoveryLifecycleEvent) (request: PreProviderResumeRequest) =
+        task {
+            publishNoAuthorizedDisposition request
+
+            if eventIsIdleSweep event then
+                do! settleUnresolvedAsFailed request
         }
 
     let resumeFor (event: ChatExecutionRecoveryLifecycleEvent) (request: PreProviderResumeRequest) =
@@ -269,10 +285,7 @@ type SessionRecoveryHost
             let! resumed = tryResumeAccepted request
 
             if not resumed then
-                publishNoAuthorizedDisposition request
-
-                if eventIsIdleSweep event then
-                    do! settleUnresolvedAsFailed request
+                do! settleUnresumedFor event request
         }
         :> Task
 
@@ -351,7 +364,8 @@ type SessionRecoveryHost
             // `resumeFor event` settles an unresumed Accepted execution as a
             // pre-provider terminal failure instead of leaving a silent
             // dangling obligation; other events keep the plain resume port.
-            let! _ = ChatExecutionRecoveryRuntime.recover (if eventIsIdleSweep event then sweepActions else actions) evidence
+            let! _ =
+                ChatExecutionRecoveryRuntime.recover (if eventIsIdleSweep event then sweepActions else actions) evidence
 
             ()
         }

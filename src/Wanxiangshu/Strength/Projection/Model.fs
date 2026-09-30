@@ -68,6 +68,7 @@ module StrengthProjectionIntent =
         (sha256: string -> string)
         (ownerSessionId: SessionId)
         (decisionId: StrengthDecisionId)
+        (displayName: string -> string)
         (bundle: StrengthFrameBundle)
         : ProjectionMessageRow list =
         bundle.Batches
@@ -90,7 +91,7 @@ module StrengthProjectionIntent =
             let calls =
                 exchanges
                 |> List.map (fun (callId, exchange) ->
-                    ProviderProjection.WireToolCall(callId, exchange.ToolName, exchange.CanonicalArguments))
+                    ProviderProjection.WireToolCall(callId, displayName exchange.ToolName, exchange.CanonicalArguments))
 
             let results =
                 exchanges
@@ -127,12 +128,13 @@ module StrengthProjectionIntent =
         (ownerSessionId: SessionId)
         (decisionId: StrengthDecisionId)
         (anchor: ProjectionMessageAnchor)
+        (displayName: string -> string)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
         if not (digestMatches sha256 bundle) then
             Error(StrengthProjectionIntentError.FrameDigestMismatch decisionId)
         else
-            frameRows sha256 ownerSessionId decisionId bundle
+            frameRows sha256 ownerSessionId decisionId displayName bundle
             |> ProjectionIntent.insertMessageRows (key decisionId) anchor
             |> Ok
 
@@ -142,12 +144,13 @@ module StrengthProjectionIntent =
         (decisionId: StrengthDecisionId)
         (targetProviderRun: ProviderRunIdentity)
         (currentProviderRun: ProviderRunIdentity)
+        (displayName: string -> string)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
         if targetProviderRun <> currentProviderRun then
             Error(StrengthProjectionIntentError.CandidateWrongTarget decisionId)
         else
-            insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append bundle
+            insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append displayName bundle
 
     let promoted
         (sha256: string -> string)
@@ -155,6 +158,7 @@ module StrengthProjectionIntent =
         (decisionId: StrengthDecisionId)
         (beforeMessageIndex: int)
         (isReplicaRequest: bool)
+        (displayName: string -> string)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
         if isReplicaRequest then
@@ -167,6 +171,7 @@ module StrengthProjectionIntent =
                 ownerSessionId
                 decisionId
                 (ProjectionMessageAnchor.BeforeMessageIndex beforeMessageIndex)
+                displayName
                 bundle
 
     let replicaLocal
@@ -175,7 +180,7 @@ module StrengthProjectionIntent =
         (decisionId: StrengthDecisionId)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
-        insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append bundle
+        insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append id bundle
 
 /// DSL-class: Decision — Strength delegation fold refusals.
 [<RequireQualifiedAccess>]
