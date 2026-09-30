@@ -1254,9 +1254,19 @@ module StrengthDelegate =
                     output
 
             match captured with
-            | CaptureOutcome.Skipped _ -> return ()
+            | CaptureOutcome.Skipped reason ->
+                let sessionId =
+                    ProviderWireDecode.projectionSessionIdFromMessages output
+                    |> Option.defaultValue ""
+                Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
+                return ()
             | CaptureOutcome.Captured request ->
-                match! tryBind journal snapshotPort strengthDurability strengthScope output with
+                Diagnostic.emit
+                    "strength-delegation-requested"
+                    [ "session_id", SessionId.value request.OwnerSessionId
+                      "decision_id", StrengthDecisionId.value request.DecisionId
+                      "requested_rounds", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
+                match tryBind journal snapshotPort strengthDurability strengthScope output with
                 | Error _ -> return ()
                 | Ok bound ->
                     let! durableStrength = loadDurableProjectionOrThrow (fst bound) strengthScope "start"

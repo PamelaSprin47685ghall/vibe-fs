@@ -48,8 +48,7 @@ module PluginTransformSurface =
                         )
                   FreezeProviderAttemptPlan = fun _ _ -> complete "freeze-plan"
                   ApplyEnforcerContinuation = fun _ _ -> complete "continuation"
-                  CaptureReadonlyDelegation = fun _ -> complete "capture-delegation"
-                  ApplyReadonlyDelegation = fun _ -> complete "delegation"
+                  CaptureAndStartReadonlyDelegation = fun _ -> complete "capture-and-start-delegation"
                   InjectPairGuideline = fun _ _ _ -> complete "pair"
                   ProjectRequirementGrounding = fun _ _ -> complete "grounding"
                   InjectBloggerChronicle = fun _ _ -> record "chronicle"
