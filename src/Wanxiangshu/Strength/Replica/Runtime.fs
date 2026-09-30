@@ -742,8 +742,13 @@ type StrengthReplicaRuntime
 
         let retiredLive = liveRegistry.Retire state.Replica |> Option.isSome
 
+        // STRENGTH-004: the child is the owner's RESIDENT replica, so a decision
+        // reaching its terminal does not give the lease back — it is held for the
+        // owner's whole life and a later binding reclaims the same resident
+        // session under the same (idempotent) lease. The physical-cleanup
+        // bookkeeping still happens here: it records that this decision's tail is
+        // done, which is independent of when the lease is finally returned.
         if removedLocal || retiredLive then
-            releaseModel |> Option.iter (fun release -> release state.Replica)
             notePhysicalCleanup state.Replica (not (isMaterialEnd terminal))
 
     let releaseLease sessionId =
@@ -763,16 +768,19 @@ type StrengthReplicaRuntime
             notePhysicalCleanup sessionId true
 
     /// Owner deletion orphans its live replica: retire that side too.
-    /// removeState keeps the release single-shot when decision state
-    /// is still present.
+    /// This IS the owner-end path, so it is where the resident replica's lease is
+    /// finally given back and its session slot cleared. removeState only drops the
+    /// per-decision entry; the residency lives here.
     let retireReplicaSide (binding: StrengthReplicaBinding) =
         match tryState binding.ReplicaSessionId with
         | Some replicaState -> removeState replicaState
         | None ->
             liveRegistry.Retire binding.ReplicaSessionId |> ignore
-            releaseLease binding.ReplicaSessionId
             // The owner went away before this side ever became a decision.
             notePhysicalCleanup binding.ReplicaSessionId true
+
+        releaseLease binding.ReplicaSessionId
+        liveRegistry.ReleaseResident binding.OwnerSessionId |> ignore
 
     let retireOwnerOrphan sessionId =
         match liveRegistry.TryFindByOwner sessionId with
@@ -780,8 +788,23 @@ type StrengthReplicaRuntime
         | None -> ()
 
     let clearOrphanSession sessionId =
+        // The resident replica was deleted: its owner's lease is given back and
+        // the residency slot cleared, so the next decision for that owner builds
+        // a fresh child instead of trusting a stale id.
+        match liveRegistry.ReleaseResidentByReplica sessionId with
+        | Some owner -> releaseLease sessionId; ignore owner
+        | None -> ()
+
         retireOrphanLiveBinding sessionId
         retireOwnerOrphan sessionId
+
+    /// The owner ended: every resident child of this owner loses its lease. This
+    /// runs even while a decision is still live, because the owner's lifetime is
+    /// the residency's lifetime.
+    let releaseOwnerResidency (owner: SessionId) =
+        match liveRegistry.ReleaseResident owner with
+        | Some resident -> releaseLease resident
+        | None -> ()
 
     let observeReplicaTurn state outcome =
         StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state outcome
@@ -929,12 +952,26 @@ type StrengthReplicaRuntime
             true
 
     member _.HandleSessionDeleted(sessionId: SessionId) =
+        // The deleted session is either an owner (give its resident lease back)
+        // or a resident replica itself (give that lease back and clear the
+        // owner's slot, so the next decision cannot trust a dead child).
+        releaseOwnerResidency sessionId
+
+        match liveRegistry.ReleaseResidentByReplica sessionId with
+        | Some _ -> releaseLease sessionId
+        | None -> ()
+
         match tryState sessionId with
         | Some state -> removeState state
         | None -> clearOrphanSession sessionId
 
     member _.CancelOwner(owner: SessionId) : Task =
         task {
+            // The owner's lifetime ended: its resident lease goes back even when
+            // no decision is currently live, so a cancelled owner cannot hold a
+            // model slot forever.
+            releaseOwnerResidency owner
+
             match liveRegistry.TryFindByOwner owner with
             | None -> ()
             | Some binding ->
@@ -991,13 +1028,41 @@ type StrengthReplicaRuntime
                 PromptAuthority.issueInheritedIdentitySeed replicaAgent ownerProfile
                 |> Result.mapError (sprintf "StrengthReplica identity seed is invalid: %A")
 
+            // STRENGTH-004: ONE resident read-only child per owner. Every
+            // decision reuses it, so the provider sees the same session and the
+            // prefix cache holds across delegations; the child is released only
+            // when the owner itself ends. Reuse is safe because the transform
+            // replaces the replica's message base wholesale for the new decision
+            // rather than letting the previous decision's context leak in.
+            // A resident child is trusted only while the Host still lists it
+            // under this owner; otherwise it was closed behind us and a fresh
+            // child takes the slot, replacing the recorded id.
             let! replica =
-                sessions.CreateChildSession(
-                    owner,
-                    { Title = Some replicaAgent
-                      Agent = Some replicaAgent
-                      Directory = directory }
-                )
+                task {
+                    match liveRegistry.TryFindResident owner with
+                    | Some resident ->
+                        match! sessions.ListChildren owner with
+                        | Ok children when children |> List.exists (fun child -> child.SessionId = resident) ->
+                            return Ok resident
+                        | _ ->
+                            return!
+                                sessions.CreateChildSession(
+                                    owner,
+                                    { Title = Some replicaAgent
+                                      Agent = Some replicaAgent
+                                      Directory = directory }
+                                )
+                    | None ->
+                        return!
+                            sessions.CreateChildSession(
+                                owner,
+                                { Title = Some replicaAgent
+                                  Agent = Some replicaAgent
+                                  Directory = directory }
+                            )
+                }
+
+            liveRegistry.BindResident(owner, replica)
 
             let capabilities =
                 PromptAuthority.toolCapabilitiesFor ownerProfile.CanonicalRole ProviderRequestKind.StrengthReplica
@@ -1115,6 +1180,11 @@ type StrengthReplicaRuntime
             // removeState performs the one physical cleanup per decision.
             complete StrengthReplicaTerminal.Cancelled state
             removeState state
+
+        // The resident replicas outlive single decisions, so their leases are
+        // given back here, at process teardown, rather than per decision.
+        for resident in liveRegistry.ReleaseAllResidents() do
+            releaseModel |> Option.iter (fun release -> release resident)
 
         liveRegistry.Clear()
 

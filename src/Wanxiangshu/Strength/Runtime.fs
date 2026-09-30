@@ -74,6 +74,14 @@ type StrengthRuntime() =
     // DSL-MUTABLE: resource — admitted outbound request count per live replica
     let admittedRequests = Dictionary<string, int>()
 
+    /// STRENGTH-004: the owner's resident read-only replica session. Unlike the
+    /// per-decision binding index below, this survives decision boundaries: the
+    /// owner keeps ONE predictor child for as long as it lives, so its provider
+    /// session (and therefore its prefix cache) is reused instead of being
+    /// recreated per delegation. Released only when the owner ends.
+    // DSL-MUTABLE: resource — owner-to-resident-replica map, one entry per owner
+    let residentByOwner = Dictionary<string, SessionId>()
+
     let tryConsumeBudget key (binding: StrengthReplicaBinding) =
         let used =
             match admittedRequests.TryGetValue key with
@@ -85,6 +93,54 @@ type StrengthRuntime() =
             true
         else
             false
+
+    member _.TryFindResident(owner: SessionId) : SessionId option =
+        lock gate (fun () ->
+            match residentByOwner.TryGetValue(SessionId.value owner) with
+            | true, replica -> Some replica
+            | false, _ -> None)
+
+    /// STRENGTH-004: bind the owner's resident replica session. A later bind
+    /// replaces the slot: that is the recovery path where the previously recorded
+    /// child is no longer listed by the Host, so the recorded id is stale rather
+    /// than authoritative.
+    member _.BindResident(owner: SessionId, replica: SessionId) =
+        lock gate (fun () -> residentByOwner.[SessionId.value owner] <- replica)
+
+    /// The owner ended: its resident replica is released and the slot cleared so
+    /// the next owner of that id starts fresh.
+    member _.ReleaseResident(owner: SessionId) : SessionId option =
+        lock gate (fun () ->
+            match residentByOwner.TryGetValue(SessionId.value owner) with
+            | true, replica ->
+                residentByOwner.Remove(SessionId.value owner) |> ignore
+                Some replica
+            | false, _ -> None)
+
+    /// The resident replica itself was deleted: find its owner so that owner's
+    /// slot is cleared too, instead of leaving a stale entry that a later
+    /// decision would trust.
+    member _.ReleaseResidentByReplica(replica: SessionId) : SessionId option =
+        lock gate (fun () ->
+            let target = SessionId.value replica
+
+            let owner =
+                residentByOwner
+                |> Seq.tryPick (fun entry ->
+                    if SessionId.value entry.Value = target then Some entry.Key else None)
+
+            match owner with
+            | Some ownerKey ->
+                residentByOwner.Remove ownerKey |> ignore
+                Some(SessionId.create ownerKey)
+            | None -> None)
+
+    /// Process teardown: hand back every resident lease at once.
+    member _.ReleaseAllResidents() : SessionId list =
+        lock gate (fun () ->
+            let all = residentByOwner.Values |> Seq.toList
+            residentByOwner.Clear()
+            all)
 
     member _.Register(binding: StrengthReplicaBinding) : Result<unit, StrengthRuntimeRegisterError> =
         lock gate (fun () ->
@@ -149,4 +205,5 @@ type StrengthRuntime() =
         lock gate (fun () ->
             byOwner.Clear()
             byReplica.Clear()
+            residentByOwner.Clear()
             admittedRequests.Clear())

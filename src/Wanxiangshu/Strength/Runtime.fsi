@@ -31,6 +31,13 @@ module StrengthReplicaTools =
 type StrengthRuntime =
     new: unit -> StrengthRuntime
     member Register: binding: StrengthReplicaBinding -> Result<unit, StrengthRuntimeRegisterError>
+    /// STRENGTH-004: the owner's resident replica session, reused across decisions
+    /// and released only when the owner ends.
+    member TryFindResident: owner: SessionId -> SessionId option
+    member BindResident: owner: SessionId * replica: SessionId -> unit
+    member ReleaseResident: owner: SessionId -> SessionId option
+    member ReleaseResidentByReplica: replica: SessionId -> SessionId option
+    member ReleaseAllResidents: unit -> SessionId list
     member TryFindByOwner: ownerSessionId: SessionId -> StrengthReplicaBinding option
     member TryFindByReplica: replicaSessionId: SessionId -> StrengthReplicaBinding option
     member TryCapabilities: replicaSessionId: SessionId -> Set<ToolPermission> option
