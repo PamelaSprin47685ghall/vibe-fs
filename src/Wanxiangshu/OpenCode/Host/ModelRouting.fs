@@ -1575,6 +1575,16 @@ module ModelRouting =
             else
                 lock gate (fun () -> tryProviderStepIdentity (providerRun.Trim()))
 
+        /// Read-only: the physical user message of this session's current
+        /// active lease, when the lease is bound to an exact physical message.
+        /// Callers use it to settle an in-flight execution before replacing it
+        /// with a new admission on the same session.
+        member _.TryActivePhysical(sessionId: string) : string option =
+            lock gate (fun () ->
+                match activeBySession.TryGetValue sessionId with
+                | true, lease -> lease.PhysicalUserMessageId
+                | false, _ -> None)
+
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
                 match boundDevopsTargetBySession.TryGetValue sessionId with
@@ -2008,6 +2018,13 @@ module ModelRouting =
         | Some runtime ->
             runtime.SuppressProviderStep(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId)
         | None -> ()
+
+    /// The physical user message of a session's current active lease, when the
+    /// lease is bound to an exact physical message. Read-only.
+    let tryActivePhysical (sessionId: string) : string option =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.TryActivePhysical(sessionId.Trim())
+        | None -> None
 
     let private requireOutputMessage output =
         let message = if isNull output then null else output?message

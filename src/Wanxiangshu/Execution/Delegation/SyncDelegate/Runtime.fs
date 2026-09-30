@@ -294,6 +294,38 @@ type SyncDelegateRuntime
                 && (profile.CanonicalRole = canonicalRole call.Role
                     || profile.CanonicalRole = Role.Engineer)
                 ->
+                // The delegate session may still be running an in-flight physical
+                // execution (an earlier charge or a Blogger request). The new
+                // continuation's chat.message admission would replace that lease and
+                // mark the old physical superseded; the Host loop would then keep
+                // executing the old step and fail closed in chat.params
+                // (PROMPT-006), killing this new execution's run too. Settle the old
+                // attempt first — the same retire order the manager loop uses.
+                let delegateKey = SessionId.value call.Delegate
+
+                match ModelRouting.tryActivePhysical delegateKey with
+                | Some inFlightPhysical ->
+                    let physicalId = PhysicalUserMessageId.create inFlightPhysical
+
+                    ModelRouting.suppressProviderStep call.Delegate physicalId
+                    ModelRouting.releasePhysicalExecution call.Delegate physicalId |> ignore
+
+                    // Best-effort: the lease bookkeeping above already fenced the old
+                    // physical out of further provider steps. A failed Host interrupt
+                    // degrades to today's behaviour (the old run's next chat.params
+                    // fails closed); it must not block the delegation itself.
+                    do!
+                        sessions.InterruptAttempt call.Delegate
+                        |> TaskValue.map (fun outcome ->
+                            outcome
+                            |> Result.mapError (fun reason ->
+                                Diagnostic.emit
+                                    "sync-delegate-interrupt-inflight-failed"
+                                    [ "session_id", delegateKey; "result", reason ])
+                            |> ignore
+                            Ok())
+                | None -> ()
+
                 let! _ =
                     dispatcher.SendContinuationWithTools
                         (DispatchSessionPort.ofSessionPort sessions)

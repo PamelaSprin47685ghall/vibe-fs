@@ -88,6 +88,12 @@ module ModelRouting =
             sessionId: string * physicalUserMessageId: string * providerRun: string -> unit
 
         member TryProviderStepIdentity: providerRun: string -> (string * string) option
+
+
+        /// Read-only: the physical user message of this session's current
+        /// active lease, when the lease is bound to an exact physical message.
+        member TryActivePhysical: sessionId: string -> string option
+
         member BoundDevopsTarget: sessionId: string -> ModelRoutingTarget option
 
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome
@@ -195,4 +201,9 @@ module ModelRouting =
         sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> providerRun: ProviderRunIdentity -> unit
 
     val suppressProviderStep: sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> unit
+
+    /// The physical user message of a session's current active lease, when the
+    /// lease is bound to an exact physical message. Read-only.
+    val tryActivePhysical: sessionId: string -> string option
+
     val projectHostModel: output: obj -> model: OpencodeModel -> Result<unit, exn>
