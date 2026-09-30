@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — F# 控制金字塔债务清零
+
+- **`fsharp-control-pyramid` 从 42 项降为 0，baseline 清空为 `{ "version": 1, "files": {} }`**：13 个文件逐处按 `structured-workflow-004` 提取具名 helper 或改用组合子消除 `depth>=2` decision，不再依赖按文件记账的 ratchet。`Batching.fs`（10）把 charge 渲染、消息替换、pending 取走各自成函数；`Delegate.fs`（8）把 wire 批次扫描收成 `wireBatchStep` 单步 Result、把预算聚合收成 `ofRounds`/`ofParsedResults`/`parseCall`；`InvestigationEstimateContract.fs`（8）拆出 `validateNumber`/`validateNoteText` 与中英文文案表；`Send.fs`（4）拆出 `persistSubmittedFact`/`admissionVerdict`/`settleAdmittedReceipt`，try 只包一层。
+- **其余清零点**：`PhysicalAcceptance.fs` 环境变量解析、`AgentJournal.fs` 用 `Result.map fst`、`ToolRegistry.fs` 提取 `executeReplica`、`ProviderSystemTransform.fs` 提取 `isReplicaConstraintLine`、`SessionRecoveryHost.fs` 提取 `settleUnresumedFor`、`OpenCodePort.fs` 提取 `promptDispatchOutcome`（HTTP 前缀判定改为 guard）、`ModelRouting.fs` 提取 `normalizeProviderStepRecording`、`Runtime.fs` 提取 `settleInFlightDelegateExecution`、`PluginHooks.fs` 提取参数恢复与估计校验 helper（`toolAfter` 的 participating 恢复语义不变）。
+- **门禁说明同步**：`fsharp-control-pyramid-guide.mjs` 第 14 节改为「baseline 为空对象，任何 depth>=2 decision 即新增债务」，删去按文件历史记账的表述。
+- 验证：`node scripts/build.mjs` 绿（165 surfaces / 836 modules）；`node scripts/check.mjs` 中 `fsharp-control-pyramid` 报 0（余下 174 项为既有 `js-boundary-gate` 债务，不在本次范围）；定向套件 `structured-workflow-004`、`host-boundary-032`、`speculative-investigation-{002,004,011,012,013,016}`、`delegation-{007..012,023..025,028,031,032}`、`execution-model-routing-{004,010}`、`managed-session-lifecycle-{004,009,014}`、`provider-attempt-recovery-021`、`feature-ablation-002`、`crash-reconciliation-015` 共 32 个文件 0 failed。
+
 ## Unreleased — todowrite 列表的 provider 名与 Host 名分离
 
 - **`todowrite` 的列表在 provider 面叫 `obligations`，executor 面仍是 `todos`（action-affordance-015 / obligation-ledger-001/002）**：`TodoWriteCompressionContract` 现在把发布 schema 里的 `todos` 属性（含其数组 items 与 `required`）原地换名为必填 `obligations`，`tool.execute.before` 再把该字段换回 `todos` 后交给原生 Effect schema，`tool.execute.after` 删除 `todos` 并恢复 `obligations`。换名与隐藏全程在参数对象内部以属性描述符完成（`obligations` 删除、`todos` 以同一描述符定义、原描述符存入私有 Symbol），因此 executor 收到的是同一个数组对象而非副本，provider wire 历史仍携带模型实际提交的字段名。同名同调（同时携带 `obligations` 与 `todos`）明确拒绝。
