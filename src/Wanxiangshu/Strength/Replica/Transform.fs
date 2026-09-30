@@ -137,11 +137,15 @@ module StrengthReplicaTransform =
         (message: ProviderProjection.WireMessage)
         (results: (ToolCallId * string) list)
         =
-        // Reachable only for a calls-free message carrying results. A Host
-        // session-shaped completed part legitimately sits beside reasoning/text
-        // parts, so any non-empty result set on such a message is the completed
-        // form rather than an orphan.
+        // Reachable only for a calls-free message carrying results, so the
+        // evidence that separates the session shape from an orphan is the role:
+        // the Host folds a completed call into the SAME assistant response that
+        // produced it, whereas a logical `tool` message only ever holds the
+        // result half and therefore still requires a preceding call batch.
+        // A Host session-shaped part legitimately sits beside reasoning/text
+        // parts, so the non-tool parts are preserved rather than rejected.
         not (List.isEmpty results)
+        && String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
 
     let private emitHostCompletedExchange
         (sessionId: string)
@@ -257,18 +261,16 @@ module StrengthReplicaTransform =
             startCallBatch pendingBatch message index hostId calls
             |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
         | true, false ->
-            match pendingBatch with
-            | Some _ ->
+            // A result WITH a pending call batch belongs to that batch's logical
+            // `tool` message. A result WITHOUT one is either the self-contained
+            // Host session shape (folded into its own assistant response) or a
+            // genuine orphan the pending-batch check still refuses.
+            if Option.isSome pendingBatch || not (isHostCompletedToolMessage message results) then
                 finishResultBatch sessionId sha256 pendingBatch message results
                 |> Result.bind (fun raw -> loop tail None (raw :: acc))
-            | None ->
-                // Self-contained Host session-shaped completed tool message.
-                if isHostCompletedToolMessage message results then
-                    emitHostCompletedExchange sessionId sha256 index message hostId results
-                    |> Result.bind (fun raw -> loop tail None (raw :: acc))
-                else
-                    finishResultBatch sessionId sha256 pendingBatch message results
-                    |> Result.bind (fun raw -> loop tail None (raw :: acc))
+            else
+                emitHostCompletedExchange sessionId sha256 index message hostId results
+                |> Result.bind (fun raw -> loop tail None (raw :: acc))
         | true, true ->
             emitRegularMessage sessionId sha256 pendingBatch index message hostId
             |> Result.bind (fun raw -> loop tail None (raw :: acc))

@@ -37,8 +37,8 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
   // a part as a result only, so the message reaches the adapter with results and
   // no preceding call batch. It must become a built exchange, not a retire.
   const { default: crypto } = await import('node:crypto')
-  const h = (text) => `H(${text})`
   const Transform = await import('../../../dist/Strength/Surface.js')
+  const Wire = await import('../../../dist/OpenCode/Codec/ProviderProjectionSurface.js')
   const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex')
   const runtime = Transform.runtimeCreate()
   assert.equal(Transform.runtimeRegister(runtime, Transform.runtimeBinding('owner', 'replica', 'dec', 'run', 'devops', 2, 'sd', [])).ok, true)
@@ -51,10 +51,58 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
       { type: 'step-finish' },
     ],
   }]
+  // transformApply replaces `messages` in place, so snapshot the owner's original
+  // transcript before the transform; the adapter assertion below must see that
+  // pristine Host shape, not the frame rows written back over it.
+  const pristineHostMessages = JSON.parse(JSON.stringify(messages))
   const out = await Transform.transformApply(sha256, runtime, { messages }, true)
   assert.equal(out.kind, 'Ready', `expected a built frame, got ${out.kind} ${out.reason ?? ''}`)
   assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['glob'])
   assert.equal(out.batches[0].exchanges[0].canonicalResult, 'found 12')
+
+  // The mirror the adapter actually receives is the localized owner transcript,
+  // and that transcript keeps the result-only assistant message verbatim
+  // (Frame.tryLocalizeMirror tolerates it). Passing it through the adapter is the
+  // path that used to die in requirePendingBatch, so exercise it directly rather
+  // than only through the batch collector above.
+  const decoded = Wire.decodeMessageView(pristineHostMessages)
+  // ProviderProjectionSurface emits capitalized discriminators ("Reasoning",
+  // "ToolResult"); Strength.Surface accepts only its own lowercase vocabulary.
+  // Normalize rather than feeding one surface's output into the other's decoder.
+  const wireMessages = decoded.messages.map((message) => ({
+    role: message.role,
+    parts: message.parts.map((part) =>
+      part.kind === 'ToolResult'
+        ? { kind: 'tool-result', callId: part.callId, result: part.result }
+        : part.kind === 'Reasoning'
+          ? { kind: 'reasoning', text: part.text }
+          : part),
+  }))
+  const localized = Transform.frameTryLocalizeMirror(sha256, 'dec', sha256('anchor'), wireMessages)
+  assert.equal(localized.ok, true)
+  assert.equal(localized.value.length, 1)
+  assert.equal(localized.value[0].role, 'assistant')
+  assert.deepEqual(localized.value[0].parts.map((part) => part.kind), ['reasoning', 'tool-result'])
+  const rendered = { messages: localized.value, hostMessageIds: [null], hostIsPhysical: [false] }
+  const applied = Transform.tryApplyRenderedMessages('replica', sha256, rendered)
+  assert.equal(applied.ok, true, `host session-shaped message must be emitted, got ${applied.error}`)
+  const appliedParts = applied.value[0].parts
+  assert.deepEqual(appliedParts.map((part) => part.type), ['reasoning', 'tool'])
+  const completed = appliedParts.find((part) => part.type === 'tool')
+  assert.equal(completed.tool, '')
+  assert.equal(completed.state.status, 'completed')
+  assert.equal(completed.state.output, 'found 12')
+  assert.equal(completed.callID, localized.value[0].parts[1].callId, 'the completed part keeps the relocated call identity')
+
+  // A genuinely orphaned result is still refused: a logical `tool` message carries
+  // only the result half, so it must keep requiring its preceding call batch.
+  const orphan = Transform.tryApplyRenderedMessages('replica', sha256, {
+    messages: [{ role: 'tool', parts: [{ kind: 'tool-result', callId: 'orphan-1', result: 'no call ever arrived' }] }],
+    hostMessageIds: [null],
+    hostIsPhysical: [false],
+  })
+  assert.equal(orphan.ok, false)
+  assert.match(orphan.error, /without a preceding call batch/)
 })
 
 test('WHAT[speculative-investigation-005] repeated frame construction and owner wire ID derivation are deterministic', () => {
