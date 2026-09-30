@@ -6,10 +6,10 @@ const zh = readFileSync(new URL('../../../resources/provider/host/pair-programmi
 const en = readFileSync(new URL('../../../resources/provider/host/pair-programming-guideline/en.md', import.meta.url), 'utf8')
 
 test('WHAT[cognitive-environment-013] Pair Hint carries the seven numbered disciplines in both locales', () => {
-  for (const tag of ['使用中文', '小步快跑', '不要吝啬', '进度更新', '极高并发', '超越常识', '善于内省']) {
+  for (const tag of ['使用中文与思考锚定', '小步快跑', '不要吝啬', '进度更新', '极高并发', '超越常识', '善于内省']) {
     assert.match(zh, new RegExp(`\\[${tag}\\]`), tag)
   }
-  for (const tag of ['Use English', 'Small quick steps', 'Do not skimp', 'Update the ledger', 'Very high concurrency', 'Beyond common sense', 'Introspect well']) {
+  for (const tag of ['Use English and Anchor Reasoning', 'Small Quick Steps', 'Do Not Skimp', 'Update the Ledger', 'Very High Concurrency', 'Beyond Common Sense', 'Introspect Well']) {
     assert.match(en, new RegExp(`\\[${tag}\\]`), tag)
   }
 })
