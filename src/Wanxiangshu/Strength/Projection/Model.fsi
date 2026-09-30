@@ -95,6 +95,13 @@ type StrengthProjectionError =
 module StrengthProjection =
     val empty: StrengthProjection
     val tryCandidate: decisionId: StrengthDecisionId -> projection: StrengthProjection -> StrengthDelegationView option
+    val tryCandidateBySource:
+        ownerSessionId: SessionId ->
+        ownerLogicalRun: OwnerLogicalRunIdentity ->
+        sourcePhysicalUserMessageId: PhysicalUserMessageId ->
+        sourceProviderRun: ProviderRunIdentity ->
+        projection: StrengthProjection ->
+            StrengthDelegationView option
     val hasPrepared: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
     val isPromoted: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
 

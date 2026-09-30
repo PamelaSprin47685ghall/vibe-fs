@@ -63,7 +63,7 @@ test("STRENGTH_002_admission_refuses_every_documented_dependency_gap_with_a_visi
     },
     {
       expected: "not-work-main",
-      opportunity: makeOpportunity({ requestKind: "other" }),
+      opportunity: makeOpportunity({ requestKind: "blogger-main" }),
     },
     {
       expected: "role-ineligible",
@@ -162,7 +162,7 @@ test("STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_z
     self_note: "Checking invariants",
   });
   assert.equal(negParsed.tag, 1, "negative rounds must be rejected by contract parser");
-  assert.equal(negParsed.fields[0].name, "InvalidRange", "error must be InvalidRange");
+  assert.equal(Contract.errorCode(negParsed.fields[0]), "InvalidRange", "error must be InvalidRange");
 
   const zeroParsed = Contract.parseParticipatingArguments({
     [Contract.EstimatedReadonlyRoundsField]: 0,
@@ -177,7 +177,7 @@ test("STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_z
   assert.equal(posParsed.tag, 0, "positive rounds with non-blank self_note must succeed");
   assert.equal(Contract.EstimatedReadonlyRoundsModule_value(posParsed.fields[0][0]), 4);
   assert.equal(
-    Contract.EstimatedReadonlyRoundsModule_toExecutionBudget(posParsed.fields[0][0]),
+    Contract.EstimatedReadonlyRoundsModule_toExecutionBudget(posParsed.fields[0][0]).fields[0],
     Strength.budgetTryCreate(4).value
   );
 });
@@ -290,29 +290,29 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
 
   // 2. 逐工具 Policy 分类断言：严格三态
   assert.equal(
-    Contract.classifyTool("fork").tag,
-    1, // NoEstimate
+    Contract.policyCode(Contract.classifyTool("fork")),
+    "NoEstimate",
     "fork must be classified as NoEstimate"
   );
   assert.equal(
-    Contract.classifyTool("read").tag,
-    0, // EstimateAfterCall
+    Contract.policyCode(Contract.classifyTool("read")),
+    "EstimateAfterCall",
     "read must be classified as EstimateAfterCall"
   );
   assert.equal(
-    Contract.classifyTool("edit").tag,
-    0, // EstimateAfterCall
+    Contract.policyCode(Contract.classifyTool("edit")),
+    "EstimateAfterCall",
     "edit must be classified as EstimateAfterCall"
   );
   assert.equal(
-    Contract.classifyTool("grep").tag,
-    0, // EstimateAfterCall
+    Contract.policyCode(Contract.classifyTool("grep")),
+    "EstimateAfterCall",
     "grep must be classified as EstimateAfterCall"
   );
 
   // 3. 取值与校验只看参与子集：筛选 EstimateAfterCall 工具
   const participatingExchanges = batch.exchanges.filter(
-    (e) => Contract.classifyTool(e.toolName).tag === 0
+    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
   );
   assert.equal(
     participatingExchanges.length,
@@ -352,7 +352,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     self_note: "old protocol call",
   });
   assert.equal(legacyAttempt.tag, 1, "Legacy delegate_readonly_rounds must be rejected");
-  assert.equal(legacyAttempt.fields[0].name, "MixedProtocolFields", "Error must be MixedProtocolFields");
+  assert.equal(Contract.errorCode(legacyAttempt.fields[0]), "MixedProtocolFields", "Error must be MixedProtocolFields");
 
   // 7. 协议不变量：0 估计时 self_note 必须不存在；正数时必须有非空 self_note
   const zeroWithNote = Contract.parseParticipatingArguments({
@@ -360,14 +360,14 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     self_note: "should-not-be-present",
   });
   assert.equal(zeroWithNote.tag, 1, "0 rounds carrying self_note must fail");
-  assert.equal(zeroWithNote.fields[0].name, "NotePresentWhenZero", "Error must be NotePresentWhenZero");
+  assert.equal(Contract.errorCode(zeroWithNote.fields[0]), "NotePresentWhenZero", "Error must be NotePresentWhenZero");
 
   const posWithoutNote = Contract.parseParticipatingArguments({
     [Contract.EstimatedReadonlyRoundsField]: 2,
   });
   assert.equal(posWithoutNote.tag, 1, "positive rounds missing self_note must fail");
   assert.equal(
-    posWithoutNote.fields[0].name,
+    Contract.errorCode(posWithoutNote.fields[0]),
     "MissingOrBlankNoteWhenPositive",
     "Error must be MissingOrBlankNoteWhenPositive"
   );
@@ -378,7 +378,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
   });
   assert.equal(posWithBlankNote.tag, 1, "positive rounds with blank self_note must fail");
   assert.equal(
-    posWithBlankNote.fields[0].name,
+    Contract.errorCode(posWithBlankNote.fields[0]),
     "MissingOrBlankNoteWhenPositive",
     "Error must be MissingOrBlankNoteWhenPositive"
   );
@@ -439,7 +439,7 @@ test("STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggr
   // 1. 无参与机会 (NoEstimateOpportunity)：全是不参与工具时，不求 max，返回 null，policyDecide 跳过
   const noEstimateBatch = [{ toolName: "fork", arguments: {} }];
   const noEstimateParticipating = noEstimateBatch.filter(
-    (c) => Contract.classifyTool(c.toolName).tag === 0
+    (c) => Contract.policyCode(Contract.classifyTool(c.toolName)) === "EstimateAfterCall"
   );
   assert.equal(noEstimateParticipating.length, 0, "No tools in participating subset");
   const noEstimateBudget = Strength.budgetMaxOf(noEstimateParticipating.map(() => 0));

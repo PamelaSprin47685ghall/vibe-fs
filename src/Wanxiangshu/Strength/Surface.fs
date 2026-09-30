@@ -956,6 +956,66 @@ module StrengthSurface =
         | Some view -> delegationViewToJs view
         | None -> null
 
+    let projectionCandidateBySource
+        (ownerSessionId: string)
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (sourcePhysicalUserMessageId: string)
+        (sourceProviderRun: string)
+        (projection: obj)
+        : obj =
+        let owner = SessionId.create ownerSessionId
+        let logicalRun =
+            { LogicalRunId = LogicalRunId.create logicalRunId
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+        let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
+        let providerRun = ProviderRunIdentity.create sourceProviderRun
+        match
+            StrengthProjection.tryCandidateBySource
+                owner
+                logicalRun
+                physicalUserMsg
+                providerRun
+                (projectionOf projection)
+        with
+        | Some view -> delegationViewToJs view
+        | None -> null
+
+    let projectionRequestedRoundsBySource
+        (ownerSessionId: string)
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (sourcePhysicalUserMessageId: string)
+        (sourceProviderRun: string)
+        (projection: obj)
+        : obj =
+        let owner = SessionId.create ownerSessionId
+        let logicalRun =
+            { LogicalRunId = LogicalRunId.create logicalRunId
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+        let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
+        let providerRun = ProviderRunIdentity.create sourceProviderRun
+        match
+            StrengthProjection.tryCandidateBySource
+                owner
+                logicalRun
+                physicalUserMsg
+                providerRun
+                (projectionOf projection)
+        with
+        | Some view ->
+            match view.State with
+            | StrengthCandidateState.Closed closed when closed.Reason = DelegationClosedReason.Superseded -> null
+            | StrengthCandidateState.Closed _
+            | StrengthCandidateState.Requested
+            | StrengthCandidateState.Bound
+            | StrengthCandidateState.Prepared
+            | StrengthCandidateState.Promoted
+            | StrengthCandidateState.Traced ->
+                box (ReadonlyRoundBudget.value view.Request.RequestedRounds)
+            | StrengthCandidateState.Abandoned -> null
+        | None -> null
+
     /// DELEGATE-6.3: the requested rounds are read from the immutable
     /// projection; no layer keeps its own copy of the budget.
     let projectionRequestedRounds (decision: string) (projection: obj) =

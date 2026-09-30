@@ -473,6 +473,11 @@ module StrengthDelegate =
         | Captured of DelegationRequest
         | Skipped of reason: string
 
+    let captureOutcomeCode (outcome: CaptureOutcome) : string =
+        match outcome with
+        | Captured _ -> "Captured"
+        | Skipped _ -> "Skipped"
+
     let private checkCaptureEligibility (surface: OwnerSurface) : Result<unit, string> =
         if surface.RequestKind <> ProviderRequestKind.WorkMain then
             Error "not-work-main"
@@ -529,33 +534,17 @@ module StrengthDelegate =
         | Conflict
         | Fresh of DelegationRequest
 
-    let private tryFindExistingBySourceQuadruple
-        (durableProjection: StrengthProjection)
-        (owner: SessionId)
-        (logicalRun: OwnerLogicalRunIdentity)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (sourceProviderRun: ProviderRunIdentity)
-        : StrengthDelegationView option =
-        durableProjection.ByDecision
-        |> Map.toList
-        |> List.map snd
-        |> List.tryFind (fun view ->
-            view.Request.OwnerSessionId = owner
-            && view.Request.OwnerLogicalRun = logicalRun
-            && view.Request.SourcePhysicalUserMessageId = physicalUserMessageId
-            && view.Request.SourceProviderRun = sourceProviderRun)
-
     let private evaluateCaptureDisposition
         (durableProjection: StrengthProjection)
         (request: DelegationRequest)
         : CaptureDisposition =
         match
-            tryFindExistingBySourceQuadruple
-                durableProjection
+            StrengthProjection.tryCandidateBySource
                 request.OwnerSessionId
                 request.OwnerLogicalRun
                 request.SourcePhysicalUserMessageId
                 request.SourceProviderRun
+                durableProjection
         with
         | Some existing when Delegation.sameRequest existing.Request request ->
             CaptureDisposition.Replay existing.Request
@@ -1021,6 +1010,27 @@ module StrengthDelegate =
         (surface: OwnerSurface)
         : Task<unit> =
         task {
+            let isTerminalState state =
+                match state with
+                | StrengthCandidateState.Traced
+                | StrengthCandidateState.Closed _
+                | StrengthCandidateState.Abandoned -> true
+                | StrengthCandidateState.Requested
+                | StrengthCandidateState.Bound
+                | StrengthCandidateState.Prepared
+                | StrengthCandidateState.Promoted -> false
+
+            let isSourceAlreadyTerminal (req: DelegationRequest) =
+                surface.DurableProjection.ByDecision
+                |> Map.toList
+                |> List.map snd
+                |> List.exists (fun other ->
+                    other.Request.OwnerSessionId = req.OwnerSessionId
+                    && other.Request.OwnerLogicalRun = req.OwnerLogicalRun
+                    && other.Request.SourcePhysicalUserMessageId = req.SourcePhysicalUserMessageId
+                    && other.Request.SourceProviderRun = req.SourceProviderRun
+                    && isTerminalState other.State)
+
             let pending =
                 surface.DurableProjection.ByDecision
                 |> Map.toList
@@ -1028,7 +1038,8 @@ module StrengthDelegate =
                 |> List.filter (fun view ->
                     view.State = StrengthCandidateState.Requested
                     && view.Request.OwnerSessionId = surface.Owner
-                    && view.Request.OwnerLogicalRun.LogicalRunId = surface.Authority.LogicalRunId)
+                    && view.Request.OwnerLogicalRun.LogicalRunId = surface.Authority.LogicalRunId
+                    && not (isSourceAlreadyTerminal view.Request))
                 |> List.sortBy (fun view -> StrengthDecisionId.value view.Request.DecisionId)
 
             match pending with

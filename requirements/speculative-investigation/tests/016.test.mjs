@@ -44,7 +44,7 @@ test('WHAT[speculative-investigation-016] classifyTool maps known tools correctl
   ];
   for (const name of participate) {
     const policy = Contract.classifyTool(name);
-    assert.equal(policy.tag, 0, `tool ${name} must be EstimateAfterCall (tag 0)`);
+    assert.equal(Contract.policyCode(policy), 'EstimateAfterCall', `tool ${name} must be EstimateAfterCall`);
   }
 
   const noEstimate = [
@@ -56,7 +56,7 @@ test('WHAT[speculative-investigation-016] classifyTool maps known tools correctl
   ];
   for (const name of noEstimate) {
     const policy = Contract.classifyTool(name);
-    assert.equal(policy.tag, 1, `tool ${name} must be NoEstimate (tag 1)`);
+    assert.equal(Contract.policyCode(policy), 'NoEstimate', `tool ${name} must be NoEstimate`);
   }
 
   // Prefix matching is strictly forbidden
@@ -66,7 +66,7 @@ test('WHAT[speculative-investigation-016] classifyTool maps known tools correctl
   ];
   for (const name of unreviewedPrefixes) {
     const policy = Contract.classifyTool(name);
-    assert.equal(policy.tag, 2, `tool ${name} must be Unreviewed (tag 2)`);
+    assert.equal(Contract.policyCode(policy), 'Unreviewed', `tool ${name} must be Unreviewed`);
   }
 });
 
@@ -118,7 +118,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
     self_note: ''
   });
   assert.equal(resEmpty.tag, 1, 'should fail');
-  assert.equal(resEmpty.fields[0].tag, 3, 'NotePresentWhenZero tag is 3');
+  assert.equal(Contract.errorCode(resEmpty.fields[0]), 'NotePresentWhenZero');
   assert.equal(Contract.describeArgumentErrorZh(resEmpty.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
   assert.equal(Contract.describeArgumentErrorEn(resEmpty.fields[0]), 'self_note must be omitted when estimated_readonly_rounds is 0');
 
@@ -128,7 +128,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
     self_note: '   '
   });
   assert.equal(resWs.tag, 1);
-  assert.equal(resWs.fields[0].tag, 3);
+  assert.equal(Contract.errorCode(resWs.fields[0]), 'NotePresentWhenZero');
   assert.equal(Contract.describeArgumentErrorZh(resWs.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
 
   // null
@@ -137,7 +137,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
     self_note: null
   });
   assert.equal(resNull.tag, 1);
-  assert.equal(resNull.fields[0].tag, 3);
+  assert.equal(Contract.errorCode(resNull.fields[0]), 'NotePresentWhenZero');
   assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
 
   // own-property with undefined value
@@ -145,7 +145,7 @@ test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note
   objWithUndef.self_note = undefined;
   const resUndef = Contract.parseParticipatingArguments(objWithUndef);
   assert.equal(resUndef.tag, 1);
-  assert.equal(resUndef.fields[0].tag, 3, 'own-property undefined must be rejected as NotePresentWhenZero');
+  assert.equal(Contract.errorCode(resUndef.fields[0]), 'NotePresentWhenZero', 'own-property undefined must be rejected as NotePresentWhenZero');
   assert.equal(Contract.describeArgumentErrorZh(resUndef.fields[0]), 'estimated_readonly_rounds 为 0 时必须省略 self_note');
   assert.equal(Contract.describeArgumentErrorEn(resUndef.fields[0]), 'self_note must be omitted when estimated_readonly_rounds is 0');
 
@@ -162,7 +162,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     estimated_readonly_rounds: 2
   });
   assert.equal(resMissing.tag, 1);
-  assert.equal(resMissing.fields[0].tag, 4, 'MissingOrBlankNoteWhenPositive tag is 4');
+  assert.equal(Contract.errorCode(resMissing.fields[0]), 'MissingOrBlankNoteWhenPositive');
   assert.equal(Contract.describeArgumentErrorZh(resMissing.fields[0]), '正数估计需要非空的后续查证展望');
   assert.equal(Contract.describeArgumentErrorEn(resMissing.fields[0]), 'A positive estimate requires a non-empty self_note outlook');
 
@@ -172,7 +172,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: ''
   });
   assert.equal(resEmpty.tag, 1);
-  assert.equal(resEmpty.fields[0].tag, 4);
+  assert.equal(Contract.errorCode(resEmpty.fields[0]), 'MissingOrBlankNoteWhenPositive');
   assert.equal(Contract.describeArgumentErrorZh(resEmpty.fields[0]), '正数估计需要非空的后续查证展望');
 
   // blank whitespace note
@@ -181,7 +181,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: '  \t\n  '
   });
   assert.equal(resBlank.tag, 1);
-  assert.equal(resBlank.fields[0].tag, 4);
+  assert.equal(Contract.errorCode(resBlank.fields[0]), 'MissingOrBlankNoteWhenPositive');
   assert.equal(Contract.describeArgumentErrorZh(resBlank.fields[0]), '正数估计需要非空的后续查证展望');
 
   // non-string note: number
@@ -190,7 +190,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: 123
   });
   assert.equal(resNum.tag, 1);
-  assert.equal(resNum.fields[0].tag, 5, 'NoteNotString tag is 5');
+  assert.equal(Contract.errorCode(resNum.fields[0]), 'NoteNotString');
   assert.equal(Contract.describeArgumentErrorZh(resNum.fields[0]), 'self_note 必须为字符串类型');
   assert.equal(Contract.describeArgumentErrorEn(resNum.fields[0]), 'self_note must be a string');
 
@@ -200,7 +200,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: true
   });
   assert.equal(resBool.tag, 1);
-  assert.equal(resBool.fields[0].tag, 5);
+  assert.equal(Contract.errorCode(resBool.fields[0]), 'NoteNotString');
   assert.equal(Contract.describeArgumentErrorZh(resBool.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: object
@@ -209,7 +209,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: { text: "note" }
   });
   assert.equal(resObj.tag, 1);
-  assert.equal(resObj.fields[0].tag, 5);
+  assert.equal(Contract.errorCode(resObj.fields[0]), 'NoteNotString');
   assert.equal(Contract.describeArgumentErrorZh(resObj.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: array
@@ -218,7 +218,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: ["note"]
   });
   assert.equal(resArr.tag, 1);
-  assert.equal(resArr.fields[0].tag, 5);
+  assert.equal(Contract.errorCode(resArr.fields[0]), 'NoteNotString');
   assert.equal(Contract.describeArgumentErrorZh(resArr.fields[0]), 'self_note 必须为字符串类型');
 
   // non-string note: null
@@ -227,7 +227,7 @@ test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank
     self_note: null
   });
   assert.equal(resNull.tag, 1);
-  assert.equal(resNull.fields[0].tag, 5);
+  assert.equal(Contract.errorCode(resNull.fields[0]), 'NoteNotString');
   assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'self_note 必须为字符串类型');
 });
 
@@ -237,7 +237,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     estimated_readonly_rounds: -1
   });
   assert.equal(resNeg.tag, 1);
-  assert.equal(resNeg.fields[0].tag, 2, 'InvalidRange tag is 2');
+  assert.equal(Contract.errorCode(resNeg.fields[0]), 'InvalidRange');
   assert.equal(Contract.describeArgumentErrorZh(resNeg.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
   assert.equal(Contract.describeArgumentErrorEn(resNeg.fields[0]), 'estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647');
 
@@ -247,7 +247,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resFloat.tag, 1);
-  assert.equal(resFloat.fields[0].tag, 2);
+  assert.equal(Contract.errorCode(resFloat.fields[0]), 'InvalidRange');
   assert.equal(Contract.describeArgumentErrorZh(resFloat.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // out of range (> 2147483647)
@@ -256,7 +256,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resOverflow.tag, 1);
-  assert.equal(resOverflow.fields[0].tag, 2);
+  assert.equal(Contract.errorCode(resOverflow.fields[0]), 'InvalidRange');
   assert.equal(Contract.describeArgumentErrorZh(resOverflow.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // string number (no string coercion)
@@ -265,7 +265,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resStr.tag, 1);
-  assert.equal(resStr.fields[0].tag, 1, 'WrongNumberType tag is 1');
+  assert.equal(Contract.errorCode(resStr.fields[0]), 'WrongNumberType');
   assert.equal(Contract.describeArgumentErrorZh(resStr.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
   assert.equal(Contract.describeArgumentErrorEn(resStr.fields[0]), 'estimated_readonly_rounds must be a number');
 
@@ -275,7 +275,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resBool.tag, 1);
-  assert.equal(resBool.fields[0].tag, 1);
+  assert.equal(Contract.errorCode(resBool.fields[0]), 'WrongNumberType');
   assert.equal(Contract.describeArgumentErrorZh(resBool.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // array
@@ -284,7 +284,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resArr.tag, 1);
-  assert.equal(resArr.fields[0].tag, 1);
+  assert.equal(Contract.errorCode(resArr.fields[0]), 'WrongNumberType');
   assert.equal(Contract.describeArgumentErrorZh(resArr.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // object
@@ -293,7 +293,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resObj.tag, 1);
-  assert.equal(resObj.fields[0].tag, 1);
+  assert.equal(Contract.errorCode(resObj.fields[0]), 'WrongNumberType');
   assert.equal(Contract.describeArgumentErrorZh(resObj.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // NaN
@@ -302,7 +302,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resNaN.tag, 1);
-  assert.equal(resNaN.fields[0].tag, 2);
+  assert.equal(Contract.errorCode(resNaN.fields[0]), 'InvalidRange');
   assert.equal(Contract.describeArgumentErrorZh(resNaN.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // Infinity
@@ -311,7 +311,7 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resInf.tag, 1);
-  assert.equal(resInf.fields[0].tag, 2);
+  assert.equal(Contract.errorCode(resInf.fields[0]), 'InvalidRange');
   assert.equal(Contract.describeArgumentErrorZh(resInf.fields[0]), 'estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数');
 
   // null
@@ -320,13 +320,13 @@ test('WHAT[speculative-investigation-016] native number checks and range validat
     self_note: 'note'
   });
   assert.equal(resNull.tag, 1);
-  assert.equal(resNull.fields[0].tag, 1);
+  assert.equal(Contract.errorCode(resNull.fields[0]), 'WrongNumberType');
   assert.equal(Contract.describeArgumentErrorZh(resNull.fields[0]), 'estimated_readonly_rounds 必须为数字类型');
 
   // missing
   const resMissing = Contract.parseParticipatingArguments({});
   assert.equal(resMissing.tag, 1);
-  assert.equal(resMissing.fields[0].tag, 0, 'MissingEstimate tag is 0');
+  assert.equal(Contract.errorCode(resMissing.fields[0]), 'MissingEstimate');
   assert.equal(Contract.describeArgumentErrorZh(resMissing.fields[0]), '必须提供 estimated_readonly_rounds 估计字段');
   assert.equal(Contract.describeArgumentErrorEn(resMissing.fields[0]), 'The estimated_readonly_rounds field must be provided');
 });
@@ -338,7 +338,7 @@ test('WHAT[speculative-investigation-016] protocol field mixing and legacy field
     self_note: 'note'
   });
   assert.equal(resLegacy.tag, 1);
-  assert.equal(resLegacy.fields[0].tag, 6, 'MixedProtocolFields tag is 6');
+  assert.equal(Contract.errorCode(resLegacy.fields[0]), 'MixedProtocolFields');
   assert.equal(Contract.describeArgumentErrorZh(resLegacy.fields[0]), '不得携带旧协议字段 delegate_readonly_rounds');
   assert.equal(Contract.describeArgumentErrorEn(resLegacy.fields[0]), 'The legacy delegate_readonly_rounds field must not be used');
 
@@ -349,7 +349,7 @@ test('WHAT[speculative-investigation-016] protocol field mixing and legacy field
     self_note: 'note'
   });
   assert.equal(resBoth.tag, 1);
-  assert.equal(resBoth.fields[0].tag, 6);
+  assert.equal(Contract.errorCode(resBoth.fields[0]), 'MixedProtocolFields');
   assert.equal(Contract.describeArgumentErrorZh(resBoth.fields[0]), '不得携带旧协议字段 delegate_readonly_rounds');
   assert.equal(Contract.describeArgumentErrorEn(resBoth.fields[0]), 'The legacy delegate_readonly_rounds field must not be used');
 });
@@ -358,7 +358,7 @@ test('WHAT[speculative-investigation-016] invalid argument container (not a plai
   for (const bad of [null, undefined, 123, 'arguments', [1, 2]]) {
     const res = Contract.parseParticipatingArguments(bad);
     assert.equal(res.tag, 1);
-    assert.equal(res.fields[0].tag, 7, 'InvalidArgumentObject tag is 7');
+    assert.equal(Contract.errorCode(res.fields[0]), 'InvalidArgumentObject');
     assert.equal(Contract.describeArgumentErrorZh(res.fields[0]), '工具参数必须为合法的普通对象');
     assert.equal(Contract.describeArgumentErrorEn(res.fields[0]), 'Tool arguments must be a valid plain object');
   }
@@ -757,7 +757,7 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
   );
 
   // Must fail as an ArgumentError rejection, NOT silently degrade to no-estimate-opportunity or estimated-zero
-  assert.equal(outcomeParticipating?.tag, 1, 'outcome must be Skipped');
+  assert.equal(rawDelegate.captureOutcomeCode(outcomeParticipating), 'Skipped', 'outcome must be Skipped');
   const participatingReason = outcomeParticipating?.fields?.[0];
   assert.ok(typeof participatingReason === 'string', 'skipped reason must be a string');
   assert.notEqual(
@@ -818,7 +818,7 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
   );
 
   // Non-participating tool is filtered out of estimateCalls -> evaluates to no-estimate-opportunity
-  assert.equal(outcomeNonParticipating?.tag, 1, 'outcome must be Skipped');
+  assert.equal(rawDelegate.captureOutcomeCode(outcomeNonParticipating), 'Skipped', 'outcome must be Skipped');
   assert.equal(
     outcomeNonParticipating?.fields?.[0],
     'no-estimate-opportunity',
@@ -857,7 +857,7 @@ test('WHAT[speculative-investigation-016] mechanical inventory of unreviewed too
   // Mechanically compute the difference set of tools in knownToolNames that are Unreviewed (tag === 2)
   const unreviewedDifference = knownToolsFromSrc.filter((name) => {
     const policy = Contract.classifyTool(name);
-    return policy.tag === 2; // Unreviewed
+    return Contract.policyCode(policy) === 'Unreviewed';
   });
 
   // Explicit registry of acknowledged unreviewed candidates.
@@ -874,30 +874,30 @@ test('WHAT[speculative-investigation-016] mechanical inventory of unreviewed too
   for (const candidate of acknowledgedUnreviewedCandidates) {
     const policy = Contract.classifyTool(candidate);
     assert.equal(
-      policy.tag,
-      2,
-      `Acknowledged candidate '${candidate}' must evaluate to Unreviewed (tag 2)`
+      Contract.policyCode(policy),
+      'Unreviewed',
+      `Acknowledged candidate '${candidate}' must evaluate to Unreviewed`
     );
   }
 });
 
 test('WHAT[speculative-investigation-016] known-bad fixtures prove the gate detects policy mutations and unreviewed leakage', () => {
-  // Mutation 1: default branch mutates from Unreviewed (tag 2) to EstimateAfterCall (tag 0)
+  // Mutation 1: default branch mutates from Unreviewed to EstimateAfterCall
   function mutatedClassifyDefaultEstimate(name) {
     const policy = Contract.classifyTool(name);
-    if (policy.tag === 2) {
-      return { tag: 0, cases: () => ["EstimateAfterCall", "NoEstimate", "Unreviewed"] };
+    if (Contract.policyCode(policy) === 'Unreviewed') {
+      return Contract.classifyTool("read");
     }
     return policy;
   }
 
-  // Under mutated default, an unknown tool falsely expects participation (tag 0),
+  // Under mutated default, an unknown tool falsely expects participation,
   // but the schema decorator does not decorate it (false).
   assert.throws(
     () => {
       const toolName = "js-foo-unknown";
       const mutatedPolicy = mutatedClassifyDefaultEstimate(toolName);
-      const expectedParticipate = mutatedPolicy.tag === 0;
+      const expectedParticipate = Contract.policyCode(mutatedPolicy) === 'EstimateAfterCall';
       // Real schema decoration for unknown tool is false
       const schemaDecorates = false;
       assert.equal(
@@ -910,10 +910,10 @@ test('WHAT[speculative-investigation-016] known-bad fixtures prove the gate dete
     "Gate must fail when default branch mutates from Unreviewed to EstimateAfterCall"
   );
 
-  // Mutation 2: a NoEstimate tool (chronicle) is incorrectly moved into participating set (tag 0)
+  // Mutation 2: a NoEstimate tool (chronicle) is incorrectly moved into participating set
   function mutatedClassifyChronicleParticipating(name) {
     if (name === "chronicle") {
-      return { tag: 0, cases: () => ["EstimateAfterCall", "NoEstimate", "Unreviewed"] };
+      return Contract.classifyTool("read");
     }
     return Contract.classifyTool(name);
   }
@@ -921,7 +921,7 @@ test('WHAT[speculative-investigation-016] known-bad fixtures prove the gate dete
   assert.throws(
     () => {
       const mutatedPolicy = mutatedClassifyChronicleParticipating("chronicle");
-      const expectedParticipate = mutatedPolicy.tag === 0;
+      const expectedParticipate = Contract.policyCode(mutatedPolicy) === 'EstimateAfterCall';
       // Real schema decoration for chronicle is false (NoEstimate)
       const schemaDecorates = false;
       assert.equal(
@@ -939,7 +939,7 @@ test('WHAT[speculative-investigation-016] known-bad fixtures prove the gate dete
     () => {
       const simulatedKnownTools = ["read", "chronicle", "new-leaked-tool"];
       const acknowledgedList = [];
-      const unreviewed = simulatedKnownTools.filter((name) => Contract.classifyTool(name).tag === 2);
+      const unreviewed = simulatedKnownTools.filter((name) => Contract.policyCode(Contract.classifyTool(name)) === 'Unreviewed');
       assert.deepEqual(
         unreviewed,
         acknowledgedList,

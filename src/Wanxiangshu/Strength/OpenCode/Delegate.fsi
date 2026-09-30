@@ -20,6 +20,9 @@ module StrengthDelegate =
         | Captured of DelegationRequest
         | Skipped of reason: string
 
+    /// 机器可判的稳定捕获结果标识（非散文文案，严禁使用 Fable 内部反射）
+    val captureOutcomeCode: outcome: CaptureOutcome -> string
+
     /// Phase one: freeze one authorization from the owner's completed source
     /// batch and persist DelegationRequested. The predictor configuration is a
     /// caller-provided existence input, independent of capacity and health.

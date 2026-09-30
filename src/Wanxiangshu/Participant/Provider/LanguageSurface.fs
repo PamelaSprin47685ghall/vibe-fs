@@ -126,7 +126,7 @@ module ProviderLanguageSurface =
             Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
             let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
             let output = createObj [ "system" ==> system ]
-            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> None) input output
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> None) (fun _ -> false) input output
             return box {| system = unbox<string array> output?system |}
         }
 
@@ -143,7 +143,26 @@ module ProviderLanguageSurface =
             let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
             let output = createObj [ "system" ==> system ]
 
-            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> role) input output
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> role) (fun _ -> false) input output
 
             return box {| system = unbox<string array> output?system |}
         }
+
+    /// Same boundary for a replica session of a public role.
+    let transformReplicaSystem (sessionId: string) (roleLabel: string) (system: string array) : Task<obj> =
+        task {
+            let sid = SessionId.create sessionId
+            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
+
+            let role = Roles.tryParseRole roleLabel
+
+            let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
+            let output = createObj [ "system" ==> system ]
+
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> role) (fun _ -> true) input output
+
+            return box {| system = unbox<string array> output?system |}
+        }
+
+    let replicaConstraintFor (language: string) : string =
+        Wanxiangshu.OpenCode.ProviderSystemTransform.replicaConstraintFor (languageOf language)

@@ -9,7 +9,7 @@ open Wanxiangshu.Strength
 
 /// DELEGATE.md 4.2: explicit read-only delegation schema contract and
 /// parameter boundary. Schema decoration, budget/note validation, provider
-/// argument evidence preservation and bilingual collaboration prose live
+/// argument evidence preservation and bilingual investigation outlook prose live
 /// here. This module never creates a child session, sends a provider
 /// request, computes the batch max, or writes business events.
 module ReadonlyDelegationContract =
@@ -85,23 +85,26 @@ module ReadonlyDelegationContract =
 
     // DELEGATE_REVISE.md 7.3 short outlook prose, verbatim.
     [<Literal>]
-    let private englishCollaboration =
+    let private englishInvestigationOutlook =
         "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."
 
     [<Literal>]
-    let private chineseCollaboration =
+    let private chineseInvestigationOutlook =
         "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"
 
     [<Literal>]
-    let private chineseCollaborationAlt =
+    let private chineseInvestigationOutlookAlt =
         "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数；self_note 在轮数大于 0 时简述下一步核对目标，为 0 时必须省略。"
 
+    // Legacy v1 investigation outlook blocks (DELEGATE.md v1).
+    // Kept strictly for internal backward-compatibility stripping in stripInvestigationOutlookBlocks;
+    // never published as current model-visible description.
     [<Literal>]
-    let private legacyEnglishCollaboration =
+    let private legacyEnglishInvestigationOutlookBlock =
         "Fill in delegate_readonly_rounds on every tool call. After all calls in this response complete, the maximum value grants your companion up to that many read-only model requests. A 0 does not veto a positive value elsewhere in the batch. One request may call several tools in parallel. Your companion sees the current conversation, may stop early, and returns actual tool calls and results. Use 0 when you need to retain control. Do not invent work to fill the budget; using it up does not require an edit.\n\nWorking together is a way to learn about each other and build trust. Judge by the investigation you can actually see in the conversation. When your companion does well, trust him more and let him do as much of the work as your judgment supports. When he struggles in particular situations, delegate less or not at all in similar situations next time. When in doubt, estimating how many steps remain before the first edit can give you a starting point. This is only a heuristic baseline, not an optimal policy or a substitute for judgment, and it does not require an eventual edit.\n\nOptionally leave a brief self_note in the first person, such as \u201cI suspect the caller and entry point disagree about empty values; I want to check the callers next.\u201d Your companion will naturally see it in the conversation. Omit it when it adds nothing. A short intention or uncertainty is enough; do not write a full analysis or present a guess as a fact."
 
     [<Literal>]
-    let private legacyChineseCollaboration =
+    let private legacyChineseInvestigationOutlookBlock =
         "每个工具调用都要填写 delegate_readonly_rounds。当前响应的全部工具完成后，系统取这些值的最大值，把接下来的至多这么多轮只读调查交给你的同伴。0 不会否决同批其他调用的正数。一轮是一次模型请求，可以并行调用多个工具。同伴看到当前对话，只能只读，可随时提前结束；真实工具调用与结果会回到你的上下文。需要亲自判断时填 0；不要为了用满预算增加调查，预算到期也不要求立即修改代码。\n\n和同伴合作，也是逐渐了解彼此、建立信任的过程。根据你在对话中实际看见的调查表现判断：他做得好，就尽可能多信任他、多让他工作；他不善于某些状况，下次遇到类似状况就适当少用或不用。当拿不准时，可以先估计距离第一次 edit 还有几步，作为抛砖引玉的基线。这只是启发式方法，不代表最优，不能代替实际判断，也不要求你最终一定 edit。\n\n需要留下当前意图或线索时，可选填 self_note，用第一人称给自己留一句短记，例如“我怀疑入口与调用方对空值的约定不同，接下来先核对调用点”。同伴会在对话中自然看见它。没有有用的话就省略；不必写完整分析，也不要把猜测写成事实。"
 
     /// JS 边界先检查原生 number、有限值、整数和范围，再构造 F# 类型。
@@ -335,16 +338,16 @@ module ReadonlyDelegationContract =
         ensureNoteProperty properties toolId
         ensureRequiredBudget schemaObj toolId
 
-    let private stripCollaborationBlocks (text: string) : string =
+    let private stripInvestigationOutlookBlocks (text: string) : string =
         text
-            .Replace(englishCollaboration, "")
-            .Replace(chineseCollaboration, "")
-            .Replace(chineseCollaborationAlt, "")
-            .Replace(legacyEnglishCollaboration, "")
-            .Replace(legacyChineseCollaboration, "")
+            .Replace(englishInvestigationOutlook, "")
+            .Replace(chineseInvestigationOutlook, "")
+            .Replace(chineseInvestigationOutlookAlt, "")
+            .Replace(legacyEnglishInvestigationOutlookBlock, "")
+            .Replace(legacyChineseInvestigationOutlookBlock, "")
             .TrimEnd('\n')
 
-    let private appendCollaborationDescription (toolOutput: obj) : unit =
+    let private appendInvestigationOutlookDescription (toolOutput: obj) : unit =
         if not (isPlainObject toolOutput) then
             raise (InvalidOperationException "Tool definition output must be an object")
 
@@ -358,20 +361,16 @@ module ReadonlyDelegationContract =
 
         let block =
             match language with
-            | ProviderLanguage.SimplifiedChinese -> chineseCollaboration
-            | _ -> englishCollaboration
+            | ProviderLanguage.SimplifiedChinese -> chineseInvestigationOutlook
+            | _ -> englishInvestigationOutlook
 
-        toolOutput?description <- stripCollaborationBlocks current + "\n\n" + block
+        toolOutput?description <- stripInvestigationOutlookBlocks current + "\n\n" + block
 
     /// A definition that already states its provider view as `properties` on
     /// `parameters` needs no Effect rendering; it is decorated where it stands
     /// and published as the JSON schema so the Host sends exactly these bytes.
-    let private parametersHoldSchemaView (parameters: obj) : bool =
-        if not (isPlainObject parameters) then
-            false
-        else
-            let properties = parameters?properties
-            not (isNull properties) && isPlainObject properties
+    [<Emit("Boolean($0 && typeof $0 === 'object' && !Array.isArray($0) && (($0.properties && typeof $0.properties === 'object' && !Array.isArray($0.properties)) || $0.type === 'object'))")>]
+    let private parametersHoldSchemaView (parameters: obj) : bool = jsNative
 
     /// The Host renders the provider-visible schema itself for any tool whose
     /// definition carries an Effect argument schema (`ToolJsonSchema.fromTool`:
@@ -408,7 +407,7 @@ module ReadonlyDelegationContract =
             decorateRootSchema rendered toolId
             toolOutput?jsonSchema <- rendered
 
-        appendCollaborationDescription toolOutput
+        appendInvestigationOutlookDescription toolOutput
 
     let private decorateToolParameters (toolOutput: obj) (toolId: string) =
         let jsonSchema = toolOutput?jsonSchema

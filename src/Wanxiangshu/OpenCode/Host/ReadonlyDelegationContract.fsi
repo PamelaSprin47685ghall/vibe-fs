@@ -4,7 +4,7 @@ open Wanxiangshu.Strength
 
 /// DELEGATE.md 4.2: explicit read-only delegation schema contract and
 /// parameter boundary. Owns schema decoration, budget/note field validation,
-/// provider argument evidence preservation, and the bilingual collaboration
+/// provider argument evidence preservation, and the bilingual investigation outlook
 /// prose. It never creates a child session, sends a provider request,
 /// computes the batch max, or writes business events.
 module ReadonlyDelegationContract =

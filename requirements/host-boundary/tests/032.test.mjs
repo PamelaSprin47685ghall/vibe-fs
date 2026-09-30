@@ -799,7 +799,29 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
   )
 })
 
+// ---------------------------------------------------------------------------
+// DELEGATE.md 9.1/9.2 两态门控：ModelRouting.initialize 的 scheduler 是进程
+// 单例（每测试进程只 import 一次），因此两个可观察态由测试自有的动态源驱动
+// ——fixture 在隔离 HOME 下写出的 wanxiangshu.mjs 导出 predictorConfiguration，
+// 读 globalThis 上的测试注入值，不触碰用户真实配置。默认（未注入）即未配置。
+// ---------------------------------------------------------------------------
+
+const setPredictorState = (state, reason) => {
+  globalThis.__wanxiangshu_test_predictor_state = state
+  if (reason === undefined) {
+    delete globalThis.__wanxiangshu_test_predictor_reason
+  } else {
+    globalThis.__wanxiangshu_test_predictor_reason = reason
+  }
+}
+
+const clearPredictorState = () => {
+  delete globalThis.__wanxiangshu_test_predictor_state
+  delete globalThis.__wanxiangshu_test_predictor_reason
+}
+
 test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence', async () => {
+  setPredictorState('configured')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const tool = 'read'
     const sessionID = 'ses-c23'
@@ -1009,27 +1031,6 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
     )
   })
 })
-
-// ---------------------------------------------------------------------------
-// DELEGATE.md 9.1/9.2 两态门控：ModelRouting.initialize 的 scheduler 是进程
-// 单例（每测试进程只 import 一次），因此两个可观察态由测试自有的动态源驱动
-// ——fixture 在隔离 HOME 下写出的 wanxiangshu.mjs 导出 predictorConfiguration，
-// 读 globalThis 上的测试注入值，不触碰用户真实配置。默认（未注入）即未配置。
-// ---------------------------------------------------------------------------
-
-const setPredictorState = (state, reason) => {
-  globalThis.__wanxiangshu_test_predictor_state = state
-  if (reason === undefined) {
-    delete globalThis.__wanxiangshu_test_predictor_reason
-  } else {
-    globalThis.__wanxiangshu_test_predictor_reason = reason
-  }
-}
-
-const clearPredictorState = () => {
-  delete globalThis.__wanxiangshu_test_predictor_state
-  delete globalThis.__wanxiangshu_test_predictor_reason
-}
 
 test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated', async () => {
   clearPredictorState()
@@ -1459,6 +1460,7 @@ integrationTest(
 // vaulted wire originals into that history before any consumer reads it.
 
 test('WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history', async () => {
+  setPredictorState('configured')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const tool = 'js-manager'
     const sessionID = 'ses-c34'

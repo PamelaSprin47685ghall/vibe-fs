@@ -401,6 +401,19 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
         assert.equal(joinOutput.parameters.required.includes('estimated_readonly_rounds'), false)
         assert.equal(joinOutput.description, 'Original join description')
 
+        // chronicle (Blogger) is an explicit NoEstimate tool: verify zero increment through production hook
+        const chronicleOutput = {
+          description: 'Record narrative events into the chronicle',
+          parameters: { type: 'object', properties: { note: { type: 'string' } }, required: ['note'] },
+        }
+        await hooks['tool.definition']({ toolID: 'chronicle' }, chronicleOutput)
+        assert.ok(chronicleOutput, 'chronicle tool definition must exist')
+        assert.equal(chronicleOutput.parameters.properties?.estimated_readonly_rounds, undefined, 'chronicle must not contain estimated_readonly_rounds')
+        assert.equal(chronicleOutput.parameters.properties?.self_note, undefined, 'chronicle must not contain self_note')
+        assert.equal(chronicleOutput.parameters.required?.includes('estimated_readonly_rounds'), false, 'chronicle required must not contain estimated_readonly_rounds')
+        assert.equal(chronicleOutput.parameters.required?.includes('self_note'), false, 'chronicle required must not contain self_note')
+        assert.equal(chronicleOutput.description, 'Record narrative events into the chronicle', 'chronicle description must strictly equal original description')
+
         const unreviewedOutput = {
           description: 'custom unreviewed tool',
           parameters: { type: 'object', properties: {}, required: [] },

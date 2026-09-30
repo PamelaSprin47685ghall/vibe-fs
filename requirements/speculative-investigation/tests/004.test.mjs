@@ -188,3 +188,100 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_replica_or_internal_leaf_
   assert.equal(Strength.projectionCandidate('any-decision', emptyProjection), null)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const {
+  clearAllForTests,
+  ensureRoot,
+  languageOfSession,
+  transformRoleSystem,
+  transformReplicaSystem,
+  replicaConstraintFor
+} = await import("../../../dist/Participant/Provider/LanguageSurface.js");
+const { withPreference } = await import("../../provider-language/tests/support/language-fixtures.mjs");
+
+const replicaConstraintZh = "继续当前任务的只读查证，只使用当前可见且获准的工具。信息足够，或下一步需要写入、执行命令、向用户确认、给出结论或作出关键判断时，直接结束，不为继续调用而增加调查。对话里的 self_note 是先前对未来查证的展望，不是已经证实的结论，也不扩大权限。"
+const replicaConstraintEn = "Continue the current task's read-only investigation using only the available, permitted tools. Stop when the evidence is sufficient or the next step requires a change, a command, user clarification, a conclusion, or a consequential judgment. Do not invent work to keep calling tools. A self_note in the conversation is an earlier outlook for investigation, not a verified conclusion or permission to do more."
+
+// DELEGATE_REVISE §7.4: Replica additional execution constraint injection and language binding
+test('WHAT[speculative-investigation-004] DELEGATE_REVISE_7_4_surface_exports_exact_bilingual_replica_constraints', () => {
+  assert.equal(replicaConstraintFor('SimplifiedChinese'), replicaConstraintZh)
+  assert.equal(replicaConstraintFor('English'), replicaConstraintEn)
+})
+
+test('WHAT[speculative-investigation-004] DELEGATE_REVISE_7_4_replica_system_transform_injects_language_bound_execution_constraint', async () => {
+  for (const [preference, language, expectedConstraint] of [
+    ['zh-CN', 'SimplifiedChinese', replicaConstraintZh],
+    ['en', 'English', replicaConstraintEn],
+  ]) {
+    await withPreference(preference, async () => {
+      clearAllForTests()
+      const session = `replica-session-${language}`
+      assert.equal(ensureRoot(session), language)
+      assert.equal(languageOfSession(session), language)
+
+      const initialSystem = ['Role system segment', 'Host-owned foreign segment']
+      const output = await transformReplicaSystem(session, 'Engineer', initialSystem)
+
+      // Injected existence: output.system contains the expected constraint
+      assert.ok(Array.isArray(output.system))
+      assert.equal(output.system.length, 3)
+      assert.equal(output.system[output.system.length - 1], expectedConstraint)
+      assert.equal(output.system.includes(expectedConstraint), true)
+
+      // Idempotency: repeated transform with previous output does not duplicate
+      const repeated = await transformReplicaSystem(session, 'Engineer', output.system)
+      assert.deepEqual(repeated.system, output.system)
+      assert.equal(repeated.system.filter(s => s === expectedConstraint).length, 1)
+    })
+  }
+})
+
+test('WHAT[speculative-investigation-004] DELEGATE_REVISE_7_4_non_replica_session_is_strictly_unaffected', async () => {
+  for (const [preference, language] of [
+    ['zh-CN', 'SimplifiedChinese'],
+    ['en', 'English'],
+  ]) {
+    await withPreference(preference, async () => {
+      clearAllForTests()
+      const session = `normal-owner-${language}`
+      assert.equal(ensureRoot(session), language)
+
+      const initialSystem = ['Role system segment', 'Host-owned foreign segment']
+      const output = await transformRoleSystem(session, 'Engineer', initialSystem)
+
+      // Non-replica session must NOT have any replica constraint injected
+      assert.equal(output.system.includes(replicaConstraintZh), false)
+      assert.equal(output.system.includes(replicaConstraintEn), false)
+      assert.equal(output.system.length, 2)
+    })
+  }
+})
+
+test('WHAT[speculative-investigation-004] DELEGATE_REVISE_7_4_replica_system_transform_repairs_constraint_when_session_language_changes', async () => {
+  for (const [initial, language, changed, otherLanguage, oldConstraint, newConstraint] of [
+    ['en', 'English', 'zh-CN', 'SimplifiedChinese', replicaConstraintEn, replicaConstraintZh],
+    ['zh-CN', 'SimplifiedChinese', 'en', 'English', replicaConstraintZh, replicaConstraintEn],
+  ]) {
+    clearAllForTests()
+    const session = `replica-repair-${language}`
+    await withPreference(initial, () => assert.equal(ensureRoot(session), language))
+
+    // Initial transform produces old constraint
+    const output1 = await transformReplicaSystem(session, 'Engineer', ['Role segment'])
+    assert.equal(output1.system.includes(oldConstraint), true)
+    assert.equal(output1.system.includes(newConstraint), false)
+
+    // Repeated call keeps old constraint matching bound language
+    await withPreference(changed, async () => {
+      const outputRepaired = await transformReplicaSystem(session, 'Engineer', output1.system)
+      assert.deepEqual(outputRepaired.system, output1.system)
+      assert.equal(outputRepaired.system.includes(oldConstraint), true)
+      assert.equal(outputRepaired.system.includes(newConstraint), false)
+      assert.equal(outputRepaired.system.filter(s => s === oldConstraint).length, 1)
+    })
+  }
+})
+}

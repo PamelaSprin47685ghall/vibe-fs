@@ -214,6 +214,22 @@ module StrengthProjection =
     let tryCandidate (decisionId: StrengthDecisionId) (projection: StrengthProjection) =
         Map.tryFind (decisionKey decisionId) projection.ByDecision
 
+    let tryCandidateBySource
+        (ownerSessionId: SessionId)
+        (ownerLogicalRun: OwnerLogicalRunIdentity)
+        (sourcePhysicalUserMessageId: PhysicalUserMessageId)
+        (sourceProviderRun: ProviderRunIdentity)
+        (projection: StrengthProjection)
+        : StrengthDelegationView option =
+        projection.ByDecision
+        |> Map.toList
+        |> List.map snd
+        |> List.tryFind (fun view ->
+            view.Request.OwnerSessionId = ownerSessionId
+            && view.Request.OwnerLogicalRun = ownerLogicalRun
+            && view.Request.SourcePhysicalUserMessageId = sourcePhysicalUserMessageId
+            && view.Request.SourceProviderRun = sourceProviderRun)
+
     let hasPrepared decisionId projection =
         tryCandidate decisionId projection
         |> Option.exists (fun view -> Option.isSome view.Prepared)
@@ -271,16 +287,26 @@ module StrengthProjection =
         match Map.tryFind dkey projection.ByDecision with
         | Some existing -> resolveRequestedConflict projection requested existing
         | None ->
-            let view =
-                { Request = requested
-                  Binding = None
-                  Prepared = None
-                  State = StrengthCandidateState.Requested
-                  TraceRange = None }
+            match
+                tryCandidateBySource
+                    requested.OwnerSessionId
+                    requested.OwnerLogicalRun
+                    requested.SourcePhysicalUserMessageId
+                    requested.SourceProviderRun
+                    projection
+            with
+            | Some existing -> resolveRequestedConflict projection requested existing
+            | None ->
+                let view =
+                    { Request = requested
+                      Binding = None
+                      Prepared = None
+                      State = StrengthCandidateState.Requested
+                      TraceRange = None }
 
-            Ok
-                { projection with
-                    ByDecision = Map.add dkey view projection.ByDecision }
+                Ok
+                    { projection with
+                        ByDecision = Map.add dkey view projection.ByDecision }
 
     let private bindExistingView projection dkey tkey (bound: DelegationBinding) (existing: StrengthDelegationView) =
         match existing.State with

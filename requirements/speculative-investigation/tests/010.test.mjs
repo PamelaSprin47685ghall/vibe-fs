@@ -241,18 +241,164 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_cross_version_same_source
   const identicalRequest = Strength.projectionApply(projection.value, Strength.eventRequested(requestV1))
   assert.equal(identicalRequest.ok, true)
 
-  // If revision 2 attempts to request with different parameters/revision for the same authorization decision,
-  // or if conflict is asserted:
-  const conflictSameDecision = Strength.projectionApply(projection.value, Strength.eventRequested({
-    ...requestV1,
-    contractRevision: 2,
-  }))
-  assert.equal(conflictSameDecision.ok, false)
-  assert.equal(conflictSameDecision.error, 'RequestedConflict')
+  // Invariant 2: Same-version same-source deduplication
+  // If identical, it is idempotent
+  const sameVersionDedup = Strength.projectionApply(projection.value, Strength.eventRequested(requestV1))
+  assert.equal(sameVersionDedup.ok, true)
 
-  // Invariant 3: Projection retains exactly one candidate for this source authorization, no second budget
+  // Same-version non-identical requests (different rounds or different call set) are rejected
+  const conflictDifferentRounds = Strength.projectionApply(projection.value, Strength.eventRequested({
+    ...requestV1,
+    requestedRounds: 5,
+  }))
+  assert.equal(conflictDifferentRounds.ok, false)
+  assert.equal(conflictDifferentRounds.error, 'RequestedConflict')
+
+  const conflictDifferentCalls = Strength.projectionApply(projection.value, Strength.eventRequested({
+    ...requestV1,
+    sourceToolCallIds: ['call-99'],
+  }))
+  assert.equal(conflictDifferentCalls.ok, false)
+  assert.equal(conflictDifferentCalls.error, 'RequestedConflict')
+
+  // Invariant 3: Cross-version same-source deduplication
+  // Revision 2 creates a new DecisionId (decisionIdV2), but references the exact same real source quadruple.
+  // The projection MUST refuse it as a RequestedConflict, preventing any second budget.
+  const requestV2 = {
+    ...requestV1,
+    decisionId: decisionIdV2,
+    contractRevision: 2,
+  }
+  const conflictCrossVersion = Strength.projectionApply(projection.value, Strength.eventRequested(requestV2))
+  assert.equal(conflictCrossVersion.ok, false)
+  assert.equal(conflictCrossVersion.error, 'RequestedConflict')
+
+  // Invariant 4: Projection retains exactly one candidate for this source authorization, no second budget
   assert.equal(Strength.projectionRequestedRounds(decisionIdV1, projection.value), 2)
   assert.equal(Strength.projectionCandidate(decisionIdV2, projection.value), null, 'New revision decisionId must not exist as fresh in existing projection')
+  assert.equal(Strength.projectionRequestedRounds(decisionIdV2, projection.value), null)
+
+  // Canonical query by source returns the original single authorization
+  const bySource = Strength.projectionCandidateBySource(
+    ownerSessionId, logicalRunId, authorityRootUserMessageId, sourcePhysicalUserMessageId, sourceProviderRun, projection.value,
+  )
+  assert.notEqual(bySource, null)
+  assert.equal(bySource.decisionId, decisionIdV1)
+  assert.equal(
+    Strength.projectionRequestedRoundsBySource(
+      ownerSessionId, logicalRunId, authorityRootUserMessageId, sourcePhysicalUserMessageId, sourceProviderRun, projection.value,
+    ),
+    2,
+  )
+
+  // Invariant 5: Different real sources still legally form their own budgets independently
+  const diffProviderRun = 'run-2'
+  const decisionIdOtherRun = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, diffProviderRun,
+  )
+  const requestOtherRun = {
+    ...requestV1,
+    decisionId: decisionIdOtherRun,
+    sourceProviderRun: diffProviderRun,
+    requestedRounds: 3,
+  }
+  const applyOtherRun = Strength.projectionApply(projection.value, Strength.eventRequested(requestOtherRun))
+  assert.equal(applyOtherRun.ok, true)
+  assert.equal(Strength.projectionRequestedRounds(decisionIdOtherRun, applyOtherRun.value), 3)
+  assert.equal(Strength.projectionRequestedRounds(decisionIdV1, applyOtherRun.value), 2)
+
+  const diffUserMsg = 'u-2'
+  const decisionIdOtherUser = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, diffUserMsg, sourceProviderRun,
+  )
+  const requestOtherUser = {
+    ...requestV1,
+    decisionId: decisionIdOtherUser,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId: diffUserMsg },
+    sourcePhysicalUserMessageId: diffUserMsg,
+    requestedRounds: 4,
+  }
+  const applyOtherUser = Strength.projectionApply(projection.value, Strength.eventRequested(requestOtherUser))
+  assert.equal(applyOtherUser.ok, true)
+  assert.equal(Strength.projectionRequestedRounds(decisionIdOtherUser, applyOtherUser.value), 4)
+  assert.equal(Strength.projectionRequestedRounds(decisionIdV1, applyOtherUser.value), 2)
+})
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_terminal_sources_do_not_resurrect_across_protocol_versions', () => {
+  const H = (text) => `H(${text})`
+  const ownerSessionId = 'owner-ses-1'
+  const logicalRunId = 'log-1'
+  const authorityRootUserMessageId = 'u-1'
+  const sourcePhysicalUserMessageId = 'u-1'
+  const sourceProviderRun = 'run-1'
+
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  )
+  const decisionIdV2 = Strength.delegationDeriveDecisionId(
+    H, 2, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  )
+
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  }
+
+  const requestV2 = {
+    ...requestV1,
+    decisionId: decisionIdV2,
+    contractRevision: 2,
+  }
+
+  // 1. Closed state does not resurrect under v2
+  {
+    let proj = Strength.projectionApply(Strength.projectionEmpty(), Strength.eventRequested(requestV1)).value
+    proj = Strength.projectionApply(proj, Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue')).value
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Closed')
+
+    const v2Result = Strength.projectionApply(proj, Strength.eventRequested(requestV2))
+    assert.equal(v2Result.ok, false)
+    assert.equal(v2Result.error, 'RequestedConflict')
+    assert.equal(Strength.projectionCandidate(decisionIdV2, proj), null)
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Closed')
+  }
+
+  // 2. Traced state does not resurrect under v2
+  {
+    let proj = Strength.projectionApply(Strength.projectionEmpty(), Strength.eventRequested(requestV1)).value
+    proj = Strength.projectionApply(proj, bound(decisionIdV1)).value
+    proj = Strength.projectionApply(proj, prepared(decisionIdV1)).value
+    proj = Strength.projectionApply(proj, promoted(decisionIdV1)).value
+    proj = Strength.projectionApply(proj, Strength.eventTraced(decisionIdV1, 1n, 2n)).value
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Traced')
+
+    const v2Result = Strength.projectionApply(proj, Strength.eventRequested(requestV2))
+    assert.equal(v2Result.ok, false)
+    assert.equal(v2Result.error, 'RequestedConflict')
+    assert.equal(Strength.projectionCandidate(decisionIdV2, proj), null)
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Traced')
+  }
+
+  // 3. Abandoned state does not resurrect under v2
+  {
+    let proj = Strength.projectionApply(Strength.projectionEmpty(), Strength.eventRequested(requestV1)).value
+    proj = Strength.projectionApply(proj, bound(decisionIdV1)).value
+    proj = Strength.projectionApply(proj, prepared(decisionIdV1)).value
+    proj = Strength.projectionApply(proj, Strength.eventAbandoned(decisionIdV1, 'run-1')).value
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Abandoned')
+
+    const v2Result = Strength.projectionApply(proj, Strength.eventRequested(requestV2))
+    assert.equal(v2Result.ok, false)
+    assert.equal(v2Result.error, 'RequestedConflict')
+    assert.equal(Strength.projectionCandidate(decisionIdV2, proj), null)
+    assert.equal(Strength.projectionCandidate(decisionIdV1, proj).state, 'Abandoned')
+  }
 })
 }
 
@@ -399,7 +545,7 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_capture_quadruple_conflic
   );
 
   // 断言捕获结果为 Skipped 且原因严格等于 "delegation-request-conflict"
-  assert.equal(outcome?.tag, 1, 'outcome must be Skipped (tag 1)');
+  assert.equal(rawDelegate.captureOutcomeCode(outcome), 'Skipped', 'outcome must be Skipped');
   assert.equal(outcome?.fields?.[0], 'delegation-request-conflict');
 
   // 断言持久化端口的 Append 未被调用，绝无第二份授权入库
@@ -466,6 +612,112 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_apply_explicitly_closes_m
   // 断言该事件与 Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue') 完全一致
   const expectedClosedEvent = Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue');
   assert.deepEqual(closedEvent, expectedClosedEvent);
+});
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_tryCapture_skips_when_source_is_already_terminal', async () => {
+  const ownerSessionId = 'ses-1';
+  const logicalRunId = 'log-1';
+  const authorityRootUserMessageId = 'u-1';
+  const sourcePhysicalUserMessageId = 'u-1';
+  const sourceProviderRun = 'a-1';
+
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  );
+
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  };
+
+  // 预置已终态（Closed）的既有投影
+  let projection = Strength.projectionApply(
+    Strength.projectionEmpty(),
+    Strength.eventRequested(requestV1),
+  ).value;
+  projection = Strength.projectionApply(
+    projection,
+    Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue'),
+  ).value;
+  assert.equal(Strength.projectionCandidate(decisionIdV1, projection).state, 'Closed');
+
+  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
+    createDelegateMockContext(projection);
+
+  // 走真实捕获入口 tryCapture
+  const outcome = await rawDelegate.tryCapture(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    output,
+  );
+
+  // 终态来源不得被重新捕获产生新预算，必须 Skip 且不追加任何事件
+  assert.equal(rawDelegate.captureOutcomeCode(outcome), 'Skipped', 'outcome must be Skipped');
+  assert.equal(outcome?.fields?.[0], 'delegation-request-conflict');
+  assert.equal(appendedEvents.length, 0, 'durability.Append must not be called for terminal source');
+});
+
+test('WHAT[speculative-investigation-010] STRENGTH_010_tryApply_does_not_resurrect_terminal_source', async () => {
+  const ownerSessionId = 'ses-1';
+  const logicalRunId = 'log-1';
+  const authorityRootUserMessageId = 'u-1';
+  const sourcePhysicalUserMessageId = 'u-1';
+  const sourceProviderRun = 'a-1';
+
+  const decisionIdV1 = Strength.delegationDeriveDecisionId(
+    H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  );
+
+  const requestV1 = {
+    decisionId: decisionIdV1,
+    ownerSessionId,
+    ownerLogicalRun: { logicalRunId, authorityRootUserMessageId },
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 1,
+  };
+
+  // 预置已终态（Traced）的既有投影
+  let projection = Strength.projectionApply(
+    Strength.projectionEmpty(),
+    Strength.eventRequested(requestV1),
+  ).value;
+  projection = Strength.projectionApply(projection, bound(decisionIdV1)).value;
+  projection = Strength.projectionApply(projection, prepared(decisionIdV1)).value;
+  projection = Strength.projectionApply(projection, promoted(decisionIdV1)).value;
+  projection = Strength.projectionApply(projection, Strength.eventTraced(decisionIdV1, 1n, 2n)).value;
+  assert.equal(Strength.projectionCandidate(decisionIdV1, projection).state, 'Traced');
+
+  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
+    createDelegateMockContext(projection);
+
+  // 走真实 apply 入口 tryApply
+  await rawDelegate.tryApply(
+    snapshotPort,
+    journal,
+    durability,
+    strengthScope,
+    () => null,
+    null,
+    true,
+    output,
+  );
+
+  // 终态来源绝不复活，不产生任何新的追加事件
+  assert.equal(appendedEvents.length, 0, 'no event appended, terminal source does not resurrect');
 });
 }
 

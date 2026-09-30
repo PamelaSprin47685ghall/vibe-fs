@@ -189,17 +189,32 @@ module PluginHooksSurface =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwn (target: obj) (key: string) : bool = jsNative
 
+    [<Emit("Boolean($0 && typeof $0 === 'object' && !Array.isArray($0))")>]
+    let private isPlainObject (value: obj) : bool = jsNative
+
+    [<Emit("Array.prototype.slice.call(arguments)")>]
+    let private getJsArguments () : obj array = jsNative
+
     /// DELEGATE_REVISE.md 7.1/7.2: self_note validation as a JS-native result:
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
-        match InvestigationEstimateContract.parseParticipatingArguments arguments with
+        let jsArgs = getJsArguments ()
+        let target =
+            if jsArgs.Length = 1 && isPlainObject jsArgs[0] then
+                jsArgs[0]
+            elif jsArgs.Length = 1 then
+                createObj [ "estimated_readonly_rounds", jsArgs[0] ]
+            else
+                createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
+
+        match InvestigationEstimateContract.parseParticipatingArguments target with
         | Ok (rounds, _) ->
             let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
             let noteVal =
                 if rawRounds = 0 then
                     null
-                elif hasOwn arguments "self_note" then
-                    arguments?self_note
+                elif hasOwn target "self_note" then
+                    target?self_note
                 else
                     null
             box

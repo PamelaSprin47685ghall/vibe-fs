@@ -115,7 +115,10 @@ module PluginHooks =
                         PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections))
                 |> Option.map (fun profile -> profile.CanonicalRole)
 
-            let systemTransform = ProviderSystemTransform.createWith roleFor
+            let isReplica (sessionId: SessionId) =
+                boot.StrengthScope.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome
+
+            let systemTransform = ProviderSystemTransform.createWith roleFor isReplica
 
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.
@@ -592,15 +595,15 @@ module PluginHooks =
                     let isParticipatingTool =
                         InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
 
-                    if not (isNull toolInput) && not (isNull toolInput?args) then
-                        // host-boundary-032: same-source restore for both
-                        // contract families on exception, repeat and concurrent
-                        // paths. Restore is idempotent and a no-op when the
-                        // after hook receives a different object than before.
-                        if isParticipatingTool then
-                            ReadonlyDelegationContract.restore toolInput?args
-                        ManagerReviewContract.restore toolInput?args
-                        TodoWriteCompressionContract.restore toolInput?args
+                    let restoreTarget (target: obj) =
+                        if not (isNull target) && not (isNull target?args) then
+                            if isParticipatingTool then
+                                ReadonlyDelegationContract.restore target?args
+                            ManagerReviewContract.restore target?args
+                            TodoWriteCompressionContract.restore target?args
+
+                    restoreTarget toolInput
+                    restoreTarget toolOutput
 
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after

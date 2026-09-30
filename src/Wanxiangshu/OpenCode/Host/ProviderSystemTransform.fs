@@ -13,6 +13,45 @@ open Wanxiangshu.Resources
 /// Wanxiangshu-owned system-prompt segment without disturbing Host/AGENTS text.
 module ProviderSystemTransform =
 
+    [<Literal>]
+    let replicaConstraintZh =
+        "继续当前任务的只读查证，只使用当前可见且获准的工具。信息足够，或下一步需要写入、执行命令、向用户确认、给出结论或作出关键判断时，直接结束，不为继续调用而增加调查。对话里的 self_note 是先前对未来查证的展望，不是已经证实的结论，也不扩大权限。"
+
+    [<Literal>]
+    let replicaConstraintEn =
+        "Continue the current task's read-only investigation using only the available, permitted tools. Stop when the evidence is sufficient or the next step requires a change, a command, user clarification, a conclusion, or a consequential judgment. Do not invent work to keep calling tools. A self_note in the conversation is an earlier outlook for investigation, not a verified conclusion or permission to do more."
+
+    let replicaConstraintFor lang =
+        match lang with
+        | ProviderLanguage.SimplifiedChinese -> replicaConstraintZh
+        | ProviderLanguage.English -> replicaConstraintEn
+
+    let private canonical (text: string) = if isNull text then "" else text.Trim()
+
+    let private applyReplicaConstraint (lang: ProviderLanguage) (output: obj) =
+        let currentSystem = unbox<string array> output?system
+        let expectedZh = canonical replicaConstraintZh
+        let expectedEn = canonical replicaConstraintEn
+        let nextConstraint = replicaConstraintFor lang
+
+        let hasConstraint =
+            currentSystem
+            |> Array.exists (fun text ->
+                let c = canonical text
+                c = expectedZh || c = expectedEn)
+
+        if hasConstraint then
+            output?system <-
+                currentSystem
+                |> Array.map (fun text ->
+                    let c = canonical text
+                    if c = expectedZh || c = expectedEn then
+                        nextConstraint
+                    else
+                        text)
+        else
+            output?system <- Array.append currentSystem [| nextConstraint |]
+
     /// Only active roles own a projected segment; retired identities are
     /// decoded for history but never rewrite a live system prompt.
     let private catalogPrompt (catalog: PromptCatalog) =
@@ -38,7 +77,6 @@ module ProviderSystemTransform =
         | _ -> PromptResources.systemForRole lang role
 
     let private replaceOwnedSegment (oldPrompt: string) (nextPrompt: string) (system: string array) =
-        let canonical (text: string) = if isNull text then "" else text.Trim()
         let expected = canonical oldPrompt
 
         system
@@ -58,8 +96,6 @@ module ProviderSystemTransform =
 
     let private activeRoles =
         [ Role.Manager; Role.Orchestrator; Role.Engineer; Role.DevOps; Role.Blogger ]
-
-    let private canonical (text: string) = if isNull text then "" else text.Trim()
 
     let private chooseBookkeeperPrompt expectedEn expectedZh nextPrompt (text: string) =
         let c = canonical text
@@ -148,7 +184,13 @@ module ProviderSystemTransform =
                 system
                 |> Array.map (chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt)
 
-    let private transformSystem (role: SessionId -> Role option) sessionText output system =
+    let private transformSystem
+        (role: SessionId -> Role option)
+        (isReplica: SessionId -> bool)
+        sessionText
+        output
+        system
+        =
         let sid = SessionId.create sessionText
         let lang = ProviderLanguageBinding.ensureRoot sid
 
@@ -157,10 +199,13 @@ module ProviderSystemTransform =
         else
             replaceRoleSystem role sid lang output system
 
-    let createWith (role: SessionId -> Role option) : obj -> obj -> Task<unit> =
+        if isReplica sid then
+            applyReplicaConstraint lang output
+
+    let createWith (role: SessionId -> Role option) (isReplica: SessionId -> bool) : obj -> obj -> Task<unit> =
         fun input output ->
             task {
                 match sessionTransformInput input output with
                 | None -> ()
-                | Some(sessionText, system) -> transformSystem role sessionText output system
+                | Some(sessionText, system) -> transformSystem role isReplica sessionText output system
             }

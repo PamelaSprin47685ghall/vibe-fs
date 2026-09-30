@@ -54,3 +54,6 @@ module InvestigationEstimateContract =
 
     /// 机器可判的稳定错误标识（非散文文案，严禁使用 Fable 内部反射）
     val errorCode: error: EstimateArgumentError -> string
+
+    /// 机器可判的稳定工具策略标识（非散文文案，严禁使用 Fable 内部反射）
+    val policyCode: policy: InvestigationToolPolicy -> string

@@ -223,3 +223,9 @@ module InvestigationEstimateContract =
         | EstimateArgumentError.NoteNotString -> "NoteNotString"
         | EstimateArgumentError.MixedProtocolFields -> "MixedProtocolFields"
         | EstimateArgumentError.InvalidArgumentObject -> "InvalidArgumentObject"
+
+    let policyCode (policy: InvestigationToolPolicy) : string =
+        match policy with
+        | InvestigationToolPolicy.EstimateAfterCall -> "EstimateAfterCall"
+        | InvestigationToolPolicy.NoEstimate -> "NoEstimate"
+        | InvestigationToolPolicy.Unreviewed -> "Unreviewed"

@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- speculative-investigation / host-boundary [进行中 / 未验证]: 规范切换到 DELEGATE_REVISE.md 新合同（代码与测试尚待 DevOps 运行验证）。
+- speculative-investigation / host-boundary: 规范切换到 DELEGATE_REVISE.md 新合同。
   - **共享合同与协议修订版 2**：新增 `src/Wanxiangshu/Strength/InvestigationEstimateContract.fs`，将面向模型的意图性字段 `delegate_readonly_rounds` clean-break 重构为事实性连续只读轮数估计 `estimated_readonly_rounds`（0..2147483647 原生整数）。
   - **条件性调查展望**：`self_note` 明确为条件参数——估计大于 0 时必须提供一至三句非空白未来展望；估计为 0 时必须完全省略。提供与规则解释文案彻底解耦的机器稳定标识（`NotePresentWhenZero`、`MissingOrBlankNoteWhenPositive` 等）。
   - **逐工具判定矩阵**：严格按工具操作性质判定（全系统 12 个参与工具装饰，28 个不参与工具无任何增量）。
@@ -74,7 +74,7 @@
 
 - **修复配置 Predictor 后宿主内建工具的装饰抛错、会话不可用（speculative-investigation-013）**：opencode 1.18.32 交给 `tool.definition` 的定义里，内建工具（`read`/`edit`/`question`/`glob`…）的 `parameters` 是 Effect 参数 schema、`jsonSchema` 为空，provider 侧 schema 由宿主 `ToolJsonSchema.fromTool`（`src/tool/json-schema.ts`）现场渲染。原装饰要求 `parameters.properties` 存在，对这类定义直接抛 `Tool … parameters schema missing object properties`，工具解析失败，用户消息到不了 provider（实机现象：manager 续话直接不工作）。
   修复：新增 `OpenCode/Host/ToolSchemaJson.fs(i)`，用宿主同版本（`4.0.0-beta.83`）的 `effect` 调 `Schema.toJsonSchemaDocument(parameters, { additionalProperties: true })`，并复刻宿主 `normalize`/`inlineLocalReferences`/`dropDefinitionsIfResolved` 的渲染结果，按 schema 对象缓存；装饰改为发布到 JSON schema 视图（`output.jsonSchema`），`parameters`（含 Effect schema）保持原样供宿主解码参数；带 `properties` 的定义仍在原地装饰并同时发布为 JSON schema。`effect` 升为显式运行时依赖。
-  验证：新增真实 Host canary（`requirements/host-boundary/tests/support/run-readonly-delegation-schema-canary.mjs` 与 `requirements/speculative-investigation/tests/016.test.mjs`）：配置 Predictor 后 wire 上全部可见工具都带 `required: [delegate_readonly_rounds]` 与可选 `self_note`，内建工具原有 required 不变，协作说明送达，携带协议字段的内建调用真实执行且 wire 历史保留原调用；另与宿主 `/experimental/tool` 逐工具对拍 11 个内建工具，0 处差异。
+  验证：新增真实 Host canary（`requirements/host-boundary/tests/support/run-readonly-delegation-schema-canary.mjs` 与 `requirements/speculative-investigation/tests/013.test.mjs`）：配置 Predictor 后 wire 上参与工具带 `required: [estimated_readonly_rounds]` 与条件性 `self_note`（非参与工具零增量），内建工具原有 required 不变，协作说明送达，携带协议字段的内建调用真实执行且 wire 历史保留原调用；另与宿主 `/experimental/tool` 逐工具对拍 11 个内建工具，0 处差异。
 
 - **只读委托升级说明（DELEGATE 12 交付项）**：旧 Strength 环境变量（`WANXIANGSHU_STRENGTH_MODE`、`WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET`、`WANXIANGSHU_STRENGTH_HOST_CANARY`、`WANXIANGSHU_STRENGTH_K1_MARGIN`、`WANXIANGSHU_STRENGTH_K2_MARGIN`、`WANXIANGSHU_STRENGTH_K2_MIN_EVIDENCE`、`WANXIANGSHU_STRENGTH_CONTROL_BPS`、`WANXIANGSHU_STRENGTH_POLICY_VERSION`、`WANXIANGSHU_STRENGTH_SAVED_DEEP_*` 等）全部失效——残留旧值不阻止运行，也不启用任何功能；模型调度配置升级到协议 2（`routingProtocol = 2`、四参数 `route(role, running, previous, purpose)`、`hasTheoreticalCapacity(role, purpose)`、`predictorConfiguration()` 三态存在性查询；`readonly-delegate` 用途从 Predictor 模型池选择，角色与参与者身份不变），旧三参数配置被加载器明确拒绝并给出可操作错误，运行时不覆盖用户已有的 `wanxiangshu.mjs`；Predictor 模型配置成为唯一生产启用依据（配置存在即启用，未配置即无委托，没有独立开关、环境变量或消融选项）；旧 Strength 历史经离线脚本 `scripts/migrate-delegation-history.mjs` 在 EventStore 备份副本上迁移（只追加 `DelegationHistoryImported` 导入事实，cold replay 对照，拒绝活库），未迁移的旧存储在集成规则入口被拒绝消费。用户升级指引落在 README「升级：只读委托（调度协议 2）」节；README 环境变量表与人工巡检文档中的旧变量示范同批清除。
 

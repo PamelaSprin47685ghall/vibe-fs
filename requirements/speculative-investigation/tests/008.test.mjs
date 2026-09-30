@@ -485,7 +485,7 @@ test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_
     )
 
     // 断言：回传历史绝不被识别为新的委托请求来源
-    assert.notEqual(captureOutcome?.tag, 0, 'Replayed Replica history must not produce a Captured outcome')
+    assert.notEqual(rawDelegate.captureOutcomeCode(captureOutcome), 'Captured', 'Replayed Replica history must not produce a Captured outcome')
     assert.equal(appendedCaptureEvents.length, 0, 'No DelegationRequested event may be appended from replayed history')
   } finally {
     local.close()

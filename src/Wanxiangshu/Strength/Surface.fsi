@@ -129,6 +129,24 @@ module StrengthSurface =
     /// the closed lifecycle state. Never boolean combinations.
     val projectionCandidate: decision: string -> projection: obj -> obj
 
+    val projectionCandidateBySource:
+        ownerSessionId: string ->
+        logicalRunId: string ->
+        authorityRootUserMessageId: string ->
+        sourcePhysicalUserMessageId: string ->
+        sourceProviderRun: string ->
+        projection: obj ->
+            obj
+
+    val projectionRequestedRoundsBySource:
+        ownerSessionId: string ->
+        logicalRunId: string ->
+        authorityRootUserMessageId: string ->
+        sourcePhysicalUserMessageId: string ->
+        sourceProviderRun: string ->
+        projection: obj ->
+            obj
+
     /// Read the requested rounds from the immutable projection.
     val projectionRequestedRounds: decision: string -> projection: obj -> obj
 

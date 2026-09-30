@@ -214,7 +214,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     })
   }
 
-  // 6. Sentinel: mixing legacy field delegate_readonly_rounds is rejected as MixedProtocolFields
+  // 6. Sentinel: legacy field delegate_readonly_rounds is strictly rejected as MixedProtocolFields under current v2 contract
   for (const mixedArgs of [
     { delegate_readonly_rounds: 2, self_note: 'note' },
     { estimated_readonly_rounds: 2, delegate_readonly_rounds: 2, self_note: 'note' },
