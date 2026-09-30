@@ -85,11 +85,19 @@ test('WHAT[speculative-investigation-007] STRENGTH_007_closed_authorization_is_n
   assert.equal(Strength.projectionCandidate('d1', reopened.ok ? reopened.value : projection).state, 'Closed')
 })
 test('WHAT[speculative-investigation-007] STRENGTH_007_closed_authorization_releases_the_target_for_a_new_request', () => {
-  let projection = apply(Strength.projectionEmpty(), request('d1'))
-  projection = apply(projection, Strength.eventClosed('d1', 'Requested', 'Superseded'))
+  let projection = apply(apply(Strength.projectionEmpty(), request('d1')), bound('d1'))
+  assert.equal(Strength.projectionDecisionForTarget('run-1', projection), 'd1')
+  projection = apply(projection, Strength.eventClosed('d1', 'Bound', 'CannotContinue'))
   assert.equal(Strength.projectionDecisionForTarget('run-1', projection), null)
-  assert.equal(Strength.projectionRequestedRounds('d1', projection), null)
-  assert.equal(Strength.projectionApply(projection, request('d2')).ok, true)
+  assert.equal(Strength.projectionRequestedRounds('d1', projection), 2)
+  const request2 = Strength.eventRequested({
+    decisionId: 'd2', ownerSessionId: 'owner',
+    ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
+    sourcePhysicalUserMessageId: 'user-2', sourceProviderRun: 'run-2',
+    sourceToolCallIds: ['call-2'], requestedRounds: 3, contractRevision: 1,
+  })
+  projection = apply(apply(projection, request2), bound('d2'))
+  assert.equal(Strength.projectionDecisionForTarget('run-1', projection), 'd2')
 })
 test('WHAT[speculative-investigation-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping', () => {
   const text = (value) => ({ kind: 'text', text: value })

@@ -246,7 +246,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
       ],
     },
     {
-      role: "user",
+      role: "tool",
       parts: [
         { kind: "tool-result", callId: "call-fork-1", result: "ok" },
         { kind: "tool-result", callId: "call-read-1", result: "source-content" },
@@ -260,7 +260,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
   const incompleteMessages = [
     mixedWireMessages[0],
     {
-      role: "user",
+      role: "tool",
       parts: [
         { kind: "tool-result", callId: "call-fork-1", result: "ok" },
         { kind: "tool-result", callId: "call-read-1", result: "source-content" },
@@ -493,10 +493,10 @@ test("STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols", 
   );
   const pluginFs = fs.readFileSync(pluginFsPath, "utf8");
 
-  // 验证 PluginTransforms 引用了 Delegate.tryResolveCaptureCallsAndBudget 等核心符号
+  // 验证 PluginTransforms 引用了 StrengthDelegate.tryCapture 等公开委托入口符号
   assert.match(
     pluginFs,
-    /Delegate\.tryResolveCaptureCallsAndBudget|tryResolveCaptureCallsAndBudget/,
+    /StrengthDelegate\.tryCapture/,
     "PluginTransforms.fs must route delegation through Delegate resolution"
   );
 });

@@ -1,14 +1,7 @@
 > **⚠️ 历史文档与规范修订声明**
-> **本文件描述的是 v1 协议（delegate_readonly_rounds）。该协议已被 estimated_readonly_rounds 调查估计协议取代，当前有效规范与执行合同以 [requirements/speculative-investigation/WHAT.md](requirements/speculative-investigation/WHAT.md) 与 [DELEGATE_REVISE.md](DELEGATE_REVISE.md) 为准；本文件仅作历史说明保留。**
 >
-> 依据 DELEGATE_REVISE.md 第 2.1 节，本文档中被新修订案推翻的核心要点包括：
-> 1. **字段与语义**：旧意愿性字段 `delegate_readonly_rounds` 已废弃，现行字段为事实性连续只读轮数估计 `estimated_readonly_rounds`；
-> 2. **条件短记**：`self_note` 不再是无条件的普通可选字段，改为严格的条件参数（大于 0 时必填非空展望，等于 0 时必须完全省略）；
-> 3. **工具范围**：废除“给所有可见工具加参数”的做法，改为严格的逐工具判定（仅 12 个只读/调查类工具参与，协调与变更高危工具无增量）；
-> 4. **剔除动机叙事**：彻底删除面向模型的“同伴、建立信任、保留控制权”等协作意图叙事，同批 max 的调度解释亦从模型可见文字中撤回；
-> 5. **防递归门禁**：撤回“副本固定填 0”的约定，副本在共享 schema 下按相同事实含义填写，防递归由宿主真实身份边界严格保证。
->
-> 以下正文保留作为历史设计脉络记录，涉及上述冲突之处均以 [requirements/speculative-investigation/WHAT.md](requirements/speculative-investigation/WHAT.md) 与 [DELEGATE_REVISE.md](DELEGATE_REVISE.md) 为准。
+> 本文档是 v1 协议（delegate_readonly_rounds）的历史设计稿与归档说明，已被 [DELEGATE_REVISE.md](DELEGATE_REVISE.md) 修订覆盖。
+> 当前有效合同以 `requirements/` 下各包 WHAT 为准；冲突处以现行规范为准，历史正文原样保留不改写，仅作设计演进脉络记录，不作为当前执行依据。
 
 # 显式只读委托：clean-break 实现指南（历史归档）
 

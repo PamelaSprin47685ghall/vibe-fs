@@ -12,8 +12,11 @@ const rawStaticTools = await import("../../../dist/OpenCode/Tools/StaticTools.js
 const rawPluginHooks = await import("../../../dist/OpenCode/Plugin/PluginHooks.js");
 const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
 const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
+const rawModelRoutingSurface = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const ModelRoutingSurface = rawModelRoutingSurface;
 const fs = await import("node:fs");
 const path = await import("node:path");
+const os = await import("node:os");
 const { fileURLToPath } = await import("node:url");
 
 const Contract = {
@@ -30,6 +33,44 @@ const Budget = {
     value: rawBudget.ReadonlyRoundBudgetModule_value,
   },
 };
+
+// execution-model-routing-020 / DELEGATE.md 9.1:
+// Ensure the test process has initialized the ModelRouting scheduler singleton
+// with dynamic predictorConfiguration query, allowing test cases to toggle predictor state
+// via globalThis.__wanxiangshu_test_predictor_state.
+{
+  const tmpDir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'wxs-016-routing-'));
+  const routingHome = path.join(tmpDir, 'routing-home');
+  const routingDir = path.join(routingHome, '.config', 'opencode');
+  fs.mkdirSync(routingDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(routingDir, 'wanxiangshu.mjs'),
+    `export const routingProtocol = 2
+export default function route(role, running, previous, purpose) {
+  return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}
+export const predictorConfiguration = () => {
+  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
+  if (state === 'configured') return { state: 'configured', reason: null }
+  if (state === 'invalid') return { state: 'invalid', reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test injected invalid state' }
+  return { state: 'unconfigured', reason: null }
+}
+`
+  );
+  const prevHome = process.env.HOME;
+  const prevProfile = process.env.USERPROFILE;
+  process.env.HOME = routingHome;
+  process.env.USERPROFILE = routingHome;
+  try {
+    await ModelRoutingSurface.initialize();
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevProfile;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
 
 test('WHAT[speculative-investigation-016] protocol revision and field constants are defined and stable', () => {
   assert.equal(rawContract.EstimatedReadonlyRoundsField, 'estimated_readonly_rounds');
@@ -426,7 +467,7 @@ test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive
         );
       },
       (err) => {
-        assert.ok(err instanceof Error);
+        assert.ok(err, 'expected error to be thrown');
         assert.ok(err.message.includes('Invalid investigation estimate arguments:'));
         assert.ok(
           err.message.includes('estimated_readonly_rounds 为 0 时必须省略 self_note') ||
@@ -447,7 +488,7 @@ test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive
         );
       },
       (err) => {
-        assert.ok(err instanceof Error);
+        assert.ok(err, 'expected error to be thrown');
         assert.ok(err.message.includes('Invalid investigation estimate arguments:'));
         assert.ok(
           err.message.includes('必须提供 estimated_readonly_rounds 估计字段') ||

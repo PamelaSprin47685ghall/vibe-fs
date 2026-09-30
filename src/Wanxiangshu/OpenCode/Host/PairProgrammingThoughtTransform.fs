@@ -281,27 +281,6 @@ module PairProgrammingThoughtTransform =
         else
             tryObj part?state |> Option.bind statusFromState
 
-    let private isPendingToolStatus (status: string option) =
-        match status with
-        | Some "completed"
-        | Some "error" -> false
-        | _ -> true
-
-    let private isCompletedToolStatus (status: string option) =
-        match status with
-        | Some "completed"
-        | Some "error" -> true
-        | _ -> false
-
-    /// Host raw：pending/running tool part = call；completed/error = result。
-    let private isToolCallMessage (rawMsg: obj) : bool =
-        rawParts rawMsg
-        |> Array.exists (fun part -> isToolPart part && isPendingToolStatus (partStatus part))
-
-    let private isToolResultMessage (rawMsg: obj) : bool =
-        rawParts rawMsg
-        |> Array.exists (fun part -> isToolPart part && isCompletedToolStatus (partStatus part))
-
     // ── transcript addressing ────────────────────────────────────────────────
 
     let private callIdFromRawId (raw: string) : string =
@@ -689,38 +668,6 @@ module PairProgrammingThoughtTransform =
 
     // ── 本轮新 pair 的 placement（只读当前真实消息）──────────────────────────
 
-    /// 末端结构 → gap：
-    ///
-    /// - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2 [User]`，或 batch 直接
-    ///   结尾）：`After(last call)` / `After(last result)` —— placement identity。
-    ///   ordinary 只在 ResultGap 渲染一条 completed Host 行。
-    /// - 无 batch 且最后一条消息是 user（trailing user）：`Before(user)` / `Before(user)`。
-    /// - 无 batch、无 trailing user：`After(last real)` / `After(last real)`。
-    /// - 空 transcript：`Start` / `Start`。
-    ///
-    /// 新 pair 的 gap 必须落在本次追加区（末尾），否则会改写已发送 wire 的中间字节、
-    /// 破坏 append-only prefix。旧实现「pair 总在最后一条 user（任意位置）前」在
-    /// continuation transcript（末尾是 assistant 文本）上会在中途插入新 pair —— 正是
-    /// 本 Change 修复的 prefix 破坏。
-    let rec private takeToolResults found xs =
-        match xs with
-        | message :: tail when isToolResultMessage message -> takeToolResults (message :: found) tail
-        | _ -> found, xs
-
-    let rec private takeToolCalls found xs =
-        match xs with
-        | message :: tail when isToolCallMessage message -> takeToolCalls (message :: found) tail
-        | _ -> found, xs
-
-    let private gapsAfterToolBatch (lastCall: obj) (lastResult: obj) =
-        match ProviderWireDecode.hostMessageId lastCall, ProviderWireDecode.hostMessageId lastResult with
-        | Some callId, Some resultId ->
-            Ok(
-                TranscriptGap.After(TranscriptMessageAddress.create callId),
-                TranscriptGap.After(TranscriptMessageAddress.create resultId)
-            )
-        | _ -> Error "tool batch message without transcript address (HOST-013)"
-
     // semantic-decorator-owner: guidance-delivery
     // semantic-decorator-WHAT: guidance-delivery-011
     // semantic-decorator-trace-relation: R_gap_pair(address) = (gapCtor address, gapCtor address), left then right, with a pure extensional constructor
@@ -740,34 +687,37 @@ module PairProgrammingThoughtTransform =
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
 
-    let private decideFromBatchEnds
-        (lastIsUser: bool)
-        (restIsEmpty: bool)
-        (last: obj)
-        (resultRun: obj list)
-        (callRun: obj list)
-        =
-        match List.rev resultRun, List.rev callRun with
-        | lastResult :: _, lastCall :: _ -> gapsAfterToolBatch lastCall lastResult |> Result.map Some
-        | _ when lastIsUser && restIsEmpty ->
-            gapsAroundAddress TranscriptGap.After last "first user message without transcript address (HOST-013)"
-            |> Result.map Some
-        | _ when lastIsUser ->
-            gapsAroundAddress TranscriptGap.Before last "trailing user without transcript address (HOST-013)"
-            |> Result.map Some
-        | _ ->
-            gapsAroundAddress TranscriptGap.After last "last message without transcript address (HOST-013)"
-            |> Result.map Some
+    /// A message hosts a cursor guidance carrier when the replay renderer can
+    /// actually change its bytes: user messages through a terminal text part,
+    /// every other role through a terminal tool result (HOST-013). A placement
+    /// may only be anchored where the renderer produces bytes — otherwise the
+    /// occurrence is committed but never rendered.
+    let private messageCarriesGuidance (rawMsg: obj) : bool =
+        if messageRole rawMsg = "user" then
+            terminalTextPartIndex (rawParts rawMsg) |> Option.isSome
+        else
+            rawParts rawMsg
+            |> Array.mapi terminalGuidanceIndex
+            |> Array.exists Option.isSome
 
+    /// 本轮新 occurrence 的 placement：**最新一条真实消息**，且只有它承载
+    /// cursor 呈现时才有 placement；否则本轮不新增 occurrence。
+    ///
+    /// 旧实现按「有无 tool batch / 是否 trailing user」分支，产出的
+    /// `Before(user)`、`After(assistant 文本)` 形状 cursor 渲染器不认，于是
+    /// durable occurrence 记了却一个字节也不出现（首轮之后的纯用户轮次、重锚
+    /// 后的空窗）。锚定最新消息既保证字节一定落在本次追加区（append-only），
+    /// 又保证落点一定是渲染器真会改写的消息。
+    ///
+    /// 空 transcript 无 placement；最新消息不是载体（例如末尾是纯 assistant
+    /// 文本）本轮不生成 occurrence，等下一次出现载体的请求再追加。
     let decideCurrentPlacement (realMessages: obj list) : Result<(TranscriptGap * TranscriptGap) option, string> =
         match List.rev realMessages with
         | [] -> Ok None
-        | last :: rest ->
-            let lastIsUser = messageRole last = "user"
-            let scanFrom = if lastIsUser then rest else (last :: rest)
-            let resultRun, afterResults = takeToolResults [] scanFrom
-            let callRun, _ = takeToolCalls [] afterResults
-            decideFromBatchEnds lastIsUser (List.isEmpty rest) last resultRun callRun
+        | last :: _ when messageCarriesGuidance last ->
+            gapsAroundAddress TranscriptGap.After last "guidance carrier without transcript address (HOST-013)"
+            |> Result.map Some
+        | _ -> Ok None
 
     // ── durable / memory history ─────────────────────────────────────────────
 

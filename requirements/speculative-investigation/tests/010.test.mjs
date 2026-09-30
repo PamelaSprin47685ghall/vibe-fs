@@ -53,9 +53,11 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_bound_without_a_Sent_requ
 })
 test('WHAT[speculative-investigation-010] STRENGTH_010_closed_authorization_releases_its_target_for_a_fresh_request', () => {
   let projection = apply(Strength.projectionEmpty(), request('d1'))
-  projection = apply(projection, Strength.eventClosed('d1', 'Requested', 'Superseded'))
+  projection = apply(projection, bound('d1'))
+  assert.equal(Strength.projectionDecisionForTarget('run-1', projection), 'd1')
+  projection = apply(projection, Strength.eventClosed('d1', 'Bound', 'Superseded'))
   assert.equal(Strength.projectionDecisionForTarget('run-1', projection), null)
-  const restartedResult = Strength.projectionApply(projection, request('d2'))
+  const restartedResult = Strength.projectionApply(projection, request('d2', 2, { sourceProviderRun: 'run-2' }))
   assert.equal(restartedResult.ok, true)
   const restarted = restartedResult.value
   const decision = apply(restarted, bound('d2'))
@@ -283,7 +285,7 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_cross_version_same_source
     ownerSessionId, logicalRunId, authorityRootUserMessageId, sourcePhysicalUserMessageId, sourceProviderRun, projection.value,
   )
   assert.notEqual(bySource, null)
-  assert.equal(bySource.decisionId, decisionIdV1)
+  assert.equal(bySource.request.decisionId, decisionIdV1)
   assert.equal(
     Strength.projectionRequestedRoundsBySource(
       ownerSessionId, logicalRunId, authorityRootUserMessageId, sourcePhysicalUserMessageId, sourceProviderRun, projection.value,
@@ -415,6 +417,10 @@ const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
 const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
 
 const H = (text) => createHash("sha256").update(text).digest("hex");
+const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
+const bound = (decisionId) => Strength.eventBound(decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a');
+const prepared = (decisionId) => Strength.eventPrepared('owner', decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
+const promoted = (decisionId) => Strength.eventPromoted('owner', decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);
 
 function createDelegateMockContext(projection) {
   const strengthScope = new rawPluginScope.PluginStrengthScope();

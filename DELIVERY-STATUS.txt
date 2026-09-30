@@ -1,0 +1,768 @@
+CHALLENGE=f6040236faec476bc35535ee6799bf2d
+started=2026-09-30T10:22:40+08:00
+/home/kunweiz/Desktop/vibe/wanxiangshu
+EXIT=0
+total 734
+drwxr-xr-x  17 kunweiz kunweiz   3488 Sep 30 10:22 .
+drwxr-xr-x  19 kunweiz kunweiz   3488 Sep 29 18:04 ..
+-rw-r--r--   1 kunweiz kunweiz   7167 Sep 29 20:40 AGENTS.md
+-rw-r--r--   1 kunweiz kunweiz  13943 Sep 29 11:19 ASK.md
+-rw-r--r--   1 kunweiz kunweiz 105683 Sep 30 09:26 CHANGELOG.md
+drwxr-xr-x   2 kunweiz kunweiz   3488 Aug 24 11:03 .config
+-rw-r--r--   1 kunweiz kunweiz  71804 Sep 30 09:43 DELEGATE.md
+-rw-r--r--   1 kunweiz kunweiz 111399 Sep 29 11:46 DELEGATE_REVISE.md
+-rw-r--r--   1 kunweiz kunweiz    123 Sep 30 10:22 DELIVERY-STATUS.txt
+-rw-r--r--   1 kunweiz kunweiz    715 Aug 24 11:03 Directory.Build.props
+drwxr-xr-x  24 kunweiz kunweiz   3488 Sep 30 09:07 dist
+-rw-r--r--   1 kunweiz kunweiz   1165 Sep 29 10:53 Dockerfile.ci
+-rw-r--r--   1 kunweiz kunweiz     36 Sep 29 10:53 .dockerignore
+-rw-r--r--   1 kunweiz kunweiz    311 Aug 24 11:03 .editorconfig
+drwxr-xr-x   4 kunweiz kunweiz   3488 Sep 30 09:47 .fable-build
+drwx------   2 kunweiz kunweiz   3488 Sep 29 16:39 .freebuff
+drwxr-xr-x   9 kunweiz kunweiz   3488 Sep 30 10:22 .git
+-rw-r--r--   1 kunweiz kunweiz    100 Aug 24 11:03 .gitattributes
+drwxr-xr-x   3 kunweiz kunweiz   3488 Aug 24 11:03 .github
+-rw-r--r--   1 kunweiz kunweiz    950 Sep 29 15:40 .gitignore
+-rw-r--r--   1 kunweiz kunweiz     81 Aug 24 11:03 global.json
+-rw-r--r--   1 kunweiz kunweiz    967 Aug 24 11:03 LICENSE
+drwxr-xr-x 208 kunweiz kunweiz   8192 Sep 29 10:58 node_modules
+-rw-r--r--   1 kunweiz kunweiz   2501 Sep 30 08:49 package.json
+-rw-r--r--   1 kunweiz kunweiz 114582 Sep 30 08:49 package-lock.json
+drwxr-xr-x   2 kunweiz kunweiz   3488 Sep 29 17:52 proposals
+-rw-r--r--   1 kunweiz kunweiz  20954 Sep 30 09:43 README.md
+drwxr-xr-x  59 kunweiz kunweiz   3488 Sep 30 08:49 requirements
+drwxr-xr-x   6 kunweiz kunweiz   3488 Sep 29 10:53 resources
+drwxr-xr-x   6 kunweiz kunweiz   3488 Sep 30 08:01 scripts
+drwxr-xr-x   3 kunweiz kunweiz   3488 Sep 23 16:46 src
+drwxr-xr-x   3 kunweiz kunweiz   3488 Sep 29 11:00 .wanxiangshu
+drwxr-xr-x   4 kunweiz kunweiz   3488 Sep 29 20:16 .wireit
+drwxr-xr-x   2 kunweiz kunweiz   3488 Sep 23 13:28 万象体系
+-rw-r--r--   1 kunweiz kunweiz  73483 Sep 29 10:53 人工巡检.md
+-rw-r--r--   1 kunweiz kunweiz 113888 Sep 29 13:27 保姆级完整设计.md
+-rw-r--r--   1 kunweiz kunweiz  28459 Sep 30 08:49 保姆级计划.md
+EXIT=0
+-rw-r--r-- 1 kunweiz kunweiz 2465 Sep 30 10:22 /home/kunweiz/Desktop/vibe/wanxiangshu/DELIVERY-STATUS.txt
+EXIT=0
+
+--- CMD: git -C "$R" status --short
+ M CHANGELOG.md
+ M DELEGATE.md
+ M README.md
+ M requirements/speculative-investigation/tests/002.test.mjs
+ M requirements/speculative-investigation/tests/004.test.mjs
+ M requirements/speculative-investigation/tests/008.test.mjs
+ M requirements/speculative-investigation/tests/010.test.mjs
+ M requirements/speculative-investigation/tests/012.test.mjs
+ M requirements/speculative-investigation/tests/013.test.mjs
+ M requirements/speculative-investigation/tests/016.test.mjs
+ M src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs
+ M src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fsi
+ M src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs
+ M src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fsi
+ M src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+ M src/Wanxiangshu/Participant/Provider/LanguageSurface.fs
+ M src/Wanxiangshu/Participant/Provider/LanguageSurface.fsi
+ M src/Wanxiangshu/Strength/InvestigationEstimateContract.fs
+ M src/Wanxiangshu/Strength/InvestigationEstimateContract.fsi
+ M src/Wanxiangshu/Strength/OpenCode/Delegate.fs
+ M src/Wanxiangshu/Strength/OpenCode/Delegate.fsi
+ M src/Wanxiangshu/Strength/Projection/Model.fs
+ M src/Wanxiangshu/Strength/Projection/Model.fsi
+ M src/Wanxiangshu/Strength/Surface.fs
+ M src/Wanxiangshu/Strength/Surface.fsi
+?? DELIVERY-STATUS.txt
+EXIT=0
+
+--- CMD: git -C "$R" log -5 --oneline
+1a1052ec8 fix(todowrite): tool.definition 装饰幂等，消除 "Tool todowrite already defines retainCheckpoints"
+29702219e Merge remote-tracking branch 'origin/master'
+ed3818a3e wip: estimated_readonly_rounds 契约细化与 delegation 门控收窄（合并前暂存）
+f1c956c73 refactor: restore assume and native todowrite compression
+5ec3765fc fix(delegation): 委派 continuation 发送前收尾在途物理执行，消除 PROMPT-006 竞态
+EXIT=0
+
+--- CMD: git -C "$R" diff --stat
+ CHANGELOG.md                                       |   4 +-
+ DELEGATE.md                                        |   7 +-
+ README.md                                          |   2 +-
+ .../speculative-investigation/tests/002.test.mjs   |  30 +--
+ .../speculative-investigation/tests/004.test.mjs   |  97 ++++++++
+ .../speculative-investigation/tests/008.test.mjs   |   2 +-
+ .../speculative-investigation/tests/010.test.mjs   | 268 ++++++++++++++++++++-
+ .../speculative-investigation/tests/012.test.mjs   |   2 +-
+ .../speculative-investigation/tests/013.test.mjs   |  13 +
+ .../speculative-investigation/tests/016.test.mjs   |  88 +++----
+ .../OpenCode/Host/ProviderSystemTransform.fs       |  57 ++++-
+ .../OpenCode/Host/ProviderSystemTransform.fsi      |  17 +-
+ .../OpenCode/Host/ReadonlyDelegationContract.fs    |  37 +--
+ .../OpenCode/Host/ReadonlyDelegationContract.fsi   |   2 +-
+ src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs     |   5 +-
+ .../Participant/Provider/LanguageSurface.fs        |  23 +-
+ .../Participant/Provider/LanguageSurface.fsi       |   6 +
+ .../Strength/InvestigationEstimateContract.fs      |   6 +
+ .../Strength/InvestigationEstimateContract.fsi     |   3 +
+ src/Wanxiangshu/Strength/OpenCode/Delegate.fs      |  49 ++--
+ src/Wanxiangshu/Strength/OpenCode/Delegate.fsi     |   3 +
+ src/Wanxiangshu/Strength/Projection/Model.fs       |  46 +++-
+ src/Wanxiangshu/Strength/Projection/Model.fsi      |   7 +
+ src/Wanxiangshu/Strength/Surface.fs                |  60 +++++
+ src/Wanxiangshu/Strength/Surface.fsi               |  18 ++
+ 25 files changed, 719 insertions(+), 133 deletions(-)
+EXIT=0
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (full)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @zanaptak
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 1037ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 35046ms
+
+[39m[22m[owner-compile] OK: Wanxiangshu.Impact.fsproj in 37002ms (noRestore, fp:88e074a49d34)
+[36m[build][0m compiled full impact (1498 items in 37002ms)
+[31m════════════════════════════════════════════════════════════════════════════════
+  BUILD FAILED
+════════════════════════════════════════════════════════════════════════════════[0m
+/home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/010.test.mjs: Identifier 'identicalRequest' has already been declared (246:8)
+EXIT=1
+=== 修复轮次 1: 修复 010.test.mjs 中 identicalRequest 重名声明问题 ===
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (full)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @JacobChang
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 1089ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 36354ms
+
+[39m[22m[owner-compile] OK: Wanxiangshu.Impact.fsproj in 38391ms (noRestore, fp:88e074a49d34)
+[36m[build][0m compiled full impact (1498 items in 38391ms)
+js-surface-manifest: OK — 165 registered surfaces, laws and contract imports closed
+js-module-linkage: OK — 819 emitted modules linked and loaded
+[36m[build][0m build ok (generation 83)
+EXIT=0
+
+--- CMD: cd "$R" && TESTS_MJS_FILES='requirements/host-boundary/tests/032.test.mjs,requirements/speculative-investigation/tests/002.test.mjs,requirements/speculative-investigation/tests/012.test.mjs,requirements/speculative-investigation/tests/013.test.mjs' node requirements/verification-system/tests/run.mjs
+runner: scoped 使用 TESTS_MJS_FILES=4 files
+runner: build is current (1779 sources, 875 artifacts)
+runner: discovery OVERRIDDEN by TESTS_MJS_FILES (4 file(s))
+runner: 4 test file(s), 5000ms verdict-silence window
+
+✖ failing tests:
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:54:1
+✖ STRENGTH_002_admission_refuses_every_documented_dependency_gap_with_a_visible_reason (2.320ms)
+  AssertionError [ERR_ASSERTION]: WHAT[speculative-investigation-002]: policyDecide should skip for not-work-main
+  + actual - expected
+  
+  + undefined
+  - 'Skip'
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:128:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:147:1
+✖ STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_zero (1.083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + ReadonlyRoundBudget {
+  +   fields: [
+  +     4
+  +   ],
+  +   tag: 0
+  + }
+  - 4
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:179:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:196:1
+✖ STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max (0.804ms)
+  AssertionError [ERR_ASSERTION]: Completed batch must yield exactly 1 batch
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:279:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:489:1
+✖ STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols (0.255ms)
+  AssertionError [ERR_ASSERTION]: PluginTransforms.fs must route delegation through Delegate resolution
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:497:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:289:1
+✖ WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query (306.425ms)
+  AssertionError [ERR_ASSERTION]: js-manager description must include collaboration prose
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:452:16
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:292:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:607:1
+✖ WHAT[host-boundary-032] C19_self_note_requires_pairing_with_positive_budget_and_omitted_for_zero (0.673ms)
+  AssertionError [ERR_ASSERTION]: absent self_note is required when estimated_readonly_rounds is 0
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:611:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:741:1
+✖ WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_required_fail_loudly (0.701ms)
+  AssertionError [ERR_ASSERTION]: a root schema that cannot be legally extended must fail loudly
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:795:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:802:1
+✖ WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence (97.507ms)
+  AssertionError [ERR_ASSERTION]: business view must not see the budget field
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:818:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:803:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:856:1
+✖ WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk (117.805ms)
+  AssertionError [ERR_ASSERTION]: both contract families must leave the business view together
+  + actual - expected
+  
+    {
+  +   estimated_readonly_rounds: 2,
+      path: 'src/App.fs',
+  +   self_note: 'note-c24'
+    }
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:872:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:857:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:889:1
+✖ WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_without_losing_evidence (97.931ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection (TypeError): frozen args with protocol fields must fail atomically with TypeError
+      at async file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:895:5
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:890:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:919:1
+✖ WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstalk (98.918ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:942:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:920:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:966:1
+✖ WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protocol_fields (98.019ms)
+  AssertionError [ERR_ASSERTION]: business execution view must not carry the budget field
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:982:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:967:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1461:1
+✖ WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history (136.828ms)
+  AssertionError [ERR_ASSERTION]: budget must return to the persisted history on the wire
+  
+  undefined !== 3
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1505:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1462:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1633:1
+✖ WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore (127.485ms)
+  AssertionError [ERR_ASSERTION]: the budget must still be restored beside its result
+  
+  undefined !== 1
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1686:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1634:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1694:1
+✖ WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments (120.627ms)
+  AssertionError [ERR_ASSERTION]: the protocol field must be restored beside the business arguments
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1743:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1695:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1761:1
+✖ WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_tool_before_for_participating_tools (115.089ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection: participating tool with legacy delegate_readonly_rounds must be rejected on tool.execute.before
+      at async file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1767:5
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1762:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1811:1
+✖ WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases (136.075ms)
+  AssertionError [ERR_ASSERTION]: participating tool estimate must be restored normally from vault
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1904:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1812:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2077:1
+✖ WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_parameters_from_snapshot (97.381ms)
+  AssertionError [ERR_ASSERTION]: toolAfter must restore estimated_readonly_rounds from private snapshot even after predictor is revoked mid-flight
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2183:14
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2142:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+
+[test-summary] 4 file(s), 48 passed, 18 failed, 2 skipped (4.69s wall, 4.93s test time)
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:WHAT[speculative-investigation-013] SPEC_INV_013_configured_predictor_decorates_builtin_tools_on_real_host — integration tier not enabled
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:WHAT[host-boundary-032] canary_manager_review_tools_contract_observed_on_real_host — integration tier not enabled
+runner: post-exit group verification/reclamation: pid=1562604; elapsedMs=9.803; accepted=true
+runner: 68 test(s), 4.9s of test time; max 306ms, p90 137ms, median 94ms
+runner:     306ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query
+runner:     299ms  WHAT[host-boundary-032] C01_tool_definition_decorates_four_dedicated_tools_with_contract_enum
+runner:     224ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session
+runner:     180ms  WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query
+runner:     173ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_an_in_flight_source_batch
+
+runner: 48 passed, 18 failed; 4/4 planned file(s) completed
+EXIT=1
+=== 修复轮次 2: 修复 ReadonlyDelegationContract 模式识别与 PluginHooksSurface 交互 ===
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (focused)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @theimowski
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 964ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 30685ms
+
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,16): (378,17) error FSHARP: Unmatched '(' (code 583)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,35): (378,39) error FSHARP: Incomplete structured construct at or before this point in expression. Expected identifier, '(' or other token. (code 10)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,35): (378,39) error FSHARP: Unexpected keyword 'type' in binding. Expected incomplete structured construct at or before this point or other token. (code 10)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs(221,13): (221,70) error FSHARP: Type mismatch. Expecting a    'obj -> obj'    but given a    'obj -> Result<(InvestigationEstimateContract.EstimatedReadonlyRounds * string option),InvestigationEstimateContract.EstimateArgumentError>'    The type 'obj' does not match the type 'Result<(InvestigationEstimateContract.EstimatedReadonlyRounds * string option),InvestigationEstimateContract.EstimateArgumentError>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs(222,13): (222,72) error FSHARP: Type mismatch. Expecting a    'obj -> int'    but given a    'InvestigationEstimateContract.EstimatedReadonlyRounds -> int'    The type 'InvestigationEstimateContract.EstimatedReadonlyRounds' does not match the type 'obj' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs(223,13): (223,52) error FSHARP: Type mismatch. Expecting a    'obj -> string'    but given a    'InvestigationEstimateContract.EstimateArgumentError -> string'    The type 'InvestigationEstimateContract.EstimateArgumentError' does not match the type 'obj' (code 1)
+[39m[22m[31mCompilation failed
+[39m[22m[31m════════════════════════════════════════════════════════════════════════════════
+  BUILD FAILED
+════════════════════════════════════════════════════════════════════════════════[0m
+Fable compilation failed with exit code 1
+EXIT=1
+=== 重新编译 Fable ===
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (focused)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @chadunit
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 967ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 32549ms
+
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(372,5): (372,8) error FSHARP: Incomplete value or function definition. If this is in an expression, the body of the expression must be indented to the same column as the 'let' keyword. (code 3118)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,16): (378,17) error FSHARP: Unmatched '(' (code 583)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,35): (378,36) error FSHARP: Unexpected symbol '[' in expression. Expected identifier, '(' or other token. (code 10)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(378,54): (378,55) error FSHARP: Unexpected symbol ')' in expression. Expected incomplete structured construct at or before this point or other token. (code 10)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(398,5): (398,8) error FSHARP: Incomplete structured construct at or before this point in binding. Expected incomplete structured construct at or before this point or other token. (code 10)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ReadonlyDelegationContract.fs(398,5): (398,8) error FSHARP: Incomplete structured construct at or before this point in implementation file. Expected incomplete structured construct at or before this point or other token. (code 10)
+[39m[22m[31mCompilation failed
+[39m[22m[31m════════════════════════════════════════════════════════════════════════════════
+  BUILD FAILED
+════════════════════════════════════════════════════════════════════════════════[0m
+Fable compilation failed with exit code 1
+EXIT=1
+=== 重新编译 Fable ===
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (focused)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @zpodlovics
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 958ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 32206ms
+
+[39m[22m[owner-compile] OK: Wanxiangshu.Impact.fsproj in 34044ms (noRestore, fp:e648f1cfbbfa)
+[36m[build][0m compiled focused impact (1498 items in 34044ms)
+js-surface-manifest: OK — 165 registered surfaces, laws and contract imports closed
+js-module-linkage: OK — 819 emitted modules linked and loaded
+[36m[build][0m build ok (generation 84)
+EXIT=0
+
+--- CMD: cd "$R" && TESTS_MJS_FILES='requirements/host-boundary/tests/032.test.mjs,requirements/speculative-investigation/tests/002.test.mjs,requirements/speculative-investigation/tests/012.test.mjs,requirements/speculative-investigation/tests/013.test.mjs' node requirements/verification-system/tests/run.mjs
+runner: scoped 使用 TESTS_MJS_FILES=4 files
+runner: build is current (1779 sources, 875 artifacts)
+runner: discovery OVERRIDDEN by TESTS_MJS_FILES (4 file(s))
+runner: 4 test file(s), 5000ms verdict-silence window
+
+✖ failing tests:
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:196:1
+✖ STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max (1.298ms)
+  AssertionError [ERR_ASSERTION]: Completed batch must yield exactly 1 batch
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:279:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:489:1
+✖ STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols (0.312ms)
+  AssertionError [ERR_ASSERTION]: PluginTransforms.fs must route delegation through Delegate resolution
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:497:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:289:1
+✖ WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query (321.703ms)
+  AssertionError [ERR_ASSERTION]: js-manager description must include collaboration prose
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:452:16
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:292:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:802:1
+✖ WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence (110.668ms)
+  AssertionError [ERR_ASSERTION]: business view must not see the budget field
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:818:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:803:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:856:1
+✖ WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk (100.689ms)
+  AssertionError [ERR_ASSERTION]: both contract families must leave the business view together
+  + actual - expected
+  
+    {
+  +   estimated_readonly_rounds: 2,
+      path: 'src/App.fs',
+  +   self_note: 'note-c24'
+    }
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:872:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:857:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:889:1
+✖ WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_without_losing_evidence (96.385ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection (TypeError): frozen args with protocol fields must fail atomically with TypeError
+      at async file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:895:5
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:890:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:919:1
+✖ WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstalk (99.536ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:942:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:920:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:966:1
+✖ WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protocol_fields (97.200ms)
+  AssertionError [ERR_ASSERTION]: business execution view must not carry the budget field
+  
+  true !== false
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:982:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:967:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1461:1
+✖ WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history (135.450ms)
+  AssertionError [ERR_ASSERTION]: budget must return to the persisted history on the wire
+  
+  undefined !== 3
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1505:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1462:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1633:1
+✖ WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore (125.518ms)
+  AssertionError [ERR_ASSERTION]: the budget must still be restored beside its result
+  
+  undefined !== 1
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1686:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1634:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1694:1
+✖ WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments (143.118ms)
+  AssertionError [ERR_ASSERTION]: the protocol field must be restored beside the business arguments
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1743:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1695:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1761:1
+✖ WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_tool_before_for_participating_tools (102.287ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection: participating tool with legacy delegate_readonly_rounds must be rejected on tool.execute.before
+      at async file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1767:5
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1762:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1811:1
+✖ WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases (127.330ms)
+  AssertionError [ERR_ASSERTION]: participating tool estimate must be restored normally from vault
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1904:12
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1812:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2077:1
+✖ WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_parameters_from_snapshot (97.591ms)
+  AssertionError [ERR_ASSERTION]: toolAfter must restore estimated_readonly_rounds from private snapshot even after predictor is revoked mid-flight
+  
+  undefined !== 2
+  
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2183:14
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:2142:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+
+[test-summary] 4 file(s), 52 passed, 14 failed, 2 skipped (4.66s wall, 4.91s test time)
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:WHAT[speculative-investigation-013] SPEC_INV_013_configured_predictor_decorates_builtin_tools_on_real_host — integration tier not enabled
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:WHAT[host-boundary-032] canary_manager_review_tools_contract_observed_on_real_host — integration tier not enabled
+runner: post-exit group verification/reclamation: pid=1567097; elapsedMs=9.847; accepted=true
+runner: 68 test(s), 4.9s of test time; max 322ms, p90 143ms, median 94ms
+runner:     322ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query
+runner:     292ms  WHAT[host-boundary-032] C01_tool_definition_decorates_four_dedicated_tools_with_contract_enum
+runner:     229ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session
+runner:     181ms  WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query
+runner:     176ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_an_in_flight_source_batch
+
+runner: 52 passed, 14 failed; 4/4 planned file(s) completed
+EXIT=1
+=== 重新编译并运行首批定向回归测试 ===
+
+--- CMD: cd "$R" && node scripts/build.mjs
+[36m[build][0m Compiling F# (focused)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @valery-vitko
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/dc1d1cf3db3e95cfe5a197898928ad6dfc5cf94150f55bd664ab043862a35b89/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1536 source files) parsed in 1001ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 31882ms
+
+[39m[22m[owner-compile] OK: Wanxiangshu.Impact.fsproj in 33766ms (noRestore, fp:4d640f279b01)
+[36m[build][0m compiled focused impact (1498 items in 33766ms)
+js-surface-manifest: OK — 165 registered surfaces, laws and contract imports closed
+js-module-linkage: OK — 819 emitted modules linked and loaded
+[36m[build][0m build ok (generation 85)
+EXIT=0
+
+--- CMD: cd "$R" && TESTS_MJS_FILES='requirements/host-boundary/tests/032.test.mjs,requirements/speculative-investigation/tests/002.test.mjs,requirements/speculative-investigation/tests/012.test.mjs,requirements/speculative-investigation/tests/013.test.mjs' node requirements/verification-system/tests/run.mjs
+runner: scoped 使用 TESTS_MJS_FILES=4 files
+runner: build is current (1779 sources, 875 artifacts)
+runner: discovery OVERRIDDEN by TESTS_MJS_FILES (4 file(s))
+runner: 4 test file(s), 5000ms verdict-silence window
+
+✖ failing tests:
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:196:1
+✖ STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max (1.277ms)
+  AssertionError [ERR_ASSERTION]: Completed batch must yield exactly 1 batch
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:279:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:489:1
+✖ STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols (0.235ms)
+  AssertionError [ERR_ASSERTION]: PluginTransforms.fs must route delegation through Delegate resolution
+      at TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/002.test.mjs:497:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:289:1
+✖ WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query (321.692ms)
+  AssertionError [ERR_ASSERTION]: js-manager description must include collaboration prose
+      at file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:452:16
+      at async withExecutablePlugin (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/verification-system/tests/support/plugin-fixture.mjs:262:7)
+      at async TestContext.<anonymous> (file:///home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:292:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1587:1
+✖ WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable (95.353ms)
+  {
+    message: 'Invalid investigation estimate arguments: The estimated_readonly_rounds field must be provided',
+    innerException: undefined
+  }
+
+test at /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:1813:1
+✖ WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases (99.654ms)
+  {
+    message: 'Invalid investigation estimate arguments: The estimated_readonly_rounds field must be provided',
+    innerException: undefined
+  }
+
+
+[test-summary] 4 file(s), 61 passed, 5 failed, 2 skipped (4.53s wall, 4.84s test time)
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/speculative-investigation/tests/013.test.mjs:WHAT[speculative-investigation-013] SPEC_INV_013_configured_predictor_decorates_builtin_tools_on_real_host — integration tier not enabled
+  skip: /home/kunweiz/Desktop/vibe/wanxiangshu/requirements/host-boundary/tests/032.test.mjs:WHAT[host-boundary-032] canary_manager_review_tools_contract_observed_on_real_host — integration tier not enabled
+runner: post-exit group verification/reclamation: pid=1576045; elapsedMs=10.506; accepted=true
+runner: 68 test(s), 4.8s of test time; max 322ms, p90 125ms, median 95ms
+runner:     322ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_holds_the_capture_gate_and_the_shared_predictor_query
+runner:     295ms  WHAT[host-boundary-032] C01_tool_definition_decorates_four_dedicated_tools_with_contract_enum
+runner:     232ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session
+runner:     183ms  WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query
+runner:     177ms  WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_an_in_flight_source_batch
+
+runner: 61 passed, 5 failed; 4/4 planned file(s) completed
+EXIT=1

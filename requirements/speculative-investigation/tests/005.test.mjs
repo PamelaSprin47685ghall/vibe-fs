@@ -321,27 +321,23 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_candidate_refuses_wrong_t
 const assert = (await import('node:assert/strict')).default
 const Strength = await import('../../../dist/Strength/Surface.js')
 
-test('WHAT[speculative-investigation-005] frame cap counts complete canonical UTF-8 material and rejects the whole bundle below its exact boundary', () => {
+test('WHAT[speculative-investigation-005] frame counts complete canonical UTF-8 material without delegate byte ceiling', () => {
   for (const result of ['ASCII', '中文', '😀', '\uD800']) {
     const batches = [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{}', canonicalResult: result }] }]
     let canonical
     const digest = text => { canonical = text; return 'recorded-digest' }
-    const built = Strength.frameTryBuild(digest, 65536, batches)
+    const built = Strength.frameTryBuild(digest, batches)
     assert.equal(built.ok, true)
     const expectedBytes = Buffer.byteLength(canonical, 'utf8')
     assert.equal(built.value.byteLength, expectedBytes)
     assert.ok(expectedBytes > Buffer.byteLength(result, 'utf8'))
-    assert.equal(Strength.frameTryBuild(digest, expectedBytes, batches).ok, true)
-    const rejected = Strength.frameTryBuild(digest, expectedBytes - 1, batches)
-    assert.equal(rejected.ok, false)
-    assert.equal(rejected.error, 'ByteLimitExceeded')
   }
 })
 
 test('WHAT[speculative-investigation-005] request ordinals must be contiguous and every owner identity component changes the derived call identity', () => {
   const exchange = { toolName: 'read', canonicalArguments: '{}', canonicalResult: 'x' }
   for (const ordinals of [[0], [2], [1, 1], [1, 3]]) {
-    assert.equal(Strength.frameTryBuild(text => text, 65536, ordinals.map(requestOrdinal => ({ requestOrdinal, exchanges: [exchange] }))).error, 'InvalidRequestOrdinal')
+    assert.equal(Strength.frameTryBuild(text => text, ordinals.map(requestOrdinal => ({ requestOrdinal, exchanges: [exchange] }))).error, 'InvalidRequestOrdinal')
   }
   const base = ['owner', 'decision', 1, 1, 'digest']
   const id = Strength.frameWireToolCallId(text => text, ...base)

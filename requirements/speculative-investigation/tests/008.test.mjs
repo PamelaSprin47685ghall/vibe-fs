@@ -422,7 +422,7 @@ test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_
 
     // R14: 镜像 ID 重定位后，tool call 的 arguments 保持不变
     const decodedTranscript = Adapter.decodeMessageView(written.value)
-    const toolCallPart = decodedTranscript.messages.flatMap((m) => m.parts).find((p) => p.kind === 'tool-call')
+    const toolCallPart = decodedTranscript.messages.flatMap((m) => m.parts).find((p) => p.kind === 'ToolCall' || p.kind === 'tool-call')
     assert.ok(toolCallPart, 'Replayed transcript must contain replayed tool-call part')
     const replayedCallArgs = JSON.parse(toolCallPart.args)
     assert.equal(replayedCallArgs.estimated_readonly_rounds, 3)

@@ -105,6 +105,29 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_process_fuse_is_first_fai
   assert.equal(Strength.scopeFuseReason(scope), 'projection-conflict')
   Strength.scopeDispose(scope)
 })
+test('WHAT[speculative-investigation-011] STRENGTH_011_ordinary_argument_errors_never_trip_process_fuse_unlike_invariant_failures', async () => {
+  const Contract = await import("../../../dist/Investigation/InvestigationEstimateContract.js");
+  const scope = Strength.scopeCreate()
+  assert.equal(Strength.scopeFuseReason(scope), null)
+
+  const badArgs = [
+    { estimated_readonly_rounds: -1 },
+    { estimated_readonly_rounds: '2' },
+    { estimated_readonly_rounds: 3 },
+    { estimated_readonly_rounds: 3, self_note: '   ' },
+    { estimated_readonly_rounds: 0, self_note: 'note' },
+    { estimated_readonly_rounds: 2, self_note: 'ok', delegate_readonly_rounds: 2 },
+  ]
+  for (const args of badArgs) {
+    const parsed = Contract.parseParticipatingArguments(args)
+    assert.equal(parsed.tag, 1, 'must be rejected as argument error')
+    assert.equal(Strength.scopeFuseReason(scope), null, 'ordinary argument error must never trip the process fuse')
+  }
+
+  Strength.scopeTripFuse(scope, 'projection-conflict')
+  assert.equal(Strength.scopeFuseReason(scope), 'projection-conflict', 'invariant violation trips the fuse')
+  Strength.scopeDispose(scope)
+})
 test('WHAT[speculative-investigation-011] STRENGTH_011_scope_dispose_drops_process_local_caches_but_never_untrips_the_fuse', () => {
   const scope = Strength.scopeCreate()
   const binding = Strength.runtimeBinding('owner-d', 'replica-d', 'dec-d', 'run-dec-d', 'Engineer', 1, 'sem-d', [])

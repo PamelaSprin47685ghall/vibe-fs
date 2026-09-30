@@ -1593,7 +1593,7 @@ test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stab
 
     await hooks['tool.execute.before'](
       { tool, sessionID, callID },
-      { args: { path: 'src/App.fs', contract: 'js-manager-contract-v1' } },
+      { args: { path: 'src/App.fs', contract: 'js-manager-contract-v1', estimated_readonly_rounds: 0 } },
     )
 
     const transformed = {
@@ -1626,7 +1626,7 @@ test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stab
     )
     assert.deepEqual(
       Object.keys(transformed.messages[0].parts[0].state.input),
-      ['path', 'contract'],
+      ['path', 'contract', 'estimated_readonly_rounds'],
       'business keys must keep their order before the appended protocol key',
     )
   })
@@ -1833,16 +1833,16 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
       readBeforeOutput,
     )
 
-    // 若 read 仅携带 contract 而没有任何只读估计字段，sanitizeSnapshot 将三项全部清洗为 None，commitRecordedSnapshot 直接跳过，完全不入 vault
+    // 若非参与工具（如 join）仅携带 contract 而没有任何只读估计字段，sanitizeSnapshot 将三项全部清洗为 None，commitRecordedSnapshot 直接跳过，完全不入 vault
     const readOnlyContractCallID = 'call-c40-read-only-contract'
     const readOnlyContractOutput = {
       args: {
-        path: 'src/Lib.fs',
+        taskID: 'task-c40-1',
         contract: 'unexpected-contract-only',
       },
     }
     await hooks['tool.execute.before'](
-      { tool: 'read', sessionID, callID: readOnlyContractCallID },
+      { tool: 'join', sessionID, callID: readOnlyContractCallID },
       readOnlyContractOutput,
     )
 
@@ -1880,9 +1880,9 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
             },
             {
               type: 'tool',
-              tool: 'read',
+              tool: 'join',
               callID: readOnlyContractCallID,
-              state: { status: 'completed', input: { path: 'src/Lib.fs' }, output: 'ok' },
+              state: { status: 'completed', input: { taskID: 'task-c40-1' }, output: 'ok' },
             },
             {
               type: 'tool',
@@ -1918,7 +1918,7 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
     assert.equal(
       restoredReadOnlyContract.contract,
       undefined,
-      'read tool carrying only contract must have empty vault entry and never restore contract',
+      'non-participating tool carrying only contract must have empty vault entry and never restore contract',
     )
 
     const restoredNonParticipating = transformed.messages[0].parts[2].state.input
