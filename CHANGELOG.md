@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — todowrite 列表的 provider 名与 Host 名分离
+
+- **`todowrite` 的列表在 provider 面叫 `obligations`，executor 面仍是 `todos`（action-affordance-015 / obligation-ledger-001/002）**：`TodoWriteCompressionContract` 现在把发布 schema 里的 `todos` 属性（含其数组 items 与 `required`）原地换名为必填 `obligations`，`tool.execute.before` 再把该字段换回 `todos` 后交给原生 Effect schema，`tool.execute.after` 删除 `todos` 并恢复 `obligations`。换名与隐藏全程在参数对象内部以属性描述符完成（`obligations` 删除、`todos` 以同一描述符定义、原描述符存入私有 Symbol），因此 executor 收到的是同一个数组对象而非副本，provider wire 历史仍携带模型实际提交的字段名。同名同调（同时携带 `obligations` 与 `todos`）明确拒绝。
+- 依据：上游 `packages/opencode/src/tool/todo.ts` 的 `Parameters = Schema.Struct({ todos: ... })` 不变，插件不动宿主 schema；`Effect Struct` 只读入参自有属性，故 before 期把 `todos` 定义为参数自有属性后上游 `Schema.decodeUnknownSync` 可正常解出（已用 throwaway smoke 验证）。
+- 验证：`action-affordance-014`、`obligation-ledger-001/002`、`effect-accounting-008`、`context-compression-020`、`prefix-stability-009`、`host-boundary-032`（44 用例）全绿；`node scripts/build.mjs` 与 `npm run check` 对本次改动无新增问题。
+
 ## Unreleased — Pair Programming 指引七条纪律真理版本
 
 - `resources/provider/host/pair-programming-guideline/zh-CN.md` 重写为七条编号纪律（使用中文、小步快跑、不要吝賂、进度更新、极高并发、超越常识、善于内省）；`en.md` 按该真理版本忠实重写，语言纪律按绑定语言镜像（英文版要求全程英文）。cognitive-environment WHAT 013/016 与 tests/013、016 锚点同步：`ready frontier` 改为就绪前沿、`先抽象，再笃定` 改为分析与抽象后钉住反常识判断，并新增 en 版七条纪律结构断言。

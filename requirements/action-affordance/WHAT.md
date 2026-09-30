@@ -68,3 +68,9 @@
 `assume` 只接受必填 `assumption: string`，表示调用方已经完成抽象、接下来将据此行动的当前判断。它不求证、不持久化工作记忆、不维护画板、不写待办、不触发上下文压缩，也不授予任何权限。
 
 成功返回固定的笃定提示，不回显 `assumption`，避免把同一句判断再塞回上下文。描述保留“先抽象→笃定→执行→验证；只有新增证据才重开判断”的纪律，但不得把该纪律扩张成持久记忆或事实证明。
+
+## [015] todowrite 的列表在 provider 面叫 obligations
+
+原生 `todowrite` 仍由 Host executor 物理执行，其待办行 schema 与语义不变（见 obligation-ledger）。provider 面把这个工作列表发布为必填 `obligations`，与必填 `retainCheckpoints` 并列；模型只读写 `obligations`。
+
+插件在 `tool.execute.before` 把该字段换名为 Host 的 `todos` 后交给 executor，换名以同一个数组对象完成，不复制、不改写行内容；换名与隐藏保留在参数对象内部完成，不经由可序列化的中间产物，以保证 after 能原样恢复 provider 形状。`tool.execute.after` 删除 `todos` 并恢复 `obligations`，使 provider wire 历史继续携带模型实际提交的字段名。同一个调用同时携带两个字段名必须被明确拒绝，不得静默二选一。

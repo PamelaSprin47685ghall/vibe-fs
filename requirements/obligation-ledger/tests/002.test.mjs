@@ -18,12 +18,13 @@ integrationTest('WHAT[obligation-ledger-002] empty and duplicate native todo lis
 
     for (let index = 0; index < examples.length; index += 1) {
       const todos = examples[index]
-      const args = { todos, retainCheckpoints: 1 }
+      const args = { obligations: todos, retainCheckpoints: 1 }
       await hooks['tool.execute.before'](
         { tool: 'todowrite', sessionID, callID: 'todo-native-' + index },
         { args },
       )
-      assert.equal(args.todos, todos)
+      assert.equal(args.todos, todos, 'the executor receives the same array object')
+      assert.equal('obligations' in args, false)
       assert.deepEqual(args.todos, todos)
     }
   })

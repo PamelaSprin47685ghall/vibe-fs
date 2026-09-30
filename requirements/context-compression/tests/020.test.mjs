@@ -11,7 +11,7 @@ test('WHAT[context-compression-020] todowrite has no permanent raw-history exemp
   const raw = [
     {
       info: { id: 'todo-call', role: 'assistant' },
-      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-1', args: { todos: [], retainCheckpoints: 1 } }],
+      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-1', args: { obligations: [], retainCheckpoints: 1 } }],
     },
     {
       info: { id: 'todo-result', role: 'tool' },

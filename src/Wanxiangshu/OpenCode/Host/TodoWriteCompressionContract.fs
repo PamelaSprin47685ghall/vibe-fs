@@ -6,11 +6,13 @@ open Fable.Core.JsInterop
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
-/// Provider-only compression control for the Host-native todowrite tool.
+/// Provider-only control for the Host-native todowrite tool.
 ///
-/// The Host remains the physical todo executor. This contract only decorates
-/// the provider-visible schema, captures retainCheckpoints at the hook boundary,
-/// and hides that protocol field before the native Effect schema decodes args.
+/// The Host remains the physical todo executor. The plugin owns three provider
+/// concerns and nothing else: it publishes the work list under `obligations`
+/// instead of the Host's `todos`, captures retainCheckpoints at the hook
+/// boundary, and hides both the provider name and the protocol field before the
+/// native Effect schema decodes args.
 module TodoWriteCompressionContract =
 
     [<RequireQualifiedAccess>]
@@ -21,10 +23,22 @@ module TodoWriteCompressionContract =
         [<Literal>]
         let RetainCheckpoints = "tool/todowrite/arg-retain-checkpoints"
 
+    /// The Host publishes the list under the Host-native name `todos`.
+    [<Literal>]
+    let private hostListField = "todos"
+
+    /// The provider-visible name for that same list. The model reads and writes
+    /// `obligations`; the plugin translates it back to `todos` before the native
+    /// Effect schema decodes the arguments.
+    [<Literal>]
+    let private providerListField = "obligations"
+
     [<Literal>]
     let private field = "retainCheckpoints"
 
     let private savedArgsKey: obj = emitJsExpr () "Symbol('todowrite-compression-args')"
+
+    let private savedListKey: obj = emitJsExpr () "Symbol('todowrite-list-args')"
 
     [<Emit("typeof $0 === 'object' && $0 !== null && !Array.isArray($0)")>]
     let private isPlainObject (value: obj) : bool = jsNative
@@ -116,15 +130,75 @@ module TodoWriteCompressionContract =
         else
             hideDescriptor args retain (getOwnPropertyDescriptor args (box field))
 
-    let captureAndHide (args: obj) : Result<int, string> =
-        capturedOrVisible args |> Result.bind (hideCaptured args)
+    /// Publish the list under the Host name and stop publishing the provider
+    /// name: the exact array is defined under the Host name, then the provider
+    /// name is deleted. Keeping the published array reference identical is what
+    /// makes the rename safe to undo in the after hook.
+    let private renameToHostList (args: obj) : Result<unit, string> =
+        let descriptor = getOwnPropertyDescriptor args providerListField
 
-    let restore (args: obj) : unit =
+        defineProperty
+            args
+            savedListKey
+            (createObj [ "value", descriptor; "enumerable", box false; "configurable", box true ])
+
+        defineProperty args hostListField descriptor
+
+        if deleteProperty args providerListField then
+            Ok()
+        else
+            deleteProperty args hostListField |> ignore
+            deleteProperty args savedListKey |> ignore
+            Error "todowrite.obligations could not be hidden from the native executor"
+
+    let private captureAndHideList (args: obj) : Result<unit, string> =
+        if isNull args || not (isPlainObject args) || not (hasOwn args providerListField) then
+            Ok()
+        else
+            renameToHostList args
+
+    /// The provider list name and the Host list name must be one array, not two
+    /// copies that can drift. A call that carries the Host name as well is a
+    /// conflict rather than a silently preferred side.
+    let private requireSingleListName (args: obj) : Result<unit, string> =
+        if
+            not (isNull args)
+            && isPlainObject args
+            && hasOwn args providerListField
+            && hasOwn args hostListField
+        then
+            Error(sprintf "tool arguments carry both %s and %s" providerListField hostListField)
+        else
+            Ok()
+
+    let captureAndHide (args: obj) : Result<int, string> =
+        requireSingleListName args
+        |> Result.bind (fun () -> captureAndHideList args)
+        |> Result.bind (fun () -> capturedOrVisible args)
+        |> Result.bind (hideCaptured args)
+
+    /// after: the Host name disappears and the provider name is enumerable
+    /// again, which is the state the provider-facing history persists.
+    let private reinstallHeldList (args: obj) (holder: obj) : unit =
+        if not (isNull holder) then
+            deleteProperty args hostListField |> ignore
+            defineProperty args providerListField holder?value
+            deleteProperty args savedListKey |> ignore
+
+    let private restoreList (args: obj) : unit =
+        if not (isNull args) && isPlainObject args then
+            reinstallHeldList args (getOwnPropertyDescriptor args savedListKey)
+
+    let private restoreRetain (args: obj) : unit =
         let descriptor = savedDescriptor args
 
         if not (isNull descriptor) then
             defineProperty args (box field) descriptor
             deleteProperty args savedArgsKey |> ignore
+
+    let restore (args: obj) : unit =
+        restoreList args
+        restoreRetain args
 
     let private integerProperty language =
         createObj
@@ -148,14 +222,41 @@ module TodoWriteCompressionContract =
         && (let description = string value?description
 
             description = ProviderProse.render ProviderLanguage.English Path.RetainCheckpoints Map.empty
-            || description
-               = ProviderProse.render ProviderLanguage.SimplifiedChinese Path.RetainCheckpoints Map.empty)
+            || description = ProviderProse.render ProviderLanguage.SimplifiedChinese Path.RetainCheckpoints Map.empty)
 
     let private appendRequired (required: obj array) =
         if required |> Array.exists (fun item -> string item = field) then
             required
         else
             Array.append required [| box field |]
+
+    let private renameRequiredListField (required: obj array) =
+        required
+        |> Array.map (fun item ->
+            if string item = hostListField then
+                providerListField
+            else
+                string item)
+
+    /// The published schema keeps the Host array schema in every respect; only
+    /// the key it is filed under changes, so the model reads `obligations` while
+    /// the argument the executor decodes still carries `todos`. The rename is
+    /// applied in place, so a repeated decoration is a no-op instead of a
+    /// conflict, and the `required` list is renamed with it.
+    let private renameSchemaListField toolId (schema: obj) =
+        let properties = schema?properties
+        let existing = properties?(hostListField)
+
+        if not (isNull existing) then
+            properties?(providerListField) <- existing
+            deleteProperty properties hostListField |> ignore
+        elif isNull (properties?(providerListField)) then
+            raise (InvalidOperationException(sprintf "Tool %s schema has no %s property" toolId hostListField))
+
+        let required = schema?required
+
+        if isArray required then
+            schema?required <- box (unbox<obj array> required |> renameRequiredListField)
 
     let private decorateRootSchema language toolId (schema: obj) =
         if isNull schema || not (isPlainObject schema) then
@@ -165,6 +266,8 @@ module TodoWriteCompressionContract =
 
         if isNull properties || not (isPlainObject properties) then
             raise (InvalidOperationException(sprintf "Tool %s schema has no object properties" toolId))
+
+        renameSchemaListField toolId schema
 
         let existing = properties?(field)
 
@@ -215,6 +318,7 @@ module TodoWriteCompressionContract =
             raise (InvalidOperationException(sprintf "Tool %s parameters schema is not available" toolId))
 
         toolOutput?description <- box (ProviderProse.render language Path.Description Map.empty)
+
 
     let decorateDefinition (toolInput: obj) (toolOutput: obj) : unit =
         if

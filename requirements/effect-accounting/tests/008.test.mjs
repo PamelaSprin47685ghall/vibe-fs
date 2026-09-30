@@ -12,7 +12,7 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
 
     const beforeOutput = {
       args: {
-        todos: [{ content: 'verify effect boundary', status: 'in_progress', priority: 'high' }],
+        obligations: [{ content: 'verify effect boundary', status: 'in_progress', priority: 'high' }],
         retainCheckpoints: 2,
       },
     }
@@ -61,7 +61,7 @@ integrationTest('WHAT[effect-accounting-008] todowrite executor failure restores
 
     const beforeOutput = {
       args: {
-        todos: [{ content: 'this native write fails', status: 'in_progress', priority: 'high' }],
+        obligations: [{ content: 'this native write fails', status: 'in_progress', priority: 'high' }],
         retainCheckpoints: 1,
       },
     }

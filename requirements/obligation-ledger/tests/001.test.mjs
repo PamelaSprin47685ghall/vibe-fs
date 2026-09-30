@@ -12,12 +12,13 @@ integrationTest('WHAT[obligation-ledger-001] plugin strips only retainCheckpoint
     const sessionID = 'obligation-native-rows'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     const todos = structuredClone(rows)
-    const args = { todos, retainCheckpoints: 2 }
+    const args = { obligations: todos, retainCheckpoints: 2 }
 
     await hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID: 'todo-native-1' }, { args })
 
     assert.equal('retainCheckpoints' in args, false)
-    assert.equal(args.todos, todos, 'the plugin must preserve the exact native todos array object')
+    assert.equal('obligations' in args, false, 'the provider name is hidden from the executor')
+    assert.equal(args.todos, todos, 'the executor receives the exact same array object, not a copy')
     assert.deepEqual(args.todos, rows)
   })
 })
@@ -30,9 +31,10 @@ integrationTest('WHAT[obligation-ledger-001] provider schema adds no retired pla
     }
     await hooks['tool.definition']({ toolID: 'todowrite' }, output)
     const schema = output.jsonSchema ?? output.parameters
-    assert.ok(schema.properties.todos)
+    assert.ok(schema.properties.obligations, 'the published list field is obligations')
     assert.ok(schema.properties.retainCheckpoints)
-    for (const retired of ['planComplete', 'workingOn', 'obligations', 'horizon', 'revision']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(schema.properties, 'todos'), false)
+    for (const retired of ['planComplete', 'workingOn', 'horizon', 'revision']) {
       assert.equal(Object.prototype.hasOwnProperty.call(schema.properties, retired), false)
     }
   })
