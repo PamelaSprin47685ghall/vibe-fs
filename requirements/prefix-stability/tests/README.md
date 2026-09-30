@@ -2,7 +2,7 @@
 
 WHAT 定义 byte identity、冷边界与呈现协议，本文只界定测试证据。
 
-2026-09-28 上游适配：冷边界的原 TodoCheckpoint lag-1 已由 context-compression-028/029 的 Assume 阶段窗口替代；WHAT 引用该所有者，不在本包重写 K 公式或将首次 Assume 等同于 Opening 终点。009 保留上游按 stable Host identity 保护当前 Assume call/result 的实际写回用例。
+2026-09-28 上游适配：冷边界由 context-compression-028/029 的 native todowrite checkpoint 窗口拥有；WHAT 引用该所有者，不在本包重写 K 公式。009 负责 stable Host identity 写回：普通 covered assistant/tool 历史可被 LWR 替换，真实 user message 与 assume call/result 按 context-compression-017/030 原文穿透。
 
 - 001 保留实际委托复用、guidance 连续注入和前缀判别性质。委托组中的 wire 是测试重建，已改名并单列真实 transport 采集 TODO。正反例覆盖历史各语义部分的变更。
 - 002—006 检查实际 epoch/候选纯规则、同一 snapshot 渲染、rebase successor 与重复重锚。003 没有候选不等于一次真实失败；005 拒绝重放也不等于证明下一 attempt seal 前的提交顺序。缺失的 durable 流程分别留 TODO。

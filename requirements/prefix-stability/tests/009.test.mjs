@@ -10,7 +10,7 @@ const textMessage = (id, role, text) => ({
   parts: [{ type: 'text', text }],
 })
 
-test('WHAT[prefix-stability-009] prefix replacement removes covered history by stable Host identity', () => {
+test('WHAT[prefix-stability-009] prefix replacement removes ordinary covered history but preserves covered user messages by stable Host identity', () => {
   const raw = [
     textMessage('covered-u', 'user', 'old user'),
     textMessage('request-local', 'assistant', 'request-local presentation only'),
@@ -26,9 +26,10 @@ test('WHAT[prefix-stability-009] prefix replacement removes covered history by s
     'compressed canonical X',
   )
 
-  assert.deepEqual(projected.map(item => item.info.id), ['y-prefix', 'request-local', 'live-u'])
-  assert.equal(projected[1], raw[1], 'request-local presentation must survive as the same Host object')
-  assert.equal(projected[2], raw[3], 'live history must survive as the same Host object')
+  assert.deepEqual(projected.map(item => item.info.id), ['y-prefix', 'covered-u', 'request-local', 'live-u'])
+  assert.equal(projected[1], raw[0], 'covered user history must survive as the same Host object')
+  assert.equal(projected[2], raw[1], 'request-local presentation must survive as the same Host object')
+  assert.equal(projected[3], raw[3], 'live history must survive as the same Host object')
 })
 test('WHAT[prefix-stability-009] stable identity replacement grants no per-tool raw-history exemption', () => {
   const raw = [
