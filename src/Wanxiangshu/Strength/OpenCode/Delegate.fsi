@@ -41,6 +41,20 @@ module StrengthDelegate =
     /// legal ordinary continuation's target and mirror, run the replica through
     /// its prepared stages with DelegationBound persisted in between, publish
     /// Prepared, and render the candidate after publication succeeds.
+    /// Capture and start in ONE call at the end of the transform: freezes the
+    /// authorization and starts the replica with the final outgoing request as
+    /// mirror, eliminating the cross-request pending hand-off.
+    val tryCaptureAndStart:
+        snapshotPort: ISessionSnapshotPort option ->
+        journal: AgentJournal option ->
+        strengthDurability: StrengthDurabilityPort option ->
+        strengthScope: PluginStrengthScope ->
+        tryAttemptPlan: (SessionId -> ProviderRunIdentity -> AttemptPlan option) ->
+        syncDelegateRuntime: SyncDelegateRuntime option ->
+        predictorConfigured: bool ->
+        output: obj ->
+            Task<unit>
+
     val tryApply:
         snapshotPort: ISessionSnapshotPort option ->
         journal: AgentJournal option ->

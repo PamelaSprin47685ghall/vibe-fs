@@ -28,9 +28,24 @@ module EnforcerCycle =
         |> String.concat " "
 
     let private renderStructured (record: ChronicleRecord) =
-        [ record.Charge; record.Occurrence; record.Settlement; record.Consequence ]
-        |> List.map oneLine
-        |> String.concat " "
+        let prose =
+            [ record.Charge; record.Occurrence; record.Settlement; record.Consequence ]
+            |> List.map oneLine
+            |> String.concat " "
+
+        let inlineEvidence (evidence: string) =
+            evidence
+                .Replace("\\", "\\\\")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n")
+                .Replace("\t", "\\t")
+                .Replace("\u0085", "\\u0085")
+                .Replace("\u2028", "\\u2028")
+                .Replace("\u2029", "\\u2029")
+
+        match record.Evidence with
+        | Some evidence -> prose + " [" + inlineEvidence evidence + "]"
+        | None -> prose
 
     let ofCall (call: CanonicalBlogCall) : CanonicalCycle =
         match call.Content with
@@ -38,10 +53,10 @@ module EnforcerCycle =
             { MergedText = renderStructured record
               CanonicalTip = call.Tip
               MergedEvidence = "" }
-        | ChronicleContent.Legacy(text, evidence) ->
+        | ChronicleContent.Legacy(text, _) ->
             { MergedText = text
               CanonicalTip = call.Tip
-              MergedEvidence = evidence |> Option.defaultValue "" }
+              MergedEvidence = "" }
 
     let isValidCycle (cycle: CanonicalCycle) : bool = cycle.MergedText.Trim().Length > 0
 

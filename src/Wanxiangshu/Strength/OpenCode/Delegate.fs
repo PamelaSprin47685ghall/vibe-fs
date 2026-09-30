@@ -1180,9 +1180,17 @@ module StrengthDelegate =
         match StrengthProjection.tryDecisionForTarget target durable with
         | None -> SurfaceApplication.StartPending
         | Some decisionId ->
-            StrengthProjection.tryCandidate decisionId durable
-            |> Option.map SurfaceApplication.ConsumeBound
-            |> Option.defaultValue SurfaceApplication.Skip
+            match StrengthProjection.tryCandidate decisionId durable with
+            | Some candidate -> SurfaceApplication.ConsumeBound candidate
+            // A decision is already bound to THIS target but has produced no
+            // candidate yet. That is the state of every decision captured moments
+            // ago in this same transform: its target is this request's target, so
+            // the target lookup short-circuits before the pending scan can ever see
+            // it. Answering Skip here is what stranded captured-but-unstarted
+            // decisions across requests; answering StartPending lets the start run
+            // in the same request that captured it, which is also where its mirror
+            // is the request actually being sent.
+            | None -> SurfaceApplication.StartPending
 
     let private planSurfaceApplication (surface: OwnerSurface) : SurfaceApplication =
         if surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
@@ -1215,6 +1223,47 @@ module StrengthDelegate =
             match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
             | Error _ -> return ()
             | Ok surface -> return! applyOnSurface strengthScope predictorConfigured surface
+        }
+
+    /// Capture and start in ONE step at the end of the transform.
+    ///
+    /// The authorization metadata is frozen from the completed source batch of
+    /// the tail assistant message; the start runs immediately in the same call,
+    /// so the mirror is the FINAL outgoing request (post-sanitization) and no
+    /// decision is ever left pending across requests.
+    let tryCaptureAndStart
+        (snapshotPort: ISessionSnapshotPort option)
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (strengthScope: PluginStrengthScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
+        (predictorConfigured: bool)
+        (output: obj)
+        : Task<unit> =
+        task {
+            let! captured =
+                tryCapture
+                    snapshotPort
+                    journal
+                    strengthDurability
+                    strengthScope
+                    tryAttemptPlan
+                    syncDelegateRuntime
+                    predictorConfigured
+                    output
+
+            match captured with
+            | CaptureOutcome.Skipped _ -> return ()
+            | CaptureOutcome.Captured request ->
+                match! tryBind journal snapshotPort strengthDurability strengthScope output with
+                | Error _ -> return ()
+                | Ok bound ->
+                    let! durableStrength = loadDurableProjectionOrThrow (fst bound) strengthScope "start"
+                    match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
+                    | Error _ -> return ()
+                    | Ok surface ->
+                        return! startRequest strengthScope predictorConfigured surface request
         }
 
     let tryApply

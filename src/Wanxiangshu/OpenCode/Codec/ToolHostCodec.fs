@@ -346,7 +346,7 @@ module ToolHostCodec =
     [<Emit("$0.schema.string().optional()")>]
     let private rawOptionalStringSchema (tool: obj) : obj = jsNative
 
-    [<Emit("$0.schema.string().describe($1).optional()")>]
+    [<Emit("$0.schema.string().optional().describe($1)")>]
     let private rawOptionalStringSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.number().optional()")>]

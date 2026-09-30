@@ -1,1 +1,2 @@
-One complete sentence explaining why this turn had to exist: the concrete uncertainty that needed resolution or the concrete world-state change that had to be achieved. Write a specific question or required change, not a topic label or generic task title.
+One sharp, self-contained sentence naming the exact proposition that is not yet safe to believe or the exact state that must change. Name the entity, interface, or invariant directly; do not say merely that something needs investigation, clarification, or confirmation.
+Phrase it as a proposition that can be proved false/true or as a concrete invariant gap, not as a diary-style statement of what this turn intends to do.
