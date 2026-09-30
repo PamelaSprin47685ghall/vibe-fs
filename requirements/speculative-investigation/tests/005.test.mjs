@@ -31,6 +31,32 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only
   assert.equal(empty.ok, false)
   assert.equal(empty.error, 'EmptyBatch')
 })
+test('WHAT[speculative-investigation-005] host_completed_tool_part_message_builds_a_frame_instead_of_orphan_failure', async () => {
+  // The real Host session shape: ONE assistant message whose parts are a
+  // completed `tool` part beside non-tool parts. ProviderWireDecode decodes such
+  // a part as a result only, so the message reaches the adapter with results and
+  // no preceding call batch. It must become a built exchange, not a retire.
+  const { default: crypto } = await import('node:crypto')
+  const h = (text) => `H(${text})`
+  const Transform = await import('../../../dist/Strength/Surface.js')
+  const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex')
+  const runtime = Transform.runtimeCreate()
+  assert.equal(Transform.runtimeRegister(runtime, Transform.runtimeBinding('owner', 'replica', 'dec', 'run', 'devops', 2, 'sd', [])).ok, true)
+  const messages = [{
+    info: { role: 'assistant', id: 'msg_src', sessionID: 'replica' },
+    parts: [
+      { type: 'step-start' },
+      { type: 'reasoning', text: 'r' },
+      { type: 'tool', callID: 'call_1', tool: 'glob', state: { status: 'completed', input: { pattern: 'x' }, output: 'found 12' } },
+      { type: 'step-finish' },
+    ],
+  }]
+  const out = await Transform.transformApply(sha256, runtime, { messages }, true)
+  assert.equal(out.kind, 'Ready', `expected a built frame, got ${out.kind} ${out.reason ?? ''}`)
+  assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['glob'])
+  assert.equal(out.batches[0].exchanges[0].canonicalResult, 'found 12')
+})
+
 test('WHAT[speculative-investigation-005] repeated frame construction and owner wire ID derivation are deterministic', () => {
   const batches = [batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])]
   const first = Strength.frameTryBuild(H, batches).value

@@ -124,6 +124,58 @@ module StrengthReplicaTransform =
         | None -> Error "Strength Host adapter found tool results without a preceding call batch"
         | Some batch -> Ok batch
 
+    /// The Host session-shaped encoding: ONE assistant message whose parts are
+    /// completed `tool` parts. `ProviderWireDecode` decodes such a part as a
+    /// `WireToolResult` only, so the message reaches this adapter with results and
+    /// no preceding call batch -- exactly how the owner's own transcript looks.
+    /// Such a message is a self-contained completed exchange: the part already
+    /// carries the call identity, and the result is the only evidence that exists.
+    /// Emitting it verbatim keeps the replica's material byte-identical to what the
+    /// Host really recorded. A result with no pending batch on any OTHER message
+    /// shape is still an orphan and stays rejected.
+    let private isHostCompletedToolMessage
+        (message: ProviderProjection.WireMessage)
+        (results: (ToolCallId * string) list)
+        =
+        // Reachable only for a calls-free message carrying results. A Host
+        // session-shaped completed part legitimately sits beside reasoning/text
+        // parts, so any non-empty result set on such a message is the completed
+        // form rather than an orphan.
+        not (List.isEmpty results)
+
+    let private emitHostCompletedExchange
+        (sessionId: string)
+        (sha256: string -> string)
+        (index: int)
+        (message: ProviderProjection.WireMessage)
+        (hostId: string option)
+        (results: (ToolCallId * string) list)
+        : Result<obj, string> =
+        let nonToolParts =
+            message.Parts
+            |> List.filter (function
+                | ProviderProjection.WireToolResult _ -> false
+                | _ -> true)
+
+        match ProjectionMessageEdit.HostWireEncoding.tryEncodeNonToolParts nonToolParts with
+        | Error error -> Error error
+        | Ok encoded ->
+            let completed =
+                results
+                |> List.map (fun (callId, result) ->
+                    ProjectionMessageEdit.HostWireEncoding.completedToolPart callId "" "{}" result)
+
+            Ok(
+                ProjectionMessageEdit.HostWireEncoding.rawMessage
+                    sessionId
+                    sha256
+                    index
+                    message
+                    hostId
+                    "assistant"
+                    (encoded @ completed)
+            )
+
     let private finishResultBatch
         (sessionId: string)
         (sha256: string -> string)
@@ -205,8 +257,18 @@ module StrengthReplicaTransform =
             startCallBatch pendingBatch message index hostId calls
             |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
         | true, false ->
-            finishResultBatch sessionId sha256 pendingBatch message results
-            |> Result.bind (fun raw -> loop tail None (raw :: acc))
+            match pendingBatch with
+            | Some _ ->
+                finishResultBatch sessionId sha256 pendingBatch message results
+                |> Result.bind (fun raw -> loop tail None (raw :: acc))
+            | None ->
+                // Self-contained Host session-shaped completed tool message.
+                if isHostCompletedToolMessage message results then
+                    emitHostCompletedExchange sessionId sha256 index message hostId results
+                    |> Result.bind (fun raw -> loop tail None (raw :: acc))
+                else
+                    finishResultBatch sessionId sha256 pendingBatch message results
+                    |> Result.bind (fun raw -> loop tail None (raw :: acc))
         | true, true ->
             emitRegularMessage sessionId sha256 pendingBatch index message hostId
             |> Result.bind (fun raw -> loop tail None (raw :: acc))
@@ -382,6 +444,14 @@ module StrengthReplicaTransform =
         (batches: StrengthRequestBatch list)
         : Task<StrengthReplicaTransformOutcome> =
         task {
+            // The retire reason is the only place a replica's early end is
+            // explained; without it an aborted child is indistinguishable from a
+            // crash. Emit it before the abort so operators can diagnose the
+            // decision instead of guessing from raw Host cancellation lines.
+            Diagnostic.emit
+                "strength-replica-retired"
+                [ "replica_session_id", SessionId.value replicaSessionId; "result", reason ]
+
             // Physical identity remains live until the Host reports the child
             // terminal/deletion. This transform only closes semantic admission
             // and aborts before the unadmitted request can leave the process;

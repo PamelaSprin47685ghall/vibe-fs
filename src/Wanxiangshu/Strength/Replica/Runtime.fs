@@ -158,6 +158,10 @@ module private StrengthReplicaRuntimeLogic =
             match safeAcquire acquire replica modelRole with
             | Ok(Some model) -> return Ok(Some model)
             | Ok None ->
+                Diagnostic.emit
+                    "strength-replica-model-unavailable"
+                    [ "replica_session_id", SessionId.value replica; "result", modelRole ]
+
                 let! _ = sessions.AbortSession replica
                 return Error "model-capacity-unavailable"
             | Error ex ->
