@@ -106,7 +106,7 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_process_fuse_is_first_fai
   Strength.scopeDispose(scope)
 })
 test('WHAT[speculative-investigation-011] STRENGTH_011_ordinary_argument_errors_never_trip_process_fuse_unlike_invariant_failures', async () => {
-  const Contract = await import("../../../dist/Investigation/InvestigationEstimateContract.js");
+  const Contract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
   const scope = Strength.scopeCreate()
   assert.equal(Strength.scopeFuseReason(scope), null)
 

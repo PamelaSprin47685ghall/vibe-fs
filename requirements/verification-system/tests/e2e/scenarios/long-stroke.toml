@@ -303,9 +303,10 @@ flow = [
   # later provider requests.
   { custom = "assertDelegationMaterialOnWire" },
   # Configured-state protocol surface (DELEGATE 4.1/11.2, E5, G10), observed on
-  # the real provider wire: every visible tool carries the required budget and
-  # optional note plus the collaboration text; completed calls keep their
-  # original arguments in later histories; a note-less call is legal.
+  # the real provider wire: participating tools carry the required estimated_readonly_rounds and
+  # optional self_note plus the investigation outlook text; non-participating tools remain untouched
+  # with zero protocol increment; completed calls keep their original arguments in later histories;
+  # a note-less call is legal.
   { custom = "assertDelegationProtocolSurface" },
 
   # DELEGATE 9.2: this world configures the Predictor pool equal to the
@@ -1215,7 +1216,7 @@ optional = true
   respond = { type = "title", text = "Read-only Delegate Canary" }
 
 # Owner of the normal-complete + early-end + natural-truncation decision.
-# Step 0 carries the explicit budget (batch max) and the optional short note;
+# Step 0 carries the explicit estimated_readonly_rounds (batch max) and the optional self_note;
 # capture freezes DelegationRequested from this completed batch.
 [[turn]]
 id = "strength-canary-owner"
@@ -1287,7 +1288,7 @@ tools = ["js-manager"]
   [[turn.step]]
   respond = { type = "text", text = "Recovered delegation consumed; continuing the road." }
 
-# The recovery decision's companion: budget 1, so its bootstrap is the only
+# The recovery decision's companion: estimated_readonly_rounds 1, so its bootstrap is the only
 # admitted round and the N+1 outbound request is refused at the transform gate
 # before any physical send — exactly one delivery of this entry.
 [[turn]]

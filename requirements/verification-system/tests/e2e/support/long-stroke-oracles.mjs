@@ -1079,28 +1079,74 @@ const PARTICIPATING_TOOLS = new Set([
 
 const toolNameOfCall = (call) => call?.function?.name ?? call?.name ?? '';
 
-const budgetOfCall = (call) => {
+/**
+ * DELEGATE_REVISE §16.7 / §5.2: Extract the factual investigation estimate.
+ * Exclusively reads `arguments.estimated_readonly_rounds`.
+ * Legacy `arguments.delegate_readonly_rounds` is strictly rejected and never produces an estimate.
+ */
+const estimateOfCall = (call) => {
   const toolName = toolNameOfCall(call);
   if (!PARTICIPATING_TOOLS.has(toolName)) return null;
-  const args = call?.function?.arguments ?? call?.arguments;
-  if (typeof args !== 'string') return null;
-  try {
-    const value = JSON.parse(args)?.estimated_readonly_rounds;
-    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
-  } catch {
+  const rawArgs = call?.function?.arguments ?? call?.arguments;
+  if (!rawArgs) return null;
+  let parsed = null;
+  if (typeof rawArgs === 'string') {
+    try {
+      parsed = JSON.parse(rawArgs);
+    } catch {
+      return null;
+    }
+  } else if (typeof rawArgs === 'object') {
+    parsed = rawArgs;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  // Negative refusal: legacy field must not be read as budget and is rejected
+  if (Object.hasOwn(parsed, 'delegate_readonly_rounds')) {
     return null;
   }
+
+  const value = parsed.estimated_readonly_rounds;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 };
 
-const hasPositiveBudgetCall = (request) =>
-  (request?.messages ?? []).some(
-    (message) =>
-      Array.isArray(message?.tool_calls)
-      && message.tool_calls.some((call) => {
-        const budget = budgetOfCall(call);
-        return typeof budget === 'number' && budget > 0;
-      }),
+/**
+ * DELEGATE_REVISE §16.7: Authenticate owner provider requests by true origin identity.
+ * An authentic owner opportunity requires:
+ *   1. The session is not a Replica (replicas never mint owner opportunities; §11);
+ *   2. The request carries a positive estimated_readonly_rounds call in its active/latest
+ *      assistant tool turn, rather than merely inheriting ancient positive values from history.
+ */
+const isAuthenticOwnerPositiveEstimateRequest = (request, replicaIds = new Set()) => {
+  const sessionId = request?.sessionID ?? request?.sessionId;
+  if (!sessionId || replicaIds.has(sessionId)) return false;
+  const messages = Array.isArray(request?.messages) ? request.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message?.role === 'assistant' && Array.isArray(message?.tool_calls) && message.tool_calls.length > 0) {
+      return message.tool_calls.some((call) => {
+        const rounds = estimateOfCall(call);
+        return typeof rounds === 'number' && rounds > 0;
+      });
+    }
+  }
+  return false;
+};
+
+const delegatingOwnerSessions = (scenario) => {
+  const requests = scenario.provider.requests ?? [];
+  const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
+  const replicaIds = new Set(
+    bounds.map(payloadReplicaSessionId).filter((id) => typeof id === 'string' && id !== ''),
   );
+  const owners = new Set();
+  for (const request of requests) {
+    if (isAuthenticOwnerPositiveEstimateRequest(request, replicaIds)) {
+      owners.add(request?.sessionID ?? request?.sessionId);
+    }
+  }
+  return { owners, replicaIds };
+};
 
 /**
  * DELEGATE 9.2: bind every durable DelegationBound replica session to its own
@@ -1148,7 +1194,7 @@ export async function bindDelegationReplicas(scenario, ctx) {
   assert.deepEqual(
     counts,
     [1, 2],
-    `DELEGATE 14.5: replica chat request counts must be one budget-1 and one budget-2 decision, got ${JSON.stringify(counts)}`,
+    `DELEGATE 14.5: replica chat request counts must be one estimate-1 and one estimate-2 decision, got ${JSON.stringify(counts)}`,
   );
 
   chats.forEach(({ id }, index) => {
@@ -1168,10 +1214,7 @@ export async function bindDelegationReplicas(scenario, ctx) {
  */
 export async function assertDelegationMaterialOnWire(scenario) {
   const requests = scenario.provider.requests ?? [];
-  const ownerSessions = new Set();
-  for (const request of requests) {
-    if (hasPositiveBudgetCall(request)) ownerSessions.add(request?.sessionID ?? request?.sessionId);
-  }
+  const { owners: ownerSessions } = delegatingOwnerSessions(scenario);
   assert.ok(
     ownerSessions.size >= 2,
     `DELEGATE 14.5: expected two delegating owner sessions, got ${[...ownerSessions].length}`,
@@ -1192,8 +1235,8 @@ export async function assertDelegationMaterialOnWire(scenario) {
       `DELEGATE 14.5: owner ${ownerId} must receive the companion's real readonly result in a later provider request`,
     );
   }
-  // R6: bounded delivery. The canary owner walks three chat requests (budget
-  // call, injected continuation, successor); the recovery owner four (budget
+  // R6: bounded delivery. The canary owner walks three chat requests (investigation estimate
+  // call, injected continuation, successor); the recovery owner four (investigation estimate
   // call, faulted delivery, retried delivery, successor). An unbounded
   // redelivery loop after injection fails this equality.
   const ownerChatCounts = [...ownerSessions]
@@ -1221,7 +1264,7 @@ const providerOfModel = (model) =>
  *      single capacity token they share (the ledger is keyed by provider with
  *      exactly one token per provider; execution-model-routing 003 proves one
  *      acquire builds one ledger entry and one token);
- *   2. parent waits — the owner request that CARRIES the budget call reaches
+ *   2. parent waits — the owner request that CARRIES the investigation estimate call reaches
  *      the mock only AFTER every companion request has arrived, because the
  *      owner transform does not release its provider request until the
  *      companion window closed. An owner request inside the companion window
@@ -1247,10 +1290,7 @@ export async function assertDelegateCapacityOneParentWaits(scenario) {
     `DELEGATE 14.5: expected exactly two durable DelegationBound facts, got ${replicaIds.length}`,
   );
 
-  const ownerSessions = new Set();
-  for (const request of requests) {
-    if (hasPositiveBudgetCall(request)) ownerSessions.add(sessionOf(request));
-  }
+  const { owners: ownerSessions, replicaIds: replicaSet } = delegatingOwnerSessions(scenario);
   assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions');
 
   for (const replicaId of replicaIds) {
@@ -1291,15 +1331,15 @@ export async function assertDelegateCapacityOneParentWaits(scenario) {
       );
     }
 
-    // The delegating owner request — the one carrying the budget call — is
+    // The delegating owner request — the one carrying the investigation estimate call — is
     // released by the transform only after the companion window closed.
     for (const ownerId of ownerSessions) {
-      const budgetIndex = requests.findIndex(
-        (request) => sessionOf(request) === ownerId && hasPositiveBudgetCall(request),
+      const estimateIndex = requests.findIndex(
+        (request) => sessionOf(request) === ownerId && isAuthenticOwnerPositiveEstimateRequest(request, replicaSet),
       );
       assert.ok(
-        budgetIndex > last,
-        `DELEGATE 14.5: owner ${ownerId}'s delegating request (index ${budgetIndex}) must arrive after the companion window closes (last ${last})`,
+        estimateIndex > last,
+        `DELEGATE 14.5: owner ${ownerId}'s delegating request (index ${estimateIndex}) must arrive after the companion window closes (last ${last})`,
       );
     }
   }
@@ -1330,12 +1370,12 @@ const toolFunctionShape = (tool) => {
  *      rather than a guessed host naming scheme. Dynamically discovered tools
  *      after mcp.tools.changed are NOT covered — see the boundary note below.
  *      Long Stroke semantics are preserved without dilution: delegating owner
- *      identification checks both participating membership and positive budget,
+ *      identification checks both participating membership and positive investigation estimate,
  *      while per-tool assertions enforce strict protocol partitioning.
  *   2. wire history retention (E5) — a completed owner call appears in a LATER
- *      request's history with both original arguments (budget and note) intact,
+ *      request's history with both original arguments (estimated_readonly_rounds and self_note) intact,
  *      so the persisted record was never stripped or rewritten;
- *   3. collaboration text (G10) — every participating tool's description carries
+ *   3. investigation outlook text (DELEGATE 7.3) — every participating tool's description carries
  *      the stable investigation outlook note in the actual provider language
  *      (this world runs English); a dropped or reworded-away note turns this red.
  *
@@ -1372,10 +1412,7 @@ export async function assertDelegationProtocolSurface(scenario) {
   const requests = scenario.provider.requests ?? [];
   const sessionOf = (request) => request?.sessionID ?? request?.sessionId;
 
-  const ownerSessions = new Set();
-  for (const request of requests) {
-    if (hasPositiveBudgetCall(request)) ownerSessions.add(sessionOf(request));
-  }
+  const { owners: ownerSessions } = delegatingOwnerSessions(scenario);
   assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions for the protocol surface');
 
   // 1 + 3: per-tool assertion across the visible tool surface of a delegating owner's real requests.
@@ -1414,6 +1451,15 @@ export async function assertDelegationProtocolSurface(scenario) {
         assert.ok(
           required.includes('estimated_readonly_rounds'),
           `DELEGATE 5.2: participating tool ${name} must list estimated_readonly_rounds as required`,
+        );
+        assert.equal(
+          properties.delegate_readonly_rounds,
+          undefined,
+          `DELEGATE 16.7: participating tool ${name} must not expose legacy delegate_readonly_rounds`,
+        );
+        assert.ok(
+          !required.includes('delegate_readonly_rounds'),
+          `DELEGATE 16.7: participating tool ${name} must not require legacy delegate_readonly_rounds`,
         );
         assert.ok(
           properties.self_note !== undefined,
@@ -1460,6 +1506,11 @@ export async function assertDelegationProtocolSurface(scenario) {
           `DELEGATE 5.3: non-participating tool ${name} must have zero protocol increment (no estimated_readonly_rounds)`,
         );
         assert.equal(
+          properties.delegate_readonly_rounds,
+          undefined,
+          `DELEGATE 16.7: non-participating tool ${name} must have zero protocol increment (no legacy delegate_readonly_rounds)`,
+        );
+        assert.equal(
           properties.self_note,
           undefined,
           `DELEGATE 5.3: non-participating tool ${name} must not expose self_note`,
@@ -1469,12 +1520,20 @@ export async function assertDelegationProtocolSurface(scenario) {
           `DELEGATE 5.3: non-participating tool ${name} must not require estimated_readonly_rounds`,
         );
         assert.ok(
+          !required.includes('delegate_readonly_rounds'),
+          `DELEGATE 16.7: non-participating tool ${name} must not require legacy delegate_readonly_rounds`,
+        );
+        assert.ok(
           !required.includes('self_note'),
           `DELEGATE 5.3: non-participating tool ${name} must not require self_note`,
         );
         assert.ok(
           !description.includes('estimated_readonly_rounds'),
           `DELEGATE 5.3: non-participating tool ${name} must not carry investigation outlook prose`,
+        );
+        assert.ok(
+          !description.includes('delegate_readonly_rounds'),
+          `DELEGATE 16.7: non-participating tool ${name} must not carry legacy delegate prose`,
         );
       }
     }
@@ -1537,12 +1596,23 @@ export async function assertDelegationProtocolSurface(scenario) {
             `DELEGATE 5.3: non-participating tool call ${name} must not carry estimated_readonly_rounds`,
           );
           assert.equal(
+            Object.hasOwn(parsed, 'delegate_readonly_rounds'),
+            false,
+            `DELEGATE 16.7: non-participating tool call ${name} must not carry legacy delegate_readonly_rounds`,
+          );
+          assert.equal(
             Object.hasOwn(parsed, 'self_note'),
             false,
             `DELEGATE 5.3: non-participating tool call ${name} must not carry self_note`,
           );
           continue;
         }
+
+        assert.equal(
+          Object.hasOwn(parsed, 'delegate_readonly_rounds'),
+          false,
+          `DELEGATE 16.7: participating tool call ${name} must not carry legacy delegate_readonly_rounds`,
+        );
 
         if (Object.hasOwn(parsed, 'estimated_readonly_rounds')) {
           assert.equal(
@@ -1613,8 +1683,8 @@ export async function assertDelegationProtocolSurface(scenario) {
  *   3. exactly two companion executions are still bound, and the companion's
  *      real readonly result still reaches both delegating owners' later
  *      requests;
- *   4. the protocol surface is still fully decorated (required budget,
- *      optional note, collaboration prose).
+ *   4. the protocol surface is still fully decorated (required estimated_readonly_rounds,
+ *      optional self_note, investigation outlook prose).
  * Red capability: any layer that treats model equality as "the Predictor is
  * not really configured" (config query, delegate admission, tool decoration)
  * turns the bound count, the material-on-wire, or the protocol-surface
@@ -1632,10 +1702,7 @@ export async function assertDelegationSameModelIsLegal(scenario) {
     `DELEGATE 9.2: expected exactly two companion executions under the shared model, got ${replicaIds.length}`,
   );
 
-  const ownerSessions = new Set();
-  for (const request of requests) {
-    if (hasPositiveBudgetCall(request)) ownerSessions.add(request?.sessionID ?? request?.sessionId);
-  }
+  const { owners: ownerSessions } = delegatingOwnerSessions(scenario);
   assert.ok(ownerSessions.size >= 2, 'DELEGATE 9.2: expected two delegating owner sessions');
 
   for (const replicaId of replicaIds) {
@@ -1684,7 +1751,7 @@ export async function assertDelegationSameModelIsLegal(scenario) {
   }
 
   // The protocol surface is still fully decorated: same-model must not
-  // withdraw the budget, the note, or the collaboration prose.
+  // withdraw estimated_readonly_rounds, self_note, or investigation outlook prose.
   await assertDelegationProtocolSurface(scenario);
 
   console.log(
