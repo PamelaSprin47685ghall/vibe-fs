@@ -31,3 +31,5 @@ module AttentionProjection =
         workIds: string list ->
         state: AttentionProjectionState ->
             AttentionProjectionState
+
+    val closeLife: sessionId: SessionId -> state: AttentionProjectionState -> AttentionProjectionState
