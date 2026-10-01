@@ -128,7 +128,7 @@
 | GAP-119 | verification-system-021 | PARTIAL | 文件缺失/加载错误曾被汇总器忽略；已迁入容器失败与非零传播回归，待本基线正式验证。不能用其它成功叶子掩盖文件未完成。 |
 | GAP-120 | execution-failure-policy-003—008/012/013 | PARTIAL | 有真实 policy 与 admission 屏障，尚缺完整 ledger发射去重、unknown跨重启、exact terminal、sealed授权及真实settlement→fuse生命周期。独立局部trace不能拼成一次执行。 |
 | GAP-121 | execution-failure-policy-010/014 | PARTIAL | fatal gate 的一跳 alias、文件/operation/测试路径存在不证明用例执行或覆盖真实分支。F05/F06/F08/F33/F34/C01/C02 在共同祖先与新基线都已无对应实际 fatal subject，已移出 active 库存并保留于本包 fatal-inventory-retired.md；现存 strength-semantic-cut 仍由 F17 索引。普通 Prepared 成功/重开不证明真实 cut 的 owner 传播、结算与终止，见183。F26只修正operation大小写，不是新政策。 |
-| GAP-128 | execution-model-routing | PARTIAL | 保留真实lease/绑定/调度与字段反例；012伪造fence与外部custody已证fail-closed：commit/release/shared路径对null/对象/原始值伪造全部StaleFence且真实lease结算不受扰动（tests/012）。真实provider wire、完整跨进程恢复、固定角色道路生命周期及所有消费者仍缺证，不能将配置或纯投影当作全链证明。 |
+| GAP-128 | execution-model-routing | PARTIAL | 保留真实lease/绑定/调度与字段反例；009已证chat.params无committed lease时fail-closed不发明admission且内部synthetic send保持model-free；012伪造fence与外部custody已证fail-closed：commit/release/shared路径对null/对象/原始值伪造全部StaleFence且真实lease结算不受扰动（tests/012）。真实provider wire、完整跨进程恢复、固定角色道路生命周期及所有消费者仍缺证，不能将配置或纯投影当作全链证明。 |
 | GAP-129 | execution-model-routing-019 | PARTIAL | DevOps 现行实现可随策略覆盖旧绑定，与合同永不更换冲突；真实失败TODO保留，需要明确固定作用域与恢复来源。 |
 | GAP-130 | execution-model-routing-004/005 | PARTIAL | optional reservation 可在Host承接前占容量；不能因optional名称默认豁免零前置占用。需删除提前占用或正式裁决受限reservation例外。 |
 | GAP-131 | execution-model-routing-011 | PARTIAL | 合同target解析先于durable accept，实际接受后进入模型调度；null scheduler排队与前置选择如何共存待决，不能为null虚构已解析target。 |
