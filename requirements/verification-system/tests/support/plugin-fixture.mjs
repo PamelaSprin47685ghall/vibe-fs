@@ -34,13 +34,19 @@ const withJournalRuntime = async (directory, action) => {
   if (!journalResult?.ok) {
     throw new Error(`journal acquire rejected: ${journalResult?.error ?? 'unknown error'}`)
   }
+  const terminalPort = eventsSurface.acquireSharedForWorkspace(directory)
   try {
     return await action({
       journal: journalResult.journal,
       runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
+      terminalPort,
     })
   } finally {
-    journalSurface.JournalSurface_dispose(journalResult.journal)
+    try {
+      eventsSurface.releaseSharedForWorkspace(directory, terminalPort)
+    } finally {
+      journalSurface.JournalSurface_dispose(journalResult.journal)
+    }
   }
 }
 
@@ -303,10 +309,10 @@ export const withRestartablePlugin = async (body) => {
     const prompts = []
     const messages = []
     const client = stubClient(createdIds, prompts, messages, abortedIds)
-    const start = async () => {
+    const start = async (workspaceDirectory = directory) => {
       const hooks = await initSpikePlugin({
         client,
-        directory,
+        directory: workspaceDirectory,
         events: { listen: () => () => {} },
       })
       liveHooks.add(hooks)

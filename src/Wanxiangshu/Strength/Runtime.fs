@@ -49,8 +49,7 @@ module StrengthReplicaTools =
     /// comes before the single specific allow so Host's last-match permission rule
     /// lets exactly `js-predictor` through and nothing else -- the replica has no
     /// read/glob/grep; all investigation goes through the readonly JS surface.
-    let exactReadonlyHostToolMap =
-        Map.ofList [ "*", false; "js-predictor", true ]
+    let exactReadonlyHostToolMap = Map.ofList [ "*", false; "js-predictor", true ]
 
     let isExactReadonly (capabilities: Set<ToolPermission>) =
         capabilities = set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
@@ -100,6 +99,9 @@ type StrengthRuntime() =
             | true, replica -> Some replica
             | false, _ -> None)
 
+    member _.IsResidentSession(replica: SessionId) : bool =
+        lock gate (fun () -> residentByOwner.Values |> Seq.exists ((=) replica))
+
     /// STRENGTH-004: bind the owner's resident replica session. A later bind
     /// replaces the slot: that is the recovery path where the previously recorded
     /// child is no longer listed by the Host, so the recorded id is stale rather
@@ -127,7 +129,10 @@ type StrengthRuntime() =
             let owner =
                 residentByOwner
                 |> Seq.tryPick (fun entry ->
-                    if SessionId.value entry.Value = target then Some entry.Key else None)
+                    if SessionId.value entry.Value = target then
+                        Some entry.Key
+                    else
+                        None)
 
             match owner with
             | Some ownerKey ->
@@ -135,10 +140,14 @@ type StrengthRuntime() =
                 Some(SessionId.create ownerKey)
             | None -> None)
 
-    /// Process teardown: hand back every resident lease at once.
-    member _.ReleaseAllResidents() : SessionId list =
+    /// Process teardown: return each resident and the owner whose lease it shares.
+    member _.ReleaseAllResidents() : (SessionId * SessionId) list =
         lock gate (fun () ->
-            let all = residentByOwner.Values |> Seq.toList
+            let all =
+                residentByOwner
+                |> Seq.map (fun entry -> SessionId.create entry.Key, entry.Value)
+                |> Seq.toList
+
             residentByOwner.Clear()
             all)
 

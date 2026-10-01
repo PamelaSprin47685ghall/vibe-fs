@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — predictor 的源消息、常驻生命周期与物理父链纠正
+
+- `../wanxiang/.git/wanxiang/events/b1ca41f13bc24d709cc25219737ec160.ndjson` 中 14 次只读委托全部在 Requested 阶段以 `cannot-continue` 关闭，零 Bound；授权记录把下一条 assistant 占位消息当成发出工具批次的源消息。现在源 ID 与工具批次从同一实际 assistant 取出，并核对它的真实 physical parent；新输入不能借用旧批次的估计。日志未开启逐门诊断，不能把全部历史关闭逐一归因于同一分支。
+- 常驻 predictor 在第一次 await 前认领 owner；同一 decision 共享准备结果，不同 decision 不创建竞争子会话。取消与卸载会排空未完成的创建；无模型容量的未发送委托立即退出，不等待不存在的物理终态。复用只订阅未来终态，退出时移除监听；终态按实际 physical input 精确匹配，旧回合不能结束新委托。结果保留到持久发布确认，避免物理清理先到时把并发消费者误判为恢复孤儿。
+- 每次结果收集仅扫描本次 bootstrap 之后的消息，历史工具材料与旧纯文本结尾不再污染或中止新委托。重启复用依据 durable Bound 中的子会话 ID 与 Host 的精确 agent/title；查询失败、历史多候选或元数据冲突明确拒绝，不另建副本，不按标题或时间任意收养，也不删除历史会话。
+- Host 父链在缓存缺失时按原生 session metadata 恢复；创建与查询统一使用实际 family root，子 owner 的 predictor 与其他受管同伴不再成为物理孙会话。逻辑 owner、预算、语言和材料归属不变；父链查询失败或出现环时不创建会话。需求条款补上不变量与条件性进展证明，模型是否给出合法正数估计及外部服务可用性不作无条件保证。
+- root/worktree 实例按同一 git common-dir runtime key 共享 predictor 登记表、物理协调器与 fuse；引用计数归零才卸载。通用实例清理不释放共享常驻会话及其 owner 的模型租约，最后卸载再交还两者。带有真实 physical parent 证据的早到终态先暂存，再由实际绑定精确重放；不丢失通知，也不借旧通知认领新决策。
+
 ## Unreleased — provider 错误不再被空输出修复抢走
 
 - 修复 `CompletedTurnClassifier` 将 `completed + error + 空/XML-only 输出` 降级为 `TurnNeedsContinuation` 的错误。错误终态现在始终是 `TurnFailed`：先到的 idle 等待 exact typed failure，不再发送 `missing-final-report`；确切失败观察仍由原有 provider recovery 记账、派发 fresh `ProviderRetryAttempt` 并重新选择可用的 LWR 前缀。无 provider error 的空/XML-only `stop` 仍走内容修复，operator abort 仍为取消。

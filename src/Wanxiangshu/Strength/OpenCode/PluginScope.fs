@@ -10,13 +10,17 @@ open Wanxiangshu.Strength.Replica
 /// STRENGTH-*: decision-local replica ownership/capability registry plus the
 /// process-lifetime fuse for one plugin instance. Durable causality stays in
 /// EventStore; this is only live physical-session state (STRENGTH-014).
+/// When acquired for a git common-dir runtime key, multiple plugin instances (e.g.
+/// root workspace and manager worktrees) share the same live registry and attached
+/// replica coordinator, refcounted across plugin instance lifecycles.
 [<AttachMembers>]
-type PluginStrengthScope() =
+type PluginStrengthScope(sharedKey: string option) =
     // STRENGTH-014: decision-local replica ownership/capability registry. Durable
     // causality remains in EventStore; this is only live physical-session state.
-    let strengthRuntime = StrengthRuntime()
+    let runtimeRegistry = StrengthRuntime()
     // STRENGTH-004: physical coordinator is attached after Host ports are wired.
     // The Session StrengthRuntime above remains the sole live ownership/capability registry.
+
     // DSL-MUTABLE: resource — attached process-local Replica coordinator
     let mutable strengthReplicaRuntime: StrengthReplicaRuntime option = None
 
@@ -27,8 +31,8 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — strength fuse latch (Ok=operational, Error=tripped)
     let mutable strengthFuse: Result<unit, string> = Ok()
 
-    member _.StrengthRuntime = strengthRuntime
-
+    member _.SharedKey = sharedKey
+    member _.StrengthRuntime = runtimeRegistry
     member _.AttachStrengthReplicaRuntime(runtime: StrengthReplicaRuntime) = strengthReplicaRuntime <- Some runtime
     member _.StrengthReplicaRuntime = strengthReplicaRuntime
 
@@ -47,11 +51,11 @@ type PluginStrengthScope() =
     /// Session deletion drops the decision-local Strength state for that session
     /// (mirror of DisposeSession's per-session cleanup in PluginRuntimeScope).
     member private _.RetireOrphanSessionBinding(replicaId: SessionId) =
-        match strengthRuntime.TryFindByReplica replicaId with
-        | Some _ -> strengthRuntime.Retire replicaId |> ignore
+        match runtimeRegistry.TryFindByReplica replicaId with
+        | Some _ -> runtimeRegistry.Retire replicaId |> ignore
         | None ->
-            strengthRuntime.TryFindByOwner replicaId
-            |> Option.iter (fun binding -> strengthRuntime.Retire binding.ReplicaSessionId |> ignore)
+            runtimeRegistry.TryFindByOwner replicaId
+            |> Option.iter (fun binding -> runtimeRegistry.Retire binding.ReplicaSessionId |> ignore)
 
     member this.ClearSession(sessionId: string) =
         // The strength fuse is a process-lifetime latch and is never cleared here.
@@ -69,4 +73,48 @@ type PluginStrengthScope() =
         strengthReplicaRuntime <- None
         // Drop the live ownership registry. The strength fuse is a
         // process-lifetime latch and is never cleared here.
-        strengthRuntime.Clear()
+        runtimeRegistry.Clear()
+
+module SharedPredictorScope =
+
+    /// DSL-state-combination: physical — shared predictor scope refcount resource
+    type private SharedEntry =
+        { Scope: PluginStrengthScope
+          mutable RefCount: int }
+
+    let private gate = obj ()
+    // DSL-MUTABLE: resource — shared predictor scope registry by runtime directory
+    let private shared = Dictionary<string, SharedEntry>()
+
+    let acquire (key: string) : PluginStrengthScope =
+        lock gate (fun () ->
+            match shared.TryGetValue key with
+            | true, entry ->
+                entry.RefCount <- entry.RefCount + 1
+                entry.Scope
+            | false, _ ->
+                let scope = PluginStrengthScope(Some key)
+                shared.[key] <- { Scope = scope; RefCount = 1 }
+                scope)
+
+    let private updateRelease key (entry: SharedEntry) =
+        let remaining = entry.RefCount - 1
+
+        if remaining <= 0 then
+            shared.Remove key |> ignore
+            entry.Scope.Dispose()
+        else
+            entry.RefCount <- remaining
+
+    let private releaseShared key scope =
+        lock gate (fun () ->
+            match shared.TryGetValue key with
+            | true, entry when obj.ReferenceEquals(entry.Scope, scope) -> updateRelease key entry
+            | _ -> ())
+
+    let release (scope: PluginStrengthScope) =
+        match scope.SharedKey with
+        | None -> scope.Dispose()
+        | Some key -> releaseShared key scope
+
+    let tryAcquireForRuntime (key: string option) : PluginStrengthScope option = key |> Option.map acquire

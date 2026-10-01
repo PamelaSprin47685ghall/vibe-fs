@@ -45,7 +45,14 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 /// owned sessions, companions, verdicts, nudges,
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
-type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal option) =
+type PluginSessionScope
+    (journal: Wanxiangshu.Persistence.Journal.AgentJournal option, isModelLeaseExternallyOwned: SessionId -> bool) =
+    let releaseInstanceModelLease sessionId =
+        let session = SessionId.create sessionId
+
+        if not (isModelLeaseExternallyOwned session) then
+            ModelRouting.releaseExecution session |> ignore
+
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、Companions 等）保持
     // per-instance。
@@ -180,9 +187,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             this.JoinInterrupts.ClearSession sid
         }
 
-    /// Plugin dispose releases every companion host and every routing demand/lease
-    /// this instance touched. The process-shared allocator remains alive for sibling
-    /// root/worktree plugin instances.
+    /// Instance disposal releases local leases, not leases owned by a shared coordinator.
     member this.Dispose() =
         for companion in this.Companions.Values |> Seq.toList do
             (companion :> IDisposable).Dispose()
@@ -195,7 +200,7 @@ type PluginSessionScope(journal: Wanxiangshu.Persistence.Journal.AgentJournal op
             |> Seq.toArray
 
         for sessionId in routed do
-            ModelRouting.releaseExecution (SessionId.create sessionId) |> ignore
+            releaseInstanceModelLease sessionId
 
         this.ModelRoutingSessions.Clear()
         this.OwnedSessions.Clear()

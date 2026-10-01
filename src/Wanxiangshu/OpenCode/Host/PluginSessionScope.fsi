@@ -12,7 +12,9 @@ open Wanxiangshu.Foundation.Identity
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope =
-    new: journal: Wanxiangshu.Persistence.Journal.AgentJournal option -> PluginSessionScope
+    new:
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal option * isModelLeaseExternallyOwned: (SessionId -> bool) ->
+            PluginSessionScope
 
     /// Cross-instance session directory map alias.
     member SessionDirectories: Dictionary<string, string>
@@ -59,5 +61,5 @@ type PluginSessionScope =
     /// the lifecycle may be declared drained.
     member ClearSession: sessionId: string -> Task
 
-    /// Plugin dispose releases every companion host and every routing demand/lease.
+    /// Plugin dispose releases companions and instance-owned model leases.
     member Dispose: unit -> unit

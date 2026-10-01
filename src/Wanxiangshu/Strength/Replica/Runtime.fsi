@@ -49,13 +49,20 @@ type StrengthReplicaRuntime =
         registerReplica: (SessionId -> SessionId -> string -> unit) *
         ?workspaceDirectory: string *
         ?tryAcquireModel: (SessionId -> string -> OpencodeModel option) *
-        ?releaseModel: (SessionId -> unit) ->
+        ?releaseModel: (SessionId -> unit) *
+        ?restoreResident: (SessionId -> string -> Task<Result<SessionId option, string>>) *
+        ?snapshotPort: ISessionSnapshotPort ->
             StrengthReplicaRuntime
 
     member IsReplica: sessionId: SessionId -> bool
     member TryOwner: sessionId: SessionId -> SessionId option
     member TryDecision: sessionId: SessionId -> StrengthDecisionId option
     member TryPeek: replicaSessionId: SessionId -> StrengthReplicaPeek option
+
+    member TryDecisionOutcome:
+        replicaSessionId: SessionId * decisionId: StrengthDecisionId -> Task<StrengthReplicaOutcome> option
+
+    member ReleaseDecisionOutcome: decisionId: StrengthDecisionId -> unit
 
     /// DELEGATE-6.2 prepared stage: create the empty child and internal
     /// identity without sending a prompt or reserving model capacity. The

@@ -11,9 +11,10 @@ open Wanxiangshu.Strength.Replica
 /// EventStore; this is only live physical-session state (STRENGTH-014).
 [<AttachMembers>]
 type PluginStrengthScope =
-    new: unit -> PluginStrengthScope
+    new: sharedKey: string option -> PluginStrengthScope
 
     member StrengthRuntime: StrengthRuntime
+    member SharedKey: string option
     member AttachStrengthReplicaRuntime: runtime: StrengthReplicaRuntime -> unit
     member StrengthReplicaRuntime: StrengthReplicaRuntime option
 
@@ -23,3 +24,8 @@ type PluginStrengthScope =
 
     member ClearSession: sessionId: string -> unit
     member Dispose: unit -> unit
+
+module SharedPredictorScope =
+    val acquire: key: string -> PluginStrengthScope
+    val release: scope: PluginStrengthScope -> unit
+    val tryAcquireForRuntime: key: string option -> PluginStrengthScope option

@@ -143,6 +143,185 @@ module SessionsSurface =
                       "workerFamily" ==> SessionId.value (sessions.FamilyRootOf worker) ]
         }
 
+    type private AuthoritativeHierarchyPort() =
+        let parents = Dictionary<string, Result<string option, string>>()
+        let createParents = ResizeArray<string>()
+        let listParents = ResizeArray<string>()
+        let parentQueryCalls = ResizeArray<string>()
+        let createdChildren = ResizeArray<string>()
+
+        member _.SetParent(childId: string, parentOutcome: Result<string option, string>) =
+            parents.[childId] <- parentOutcome
+
+        member _.CreateParents = createParents.ToArray()
+        member _.ListParents = listParents.ToArray()
+        member _.ParentQueryCalls = parentQueryCalls.ToArray()
+        member _.CreatedChildren = createdChildren.ToArray()
+
+        interface IOpenCodePort with
+            member _.SendPrompt _ _ _ = Task.FromResult(Fatal "unused")
+            member _.AbortSession _ = Task.FromResult(Ok())
+            member _.CreateSession _ _ = Task.FromResult(Error "unused")
+
+            member _.GetSessionParent sessionId =
+                let key = SessionId.value sessionId
+                parentQueryCalls.Add key
+
+                match parents.TryGetValue key with
+                | true, outcome ->
+                    match outcome with
+                    | Ok opt -> Task.FromResult(Ok(opt |> Option.map SessionId.create))
+                    | Error err -> Task.FromResult(Error err)
+                | false, _ -> Task.FromResult(Ok None)
+
+            member _.CreateChildSession parent _ =
+                let p = SessionId.value parent
+                createParents.Add p
+                let child = sprintf "%s-child-%d" p (createParents.Count)
+                createdChildren.Add child
+                Task.FromResult(Ok(SessionId.create child))
+
+            member _.ListChildren parent =
+                let p = SessionId.value parent
+                listParents.Add p
+
+                let children: OpenCodeChildInfo list =
+                    createdChildren
+                    |> Seq.map (fun c ->
+                        { SessionId = SessionId.create c
+                          ParentSessionId = Some parent
+                          Agent = Some "test-agent"
+                          Title = Some "test-title" })
+                    |> Seq.toList
+
+                Task.FromResult(Ok children)
+
+            member _.CloseChildSession _ = Task.FromResult(Ok())
+
+    /// HOST-015: restored child owner whose process-local family map is empty
+    /// resolves physical parent to the authoritative Host family root, inherits
+    /// owner language, normalizes ListChildren, and caches ancestry to avoid extra queries.
+    let restoredOwnerFlatteningProbe () : Task<obj> =
+        task {
+            let transport = AuthoritativeHierarchyPort()
+            transport.SetParent("restored-child", Ok(Some "intermediate-sub"))
+            transport.SetParent("intermediate-sub", Ok(Some "host-family-root"))
+            transport.SetParent("host-family-root", Ok None)
+
+            let ownerSession = SessionId.create "restored-child"
+            let ownerLang = ProviderLanguageBinding.ensureRoot ownerSession
+
+            let sessions =
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
+                :> ISessionHostPort
+
+            let options: OpenCodeChildOptions =
+                { Title = Some "restored owner worker"
+                  Agent = Some "worker"
+                  Directory = None }
+
+            let! firstOutcome = sessions.CreateChildSession(ownerSession, options)
+            let firstChild = firstOutcome |> Result.defaultWith invalidOp
+            let queriesAfterFirst = transport.ParentQueryCalls.Length
+
+            let childLang =
+                match Wanxiangshu.Participant.Provider.SessionProviderLanguage.tryGet firstChild with
+                | Some l -> string l
+                | None -> "unbound"
+
+            let! listOutcome = sessions.ListChildren(ownerSession)
+
+            let! secondOutcome = sessions.CreateChildSession(ownerSession, options)
+            let secondChild = secondOutcome |> Result.defaultWith invalidOp
+            let queriesAfterSecond = transport.ParentQueryCalls.Length
+
+            return
+                createObj
+                    [ "firstOk", box (Result.isOk firstOutcome)
+                      "secondOk", box (Result.isOk secondOutcome)
+                      "firstChildId", box (SessionId.value firstChild)
+                      "secondChildId", box (SessionId.value secondChild)
+                      "physicalParents", box transport.CreateParents
+                      "listParents", box transport.ListParents
+                      "parentQueries", box transport.ParentQueryCalls
+                      "queriesAfterFirst", box queriesAfterFirst
+                      "queriesAfterSecond", box queriesAfterSecond
+                      "ownerLanguage", box (string ownerLang)
+                      "childLanguage", box childLang
+                      "firstChildFamilyRoot", box (SessionId.value (sessions.FamilyRootOf firstChild))
+                      "ownerFamilyRoot", box (SessionId.value (sessions.FamilyRootOf ownerSession)) ]
+        }
+
+    /// HOST-015: query failure on session parent query must fail closed,
+    /// never guess that the session is a root, and create no session.
+    let unknownParentQueryErrorProbe () : Task<obj> =
+        task {
+            let transport = AuthoritativeHierarchyPort()
+            transport.SetParent("broken-owner", Error "Host transport connection reset")
+
+            let sessions =
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
+                :> ISessionHostPort
+
+            let options: OpenCodeChildOptions =
+                { Title = Some "failing child"
+                  Agent = Some "worker"
+                  Directory = None }
+
+            let! createOutcome = sessions.CreateChildSession(SessionId.create "broken-owner", options)
+            let! listOutcome = sessions.ListChildren(SessionId.create "broken-owner")
+
+            return
+                createObj
+                    [ "createOk", box (Result.isOk createOutcome)
+                      "createError",
+                      box (
+                          match createOutcome with
+                          | Error err -> err
+                          | Ok _ -> ""
+                      )
+                      "createCalls", box transport.CreateParents.Length
+                      "listOk", box (Result.isOk listOutcome)
+                      "listError",
+                      box (
+                          match listOutcome with
+                          | Error err -> err
+                          | Ok _ -> ""
+                      )
+                      "listCalls", box transport.ListParents.Length ]
+        }
+
+    /// HOST-015: parent cycle in session ancestry must fail closed with cycle
+    /// error and refuse creation.
+    let ancestryCycleProbe () : Task<obj> =
+        task {
+            let transport = AuthoritativeHierarchyPort()
+            transport.SetParent("cycle-a", Ok(Some "cycle-b"))
+            transport.SetParent("cycle-b", Ok(Some "cycle-a"))
+
+            let sessions =
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
+                :> ISessionHostPort
+
+            let options: OpenCodeChildOptions =
+                { Title = Some "cyclic child"
+                  Agent = Some "worker"
+                  Directory = None }
+
+            let! createOutcome = sessions.CreateChildSession(SessionId.create "cycle-a", options)
+
+            return
+                createObj
+                    [ "createOk", box (Result.isOk createOutcome)
+                      "createError",
+                      box (
+                          match createOutcome with
+                          | Error err -> err
+                          | Ok _ -> ""
+                      )
+                      "createCalls", box transport.CreateParents.Length ]
+        }
+
     /// managed-session-lifecycle-016/017: exercise the production session adapter against
     /// a controlled physical Host boundary. The returned view contains values,
     /// never the adapter or its managed-child representation.

@@ -21,6 +21,11 @@ type ISessionHostPort =
             Task<Result<SessionId, string>>
 
     abstract TryGetParentSession: sessionId: SessionId -> Task<Result<SessionId option, string>>
+    /// HOST-015: resolves physical parent to the authoritative family root (using in-process proved
+    /// ancestry or querying Host GetSessionParent with loop safety; query failure or cycle refuses creation).
+    /// Creates the child under that root and registers in-process linkage while inheriting immediate owner language.
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    /// HOST-015: normalizes parentId to the proved physical family root so callers query the flat physical
+    /// children and identify exact managed children by durable ID rather than assuming exclusive immediate sub-sessions.
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
     abstract FamilyRootOf: sessionId: SessionId -> SessionId

@@ -16,9 +16,9 @@ open Wanxiangshu.Persistence.Journal
 
 /// Explicit lifetime root for one plugin instance. Collections here are either
 /// physical resources, display caches, or bounded per-call deduplication.
-type PluginRuntimeScope(journal: AgentJournal option) =
+type PluginRuntimeScope(journal: AgentJournal option, isModelLeaseExternallyOwned: SessionId -> bool) =
     let blogger = PluginBloggerScope()
-    let sessions = PluginSessionScope(journal)
+    let sessions = PluginSessionScope(journal, isModelLeaseExternallyOwned)
     let recovery = PluginRecoveryScope(journal)
     // DSL-MUTABLE: resource — session cleanup hook list registered by composition
     let mutable sessionCleanups: (string -> unit) list = []

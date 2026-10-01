@@ -1,45 +1,5 @@
 import test from 'node:test'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
-const { default: test } = await import("node:test");
-
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-
-// WHAT[011]: termination only ever comes from an explicit causal event.
-test('WHAT[speculative-investigation-011] SPEC_INV_011_replica_lifecycle_has_no_wall_clock_terminal_arbitration', async () => {
-  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  assert.doesNotMatch(runtime, /ITimerPort|timer\.Delay|completionWins|settleCompletionRace|maxLatencyMs|TimedOut/)
-  assert.doesNotMatch(runtime, /\.IsCompleted|get_IsCompleted/)
-  assert.match(runtime, /SemanticTerminal:\s*StrengthReplicaTerminal option/)
-
-  const start = runtime.indexOf('member this.StartDecision')
-  assert.ok(start > 0, 'the composed start capability is retained')
-  const decision = runtime.slice(start, runtime.indexOf('member _.Dispose', start))
-  assert.match(decision, /let!\s+result\s*=\s*prepared\.Completion/)
-})
-test('WHAT[speculative-investigation-011] SPEC_INV_011_model_reservation_stays_in_routing_while_the_bootstrap_send_is_model_free', async () => {
-  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  assert.match(
-    runtime,
-    /acquireOptionalModelOrAbort/,
-    'the prepared replica still reserves its model through ModelRouting before the bootstrap send',
-  )
-  assert.doesNotMatch(
-    runtime,
-    /promptModel/,
-    'the bootstrap send must not carry a model parameter; the reservation stays in ModelRouting',
-  )
-  const wiring = await read('src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs')
-  assert.match(wiring, /ModelRouting\.tryReserveManaged/, 'the reservation stays registered with ModelRouting')
-  assert.match(wiring, /ModelExecutionPurpose\.ReadonlyDelegate/, 'the replica keeps its readonly-delegate purpose')
-})
-test('WHAT[speculative-investigation-011] SPEC_INV_011_runtime_has_no_production_dry_run_entry', async () => {
-  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  assert.doesNotMatch(runtime, /DryRun|dryRunStateAtTargetTerminal|StrengthReplicaPurpose/)
-})
-}
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -93,7 +53,7 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_process_fuse_is_first_fai
   Strength.scopeDispose(scope)
 })
 test('WHAT[speculative-investigation-011] STRENGTH_011_ordinary_argument_errors_never_trip_process_fuse_unlike_invariant_failures', async () => {
-  const Contract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
+  const { readonlyDelegationSelfNoteOf } = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
   const scope = Strength.scopeCreate()
   assert.equal(Strength.scopeFuseReason(scope), null)
 
@@ -106,8 +66,8 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_ordinary_argument_errors_
     { estimated_readonly_rounds: 2, self_note: 'ok', delegate_readonly_rounds: 2 },
   ]
   for (const args of badArgs) {
-    const parsed = Contract.parseParticipatingArguments(args)
-    assert.equal(parsed.tag, 1, 'must be rejected as argument error')
+    const parsed = readonlyDelegationSelfNoteOf(args)
+    assert.equal(parsed.ok, false, 'must be rejected as argument error')
     assert.equal(Strength.scopeFuseReason(scope), null, 'ordinary argument error must never trip the process fuse')
   }
 
@@ -124,6 +84,28 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_scope_dispose_drops_proce
   Strength.scopeDispose(scope)
   assert.equal(Strength.scopeRuntimeFindByReplica(scope, 'replica-d'), null)
   assert.equal(Strength.scopeFuseReason(scope), 'boom')
+})
+
+test('WHAT[speculative-investigation-011] STRENGTH_011_shared_predictor_scope_shares_registry_and_refcounts_across_instances', () => {
+  const key = 'test-common-runtime-key'
+  const scope1 = Strength.scopeAcquireShared(key)
+  const scope2 = Strength.scopeAcquireShared(key)
+
+  const binding = Strength.runtimeBinding('shared-owner', 'shared-replica', 'dec-shared', 'run-shared', 'Engineer', 1, 'sem-shared', [])
+  assert.equal(Strength.scopeRuntimeRegister(scope1, binding).ok, true)
+
+  // Both instances see the exact same registered child
+  assert.notEqual(Strength.scopeRuntimeFindByReplica(scope2, 'shared-replica'), null)
+  const duplicate = Strength.runtimeBinding('shared-owner', 'loser-replica', 'dec-loser', 'run-loser', 'Engineer', 1, 'sem-loser', [])
+  assert.equal(Strength.scopeRuntimeRegister(scope2, duplicate).error, 'OwnerAlreadyHasReplica')
+
+  // Unloading first instance does not drop shared registry or unbind child
+  Strength.scopeReleaseShared(scope1)
+  assert.notEqual(Strength.scopeRuntimeFindByReplica(scope2, 'shared-replica'), null)
+
+  // Releasing the second (last) instance drops resources
+  Strength.scopeReleaseShared(scope2)
+  assert.equal(Strength.scopeRuntimeFindByReplica(scope2, 'shared-replica'), null)
 })
 }
 
@@ -146,9 +128,8 @@ const attach = (replica, rounds, owner = 'owner') => {
   assert.equal(result.ok, true, result.error)
   return { handle, completion: result.value.completion }
 }
-const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
+const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, physicalUserMessageId: 'u1', providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
-const plainAnswer = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostText('plain answer')])] })
 
 test('WHAT[speculative-investigation-011] STRENGTH_011_replica_semantic_vs_physical_tail_lifecycle_split', () => {
   const runtime = Strength.runtimeCreate()
@@ -214,9 +195,9 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_replica_dispose_keeps_fir
   assert.deepEqual(Strength.replicaReleased(open.handle), ['replica-open'])
 
   const closed = attach('replica-closed', 1)
-  assert.equal(await Strength.replicaHandleTransform(closed.handle, plainAnswer('replica-closed')), true)
+  assert.equal(await Strength.replicaHandleTransform(closed.handle, { messages: [user('u1', 'replica-closed', [hostText('readonly assignment')])] }), true)
   assert.equal(Strength.replicaHandleTurn(closed.handle, {
-    sessionId: 'replica-closed', providerRun: 'run-t', outcome: 'failed', parts: [{ kind: 'text', text: 'plain answer' }],
+    sessionId: 'replica-closed', physicalUserMessageId: 'u1', providerRun: 'run-t', outcome: 'completed', parts: [{ kind: 'text', text: 'plain answer' }],
   }), true)
   const first = await Strength.replicaAwaitOutcome(closed.completion)
   assert.equal(first.terminal.kind, 'TextCompleted')

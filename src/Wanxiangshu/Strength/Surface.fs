@@ -13,6 +13,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
@@ -616,7 +618,13 @@ module StrengthSurface =
         box
             {| satelliteCases = [| "Companion" |]
                hasReplicaSatellite = false
-               attachmentCases = [| "Companion"; "SyncInspector"; "SyncCoder"; "SyncEngineer"; "Bookkeeper"; "StrengthReplica" |]
+               attachmentCases =
+                [| "Companion"
+                   "SyncInspector"
+                   "SyncCoder"
+                   "SyncEngineer"
+                   "Bookkeeper"
+                   "StrengthReplica" |]
                executionClass =
                 match StrengthReplicaAssociationHints.executionClass with
                 | SessionExecutionClass.InternalLeaf -> "InternalLeaf"
@@ -977,11 +985,14 @@ module StrengthSurface =
         (projection: obj)
         : obj =
         let owner = SessionId.create ownerSessionId
+
         let logicalRun =
             { LogicalRunId = LogicalRunId.create logicalRunId
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+
         let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
         let providerRun = ProviderRunIdentity.create sourceProviderRun
+
         match
             StrengthProjection.tryCandidateBySource
                 owner
@@ -1002,11 +1013,14 @@ module StrengthSurface =
         (projection: obj)
         : obj =
         let owner = SessionId.create ownerSessionId
+
         let logicalRun =
             { LogicalRunId = LogicalRunId.create logicalRunId
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+
         let physicalUserMsg = PhysicalUserMessageId.create sourcePhysicalUserMessageId
         let providerRun = ProviderRunIdentity.create sourceProviderRun
+
         match
             StrengthProjection.tryCandidateBySource
                 owner
@@ -1023,8 +1037,7 @@ module StrengthSurface =
             | StrengthCandidateState.Bound
             | StrengthCandidateState.Prepared
             | StrengthCandidateState.Promoted
-            | StrengthCandidateState.Traced ->
-                box (ReadonlyRoundBudget.value view.Request.RequestedRounds)
+            | StrengthCandidateState.Traced -> box (ReadonlyRoundBudget.value view.Request.RequestedRounds)
             | StrengthCandidateState.Abandoned -> null
         | None -> null
 
@@ -1640,10 +1653,16 @@ module StrengthSurface =
         member _.Value = scope
 
     let scopeCreate () : obj =
-        ScopeHandle(PluginStrengthScope()) :> obj
+        ScopeHandle(PluginStrengthScope(None)) :> obj
+
+    let scopeAcquireShared (key: string) : obj =
+        ScopeHandle(SharedPredictorScope.acquire key) :> obj
 
     let private scopeOf value =
         unbox<ScopeHandle> value |> fun handle -> handle.Value
+
+    let scopeReleaseShared (scope: obj) : unit =
+        SharedPredictorScope.release (scopeOf scope)
 
     let scopeFuseReason (scope: obj) =
         match (scopeOf scope).StrengthFuseReason with
@@ -1847,6 +1866,230 @@ module StrengthSurface =
         member _.Live = live
 
     let private replicaOf value = unbox<ReplicaHandle> value
+
+    let private preparationProfile owner role =
+        let identity =
+            ParticipantIdentity.resolveAtRoot role
+            |> Result.defaultWith (fun error -> invalidArg "role" (sprintf "%A" error))
+
+        PromptAuthority.createAuthorityExecutionProfile
+            owner
+            (LogicalRunId.create "preparation-logical-run")
+            (AuthorityRootUserMessageId.create "preparation-authority-root")
+            PromptAuthority.RootAuthorityKind.HumanRoot
+            identity
+        |> Result.defaultWith invalidOp
+
+    let private preparationJournal owner profile : IPromptJournal =
+        { new IPromptJournal with
+            member _.RuntimeId = RuntimeId.create "preparation-probe"
+
+            member _.ProjectionFor session =
+                if session = owner then
+                    { PromptAuthority.empty with
+                        ActiveLogicalRun = Some profile }
+                else
+                    PromptAuthority.empty
+
+            member _.Append _ _ _ =
+                invalidOp "Preparation probe cannot replace a durable dispatch journal"
+
+            member _.HandleForChild _ = None
+
+            member _.ChatAcceptancePersistence() =
+                invalidOp "Preparation probe cannot accept chat execution" }
+
+    let private childInfoFromJs (value: obj) : OpenCodeChildInfo =
+        { SessionId = SessionId.create (textOf value?sessionId)
+          ParentSessionId = None
+          Agent = optionalText value?agent
+          Title = optionalText value?title }
+
+    let private childListingFromJs (value: obj) =
+        if unbox<bool> value?ok then
+            Ok(arrayOf value?children |> Array.map childInfoFromJs |> Array.toList)
+        else
+            Error(textOf value?error)
+
+    let private preparationSessionPort owner (events: IEventObservationPort) (ports: obj) : ISessionHostPort =
+        // DSL-MUTABLE: resource — Host-proved children owned by this controlled transport
+        let children = Collections.Generic.HashSet<SessionId>()
+
+        let abort session =
+            task {
+                do! emitJsExpr (ports?abort, SessionId.value session) "$0($1)" |> unbox<Task>
+                return Ok()
+            }
+
+        let subscribe future session callback =
+            let listener observed outcome =
+                if observed = session then
+                    callback observed outcome
+
+            if future then
+                events.SubscribeFutureTerminalListener listener
+            else
+                events.SubscribeTerminalListener listener
+
+        { new ISessionHostPort with
+            member _.SubscribeTerminal(session, callback) = subscribe false session callback
+            member _.SubscribeFutureTerminal(session, callback) = subscribe true session callback
+
+            member _.CreateChildSession(parent, options) =
+                task {
+                    let descriptor =
+                        box
+                            {| agent = options.Agent |> Option.toObj
+                               title = options.Title |> Option.toObj |}
+
+                    let! created =
+                        emitJsExpr (ports?create, SessionId.value parent, descriptor) "$0($1,$2)"
+                        |> unbox<Task<string>>
+
+                    let child = SessionId.create created
+                    children.Add child |> ignore
+                    return Ok child
+                }
+
+            member _.ListChildren parent =
+                task {
+                    let! listed = emitJsExpr (ports?list, SessionId.value parent) "$0($1)" |> unbox<Task<obj>>
+                    return childListingFromJs listed
+                }
+
+            member _.AbortSession session = abort session
+            member _.InterruptAttempt session = abort session
+
+            member _.AbortChildren _ =
+                task {
+                    for child in children do
+                        let! _ = abort child
+                        ()
+                }
+
+            member _.IsManagedChild session = children.Contains session
+            member _.FamilyRootOf _ = owner
+
+            member _.TryGetParentSession session =
+                if children.Contains session then
+                    Task.FromResult(Ok(Some owner))
+                else
+                    Task.FromResult(Ok None)
+
+            member _.CreateSiblingSession(_, _, _) =
+                invalidOp "Preparation probe does not create work siblings"
+
+            member _.SendPrompt(_, _, _) =
+                invalidOp "Use the real Host canary to dispatch prepared prompts" }
+
+    let private acquireModelFromJs callback session role =
+        let value = emitJsExpr (callback, SessionId.value session, role) "$0($1,$2)"
+
+        if isNullish value then
+            None
+        else
+            Some
+                { providerID = textOf value?providerID
+                  modelID = textOf value?modelID
+                  variant = optionalText value?variant }
+
+    /// Construct the real preparation coordinator over controlled physical ports.
+    /// The journal is a frozen owner authority; actual dispatch uses the real Host canary.
+    let replicaPreparationCreate (owner: string) (role: string) (eventPort: obj) (ports: obj) : obj =
+        let ownerId = SessionId.create owner
+        let events = unbox<IEventObservationPort> eventPort
+        let profile = preparationProfile ownerId role
+        let sessions = preparationSessionPort ownerId events ports
+        let dispatcher = PromptDispatcher.forPrompts (preparationJournal ownerId profile)
+        let live = StrengthRuntime()
+
+        let snapshot =
+            if isNullish ports?getMessages then
+                None
+            else
+                Some
+                    { new ISessionSnapshotPort with
+                        member _.GetMessages sessionId =
+                            task {
+                                try
+                                    let! raw =
+                                        emitJsExpr (ports?getMessages, SessionId.value sessionId) "$0($1)"
+                                        |> unbox<Task<obj array>>
+
+                                    return Ok(SessionSnapshotPort.projectMessages raw)
+                                with ex ->
+                                    return Error ex.Message
+                            } }
+
+        let acquire =
+            if isNullish ports?acquireModel then
+                None
+            else
+                Some(acquireModelFromJs ports?acquireModel)
+
+        let runtime =
+            new StrengthReplicaRuntime(
+                sessions,
+                dispatcher,
+                live,
+                (fun _ _ _ -> ()),
+                ?tryAcquireModel = acquire,
+                ?snapshotPort = snapshot
+            )
+
+        ReplicaHandle(runtime, live) :> obj
+
+    let private preparedResultToJs result =
+        match result with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok(prepared: StrengthReplicaPreparation) ->
+            box
+                {| ok = true
+                   value =
+                    box
+                        {| replicaSessionId = SessionId.value prepared.ReplicaSessionId
+                           completion = prepared.Completion |} |}
+
+    let private prepareBinding (handle: ReplicaHandle) (binding: StrengthReplicaBinding) =
+        task {
+            let! prepared =
+                handle.Runtime.PrepareReplicaStart(
+                    binding.OwnerSessionId,
+                    binding.DecisionId,
+                    binding.TargetProviderRun,
+                    binding.RequestedRounds,
+                    Roles.roleLabel binding.CanonicalRole,
+                    binding.LocalizedMirrorMessages,
+                    binding.SemanticDigest
+                )
+
+            return preparedResultToJs prepared
+        }
+
+    let replicaPrepare (handle: obj) (request: obj) : Task<obj> =
+        match bindingOf request with
+        | Error error -> Task.FromResult(box {| ok = false; error = error |})
+        | Ok binding -> prepareBinding (replicaOf handle) binding
+
+    let replicaSendPrepared (handle: obj) (replica: string) : Task<obj> =
+        task {
+            let! sent = (replicaOf handle).Runtime.SendPreparedPrompt(SessionId.create replica)
+
+            return
+                match sent with
+                | Ok() -> box {| ok = true |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    let replicaDecisionOutcome (handle: obj) (replica: string) (decision: string) : obj =
+        (replicaOf handle)
+            .Runtime.TryDecisionOutcome(SessionId.create replica, StrengthDecisionId.create decision)
+        |> Option.map box
+        |> Option.toObj
+
+    let replicaReleaseDecisionOutcome (handle: obj) (decision: string) =
+        (replicaOf handle)
+            .Runtime.ReleaseDecisionOutcome(StrengthDecisionId.create decision)
 
     let replicaRuntimeCreate () : obj =
         let sessions =

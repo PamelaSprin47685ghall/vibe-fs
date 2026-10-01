@@ -105,7 +105,7 @@ module PluginHooksSurface =
         (requestId: string)
         : Task<BloggerAdapterObservation> =
         task {
-            let scope = new PluginRuntimeScope(None)
+            let scope = new PluginRuntimeScope(None, (fun _ -> false))
             let durable = AgentJournalCompanionPort handle.Journal :> ICompanionDurablePort
             let sessionPort = DispatchSurface.sessionPort port
             // managed-session-lifecycle-001: one lease registry for this isolated
