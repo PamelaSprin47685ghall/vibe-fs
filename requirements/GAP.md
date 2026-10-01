@@ -149,7 +149,7 @@
 | GAP-155 | concern-routing | PARTIAL | 002已证多角色exactly-once：engineer/manager/devops各收一次公告，blogger（无认知工具）不收，重启后新合格者仍收到；transform helper补chat.message建立accepted execution（HOST-BOUNDARY-008），修复002/004基线红。跨重启已收者不重复仍待journal重放恢复AnnouncementCoverage的验证（tests/002）。真实插件投递、冻结和重放与纯投影已有证据；所有角色、真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
 | GAP-156 | concern-routing-003 | PARTIAL | 同occurrence不同sender/address/message原被当成功重放；已迁入完整材料一致性裁决、双语拒绝资源和真实入口反例，待新构建验证。 |
 | GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留；手工retire纯测试不证明正式终结驱动durable MailboxRetired，需接通完成/放弃/replacement及恢复。 |
-| GAP-158 | intra-participant-parallelism | PARTIAL | 真admission、parser、bundle/ring与权限拒绝保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
+| GAP-158 | intra-participant-parallelism | PARTIAL | 008已证lineage不从物理父级推断：InheritedFromOwner缺任一owner字段（空串/空白/null/undefined）全部typed fail-closed，完整owner witness正常准入（tests/008）。真admission、parser、bundle/ring与权限拒绝保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
 | GAP-159 | intra-participant-parallelism-017；speculative-investigation-004 | PARTIAL | Predictor配置映射Engineer并暴露Fission；真实authority准入也接受，但actual根Fission被origin gate拒绝。保留分别取证的失败TODO，不宣称已发生完整越权。 |
 | GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；终结自动归档、全部工具访问、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。删除假维护接口，不补空实现凑绿。 |
 | GAP-161 | knowledge-reuse-005/015/016 | PARTIAL | 持久baseline的diff用旧hash代替payload原文；实际失败TODO保留。生产分别计算diff与冻结目标，须让同次捕获和不可变旧材料同时支撑维护及基线。 |

@@ -873,5 +873,45 @@ test('WHAT[participant-identity-008] an Engineer inherited seed validates agains
     error: null,
   })
 })
-test.todo('WHAT[participant-identity-008] actual Fission lane admission preserves owner-issued lineage without inferring it from a physical parent (GAP-158)')
+test('WHAT[participant-identity-008] fission lane admission preserves owner-issued lineage without inferring it from a physical parent', () => {
+  const owner = ownerProfile('engineer')
+  const seed = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(seed.ok, true, seed.error)
+
+  // A derived root must carry the full typed owner witness. Blank owner
+  // fields fail closed: admission never back-fills lineage from the physical
+  // parent session, a Host session cache, or any other topology (WHAT 008).
+  const base = {
+    kind: 'InheritedFromOwner',
+    ownerSession: owner.session,
+    ownerLogicalRun: seed.value.ownerLogicalRun,
+    ownerAuthorityRoot: seed.value.ownerAuthorityRoot,
+    participantIdentity: seed.value.participantIdentity,
+  }
+  for (const field of ['ownerSession', 'ownerLogicalRun', 'ownerAuthorityRoot']) {
+    for (const blank of ['', '   ', null, undefined]) {
+      const result = authority.createAuthorityRoot(
+        H,
+        'runtime-identity-lineage',
+        'ses_fission_child',
+        'AgentOwnerRoot',
+        'msg_fission_physical',
+        { ...base, [field]: blank },
+      )
+      assert.equal(result.ok, false, field + '=' + JSON.stringify(blank) + ' must fail closed')
+      assert.match(result.error, /blank|invalid identity seed/i, field + ' blank rejection is typed')
+    }
+  }
+
+  // The honest seed with the complete owner witness still admits.
+  const honest = authority.createAuthorityRoot(
+    H,
+    'runtime-identity-lineage',
+    'ses_fission_child',
+    'AgentOwnerRoot',
+    'msg_fission_physical',
+    base,
+  )
+  assert.equal(honest.ok, true, honest.error)
+})
 }
