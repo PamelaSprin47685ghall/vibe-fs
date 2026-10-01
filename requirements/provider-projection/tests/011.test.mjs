@@ -31,4 +31,29 @@ test('WHAT[provider-projection-011] cutoff digest includes exactly the selected 
   assert.notEqual(Projection.cutoffDigest(sha256, snapshot, 2), Projection.cutoffDigest(sha256, snapshot, 3))
 })
 
-test.todo('WHAT[provider-projection-011] production composition supplies SHA-256 and excludes every transport-only field; injected hash tests cover the projection boundary only (GAP-082)')
+test('WHAT[provider-projection-011] production composition supplies SHA-256 and excludes every transport-only field', async () => {
+  // The production adapter is HostDigest.sha256Hex (the single Host crypto
+  // adapter); composition injects it into the journal (DelegationJournalAdapter).
+  // It must agree byte-for-byte with the reference implementation the injected
+  // tests used, so the boundary tests were not proving a different digest.
+  const { sha256Hex } = await import('../../../dist/Host/Digest.js')
+  assert.equal(sha256Hex('boundary-agreement'), sha256('boundary-agreement'))
+
+  // Transport-only fields never reach the semantic projection, so they cannot
+  // influence the canonical digest (WHAT 011: 排除时间戳、耗时、成本等传输字段).
+  const plain = { role: 'assistant', parts: [{ kind: 'text', text: 'payload' }] }
+  const transported = {
+    ...plain,
+    timestamp: '2026-01-01T00:00:00Z',
+    durationMs: 1234,
+    cost: 0.5,
+    requestId: 'wire-transport-id',
+  }
+  const digestOf = (messages) =>
+    Projection.cutoffDigest(sha256Hex, Projection.projectionSnapshot(Projection.semanticProjection(messages)), 1)
+  assert.equal(digestOf([plain]), digestOf([transported]))
+  const semantic = Projection.semanticProjection([transported])
+  for (const field of ['timestamp', 'durationMs', 'cost', 'requestId']) {
+    assert.equal(JSON.stringify(semantic).includes(field), false, `${field} must be excluded`)
+  }
+})

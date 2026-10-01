@@ -91,7 +91,7 @@
 | GAP-079 | participant-horizon-001/002/004/006—008/011/014/015 | PARTIAL | 有真实名册、fork 拒绝、热启动与结果渲染；完整 provider 可见性、最新 Blob 读取和多 child 生命周期待证。已知信息省略与最新记录交付的范围待审。 |
 | GAP-080 | participant-horizon-011 | PARTIAL | 旧真实取消场景名册仍列未返回后果，但后续 Join 未结束；保留最终领取/Retired 的 TODO。不得扩大超时或把取消前后名册正确当作闭环。 |
 | GAP-081 | participant-horizon-013；provider-projection-008 | PARTIAL | 热启动多行正文经 SyntheticToml 后多出 LF；无尾 LF/有尾 LF 均有实际反例。公共表示所有者需统一值保真与布局，不在调用方 trim 掩盖。 |
-| GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 保留编码、摘要、真实输入不变和组合用例；在线/重放全链、表示不取得权威及统一 I/O 所有权尚未完整证明。 |
+| GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 保留编码、摘要、真实输入不变和组合用例；011已证生产HostDigest.sha256Hex与注入哈希逐字节一致，transport-only字段（timestamp/durationMs/cost/requestId）不进语义投影不影响digest（tests/011）。在线/重放全链、表示不取得权威及统一 I/O 所有权尚未完整证明。 |
 | GAP-083 | repository-investigation-001—006/009 | OPEN | RoleLaw 词形不能证明 Agent 取证、推理、只读调查或停止时机；需要实际任务和可复核轨迹。局部热启动数据/指令隔离不代替这些行为。 |
 | GAP-084 | repository-investigation-007/008 | PARTIAL | 完整关键词与无跨调用缓存有局部证据；热启动任务字节被添加前缀的反例保留。原始任务保真及容量规则范围仍待统一。 |
 | GAP-085 | requirement-grounding-002/006/007/011/012 | PARTIAL | 自身 tests 覆盖可漏拒；read v1 后重读磁盘 v2 会把未见版本登记为已见。真实输出版本须贯穿原生/程序调用链；插件顺序与独立进程恢复仍缺证。文件/外链覆盖修复需在新构建验证。 |
