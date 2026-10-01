@@ -122,7 +122,7 @@
 | GAP-113 | behavior-diagnosis-010/017/019 | PARTIAL | 每个 cycle 必选 tip 不等于已成立违约；缺 provider identity/协议预算耗尽的 attempt 终态与进程 fatal 范围待统一。保持原合同，不扩大真实 kill。 |
 | GAP-114 | behavior-diagnosis 测试接缝 | PARTIAL | 中文完整 Rulebook、额外字段进入真实 decoder 的修正需新基线验证；生产 locale 装配本已正确，不声称修复了不存在的生产中文故障。 |
 | GAP-115 | guidance-delivery-001/002/005 | PARTIAL | TipName 覆盖集合不具独立 occurrence frontier，新 run 仍 IdentityOnly 的真实失败 TODO 保留。当前合同首个 occurrence Full 与已知机制提醒范围需裁决。 |
-| GAP-116 | guidance-delivery-002/004/007—012 | PARTIAL | 已有双语正文、磁盘重开与冻结字节；Full 事实与实际交付原子性、动态 owner 单次读取、权限不变和事务故障仍缺证，disposed handle 不冒充 append 失败。 |
+| GAP-116 | guidance-delivery-002/004/007—012 | PARTIAL | 008已证Blogger历史不进Main authority：两次观察后Main resolve只含处置正文不含检测正文，Blogger侧保留自身观察视图（tests/008）。已有双语正文、磁盘重开与冻结字节；Full 事实与实际交付原子性、动态 owner 单次读取、权限不变和事务故障仍缺证，disposed handle 不冒充 append 失败。 |
 | GAP-117 | guidance-delivery-006 | PARTIAL | 原无 association 时默认作为 guidance owner 的反例与拒绝修复已迁入；需新基线验证，不以单入口拒绝代替所有注入来源证明。 |
 | GAP-118 | attention-regulation | PARTIAL | 002已证abandon不动真实义务账本：seed WorkOwned后abandon，journal全投影deepEqual不变且快照非空（tests/002）。真插件重开、session 隔离与冻结消费有证据；同 SessionId 的 Life 清退已贯通：foldRelay 在 road 完成时 closeLife 清 Attention pending，复用 SessionId 不继承旧 work（tests/004 红绿对照）。同 occurrence 不同正文的拒绝/原值重放政策待审，actual enough 模型行为及完整账本不变仍待证。 |
 | GAP-119 | verification-system-021 | PARTIAL | 文件缺失/加载错误曾被汇总器忽略；已迁入容器失败与非零传播回归，待本基线正式验证。不能用其它成功叶子掩盖文件未完成。 |

@@ -6,7 +6,7 @@ import * as toml from '../../../dist/Context/Companion/Blogger/TomlSurface.js'
 import * as companion from '../../../dist/Context/Companion/ProjectionSurface.js'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import { withRulebookPackage } from '../../behavior-diagnosis/tests/support/resource-package.mjs'
-import { guidance, link, observe, withJournal, main, tip } from './support/journal.mjs'
+import { guidance, link, observe, withJournal, main, blogger, tip } from './support/journal.mjs'
 
 integrationTest('WHAT[guidance-delivery-008] Blogger composer takes detection source regardless of section vocabulary', async () => {
   await withRulebookPackage(async ({ write, surface }) => {
@@ -45,4 +45,24 @@ test('WHAT[guidance-delivery-008] previous tip retains its identity as low-trust
   assert.ok(plan.texts[1].includes('historic_frame'))
 })
 
-test.todo('WHAT[guidance-delivery-008] GAP-116 complete Main Host projection never promotes Blogger history into interaction authority')
+
+test('WHAT[guidance-delivery-008] complete Main Host projection never promotes Blogger history into interaction authority', async () => {
+  await withJournal(async ({ journal }) => {
+    await link(journal)
+    // Blogger observes the tip twice: the observation history is Blogger's
+    // low-trust material, never a Main authority source.
+    await observe(journal, 1)
+    await observe(journal, 2)
+
+    const resolved = await guidance.resolve(journal, main)
+    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/enforcer.md`, import.meta.url), 'utf8').trim()
+    const remediation = readFileSync(new URL(`../../../resources/enforcer/${tip}/main.md`, import.meta.url), 'utf8').trim()
+    assert.ok(resolved.text.includes(remediation), 'Main guidance still carries the remediation body')
+    assert.equal(resolved.text.includes(detection), false, 'Blogger detection history must not be promoted into Main guidance')
+
+    // The Blogger-side view keeps its own detection material: the histories
+    // stay isolated per audience rather than merging into one authority.
+    const bloggerView = await guidance.latest(journal, blogger)
+    assert.ok(bloggerView, 'Blogger keeps its own observation view')
+  })
+})
