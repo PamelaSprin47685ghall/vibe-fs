@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条只守住 Host-native todowrite 边界：provider 名单 `obligations` 换回 `todos`、数组原样交给宿主，插件只处理换名与 retainCheckpoints；实际安装版 Host TodoTable 物理替换仍见 GAP-220。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条只守住 Host-native todowrite 边界：provider 名单 `obligations` 换回 `todos`、数组原样交给宿主，插件只处理换名与 retainCheckpoints；004已证压缩事实不可反推待办：fold TodoCheckpointCommitted 只写压缩窗口（ToolCallId+RetainCheckpoints），其余投影字段不变，重放幂等，投影无 TodoTable 字段，退役 appendMagicTodo/snapshotMagicTodo 拒绝读写（tests/004）。实际安装版 Host TodoTable 物理替换仍见 GAP-220。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
