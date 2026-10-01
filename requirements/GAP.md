@@ -158,7 +158,7 @@
 | GAP-182 | institutional-learning-008 | PARTIAL | 合同要求LearningDispositionCommitted与必要DeferredWorkResurfaced同批；实际单事实携带消费ID并原子投影。需裁决是否允许完整单事实承载，不为实现方便删义务。 |
 | GAP-183 | speculative-investigation | PARTIAL | Policy/Frame/coordinator/EventStore真实局部证据保留；Host K+1外发、Off/K0等价、模糊提交阻断、XTrace闭环与真实semantic cut→结算→fatal仍缺证。旧 C01 入口已无实际 fatal subject，转入31的退役历史；真实 composition 的 F17 仍保留，不用006成功写入/重开充数。新上游013测试声称DryRun删除，却与现WHAT/runtime/九参数binding冲突；本批按真实接口保留DryRun反例并记录，未导入另一协议的假证明。 |
 | GAP-184 | speculative-investigation-002 | PARTIAL | 旧白名单coder/inspector/devops/inquiry与现活跃身份冲突，实际策略允许Engineer；失败TODO保留，活跃Engineer/DevOps及历史解码范围须统一后改合同。 |
-| GAP-210 | distribution | PARTIAL | 仓库manifest/loader、归档校验器及发布调度有局部证据；clean/incremental同字节、真实pack、完整release和隔离消费者仍须分别执行，安装场景TODO保留。 |
+| GAP-210 | distribution | PARTIAL | 仓库manifest/loader、归档校验器及发布调度有局部证据；006已证资源读取唯一owner：src/中读打包resources/语义文本的只有Resources/基础设施（PackageResources→ProviderResourceBytes链）与Ablation JSON loader，其余readFileSync均为物理工作区I/O；缺失资源经双语链fatal上抛（tests/006）。clean/incremental同字节、真实pack、完整release和隔离消费者仍须分别执行，安装场景TODO保留。 |
 | GAP-211 | distribution-003/007 | PARTIAL | 归档“仅dist/resources”与必需package.json及npm根README/LICENSE存在字面冲突；需明确payload与允许根元数据边界，不由checker白名单暗定合同。 |
 | GAP-212 | change-integration | PARTIAL | 保留真实Program/Git/CAS/Gate；移除猜Job、补claim、自建跨Road失效的Surface路径。真实horizon、多Road、mutation重验、跨进程发布恢复仍TODO；四个有效Mailbox用例迁回42。 |
 | GAP-213 | change-integration-004 | PARTIAL | 真实Program曾在gate内外两次TerminateRoadResources；已迁入只留release后settleLanded的窄修复和反例，待新构建验证，未重排其它durable写入。 |
