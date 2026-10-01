@@ -231,7 +231,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-216 | 全局构建 | OPEN | 上游plugin-composition仍引用已删除Vault及StrengthDelegate等；当前不能生成全局新鲜产物。部分认知/Relay独立闭包另缺CanvasCodec、AssumeFactCases、AgentFact等依赖，已实际编译确认失败。 |
 | GAP-217 | host-boundary-032 | PARTIAL | 现在精确断言值、对象身份、原键序和真实Host终态；现源码删除contract后尾部defineProperty，静态分析预示中间/首位键序反例，尚未执行。异常路径TODO保留，canary不再默认成功。 |
 | GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 上游load结算忽略append Error，TargetAgent空值又回退Byname；新接缝不补造成功事实。需在真实加载入口保留失败并验证合法历史材料边界。 |
-| GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。 |
+| GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。026已证证书传播不升级：posterior-credible wire解码固定为PosteriorCredible，数值不进DeterministicBound payload，FrequentistCoverage独立类型，非法mass验证拒绝（tests/026）。 |
 | GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 已证明插件 before 把 `obligations` 换名为 `todos`、只剥离 retainCheckpoints，数组对象与内容原样交给 Host（上游 Effect schema 解码已在 throwaway smoke 验证）；仍缺安装版 OpenCode 对当前 session TodoTable 的真实替换/清空物理 canary。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
