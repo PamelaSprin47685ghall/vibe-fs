@@ -192,7 +192,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-072 | office-capability-003/005/011 | PARTIAL | 上游已区分稳定权能与当前准入，旧歧义不再待决；跨投影语义同源及完整执行证明仍缺。 |
 | GAP-073 | office-capability | PARTIAL | 权限函数和有限样例判别器不证明Agent实际职责履行。标准Engineer的Sphinx新权限、Manager只读取证窗口、接力与在途PTY需真实调用链。 |
 | GAP-074 | capability-enforcement-001/013/014/017/018 | PARTIAL | 一次性permit与消费→释放→再消费仍有合同分岔；manifest和全链authority证明未闭合。 |
-| GAP-075 | capability-enforcement | PARTIAL | 配置、门禁、沙箱读写有局部证据；025拒绝后零物理读、评审时仍在途的调用、026零durable append及跨进程能力隔离仍待证。 |
+| GAP-075 | capability-enforcement | PARTIAL | 配置、门禁、沙箱读写有局部证据；025拒绝后零物理读已证：拒绝路径工具execute零调用且caller参数零变更（tests/025）。评审时仍在途调用的真并发overlap、026零durable append及跨进程能力隔离仍待证。 |
 | GAP-076 | cognitive-environment | PARTIAL | 资源组装不证明认知纪律、职责和完整双语语义；关键词伪证明已撤，有限材料审阅及真实行为仍须补齐。 |
 | GAP-077 | cognitive-environment-015 | OPEN | Blogger临时提示仍内联，白名单、重复注入、历史不变和真实Host路径缺证；不以源码词形计入通过。 |
 | GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |

@@ -388,5 +388,42 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     )
   })
 })
+test('WHAT[capability-enforcement-025] runtime denial performs zero reads and mutations', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-p15'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await openIncumbency(runtime, sessionID)
+    await injectAcceptedAssessment(runtime, sessionID)
 
-test.todo('WHAT[capability-enforcement-025] runtime denial performs zero reads and mutations, and an in-flight admitted read finishes across review acceptance; the current sequential case does not prove overlap')
+    const deniedOutput = {
+      args: {
+        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        contract: 'do-not-use-except-for-review',
+      },
+    }
+    const argsSnapshot = JSON.stringify(deniedOutput.args)
+
+    // Count every execution attempt on the tool body: a denial must never
+    // reach it (WHAT 025: 已接纳评审一律拒绝执行).
+    const tool = hooks.tool['js-manager']
+    const originalExecute = tool.execute.bind(tool)
+    let executions = 0
+    tool.execute = (...callArgs) => {
+      executions += 1
+      return originalExecute(...callArgs)
+    }
+
+    await assert.rejects(
+      async () => {
+        await hooks['tool.execute.before'](
+          { tool: 'js-manager', sessionID, callID: 'call-p15-denied' },
+          deniedOutput,
+        )
+      },
+      /not permitted under current manager capability facts/i,
+    )
+
+    assert.equal(executions, 0, 'denial must perform zero tool executions (zero reads)')
+    assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial must not mutate the caller arguments')
+  })
+})
