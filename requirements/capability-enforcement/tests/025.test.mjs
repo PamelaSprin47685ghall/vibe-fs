@@ -388,23 +388,33 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     )
   })
 })
-test('WHAT[capability-enforcement-025] runtime denial performs zero reads and mutations', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+test('WHAT[capability-enforcement-025] runtime denial performs zero reads, mutations and durable side effects', async () => {
+  const { writeFileSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-p15'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     await injectAcceptedAssessment(runtime, sessionID)
 
+    // A sentinel file inside the plugin workspace: a real read through the
+    // js-manager body would touch it; the denial must leave both its bytes
+    // and the durable ledger untouched.
+    const sentinel = join(directory, 'sentinel-p15.md')
+    writeFileSync(sentinel, 'untouched evidence\n')
+    const before = journal.JournalSurface_snapshot(runtime.journal)
+
     const deniedOutput = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { const f = await this.file('sentinel-p15.md'); return f.text('^', '$'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
     const argsSnapshot = JSON.stringify(deniedOutput.args)
 
-    // Count every execution attempt on the tool body: a denial must never
-    // reach it (WHAT 025: 已接纳评审一律拒绝执行).
+    // Count every execution attempt on the tool body: the denial must never
+    // reach the interpreter (WHAT 025: 已接纳评审一律拒绝执行).
     const tool = hooks.tool['js-manager']
     const originalExecute = tool.execute.bind(tool)
     let executions = 0
@@ -423,7 +433,15 @@ test('WHAT[capability-enforcement-025] runtime denial performs zero reads and mu
       /not permitted under current manager capability facts/i,
     )
 
-    assert.equal(executions, 0, 'denial must perform zero tool executions (zero reads)')
+    assert.equal(executions, 0, 'denial must never reach the tool interpreter')
     assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial must not mutate the caller arguments')
+    // The sentinel file keeps its exact bytes: no read side effect escaped.
+    assert.equal(readFileSync(sentinel, 'utf8'), 'untouched evidence\n')
+    // The durable ledger is unchanged: the denial appended no fact that any
+    // fold consumed, so the whole projection set is byte-identical.
+    const after = journal.JournalSurface_snapshot(runtime.journal)
+    assert.deepEqual(after, before)
   })
 })
+
+test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')

@@ -873,7 +873,7 @@ test('WHAT[participant-identity-008] an Engineer inherited seed validates agains
     error: null,
   })
 })
-test('WHAT[participant-identity-008] fission lane admission preserves owner-issued lineage without inferring it from a physical parent', () => {
+test('WHAT[participant-identity-008] derived roots reject blank owner witness fields at construction', () => {
   const owner = ownerProfile('engineer')
   const seed = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(seed.ok, true, seed.error)
@@ -915,3 +915,4 @@ test('WHAT[participant-identity-008] fission lane admission preserves owner-issu
   assert.equal(honest.ok, true, honest.error)
 })
 }
+test.todo('WHAT[participant-identity-008] actual Fission lane admission preserves owner-issued lineage without inferring it from a physical parent (GAP-158: real fission admission path pending — the construction-time blank-field rejection above is retained but does not prove the lane admission flow)')

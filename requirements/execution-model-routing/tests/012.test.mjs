@@ -292,7 +292,7 @@ test('WHAT[execution-model-routing-012] EMR_012_try_read_execution_is_read_only'
   assert.equal(scheduled, settled, 'read-only queries never invoke the scheduler')
 })
 
-test('WHAT[execution-model-routing-012] compiler rejects a fabricated exact opaque capacity fence and direct foreign custody construction', async () => {
+test('WHAT[execution-model-routing-012] fabricated fences and foreign custody fail closed at every settlement API', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
   assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
@@ -331,4 +331,6 @@ test('WHAT[execution-model-routing-012] compiler rejects a fabricated exact opaq
   // The real lease stays settled exactly once; no fabricated call disturbed it.
   assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'AlreadyApplied' })
 })
+
+test.todo('WHAT[execution-model-routing-012] compiler rejects fabricated exact opaque capacity fences and direct foreign custody construction (GAP-128: F# type-level opacity proof pending — the runtime fail-closed test above is retained but does not prove compile-time rejection)')
 }

@@ -46,7 +46,7 @@ test('WHAT[guidance-delivery-008] previous tip retains its identity as low-trust
 })
 
 
-test('WHAT[guidance-delivery-008] complete Main Host projection never promotes Blogger history into interaction authority', async () => {
+test('WHAT[guidance-delivery-008] Main guidance resolution keeps Blogger detection history out of the remediation body', async () => {
   await withJournal(async ({ journal }) => {
     await link(journal)
     // Blogger observes the tip twice: the observation history is Blogger's
@@ -66,3 +66,6 @@ test('WHAT[guidance-delivery-008] complete Main Host projection never promotes B
     assert.ok(bloggerView, 'Blogger keeps its own observation view')
   })
 })
+
+
+test.todo('WHAT[guidance-delivery-008] complete Main Host projection never promotes Blogger history into interaction authority (GAP-116: full Host projection path pending — the resolver isolation test above covers the guidance text only)')

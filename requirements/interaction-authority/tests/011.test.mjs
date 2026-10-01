@@ -336,7 +336,7 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_agentless_root_does_not_invent
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 
-test('WHAT[interaction-authority-011] attempt profile carries exact accepted identity atomically', async () => {
+test('WHAT[interaction-authority-011] accepted root identity and its projection agree field by field', async () => {
   const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
   const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
   const { withJournal, acceptOwner, hostPort } = await import('./support/authority.mjs')
@@ -366,11 +366,14 @@ test('WHAT[interaction-authority-011] attempt profile carries exact accepted ide
     assert.ok(profile.participantIdentity)
     assert.equal(profile.participantIdentity.participant, 'engineer')
 
-    // The projection serves the same atomic record: no field-level drift
-    // between the acceptance and the durable observation.
+    // The projection serves the same record: no field-level drift between
+    // the acceptance and the durable observation (same-process only).
     const observed = dispatch.projectionObservation(handle, 'child-ia011').activeLogicalRun
     assert.deepEqual(observed, profile)
   })
 })
 }
 
+
+
+test.todo('WHAT[interaction-authority-011] per-physical target/lease is carried atomically in the attempt profile and survives restart (GAP-122: lease atomicity and restart replay pending — the identity-agreement test above covers the same-process projection only)')

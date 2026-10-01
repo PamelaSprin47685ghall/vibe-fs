@@ -31,8 +31,9 @@ test('WHAT[concern-routing-002] actual newly eligible peer receives address disc
   })
 })
 
-test('WHAT[concern-routing-002] all eligible participant kinds receive each live generation exactly once across restart, excluding ineligible roles', async () => {
+test('WHAT[concern-routing-002] eligible participant kinds receive each live generation once, excluding ineligible roles', async () => {
   const { withRestartablePlugin, configureManagedPlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
   await withRestartablePlugin(async (start, _directory, fixture) => {
     const boot = async () => {
       const hooks = await start()
@@ -54,19 +55,28 @@ test('WHAT[concern-routing-002] all eligible participant kinds receive each live
       ['restart-devops', 'devops'],
     ]
     await fixture.withRuntime(async (runtime) => {
-      for (const [session] of eligible) await admit(runtime, session)
+      for (const [session, role] of eligible) await admit(runtime, session, role)
     })
-    const seen = new Map()
+    // Observe the durable admission: each session's accepted root carries the
+    // declared role, so the test really covers distinct participant kinds.
+    for (const [session, role] of eligible) {
+      await fixture.withRuntime(async (runtime) => {
+        const observed = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+        assert.equal(observed?.participantIdentity?.role, role, `${session} must be admitted as ${role}`)
+      })
+    }
+    const delivered = []
     for (const [session] of eligible) {
       const first = await transform(hooks, session, [user(session)])
       assert.match(JSON.stringify(hints(first)), /RESTART-GENERATION/, `${session} receives the announcement`)
-      seen.set(session, 1)
+      delivered.push(session)
       const next = await transform(hooks, session, [...first, ...toolBatch(session, 'second')])
       assert.doesNotMatch(JSON.stringify(hints(next).slice(hints(first).length)), /RESTART-GENERATION/, 'no repeat within the same life')
     }
+    assert.deepEqual(delivered, eligible.map(([session]) => session))
 
-    // Restart: durable subscription survives, already-delivered recipients do
-    // not get a second announcement, and a newly eligible peer still gets it.
+    // Restart: the durable subscription survives and a newly eligible peer
+    // still receives the announcement.
     await fixture.stop(hooks)
     hooks = await boot()
     await fixture.withRuntime(async (runtime) => {
@@ -74,8 +84,6 @@ test('WHAT[concern-routing-002] all eligible participant kinds receive each live
     })
     const newcomer = await transform(hooks, 'restart-newcomer', [user('restart-newcomer')])
     assert.match(JSON.stringify(hints(newcomer)), /RESTART-GENERATION/, 'newly eligible peer receives it after restart')
-    // Across-restart exactly-once for already-delivered recipients depends on
-    // journal replay restoring AnnouncementCoverage; recorded in GAP-155.
 
     // Ineligible role: blogger carries no cognitive tools, so no announcement.
     await fixture.withRuntime(async (runtime) => {
@@ -86,3 +94,5 @@ test('WHAT[concern-routing-002] all eligible participant kinds receive each live
     await fixture.stop(hooks)
   })
 })
+
+test.todo('WHAT[concern-routing-002] already-delivered recipients do not receive the announcement again after restart (GAP-155: restart replay does not restore AnnouncementCoverage — reproduced, root cause under investigation)')

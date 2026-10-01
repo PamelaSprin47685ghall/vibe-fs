@@ -35,20 +35,36 @@ test('WHAT[distribution-006] every production resource reader uses the sole infr
   // physical reads, the other modules are semantic assemblers on top of it.
   // Ablation/Manifest reads its own structured JSON configuration.
   const isOwner = (rel) => rel.startsWith('Resources/') || rel === 'Ablation/Manifest.fs'
-  const violators = []
-  for (const file of collect(SRC_ROOT)) {
-    const rel = relative(SRC_ROOT, file)
-    if (isOwner(rel)) continue
-    const text = read(file, 'utf8')
-    // Reading packaged semantic resources means touching the `resources/`
-    // tree or the PackageResources API; physical workspace I/O is unrelated.
-    if (/PackageResources\s*\.\s*(readText|exists)/.test(text) && !isOwner(rel)) {
-      violators.push(`${rel}: calls PackageResources directly`)
+  const scanViolators = (files) => {
+    const found = []
+    for (const file of files) {
+      const rel = relative(SRC_ROOT, file)
+      if (isOwner(rel)) continue
+      const text = read(file, 'utf8')
+      // Reading packaged semantic resources means touching the `resources/`
+      // tree or the PackageResources API; physical workspace I/O is unrelated.
+      if (/PackageResources\s*\.\s*(readText|exists)/.test(text)) {
+        found.push(`${rel}: calls PackageResources directly`)
+      }
+      if (/["']resources\/(?!ablation)/.test(text) && /readFileSync|readFile\b/.test(text)) {
+        found.push(`${rel}: reads packaged resources/ directly`)
+      }
     }
-    if (/["']resources\/(?!ablation)/.test(text) && /readFileSync|readFile\b/.test(text)) {
-      violators.push(`${rel}: reads packaged resources/ directly`)
-    }
+    return found
   }
+  // Violation oracle (verification-system-004): the scan must actually detect
+  // a non-owner that calls PackageResources — an empty list on the current
+  // tree is only meaningful if the rule fires on a controlled violation.
+  const syntheticViolator = join(REPO_ROOT, 'src', 'Wanxiangshu', 'OpenCode', 'Tools', 'synthetic-owner-probe.fs')
+  const { writeFileSync: writeProbe, rmSync: rmProbe } = await import('node:fs')
+  writeProbe(syntheticViolator, 'module Probe =\n    let text = PackageResources.readText \"provider/role/manager/en.md\"\n')
+  try {
+    const detected = scanViolators([syntheticViolator])
+    assert.deepEqual(detected, ['OpenCode/Tools/synthetic-owner-probe.fs: calls PackageResources directly'])
+  } finally {
+    rmProbe(syntheticViolator)
+  }
+  const violators = scanViolators(collect(SRC_ROOT))
   assert.deepEqual(violators, [])
 
   // Missing-resource failure is fatal and reaches the caller: the loader

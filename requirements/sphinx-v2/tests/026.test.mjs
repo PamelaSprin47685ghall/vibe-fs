@@ -24,7 +24,7 @@ test('WHAT[sphinx-v2-026] malformed likelihoods cannot produce an exact posterio
   }
 })
 
-test('WHAT[sphinx-v2-026] runtime certificate propagation never upgrades model posterior or adaptive samples into external correctness or deterministic bounds', async () => {
+test('WHAT[sphinx-v2-026] certificate wire decoding keeps posterior guarantees distinct from external correctness classes', async () => {
   const surface = await import('../../../dist/Sphinx/V2/Core/Surface.js')
   const certificate = await import('../../../dist/Sphinx/V2/Core/Certificate.js')
 
@@ -55,3 +55,6 @@ test('WHAT[sphinx-v2-026] runtime certificate propagation never upgrades model p
   const validPosterior = new certificate.CertificateGuarantee(3, ['0.9', 0.05, 'model'])
   assert.equal(certificate.Certificate_validateGuarantee(validPosterior).tag, 0)
 })
+
+
+test.todo('WHAT[sphinx-v2-026] runtime certificate propagation never upgrades model posterior or adaptive samples into external correctness or deterministic bounds (GAP-219: runtime wiring pending — the wire-decoding distinctness test above does not prove cross-operator propagation)')

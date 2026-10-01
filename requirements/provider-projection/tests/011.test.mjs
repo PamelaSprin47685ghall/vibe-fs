@@ -31,7 +31,7 @@ test('WHAT[provider-projection-011] cutoff digest includes exactly the selected 
   assert.notEqual(Projection.cutoffDigest(sha256, snapshot, 2), Projection.cutoffDigest(sha256, snapshot, 3))
 })
 
-test('WHAT[provider-projection-011] production composition supplies SHA-256 and excludes every transport-only field', async () => {
+test('WHAT[provider-projection-011] the Host crypto adapter agrees with the reference hash and transport fields stay out of the semantic projection', async () => {
   // The production adapter is HostDigest.sha256Hex (the single Host crypto
   // adapter); composition injects it into the journal (DelegationJournalAdapter).
   // It must agree byte-for-byte with the reference implementation the injected
@@ -57,3 +57,6 @@ test('WHAT[provider-projection-011] production composition supplies SHA-256 and 
     assert.equal(JSON.stringify(semantic).includes(field), false, `${field} must be excluded`)
   }
 })
+
+
+test.todo('WHAT[provider-projection-011] production composition actually injects HostDigest.sha256 into the journal path (GAP-082: composition wiring observation pending — the adapter-agreement test above proves the function, not the wiring)')

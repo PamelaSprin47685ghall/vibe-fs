@@ -317,7 +317,7 @@ for (const [participant, tools] of [
     })
   })
 }
-test('WHAT[dispatch-protocol-010] all actual synthetic send producers leave model selection to admission', async () => {
+test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection to admission at the wire', async () => {
   await withJournal('dp010-producers', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
@@ -354,4 +354,6 @@ test('WHAT[dispatch-protocol-010] all actual synthetic send producers leave mode
     }
   })
 })
+
+test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root (GAP-136: F# type-level proof pending — the wire model-free test above is retained but does not prove compile-time rejection)')
 }

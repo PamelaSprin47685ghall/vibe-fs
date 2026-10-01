@@ -368,7 +368,7 @@ test('WHAT[context-compression-027] live request construction preserves its supp
 
 test.todo('WHAT[context-compression-027] actual commit refuses a restored old-epoch request against a newer live projection; preserving the number alone does not prove authority; GAP-104')
 
-test('WHAT[context-compression-027] independent consumer cannot construct private Main or Squash records', () => {
+test('WHAT[context-compression-027] wire descriptors cannot bypass the validating constructor at runtime', () => {
   const scope = runtime.createScope()
   try {
     // A wire descriptor is not a context: the only path to a live request is
@@ -463,3 +463,5 @@ test('WHAT[context-compression-027] independent consumer cannot construct privat
     runtime.dispose(scope)
   }
 })
+
+test.todo('WHAT[context-compression-027] independent consumers cannot construct private Main or Squash records at compile time (GAP-104: F# record private-constructor proof pending — the runtime validating-constructor test above is retained but does not prove F# type-level privacy)')
