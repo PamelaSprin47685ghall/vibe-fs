@@ -1,8 +1,10 @@
 # master 修正轮单测结果（2026-10-02）
+# 复核提交: dde72867e
 # 方法: node requirements/verification-system/tests/run.mjs (810 文件)
 # 总数: 31 项失败 — 与审查时基线 (master-a9dba0a2a) 逐项 diff 完全一致, 零新增零修复
-# 本轮改动: 8 个测试文件修正 (角色传递/真实副作用观察/编译正反例/TODO 恢复) + GAP 修正
-# 注意: durable-events/023 的编译测试含受控变异 (约 30s), 属最慢用例之一
+# 复核汇总: 3586 passed, 31 failed, 70 skipped, 434 todo; 810/810 文件完成, 进程组检查通过
+# 本轮改动: 12 个测试文件修改 (角色传递、局部断言、编译测试及 11 项 TODO 恢复) + GAP 修正
+# 证明限制: 零读取观察、codec 编译反例、测试源码隔离及 concern 跨重启复现仍待修正；失败集合不变不代表这些义务已完成
 
 ✖ WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ignored
 ✖ WHAT[behavior-diagnosis-009] actual cycle decoder accepts one completed call and refuses zero or two
