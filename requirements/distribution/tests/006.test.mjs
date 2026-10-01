@@ -35,10 +35,10 @@ test('WHAT[distribution-006] every production resource reader uses the sole infr
   // physical reads, the other modules are semantic assemblers on top of it.
   // Ablation/Manifest reads its own structured JSON configuration.
   const isOwner = (rel) => rel.startsWith('Resources/') || rel === 'Ablation/Manifest.fs'
-  const scanViolators = (files) => {
+  const scanViolators = (files, rootDir = SRC_ROOT) => {
     const found = []
     for (const file of files) {
-      const rel = relative(SRC_ROOT, file)
+      const rel = relative(rootDir, file)
       if (isOwner(rel)) continue
       const text = read(file, 'utf8')
       // Reading packaged semantic resources means touching the `resources/`
@@ -55,15 +55,29 @@ test('WHAT[distribution-006] every production resource reader uses the sole infr
   // Violation oracle (verification-system-004): the scan must actually detect
   // a non-owner that calls PackageResources — an empty list on the current
   // tree is only meaningful if the rule fires on a controlled violation.
-  const syntheticViolator = join(REPO_ROOT, 'src', 'Wanxiangshu', 'OpenCode', 'Tools', 'synthetic-owner-probe.fs')
-  const { writeFileSync: writeProbe, rmSync: rmProbe } = await import('node:fs')
-  writeProbe(syntheticViolator, 'module Probe =\n    let text = PackageResources.readText \"provider/role/manager/en.md\"\n')
+  // The probe lives in an isolated temp tree that mirrors the src layout, so
+  // the real workspace is never written (a crash cannot leave residue, and
+  // parallel verification inputs stay clean).
+  const { mkdtempSync, rmSync: rmProbeDir, writeFileSync: writeProbe } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const probeRoot = mkdtempSync(join(tmpdir(), 'wxs-006-probe-'))
+  const probeDir = join(probeRoot, 'OpenCode', 'Tools')
+  const { mkdirSync: mkdirProbe } = await import('node:fs')
+  mkdirProbe(probeDir, { recursive: true })
+  const syntheticViolator = join(probeDir, 'synthetic-owner-probe.fs')
+  writeProbe(syntheticViolator, 'module Probe =\n    let text = PackageResources.readText "provider/role/manager/en.md"\n')
   try {
-    const detected = scanViolators([syntheticViolator])
+    // The scan rule takes explicit source material: the probe tree is passed
+    // in with the same relative layout the real scan uses.
+    const detected = scanViolators(collect(probeRoot), probeRoot)
     assert.deepEqual(detected, ['OpenCode/Tools/synthetic-owner-probe.fs: calls PackageResources directly'])
+    // Isolation evidence: the probe never existed under the real src root.
+    const { existsSync: probeExists } = await import('node:fs')
+    assert.equal(probeExists(join(SRC_ROOT, 'OpenCode', 'Tools', 'synthetic-owner-probe.fs')), false)
   } finally {
-    rmProbe(syntheticViolator)
+    rmProbeDir(probeRoot, { recursive: true, force: true })
   }
+  // Real-tree scan stays read-only.
   const violators = scanViolators(collect(SRC_ROOT))
   assert.deepEqual(violators, [])
 

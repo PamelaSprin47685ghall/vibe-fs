@@ -95,4 +95,50 @@ test('WHAT[concern-routing-002] eligible participant kinds receive each live gen
   })
 })
 
-test.todo('WHAT[concern-routing-002] already-delivered recipients do not receive the announcement again after restart (GAP-155: restart replay does not restore AnnouncementCoverage — reproduced, root cause under investigation)')
+
+test('WHAT[concern-routing-002] already-delivered recipients do not receive the announcement again after restart (reproduced defect: plugin-internal journal replay does not restore AnnouncementCoverage)', async () => {
+  const { withRestartablePlugin, configureManagedPlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  await withRestartablePlugin(async (start, _directory, fixture) => {
+    const boot = async () => {
+      const hooks = await start()
+      await configureManagedPlugin(hooks)
+      return hooks
+    }
+    let hooks = await boot()
+    await fixture.withRuntime(async (runtime) => {
+      await admit(runtime, 'repro-owner')
+    })
+    await hooks.tool.subscribe.execute({ id: 'build', concern: 'REPRO-GENERATION' }, context('repro-owner', 'subscription'))
+    await hooks.tool.publish.execute({ id: 'build', message: 'OWNER-REPRO-MESSAGE' }, context('repro-owner', 'publication'))
+
+    const eligible = [
+      ['repro-engineer', 'engineer'],
+      ['repro-manager', 'manager'],
+      ['repro-devops', 'devops'],
+    ]
+    await fixture.withRuntime(async (runtime) => {
+      for (const [session, role] of eligible) await admit(runtime, session, role)
+    })
+    for (const [session] of eligible) {
+      const first = await transform(hooks, session, [user(session)])
+      assert.match(JSON.stringify(hints(first)), /REPRO-GENERATION/, session + ' receives the announcement before restart')
+    }
+
+    // Restart the plugin incarnation over the same Git-private journal
+    // (plugin reopen — not a proven OS-crash recovery).
+    await fixture.stop(hooks)
+    hooks = await boot()
+
+    // New transform occurrences for already-delivered recipients must not
+    // re-announce. Evidence gathered while reproducing: the durable event
+    // order is correct (MailboxSubscribed precedes the Host facts), a
+    // separately-acquired journal replays to AnnouncementCoverage = 3, and
+    // the re-delivering transform appends no new Host fact — the plugin's
+    // internal journal view simply does not carry the restored coverage.
+    for (const [session] of eligible) {
+      const after = await transform(hooks, session, [user(session)])
+      assert.doesNotMatch(JSON.stringify(hints(after)), /REPRO-GENERATION/, session + ' does not receive it twice across restart')
+    }
+    await fixture.stop(hooks)
+  })
+})

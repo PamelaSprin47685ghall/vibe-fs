@@ -146,7 +146,7 @@
 | GAP-146 | degeneration-guard-007 | PARTIAL | interrupt拒绝后同run可再次中断；interrupt仍pending时可启动continuation。真实失败TODO保留，须沿actual任务先后和清理修复，不放宽至多一次合同。 |
 | GAP-147 | degeneration-guard-003/004/005 | PARTIAL | runtime逐delta tokenize与仓库连续流包络可能因分块产生不同度量；需明确传输分块是否影响语义及有界缓冲，有限样本分数不同不等于已证明误杀。 |
 | GAP-153 | delegation | PARTIAL | 实际fork/resume、批次、接收、队列和交接用例保留；Sphinx标准Engineer的完整权限链、全局注册、绑定恢复、重复terminal及fatal settlement→mandatory fuse仍待证。55转入42的四个Mailbox用例仅证明领取顺序和中断；旧只读Sphinx政策已退役。 |
-| GAP-155 | concern-routing | PARTIAL | 002部分证明：engineer/manager/devops各收一次公告（admit传role且投影验证实际准入身份）、blogger不收、重启后新合格者仍收到；transform helper补chat.message修复002/004基线红。已收者跨重启不重复仍待证：当前仅保留文字TODO，尚无可执行复现，不能确认AnnouncementCoverage未恢复这一根因。真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
+| GAP-155 | concern-routing | PARTIAL | 002部分证明：engineer/manager/devops各收一次公告（admit传role且投影验证实际准入身份）、blogger不收、重启后新合格者仍收到；transform helper补chat.message修复002/004基线红。跨重启已收者不重复——真实缺陷已带可执行失败回归（tests/002复现测试：durable事件顺序正确、独立journal重放恢复coverage=3、重复投递的transform无新durable append，插件内部journal视图未携带恢复的coverage；插件重开非OS crash恢复）。真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
 | GAP-156 | concern-routing-003 | PARTIAL | 同occurrence不同sender/address/message原被当成功重放；已迁入完整材料一致性裁决、双语拒绝资源和真实入口反例，待新构建验证。 |
 | GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留；手工retire纯测试不证明正式终结驱动durable MailboxRetired，需接通完成/放弃/replacement及恢复。 |
 | GAP-158 | intra-participant-parallelism | PARTIAL | participant-identity/008部分证明：InheritedFromOwner缺任一owner字段（空串/空白/null/undefined）全部typed fail-closed，完整witness正常准入；真实Fission lane的identity传递仍待证。已有admission、parser、bundle/ring与权限拒绝局部测试保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
