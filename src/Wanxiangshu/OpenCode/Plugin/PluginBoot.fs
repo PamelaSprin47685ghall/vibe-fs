@@ -44,18 +44,30 @@ module PluginBoot =
             do! ToolSchemaJson.initialize ()
 
             let portOpt = OpenCodePortAdapter.create input
+            let workspaceDirectory = PluginHost.workspaceDirectory input
 
             let! journalResult = PluginHost.createJournal input
+
+            let sharedRuntimeKey = workspaceDirectory |> Option.map RuntimePath.forWorkspace
 
             let journal =
                 match journalResult with
                 | Ok value -> value
                 | Error err -> raise (InvalidOperationException err)
 
-            let scope = new PluginRuntimeScope(journal)
-            let strengthScope = new PluginStrengthScope()
+            let strengthScope =
+                match SharedPredictorScope.tryAcquireForRuntime sharedRuntimeKey with
+                | Some sharedScope -> sharedScope
+                | None -> new PluginStrengthScope(None)
+
+            let isSharedModelLease sessionId =
+                strengthScope.StrengthRuntime.IsResidentSession sessionId
+                || strengthScope.StrengthRuntime.TryFindResident(sessionId).IsSome
+
+            let scope = new PluginRuntimeScope(journal, isSharedModelLease)
+
             scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
-            scope.AttachScopeDispose(fun () -> strengthScope.Dispose())
+            scope.AttachScopeDispose(fun () -> SharedPredictorScope.release strengthScope)
 
             // host-boundary-032 / the protocol argument vault
             // records tool.execute.before originals so the provider transform
@@ -75,13 +87,6 @@ module PluginBoot =
                 match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
                 | true, parentId -> Some(SessionId.create parentId)
                 | false, _ -> None
-
-            // The stable workspace, captured once at plugin init. The transform
-            // input carries no directory; the blogger must be pinned to this
-            // path (not the manager worktree) so its system prompt survives the
-            // worktree release at publish. First boot wins: the main workspace
-            // instance starts before the manager worktree instances.
-            let workspaceDirectory = PluginHost.workspaceDirectory input
 
             return
                 { Input = input

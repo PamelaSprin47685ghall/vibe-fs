@@ -22,7 +22,7 @@ Attached session 只有一个 owner，且不得以自身为 owner；冲突归属
 
 ## [006] 物理 Host Parent 恒为 Family Root 且逻辑归属由 Journal 承载
 
-所有 managed child 在 Host 中直接挂在 family root 下。逻辑归属只由持久化关联事实决定，不从物理 parentID 推断；物理父节点也不构成 Role、Persona、身份来源或继承证据。
+所有 managed child 在 Host 中直接挂在 family root 下。逻辑归属只由持久化关联事实决定，不从物理 parentID 推断；物理父节点也不构成 Role、Persona、身份来源或继承证据。对于空本地映射的已恢复会话或深层逻辑 owner，创建托管子会话与列表子节点时必须权威查询 Host 物理父链解析真实 Family Root（查询失败或检测到环路一律安全失败拒绝创建，禁止无证猜测 root）；托管子会话列表亦在真实根节点下查询物理子节点，保证平坦拓扑与常驻副本判定一致。
 
 ## [007] Durable 关联事实与正交分类派生视图解耦
 

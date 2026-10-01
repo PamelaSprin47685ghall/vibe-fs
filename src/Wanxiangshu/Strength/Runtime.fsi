@@ -34,10 +34,11 @@ type StrengthRuntime =
     /// STRENGTH-004: the owner's resident replica session, reused across decisions
     /// and released only when the owner ends.
     member TryFindResident: owner: SessionId -> SessionId option
+    member IsResidentSession: replica: SessionId -> bool
     member BindResident: owner: SessionId * replica: SessionId -> unit
     member ReleaseResident: owner: SessionId -> SessionId option
     member ReleaseResidentByReplica: replica: SessionId -> SessionId option
-    member ReleaseAllResidents: unit -> SessionId list
+    member ReleaseAllResidents: unit -> (SessionId * SessionId) list
     member TryFindByOwner: ownerSessionId: SessionId -> StrengthReplicaBinding option
     member TryFindByReplica: replicaSessionId: SessionId -> StrengthReplicaBinding option
     member TryCapabilities: replicaSessionId: SessionId -> Set<ToolPermission> option

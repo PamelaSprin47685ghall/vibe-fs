@@ -94,7 +94,15 @@ type private StrengthReplicaDecisionState =
         Completion: TaskCompletionSource<StrengthReplicaOutcome>
         RequestsAdmitted: int
         Batches: StrengthRequestBatch list
+        TerminalSubscription: IDisposable option
+        PhysicalUserMessageId: PhysicalUserMessageId option
+        PendingTurns: (PhysicalUserMessageId * ReconcileProgram.TurnOutcome) list
     }
+
+type private StrengthReplicaPreparationFlight =
+    { DecisionId: StrengthDecisionId
+      Completion: TaskCompletionSource<Result<StrengthReplicaPreparation, string>>
+      mutable Cancelled: bool }
 
 module private StrengthReplicaRuntimeLogic =
 
@@ -126,7 +134,10 @@ module private StrengthReplicaRuntimeLogic =
           SemanticTerminal = None
           Completion = TaskCompletionSource<StrengthReplicaOutcome>()
           RequestsAdmitted = 0
-          Batches = [] }
+          Batches = []
+          TerminalSubscription = None
+          PhysicalUserMessageId = None
+          PendingTurns = [] }
 
     let registerLiveOrAbort
         (sessions: ISessionHostPort)
@@ -277,6 +288,7 @@ module private StrengthReplicaRuntimeLogic =
         (replica: SessionId)
         (identitySeed: PromptAuthority.IdentitySeed)
         (state: StrengthReplicaDecisionState)
+        (bindPhysical: PromptKey -> unit)
         : Task<unit> =
         task {
             try
@@ -299,6 +311,7 @@ module private StrengthReplicaRuntimeLogic =
                         (Some tools)
 
                 do! applyBootstrapSendResult complete abortReplica state sent
+                sent |> Result.iter bindPhysical
             with ex ->
                 complete (StrengthReplicaTerminal.Failed ex.Message) state
                 do! abortReplica state
@@ -516,6 +529,25 @@ module private StrengthReplicaRuntimeLogic =
         | ReplicaAdmission.Idempotent admitted ->
             handleIdempotentSession replaceState complete liveRegistry sessions output admitted
 
+    let private handleBoundTransform tryState replaceState complete liveRegistry sessions replica output rawMessages =
+        match tryState replica with
+        | None -> Task.FromResult true
+        | Some current ->
+            let key = requestKeyOf replica rawMessages
+            let endedInPlainText = current.RequestsAdmitted > 0 && endsWithPlainText rawMessages
+
+            handleAdmission
+                tryState
+                replaceState
+                complete
+                liveRegistry
+                sessions
+                replica
+                output
+                current
+                key
+                endedInPlainText
+
     /// DELEGATE-5.3: admission happens here, before the transform may let this
     /// outbound request leave the process. The transform only mirrors an
     /// admitted request; a request that must not be sent retires at the
@@ -526,6 +558,7 @@ module private StrengthReplicaRuntimeLogic =
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
         (liveRegistry: StrengthRuntime)
         (sessions: ISessionHostPort)
+        (bindPhysical: StrengthReplicaDecisionState -> PhysicalUserMessageId -> unit)
         (sessionIdText: string)
         (output: obj)
         : Task<bool> =
@@ -536,20 +569,11 @@ module private StrengthReplicaRuntimeLogic =
         | Some state when state.SemanticTerminal |> Option.isSome -> Task.FromResult true
         | Some state ->
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
-            let key = requestKeyOf replica rawMessages
-            let endedInPlainText = endsWithPlainText rawMessages
 
-            handleAdmission
-                tryState
-                replaceState
-                complete
-                liveRegistry
-                sessions
-                replica
-                output
-                state
-                key
-                endedInPlainText
+            ProviderWireCapture.lastUserMessageId rawMessages
+            |> Option.iter (bindPhysical state)
+
+            handleBoundTransform tryState replaceState complete liveRegistry sessions replica output rawMessages
 
     let completeFromTurnOutcome
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
@@ -616,12 +640,21 @@ type StrengthReplicaRuntime
         registerReplica: SessionId -> SessionId -> string -> unit,
         ?workspaceDirectory: string,
         ?tryAcquireModel: (SessionId -> string -> OpencodeModel option),
-        ?releaseModel: (SessionId -> unit)
+        ?releaseModel: (SessionId -> unit),
+        ?restoreResident: (SessionId -> string -> Task<Result<SessionId option, string>>),
+        ?snapshotPort: ISessionSnapshotPort
     ) =
 
     let gate = obj ()
     // DSL-MUTABLE: resource — replica decision state map
     let byReplica = Dictionary<string, StrengthReplicaDecisionState>()
+    // DSL-MUTABLE: resource — owner preparation flights, claimed before Host awaits
+    let preparingOwners = Dictionary<string, StrengthReplicaPreparationFlight>()
+    // DSL-MUTABLE: resource — semantic outcomes retained until durable publication
+    let decisionOutcomes =
+        Dictionary<string, SessionId * Task<StrengthReplicaOutcome>>()
+    // DSL-MUTABLE: resource — irreversible coordinator disposal
+    let mutable disposed = false
     let directory = workspaceDirectory
 
     let key (sessionId: SessionId) = SessionId.value sessionId
@@ -673,7 +706,10 @@ type StrengthReplicaRuntime
             | true, current when Object.ReferenceEquals(current.Completion, previous.Completion) ->
                 byReplica.[key previous.Replica] <-
                     { next with
-                        SemanticTerminal = current.SemanticTerminal }
+                        SemanticTerminal = current.SemanticTerminal
+                        TerminalSubscription = current.TerminalSubscription
+                        PhysicalUserMessageId = current.PhysicalUserMessageId
+                        PendingTurns = current.PendingTurns }
 
                 true
             | _ -> false)
@@ -745,10 +781,15 @@ type StrengthReplicaRuntime
                 match byReplica.TryGetValue(key state.Replica) with
                 | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
                     byReplica.Remove(key state.Replica) |> ignore
+
+                    current.TerminalSubscription
+                    |> Option.iter (fun subscription -> subscription.Dispose())
+
                     true
                 | _ -> false)
 
-        let retiredLive = liveRegistry.Retire state.Replica |> Option.isSome
+        let retiredLive =
+            removedLocal && (liveRegistry.Retire state.Replica |> Option.isSome)
 
         // STRENGTH-004: the child is the owner's RESIDENT replica, so a decision
         // reaching its terminal does not give the lease back — it is held for the
@@ -760,7 +801,9 @@ type StrengthReplicaRuntime
             notePhysicalCleanup state.Replica (not (isMaterialEnd terminal))
 
     let releaseLease sessionId =
-        releaseModel |> Option.iter (fun release -> release sessionId)
+        match releaseModel with
+        | Some release -> release sessionId
+        | None -> ()
 
     /// Orphaned live binding without local decision state (e.g. the transform
     /// retired semantic admission while the physical identity stayed live):
@@ -822,6 +865,114 @@ type StrengthReplicaRuntime
         if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
             removeState state
 
+    let bufferPendingTurn state physical outcome =
+        lock gate (fun () ->
+            match byReplica.TryGetValue(key state.Replica) with
+            | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
+                byReplica.[key state.Replica] <-
+                    { current with
+                        PendingTurns = (physical, outcome) :: current.PendingTurns }
+            | _ -> ())
+
+    let observeDecisionPhysicalOutcome state physical outcome =
+        match state.PhysicalUserMessageId with
+        | Some current when current = physical -> observeReplicaTurn state outcome
+        | Some _ -> ()
+        | None -> bufferPendingTurn state physical outcome
+
+    let applyCompletedSnapshot (state: StrengthReplicaDecisionState) providerRun messages =
+        let physical =
+            messages
+            |> List.tryFind (fun (message: SessionMessage) -> message.Id = ProviderRunIdentity.value providerRun)
+            |> Option.bind (fun message -> message.ParentId)
+            |> Option.map PhysicalUserMessageId.create
+
+        match physical, tryState state.Replica with
+        | Some observed, Some current when Object.ReferenceEquals(current.Completion, state.Completion) ->
+            observeDecisionPhysicalOutcome current observed ReconcileProgram.TurnCompleted
+        | _ -> ()
+
+    let observeCompletedNotification (state: StrengthReplicaDecisionState) providerRun =
+        task {
+            try
+                let! messages = snapshotPort.Value.GetMessages state.Replica
+                messages |> Result.iter (applyCompletedSnapshot state providerRun)
+            with ex ->
+                Diagnostic.emit
+                    "strength-replica-terminal-unproven"
+                    [ "replica_session_id", key state.Replica; "result", ex.Message ]
+        }
+
+    let subscribeDecisionTerminal state =
+        let subscription =
+            sessions.SubscribeFutureTerminal(
+                state.Replica,
+                fun _ outcome ->
+                    match outcome with
+                    | TerminalOutcome.Completed result when snapshotPort.IsSome ->
+                        observeCompletedNotification state result.ProviderRun |> ignore
+                    // Session-scoped failure/abort has no physical request proof.
+                    // The exact Host HandleTurn path or explicit owner cancel owns it.
+                    | TerminalOutcome.Completed _
+                    | TerminalOutcome.Failed _
+                    | TerminalOutcome.Aborted _ -> ()
+            )
+
+        lock gate (fun () ->
+            match byReplica.TryGetValue(key state.Replica) with
+            | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
+                byReplica.[key state.Replica] <-
+                    { current with
+                        TerminalSubscription = Some subscription }
+            | _ -> subscription.Dispose())
+
+    let cancelPreparation owner =
+        lock gate (fun () ->
+            match preparingOwners.TryGetValue(key owner) with
+            | true, flight ->
+                flight.Cancelled <- true
+                Some flight.Completion.Task
+            | _ -> None)
+
+    let replayPendingTurn state physical (pendingPhysical, outcome) =
+        if pendingPhysical = physical then
+            observeReplicaTurn state outcome
+
+    let bindDecisionPhysical state physical =
+        let claimed =
+            lock gate (fun () ->
+                match byReplica.TryGetValue(key state.Replica) with
+                | true, current when
+                    Object.ReferenceEquals(current.Completion, state.Completion)
+                    && (current.PhysicalUserMessageId.IsNone
+                        || current.PhysicalUserMessageId = Some physical)
+                    ->
+                    let next =
+                        { current with
+                            PhysicalUserMessageId = Some physical
+                            PendingTurns = [] }
+
+                    byReplica.[key state.Replica] <- next
+                    Some(current.PendingTurns, next)
+                | _ -> None)
+
+        match claimed with
+        | Some(pending, next) -> List.rev pending |> List.iter (replayPendingTurn next physical)
+        | _ -> ()
+
+    let observeDecisionTurn state (turn: ReconciledTurn) =
+        observeDecisionPhysicalOutcome state turn.PhysicalUserMessageId turn.Outcome
+
+    let bindAcceptedBootstrap state promptKey =
+        (dispatcher.ProjectionFor state.Replica).PhysicalLandings
+        |> Map.toSeq
+        |> Seq.tryPick (fun (physical, accepted) ->
+            if accepted.PromptKey = promptKey then
+                Some physical
+            else
+                None)
+        |> Option.iter (bindDecisionPhysical state)
+
     let sendPreparedPrompt state identitySeed replicaSessionId =
         task {
             do!
@@ -834,6 +985,7 @@ type StrengthReplicaRuntime
                     replicaSessionId
                     identitySeed
                     state
+                    (bindAcceptedBootstrap state)
 
             return Ok()
         }
@@ -849,34 +1001,90 @@ type StrengthReplicaRuntime
             with
             | Error error ->
                 complete (StrengthReplicaTerminal.Failed error) state
-                do! abortReplica state
+                removeState state
                 return Error error
             | Ok _ -> return! sendPreparedPrompt state identitySeed replicaSessionId
         }
 
-    let sendPreparedPromptForState state replicaSessionId =
+    let tryClaimBootstrap (current: StrengthReplicaDecisionState) replicaSessionId =
+        match current.SemanticTerminal, current.Bootstrap with
+        | Some _, _ -> Error "StrengthReplica decision already closed"
+        | None, StrengthReplicaBootstrap.Sent -> Ok None
+        | None, StrengthReplicaBootstrap.Pending identitySeed ->
+            let claimed =
+                { current with
+                    Bootstrap = StrengthReplicaBootstrap.Sent }
+
+            byReplica.[key replicaSessionId] <- claimed
+            Ok(Some(claimed, identitySeed))
+
+    let sendPreparedPromptForState (state: StrengthReplicaDecisionState) replicaSessionId =
         let claim =
             lock gate (fun () ->
                 match byReplica.TryGetValue(key replicaSessionId) with
                 | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
-                    if current.SemanticTerminal |> Option.isSome then
-                        Error "StrengthReplica decision already closed"
-                    else
-                        match current.Bootstrap with
-                        | StrengthReplicaBootstrap.Sent -> Ok None
-                        | StrengthReplicaBootstrap.Pending identitySeed ->
-                            let claimed =
-                                { current with
-                                    Bootstrap = StrengthReplicaBootstrap.Sent }
-
-                            byReplica.[key replicaSessionId] <- claimed
-                            Ok(Some(claimed, identitySeed))
+                    tryClaimBootstrap current replicaSessionId
                 | _ -> Error "StrengthReplica prepared session is not live")
 
         match claim with
         | Error reason -> Task.FromResult(Error reason)
         | Ok None -> Task.FromResult(Ok())
         | Ok(Some(claimed, identitySeed)) -> acquireAndSendBootstrapPrompt claimed identitySeed replicaSessionId
+
+    let createResident owner agent =
+        sessions.CreateChildSession(
+            owner,
+            { Title = Some agent
+              Agent = Some agent
+              Directory = directory }
+        )
+
+    let loadResident owner agent =
+        match restoreResident with
+        | Some restore -> restore owner agent
+        | None -> Task.FromResult(Ok None)
+
+    let restoreOrCreateResident owner agent =
+        taskResult {
+            let! restored = loadResident owner agent
+
+            match restored with
+            | Some resident -> return resident
+            | None -> return! createResident owner agent
+        }
+
+    let verifyResident owner agent resident =
+        taskResult {
+            let! children = sessions.ListChildren owner
+
+            match children |> List.tryFind (fun child -> child.SessionId = resident) with
+            | Some child when child.Agent = Some agent && child.Title = Some agent -> return resident
+            | Some _ -> return! Error "StrengthReplica resident identity disagrees with owner"
+            | None ->
+                liveRegistry.ReleaseResident owner |> ignore
+                releaseLease resident
+                return! createResident owner agent
+        }
+
+    let findResident owner agent =
+        match liveRegistry.TryFindResident owner with
+        | Some resident -> verifyResident owner agent resident
+        | None -> restoreOrCreateResident owner agent
+
+    let finishPreparation owner (flight: StrengthReplicaPreparationFlight) pending =
+        task {
+            try
+                let! prepared = pending
+                AsyncSupport.trySetResult flight.Completion prepared |> ignore
+            with ex ->
+                flight.Completion.SetException ex
+
+            lock gate (fun () -> preparingOwners.Remove(key owner) |> ignore)
+        }
+
+    let startPreparation owner flight pending =
+        finishPreparation owner flight pending |> ignore
+        flight.Completion.Task
 
     member _.IsReplica(sessionId: SessionId) =
         liveRegistry.TryFindByReplica sessionId |> Option.isSome
@@ -898,6 +1106,15 @@ type StrengthReplicaRuntime
               Batches = state.Batches
               SemanticTerminal = state.SemanticTerminal })
 
+    member _.TryDecisionOutcome(replicaSessionId: SessionId, decisionId: StrengthDecisionId) =
+        lock gate (fun () ->
+            match decisionOutcomes.TryGetValue(StrengthDecisionId.value decisionId) with
+            | true, (replica, completion) when replica = replicaSessionId -> Some completion
+            | _ -> None)
+
+    member _.ReleaseDecisionOutcome(decisionId: StrengthDecisionId) =
+        lock gate (fun () -> decisionOutcomes.Remove(StrengthDecisionId.value decisionId) |> ignore)
+
     /// Attach an already-live replica decision to this coordinator without
     /// Host bootstrap (child session created, model acquired, bootstrap sent
     /// by the caller). Registration order mirrors StartReplica: the live
@@ -907,13 +1124,23 @@ type StrengthReplicaRuntime
     member _.AttachLiveDecision(binding: StrengthReplicaBinding) : Result<Task<StrengthReplicaOutcome>, string> =
         result {
             do! StrengthReplicaRuntimeLogic.requireNonEmptyBudget binding.RequestedRounds
+
+            do!
+                lock gate (fun () ->
+                    if disposed then
+                        Error "StrengthReplica runtime is disposed"
+                    elif preparingOwners.ContainsKey(key binding.OwnerSessionId) then
+                        Error "StrengthReplica owner already has a preparing decision"
+                    else
+                        Ok())
+
             do! StrengthReplicaRuntimeLogic.requireOwnerIdle liveRegistry binding.OwnerSessionId
 
             do!
                 liveRegistry.Register binding
                 |> Result.mapError (sprintf "StrengthReplica live registration failed: %A")
 
-            return!
+            let! completion =
                 StrengthReplicaRuntimeLogic.claimLiveDecisionCell
                     gate
                     byReplica
@@ -925,6 +1152,11 @@ type StrengthReplicaRuntime
                     binding
                     (Roles.roleLabel binding.CanonicalRole)
                     None
+
+            lock gate (fun () ->
+                decisionOutcomes.[StrengthDecisionId.value binding.DecisionId] <- binding.ReplicaSessionId, completion)
+
+            return completion
         }
 
     /// Called after the Replica request profile has been bound by XWire, but
@@ -943,6 +1175,7 @@ type StrengthReplicaRuntime
                         complete
                         liveRegistry
                         sessions
+                        bindDecisionPhysical
                         sessionIdText
                         output
         }
@@ -953,13 +1186,14 @@ type StrengthReplicaRuntime
         match tryState turn.SessionId with
         | None -> false
         | Some state ->
-            observeReplicaTurn state turn.Outcome
+            observeDecisionTurn state turn
             true
 
     member _.HandleSessionDeleted(sessionId: SessionId) =
         // The deleted session is either an owner (give its resident lease back)
         // or a resident replica itself (give that lease back and clear the
         // owner's slot, so the next decision cannot trust a dead child).
+        cancelPreparation sessionId |> ignore
         releaseOwnerResidency sessionId
 
         match liveRegistry.ReleaseResidentByReplica sessionId with
@@ -972,6 +1206,12 @@ type StrengthReplicaRuntime
 
     member _.CancelOwner(owner: SessionId) : Task =
         task {
+            match cancelPreparation owner with
+            | Some pending ->
+                let! _ = pending
+                ()
+            | None -> ()
+
             // The owner's lifetime ended: its resident lease goes back even when
             // no decision is currently live, so a cancelled owner cannot hold a
             // model slot forever.
@@ -999,7 +1239,7 @@ type StrengthReplicaRuntime
     /// persists DelegationBound against the returned ReplicaSessionId and only
     /// then calls SendPreparedPrompt. On DelegationBound write failure the
     /// caller cleans the empty child through CancelOwner.
-    member this.PrepareReplicaStart
+    member private this.PrepareReplicaStartCore
         (
             owner: SessionId,
             decisionId: StrengthDecisionId,
@@ -1007,7 +1247,8 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
-            mirrorSemanticDigest: string
+            mirrorSemanticDigest: string,
+            flight: StrengthReplicaPreparationFlight
         ) : Task<Result<StrengthReplicaPreparation, string>> =
         taskResult {
             do! StrengthReplicaRuntimeLogic.requireNonEmptyBudget requestedRounds
@@ -1042,30 +1283,11 @@ type StrengthReplicaRuntime
             // A resident child is trusted only while the Host still lists it
             // under this owner; otherwise it was closed behind us and a fresh
             // child takes the slot, replacing the recorded id.
-            let! replica =
-                task {
-                    match liveRegistry.TryFindResident owner with
-                    | Some resident ->
-                        match! sessions.ListChildren owner with
-                        | Ok children when children |> List.exists (fun child -> child.SessionId = resident) ->
-                            return Ok resident
-                        | _ ->
-                            return!
-                                sessions.CreateChildSession(
-                                    owner,
-                                    { Title = Some replicaAgent
-                                      Agent = Some replicaAgent
-                                      Directory = directory }
-                                )
-                    | None ->
-                        return!
-                            sessions.CreateChildSession(
-                                owner,
-                                { Title = Some replicaAgent
-                                  Agent = Some replicaAgent
-                                  Directory = directory }
-                            )
-                }
+            let! replica = findResident owner replicaAgent
+
+            if flight.Cancelled then
+                let! _ = sessions.AbortSession replica
+                return! Error "StrengthReplica owner ended during preparation"
 
             liveRegistry.BindResident(owner, replica)
 
@@ -1110,23 +1332,56 @@ type StrengthReplicaRuntime
                     replicaAgent
                     state
 
-            let _terminalSub =
-                sessions.SubscribeTerminal(
-                    replica,
-                    fun _ outcome ->
-                        let turnOutcome =
-                            match outcome with
-                            | TerminalOutcome.Completed _ -> ReconcileProgram.TurnCompleted
-                            | TerminalOutcome.Failed stop -> ReconcileProgram.TurnFailed stop.Reason
-                            | TerminalOutcome.Aborted stop -> ReconcileProgram.TurnAborted stop.Reason
+            lock gate (fun () ->
+                decisionOutcomes.[StrengthDecisionId.value decisionId] <- replica, state.Completion.Task)
 
-                        observeReplicaTurn state turnOutcome
-                )
+            subscribeDecisionTerminal state
 
             return
                 { ReplicaSessionId = replica
                   Completion = state.Completion.Task }
         }
+
+    member this.PrepareReplicaStart
+        (
+            owner: SessionId,
+            decisionId: StrengthDecisionId,
+            targetProviderRun: ProviderRunIdentity,
+            requestedRounds: ReadonlyRoundBudget,
+            replicaAgent: string,
+            localizedMirror: WireMessage list,
+            mirrorSemanticDigest: string
+        ) : Task<Result<StrengthReplicaPreparation, string>> =
+        let claim =
+            lock gate (fun () ->
+                match disposed, preparingOwners.TryGetValue(key owner) with
+                | true, _ -> Choice2Of3 "StrengthReplica runtime is disposed"
+                | false, (true, flight) when flight.DecisionId = decisionId -> Choice1Of3 flight.Completion.Task
+                | false, (true, _) -> Choice2Of3 "StrengthReplica owner already has a preparing decision"
+                | _ ->
+                    let flight =
+                        { DecisionId = decisionId
+                          Completion = TaskCompletionSource<Result<StrengthReplicaPreparation, string>>()
+                          Cancelled = false }
+
+                    preparingOwners.[key owner] <- flight
+                    Choice3Of3 flight)
+
+        match claim with
+        | Choice1Of3 pending -> pending
+        | Choice2Of3 reason -> Task.FromResult(Error reason)
+        | Choice3Of3 flight ->
+            this.PrepareReplicaStartCore(
+                owner,
+                decisionId,
+                targetProviderRun,
+                requestedRounds,
+                replicaAgent,
+                localizedMirror,
+                mirrorSemanticDigest,
+                flight
+            )
+            |> startPreparation owner flight
 
     /// DELEGATE-6.2: claim the bootstrap once, acquire the model lease and send
     /// after DelegationBound. Only the outbound transform consumes request budget.
@@ -1150,30 +1405,38 @@ type StrengthReplicaRuntime
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaOutcome, string>> =
+        let work =
+            taskResult {
+                let! prepared =
+                    this.PrepareReplicaStart(
+                        owner,
+                        decisionId,
+                        targetProviderRun,
+                        requestedRounds,
+                        replicaAgent,
+                        localizedMirror,
+                        mirrorSemanticDigest
+                    )
+
+                do! this.SendPreparedPrompt prepared.ReplicaSessionId
+                let! outcome = prepared.Completion |> TaskValue.map Ok
+                return outcome
+            }
+
         task {
-            match!
-                this.PrepareReplicaStart(
-                    owner,
-                    decisionId,
-                    targetProviderRun,
-                    requestedRounds,
-                    replicaAgent,
-                    localizedMirror,
-                    mirrorSemanticDigest
-                )
-            with
-            | Error error -> return Error error
-            | Ok prepared ->
-                match! this.SendPreparedPrompt prepared.ReplicaSessionId with
-                | Error error -> return Error error
-                | Ok() ->
-                    // The completion cell is only ever resolved through the
-                    // semantic-terminal path, which always publishes a result.
-                    let! result = prepared.Completion
-                    return Ok result
+            try
+                return! work
+            finally
+                this.ReleaseDecisionOutcome decisionId
         }
 
     member _.Dispose() =
+        lock gate (fun () ->
+            disposed <- true
+
+            for flight in preparingOwners.Values do
+                flight.Cancelled <- true)
+
         let states = lock gate (fun () -> byReplica.Values |> Seq.toList)
 
         for state in states do
@@ -1184,9 +1447,11 @@ type StrengthReplicaRuntime
 
         // The resident replicas outlive single decisions, so their leases are
         // given back here, at process teardown, rather than per decision.
-        for resident in liveRegistry.ReleaseAllResidents() do
-            releaseModel |> Option.iter (fun release -> release resident)
+        for owner, resident in liveRegistry.ReleaseAllResidents() do
+            releaseLease resident
+            releaseLease owner
 
+        lock gate (fun () -> decisionOutcomes.Clear())
         liveRegistry.Clear()
 
     /// DELEGATE-011: every replica whose physical tail was really cleaned up

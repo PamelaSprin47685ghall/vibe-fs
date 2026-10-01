@@ -38,8 +38,6 @@ const threeBatches = (replica) => ({ messages: [
   assistant('a2', replica, [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')]),
   assistant('a3', replica, [hostResult('c3', 'glob', { pattern: '**/*.fs' }, 'a.fs')]),
 ] })
-const textOnly = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostText('plain answer, no tools')])] })
-
 test('WHAT[speculative-investigation-003] STRENGTH_003_repeated_notification_for_one_admitted_request_does_not_add_a_round', async () => {
   const { handle } = attach('replica-idem', 1)
   assert.equal(await Strength.replicaHandleTransform(handle, oneBatch('replica-idem')), true)
@@ -80,10 +78,10 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_every_admitted_round_coll
 })
 test('WHAT[speculative-investigation-003] STRENGTH_003_plain_text_ending_consumes_a_real_round', async () => {
   const { handle, completion } = attach('replica-text', 1)
-  assert.equal(await Strength.replicaHandleTransform(handle, textOnly('replica-text')), true)
+  assert.equal(await Strength.replicaHandleTransform(handle, { messages: [user('u1', 'replica-text', [hostText('readonly assignment')])] }), true)
   assert.equal(Strength.replicaPeek(handle, 'replica-text').requestsAdmitted, 1)
   assert.equal(Strength.replicaHandleTurn(handle, {
-    sessionId: 'replica-text', providerRun: 'run-t', outcome: 'failed', parts: [{ kind: 'text', text: 'plain answer, no tools' }],
+    sessionId: 'replica-text', physicalUserMessageId: 'u1', providerRun: 'run-t', outcome: 'completed', parts: [{ kind: 'text', text: 'plain answer, no tools' }],
   }), true)
   const outcome = await Strength.replicaAwaitOutcome(completion)
   assert.equal(outcome.terminal.kind, 'TextCompleted')
@@ -93,7 +91,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_repeated_terminal_notific
   const { handle, completion } = attach('replica-tail', 1)
   assert.equal(await Strength.replicaHandleTransform(handle, oneBatch('replica-tail')), true)
   assert.equal(Strength.replicaHandleTurn(handle, {
-    sessionId: 'replica-tail', providerRun: 'run-t', outcome: 'failed', parts: [],
+    sessionId: 'replica-tail', physicalUserMessageId: 'u1', providerRun: 'run-t', outcome: 'failed', parts: [],
   }), true)
   const first = await Strength.replicaAwaitOutcome(completion)
   // The host reports a failed physical turn for this admitted round: it still
@@ -104,7 +102,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_repeated_terminal_notific
   // A second terminal observation for the same physical tail adds no round and
   // cannot rewrite the immutable first outcome.
   assert.equal(Strength.replicaHandleTurn(handle, {
-    sessionId: 'replica-tail', providerRun: 'run-t', outcome: 'completed', parts: [],
+    sessionId: 'replica-tail', physicalUserMessageId: 'u1', providerRun: 'run-t', outcome: 'completed', parts: [],
   }), false)
   const again = await Strength.replicaAwaitOutcome(completion)
   assert.deepEqual(again, first)
@@ -120,7 +118,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_a_dispatched_round_that_f
   assert.equal(Strength.replicaPeek(handle, 'replica-failed-round').requestsAdmitted, 1)
 
   assert.equal(Strength.replicaHandleTurn(handle, {
-    sessionId: 'replica-failed-round', providerRun: 'run-failed', outcome: 'failed', parts: [],
+    sessionId: 'replica-failed-round', physicalUserMessageId: 'u1', providerRun: 'run-failed', outcome: 'failed', parts: [],
   }), true)
   const failed = await Strength.replicaAwaitOutcome(completion)
   assert.equal(failed.terminal.kind, 'Failed')
@@ -133,7 +131,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_a_dispatched_round_that_f
   // A repeated terminal notification for the same physical tail adds no round
   // and cannot rewrite the immutable first outcome.
   assert.equal(Strength.replicaHandleTurn(handle, {
-    sessionId: 'replica-failed-round', providerRun: 'run-failed', outcome: 'completed', parts: [],
+    sessionId: 'replica-failed-round', physicalUserMessageId: 'u1', providerRun: 'run-failed', outcome: 'completed', parts: [],
   }), false)
   const again = await Strength.replicaAwaitOutcome(completion)
   assert.deepEqual(again, failed)
@@ -190,6 +188,20 @@ const registered = (replica, rounds) => {
   assert.equal(Strength.runtimeRegister(runtime, binding(replica, rounds)).ok, true)
   return runtime
 }
+
+test('WHAT[speculative-investigation-003] resident history cannot be republished or stop collection of a new decision', async () => {
+  const replica = 'resident-new-decision'
+  const runtime = registered(replica, 2)
+  const transformed = await Strength.transformApply(H, runtime, { messages: [
+    user('old-assignment', replica, [hostText('previous readonly assignment')]),
+    assistant('old-read', replica, [hostResult('old-call', 'js-predictor', { code: 'old' }, 'stale-evidence')]),
+    assistant('old-final', replica, [hostText('previous decision completed')]),
+    user('new-assignment', replica, [hostText('current readonly assignment')]),
+    assistant('new-read', replica, [hostResult('new-call', 'js-predictor', { code: 'new' }, 'current-evidence')]),
+  ] }, true)
+  assert.equal(transformed.kind, 'Ready')
+  assert.deepEqual(transformed.batches.map(batch => batch.exchanges.map(exchange => exchange.canonicalResult)), [['current-evidence']])
+})
 
 test('WHAT[speculative-investigation-003] STRENGTH_003_outbound_gate_is_the_admission_not_the_visible_batch_count', async () => {
   const runtime = registered('replica-gate', 1)

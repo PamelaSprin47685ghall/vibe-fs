@@ -1,6 +1,183 @@
 import test from 'node:test'
 
 {
+  const { default: assert } = await import('node:assert/strict')
+  const { replicaFixture, error, ok } = await import('./support/replica-lifecycle-fixture.mjs')
+
+  test('WHAT[speculative-investigation-004] concurrent preparation claims owner before creating a predictor', async () => {
+    let finishCreate
+    const pendingCreate = new Promise(resolve => { finishCreate = resolve })
+    const fixture = replicaFixture({ create: () => pendingCreate })
+    const first = fixture.prepare('decision-one')
+    const second = fixture.prepare('decision-two')
+    finishCreate()
+    const results = await Promise.all([first, second])
+    assert.equal(results.filter(result => result.ok).length, 1)
+    assert.equal(fixture.children.length, 1, 'busy owner never creates an extra predictor session')
+    assert.deepEqual(fixture.aborted, [], 'no loser child needs cleanup')
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] a reused predictor ignores the previous decision terminal and retires its observer', async () => {
+    const fixture = replicaFixture()
+    const first = await fixture.prepare('decision-one')
+    assert.equal(first.ok, true)
+    const replica = first.value.replicaSessionId
+    await fixture.admit(replica, 'physical-one')
+    assert.equal(fixture.terminal(replica), false, 'finished decision detaches its terminal observer')
+    await first.value.completion
+    const second = await fixture.prepare('decision-two')
+    assert.equal(second.ok, true)
+    assert.equal(fixture.isReplica(replica), true, 'old sticky terminal cannot close the new decision')
+    assert.equal(fixture.children.length, 1)
+    await fixture.admit(replica, 'physical-two')
+    fixture.observe(replica, 'physical-one', 'response-physical-one')
+    assert.equal(fixture.isReplica(replica), true, 'late old physical turn cannot close a later decision')
+    fixture.terminal(replica)
+    await second.value.completion
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] duplicate preparation of one decision shares a single child and completion', async () => {
+    let finishCreate
+    const pendingCreate = new Promise(resolve => { finishCreate = resolve })
+    const fixture = replicaFixture({ create: () => pendingCreate })
+    const first = fixture.prepare('same-decision')
+    const repeated = fixture.prepare('same-decision')
+    finishCreate()
+    const [a, b] = await Promise.all([first, repeated])
+    assert.equal(a.ok, true)
+    assert.equal(b.ok, true)
+    assert.equal(a.value.completion, b.value.completion)
+    assert.equal(fixture.children.length, 1)
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] duplicate consumers retain the exact outcome across physical cleanup until publication acknowledges it', async () => {
+    const fixture = replicaFixture()
+    const prepared = await fixture.prepare('first-decision')
+    const replica = prepared.value.replicaSessionId
+    await fixture.admit(replica, 'physical-first')
+    fixture.terminal(replica)
+    assert.equal(fixture.isReplica(replica), false)
+    const retained = fixture.tryOutcome(replica, 'first-decision')
+    assert.ok(retained)
+    const outcome = await fixture.awaitOutcome(retained)
+    assert.equal(outcome.requestsAdmitted, 1)
+    assert.equal(outcome.terminal.kind, 'TextCompleted', 'first decision naturally completed')
+    assert.equal(fixture.tryOutcome(replica, 'other-decision'), null)
+    const next = await fixture.prepare('next-decision')
+    assert.equal(next.ok, true)
+    await fixture.admit(replica, 'physical-next')
+    fixture.observe(replica, 'physical-first', 'response-physical-first')
+    assert.equal(fixture.isReplica(replica), true)
+    assert.equal((await fixture.awaitOutcome(retained)).terminal.kind, 'TextCompleted')
+    fixture.releaseOutcome('first-decision')
+    assert.equal(fixture.tryOutcome(replica, 'first-decision'), null)
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] owner cancellation drains an in-flight creation before any decision can run', async () => {
+    let finishCreate
+    const pendingCreate = new Promise(resolve => { finishCreate = resolve })
+    const fixture = replicaFixture({ create: () => pendingCreate })
+    const pending = fixture.prepare('cancelled-decision')
+    const cancelled = fixture.cancelOwner()
+    finishCreate()
+    const result = await pending
+    await cancelled
+    assert.equal(result.ok, false)
+    assert.match(result.error, /owner ended during preparation/)
+    assert.deepEqual(fixture.aborted, ['replica-1'])
+    assert.equal(fixture.isReplica(fixture.children[0].sessionId), false)
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] an unloaded coordinator cannot be revived by a late preparation callback', async () => {
+    const fixture = replicaFixture()
+    fixture.dispose()
+    const result = await fixture.prepare('after-disposal')
+    assert.equal(result.ok, false)
+    assert.match(result.error, /disposed/)
+    assert.deepEqual(fixture.children, [])
+  })
+
+  test('WHAT[speculative-investigation-004] unavailable model capacity closes an unsent decision without poisoning later owner admission', async () => {
+    const fixture = replicaFixture({ acquire: () => undefined })
+    const prepared = await fixture.prepare('unavailable-capacity')
+    const replica = prepared.value.replicaSessionId
+    const sent = await fixture.sendPrepared(replica)
+    assert.equal(sent.ok, false)
+    assert.match(sent.error, /model-capacity-unavailable/)
+    assert.equal((await fixture.awaitOutcome(prepared.value.completion)).requestsAdmitted, 0)
+    assert.equal(fixture.isReplica(replica), false, 'unsent work has no physical terminal to await')
+    const next = await fixture.prepare('next-opportunity')
+    assert.equal(next.ok, true)
+    assert.equal(fixture.children.length, 1)
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] failed resident verification refuses replacement instead of multiplying sessions', async () => {
+    let unavailable = false
+    const fixture = replicaFixture({ list: children => unavailable ? error('host-unavailable') : ok(children) })
+    const first = await fixture.prepare('decision-one')
+    assert.equal(first.ok, true)
+    await fixture.admit(first.value.replicaSessionId, 'physical-one')
+    fixture.terminal(first.value.replicaSessionId)
+    await first.value.completion
+    unavailable = true
+    const second = await fixture.prepare('decision-two')
+    assert.equal(second.ok, false)
+    assert.match(second.error, /host-unavailable/)
+    assert.equal(fixture.children.length, 1, 'query error is not evidence of permanent child loss')
+    fixture.dispose()
+  })
+
+  test('WHAT[speculative-investigation-004] early proven completion is retained until physical binding and prevents a late extra request', async () => {
+    const messagesByReplica = new Map()
+    const fixture = replicaFixture({
+      getMessages: replica => messagesByReplica.get(replica) || [],
+    })
+    const prepared = await fixture.prepare('decision-early-complete')
+    assert.equal(prepared.ok, true)
+    const replica = prepared.value.replicaSessionId
+
+    // Old physical turn or old completion arriving before physical binding must not terminate current decision
+    messagesByReplica.set(replica, [
+      { info: { id: 'old-run', role: 'assistant', sessionID: replica, parentID: 'stale-physical' }, parts: [] },
+    ])
+    fixture.notifyCompleted(replica, 'old-run')
+    fixture.observe(replica, 'stale-physical', 'old-run')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(fixture.isReplica(replica), true, 'stale physical completion does not terminate decision')
+
+    // Current decision's completed physical arrives via event notification before first transform
+    messagesByReplica.set(replica, [
+      { info: { id: 'old-run', role: 'assistant', sessionID: replica, parentID: 'stale-physical' }, parts: [] },
+      { info: { id: 'early-run', role: 'assistant', sessionID: replica, parentID: 'physical-early' }, parts: [] },
+    ])
+    fixture.notifyCompleted(replica, 'early-run')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(fixture.isReplica(replica), true, 'early proven completed is buffered before transform binding')
+
+    // Binding replays the terminal before this late transform can admit more work.
+    await fixture.admit(replica, 'physical-early')
+
+    // It must now deliver the buffered completed turn and transition to terminal
+    assert.equal(fixture.isReplica(replica), false, 'replayed early terminal closes live replica')
+    const outcome = await fixture.awaitOutcome(prepared.value.completion)
+    assert.equal(outcome.terminal.kind, 'TextCompleted')
+    assert.equal(outcome.requestsAdmitted, 0, 'terminal replay must not admit a request that will never be sent')
+
+    // Repeated completion notification does not contaminate or re-deliver
+    fixture.notifyCompleted(replica, 'early-run')
+    assert.equal(fixture.isReplica(replica), false)
+
+    fixture.dispose()
+  })
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");

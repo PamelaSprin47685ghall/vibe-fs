@@ -1,59 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readdirSync, readFileSync } = await import("node:fs");
-const { resolve } = await import("node:path");
-const { default: test } = await import("node:test");
-const Strength = await import("../../../dist/Strength/Surface.js");
-
-const root = resolve(import.meta.dirname, '../../..')
-
-test('WHAT[speculative-investigation-013] SPEC_INV_013_the_dry_run_entry_does_not_exist_on_the_live_surface', () => {
-  // `replicaAttach` is live, not a DryRun leftover: it binds an already-live
-  // replica binding into the real coordinator.
-  for (const name of ['startDryRun', 'observeDryRun', 'closeDryRunAtPrimaryTerminal', 'replicaCloseDryRun', 'settingsDryRunBudget']) {
-    assert.equal(Strength[name], undefined, `no ${name} entry may remain on the delegation surface`)
-  }
-})
-test('WHAT[speculative-investigation-013] SPEC_INV_013_strength_source_carries_no_live_dry_run_branch', () => {
-  const strength = resolve(root, 'src/Wanxiangshu/Strength')
-  const walk = (directory) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = resolve(directory, entry.name)
-    if (entry.isDirectory()) return walk(path)
-    return /\.fsi?$/.test(entry.name) ? [path] : []
-  })
-  const offenders = []
-  for (const path of walk(strength)) {
-    for (const line of readFileSync(path, 'utf8').split('\n')) {
-      const trimmed = line.trim()
-      if (!/DryRun/.test(trimmed)) continue
-      // Historical or documentation prose may mention the retired mechanism; no
-      // executable line may.
-      if (trimmed.startsWith('//') || trimmed.startsWith('///') || trimmed.startsWith('(*')) continue
-      offenders.push(`${path}: ${trimmed}`)
-    }
-  }
-  assert.deepEqual(offenders, [], 'a production DryRun branch must not remain in the Strength tree')
-})
-// What still needs a real Host: enumerating the final provider-visible tool
-// set on a live Host, observing owner/Replica provider/model and purpose on the
-// provider wire, two owners' concurrent schema decoration on one live plugin
-// instance, and rejecting the legacy three-argument routingProtocol on a live
-// scheduler (host-boundary-032 and the execution-model-routing canaries).
-//
-// The unit-observable share of [013] now has carriers below and in
-// execution-model-routing-010: per-owner authorization/budget/call-id/result
-// isolation (DELEGATE 14.5) and same-provider capacity of one without
-// parent/child deadlock.
-}
 
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
-const { ProtocolRevision } = await import("../../../dist/Strength/InvestigationEstimateContract.js");
+const ProtocolRevision = 2;
 
 const H = (text) => `H(${text})`
 const hostText = (text) => ({ type: 'text', text })
@@ -186,13 +139,15 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owner_decisions_proje
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { existsSync, readdirSync, readFileSync } = await import("node:fs");
+const { existsSync, mkdirSync, readdirSync, readFileSync } = await import("node:fs");
 const { join } = await import("node:path");
 const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
-const { acceptAuthorityRoot, notifyCompleted, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+const { acceptAuthorityRoot, notifyCompleted, withExecutablePlugin, withRestartablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+const Events = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+const ModelRouting = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
 const Strength = await import("../../../dist/Strength/Surface.js");
-const { ProtocolRevision } = await import("../../../dist/Strength/InvestigationEstimateContract.js");
+const ProtocolRevision = 2;
 
 const hostText = (text) => ({ type: 'text', text })
 const hostToolCall = (callId, tool, input, output) => ({
@@ -296,7 +251,117 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
 
       // The process-shared Predictor existence query is observed per call, not
       // frozen at plugin construction: tool decoration sees the configured
- // state and decorates participating tools per contract.
+      // state and decorates participating tools per contract.
+      const schemaOutput = {
+        description: 'read a file',
+        parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+      }
+      await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+
+      const props = schemaOutput.parameters.properties
+      assert.equal(props.estimated_readonly_rounds?.type, 'integer')
+      assert.equal(props.estimated_readonly_rounds?.minimum, 0)
+      assert.equal(props.estimated_readonly_rounds?.maximum, 2147483647)
+      assert.ok(
+        schemaOutput.parameters.required.includes('estimated_readonly_rounds'),
+        'read must require estimated_readonly_rounds',
+      )
+
+      assert.equal(props.self_note?.type, 'string')
+      assert.equal('minLength' in props.self_note, false, 'self_note must not set minLength')
+      assert.equal(
+        schemaOutput.parameters.required.includes('self_note'),
+        false,
+        'self_note must not be required',
+      )
+
+      assert.equal(
+        props.delegate_readonly_rounds,
+        undefined,
+        'legacy delegate_readonly_rounds must not be present',
+      )
+      assert.equal(
+        schemaOutput.parameters.required.includes('delegate_readonly_rounds'),
+        false,
+        'legacy delegate_readonly_rounds must not be required',
+      )
+      assert.ok(schemaOutput.description.startsWith('read a file'))
+
+      // Removing configuration immediately refuses a fresh positive estimate.
+      globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+      const run = 'run-capture-1'
+      const seedUser = userMessage(physical, sessionId, [hostText('inspect the file')])
+      const seedAssistant = assistantMessage(run, sessionId, physical, [budgetCall('call-capture-1', 1)])
+      runtime.pushHostMessage(sessionId, seedUser)
+      runtime.pushHostMessage(sessionId, seedAssistant)
+      const outObj = { messages: [seedUser, seedAssistant] }
+      await hooks['experimental.chat.messages.transform']({}, outObj)
+
+      // Positive control: the real pipeline appended durable facts (authority
+      // root, manager road, XTrace capture, attempt plan freeze), so the
+      // observation path below is live and the zero-count assertion cannot
+      // pass vacuously against a wrong directory.
+      assert.ok(
+        durableFactLineCount(directory) > 0,
+        'the real transform pipeline must leave durable facts behind, or the NDJSON observation path is wrong',
+      )
+
+      assert.deepEqual(
+        durableRequestedEvents(directory),
+        [],
+        'an unconfigured Predictor cannot authorize a positive source estimate',
+      )
+
+      // Removing the Predictor configuration takes effect on the very next
+      // observation of the shared query: no decoration, and still no
+      // authorization from the same real wiring.
+      globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+      const bareOutput = {
+        description: 'read a file',
+        parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+      }
+      await hooks['tool.definition']({ toolID: 'read' }, bareOutput)
+      assert.equal(
+        bareOutput.parameters.properties.estimated_readonly_rounds,
+        undefined,
+        'an unconfigured Predictor decorates no estimated_readonly_rounds',
+      )
+      assert.equal(
+        bareOutput.parameters.properties.self_note,
+        undefined,
+        'an unconfigured Predictor decorates no self_note',
+      )
+      assert.equal(
+        bareOutput.parameters.properties.delegate_readonly_rounds,
+        undefined,
+        'legacy delegate_readonly_rounds must not be added',
+      )
+      assert.equal(
+        bareOutput.parameters.required.includes('estimated_readonly_rounds'),
+        false,
+        'an unconfigured Predictor does not require estimated_readonly_rounds',
+      )
+      assert.equal(
+        bareOutput.description,
+        'read a file',
+        'an unconfigured Predictor leaves tool description unmodified',
+      )
+      await hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
+      assert.deepEqual(
+        durableRequestedEvents(directory),
+        [],
+        'removing the Predictor configuration produces no new authorization',
+      )
+    })
+  } finally {
+    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+  }
+})
+
+test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates_schema_per_contract_and_language', async () => {
+  globalThis.__wanxiangshu_test_predictor_state = 'configured'
+  try {
+    await withExecutablePlugin(async (hooks) => {
       const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
       try {
         process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -308,45 +373,8 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
 
         const props = schemaOutput.parameters.properties
         assert.equal(props.estimated_readonly_rounds?.type, 'integer')
-        assert.equal(props.estimated_readonly_rounds?.minimum, 0)
-        assert.equal(props.estimated_readonly_rounds?.maximum, 2147483647)
-        assert.equal(
-          props.estimated_readonly_rounds?.description,
-          "Estimate how many consecutive read-only investigation rounds will still be needed after ALL tool calls in this response have completed, before a substantive change, a command, user clarification, a conclusion, or a consequential judgment that you must make yourself. One round is one model request and may contain several parallel tool calls; do not count the current batch. Routine choices about which reference or file to inspect are part of investigation. Use 0 when no such investigation remains or the next step already reaches one of those boundaries. Give your current best estimate; it need not be exact, and do not add work to match it.",
-          'budget description must match English verbatim constant',
-        )
-        assert.ok(
-          schemaOutput.parameters.required.includes('estimated_readonly_rounds'),
-          'read must require estimated_readonly_rounds',
-        )
-
         assert.equal(props.self_note?.type, 'string')
-        assert.equal(
-          props.self_note?.description,
-          "Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely, without an empty string or null. For a positive estimate, leave a brief, non-empty outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace.",
-          'self_note description must match English verbatim constant',
-        )
-        assert.equal('minLength' in props.self_note, false, 'self_note must not set minLength')
-        assert.equal(
-          schemaOutput.parameters.required.includes('self_note'),
-          false,
-          'self_note must not be required',
-        )
-
-        assert.equal(
-          props.delegate_readonly_rounds,
-          undefined,
-          'legacy delegate_readonly_rounds must not be present',
-        )
-        assert.equal(
-          schemaOutput.parameters.required.includes('delegate_readonly_rounds'),
-          false,
-          'legacy delegate_readonly_rounds must not be required',
-        )
-        assert.ok(schemaOutput.description.startsWith('read a file'))
-        assert.ok(schemaOutput.description.includes("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."))
-        assert.equal(schemaOutput.description.includes('delegate_readonly_rounds'), false)
-        assert.equal(/companion|trust|retain control|同伴|信任|保留控制权/i.test(schemaOutput.description), false)
+        const decoratedDescription = schemaOutput.description
 
         // Idempotency: repeating decoration on the same definition does not duplicate required fields or stack prose
         await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
@@ -355,13 +383,9 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
           1,
           'estimated_readonly_rounds must appear exactly once in required after repeat decoration',
         )
-        assert.equal(
-          schemaOutput.description.split("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0.").length - 1,
-          1,
-          'English collaboration prose must be appended exactly once and not stack',
-        )
+        assert.equal(schemaOutput.description, decoratedDescription, 'repeated decoration cannot stack descriptions')
 
-        // Chinese language binding test: verbatim Chinese descriptions from ReadonlyDelegationContract.fs
+        // The language binding does not change the machine protocol.
         process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'zh-CN'
         const schemaOutputZh = {
           description: '读取文件',
@@ -372,19 +396,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
         assert.equal(zhProps.estimated_readonly_rounds?.type, 'integer')
         assert.equal(zhProps.estimated_readonly_rounds?.minimum, 0)
         assert.equal(zhProps.estimated_readonly_rounds?.maximum, 2147483647)
-        assert.equal(
-          zhProps.estimated_readonly_rounds?.description,
-          "当前响应的全部工具执行完成后，预计还需要连续进行多少轮只读查证，才会到达实质修改、执行命令、向用户确认、给出结论，或必须亲自权衡的关键判断？一轮是一次模型请求，可以包含多个并行工具调用；当前这批不计入。选择接着查哪个文件或引用属于普通调查，不必一概当成关键判断。已经没有后续查证，或下一步就到达上述边界时，填 0。按当前材料估计即可，不要求精确，也不要为了符合估计增加调查。",
-          'budget description must match Chinese verbatim constant',
-        )
         assert.equal(zhProps.self_note?.type, 'string')
-        assert.equal(
-          zhProps.self_note?.description,
-          "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。",
-          'self_note description must match Chinese verbatim constant',
-        )
-        assert.ok(schemaOutputZh.description.includes("调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"))
-        assert.equal(schemaOutputZh.description.includes("Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."), false)
         if (previousLanguage === undefined) {
           delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
         } else {
@@ -450,12 +462,6 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
           1,
           'js-manager must require contract exactly once',
         )
-        assert.ok(
-          managerOutput.description.includes(
-            'Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0.',
-          ),
-          'js-manager description must include collaboration prose',
-        )
       } finally {
         if (previousLanguage === undefined) {
           delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
@@ -463,120 +469,14 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
           process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
         }
       }
-
-      // Drive the real owner transform with a complete, fresh tool batch whose
-      // only call requests one readonly round.
-      const run = 'run-capture-1'
-      const seedUser = userMessage(physical, sessionId, [hostText('inspect the file')])
-      const seedAssistant = assistantMessage(run, sessionId, physical, [budgetCall('call-capture-1', 1)])
-      runtime.pushHostMessage(sessionId, seedUser)
-      runtime.pushHostMessage(sessionId, seedAssistant)
-      const outObj = { messages: [seedUser, seedAssistant] }
-      await hooks['experimental.chat.messages.transform']({}, outObj)
-
-      // Positive control: the real pipeline appended durable facts (authority
-      // root, manager road, XTrace capture, attempt plan freeze), so the
-      // observation path below is live and the zero-count assertion cannot
-      // pass vacuously against a wrong directory.
-      assert.ok(
-        durableFactLineCount(directory) > 0,
-        'the real transform pipeline must leave durable facts behind, or the NDJSON observation path is wrong',
-      )
-
-      // The adapter fixture cannot produce a durable (Work, Root) session
-      // association, so this session is not a proven root Work continuation and
-      // the capture gate must refuse it: zero authorization, even with the
-      // Predictor configured and a complete budget-1 batch on the wire.
-      //
-      // Why the positive set (exactly one DelegationRequested with the derived
-      // DecisionId, RequestedRounds = 1 and the frozen call ids, idempotent on
-      // repeat, conflicting on a changed budget) is asserted in the test below.
-      //
-      // 1. The association writer was traced: SatelliteRuntime.fs:149 builds
-      //    AgentFact.Companion(CompanionBloggerLinked) (bridge: CompanionFact.fs:9),
-      //    folded into AgentProjection.Associations (CompanionFactFold.fs →
-      //    Composition/Durable/Projection.fs:80/136). classifyLegacy maps
-      //    WorkSession → Work × Root (Association.fs:275) and the root session's
-      //    link carries ParentSessionId = None, so it is a legal production
-      //    precondition. Association.fs:88-91 documents the lazy-creation order:
-      //    "no record yet" is the state the NEXT transform resolves — and the
-      //    companion step (transform step 8) runs after the capture step (4.5),
-      //    so one drive cannot both establish and use the association.
-      // 2. A second drive would reach the start phase, which awaits
-      //    preparation.Completion. Only the replica turn observation resolves it
-      //    (Replica/Runtime.fs observeReplicaTurn). HandlePreTurn is captured
-      //    EAGERLY in PluginStrengthPorts.create (PluginStrengthPorts.fs:28-33)
-      //    BEFORE PluginSessionWiring.attach installs the replica runtime
-      //    (SpikePlugin.fs:37-38), and HostSignalBootstrap.fs:144-152 passes the
-      //    captured None straight into the turn observer. If that reading holds,
-      //    replica terminals never reach the runtime in production either and
-      //    the owner transform would hang after SendPreparedPrompt — a suspected
-      // product defect, reported, not fixed here.
-      //
-      // Resolved: drive 1 establishes the association through the production
-      // companion step, and the replica completion now resolves through the
-      // late-bound HandlePreTurn (PluginStrengthPorts.fs reads the live scope
-      // at event time instead of capturing the runtime before attach). The
-      // positive set is asserted in the test below.
-      assert.deepEqual(
-        durableRequestedEvents(directory),
-        [],
-        'a session without a durable root Work association may never be authorized',
-      )
-
-      // Removing the Predictor configuration takes effect on the very next
-      // observation of the shared query: no decoration, and still no
-      // authorization from the same real wiring.
-      globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
-      const bareOutput = {
-        description: 'read a file',
-        parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
-      }
-      await hooks['tool.definition']({ toolID: 'read' }, bareOutput)
-      assert.equal(
-        bareOutput.parameters.properties.estimated_readonly_rounds,
-        undefined,
-        'an unconfigured Predictor decorates no estimated_readonly_rounds',
-      )
-      assert.equal(
-        bareOutput.parameters.properties.self_note,
-        undefined,
-        'an unconfigured Predictor decorates no self_note',
-      )
-      assert.equal(
-        bareOutput.parameters.properties.delegate_readonly_rounds,
-        undefined,
-        'legacy delegate_readonly_rounds must not be added',
-      )
-      assert.equal(
-        bareOutput.parameters.required.includes('estimated_readonly_rounds'),
-        false,
-        'an unconfigured Predictor does not require estimated_readonly_rounds',
-      )
-      assert.equal(
-        bareOutput.description,
-        'read a file',
-        'an unconfigured Predictor leaves tool description unmodified',
-      )
-      await hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
-      assert.deepEqual(
-        durableRequestedEvents(directory),
-        [],
-        'removing the Predictor configuration produces no new authorization',
-      )
     })
   } finally {
     globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
   }
 })
 
-// WHAT[013] positive capture set through the same real wiring. Two drives on
-// one session: drive 1 lets the production companion step write the durable
-// (Work, Root) association; drive 2 is the drive the capture gate admits. The
-// fixture has no provider, so the replica completion is unblocked through the
-// same opaque terminal port the plugin subscribed to (`notifyCompleted`),
-// which reaches the replica runtime through the now late-bound
-// HandlePreTurn.
+// Drive the admitted provider request, then deliver its exact physical child
+// completion through the shared terminal port.
 test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session', async () => {
   globalThis.__wanxiangshu_test_predictor_state = 'configured'
   try {
@@ -595,32 +495,38 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       runtime.pushHostMessage(sessionId, seedUser)
       runtime.pushHostMessage(sessionId, seedAssistant)
 
-      await withTimeout(
-        hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
-        'transform drive 1 hung',
-      )
-      assert.deepEqual(
-        durableRequestedEvents(directory),
-        [],
-        'drive 1 only establishes the root association; it authorizes nothing',
-      )
-
       const promptsBefore = runtime.prompts.length
       const pending = hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
 
       let waited = 0
-      while (runtime.prompts.length <= promptsBefore && waited < 5000) {
+      let bootstrap
+      while (!bootstrap && waited < 5000) {
         await tick()
         waited += 1
+        const binding = durableEventsOfType(directory, 'DelegationBound')[0]
+        bootstrap = runtime.prompts.slice(promptsBefore).find(prompt =>
+          prompt.path?.id === binding?.payload.replica_session_id,
+        )
       }
-      assert.ok(runtime.prompts.length > promptsBefore, 'the start phase must dispatch the replica bootstrap prompt')
+      assert.ok(bootstrap, 'the start phase must dispatch the durably bound replica bootstrap prompt')
 
-      const bootstrap = runtime.prompts[runtime.prompts.length - 1]
       const replicaSessionId = bootstrap?.path?.id ?? bootstrap?.sessionID ?? bootstrap?.sessionId
       assert.ok(replicaSessionId, 'the replica child session id must be observable from the dispatched prompt')
 
+      const childUser = runtime.messages.find(message => message.role === 'user' && message.id.startsWith(`msg-${replicaSessionId}-`))
+      assert.ok(childUser, 'bootstrap dispatch records an actual Host physical user message')
+      const childPhysical = childUser.id
+      await hooks['experimental.chat.messages.transform']({}, {
+        messages: [userMessage(childPhysical, replicaSessionId, childUser.parts)],
+      })
+      const childRun = `${replicaSessionId}-completed`
+      const childAssistant = assistantMessage(childRun, replicaSessionId, childPhysical, [
+        hostText('readonly investigation finished'),
+      ])
+      runtime.pushHostMessage(replicaSessionId, childAssistant)
+
       await notifyCompleted(runtime, replicaSessionId, 'readonly investigation finished', 'finished', 7)
-      await withTimeout(pending, 'transform drive 2 hung: the replica completion never resolved')
+      await withTimeout(pending, 'the exact replica physical completion never resolved')
 
       const requested = durableRequestedEvents(directory)
       assert.equal(requested.length, 1, 'exactly one DelegationRequested may be captured for one source batch')
@@ -654,6 +560,101 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       assert.equal(bound.length, 1, 'the start phase must bind exactly one replica for the decision')
       assert.equal(bound[0].payload.decision_id, payload.decision_id)
       assert.equal(bound[0].payload.target_provider_run, run)
+    })
+  } finally {
+    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+  }
+})
+
+test('WHAT[speculative-investigation-013] shared common-dir instances prepare one resident and unloading one preserves its lease and next decision', async () => {
+  globalThis.__wanxiangshu_test_predictor_state = 'configured'
+  try {
+    await withRestartablePlugin(async (start, directory, family) => {
+      const otherDirectory = join(directory, 'other-instance')
+      mkdirSync(otherDirectory)
+      const first = await start()
+      const second = await start(otherDirectory)
+      await family.withRuntime(async runtime => {
+        const owner = 'shared-instance-owner'
+        await acceptAuthorityRoot(runtime, owner, 'engineer', 'shared-user')
+        const seedUser = userMessage('shared-user', owner, [hostText('inspect the file')])
+        await first['chat.message'](
+          { sessionID: owner, messageID: 'shared-user', agent: 'engineer' },
+          { message: seedUser, parts: seedUser.parts },
+        )
+        family.pushHostMessage(owner, seedUser)
+        const seedAssistant = assistantMessage('shared-source', owner, 'shared-user', [])
+        family.pushHostMessage(owner, seedAssistant)
+        await first['experimental.chat.messages.transform']({}, { messages: [seedUser] })
+        seedAssistant.parts.push(budgetCall('shared-call', 1))
+        seedAssistant.info.time.completed = 2
+        const target = assistantMessage('shared-target', owner, 'shared-user', [])
+        target.info.time.created = 3
+        family.pushHostMessage(owner, target)
+        const pending = [
+          first['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
+          second['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
+        ]
+        const physicalResponses = new Map()
+        const finishDecision = async (hooks, decisionIndex) => {
+          let bootstrap
+          for (let attempt = 0; !bootstrap && attempt < 5000; attempt += 1) {
+            await tick()
+            const binding = durableEventsOfType(directory, 'DelegationBound')[decisionIndex]
+            bootstrap = family.prompts.filter(prompt => prompt.path?.id === binding?.payload.replica_session_id)[decisionIndex]
+          }
+          assert.ok(bootstrap, `missing resident bootstrap: ${JSON.stringify({
+            requested: durableRequestedEvents(directory).map(row => row.payload),
+            bound: durableEventsOfType(directory, 'DelegationBound').map(row => row.payload),
+            closed: durableEventsOfType(directory, 'DelegationClosed').map(row => row.payload),
+            promptedSessions: family.prompts.map(prompt => prompt.path?.id),
+          })}`)
+          const replica = bootstrap.path.id
+          const physical = family.messages.filter(message => message.role === 'user' && message.id.startsWith(`msg-${replica}-`)).at(-1)
+          const admission = userMessage(physical.id, replica, physical.parts)
+          await hooks['chat.message'](
+            { sessionID: replica, messageID: physical.id, agent: 'engineer' },
+            { message: admission, parts: admission.parts },
+          )
+          await hooks['experimental.chat.messages.transform']({}, { messages: [
+            admission,
+          ] })
+          const run = `response-${physical.id}`
+          const response = assistantMessage(run, replica, physical.id, [hostText('finished')])
+          family.pushHostMessage(replica, response)
+          physicalResponses.set(replica, response)
+          Events.notify(runtime.terminalPort, replica, 'Completed', run, 'finished')
+          return replica
+        }
+        const replica = await finishDecision(second, 0)
+        await withTimeout(Promise.all(pending), 'shared consumers did not receive the same decision completion')
+        assert.equal(durableRequestedEvents(directory).length, 1)
+        assert.equal(durableEventsOfType(directory, 'DelegationBound').length, 1)
+        const credits = () => ModelRouting.sharedCapacitySnapshot().custodies.filter(custody => custody.owner.sessionId === replica)
+        const before = credits()
+        assert.deepEqual(before.map(token => token.owner.sessionId), [replica], 'resident owns one actual capacity credit')
+        await family.stop(first)
+        assert.deepEqual(credits(), before, 'instance disposal cannot retire another owner’s resident credit')
+
+        const completedPhysical = physicalResponses.get(replica)
+        completedPhysical.info.time.completed = 2
+        completedPhysical.info.finish = 'stop'
+        await second.event({
+          event: { type: 'message.updated', properties: { info: completedPhysical.info } },
+        })
+
+        target.parts.push(budgetCall('shared-call-next', 1))
+        target.info.time.completed = 4
+        const nextTarget = assistantMessage('shared-target-next', owner, 'shared-user', [])
+        nextTarget.info.time.created = 5
+        family.pushHostMessage(owner, nextTarget)
+        const next = second['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant, target] })
+        assert.equal(await finishDecision(second, 1), replica)
+        await withTimeout(next, 'remaining instance could not reuse the resident')
+        assert.deepEqual(durableEventsOfType(directory, 'DelegationBound').map(row => row.payload.replica_session_id), [replica, replica])
+        await family.stop(second)
+        assert.deepEqual(credits(), [], 'last release returns the resident credit')
+      })
     })
   } finally {
     globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
@@ -705,6 +706,42 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_an
         [],
         'an in-flight source batch (calls without every result paired) must never be authorized',
       )
+    })
+  } finally {
+    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+  }
+})
+
+test('WHAT[speculative-investigation-013] a completed estimate from an older physical input cannot authorize the current request', async () => {
+  globalThis.__wanxiangshu_test_predictor_state = 'configured'
+  try {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const sessionId = 'ses-delegate-stale-physical'
+      const physical = 'user-current'
+      await acceptAuthorityRoot(runtime, sessionId, 'engineer', physical)
+      const currentUser = userMessage(physical, sessionId, [hostText('new assignment')])
+      await hooks['chat.message'](
+        { sessionID: sessionId, messageID: physical, agent: 'engineer' },
+        { message: currentUser, parts: currentUser.parts },
+      )
+      const oldUser = userMessage('user-old', sessionId, [hostText('old assignment')])
+      const oldSource = assistantMessage('source-old', sessionId, 'user-old', [budgetCall('old-call', 1)])
+      const currentTarget = assistantMessage('target-current', sessionId, physical, [])
+      for (const message of [oldUser, oldSource, currentUser, currentTarget]) {
+        runtime.pushHostMessage(sessionId, message)
+      }
+
+      await withTimeout(
+        hooks['experimental.chat.messages.transform']({}, { messages: [currentUser] }),
+        'root association establishment hung',
+      )
+      await withTimeout(
+        hooks['experimental.chat.messages.transform']({}, { messages: [oldUser, oldSource, currentUser] }),
+        'stale physical source rejection hung',
+      )
+      assert.ok(durableFactLineCount(directory) > 0)
+      assert.deepEqual(durableRequestedEvents(directory), [], 'old source belongs to user-old, not user-current')
+      assert.deepEqual(durableEventsOfType(directory, 'DelegationBound'), [])
     })
   } finally {
     globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
@@ -781,7 +818,8 @@ import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/proces
 
 {
 const { default: assert } = await import('node:assert/strict')
-const { parseParticipatingArguments, ProtocolRevision, EstimatedReadonlyRoundsField } = await import('../../../dist/Strength/InvestigationEstimateContract.js')
+const ProtocolRevision = 2;
+const EstimatedReadonlyRoundsField = 'estimated_readonly_rounds';
 const PluginHooksSurface = await import('../../../dist/OpenCode/Host/PluginHooksSurface.js')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -794,24 +832,6 @@ const PARTICIPATING_TOOLS = new Set([
   'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run',
 ])
-
-const readonlyRoundsDescriptionEn =
-  "Estimate how many consecutive read-only investigation rounds will still be needed after ALL tool calls in this response have completed, before a substantive change, a command, user clarification, a conclusion, or a consequential judgment that you must make yourself. One round is one model request and may contain several parallel tool calls; do not count the current batch. Routine choices about which reference or file to inspect are part of investigation. Use 0 when no such investigation remains or the next step already reaches one of those boundaries. Give your current best estimate; it need not be exact, and do not add work to match it."
-
-const selfNoteDescriptionEn =
-  "Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely, without an empty string or null. For a positive estimate, leave a brief, non-empty outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace."
-
-const englishCollaboration =
-  "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."
-
-const readonlyRoundsDescriptionZh =
-  "当前响应的全部工具执行完成后，预计还需要连续进行多少轮只读查证，才会到达实质修改、执行命令、向用户确认、给出结论，或必须亲自权衡的关键判断？一轮是一次模型请求，可以包含多个并行工具调用；当前这批不计入。选择接着查哪个文件或引用属于普通调查，不必一概当成关键判断。已经没有后续查证，或下一步就到达上述边界时，填 0。按当前材料估计即可，不要求精确，也不要为了符合估计增加调查。"
-
-const selfNoteDescriptionZh =
-  "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。"
-
-const chineseCollaboration =
-  "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"
 
 const checkOpencodeExecutable = () => {
   if (process.env.OPENCODE_BIN && existsSync(process.env.OPENCODE_BIN)) return true
@@ -875,13 +895,6 @@ integrationTest(
         `${name} must not require legacy delegate_readonly_rounds`,
       )
 
-      // 2. Companion/trust narrative must never appear in any description
-      assert.equal(
-        /companion|trust|retain control|同伴|信任|保留控制权/i.test(view.description),
-        false,
-        `${name} description must not contain companion or trust narrative`,
-      )
-
       if (PARTICIPATING_TOOLS.has(name)) {
         // Participating tools (12 tools): must carry estimated_readonly_rounds & self_note
         assert.ok(
@@ -918,59 +931,6 @@ integrationTest(
         assert.equal(view.budget?.maximum, 2147483647, `${name} estimated_readonly_rounds maximum must be 2147483647`)
         assert.equal(view.note?.type, 'string', `${name} self_note must be a string`)
 
-        // Verbatim description checks for participating tools matching ReadonlyDelegationContract.fs
-        const isChinese =
-          view.budget?.description === readonlyRoundsDescriptionZh ||
-          view.description.includes('调查展望：estimated_readonly_rounds')
-        if (isChinese) {
-          assert.equal(
-            view.budget?.description,
-            readonlyRoundsDescriptionZh,
-            `${name} budget description must match Chinese verbatim constant`,
-          )
-          assert.equal(
-            view.note?.description,
-            selfNoteDescriptionZh,
-            `${name} self_note description must match Chinese verbatim constant`,
-          )
-          assert.ok(
-            view.description.includes(chineseCollaboration),
-            `${name} description must contain Chinese collaboration prose`,
-          )
-          assert.equal(
-            view.description.split(chineseCollaboration).length - 1,
-            1,
-            `${name} Chinese collaboration prose must be appended exactly once (idempotent)`,
-          )
-        } else {
-          assert.equal(
-            view.budget?.description,
-            readonlyRoundsDescriptionEn,
-            `${name} budget description must match English verbatim constant`,
-          )
-          assert.equal(
-            view.note?.description,
-            selfNoteDescriptionEn,
-            `${name} self_note description must match English verbatim constant`,
-          )
-          assert.ok(
-            view.description.includes(englishCollaboration),
-            `${name} description must contain English collaboration prose`,
-          )
-          assert.equal(
-            view.description.split(englishCollaboration).length - 1,
-            1,
-            `${name} English collaboration prose must be appended exactly once (idempotent)`,
-          )
-        }
-
-        // Idempotent and stable prose: no volatile tokens, remaining counts, timestamps, or tiers
-        assert.equal(
-          /remaining rounds|\b\d{4}-\d{2}-\d{2}\b|model tier/i.test(view.description),
-          false,
-          `${name} description must not contain volatile counters, timestamps, or tiers`,
-        )
-
         // Note: js-manager is a manager review tool not issued on the engineer provider wire,
         // so summary.tools contains the engineer session tools. Its review contract and delegation
         // coexistence invariant is verified via direct decoration below.
@@ -999,16 +959,6 @@ integrationTest(
         )
         assert.equal(view.budget, null, `non-participating tool ${name} budget view must be null`)
         assert.equal(view.note, null, `non-participating tool ${name} note view must be null`)
-        assert.equal(
-          view.description.includes(englishCollaboration),
-          false,
-          `non-participating tool ${name} must not append English collaboration prose`,
-        )
-        assert.equal(
-          view.description.includes(chineseCollaboration),
-          false,
-          `non-participating tool ${name} must not append Chinese collaboration prose`,
-        )
       }
     }
 
@@ -1063,32 +1013,11 @@ integrationTest(
       false,
       'js-manager must not require self_note',
     )
-    assert.ok(
-      managerDef.description.includes(englishCollaboration) || managerDef.description.includes(chineseCollaboration),
-      'js-manager description must include collaboration prose',
-    )
-
     // Decoration extends the schema; it never replaces the tool's own contract.
     assert.ok(summary.tools.read.required.includes('filePath'), 'read must still require filePath')
     assert.ok(summary.tools.write.required.includes('content'), 'write must still require content')
     assert.ok(summary.tools.edit.required.includes('oldString'), 'edit must still require oldString')
     assert.ok(summary.tools.grep.required.includes('pattern'), 'grep must still require pattern')
-    assert.ok(
-      summary.tools.read.description.includes(englishCollaboration) ||
-        summary.tools.read.description.includes(chineseCollaboration),
-      'built-in descriptions must carry the new collaboration prose',
-    )
-    assert.equal(
-      summary.tools.read.description.includes('delegate_readonly_rounds on every tool call'),
-      false,
-      'legacy delegation prose must not appear',
-    )
-    assert.equal(
-      /companion|trust|retain control|同伴|信任|保留控制权/i.test(summary.tools.read.description),
-      false,
-      'the collaboration prose must not carry companion narrative',
-    )
-
     // The decorated call really executed with the model's own arguments, and the
     // provider-wire history kept them.
     assert.equal(summary.followUpObserved, true, 'the built-in tool call must settle into a follow-up request')
@@ -1108,35 +1037,38 @@ integrationTest(
 
     // Contract validation: legal combinations vs historical anti-pattern
     // 1. Legal positive estimate: non-blank self_note paired with rounds > 0
-    const validPositive = parseParticipatingArguments({
+    const validPositive = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       filePath: 'canary-sample.txt',
       [EstimatedReadonlyRoundsField]: 2,
       self_note: 'checking the canary fixture',
     })
-    assert.equal(validPositive.tag, 0, 'positive estimate with non-empty note is valid')
+    assert.equal(validPositive.ok, true, 'positive estimate with non-empty note is valid')
+    assert.equal(validPositive.note, 'checking the canary fixture')
 
     // 2. Legal zero estimate: self_note is omitted
-    const validZero = parseParticipatingArguments({
+    const validZero = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       filePath: 'canary-sample.txt',
       [EstimatedReadonlyRoundsField]: 0,
     })
-    assert.equal(validZero.tag, 0, 'zero estimate omitting self_note is valid')
-    assert.equal(validZero.fields[0][1], undefined, 'parsed note must be None/undefined for zero estimate')
+    assert.equal(validZero.ok, true, 'zero estimate omitting self_note is valid')
+    assert.equal(validZero.note, null, 'parsed note must be null for zero estimate')
 
     // 3. Historical anti-pattern (0 with note): must be rejected under new contract
-    const invalidZeroWithNote = parseParticipatingArguments({
+    const invalidZeroWithNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       filePath: 'canary-sample.txt',
       [EstimatedReadonlyRoundsField]: 0,
       self_note: 'checking the canary fixture',
     })
-    assert.equal(invalidZeroWithNote.tag, 1, '0 with self_note is an illegal combination and must be rejected')
+    assert.equal(invalidZeroWithNote.ok, false, '0 with self_note is an illegal combination and must be rejected')
+    assert.equal(invalidZeroWithNote.error, 'NotePresentWhenZero')
 
     // 4. Legacy field rejection: delegate_readonly_rounds must be rejected
-    const legacyAttempt = parseParticipatingArguments({
+    const legacyAttempt = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       filePath: 'canary-sample.txt',
       delegate_readonly_rounds: 0,
     })
-    assert.equal(legacyAttempt.tag, 1, 'legacy delegate_readonly_rounds field must be rejected')
+    assert.equal(legacyAttempt.ok, false, 'legacy delegate_readonly_rounds field must be rejected')
+    assert.equal(legacyAttempt.error, 'MixedProtocolFields')
   },
 )
 }

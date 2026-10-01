@@ -1,5 +1,20 @@
 # Changelog — 版本历史
 
+## Unreleased — predictor 的源消息、常驻生命周期与物理父链纠正
+
+- `../wanxiang/.git/wanxiang/events/b1ca41f13bc24d709cc25219737ec160.ndjson` 中 14 次只读委托全部在 Requested 阶段以 `cannot-continue` 关闭，零 Bound；授权记录把下一条 assistant 占位消息当成发出工具批次的源消息。现在源 ID 与工具批次从同一实际 assistant 取出，并核对它的真实 physical parent；新输入不能借用旧批次的估计。日志未开启逐门诊断，不能把全部历史关闭逐一归因于同一分支。
+- 常驻 predictor 在第一次 await 前认领 owner；同一 decision 共享准备结果，不同 decision 不创建竞争子会话。取消与卸载会排空未完成的创建；无模型容量的未发送委托立即退出，不等待不存在的物理终态。复用只订阅未来终态，退出时移除监听；终态按实际 physical input 精确匹配，旧回合不能结束新委托。结果保留到持久发布确认，避免物理清理先到时把并发消费者误判为恢复孤儿。
+- 每次结果收集仅扫描本次 bootstrap 之后的消息，历史工具材料与旧纯文本结尾不再污染或中止新委托。重启复用依据 durable Bound 中的子会话 ID 与 Host 的精确 agent/title；查询失败、历史多候选或元数据冲突明确拒绝，不另建副本，不按标题或时间任意收养，也不删除历史会话。
+- Host 父链在缓存缺失时按原生 session metadata 恢复；创建与查询统一使用实际 family root，子 owner 的 predictor 与其他受管同伴不再成为物理孙会话。逻辑 owner、预算、语言和材料归属不变；父链查询失败或出现环时不创建会话。需求条款补上不变量与条件性进展证明，模型是否给出合法正数估计及外部服务可用性不作无条件保证。
+- root/worktree 实例按同一 git common-dir runtime key 共享 predictor 登记表、物理协调器与 fuse；引用计数归零才卸载。通用实例清理不释放共享常驻会话及其 owner 的模型租约，最后卸载再交还两者。带有真实 physical parent 证据的早到终态先暂存，再由实际绑定精确重放；不丢失通知，也不借旧通知认领新决策。
+
+## Unreleased — provider 错误不再被空输出修复抢走
+
+- 修复 `CompletedTurnClassifier` 将 `completed + error + 空/XML-only 输出` 降级为 `TurnNeedsContinuation` 的错误。错误终态现在始终是 `TurnFailed`：先到的 idle 等待 exact typed failure，不再发送 `missing-final-report`；确切失败观察仍由原有 provider recovery 记账、派发 fresh `ProviderRetryAttempt` 并重新选择可用的 LWR 前缀。无 provider error 的空/XML-only `stop` 仍走内容修复，operator abort 仍为取消。
+- 现场证据：`../wanxiang` 的 DevOps 会话 `ses_f0dca4962ffeQSTPc5KnX6V0tZ` 在连续 400 超限期间记录了 210 次 `InteractionRepair`，却只有 8 次 `FailureRecorded` / `ProviderRetryAttempt`。repair 反复携带 cutoff=450 的旧 probe；最后一次真正的 provider retry 才选到 Blogger 已证明的 cutoff=656。修复不按 400 文案分支，不引入容量估算、非法截断或新会话兜底。
+- 回归覆盖空输出、reasoning-only、XML-only、partial answer、error finish、正常内容修复及取消边界；新增真实 `ReconcilePass.run` 的 idle 先到、exact provider terminal 后到回归。修改前回归失败为 `TurnNeedsContinuation`；修改后，用数据库中本次报错的原始 assistant message 离线重放，idle 交付 0 次，exact failure 交付 1 次 `TurnFailed / ProviderTransient`，不携带 idle repair 权限。
+- 定向验证：相关 12 个测试文件 90 通过、0 失败、5 TODO；构建通过。用真实 400 消息继续驱动 retry policy、生产 LWR candidate 物化与 Host-id prefix replacement 的离线 smoke，覆盖历史确实移除，Opening 与当前回合原样保留。扩展套件 630 项中 563 通过、20 失败、47 TODO；失败集中在未修改的 Chronicle 旧文案断言、Blogger flight/capacity 交错及 ingress provenance 测试。仓库 check 另报 184 项，未定位到本次修改文件；不宣称全仓门禁绿。
+
 ## Unreleased — F# 控制金字塔债务清零
 
 - **`fsharp-control-pyramid` 从 42 项降为 0，baseline 清空为 `{ "version": 1, "files": {} }`**：13 个文件逐处按 `structured-workflow-004` 提取具名 helper 或改用组合子消除 `depth>=2` decision，不再依赖按文件记账的 ratchet。`Batching.fs`（10）把 charge 渲染、消息替换、pending 取走各自成函数；`Delegate.fs`（8）把 wire 批次扫描收成 `wireBatchStep` 单步 Result、把预算聚合收成 `ofRounds`/`ofParsedResults`/`parseCall`；`InvestigationEstimateContract.fs`（8）拆出 `validateNumber`/`validateNoteText` 与中英文文案表；`Send.fs`（4）拆出 `persistSubmittedFact`/`admissionVerdict`/`settleAdmittedReceipt`，try 只包一层。

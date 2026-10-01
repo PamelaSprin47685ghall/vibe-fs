@@ -20,7 +20,8 @@ module Events =
     /// One registration slot. A bare function element would be curry-wrapped by
     /// Fable at every call site (the wrapper identity is re-created per call),
     /// so a reference-based Remove could never match and disposal leaked the
-    /// listener. A record keeps one stable identity; disposal is a flag flip.
+    /// listener. A record keeps one stable identity; disposal marks it dead
+    /// before unlinking it, so an in-flight notification snapshot also skips it.
     /// DSL-state-combination: physical — listener identity + live flag for disposal without identity leak
     type ListenerRegistration =
         { Listener: TerminalCompletionListener
@@ -94,7 +95,9 @@ module Events =
 
             { new IDisposable with
                 member _.Dispose() =
-                    lock lockObj (fun () -> registration.Live <- false) }
+                    lock lockObj (fun () ->
+                        registration.Live <- false
+                        listeners.Remove registration |> ignore) }
 
         /// One Completed terminal per (session, provider run), across every plugin
         /// instance sharing this port.

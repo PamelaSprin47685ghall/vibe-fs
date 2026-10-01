@@ -54,14 +54,3 @@ module StrengthDelegate =
         predictorConfigured: bool ->
         output: obj ->
             Task<unit>
-
-    val tryApply:
-        snapshotPort: ISessionSnapshotPort option ->
-        journal: AgentJournal option ->
-        strengthDurability: StrengthDurabilityPort option ->
-        strengthScope: PluginStrengthScope ->
-        tryAttemptPlan: (SessionId -> ProviderRunIdentity -> AttemptPlan option) ->
-        syncDelegateRuntime: SyncDelegateRuntime option ->
-        predictorConfigured: bool ->
-        output: obj ->
-            Task<unit>

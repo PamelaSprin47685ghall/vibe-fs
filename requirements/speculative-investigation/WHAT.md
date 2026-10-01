@@ -24,6 +24,8 @@
 
 授权的形成还要求：来源是新鲜的真实 owner 输出；owner logical run 未被替代；该授权尚未 Bound 或 Closed；待消费的是合法普通 WorkMain 续行；来源不是 Replica、其他 InternalLeaf、interaction repair、显式恢复特殊分支或 prefix probe；EventStore、Host 边界与进程 fuse 健康。
 
+来源身份取完成批次的 emitting assistant，不能取下一次外发请求的 assistant placeholder。来源 assistant 的 Host parent physical user message 必须与当前合法输入相符；新用户输入之后，旧批次中的正数估计不得冒充新来源。
+
 准入不含任何经济或统计判断：不存在收益估计、成本模型、证据样本量、holdout 分组或预测得分作为条件。同批参与调用出现非法值（缺失、null、字符串、负数、小数、布尔、越界、或条件短记不符）按新调用参数错误处理：整批不产生新执行，不取合法子集假装成功，也不把非法值静默规范化为 0。非只读的来源批次不否决委托——当前操作照常做完，委托针对的是接下来；Replica 输出中的正预算不能产生二次委托。
 
 ## [003] 事实性估计到只读执行上限的转换
@@ -36,6 +38,8 @@
 
 启动消息的防重发与 provider 请求预算分别记账：启动消息只认领一次，不扣调查轮数；每次 provider 外发只在 transform 准入时扣一轮。常驻会话复用时保留的历史响应不得让首个新请求重复扣费。
 
+常驻副本保留的旧决策工具结果与纯文本终态只属于历史。新决策的材料收集从其实际启动 physical user message 之后开始；旧批次不重复进入 Prepared，旧纯文本不提前结束新请求。决定完成只消费本决策的 completion cell，不能凭相同 SessionId 收束后来的决策。
+
 上限是安全门禁而不是必须做满的配额：同伴可随时提前结束，提前交还不是失败，主模型也不必在预算用尽后立即修改代码。
 
 ## [004] 同伴：同一 owner 身份的只读内部执行
@@ -43,6 +47,12 @@
 同伴以 `InternalLeaf × Attached(owner, StrengthReplica)` 构造，继承 owner 的 participant、Role、Persona、provenance/version 与会话语言。每个 owner 恰有一个**常驻**只读副本会话：该会话随 owner 存活而被复用，不随单个决策结束而终止或重建，因此 provider 侧看到同一会话并复用其前缀缓存；常驻会话占用一份 provider 容量，直到 owner 结束才释放。常驻会话的消息双向同步、只增不替换：新决策不重发已镜像的前缀，只把 owner 自上一位点以来新增的 delta 追加进常驻会话（`mirror(N) ⊕ replicaTurn(N) ⊕ mainDelta(N→N+1) ⊕ …`）；位点作为持久投射随 `DelegationBound` 记录，故前缀在 provider 侧保持稳定并被缓存复用。变化的是执行用途、模型目标、可见工具集合与短期控制权，不是"扮演另一个人"。
 
 模型目标经明确的只读委托用途，由唯一 MJS 调度权威从 Predictor 模型池选择；participant 与 Role 不改写，用途不从工具参数、用户文本、模型自述或角色名推导。Predictor 与 owner 配成相同模型是合法状态，不因模型名相同而关闭。
+
+创建与常驻复用共用 owner 排他准备权：在第一个 Host await 之前认领，同一决策的并发准备共享结果，不同决策不得先建会话再争登记。取消与删除须阻止仍在准备中的 child 外发。每个决策只订阅其后续终态，完成、取消或卸载后移除订阅；旧终态通知不能清除新绑定。
+
+同属一个 git common-dir 运行时的所有插件实例（如 root 根工作区与各 manager worktree 实例）必须共享同一个 Predictor 活跃登记表（`StrengthRuntime`）与物理协调器（`StrengthReplicaRuntime`），由统一的运行时路径键进行引用计数管理。某一个工作区实例的卸载（dispose）仅递减引用计数，不得处置共享的 predictor 或清理另一实例的活跃绑定；仅在最后一个实例卸载（引用归零）时方才释放底层资源与 live 登记。
+
+进程表只是常驻身份的缓存。重启恢复仅认 durable DelegationBound 记录的 ReplicaSessionId，并核对 Host 中的 agent、title 与物理 family children；无关联不收养其他会话，多个候选、属性冲突或查询失败明确拒绝，不以查询失败为丢失证据再建一个。仅确认原 child 永久丢失时才替换，并释放原登记的容量。物理 parent 一律压平到 Host 证明的 family root；逻辑 owner、身份继承与语言仍属于实际工作的 owner，两者不可混用。
 
 同伴只能调用唯一专用的只读 JS 编程面 `js-predictor`（能力严格限定为 {Read, Glob, Grep}）；`read`/`glob`/`grep` 原生工具不在同伴的可调用集合内，全部只读查证经该 JS 面完成。其模型可见工具 schema 与底层执行门禁同源：会话级权限规则在 deny 全部工具后精准放行此项。尝试写入、调用其他工具、借 fork/MCP/通用 JS 工具（如 `js-engineer`、`js-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
 
@@ -111,6 +121,8 @@ Delegate 不新增压缩阈值，不主动"压到可以委托为止"，不禁用
 
 Bound 之后崩溃但尚未得到 Prepared，允许损失本次同伴调查机会；不得为挽回它引入自动重复消费。晚到的旧 child 回调必须先恢复/确认身份边界，不得落入普通 owner 分支；没有 Bound 的空 child 从未获准发 provider 请求，只作为空资源清理，不得补发 prompt。
 
+重复 transform 在启动前重读 canonical 状态：仅 Requested 能启动；Bound 共享原决策的语义 completion，Prepared 重放已存材料，已关闭状态不重新准入。语义 outcome 保留到 durable publication/closure 确认之后，物理尾部先清理不能让并发消费方误判为“进程已丢失执行”。
+
 是否启动、启动几轮的判断，不存在任何统计预测器、成本公式、收益门槛、学习样本、control holdout 或 rollout 分支参与。Predictor 模型池槽位保留为本机制的模型配置位。
 
 ## [011] 失败、取消、熔断与参数错误边界
@@ -126,6 +138,10 @@ Bound 之后崩溃但尚未得到 Prepared，允许损失本次同伴调查机�
 上限用完与主动结束都保持语义终态与物理尾部分离：先停止接纳新请求，再按真实 Host terminal 清理 child 与租约；语义结束后的晚到 callback 仍识别为 Replica，不走普通 Work，资源只清理一次。
 
 owner 取消或删除时级联取消并释放 Replica 与 capacity fence，未消费候选不 Promotion。
+
+常驻 SessionId 不是决策终态的充分证据。精确 Host turn 必须匹配本决策实际启动的 physical user message；晚到的前一决策 turn 只被识别，不得收束新决策。模型容量拒绝发生在外发前时，该决策没有可等待的 provider terminal，必须立即清理其 live binding，不能使 owner 永久忙碌。卸载后的 coordinator 不再接受新准备。
+
+带有真实 assistant parent 证据的完成通知若先于 physical 绑定到达，按 physical 暂存；实际 dispatch acceptance 或 transform 确认绑定后，只重放相符终态。通知不能自行指定本决策的 physical，也不能让已完成的请求多发一轮。实例卸载只释放该实例拥有的模型租约；常驻 predictor 及其仍需继续的 owner 的租约受共享协调器保留，不能被某个实例的通用 session 清理提前释放。最后一个实例卸载时，协调器同时交还这些 owner 与 resident 的租约。
 
 ## [012] 模型可见协议：事实性估计与条件短记
 
@@ -153,6 +169,18 @@ owner 取消或删除时级联取消并释放 Replica 与 capacity fence，未�
 provider-wire 证据必须观察 owner 与 Replica 的实际 provider/model 与请求用途，证明后者实际使用用户配置的 Predictor 池。同 provider 容量为 1 时，父等子不得死锁、不得双占；取消时 capacity fence 与 child 正确释放。两个 owner 并发执行不串 schema、call id、授权、预算、结果或模型资源。
 
 E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧三参数 routingProtocol 必须被明确拒绝。
+
+### 可证明的边界
+
+证明对象是宿主状态机，不是模型必然给出正数估计或 provider 必然成功。初态为空或由唯一、无冲突的 durable/Host 证据恢复；每个合法转换保持以下不变量：
+
+1. **单 owner 单执行**：准备权在首个异步边界前排他认领；相同决策共享准备与 outcome，不同决策不能同时创建或登记。
+2. **来源一次性**：DecisionId 由真实完成来源推导；只有 Requested 能消费预算，已 Bound 或已关闭的来源不重启。
+3. **物理压平**：创建和查询共用 Host 证明的 family root；查询失败或祖先环不产生会话，不改变逻辑 owner。
+4. **材料与预算局部**：预算单调且仅在真实请求准入时扣除；只收集本次启动消息之后的完整 readonly 批次，旧材料不再刊发。
+5. **终态不串代**：physical request 身份与 completion cell 同时限定终态；清理只作用于本次登记，完成订阅与 outcome 都有明确释放点。
+
+在 Predictor 已配置、估计合法且为正、WorkMain 准入成立、持久化/Host/容量正常、各次模型请求最终返回合法工具结果或真实终态的前提下，决策沿 Requested → Bound → Prepared 或 Closed 推进，不因宿主的重复回调、常驻历史、进程重启而永久搁置。配置缺失、0、模型主动提前结束、容量拒绝及外部失败均有明确关闭或拒绝语义，不可宣称为“无条件必然启动”。
 
 ## [014] Predictor 配置是唯一启用依据
 

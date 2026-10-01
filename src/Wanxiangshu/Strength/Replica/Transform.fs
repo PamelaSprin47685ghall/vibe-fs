@@ -255,22 +255,20 @@ module StrengthReplicaTransform =
         let calls = collectToolCalls message.Parts
         let results = collectToolResults message.Parts
 
-        match List.isEmpty calls, List.isEmpty results with
-        | false, false -> Error "Strength Host adapter refuses a message mixing tool calls and results"
-        | false, true ->
-            startCallBatch pendingBatch message index hostId calls
-            |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
-        | true, false ->
-            // A result WITH a pending call batch belongs to that batch's logical
-            // `tool` message. A result WITHOUT one is either the self-contained
-            // Host session shape (folded into its own assistant response) or a
-            // genuine orphan the pending-batch check still refuses.
+        let handleToolResults results =
             if Option.isSome pendingBatch || not (isHostCompletedToolMessage message results) then
                 finishResultBatch sessionId sha256 pendingBatch message results
                 |> Result.bind (fun raw -> loop tail None (raw :: acc))
             else
                 emitHostCompletedExchange sessionId sha256 index message hostId results
                 |> Result.bind (fun raw -> loop tail None (raw :: acc))
+
+        match List.isEmpty calls, List.isEmpty results with
+        | false, false -> Error "Strength Host adapter refuses a message mixing tool calls and results"
+        | false, true ->
+            startCallBatch pendingBatch message index hostId calls
+            |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
+        | true, false -> handleToolResults results
         | true, true ->
             emitRegularMessage sessionId sha256 pendingBatch index message hostId
             |> Result.bind (fun raw -> loop tail None (raw :: acc))
@@ -397,14 +395,36 @@ module StrengthReplicaTransform =
                     { batch with
                         Exchanges = allowedExchanges })
 
+    let private currentDecisionMessages (rawMessages: obj list) =
+        let rec loop remaining current =
+            match remaining with
+            | [] -> current
+            | raw :: tail when
+                ProviderWireDecode.firstString (ProviderWireDecode.infoObject raw) [ "role" ] = Some "user"
+                && (ProviderWireDecode.hostMessageId raw |> Option.isSome)
+                ->
+                loop tail tail
+            | _ :: tail -> loop tail current
+
+        loop rawMessages rawMessages
+
     let private batchesForReplica (rawMessages: obj list) (currentWire: ProviderProjection.ProviderWireProjection) =
-        let wireBatches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
+        let decisionMessages = currentDecisionMessages rawMessages
+
+        let decisionWire =
+            if Object.ReferenceEquals(decisionMessages, rawMessages) then
+                currentWire
+            else
+                ProviderWireCapture.decodeMessageView decisionMessages
+
+        let wireBatches =
+            StrengthBatchCollector.collectCompleteBatches decisionWire.Messages
 
         let candidateBatches =
             if not (List.isEmpty wireBatches) then
                 wireBatches
             else
-                collectHostCompleteBatches rawMessages
+                collectHostCompleteBatches decisionMessages
 
         filterReadonlyBatches candidateBatches
 

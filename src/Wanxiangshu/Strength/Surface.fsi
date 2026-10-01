@@ -255,6 +255,10 @@ module StrengthSurface =
 
     val scopeCreate: unit -> obj
 
+    val scopeAcquireShared: key: string -> obj
+
+    val scopeReleaseShared: scope: obj -> unit
+
     val scopeFuseReason: scope: obj -> string
 
     val scopeTripFuse: scope: obj -> reason: string -> unit
@@ -291,6 +295,16 @@ module StrengthSurface =
     val transformApply: sha256: (string -> string) -> runtime: obj -> output: obj -> outboundRequest: bool -> Task<obj>
 
     val replicaRuntimeCreate: unit -> obj
+
+    val replicaPreparationCreate: owner: string -> role: string -> eventPort: obj -> ports: obj -> obj
+
+    val replicaPrepare: handle: obj -> request: obj -> Task<obj>
+
+    val replicaSendPrepared: handle: obj -> replica: string -> Task<obj>
+
+    val replicaDecisionOutcome: handle: obj -> replica: string -> decision: string -> obj
+
+    val replicaReleaseDecisionOutcome: handle: obj -> decision: string -> unit
 
     /// Attach an already-live binding to the real coordinator.
     val replicaAttach: handle: obj -> binding: obj -> obj

@@ -18,7 +18,7 @@ open Wanxiangshu.Persistence.Journal
 /// Explicit lifetime root for one plugin instance. Collections here are either
 /// physical resources, display caches, or bounded per-call deduplication.
 type PluginRuntimeScope =
-    new: journal: AgentJournal option -> PluginRuntimeScope
+    new: journal: AgentJournal option * isModelLeaseExternallyOwned: (SessionId -> bool) -> PluginRuntimeScope
 
     interface IDisposable
 
