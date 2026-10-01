@@ -124,7 +124,7 @@
 | GAP-115 | guidance-delivery-001/002/005 | PARTIAL | TipName 覆盖集合不具独立 occurrence frontier，新 run 仍 IdentityOnly 的真实失败 TODO 保留。当前合同首个 occurrence Full 与已知机制提醒范围需裁决。 |
 | GAP-116 | guidance-delivery-002/004/007—012 | PARTIAL | 已有双语正文、磁盘重开与冻结字节；Full 事实与实际交付原子性、动态 owner 单次读取、权限不变和事务故障仍缺证，disposed handle 不冒充 append 失败。 |
 | GAP-117 | guidance-delivery-006 | PARTIAL | 原无 association 时默认作为 guidance owner 的反例与拒绝修复已迁入；需新基线验证，不以单入口拒绝代替所有注入来源证明。 |
-| GAP-118 | attention-regulation | PARTIAL | 真插件重开、session 隔离与冻结消费有证据；同 SessionId 的 Life 清退未贯通。同 occurrence 不同正文的拒绝/原值重放政策待审，actual enough 模型行为及完整账本不变仍待证。 |
+| GAP-118 | attention-regulation | PARTIAL | 002已证abandon不动真实义务账本：seed WorkOwned后abandon，journal全投影deepEqual不变且快照非空（tests/002）。真插件重开、session 隔离与冻结消费有证据；同 SessionId 的 Life 清退未贯通。同 occurrence 不同正文的拒绝/原值重放政策待审，actual enough 模型行为及完整账本不变仍待证。 |
 | GAP-119 | verification-system-021 | PARTIAL | 文件缺失/加载错误曾被汇总器忽略；已迁入容器失败与非零传播回归，待本基线正式验证。不能用其它成功叶子掩盖文件未完成。 |
 | GAP-120 | execution-failure-policy-003—008/012/013 | PARTIAL | 有真实 policy 与 admission 屏障，尚缺完整 ledger发射去重、unknown跨重启、exact terminal、sealed授权及真实settlement→fuse生命周期。独立局部trace不能拼成一次执行。 |
 | GAP-121 | execution-failure-policy-010/014 | PARTIAL | fatal gate 的一跳 alias、文件/operation/测试路径存在不证明用例执行或覆盖真实分支。F05/F06/F08/F33/F34/C01/C02 在共同祖先与新基线都已无对应实际 fatal subject，已移出 active 库存并保留于本包 fatal-inventory-retired.md；现存 strength-semantic-cut 仍由 F17 索引。普通 Prepared 成功/重开不证明真实 cut 的 owner 传播、结算与终止，见183。F26只修正operation大小写，不是新政策。 |

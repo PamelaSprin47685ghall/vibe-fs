@@ -34,4 +34,29 @@ test('WHAT[attention-regulation-002] actual abandon leaves authority work produc
   })
 })
 
-test.todo('WHAT[attention-regulation-002] GAP-118 seed a real formal obligation and prove abandon leaves its complete ledger unchanged')
+test('WHAT[attention-regulation-002] seed a real formal obligation and prove abandon leaves its complete ledger unchanged', async () => {
+  const { openIncumbency, grantWorkOwned } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sessionID = 'attention-formal-obligation'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager', 'root-formal')
+    await openIncumbency(runtime, sessionID)
+    // Seed the formal obligation: an accepted assessment grants WorkOwned.
+    await grantWorkOwned(runtime, sessionID)
+    const before = journal.JournalSurface_snapshot(runtime.journal)
+    // The seeded obligation must actually be durable: the snapshot carries
+    // session projections, so an empty ledger would make equality vacuous.
+    assert.ok(Object.keys(before).length > 0, 'snapshot must be non-empty')
+
+    // Abandon only drops the self-formed commitment; the durable WorkOwned
+    // ledger must survive it untouched (WHAT 002: 不得因此取消真实任务义务).
+    await hooks.tool.abandon.execute({ commitment: 'drop my speculative plan' }, {
+      sessionID, agent: 'manager', messageID: 'run-formal', callID: 'abandon-formal',
+    })
+
+    const after = journal.JournalSurface_snapshot(runtime.journal)
+    // The projection set is deep-compared: abandon appended no fact that any
+    // fold consumed, so every slice of the durable ledger is unchanged.
+    assert.deepEqual(after, before)
+  })
+})
