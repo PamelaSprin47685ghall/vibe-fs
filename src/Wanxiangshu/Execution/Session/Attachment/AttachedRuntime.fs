@@ -48,7 +48,9 @@ type AttachedSessionRuntime
     /// The kinds this port owns, so a clear never touches another kind's bindings in
     /// a shared registry.
     let ownKinds =
-        [ AttachmentKind.SyncInspector; AttachmentKind.SyncCoder; AttachmentKind.SyncEngineer ]
+        [ AttachmentKind.SyncInspector
+          AttachmentKind.SyncCoder
+          AttachmentKind.SyncEngineer ]
 
     let leaseValue (lease: AttachmentLeaseCore.Lease) =
         let child = SessionId.create lease.SessionId
@@ -75,7 +77,11 @@ type AttachedSessionRuntime
 
     /// The single-flight cell is cleared whatever the establish does, so a failed
     /// ensure never becomes a poisoned flight.
-    let ensureAndClearFlight (owner: SessionId) (kind: AttachmentKind) (work: unit -> Task<Result<AttachmentLeaseCore.Lease, string>>) =
+    let ensureAndClearFlight
+        (owner: SessionId)
+        (kind: AttachmentKind)
+        (work: unit -> Task<Result<AttachmentLeaseCore.Lease, string>>)
+        =
         task {
             try
                 return! work ()
@@ -165,14 +171,19 @@ type AttachedSessionRuntime
                           RestoreHint = hint }
 
                     return!
-                        ensureAndClearFlight
-                            owner
-                            kind
-                            (fun () ->
-                                AttachmentLeaseCore.ensure
-                                    (operations owner scope role agentName (hint |> Option.map SessionId.create) createChild bindChild onReady)
+                        ensureAndClearFlight owner kind (fun () ->
+                            AttachmentLeaseCore.ensure
+                                (operations
                                     owner
-                                    spec)
+                                    scope
+                                    role
+                                    agentName
+                                    (hint |> Option.map SessionId.create)
+                                    createChild
+                                    bindChild
+                                    onReady)
+                                owner
+                                spec)
             }
 
         task {

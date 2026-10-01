@@ -45,6 +45,7 @@ module Fold =
         | RelayFactCases.TransactionCommitted payload ->
             let sessionId = SessionId.create (RoadId.value payload.RoadId)
             let events = RelayTransaction.events payload.Transaction
+
             let completesRoad =
                 events
                 |> List.exists (function
@@ -76,7 +77,9 @@ module Fold =
                             Relay = Some updated
                             PromptAuthority = updatedPromptAuthority }))
                 projection
-            |> Result.map (fun updated -> { updated with Attention = attentionAfterClosure })
+            |> Result.map (fun updated ->
+                { updated with
+                    Attention = attentionAfterClosure })
             |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =

@@ -197,8 +197,7 @@ module AttachmentSurface =
                         { new IDisposable with
                             member _.Dispose() = () }
 
-                    member _.SendPrompt(_, _, _) =
-                        Task.FromResult(Unchecked.defaultof<_>)
+                    member _.SendPrompt(_, _, _) = Task.FromResult(Unchecked.defaultof<_>)
 
                     member _.AbortSession _ = Task.FromResult(Ok())
                     member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -219,7 +218,8 @@ module AttachmentSurface =
                         Task.FromResult(
                             Ok(
                                 children
-                                |> Seq.filter (fun child -> child = ownerId || SessionId.value parent = SessionId.value ownerId)
+                                |> Seq.filter (fun child ->
+                                    child = ownerId || SessionId.value parent = SessionId.value ownerId)
                                 |> Seq.map (fun child ->
                                     { SessionId = child
                                       ParentSessionId = Some ownerId
@@ -250,7 +250,13 @@ module AttachmentSurface =
                     )
                 )
 
-            let syncCreate (_: SessionId) (_: ReuseScopeId) (role: SyncDelegateRole) (agent: string) (_: string option) =
+            let syncCreate
+                (_: SessionId)
+                (_: ReuseScopeId)
+                (role: SyncDelegateRole)
+                (agent: string)
+                (_: string option)
+                =
                 let id = SessionId.create (sprintf "sync-child-%d" (children.Count + 1))
                 children.Add id
                 syncChildren.[sprintf "%s/%s" agent (SyncDelegate.roleLabel role)] <- id
@@ -272,7 +278,16 @@ module AttachmentSurface =
                 )
 
             let! syncCoder =
-                sync.GetOrCreate(ownerId, SyncDelegateRole.Coder, "coder", None, syncObserve, syncCreate, noBind, noReady)
+                sync.GetOrCreate(
+                    ownerId,
+                    SyncDelegateRole.Coder,
+                    "coder",
+                    None,
+                    syncObserve,
+                    syncCreate,
+                    noBind,
+                    noReady
+                )
 
             let! companionLease =
                 companion.Ensure(
@@ -335,9 +350,12 @@ module AttachmentSurface =
             let coderChild = childOf syncCoder
 
             let companionChild =
-                companionLease |> Result.map (fun l -> SessionId.value l.SessionId) |> Result.toOption
+                companionLease
+                |> Result.map (fun l -> SessionId.value l.SessionId)
+                |> Result.toOption
 
-            let replicaChild = replicaResult |> Result.map (fun l -> l.SessionId) |> Result.toOption
+            let replicaChild =
+                replicaResult |> Result.map (fun l -> l.SessionId) |> Result.toOption
 
             let bindingOf child =
                 registry.TryFindByChild(SessionId.create child)
@@ -355,7 +373,16 @@ module AttachmentSurface =
             // Reuse must answer with the agent bound at create time (Sync) and must
             // not mint a second child (Companion).
             let! coderReuse =
-                sync.GetOrCreate(ownerId, SyncDelegateRole.Coder, "different-agent", None, syncObserve, syncCreate, noBind, noReady)
+                sync.GetOrCreate(
+                    ownerId,
+                    SyncDelegateRole.Coder,
+                    "different-agent",
+                    None,
+                    syncObserve,
+                    syncCreate,
+                    noBind,
+                    noReady
+                )
 
             let! companionReuse =
                 companion.Ensure(
@@ -404,6 +431,7 @@ module AttachmentSurface =
                         sync.TryFindByScope(otherScope, SyncDelegateRole.Inspector)
                         |> Option.map SessionId.value
                         |> Option.defaultValue ""
-                       replicaResidentStable = replicaAgain |> Result.map (fun l -> l.SessionId) |> Result.defaultValue ""
+                       replicaResidentStable =
+                        replicaAgain |> Result.map (fun l -> l.SessionId) |> Result.defaultValue ""
                        registrySize = registry.Snapshot() |> List.length |}
         }
