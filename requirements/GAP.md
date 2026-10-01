@@ -199,7 +199,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
 | GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
 | GAP-104 | context-compression | PARTIAL | 保留真实mailbox、flight、生产解码及XWire局部窗口证明；撤下布尔透传、手算floor、旧续传协议。027构造权已证：wire描述符非context，claim必经validating constructor，伪造DeltaDigest被SHA256(Toml)重算覆盖，next≤prev与空Squash覆盖拒绝且无部分状态，requestId缺省时为确定性canonical hash（tests/027）。Opening恢复、持续追平、当前载体、紧急Probe前置失败、恢复旧epoch拒绝及端到端退休仍待证。 |
-| GAP-122 | interaction-authority | PARTIAL | 身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
+| GAP-122 | interaction-authority | PARTIAL | 011已证attempt profile原子性：session/logicalRun/authorityRoot/authorityKind/identitySeed/participantIdentity全部来自accepted root且投影与验收逐字段一致，不从session cache或分散消息拼装（tests/011）。per-physical target/lease的原子携带仍待证。身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
 | GAP-123 | interaction-authority、managed-session-lifecycle | OPEN | 五类durable authority closure尚缺完整生产执行与归还证据；不得用描述字段代替已发生的关闭。 |
 | GAP-124 | interaction-authority历史身份 | PARTIAL | 历史Inspector材料与活跃准入必须分别验证；不靠放宽当前身份恢复旧测试。 |
 | GAP-125 | managed-chat-execution continuation | OPEN | 发送前对目标active run的真实核对仍缺完整证据；持久事实存在不等于当前可发送。 |
