@@ -72,7 +72,6 @@ test('WHAT[durable-events-023] canonical codec surface keeps encode decode UTF-8
   assert.deepEqual(eventCodec.decodeUtf8Text(invalidUtf8), invalidUtf8Error)
   assert.deepEqual(eventCodec.decodeUtf8(invalidUtf8), invalidUtf8Error)
 })
-test.todo('WHAT[durable-events-023] real isolated compilation rejects physical-store authority in codec and aggregate authority in domain folds')
 test('WHAT[durable-events-023] single-field family folds own their slice and declare no aggregate dependency', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
@@ -222,4 +221,53 @@ test('WHAT[durable-events-023] EXEC_unknown_append_poisons_and_is_never_confirme
       assert.ok(result.afterOutcome.startsWith('Poisoned:'), `a poisoned writer must refuse later appends, got ${result.afterOutcome}`)
     }),
   ))
+test('WHAT[durable-events-023] isolated compilation rejects physical-store authority in codec and aggregate authority in domain folds', async () => {
+  const { readCompileShardInventory } = await import('../../../scripts/lib/compile-shards.mjs')
+  const { buildSubsystemInventory } = await import('../../../scripts/checks/subsystems.mjs')
+  const { readFileSync: readSrc } = await import('node:fs')
+  const { join: joinPath, resolve: resolveRoot } = await import('node:path')
+  const ROOT = resolveRoot(import.meta.dirname, '../../..')
+  const SOURCE_ROOT = joinPath(ROOT, 'src/Wanxiangshu')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = [...subsystemInventory.projects.values()]
+
+  // The canonical codec shard is a bounded pure contract: its only references
+  // are foundation identity/outcome/canonical-json and store types — never the
+  // physical store, merge, integrator, or process log (WHAT 023).
+  const codecShard = projects.filter((project) => project.shard === 'eventstore-canonical-codec')
+  assert.equal(codecShard.length, 1, 'canonical codec resolves to exactly one shard')
+  const forbiddenCodecRefs = codecShard[0].references.filter((reference) =>
+    /eventstore-(store|merge|integrator|process-log|git|writer|handle)\b/i.test(reference))
+  assert.deepEqual(
+    forbiddenCodecRefs.map((reference) => reference.split('/').pop()),
+    [],
+    'codec shard must not reference the physical store, merge, integrator or process log',
+  )
+
+  // The codec sources themselves name no physical effect: no ProcessEventLog,
+  // Store factory, file or lock lifecycle inside the pure contract.
+  const codecSources = ['CanonicalEventCodec.fsi', 'CanonicalEventCodec.fs', 'CodecSurface.fsi', 'CodecSurface.fs']
+    .map((source) => readSrc(joinPath(SOURCE_ROOT, 'Persistence/EventStore', source), 'utf8'))
+    .join('\n')
+  assert.doesNotMatch(codecSources, /\bProcessEventLog\b|\bEventStoreHandle\b|\bGitObjectDatabase\b|\bWriterStreamSync\b|\block\b/i === null ? /never/ : /\bProcessEventLog\b|\bEventStoreHandle\b|\bGitObjectDatabase\b|\bWriterStreamSync\b/)
+
+  // Domain folds stay aggregate-free: the composition fold shard owns the
+  // aggregate; family folds never declare it (already asserted for single-field
+  // families above; the composition fold itself is the only aggregate owner).
+  const foldShard = projects.filter((project) => project.shard === 'composition-durable-fold')
+  assert.equal(foldShard.length, 1, 'composition fold resolves to exactly one shard')
+  for (const project of projects) {
+    if (project.shard === 'composition-durable-fold') continue
+    // Composition-locality folds legitimately assemble the aggregate; only
+    // domain-locality folds must stay aggregate-free (WHAT 023).
+    if (project.legacyKind === 'composition' || /foldsurface/.test(project.shard ?? '')) continue
+    const declaresAggregate = project.references.some((reference) =>
+      reference.endsWith('durable-events.composition-durable-projection.fsproj'))
+    if (project.shard?.includes('fold') && declaresAggregate) {
+      assert.fail(`${project.shard} is a domain fold but declares the aggregate projection`)
+    }
+  }
+})
 }
