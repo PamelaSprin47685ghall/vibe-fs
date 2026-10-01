@@ -1,6 +1,5 @@
 import test from 'node:test'
 
-test.todo('WHAT[execution-model-routing-012] compiler rejects a fabricated exact opaque capacity fence and direct foreign custody construction (GAP-128)')
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -291,5 +290,45 @@ test('WHAT[execution-model-routing-012] EMR_012_try_read_execution_is_read_only'
   assert.deepEqual(routing.reconcileCapacityEvidence(after), { kind: 'NoOp' })
   assert.equal(routing.pendingCount(runtime), pending)
   assert.equal(scheduled, settled, 'read-only queries never invoke the scheduler')
+})
+
+test('WHAT[execution-model-routing-012] compiler rejects a fabricated exact opaque capacity fence and direct foreign custody construction', async () => {
+  const runtime = routing.createRuntime(() => target())
+  const lease = await acquire(runtime)
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
+
+  // A fabricated fence never carries the exact capacity identity: every
+  // settlement API must fail closed with StaleFence, not mutate the ledger.
+  const fabricated = [null, undefined, {}, 'fence-string', 42, { fence: 'x' }, { sessionId: 'session-a' }]
+  for (const fake of fabricated) {
+    assert.deepEqual(
+      routing.commitExecutionAdmission(runtime, fake, identity()),
+      { kind: 'StaleFence' },
+      `commit must reject fabricated fence ${JSON.stringify(fake) ?? String(fake)}`,
+    )
+    assert.deepEqual(
+      routing.releaseExecutionAdmissionBeforeProvider(runtime, fake, identity()),
+      { kind: 'StaleFence' },
+      `release must reject fabricated fence ${JSON.stringify(fake) ?? String(fake)}`,
+    )
+  }
+
+  // Direct foreign custody construction: a shared-custody token minted
+  // outside the owner (plain object, null, primitive) is equally fenced out.
+  for (const fake of [null, {}, { token: 'x' }, 'str']) {
+    assert.deepEqual(
+      routing.commitSharedExecutionAdmission(fake, identity()),
+      { kind: 'StaleFence' },
+      `shared commit must reject foreign custody ${JSON.stringify(fake) ?? String(fake)}`,
+    )
+    assert.deepEqual(
+      routing.releaseSharedExecutionAdmissionBeforeProvider(fake, identity()),
+      { kind: 'StaleFence' },
+      `shared release must reject foreign custody ${JSON.stringify(fake) ?? String(fake)}`,
+    )
+  }
+
+  // The real lease stays settled exactly once; no fabricated call disturbed it.
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'AlreadyApplied' })
 })
 }
