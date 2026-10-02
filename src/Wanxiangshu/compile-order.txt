@@ -902,14 +902,14 @@ OpenCode/Host/HostSignalSubscribeSurface.fsi
 OpenCode/Host/HostSignalSubscribeSurface.fs
 Composition/Turn/Observation.fsi
 Composition/Turn/Observation.fs
+OpenCode/Host/SessionSnapshot.fsi
+OpenCode/Host/SessionSnapshot.fs
 Strength/TurnEvidence.fsi
 Strength/TurnEvidence.fs
 Strength/Lifecycle.fsi
 Strength/Lifecycle.fs
 Strength/Replica/TraceRecovery.fsi
 Strength/Replica/TraceRecovery.fs
-OpenCode/Host/SessionSnapshot.fsi
-OpenCode/Host/SessionSnapshot.fs
 OpenCode/Host/SessionSnapshotPort.fsi
 OpenCode/Host/SessionSnapshotPort.fs
 OpenCode/Host/ProviderRunBinding.fsi

@@ -17,6 +17,7 @@ open Wanxiangshu.Strength.Persistence
 module StrengthReplay =
     val applyBeforeXTrace:
         journal: AgentJournal option ->
+        snapshotPort: Wanxiangshu.OpenCode.ISessionSnapshotPort option ->
         strengthDurability: StrengthDurabilityPort option ->
         strengthFailFuse: (string -> unit) ->
         ownerRole: (string -> Role option) ->

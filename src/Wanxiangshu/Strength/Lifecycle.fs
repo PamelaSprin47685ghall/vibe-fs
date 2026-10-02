@@ -5,6 +5,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Projection
@@ -67,6 +68,42 @@ module StrengthLifecycle =
             | StrengthCandidateState.Traced
             | StrengthCandidateState.Closed _
             | StrengthCandidateState.Abandoned -> None)
+
+    let private completedRequestEvent
+        owner
+        (view: StrengthDelegationView)
+        (prepared: StrengthCandidatePrepared)
+        (assistant: SessionMessage)
+        =
+        match
+            StrengthTurnEvidence.completedRequestDecision
+                prepared.TargetProviderRun
+                view.Request.SourcePhysicalUserMessageId
+                assistant
+        with
+        | StrengthPromotionDecision.Promote ->
+            Some(
+                StrengthEvents.promoted
+                    owner
+                    prepared.DecisionId
+                    prepared.TargetProviderRun
+                    prepared.FrameDigest
+                    prepared.MaterialPayloads
+            )
+        | _ -> None
+
+    let reconcileCompletedRequest
+        (owner: SessionId)
+        (projection: StrengthProjection)
+        (assistant: SessionMessage)
+        : StrengthEvent option =
+        StrengthProjection.tryDecisionForTarget (ProviderRunIdentity.create assistant.Id) projection
+        |> Option.bind (fun decision -> StrengthProjection.tryCandidate decision projection)
+        |> Option.bind (fun view ->
+            match view.State, view.Prepared with
+            | StrengthCandidateState.Prepared, Some prepared when prepared.OwnerSessionId = owner ->
+                completedRequestEvent owner view prepared assistant
+            | _ -> None)
 
     let private anchorMissingError (prepared: StrengthCandidatePrepared) (target: string) =
         Error(

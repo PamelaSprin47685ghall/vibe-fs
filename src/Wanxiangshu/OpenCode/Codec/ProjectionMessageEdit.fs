@@ -216,7 +216,7 @@ module ProjectionMessageEdit =
                       createObj
                           [ "status", box "completed"
                             "input", canonicalValue argsCanonical
-                            "output", canonicalValue resultCanonical
+                            "output", box resultCanonical
                             "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
                   ) ]
 

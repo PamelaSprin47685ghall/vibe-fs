@@ -216,6 +216,14 @@ module StrengthSurface =
                    value = values |> List.toArray |}
         | Error error -> box {| ok = false; error = error |}
 
+    let tryEncodeOwnerMessages (sha256: string -> string) (messages: obj array) : obj =
+        match StrengthReplicaTransform.tryEncodeOwnerMessages sha256 (Array.toList messages) with
+        | Ok values ->
+            box
+                {| ok = true
+                   value = values |> List.toArray |}
+        | Error error -> box {| ok = false; error = error |}
+
     let private exchangesOf (value: obj) : StrengthToolExchange list =
         arrayOf value
         |> Array.toList
@@ -1506,6 +1514,12 @@ module StrengthSurface =
                     {| event = (EventHandle event :> obj)
                        view = eventView (EventHandle event :> obj) |}
             | None -> box {| event = null; view = null |}
+
+    let lifecycleReconcileCompletedRequest (owner: string) (projection: obj) (message: obj) : obj =
+        SessionSnapshotPort.projectMessage message
+        |> Option.bind (StrengthLifecycle.reconcileCompletedRequest (SessionId.create owner) (projectionOf projection))
+        |> Option.map (fun event -> eventView (EventHandle event :> obj))
+        |> Option.defaultValue null
 
     let private planToJs (plan: StrengthReplayPlan) : obj =
         box

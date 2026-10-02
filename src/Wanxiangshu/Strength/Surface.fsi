@@ -17,6 +17,8 @@ module StrengthSurface =
     /// Apply Strength's native completed-tool Host adaptation to rendered rows.
     val tryApplyRenderedMessages: sessionId: string -> sha256: (string -> string) -> rendered: obj -> obj
 
+    val tryEncodeOwnerMessages: sha256: (string -> string) -> messages: obj array -> obj
+
     val projectionMirror: value: obj -> obj
 
     val candidate: sha256: (string -> string) -> value: obj -> obj
@@ -264,6 +266,8 @@ module StrengthSurface =
     val lifecycleReconcileEvent: projection: obj -> turn: obj -> obj
 
     val lifecycleReconcileHandle: projection: obj -> turn: obj -> obj
+
+    val lifecycleReconcileCompletedRequest: owner: string -> projection: obj -> message: obj -> obj
 
     val lifecycleReplayPlans: owner: string -> messages: obj array -> bundle: obj -> projection: obj -> Task<obj>
 

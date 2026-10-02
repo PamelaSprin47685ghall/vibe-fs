@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — predictor 回传到主会话的映射修复
+
+- 现场 `InvalidRequestOrdinal (1, 2)` 来自第二次常驻委托：首轮工具名误成 `<tool_call>js-predictor`，Host 记录错误，次轮正常只读调用完成。筛掉首轮后仍保留材料编号 2，导致 bundle 拒绝并返回 500。现在 surviving readonly batches 连续编号，provider 请求预算仍独立记账；不放宽帧校验、不压制熔断。
+- Candidate 与 replay 都按 owner 角色映射 `js-predictor`；最终 Host 外发边界将逻辑 call/result 合并为原生 completed tool parts。追踪前仍保留完整交换与稳定 ID，已有 Host 行原样保留；JSON-looking 工具结果不再被解析，输出文本字节不变。
+- 补齐中间 provider 请求的消费确认：工具循环尚未结束时，下一次主变换按真实快照中的 exact assistant、physical parent、完成状态与模型输出提交 Promoted，再进入 XTrace 和 Traced。错误、取消、未完成、错 owner/parent 与空输出不升格。
+- 回归覆盖筛空首批/中间批、原生输出字节、并行 call/result 配对、物理行保留及 exact 消费拒绝边界。真实 OpenCode + 隔离 HTTP provider 场景覆盖两轮只读、错误工具后恢复、常驻复用、进程重启和 Engineer 子 owner：四次 Bound/Prepared、九次 predictor 请求，主模型实际收到五条完整交换，两个决策完成 Promoted → Traced；无 bundle 错误或主请求 500。
+
 ## Unreleased — predictor 的源消息、常驻生命周期与物理父链纠正
 
 - `../wanxiang/.git/wanxiang/events/b1ca41f13bc24d709cc25219737ec160.ndjson` 中 14 次只读委托全部在 Requested 阶段以 `cannot-continue` 关闭，零 Bound；授权记录把下一条 assistant 占位消息当成发出工具批次的源消息。现在源 ID 与工具批次从同一实际 assistant 取出，并核对它的真实 physical parent；新输入不能借用旧批次的估计。日志未开启逐门诊断，不能把全部历史关闭逐一归因于同一分支。

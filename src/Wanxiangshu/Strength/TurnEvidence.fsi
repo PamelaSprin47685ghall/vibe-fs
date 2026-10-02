@@ -13,3 +13,9 @@ module StrengthTurnEvidence =
     val classifyParts: parts: MessagePart array -> StrengthProviderOutputEvidence
 
     val promotionDecision: targetProviderRun: ProviderRunIdentity -> turn: ReconciledTurn -> StrengthPromotionDecision
+
+    val completedRequestDecision:
+        targetProviderRun: ProviderRunIdentity ->
+        physicalUserMessageId: PhysicalUserMessageId ->
+        assistant: SessionMessage ->
+            StrengthPromotionDecision

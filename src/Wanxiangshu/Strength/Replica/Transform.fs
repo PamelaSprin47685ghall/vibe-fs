@@ -292,6 +292,46 @@ module StrengthReplicaTransform =
 
         encodeMessages triples None []
 
+    let private isLogicalCallMessage (raw: obj) =
+        ProviderWireDecode.rawPartsOf raw
+        |> List.exists (fun part ->
+            ProviderWireDecode.firstString part [ "type" ]
+            |> Option.exists (fun kind -> kind = "tool-call"))
+
+    let private encodeOwnerBatch (sha256: string -> string) (call: obj) (resultMessage: obj) =
+        result {
+            let! sessionId =
+                ProviderWireDecode.firstString (ProviderWireDecode.infoObject call) [ "sessionID" ]
+                |> Result.requireSome "Strength owner tool batch has no Host session id"
+
+            let raw = [ call; resultMessage ]
+            let wire = ProviderWireCapture.decodeMessageView raw
+
+            let rendered =
+                { Messages = wire.Messages
+                  HostMessageIds = raw |> List.map ProviderWireDecode.hostMessageId
+                  HostIsPhysical = [ false; false ] }
+
+            return! tryApplyRenderedMessages sessionId sha256 rendered
+        }
+
+    /// Keep logical call/result rows intact through XTrace and context projection.
+    /// Only at the final Host boundary fold them into native completed tool parts.
+    let tryEncodeOwnerMessages (sha256: string -> string) (rawMessages: obj list) : Result<obj list, string> =
+        let rec encode remaining acc =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | call :: result :: tail when isLogicalCallMessage call ->
+                encodeOwnerBatch sha256 call result
+                |> Result.bind (fun encoded -> encode tail (List.rev encoded @ acc))
+            | [ last ] when isLogicalCallMessage last -> Error "Strength owner tool batch is incomplete"
+            | raw :: tail -> encode tail (raw :: acc)
+
+        if rawMessages |> List.exists isLogicalCallMessage then
+            encode rawMessages []
+        else
+            Ok rawMessages
+
     let private providerResultsByCallId (rawMessages: obj list) =
         ProviderWireCapture.decodeMessageView rawMessages
         |> fun view -> view.Messages
@@ -394,6 +434,9 @@ module StrengthReplicaTransform =
                 Some
                     { batch with
                         Exchanges = allowedExchanges })
+        |> List.mapi (fun index batch ->
+            { batch with
+                RequestOrdinal = index + 1 })
 
     let private currentDecisionMessages (rawMessages: obj list) =
         let rec loop remaining current =

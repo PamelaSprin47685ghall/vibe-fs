@@ -66,8 +66,10 @@
 
 回传给主模型的只有同伴真实的只读工具交换：每个候选帧保留 request batch 边界、原始调用顺序、原始 arguments、真实执行结果与内容 digest，call/result 严格一对一配对。同伴的纯文本、reasoning、未执行计划与总结不进入主模型上下文；纯文本输出是提前结束信号，不是待主模型采信的研究报告。
 来源整批可能包含非只读调用；Frame 构造必须过滤保留其中的只读交换（read/glob/grep/js-predictor），而不是直接因整批混入非只读工具而拒绝整个帧（UnsupportedTool）。若过滤后合法只读交换为空，则按无材料（NoMaterial）正常处理。
+过滤后仍有材料的批次按原顺序连续编号为 1..N；被筛空的首批或中间批次不留下编号空隙。材料编号不承担 provider 请求预算记账，失败请求与真实外发轮数仍由准入账本记录。
 
 同伴自己看到的交换保留其真实调用名 `js-predictor`；回传注入主人会话时，该交换按主人的角色投影为其自己的 `js-<role>` 工具名（如 devops 主人即 `js-devops`），使主人看到的是它本可自行调用、结果形态一致的证据，而非一个它无权调用的工具。该重命名只发生在面向主人的投影渲染处，Frame 的材料 digest、持久化 payload 与同伴自身的 transcript 均保持原名不变。
+候选首次投递与后续 replay 使用同一工具命名规则。逻辑 call/result 行在追踪与上下文投影阶段保持完整，最终 Host 外发边界才合并为原生 assistant completed `tool` parts；不能把 Host 不消费的通用 `tool-call/tool-result` 行当作已经交付。真实工具输出始终保留原始文本字节，内容看似 JSON 也不得解析成对象、数字或 null。
 
 新字段随真实 arguments 保存。不存在 Delegate 专属的字节、token、短记长度或批次大小上限，不存在按长度丢弃、保留小前缀、"过大退回零步"或等价替身规则；超过任何历史大小的完整交换仍可构建、持久化、映射与恢复。
 
@@ -86,6 +88,7 @@
 ## [007] 消费证明、Promotion 与关闭路径
 
 只有协调后的轮次证据明确证明 `turn.ProviderRun` 等于候选的 TargetProviderRun、且该运行产生了真实非空输出时，才可追加 Promoted；"tool.after 跑过""child 完成""owner session 还活着"均不能替代消费证据；请求尚未发起、纯传输错误、空失败或已终止的运行不得 Promotion。Promoted 必须引用与 Prepared 完全一致的 digest 与材料；写入状态未知时重新解析，未证明前保持 fail closed。
+Host 的整段工具循环未结束，不等于其中每次 provider 请求都未完成。下一次主变换在 XTrace 捕获前读取真实完整快照：仅当目标 assistant ID、physical parent、完成标志与正常 finish 均吻合，并有模型真实文本、reasoning 或具备调用身份和工具名的原生 ToolParts，才确认该次请求消费并提交 Promoted。无完成证据、错误或取消 finish、错误 parent、错误 owner 与仅有 bookkeeping 的快照均不得升格；不能只等待工具循环最终一条 assistant 而遗失中间目标请求。
 
 无材料结束、不可继续、取消、被替代、恢复放弃、或协议升级替换时写 `DelegationClosed`：明确记录关闭原因，同一授权不得在后续 transform 再次启动，并实现终态防重；成功路径（Prepared → Promoted → Traced）不额外写 Closed；材料废弃使用 Abandoned。
 

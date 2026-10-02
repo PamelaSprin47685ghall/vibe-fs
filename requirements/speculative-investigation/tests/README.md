@@ -6,17 +6,17 @@
 | --- | --- | --- |
 | [001] | 不健康前提、Shadow、嵌套请求的 K0 裁决和默认设置 | 同一次真实 Work 在 Off/K0/熔断与无优化时的行为等价 |
 | [002] | 每个机会前提单独翻转的策略矩阵；未知标签拒绝 | 真正 Work 入口从冻结身份与 target 取得证据；角色白名单有合同冲突 |
-| [003] | Collector 的并发配对、跨 request 边界；真实 transform/coordinator 的预算关闭；真实 Host 中同一常驻副本连续两次委托各发出两轮请求 | 更多预算与故障截断组合的真实网络证明 |
+| [003] | Collector 的并发配对、跨 request 边界；真实 transform/coordinator 的预算关闭；筛空首批和中间批次后的材料连续编号；真实 Host 中两轮只读工具及错误工具后恢复的预算隔离 | 更多预算与故障截断组合的真实网络证明 |
 | [004] | 现行角色的精确 readonly capability、退役角色拒绝、owner attachment、single-flight；Host 原始 system 数组中的双语约束；真实 provider 仅收到 js-predictor | 所有角色、语言及拒绝效果的真实 Host 矩阵 |
-| [005] | Frame 规范化、序号、digest/调用标识；完整 canonical 文本的独立 UTF-8 字节边界；工具交换渲染 | 真实采集结果到 Owner 注入的完整连线 |
+| [005] | Frame 规范化、序号、digest/调用标识；完整 canonical 文本的独立 UTF-8 字节边界；真实 Host provider wire 收到五条重定位后的完整交换，参数与结果同源、使用 owner 工具名 | 所有工具结果形态与普通压缩组合 |
 | [006] | 真 EventStore/payload closure、冲突拒绝、关闭重开读取；Prepared 不 replay | 模糊写入时实际 Owner 外发被阻止 |
 | [007] | 消费证据分类、exact target 裁决、失败轮次 Abandoned、Promoted 持久化 | 模糊 Promotion 时实际 continuation 被阻止 |
-| [008] | 真实 EventStore 关闭重开后的 Promoted replay plan；定位、trace-range 和覆盖判断 | 真实下一次 Owner transform、XTrace 捕获与压缩的因果闭环 |
+| [008] | 真实 EventStore 关闭重开后的 Promoted replay plan；定位、trace-range 和覆盖判断；真实中间请求快照确认消费后，两个决策进入 Promoted → XTrace → Traced，进程重启继续回放 | 普通压缩覆盖后的完整因果闭环 |
 | [009] | ToolCallId 重定位、孤儿/媒体拒绝、语义不变；mirror 替换及局部 batches | 真实新决策不会复用旧 Replica 上下文 |
 | [010] | 成本公式、预算门槛、控制分组、真实 scope 的 exact-run 计数、会话隔离与重放幂等 | rollout 样本充分性和生产训练流不接纳干预请求 |
 | [011] | scope 熔断 first-wins；真实 coordinator 的取消、删除、释放与不可复活终态 | 无因果终态时真实 Treatment 仍等待；Host Canary 真实兼容性 |
 | [012] | Candidate/Promoted 只插入准确工具交换，保留普通正文中的“replica”等合法内容 | Owner/Replica 真实输入与完整 Host/EventStore 审计字段 |
-| [013] | 真实 Host 的 Manager 经 js-manager 连续触发两次委托：两个 Bound、同一 resident child、四次 predictor 请求、两条实际工作指令、无裸 Continue；provider system 有只读约束且工具集合精确为 js-predictor | 更长生命周期与崩溃恢复组合 |
+| [013] | 真实 Host 三次 Manager 委托（含重启）与一次 Engineer 子 owner 委托：四个 Bound/Prepared、九次 predictor 请求；目标主模型收到五条精确配对的工具交换；错误工具不触发 bundle 熔断，主请求无 500；provider system 有只读约束且工具集合精确为 js-predictor | 更长生命周期、所有角色与普通压缩组合 |
 | [014] | 合法 ablation 配置下真实 Strength settings 对 Off/Shadow/DryRun/Treatment 的优先级矩阵 | 不把无效 DAG 的 fallback 当作正常 ablated 场景 |
 
 `Strength.Surface.replicaRuntimeCreate` 使用生产 coordinator，但 CreateChildSession/SendPrompt 是未使用的占位端口；测试使用 `AttachLiveDecision`。它可以证明 attach/turn/transform/delete/dispose，不能证明 StartDecision 启动。`transformApply` 的 abort 端口只记录调用，不证明物理 provider 网络已停止。`013.test.mjs` 的 `resident_manager_predictor_keeps_each_budget_and_readonly_boundary` 则启动真实 OpenCode，使用隔离 HTTP provider 观察外发字节和子会话 transcript；该 canary 不使用真实外部模型。现有纯策略测试中的历史角色只是受控输入，不代表允许新建旧身份。

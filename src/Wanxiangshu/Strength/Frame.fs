@@ -14,7 +14,8 @@ type StrengthToolExchange =
       CanonicalArguments: string
       CanonicalResult: string }
 
-/// One Replica provider request. RequestOrdinal, not tool count, spends one round of the request budget.
+/// One completed readonly batch. Material ordinals are dense after filtering;
+/// the runtime accounts for provider requests independently.
 type StrengthRequestBatch =
     { RequestOrdinal: int
       Exchanges: StrengthToolExchange list }

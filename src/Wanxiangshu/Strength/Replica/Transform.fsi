@@ -16,6 +16,8 @@ module StrengthReplicaTransform =
     val tryApplyRenderedMessages:
         sessionId: string -> sha256: (string -> string) -> rendered: RenderedMessages -> Result<obj list, string>
 
+    val tryEncodeOwnerMessages: sha256: (string -> string) -> rawMessages: obj list -> Result<obj list, string>
+
     val apply:
         sha256: (string -> string) ->
         runtime: StrengthRuntime ->
