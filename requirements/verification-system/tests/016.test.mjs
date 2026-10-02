@@ -1,13 +1,14 @@
 // Verification inputs collection and mid-run perturbation detection tests.
 
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
-import { collectVerificationInputs, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
+import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
 import { verify } from '../../../scripts/verify.mjs'
 
 function setupFixtureRepo() {
@@ -27,9 +28,97 @@ function setupFixtureRepo() {
   fs.writeFileSync(path.join(dir, '.github/workflows/ci.yml'), 'name: CI\n')
   fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"fixture"}\n')
   fs.writeFileSync(path.join(dir, 'package-lock.json'), '{"lockfileVersion":3}\n')
+  execFileSync('git', ['init', '--quiet', dir])
 
   return dir
 }
+
+test('WHAT[verification-system-016] tracked corpus proposals contribute their actual content to verification inputs', () => {
+  const fixture = setupFixtureRepo()
+  try {
+    fs.mkdirSync(path.join(fixture, 'proposals'))
+    const proposal = path.join(fixture, 'proposals', 'decision.md')
+    fs.writeFileSync(proposal, '# Before\n')
+    execFileSync('git', ['-C', fixture, 'add', 'proposals/decision.md'])
+
+    const before = collectVerificationInputs(fixture)
+    assert.ok(before.some(entry => entry.path === 'proposals/decision.md'))
+    assert.ok(collectGeneratedInputs(fixture).some(entry => entry.path === 'proposals/decision.md'))
+    fs.writeFileSync(proposal, '# Changed\n')
+    const after = collectVerificationInputs(fixture)
+
+    assert.deepEqual(diffVerificationInputs(before, after), {
+      equal: false,
+      reason: 'content-changed:proposals/decision.md',
+    })
+    assert.notEqual(computeDigest(before), computeDigest(after))
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+  }
+})
+
+for (const initiallyTracked of [false, true]) {
+  test(`WHAT[verification-system-016] corpus tracking ${initiallyTracked ? 'removal' : 'addition'} changes verification identity without changing file bytes`, () => {
+    const fixture = setupFixtureRepo()
+    try {
+      if (initiallyTracked) execFileSync('git', ['-C', fixture, 'add', 'src/Foo.fs'])
+      const original = fs.readFileSync(path.join(fixture, 'src/Foo.fs'))
+      const before = collectVerificationInputs(fixture)
+      const generatedBefore = collectGeneratedInputs(fixture)
+
+      execFileSync('git', ['-C', fixture, ...(initiallyTracked ? ['rm', '--cached', 'src/Foo.fs'] : ['add', 'src/Foo.fs'])])
+      const after = collectVerificationInputs(fixture)
+      const generatedAfter = collectGeneratedInputs(fixture)
+
+      assert.deepEqual(fs.readFileSync(path.join(fixture, 'src/Foo.fs')), original)
+      assert.deepEqual(before.map(entry => entry.path), after.map(entry => entry.path))
+      assert.notDeepEqual(generatedBefore.map(entry => entry.path), generatedAfter.map(entry => entry.path))
+      assert.equal(diffVerificationInputs(before, after).equal, false)
+      assert.notEqual(computeDigest(before), computeDigest(after))
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const collect of [collectGeneratedInputs, collectVerificationInputs]) {
+  test(`WHAT[verification-system-016] ${collect.name} rejects failed Git corpus inventory`, () => {
+    const fixture = setupFixtureRepo()
+    try {
+      fs.writeFileSync(path.join(fixture, '.git', 'index'), 'invalid index')
+      assert.throws(() => collect(fixture), error => {
+        assert.equal(error.status, 128)
+        assert.match(String(error.stderr), /index/)
+        return true
+      })
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[verification-system-016] failed Git corpus inventory stops verification before any stage starts', async () => {
+  const fixture = setupFixtureRepo()
+  const stages = []
+  try {
+    fs.writeFileSync(path.join(fixture, '.git', 'index'), 'invalid index')
+    const result = await verify({
+      root: fixture,
+      output: { write() {} },
+      runStep: async ({ label }) => {
+        stages.push(label)
+        return { label, ok: true, exitCode: 0 }
+      },
+    })
+    assert.equal(result.exitCode, 1)
+    assert.equal(result.outcome, 'fail')
+    assert.match(result.failureReason, /^input-collection-failed:.*git/s)
+    assert.deepEqual(stages, [])
+    assert.ok(result.steps.every(step => step.status === 'not-run'))
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[verification-system-016] collectVerificationInputs collects expected relative paths and diff detects mutations', () => {
   const fixture = setupFixtureRepo()

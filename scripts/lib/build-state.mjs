@@ -25,6 +25,7 @@ export function computeDigest(entries) {
   const hasher = crypto.createHash('sha256')
   for (const entry of sorted) {
     const hash = entry.sha256 ?? entry.hash
+    if (entry.loopDetectorCorpus) hasher.update('loop-detector-corpus\0')
     hasher.update(`${entry.path}:${hash}\n`)
   }
   return hasher.digest('hex')
@@ -117,6 +118,10 @@ export function collectVerificationInputs(root = REPO_ROOT) {
     }
   }
 
+  for (const entry of collectGeneratedInputs(resolvedRoot)) {
+    collectedMap.set(entry.path, { ...entry, loopDetectorCorpus: true })
+  }
+
   return Array.from(collectedMap.values()).sort((a, b) => a.path.localeCompare(b.path))
 }
 
@@ -135,6 +140,9 @@ export function diffVerificationInputs(before, after) {
     }
     if (bEntry.sha256 !== aEntry.sha256) {
       return { equal: false, reason: `content-changed:${p}` }
+    }
+    if (Boolean(bEntry.loopDetectorCorpus) !== Boolean(aEntry.loopDetectorCorpus)) {
+      return { equal: false, reason: `corpus-membership-changed:${p}` }
     }
   }
 
@@ -167,13 +175,7 @@ export function collectCompilerInputs(root = REPO_ROOT, aggregatePath) {
 
 export function collectGeneratedInputs(root = REPO_ROOT) {
   const resolvedRoot = path.resolve(root)
-  let files = []
-  try {
-    files = loopDetectorRepositoryInputFiles(resolvedRoot)
-  } catch {
-    // If not a git repo or loopDetectorRepositoryInputFiles throws, empty or fallback
-    files = []
-  }
+  const files = loopDetectorRepositoryInputFiles(resolvedRoot)
 
   const results = []
   for (const abs of files) {
