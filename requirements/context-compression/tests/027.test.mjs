@@ -5,9 +5,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const sha256Hex = (input) => {
   const hash = createHash('sha256')
@@ -464,4 +465,55 @@ test('WHAT[context-compression-027] wire descriptors cannot bypass the validatin
   }
 })
 
-test.todo('WHAT[context-compression-027] independent consumers cannot construct private Main or Squash records at compile time (GAP-104: F# record private-constructor proof pending — the runtime validating-constructor test above is retained but does not prove F# type-level privacy)')
+async function compileRequestConsumer(consumer) {
+  const { compileOwnerProject, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const root = resolve(import.meta.dirname, '../../..')
+  const sourceRoot = join(root, 'src/Wanxiangshu')
+  const projectPath = join(sourceRoot, 'Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj')
+  const scratch = mkdtempSync(join(tmpdir(), 'wxs-request-construction-'))
+  try {
+    const plan = planOwnerCompile({ projectPath })
+    const isolatedItems = plan.compileItems.map(source => {
+      const destination = join(scratch, 'src', relative(sourceRoot, source))
+      mkdirSync(dirname(destination), { recursive: true })
+      cpSync(source, destination)
+      return destination
+    })
+    const consumerPath = join(scratch, consumer)
+    cpSync(join(import.meta.dirname, 'fixtures/request-construction', consumer), consumerPath)
+    return await compileOwnerProject({
+      projectPath,
+      scratchRoot: join(scratch, 'build'),
+      rootPropsPath: join(root, 'Directory.Build.props'),
+      compilePlan: { ...plan, compileItems: [...isolatedItems, consumerPath] },
+      stdio: 'pipe',
+    })
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+integrationTest('WHAT[context-compression-027] Fable compiles an external consumer of both validating factories and readonly context members', async () => {
+  const result = await compileRequestConsumer('FactoryConsumer.fs')
+  assert.equal(result.ok, true, `the real declared request closure must compile with its public factories and readers\n${result.stdout}\n${result.stderr}`)
+  assert.equal(result.code, 0)
+  assert.equal(result.signal, null)
+})
+
+const assertPrivateConstructionRejected = async (consumer, typeName) => {
+  const result = await compileRequestConsumer(consumer)
+  const diagnostics = `${result.stdout}\n${result.stderr}`
+  assert.equal(result.ok, false, `${consumer} must not construct a private context`)
+  assert.notEqual(result.code, 0)
+  assert.equal(result.signal, null, 'a terminated compiler does not prove a private construction boundary')
+  assert.ok(
+    diagnostics.split('\n').some(line => line.includes(consumer) && line.includes(typeName) && /not accessible/i.test(line)),
+    `the compiler must reject access to ${typeName} at the external construction site\n${diagnostics}`,
+  )
+}
+
+integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Main record', () =>
+  assertPrivateConstructionRejected('DirectMainConsumer.fs', 'BloggerMainRequestContext'))
+
+integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Squash record', () =>
+  assertPrivateConstructionRejected('DirectSquashConsumer.fs', 'BloggerSquashRequestContext'))
