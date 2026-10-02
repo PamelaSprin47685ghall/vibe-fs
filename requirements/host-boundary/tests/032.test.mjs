@@ -480,10 +480,12 @@ test('WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_an
 // contract.
 // ---------------------------------------------------------------------------
 
-test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract', () => {
+test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
+    language.refreshGlobalLanguage()
     const definition = {
       description: 'Original description of the tool',
       parameters: {
@@ -568,6 +570,7 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     } else {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
     }
+    language.refreshGlobalLanguage()
   }
 })
 
@@ -636,10 +639,12 @@ test('WHAT[host-boundary-032] C19_self_note_is_advisory_and_never_fails_the_call
   assert.equal(validPositive.note, noteText, 'note content must round-trip verbatim')
 })
 
-test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', () => {
+test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
+    language.refreshGlobalLanguage()
     const definition = {
       description: 'Description for js-manager',
       parameters: {
@@ -686,6 +691,7 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
     } else {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
     }
+    language.refreshGlobalLanguage()
   }
 })
 
