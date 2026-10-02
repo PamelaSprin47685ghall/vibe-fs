@@ -7,6 +7,7 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 const Projection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
 const PluginHooksSurface = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
+const languageSurface = await import("../../../dist/Participant/Provider/LanguageSurface.js");
 
 const H = (text) => `H(${text})`
 const requestValue = {
@@ -217,10 +218,12 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_advisory_and
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const PluginHooksSurface = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
+const languageSurface = await import("../../../dist/Participant/Provider/LanguageSurface.js");
 
 const decorateUnder = (language, toolID = 'read', decorateTwice = false) => {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = language
+  languageSurface.refreshGlobalLanguage()
   try {
     const definition = {
       description: 'Original description',
@@ -235,6 +238,7 @@ const decorateUnder = (language, toolID = 'read', decorateTwice = false) => {
     } else {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
     }
+    languageSurface.refreshGlobalLanguage()
   }
 }
 

@@ -45,15 +45,19 @@ module StrengthDelegate =
         strengthScope.TripStrengthFuse reason
         raise (InvalidOperationException reason)
 
-    let private isRootWorkEntry (entry: SessionAssociation) : bool =
-        entry.ParentSessionId.IsNone
-        && match SessionOwnershipClassification.classifyLegacy entry with
-           | SessionExecutionClass.Work, Some SessionOwnership.Root -> true
-           | _ -> false
+    /// WHAT[002]: the source exclusion is "not the Replica and not another
+    /// InternalLeaf" — a durable association that classifies as InternalLeaf
+    /// (Blogger companions, satellites). A Work child delegated by its owner
+    /// (DevOps, Engineer) is a legal delegation source; its authority kind
+    /// (HumanRoot or AgentOwnerRoot) decides nothing here.
+    let private isInternalLeafEntry (entry: SessionAssociation) : bool =
+        match SessionOwnershipClassification.classifyLegacy entry with
+        | SessionExecutionClass.InternalLeaf, _ -> true
+        | _ -> false
 
-    let private rootWork (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) : bool =
+    let private internalLeafOwner (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) : bool =
         SessionAssociationProjection.tryFind sessionId associations
-        |> Option.exists isRootWorkEntry
+        |> Option.exists isInternalLeafEntry
 
     let private renderCandidate
         (owner: SessionId)
@@ -112,7 +116,7 @@ module StrengthDelegate =
           SourcePhysicalUserMessageId: PhysicalUserMessageId
           RequestKind: ProviderRequestKind
           HasPrefixProbe: bool
-          IsRootWork: bool
+          IsInternalLeaf: bool
           DurableProjection: StrengthProjection }
 
     let private hasPrefixProbeChoice (choice: Wanxiangshu.Context.Prefix.XProjectionChoice) : bool =
@@ -195,11 +199,6 @@ module StrengthDelegate =
             let! authority = tryResolveAuthorityProfile owner projections
             let requestKind, hasPrefixProbe = planEvidence tryAttemptPlan owner target
 
-            let attached =
-                syncDelegateRuntime
-                |> Option.bind (fun sd -> sd.TryFindDelegateOwner owner)
-                |> Option.isSome
-
             let wire = ProviderWireCapture.decodeMessageView rawMessages
 
             return
@@ -216,10 +215,7 @@ module StrengthDelegate =
                   SourcePhysicalUserMessageId = physical
                   RequestKind = requestKind
                   HasPrefixProbe = hasPrefixProbe
-                  IsRootWork =
-                    authority.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                    && rootWork owner projections.AgentProjections.Associations
-                    && not attached
+                  IsInternalLeaf = internalLeafOwner owner projections.AgentProjections.Associations
                   DurableProjection = durableStrength }
         }
 
@@ -696,8 +692,8 @@ module StrengthDelegate =
     let private checkCaptureEligibility (surface: OwnerSurface) : Result<unit, string> =
         if surface.RequestKind <> ProviderRequestKind.WorkMain then
             Error "not-work-main"
-        elif surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
-            Error "not-root-owner-work"
+        elif surface.Ports.Runtime.IsReplica surface.Owner || surface.IsInternalLeaf then
+            Error "replica-or-internal-leaf"
         else
             Ok()
 
@@ -802,11 +798,11 @@ module StrengthDelegate =
               SourceToolCallIds = request.SourceToolCallIds
               RequestedRounds = Some request.RequestedRounds
               ContractRevision = contractRevision
-              IsRootWork = surface.IsRootWork
+              IsRootWork = not surface.IsInternalLeaf
               RequestKind = surface.RequestKind
               CanonicalRole = surface.Authority.CanonicalRole
               HasPrefixProbe = surface.HasPrefixProbe
-              IsReplicaOrInternalLeaf = not surface.IsRootWork
+              IsReplicaOrInternalLeaf = surface.IsInternalLeaf
               IsInteractionRepair = surface.RequestKind = ProviderRequestKind.InteractionRepair
               IsExplicitRecoveryBranch = false
               OwnerCancelled = false
@@ -1371,7 +1367,7 @@ module StrengthDelegate =
             surface.RequestKind <> ProviderRequestKind.WorkMain
             || surface.HasPrefixProbe
             || surface.Ports.Runtime.IsReplica surface.Owner
-            || not surface.IsRootWork
+            || surface.IsInternalLeaf
         then
             SurfaceApplication.Skip
         else

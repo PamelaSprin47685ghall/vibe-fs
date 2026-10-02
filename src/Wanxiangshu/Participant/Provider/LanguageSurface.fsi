@@ -15,13 +15,9 @@ module ProviderLanguageSurface =
     val resourceFileName: raw: string -> string
     val inheritFrom: raw: string -> string
     val clearAllForTests: unit -> unit
-    val tryGet: sessionId: string -> obj
-    val bindOnce: sessionId: string -> language: string -> obj
-    val inheritFromOwner: ownerLanguage: string -> childSessionId: string -> obj
     val setHostConfigPreference: raw: string -> unit
     val readGlobalPreference: unit -> string
-    val ensureRoot: sessionId: string -> string
-    val ensureInherited: ownerSessionId: string -> childSessionId: string -> string
+    val refreshGlobalLanguage: unit -> unit
     val languageOfSession: sessionId: string -> string
     val languageRootsPresent: unit -> bool
     val relativePath: language: string -> semanticPath: string -> string

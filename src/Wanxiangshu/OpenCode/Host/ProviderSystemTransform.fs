@@ -192,7 +192,7 @@ module ProviderSystemTransform =
 
     let private transformSystem (role: SessionId -> Role option) (isReplica: SessionId -> bool) sessionText system =
         let sid = SessionId.create sessionText
-        let lang = ProviderLanguageBinding.ensureRoot sid
+        let lang = GlobalProviderLanguage.current ()
 
         if replaceBookkeeperSystem lang sessionText system then
             ()

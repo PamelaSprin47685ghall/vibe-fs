@@ -592,6 +592,7 @@ module PluginHooks =
 
                 if not (isNull lang) then
                     ProviderLanguageBinding.setHostConfigPreference (string lang)
+                    ProviderLanguageBinding.refreshGlobalLanguage ()
 
             let configurePluginHost (config: obj) =
                 if not (isNull config) then

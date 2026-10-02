@@ -221,7 +221,7 @@ module ReadonlyDelegationContract =
             restoreSavedArgs args
 
     let private currentLanguage () =
-        ProviderLanguageBinding.forSessionText ""
+        Wanxiangshu.Participant.Provider.GlobalProviderLanguage.current ()
 
     let private budgetProperty () : obj =
         let desc =

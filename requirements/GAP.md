@@ -187,7 +187,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-063 | host-boundary-019/021/026/027/029 | PARTIAL | 真实transform受控端口、截断和子进程退出用例保留。026/027已去除具体模块清单，Host诊断独立编译修复缺失依赖后通过；全能力Host、正常路径退出及架构语义仍待证。 |
 | GAP-064 | host-boundary-013 | OPEN | 旧基线曾断言完成但进程不退出；本次受构建阻断尚未复验，不增加超时或强制退出。 |
 | GAP-069 | managed-session-lifecycle-004/009/014 | OPEN | 旧fixture文件完成问题待本次产物复验；不能用旧断言pass关闭资源生命周期问题。 |
-| GAP-070 | provider-language-002/003/010/012 | PARTIAL | 新来源优先级已按上游对齐；跨进程绑定、锚点表示及完整双语语义仍缺证。 |
+| GAP-070 | provider-language-002/003/010/012 | PARTIAL | 会话绑定已删除，语言唯一来源为全局设置；锚点表示及完整双语语义仍缺证，真实 Host 会话边界的下一次请求语言未证。 |
 | GAP-071 | provider-language-005/006/008/009/013 | PARTIAL | 实际提示投影、资源反例保留；同一真实请求的system/tool/consequence语言交付和Class A所有权仍待证。 |
 | GAP-072 | office-capability-003/005/011 | PARTIAL | 上游已区分稳定权能与当前准入，旧歧义不再待决；跨投影语义同源及完整执行证明仍缺。 |
 | GAP-073 | office-capability | PARTIAL | 权限函数和有限样例判别器不证明Agent实际职责履行。标准Engineer的Sphinx新权限、Manager只读取证窗口、接力与在途PTY需真实调用链。 |

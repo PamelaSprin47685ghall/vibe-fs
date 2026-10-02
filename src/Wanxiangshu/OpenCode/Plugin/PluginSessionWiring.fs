@@ -149,8 +149,7 @@ module PluginSessionWiring =
                 sessionProj.PromptAuthority
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
                 |> Option.iter (fun _ ->
-                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
-                    ProviderLanguageBinding.ensureRoot sessionId |> ignore))
+                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore))
 
         match journal with
         | Some durable ->

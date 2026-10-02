@@ -194,9 +194,6 @@ module PluginHooksSurface =
     [<Emit("Boolean($0 && typeof $0 === 'object' && !Array.isArray($0))")>]
     let private isPlainObject (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'number' && $0 === 0")>]
-    let private isNumberZero (value: obj) : bool = jsNative
-
     [<Emit("Array.prototype.slice.call(arguments)")>]
     let private getJsArguments () : obj array = jsNative
 
@@ -205,8 +202,10 @@ module PluginHooksSurface =
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
         let jsArgs = getJsArguments ()
 
-        if jsArgs.Length = 1 && isNumberZero jsArgs[0] then
-            box {| ok = true; note = null |}
+        if jsArgs.Length = 0 then
+            box
+                {| ok = false
+                   error = "InvalidArgumentObject" |}
         elif jsArgs.Length = 1 && not (isPlainObject jsArgs[0]) then
             box
                 {| ok = false

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clearAllForTests, readGlobalPreference, setHostConfigPreference, ensureRoot, languageOfSession } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { clearAllForTests, readGlobalPreference, setHostConfigPreference, refreshGlobalLanguage, languageOfSession } from '../../../dist/Participant/Provider/LanguageSurface.js'
 import { withPreference } from './support/language-fixtures.mjs'
 
 const localeKeys = ['WANXIANGSHU_PROVIDER_LANGUAGE', 'VSCODE_NLS_CONFIG', 'LC_ALL', 'LC_MESSAGES', 'LANG']
@@ -27,9 +27,10 @@ const withLocale = async (environment, intlLocale, action) => {
 }
 
 test('WHAT[provider-language-004] English is the final fallback after all locale sources are non-Chinese', async () => {
-  await withLocale({}, 'en-US', () => {
+  await withLocale({}, 'en-US', async () => {
     assert.equal(readGlobalPreference(), 'English')
-    assert.equal(ensureRoot('fallback-root'), 'English')
+    refreshGlobalLanguage()
+    assert.equal(languageOfSession('fallback-root'), 'English')
   })
 })
 
@@ -55,17 +56,21 @@ test('WHAT[provider-language-004] explicit environment outranks host configurati
   })
 })
 
-test('WHAT[provider-language-004] preference changes affect only future roots in either direction', async () => {
+test('WHAT[provider-language-004] a preference change reaches every existing session on its next read', async () => {
   await withLocale({}, 'en-US', async () => {
-    await withPreference('zh-CN', () => assert.equal(ensureRoot('first'), 'SimplifiedChinese'))
-    await withPreference('en', () => {
-      assert.equal(ensureRoot('first'), 'SimplifiedChinese')
-      assert.equal(ensureRoot('second'), 'English')
-    })
-    await withPreference('zh-CN', () => {
-      assert.equal(ensureRoot('second'), 'English')
-      assert.equal(ensureRoot('third'), 'SimplifiedChinese')
+    await withPreference('zh-CN', async () => {
+      refreshGlobalLanguage()
       assert.equal(languageOfSession('first'), 'SimplifiedChinese')
+    })
+    await withPreference('en', async () => {
+      refreshGlobalLanguage()
+      assert.equal(languageOfSession('first'), 'English', 'the already-seen session switches immediately')
+      assert.equal(languageOfSession('second'), 'English')
+    })
+    await withPreference('zh-CN', async () => {
+      refreshGlobalLanguage()
+      assert.equal(languageOfSession('first'), 'SimplifiedChinese')
+      assert.equal(languageOfSession('second'), 'SimplifiedChinese')
     })
   })
 })

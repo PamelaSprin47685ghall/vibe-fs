@@ -62,10 +62,7 @@ module JsBookkeeperTool =
     let private isString (value: obj) : bool = jsNative
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        GlobalProviderLanguage.current ()
 
     let private prose language path =
         ProviderProse.render language path Map.empty

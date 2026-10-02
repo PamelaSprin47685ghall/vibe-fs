@@ -26,7 +26,7 @@ Host compaction 只通过 ContextReanchored 收容：epoch 加一、清除 Snaps
 
 ## [007] 同 Life system prompt byte-identical
 
-同一 Life 的 Office system prompt 保持逐字节一致，Persona 不重绑；交托、fallback、review 和 compaction 均不例外。
+同一 Life 且全局语言不变期间，Office system prompt 保持逐字节一致，Persona 不重绑；交托、fallback、review 和 compaction 均不例外。全局语言变化是唯一允许 system prompt 随之整体变化的情形（provider-language-013）：切换后的第一次请求建立新前缀，此后恢复 byte-identical。
 
 ## [008] FrozenRecordPrefix 是 low-trust context
 
@@ -56,6 +56,8 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 ## [013] prefix identity 的比较范围
 
 比较覆盖 provider、model、variant、完整 tools、system prompt 及 message 序列。身份、工具、system 或历史 message 的变更均不能视为追加；冷边界仍须满足 [002]。
+
+唯一例外是全局语言变化（provider-language-002/013）：语言不同导致的 system prompt 与 message 语言整体差异不按前缀漂移处理，不要求 epoch 推进或冷边界声明；语言不变期间本条款照常强制。
 
 ## [014] guidance 正文不进入 trace
 

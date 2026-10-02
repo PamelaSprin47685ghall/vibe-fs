@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Participant.Provider
 
 /// JS-native observation surface for session Host adapter contracts.
 /// Parent lineage is a durable lookup; the physical parent for every child is
@@ -209,7 +210,7 @@ module SessionsSurface =
             transport.SetParent("host-family-root", Ok None)
 
             let ownerSession = SessionId.create "restored-child"
-            let ownerLang = ProviderLanguageBinding.ensureRoot ownerSession
+            let ownerLang = GlobalProviderLanguage.current ()
 
             let sessions =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
@@ -224,10 +225,7 @@ module SessionsSurface =
             let firstChild = firstOutcome |> Result.defaultWith invalidOp
             let queriesAfterFirst = transport.ParentQueryCalls.Length
 
-            let childLang =
-                match Wanxiangshu.Participant.Provider.SessionProviderLanguage.tryGet firstChild with
-                | Some l -> string l
-                | None -> "unbound"
+            let childLang = string (GlobalProviderLanguage.current ())
 
             let! listOutcome = sessions.ListChildren(ownerSession)
 

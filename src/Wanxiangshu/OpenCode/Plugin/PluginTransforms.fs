@@ -126,10 +126,8 @@ module PluginTransforms =
           ReplicaSanitize: obj -> unit }
 
 
-    let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
-        match projectionSessionIdOpt with
-        | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-        | None -> ProviderLanguageBinding.readGlobalPreference ()
+    let private languageFor (_projectionSessionIdOpt: string option) : ProviderLanguage =
+        GlobalProviderLanguage.current ()
 
     // Explicit composition mode — replaces the previous implicit helper dispatch
     // (strengthReplicaRuntime / ordinaryProviderTransform).

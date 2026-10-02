@@ -121,3 +121,17 @@ module ProviderLanguage =
 
     /// HOST-026: child / attached / InternalLeaf language = owner | commissioner.
     let inheritFrom (owner: ProviderLanguage) : ProviderLanguage = owner
+
+[<RequireQualifiedAccess>]
+module GlobalProviderLanguage =
+
+    /// HOST-026: the live global preference is the only language authority.
+    /// Every Class A render reads it, so changing the setting changes the
+    /// language of the next request even mid-session.
+    let mutable private currentLanguage = ProviderLanguage.English
+
+    /// Re-resolve the live global preference (env → host config → locale →
+    /// English). Called at startup and whenever the host preference changes.
+    let refresh (resolve: unit -> ProviderLanguage) : unit = currentLanguage <- resolve ()
+
+    let current () : ProviderLanguage = currentLanguage

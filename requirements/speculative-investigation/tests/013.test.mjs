@@ -1050,14 +1050,14 @@ integrationTest(
     assert.equal(validZero.ok, true, 'zero estimate omitting self_note is valid')
     assert.equal(validZero.note, null, 'parsed note must be null for zero estimate')
 
-    // 3. Historical anti-pattern (0 with note): must be rejected under new contract
+    // 3. Advisory note (0 with note): WHAT [012]/[016] never treat note shape as a failure
     const invalidZeroWithNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       filePath: 'canary-sample.txt',
       [EstimatedReadonlyRoundsField]: 0,
       self_note: 'checking the canary fixture',
     })
-    assert.equal(invalidZeroWithNote.ok, false, '0 with self_note is an illegal combination and must be rejected')
-    assert.equal(invalidZeroWithNote.error, 'NotePresentWhenZero')
+    assert.equal(invalidZeroWithNote.ok, true, '0 with self_note is advisory and must not fail')
+    assert.equal(invalidZeroWithNote.note, 'checking the canary fixture', 'the advisory note is preserved verbatim')
 
     // 4. Legacy field rejection: delegate_readonly_rounds must be rejected
     const legacyAttempt = PluginHooksSurface.readonlyDelegationSelfNoteOf({

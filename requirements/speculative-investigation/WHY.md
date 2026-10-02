@@ -133,29 +133,29 @@
 - **后果与代价（Consequences）**：系统在面对磁盘或通信异常导致的悬决状态时，宁可让物理尝试在 `FailClosed` 停摆等待持久证据重新明确，也绝不自动前滚猜测。这意味着在偶发 IO 抖动时，部分本已部分成功的路径会停止执行以待耐久证据重读。
 - **重新考虑的条件**：若底层存储层引入了带有两阶段确认与租约证明的强一致性读取协议，能够在重读阶段对“尚未写入”与“因物理不可达而无法探测”提供确定性的形式化证明，方可评估扩大 `FallBackNoDelegation` 的裁量适用范围。
 
-### 为什么 Surface 应用在判定为 Replica 或非 root work 时就地 Skip？
+### 为什么 Surface 应用在判定为 Replica 或内部叶子时就地 Skip？
 
-- **约束**：DELEGATE §7.4 规定只读副本仅能进行只读查证，绝对禁止发起第二层委托；同时，非根工作（子会话）亦不得作为委托来源。
+- **约束**：WHAT [002] 规定来源不得是 Replica 或其他 InternalLeaf（如 Blogger 同伴）；Replica 仅能进行只读查证，绝对禁止发起第二层委托。Work 子会话（如 DevOps、Engineer 的 AgentOwnerRoot 续行）是合法委托来源，其 authority kind（HumanRoot 或 AgentOwnerRoot）不参与该判定。
 - **选择**：在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs` 的 `planSurfaceApplication` 中（行号随重构漂移，以函数名为准）：
   ```fsharp
   if
       surface.RequestKind <> ProviderRequestKind.WorkMain
       || surface.HasPrefixProbe
       || surface.Ports.Runtime.IsReplica surface.Owner
-      || not surface.IsRootWork
+      || surface.IsInternalLeaf
   then
       SurfaceApplication.Skip
   else
       decideTargetAction surface.Target surface.DurableProjection
   ```
-  只要检测到请求不是 WorkMain、带 prefix probe、会话属于 Replica 或不是根会话，直接返回 `SurfaceApplication.Skip`，跳过目标决策，不进入 `decideTargetAction`。
+  只要检测到请求不是 WorkMain、带 prefix probe、会话属于 Replica，或其 durable 关联分类为 InternalLeaf（Blogger 同伴等卫星会话），直接返回 `SurfaceApplication.Skip`，跳过目标决策，不进入 `decideTargetAction`。`IsInternalLeaf` 由 `SessionOwnershipClassification.classifyLegacy` 从 durable 关联派生，不从 authority kind、parentID 或角色名称推导。
 - **反事实知识：两道物理闸的纵深防御**：
   - `planSurfaceApplication` 的就地 `Skip` 是**防递归的第一道物理闸**。它直接截断了 Surface 执行入口，使得任何 Replica 会话根本无法进入决策匹配（`decideTargetAction`），从物理源头上阻止了其生成 `ConsumeBound` 或 `StartPending`；
   - 随后在下游策略层（`StrengthPolicy.decide`，`src/Wanxiangshu/Strength/Policy.fs` L120 起；行号随重构漂移，以函数名为准）中，对 `isReplicaOrInternalLeaf` 施加了第二道硬拦截（独立测试见 `requirements/speculative-investigation/tests/010.test.mjs` L117-130 与 `requirements/speculative-investigation/tests/011.test.mjs` L152-175）。
   - 这两道防线独立存在、缺一不可。
 - **被否决的替代方案**：移除外层的 `planSurfaceApplication` 检查，仅依赖下游策略层（`StrengthPolicy`）做集中拦截。
 - **否决理由**：仅依赖下游策略层拦截是脆弱的。若外层不就地 `Skip`，Replica 的输出帧就会作为合法的 Surface 目标进入 `decideTargetAction`，参与决策比对与投影扫描。任何一处下游策略疏漏、分类漂移或新增加的内部动作，都会导致系统误将 Replica 输出帧当成主模型的合法业务来源进行消费，彻底击穿防递归不变量。Replica 输出在物理本质上就不是合法的 owner 来源，这与估算数值（`estimated_readonly_rounds`）大小完全无关——即使模型在副本内填写了正数，它也绝不能被当成来源。
-- **后果（Consequences）**：嵌套委托在物理与拓扑层面上彻底不可达。矩阵 H12、H13 的测试断言以及迟到回调的物理尾部隔离均以此为确定地基。H03 覆盖的是策略层对 Replica 身份标志的响应——`isReplicaOrInternalLeaf` 由用例显式传入，断言 `policyEligibility` 返回 `Ineligible + replica-or-internal-leaf`、`policyDecide` 返回 `Skip` 与同一 reason，它不经过 `planSurfaceApplication`。capture 路径侧的同源判定由 `checkCaptureEligibility` 把 `IsReplica` 与 `not IsRootWork` 压进同一个 or 分支、共用 reason `"not-root-owner-work"`，原理上不可区分；且该路径传入的 `IsReplicaOrInternalLeaf` 取自 `IsRootWork`，在 capture 路径上恒为 false。该路径的自动化覆盖不在 `requirements/**/tests/*.test.mjs` 内。
+- **后果（Consequences）**：嵌套委托在物理与拓扑层面上彻底不可达。矩阵 H12、H13 的测试断言以及迟到回调的物理尾部隔离均以此为确定地基。H03 覆盖的是策略层对 Replica 身份标志的响应——`isReplicaOrInternalLeaf` 由用例显式传入，断言 `policyEligibility` 返回 `Ineligible + replica-or-internal-leaf`、`policyDecide` 返回 `Skip` 与同一 reason，它不经过 `planSurfaceApplication`。capture 路径侧的同源判定由 `checkCaptureEligibility` 把 `IsReplica` 与 `IsInternalLeaf` 压进同一个 or 分支、共用 reason `"replica-or-internal-leaf"`；capture 路径构造 opportunity 时，`IsRootWork = not IsInternalLeaf`、`IsReplicaOrInternalLeaf = IsInternalLeaf`，两者由同一分类派生。该路径的自动化覆盖不在 `requirements/**/tests/*.test.mjs` 内。
 - **重新考虑的条件**：除非产品架构发生根本性演进，正式引入了多层级、带全局配额树与防环检测的有界递归调查机制，否则外层 Surface 的就地 `Skip` 绝不允许移除或放宽。
 
 ### 当前未证边界清单：真实 Provider 容量为 1 时的父子无死锁

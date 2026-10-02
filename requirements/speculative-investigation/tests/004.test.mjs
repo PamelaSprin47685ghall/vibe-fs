@@ -373,7 +373,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const {
   clearAllForTests,
-  ensureRoot,
+  refreshGlobalLanguage,
   languageOfSession,
   transformRoleSystem,
   transformReplicaSystem,
@@ -388,8 +388,8 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_sy
   ]) {
     await withPreference(preference, async () => {
       clearAllForTests()
+      refreshGlobalLanguage()
       const session = `replica-session-${language}`
-      assert.equal(ensureRoot(session), language)
       assert.equal(languageOfSession(session), language)
 
       const initialSystem = ['Role system segment', 'Host-owned foreign segment']
@@ -418,8 +418,9 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_non_replic
   ]) {
     await withPreference(preference, async () => {
       clearAllForTests()
+      refreshGlobalLanguage()
       const session = `normal-owner-${language}`
-      assert.equal(ensureRoot(session), language)
+      assert.equal(languageOfSession(session), language)
 
       const initialSystem = ['Role system segment', 'Host-owned foreign segment']
       const output = await transformRoleSystem(session, 'Engineer', initialSystem)
@@ -432,27 +433,26 @@ test('WHAT[speculative-investigation-004] replica_readonly_constraint_non_replic
   }
 })
 
-test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_system_transform_repairs_constraint_when_session_language_changes', async () => {
+test('WHAT[speculative-investigation-004] replica_readonly_constraint_replica_system_transform_repairs_constraint_when_global_language_changes', async () => {
   for (const [initial, language, changed, otherLanguage, oldConstraint, newConstraint] of [
     ['en', 'English', 'zh-CN', 'SimplifiedChinese', replicaConstraintFor('English'), replicaConstraintFor('SimplifiedChinese')],
     ['zh-CN', 'SimplifiedChinese', 'en', 'English', replicaConstraintFor('SimplifiedChinese'), replicaConstraintFor('English')],
   ]) {
     clearAllForTests()
     const session = `replica-repair-${language}`
-    await withPreference(initial, () => assert.equal(ensureRoot(session), language))
+    await withPreference(initial, () => refreshGlobalLanguage())
 
  // Initial transform produces old constraint
     const output1 = await transformReplicaSystem(session, 'Engineer', ['Role segment'])
     assert.equal(output1.system.includes(oldConstraint), true)
     assert.equal(output1.system.includes(newConstraint), false)
 
- // Repeated call keeps old constraint matching bound language
+ // A live preference change repairs the constraint on the next transform
     await withPreference(changed, async () => {
+      refreshGlobalLanguage()
       const outputRepaired = await transformReplicaSystem(session, 'Engineer', output1.system)
-      assert.deepEqual(outputRepaired.system, output1.system)
-      assert.equal(outputRepaired.system.includes(oldConstraint), true)
-      assert.equal(outputRepaired.system.includes(newConstraint), false)
-      assert.equal(outputRepaired.system.filter(s => s === oldConstraint).length, 1)
+     assert.deepEqual(outputRepaired.system, [output1.system[0], newConstraint])
+     assert.equal(outputRepaired.system.filter((s) => s === newConstraint).length, 1)
     })
   }
 })
