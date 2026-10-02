@@ -381,6 +381,44 @@ module PluginHooks =
                 |> Option.defaultWith (fun () ->
                     invalidOp "todowrite compression checkpoint requires a durable journal")
 
+            let removePendingCheckpoint key =
+                lock pendingTodoCheckpointAppends (fun () -> pendingTodoCheckpointAppends.Remove(key) |> ignore)
+
+            let releaseUnattemptedCheckpoint key failure =
+                match failure with
+                | JournalAppendFailure.WriterUnavailable _ ->
+                    removePendingCheckpoint key
+                    settledTodoCheckpointCalls.Remove(key) |> ignore
+                | JournalAppendFailure.WriteUnknown _
+                | JournalAppendFailure.FactRejected _ -> ()
+
+            let appendTerminalCheckpoint key sessionText callId =
+                task {
+                    try
+                        do! appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
+                        removePendingCheckpoint key
+                    with :? JournalAppendException as appendFailure ->
+                        releaseUnattemptedCheckpoint key appendFailure.Failure
+                        return raise appendFailure
+                }
+
+            let startTerminalCheckpoint key sessionText callId =
+                lock pendingTodoCheckpointAppends (fun () ->
+                    match pendingTodoCheckpointAppends.TryGetValue(key) with
+                    | true, pending -> pending
+                    | false, _ ->
+                        let append = appendTerminalCheckpoint key sessionText callId
+                        pendingTodoCheckpointAppends[key] <- append
+                        append)
+
+            let settleNewTodoTerminal key sessionText callId status =
+                if not (settledTodoCheckpointCalls.Add(key)) then
+                    Task.FromResult(())
+                elif status = "completed" then
+                    startTerminalCheckpoint key sessionText callId
+                else
+                    Task.FromResult(())
+
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
             /// obligation-ledger-005: concurrent duplicates of the same terminal
@@ -405,40 +443,7 @@ module PluginHooks =
 
                 match joinPending () with
                 | Some pending -> pending
-                | None ->
-                    if not (settledTodoCheckpointCalls.Add(key)) then
-                        Task.FromResult(())
-                    elif status = "completed" then
-                        lock pendingTodoCheckpointAppends (fun () ->
-                            match pendingTodoCheckpointAppends.TryGetValue(key) with
-                            | true, pending -> pending
-                            | false, _ ->
-                                let append =
-                                    task {
-                                        try
-                                            do! appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
-
-                                            lock pendingTodoCheckpointAppends (fun () ->
-                                                pendingTodoCheckpointAppends.Remove(key) |> ignore)
-                                        with
-                                        | :? JournalAppendException as appendFailure ->
-                                            match appendFailure.Failure with
-                                            | JournalAppendFailure.WriterUnavailable _ ->
-                                                lock pendingTodoCheckpointAppends (fun () ->
-                                                    pendingTodoCheckpointAppends.Remove(key) |> ignore)
-
-                                                settledTodoCheckpointCalls.Remove(key) |> ignore
-                                            | JournalAppendFailure.WriteUnknown _
-                                            | JournalAppendFailure.FactRejected _ -> ()
-
-                                            return raise appendFailure
-                                        | ex -> return raise ex
-                                    }
-
-                                pendingTodoCheckpointAppends[key] <- append
-                                append)
-                    else
-                        Task.FromResult(())
+                | None -> settleNewTodoTerminal key sessionText callId status
 
             let settleTodoEvent rawInput =
                 todoTerminalObservation rawInput

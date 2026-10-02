@@ -24,21 +24,24 @@ module Fold =
 
     let private reject = FoldRejection.reject
 
-    let private settlePromptAuthority events authorityOpt =
-        let completesRoad =
-            events
-            |> List.exists (function
-                | RelayEvent.RetirementCommitted retirement ->
-                    match retirement.Outcome with
-                    | RetirementOutcome.Accepted _ -> true
-                    | RetirementOutcome.Continue -> false
-                | _ -> false)
+    let private completesRoad events =
+        events
+        |> List.exists (function
+            | RelayEvent.RetirementCommitted { Outcome = RetirementOutcome.Accepted _ } -> true
+            | _ -> false)
 
-        if completesRoad then
+    let private settlePromptAuthority events authorityOpt =
+        if completesRoad events then
             authorityOpt
             |> Option.map Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager
         else
             authorityOpt
+
+    let private settleAttentionLife events sessionId attention =
+        if completesRoad events then
+            Wanxiangshu.Interaction.Attention.AttentionProjection.closeLife sessionId attention
+        else
+            attention
 
     let private foldRelay (projection: AgentProjectionSet) (fact: RelayFactCases) =
         match fact with
@@ -46,22 +49,10 @@ module Fold =
             let sessionId = SessionId.create (RoadId.value payload.RoadId)
             let events = RelayTransaction.events payload.Transaction
 
-            let completesRoad =
-                events
-                |> List.exists (function
-                    | RelayEvent.RetirementCommitted retirement ->
-                        match retirement.Outcome with
-                        | RetirementOutcome.Accepted _ -> true
-                        | RetirementOutcome.Continue -> false
-                    | _ -> false)
-
             // ATTENTION-004: a completed life takes its un-resurfaced deferred
             // work with it, so a reused SessionId cannot inherit it.
             let attentionAfterClosure =
-                if completesRoad then
-                    Wanxiangshu.Interaction.Attention.AttentionProjection.closeLife sessionId projection.Attention
-                else
-                    projection.Attention
+                settleAttentionLife events sessionId projection.Attention
 
             AgentProjection.tryUpdate
                 sessionId
