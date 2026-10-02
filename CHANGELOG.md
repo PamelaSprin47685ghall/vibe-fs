@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — 修复只读同伴在空正文提前停止时导致的决策挂起
+
+- 现场根因：子代理（如 gate-scout）在委托只读同伴（Strength Replica）调查时，若模型在最后回合直接以 `finish='stop'` 结束且输出正文为空（仅有 step-start/step-finish 等骨架），OpenCode 的分类器会将其判定为需要交互修复的 `TurnNeedsContinuation EmptyFormalText`。
+- 由于只读同伴属于内部叶子（InternalLeaf），不享有也不执行 InteractionRepair，此前 `StrengthReplicaRuntime` 忽略了该结果，导致 completion `Task` 永不结算，决策永久卡死在 `Bound`，进而使主模型会话永远阻塞在下一次变换与 `join` 等待。
+- 现将该物理停止信号在只读同伴所有权内正确确认为决策提前结束（`TextCompleted`），并安全清理物理会话与租约；不放宽普通 Work 会话的交互修复门禁。
+- 补齐空正文提前停止、前缀证据保留、常驻副本连续复用及真实 Host 下 6 次委托（含空终止闭环）的端到端可复现回归测试。
+
 ## Unreleased — predictor 回传到主会话的映射修复
 
 - 现场 `InvalidRequestOrdinal (1, 2)` 来自第二次常驻委托：首轮工具名误成 `<tool_call>js-predictor`，Host 记录错误，次轮正常只读调用完成。筛掉首轮后仍保留材料编号 2，导致 bundle 拒绝并返回 500。现在 surviving readonly batches 连续编号，provider 请求预算仍独立记账；不放宽帧校验、不压制熔断。

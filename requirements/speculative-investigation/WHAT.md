@@ -135,6 +135,7 @@ Bound 之后崩溃但尚未得到 Prepared，允许损失本次同伴调查机�
 - 只有出现持久化歧义、投影冲突、权限突破、材料 digest 不一致等严重不变量失败时，才执行进程全局熔断；熔断在当前进程生命周期内保持生效，已完成的 Promoted 历史不受影响。
 
 终止只来自显式因果事件：达到上限、真实 provider turn terminal、owner/operator 取消或删除、授权按明确原因关闭。不得以 elapsed time、deadline race、sleep 或超时先后决定是否收集或取消；不增加 deadline、按毫秒竞争的提前结束或新 failure budget。
+只读叶子会话（Replica）不拥有也不运行交互修复（InteractionRepair）。当模型以 finish=stop 提前返回且正文为空（或仅含活动骨架）时，宿主分类器将其判定为交互修复候选（TurnNeedsContinuation EmptyFormalText）；在只读同伴的所有权边界内，该物理停止信号必须按正常提前结束（TextCompleted）收束并清理物理尾部，不能将其作为无限等待的进行中状态忽略，从而导致绑定的 Delegation 永久卡死在 Bound。
 
 普通 Replica provider/tool 失败只结束当前委托决策，主会话正常继续；已完成且通过结构/权限校验的完整前缀可以回传，残缺批次不补造；普通文件不存在不触发进程级熔断。
 
