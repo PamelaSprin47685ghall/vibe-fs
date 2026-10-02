@@ -40,7 +40,7 @@ test('WHAT[cognitive-environment-015] BLOGGER_CHRONICLE_TEXT_is_companion_only_e
   assert.match(bloggerSource, /"text", box text/)
 
   assert.doesNotMatch(bloggerSource, /AgentJournal\.append|appendDurable|GuidelineProjection|tryInject/)
-  assert.doesNotMatch(bloggerSource, /PairProgrammingThoughtTransform|skillContent|"reasoning"|"tool"|"status"|"source"|"synthetic"/)
+  assert.doesNotMatch(bloggerSource, /PairProgrammingThoughtTransform|systemBlock|"reasoning"|"tool"|"status"|"source"|"synthetic"/)
 })
 
 test('WHAT[cognitive-environment-015] BLOGGER_CHRONICLE_TEXT_is_enabled_for_step_3_5_flash_model_prefix', () => {

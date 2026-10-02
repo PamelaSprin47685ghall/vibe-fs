@@ -13,7 +13,8 @@ module ProviderProse =
     let private placeholderRe =
         Regex(@"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}", RegexOptions.Compiled)
 
-    /// Bound session → that language. Unbound → English (HOST-026 first-touch).
+    /// Language of a session: the live global preference. The session id
+    /// decides nothing (HOST-026 single authority).
     let languageOf (sessionId: SessionId) : ProviderLanguage =
         SessionProviderLanguage.languageOf sessionId
 

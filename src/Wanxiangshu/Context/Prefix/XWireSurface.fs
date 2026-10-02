@@ -894,11 +894,7 @@ module XWireSurface =
                             |> Array.fold
                                 (fun window checkpoint ->
                                     let callId = ToolCallId.create (string checkpoint?callId)
-                                    let retain = int checkpoint?retainCheckpoints
-
-                                    match PhaseWindow.appendCheckpoint callId retain window with
-                                    | Ok updated -> updated
-                                    | Error reason -> invalidArg "todoCheckpoints" reason)
+                                    PhaseWindow.appendCheckpoint callId window)
                                 PhaseWindow.emptyWindow
                           PrefixEpoch =
                             if isNullish input?prefixEpoch then

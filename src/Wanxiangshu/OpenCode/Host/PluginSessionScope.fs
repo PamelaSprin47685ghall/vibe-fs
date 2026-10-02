@@ -155,10 +155,11 @@ type PluginSessionScope
                 do! this.SettleExecution(durable, execution)
         }
 
-    /// Drops the provider-language identity for this session idempotently.
+    /// No-op: language follows the live global preference, so there is no
+    /// per-session identity left to drop. Kept as the deletion boundary's
+    /// stable call shape.
     member _.DropSessionIdentity(sessionId: string) =
-        let sid = SessionId.create sessionId
-        SessionProviderLanguage.drop sid
+        ignore sessionId
 
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup). Always drops

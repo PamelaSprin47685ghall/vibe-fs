@@ -318,9 +318,9 @@ type InjectedSessionPort
 
     let bindSiblingExecution (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
         // A fission lane's participant comes from the durable lane/owner projection
-        // and its own Accepted evidence; this boundary only inherits language.
+        // and its own Accepted evidence; language follows the live global
+        // preference, so there is nothing to bind at this boundary.
         ignore agent
-        ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
 
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
         taskResult {
@@ -367,8 +367,6 @@ type InjectedSessionPort
 
             let! childId = port.CreateChildSession hostParentId options
             registerChild rootId childId
-            // HOST-026: inherit owner/commissioner language (parentId), not family root.
-            ProviderLanguageBinding.ensureInherited parentId childId |> ignore
             return childId
         }
 

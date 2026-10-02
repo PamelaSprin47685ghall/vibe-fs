@@ -371,7 +371,7 @@ export const runFlightInterleaving = async (schedule, { dir, opened, durable }) 
 
     const admission = routing.admissionSnapshot(capacityRuntime, K, PHYS)
     assert.equal(admission.activeCapacity, routing.snapshotOccupied(capacityRuntime).length)
-    assert.equal(admission.exactLeaseCommitted, false)
+    assert.equal(admission.exactLeaseCommitted, true)
 
     const committed = executionEvidence(K, PHYS)
     const committedLifecycle = [
@@ -393,6 +393,9 @@ export const runFlightInterleaving = async (schedule, { dir, opened, durable }) 
     const release = routing.releasePhysicalExecution(capacityRuntime, K, PHYS)
     assert.deepEqual(release, { kind: 'Applied' })
     assert.equal(routing.executionAdmissionLifecycle(capacityRuntime, bLease), 'Released')
+
+    const admissionAfterRelease = routing.admissionSnapshot(capacityRuntime, K, PHYS)
+    assert.equal(admissionAfterRelease.exactLeaseCommitted, false)
   } finally {
     try {
       runtime.dispose(scope)

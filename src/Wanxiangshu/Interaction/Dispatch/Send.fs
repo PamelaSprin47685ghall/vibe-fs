@@ -746,6 +746,28 @@ module PromptDispatcherSend =
                 onAccepted
                 (Some tools)
 
+        member private this.SendAgentOwnerRootWithSeed
+            (port: IDispatchSessionPort)
+            (sessionId: SessionId)
+            (text: string)
+            (directory: string option)
+            (tools: Map<string, bool> option)
+            (issueIdentitySeed: unit -> Result<PromptAuthority.IdentitySeed, string>)
+            : Task<Result<PromptKey, string>> =
+            match issueIdentitySeed () with
+            | Error reason -> Task.FromResult(Error reason)
+            | Ok identitySeed ->
+                this.SendAgentOwnerRootCore
+                    port
+                    sessionId
+                    text
+                    identitySeed
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+                    None
+                    tools
+
         member this.SendManagedAssignment
             (port: IDispatchSessionPort)
             (sessionId: SessionId)
@@ -767,20 +789,7 @@ module PromptDispatcherSend =
                     PromptDispatcher.AwaitMode.Detached
                     None
                     tools
-            | None ->
-                match issueIdentitySeed () with
-                | Error reason -> Task.FromResult(Error reason)
-                | Ok identitySeed ->
-                    this.SendAgentOwnerRootCore
-                        port
-                        sessionId
-                        text
-                        identitySeed
-                        directory
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-                        None
-                        tools
+            | None -> this.SendAgentOwnerRootWithSeed port sessionId text directory tools issueIdentitySeed
 
         /// provider-attempt-recovery-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///

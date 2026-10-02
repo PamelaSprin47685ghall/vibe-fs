@@ -30,6 +30,10 @@ module PluginBoot =
 
     let create (input: obj) : Task<Boot> =
         task {
+            // HOST-026: the global preference is the only language authority;
+            // resolve it once at load so the first request already speaks it.
+            Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
+
             // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
             RuntimeResources.install (RuntimeResourceAssembly.load ())
 

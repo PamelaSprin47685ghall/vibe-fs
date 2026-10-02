@@ -9,18 +9,16 @@ type PhaseWindowDecision =
 
 [<RequireQualifiedAccess>]
 module PhaseWindow =
-    val validateK: k: int -> Result<unit, string>
+    /// context-compression-028: fixed number of recent todowrite checkpoints kept raw.
+    val retainCheckpoints: int
 
-    type PhaseCheckpoint =
-        { ToolCallId: ToolCallId
-          RetainCheckpoints: int }
+    type PhaseCheckpoint = { ToolCallId: ToolCallId }
 
     type PhaseCommitWindow = { Checkpoints: PhaseCheckpoint list }
 
     val emptyWindow: PhaseCommitWindow
 
-    val appendCheckpoint:
-        callId: ToolCallId -> retainCheckpoints: int -> window: PhaseCommitWindow -> Result<PhaseCommitWindow, string>
+    val appendCheckpoint: callId: ToolCallId -> window: PhaseCommitWindow -> PhaseCommitWindow
 
     val pruneBefore:
         turnStartOf: (ToolCallId -> int option) ->
@@ -30,4 +28,4 @@ module PhaseWindow =
 
     val desiredCutoffOf: turnStartOf: (ToolCallId -> int option) -> window: PhaseCommitWindow -> PhaseWindowDecision
 
-    val desiredCutoff: k: int -> checkpointTurnStarts: int list -> PhaseWindowDecision
+    val desiredCutoff: checkpointTurnStarts: int list -> PhaseWindowDecision

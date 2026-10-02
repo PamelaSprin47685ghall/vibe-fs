@@ -70,7 +70,7 @@ module ReadonlyDelegationContract =
 
     [<Literal>]
     let private selfNoteDescriptionEn =
-        "Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely, without an empty string or null. For a positive estimate, leave a brief, non-empty outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace."
+        "Optional. When this call's estimated_readonly_rounds is greater than 0 you may leave a brief outlook for the next investigation rounds: what evidence or relationships to inspect and what finding will make the next step possible. One to three sentences are enough. Do not provide a progress report, generic filler, instructions to another worker, or a full reasoning trace. Omit it freely."
 
     [<Literal>]
     let private readonlyRoundsDescriptionZh =
@@ -78,20 +78,20 @@ module ReadonlyDelegationContract =
 
     [<Literal>]
     let private selfNoteDescriptionZh =
-        "仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。正数时，用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。"
+        "可选。本次调用的 estimated_readonly_rounds 大于 0 时，可以用一至三句话给自己留下后续调查的展望：准备核对哪些材料或关系，什么证据出现后可以进入下一步。不要写完成情况、泛泛感想、对其他执行者的指令或完整思考过程。不填也完全可以。"
 
     // Short outlook prose, verbatim.
     [<Literal>]
     let private englishInvestigationOutlook =
-        "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0."
+        "Investigation outlook: estimated_readonly_rounds estimates the consecutive read-only investigation rounds after the current batch. self_note is an optional brief outlook of what to inspect next; fill it or not as it helps you."
 
     [<Literal>]
     let private chineseInvestigationOutlook =
-        "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。"
+        "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数。self_note 是可选短记，简述接下来查什么、查到什么即可进入下一步；填与不填都行。"
 
     [<Literal>]
     let private chineseInvestigationOutlookAlt =
-        "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数；self_note 在轮数大于 0 时简述下一步核对目标，为 0 时必须省略。"
+        "调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数；self_note 可选地简述下一步核对目标。"
 
     // Legacy v1 investigation outlook blocks.
     // Kept strictly for internal backward-compatibility stripping in stripInvestigationOutlookBlocks;
@@ -221,7 +221,7 @@ module ReadonlyDelegationContract =
             restoreSavedArgs args
 
     let private currentLanguage () =
-        ProviderLanguageBinding.forSessionText ""
+        Wanxiangshu.Participant.Provider.GlobalProviderLanguage.current ()
 
     let private budgetProperty () : obj =
         let desc =

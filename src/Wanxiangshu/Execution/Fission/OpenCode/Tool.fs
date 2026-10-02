@@ -78,7 +78,7 @@ module FissionTool =
     let private deliveryPrompt owner completionId payload =
         let instruction =
             ProviderProse.render
-                (ProviderLanguageBinding.ensureRoot owner)
+                (GlobalProviderLanguage.current ())
                 Path.SharedCompletion
                 (Map [ "completion_id", completionId; "payload", payload ])
 

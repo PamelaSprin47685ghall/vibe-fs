@@ -87,9 +87,6 @@ module InvestigationEstimateContract =
         | MissingEstimate
         | WrongNumberType
         | InvalidRange
-        | NotePresentWhenZero
-        | MissingOrBlankNoteWhenPositive
-        | NoteNotString
         | MixedProtocolFields
         | InvalidArgumentObject
 
@@ -126,39 +123,20 @@ module InvestigationEstimateContract =
         else
             toEstimateRange (unbox<float> raw)
 
-    let private validateNoteForZero (args: obj) : Result<string option, EstimateArgumentError> =
-        if hasOwn args NoteField then
-            Error EstimateArgumentError.NotePresentWhenZero
+    /// self_note 是纯建议性展望：填与不填、填什么类型，都不构成失败。
+    /// 只有字符串才原样保留；其余一律按缺失处理，不报错、不修正。
+    let private advisoryNote (arguments: obj) : string option =
+        if hasOwn arguments NoteField && isJsString arguments?(NoteField) then
+            Some(string arguments?(NoteField))
         else
-            Ok None
-
-    let private validateNoteText (rawNote: obj) : Result<string option, EstimateArgumentError> =
-        let noteStr = if isJsString rawNote then string rawNote else ""
-
-        if not (isJsString rawNote) then
-            Error EstimateArgumentError.NoteNotString
-        elif noteStr.Trim().Length = 0 then
-            Error EstimateArgumentError.MissingOrBlankNoteWhenPositive
-        else
-            Ok(Some noteStr)
-
-    let private validateNoteForPositive (args: obj) : Result<string option, EstimateArgumentError> =
-        if not (hasOwn args NoteField) then
-            Error EstimateArgumentError.MissingOrBlankNoteWhenPositive
-        else
-            validateNoteText args?(NoteField)
+            None
 
     let private parseRoundsArguments
         (arguments: obj)
         : Result<EstimatedReadonlyRounds * string option, EstimateArgumentError> =
         match validateNumber arguments?(EstimatedReadonlyRoundsField) with
         | Error err -> Error err
-        | Ok 0 ->
-            validateNoteForZero arguments
-            |> Result.map (fun noteOpt -> EstimatedReadonlyRounds 0, noteOpt)
-        | Ok positiveRounds ->
-            validateNoteForPositive arguments
-            |> Result.map (fun noteOpt -> EstimatedReadonlyRounds positiveRounds, noteOpt)
+        | Ok rounds -> Ok(EstimatedReadonlyRounds rounds, advisoryNote arguments)
 
     let parseParticipatingArguments
         (arguments: obj)
@@ -177,9 +155,6 @@ module InvestigationEstimateContract =
         | EstimateArgumentError.MissingEstimate -> "必须提供 estimated_readonly_rounds 估计字段"
         | EstimateArgumentError.WrongNumberType -> "estimated_readonly_rounds 必须为数字类型"
         | EstimateArgumentError.InvalidRange -> "estimated_readonly_rounds 必须为 0 至 2147483647 之间的非负整数"
-        | EstimateArgumentError.NotePresentWhenZero -> "estimated_readonly_rounds 为 0 时必须省略 self_note"
-        | EstimateArgumentError.MissingOrBlankNoteWhenPositive -> "正数估计需要非空的后续查证展望"
-        | EstimateArgumentError.NoteNotString -> "self_note 必须为字符串类型"
         | EstimateArgumentError.MixedProtocolFields -> "不得携带旧协议字段 delegate_readonly_rounds"
         | EstimateArgumentError.InvalidArgumentObject -> "工具参数必须为合法的普通对象"
 
@@ -189,10 +164,6 @@ module InvestigationEstimateContract =
         | EstimateArgumentError.WrongNumberType -> "estimated_readonly_rounds must be a number"
         | EstimateArgumentError.InvalidRange ->
             "estimated_readonly_rounds must be a non-negative integer between 0 and 2147483647"
-        | EstimateArgumentError.NotePresentWhenZero -> "self_note must be omitted when estimated_readonly_rounds is 0"
-        | EstimateArgumentError.MissingOrBlankNoteWhenPositive ->
-            "A positive estimate requires a non-empty self_note outlook"
-        | EstimateArgumentError.NoteNotString -> "self_note must be a string"
         | EstimateArgumentError.MixedProtocolFields -> "The legacy delegate_readonly_rounds field must not be used"
         | EstimateArgumentError.InvalidArgumentObject -> "Tool arguments must be a valid plain object"
 
@@ -215,11 +186,28 @@ module InvestigationEstimateContract =
         | EstimateArgumentError.MissingEstimate -> "MissingEstimate"
         | EstimateArgumentError.WrongNumberType -> "WrongNumberType"
         | EstimateArgumentError.InvalidRange -> "InvalidRange"
-        | EstimateArgumentError.NotePresentWhenZero -> "NotePresentWhenZero"
-        | EstimateArgumentError.MissingOrBlankNoteWhenPositive -> "MissingOrBlankNoteWhenPositive"
-        | EstimateArgumentError.NoteNotString -> "NoteNotString"
         | EstimateArgumentError.MixedProtocolFields -> "MixedProtocolFields"
         | EstimateArgumentError.InvalidArgumentObject -> "InvalidArgumentObject"
+
+    /// `errorCode` 的反向投影（WHAT[016] §6）：机器可判的稳定错误码回到唯一的
+    /// 分类，使「码 → 分类 → 文案」成为一条可观察链。码的字面量与 `errorCode`
+    /// 同一份集合，本函数不持有、不复制任何文案。
+    let tryFromCode (code: string) : EstimateArgumentError option =
+        match code with
+        | "MissingEstimate" -> Some EstimateArgumentError.MissingEstimate
+        | "WrongNumberType" -> Some EstimateArgumentError.WrongNumberType
+        | "InvalidRange" -> Some EstimateArgumentError.InvalidRange
+        | "MixedProtocolFields" -> Some EstimateArgumentError.MixedProtocolFields
+        | "InvalidArgumentObject" -> Some EstimateArgumentError.InvalidArgumentObject
+        | _ -> None
+
+    /// 与 `tryFromCode` 成对：未知码按 `ProviderLanguage.parse` 的既有语义
+    /// 直接抛错，绝不静默降级为任何默认分类。
+    let parseFromCode (code: string) : EstimateArgumentError =
+        match tryFromCode code with
+        | Some error -> error
+        | None ->
+            raise (System.ArgumentException(sprintf "unrecognized EstimateArgumentError code: %s (WHAT[016])" code))
 
     let policyCode (policy: InvestigationToolPolicy) : string =
         match policy with

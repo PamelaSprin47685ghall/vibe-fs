@@ -6,9 +6,10 @@ import { guidance, link, observe, withJournal, main, tip } from './support/journ
 
 for (const [locale, suffix] of [['English', ''], ['SimplifiedChinese', '.zh-CN']]) {
   test(`WHAT[guidance-delivery-002] ${locale} first Full contains the entire authored Main body`, async () => {
-    language.clearAllForTests()
+    const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    process.env.WANXIANGSHU_PROVIDER_LANGUAGE = locale === 'English' ? 'en' : 'zh-CN'
+    language.refreshGlobalLanguage()
     try {
-      assert.equal(language.bindOnce(main, locale).ok, true)
       await withJournal(async ({ journal }) => {
         await link(journal)
         await observe(journal)
@@ -19,7 +20,9 @@ for (const [locale, suffix] of [['English', ''], ['SimplifiedChinese', '.zh-CN']
         assert.ok(result.text.includes(body))
       })
     } finally {
-      language.clearAllForTests()
+      if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+      else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
+      language.refreshGlobalLanguage()
     }
   })
 }

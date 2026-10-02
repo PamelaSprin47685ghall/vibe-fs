@@ -5,7 +5,12 @@ open Fable.Core
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 
-/// HOST-026: observes the global preference; the provider owner interprets and binds it.
+/// HOST-026: the global preference is the only language authority.
+///
+/// No session binding and no durable language record exist. Every Class A
+/// render resolves through `GlobalProviderLanguage`, which this module keeps
+/// in sync with the observed preference ladder; changing the setting changes
+/// the language of the next request even mid-session.
 [<RequireQualifiedAccess>]
 module ProviderLanguageBinding =
 
@@ -50,22 +55,17 @@ module ProviderLanguageBinding =
         ProviderLanguage.fromObservationLadder explicit hostConfigPreference vscodeNls posixLocale intlLocale
         |> valueOrRaise
 
-    /// Root / first-touch: bind from the observed global preference once.
-    let ensureRoot (sessionId: SessionId) : ProviderLanguage =
-        match SessionProviderLanguage.tryGet sessionId with
-        | Some language -> language
-        | None ->
-            SessionProviderLanguage.bindOnce sessionId (readGlobalPreference ())
-            |> valueOrRaise
+    /// Publish the currently observed preference into the global language
+    /// holder. Called at startup, on host config change and in tests that
+    /// change the preference.
+    let refreshGlobalLanguage () : unit =
+        GlobalProviderLanguage.refresh readGlobalPreference
 
-    /// Child / attached / InternalLeaf: inherit owner|commissioner; never re-read global.
-    let ensureInherited (ownerId: SessionId) (childId: SessionId) : ProviderLanguage =
-        let ownerLanguage = ensureRoot ownerId
-        SessionProviderLanguage.inheritFromOwner ownerLanguage childId |> valueOrRaise
+    /// The one language resolution: the live global preference. The session id
+    /// is accepted so call sites keep one shape; it decides nothing.
+    let forSession (_sessionId: SessionId) : ProviderLanguage =
+        GlobalProviderLanguage.current ()
 
-    /// Host tool contexts without a session use the current preference; sessions bind once.
     let forSessionText (sessionText: string) : ProviderLanguage =
-        if String.IsNullOrEmpty sessionText then
-            readGlobalPreference ()
-        else
-            ensureRoot (SessionId.create sessionText)
+        ignore sessionText
+        GlobalProviderLanguage.current ()

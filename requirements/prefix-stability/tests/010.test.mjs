@@ -70,7 +70,7 @@ const assertWireEqual = (a, b, label) => {
   )
 }
 const toolNames = (messages) => messages.map((m) => m.parts[0]?.tool)
-const userCarrier = (body, markerText = text) => `${body}\0\uFEFF<skill_content>\n${markerText.trim()}\n</skill_content>`
+const userCarrier = (body, markerText = text) => `${body}\0\uFEFF<system>\n${markerText.trim()}\n</system>`
 const openJournal = async (dir) => {
   const opened = await pair.createJournal(dir)
   assert.equal(opened.ok, true, JSON.stringify(opened))
@@ -449,9 +449,9 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 })
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
 const terminalOutputOf = (messages, id) => messages.find((m) => m.info.id === id).parts[0].state.output
-// User messages wrap the marker in the skill_content envelope (HOST-013); tool
+// User messages wrap the marker in the `<system>` envelope (HOST-013); tool
 // results carry the raw suffix.
-const userCarrier = (body, markerText = text) => `${body}\0\uFEFF<skill_content>\n${markerText.trim()}\n</skill_content>`
+const userCarrier = (body, markerText = text) => `${body}\0\uFEFF<system>\n${markerText.trim()}\n</system>`
 
 test('WHAT[prefix-stability-010] PPT_tryInject_empty_history_does_not_inject_pair', async () => {
   const out = await inject('ses_empty', [])
@@ -463,7 +463,7 @@ test('WHAT[prefix-stability-010] PPT_tryInject_single_user_message_does_not_inje
   assert.ok(out)
   assert.equal(out.length, 1)
   assert.equal(pairMessages(out).length, 0)
-  assert.equal(out[0].parts[0].text, `hello\0\uFEFF<skill_content>\n${text.trim()}\n</skill_content>`)
+  assert.equal(out[0].parts[0].text, `hello\0\uFEFF<system>\n${text.trim()}\n</system>`)
   assert.doesNotMatch(out[0].parts[0].text, /name=/)
   const replay = await inject('ses_1', out)
   assert.deepEqual(replay, out)
@@ -481,7 +481,7 @@ test('WHAT[prefix-stability-010] PPT_tryInject_places_pair_before_trailing_user_
   const out = await inject('ses_assistant', raw)
   assert.ok(out)
   // The trailing user message is the carrier: the guidance rides inside the
-  // same skill_content wrapper as the first round, and no synthetic message is
+  // same `<system>` wrapper as the first round, and no synthetic message is
   // inserted before it.
   assert.equal(out.length, 3)
   assert.equal(out[0].parts[0].text, 'hello')

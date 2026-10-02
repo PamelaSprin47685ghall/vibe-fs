@@ -185,10 +185,10 @@ const loopTransform = (overrides = {}) =>
   })
 
 test('WHAT[context-compression-029] the fold lands inside a loop whose bound is its own newest turn', () => {
-  // Two phase commits at turns 2 and 6, K = 2: the window keeps both and desires B1 = 2.
-  // The request sits at the loop frontier (turn 8), so folding to B1 replaces history
-  // the request itself has already sent.
-  const boundary = prefix.desiredCutoff(2, [2, 6])
+  // Two phase commits at turns 2 and 6 under the fixed K = 3 window: both stay
+  // retained and the desire is B1 = 2. The request sits at the loop frontier
+  // (turn 8), so folding to B1 replaces history the request itself has already sent.
+  const boundary = prefix.desiredCutoff([2, 6])
   assert.equal(boundary.kind, 'KeepFrom')
   assert.equal(boundary.cutoffExclusive, 2)
 
@@ -212,7 +212,7 @@ test('WHAT[context-compression-029] a bound pinned at the opening user message f
   // The forbidden reading: the bound is the trailing role=user message, which stays at
   // turn 0 for the whole loop. Then nothing inside the loop may fold and the raw history
   // grows without bound — exactly what the clause forbids.
-  const boundary = prefix.desiredCutoff(2, [2, 6])
+  const boundary = prefix.desiredCutoff([2, 6])
 
   const result = loopTransform({ phaseCutoff: boundary.cutoffExclusive, requestStartCutoff: 0 })
 

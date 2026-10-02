@@ -8,12 +8,7 @@ test('WHAT[behavior-diagnosis-009] actual cycle decoder accepts one completed ca
   assert.deepEqual(single.decision, {
     ok: true,
     value: {
-      text: [
-        'charge:\nresolve the current question',
-        'occurrence:\nwork',
-        'settlement:\nresult settled',
-        'consequence:\ncontinue on the settled path',
-      ].join('\n\n'),
+      text: 'resolve the current question work result settled continue on the settled path',
       evidence: '',
       ruleId: 'primitive-obsession',
       toolCallIds: ['call-1'],

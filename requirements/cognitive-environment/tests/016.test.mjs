@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const zh = readFileSync(new URL('../../../resources/provider/host/pair-programming-guideline/zh-CN.md', import.meta.url), 'utf8')
-const assume = readFileSync(new URL('../../../resources/provider/tool/assume/description/zh-CN.md', import.meta.url), 'utf8')
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const zh = read('../../../resources/provider/host/pair-programming-guideline/zh-CN.md')
+const assume = read('../../../resources/provider/tool/assume/description/zh-CN.md')
 
-test('WHAT[cognitive-environment-016] Pair Hint keeps assume brief while the tool owns its full commitment meaning', () => {
-  assert.match(zh, /反常识的判断死死钉住/)
+test('WHAT[cognitive-environment-016] Pair Hint leaves micro-primitive behaviour to the tool resources', () => {
+  assert.doesNotMatch(zh, /jq|canvas|画板 schema|update, todos|assume|todowrite|retainCheckpoints/)
   assert.match(assume, /不是求证/)
   assert.match(assume, /执行并验证/)
-  assert.doesNotMatch(zh, /jq|canvas|画板 schema|update, todos/)
 })

@@ -26,11 +26,14 @@ test('WHAT[provider-projection-010] C_PH_cursor_keeps_durable_occurrence_without
     const cursor = await inject(session, raw)
     assert.equal(pairMessages(cursor).length, 0)
     assert.equal(cursor.length, 1)
-    assert.equal(cursor[0].parts[0].text, `steer\0\uFEFF<skill_content>\n${pair.text.trim()}\n</skill_content>`)
+    assert.equal(cursor[0].parts[0].text, `steer\0\uFEFF<system>\n${pair.text.trim()}\n</system>`)
     assert.doesNotMatch(cursor[0].parts[0].text, /name=/)
     const ordinary = await inject('ses_ordinary', [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
     assert.equal(pairMessages(ordinary).length, 0)
-    assert.deepEqual(ordinary, [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
+    assert.equal(ordinary.length, 3)
+    assert.deepEqual(ordinary[0], userMsg('u0'))
+    assert.deepEqual(ordinary[1], assistantText('a0'))
+    assert.equal(ordinary[2].parts[0].text, `steer\0\uFEFF<system>\n${pair.text.trim()}\n</system>`)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous

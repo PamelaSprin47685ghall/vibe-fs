@@ -126,10 +126,8 @@ module PluginTransforms =
           ReplicaSanitize: obj -> unit }
 
 
-    let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
-        match projectionSessionIdOpt with
-        | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-        | None -> ProviderLanguageBinding.readGlobalPreference ()
+    let private languageFor (_projectionSessionIdOpt: string option) : ProviderLanguage =
+        GlobalProviderLanguage.current ()
 
     // Explicit composition mode — replaces the previous implicit helper dispatch
     // (strengthReplicaRuntime / ordinaryProviderTransform).
@@ -767,6 +765,13 @@ module PluginTransforms =
                 // 14. RequirementGroundingTransform.projectOrTerminate
                 do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
+                // 17. StrengthDelegate.tryCaptureAndStart — capture and start in ONE
+                // call on the FINAL outgoing request. This replaces the old two-phase
+                // hand-off (4.5 early capture + 12 late start on a subsequent request),
+                // which stranded 44 of 201 decisions whenever a subsequent request
+                // carried a tentative cold prefix or switched logical runs.
+                do! caps.CaptureAndStartReadonlyDelegation outObj
+
             // 15. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj
 
@@ -775,13 +780,6 @@ module PluginTransforms =
 
             // 16. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
-
-            // 17. StrengthDelegate.tryCaptureAndStart — capture and start in ONE
-            // call on the FINAL outgoing request. This replaces the old two-phase
-            // hand-off (4.5 early capture + 12 late start on a subsequent request),
-            // which stranded 44 of 201 decisions whenever a subsequent request
-            // carried a tentative cold prefix or switched logical runs.
-            do! caps.CaptureAndStartReadonlyDelegation outObj
 
             ()
         }

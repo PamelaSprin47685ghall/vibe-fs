@@ -1,8 +1,6 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
 # requirements/obligation-ledger/** is covered implicitly and must not be listed here.
 
-/src/Wanxiangshu/OpenCode/Host/TodoWriteCompressionContract.*
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
 /src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.*
 /src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.*
-/resources/provider/tool/todowrite/**

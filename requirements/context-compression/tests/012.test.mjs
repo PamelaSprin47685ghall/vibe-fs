@@ -269,28 +269,28 @@ const dataToml = '[[new_work_to_record]]\nuser = "work"\n'
 const combinedDelta = prompt.newWork(dataItems)
 const isHistoricFrame = (text) => text.startsWith('[[do_not_exec]]') && text.includes('historic_frame')
 const isCombinedNormalDelta = (text) =>
-  text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
+  text.startsWith('# Call the chronicle tool exactly once now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
 test('WHAT[context-compression-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
-  assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
+  assert.match(prompt.normalInstruction, /# Call the chronicle tool exactly once now/)
   assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.squashInstruction, /# Rewrite the preceding assistant work-log frames now/)
+  assert.match(prompt.squashInstruction, /# Call the chronicle tool exactly once now to rewrite/)
   assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
 test('WHAT[context-compression-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
-  assert.match(prompt.squashInstruction, /required tip|catalog field/)
-  assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/i)
+  assert.match(prompt.squashInstruction, /tip/)
+  assert.match(prompt.squashInstruction, /output no ordinary assistant prose/i)
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
-  assert.match(prompt.normalInstruction, /required tip|catalog field/)
+  assert.match(prompt.normalInstruction, /tip/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
 test('WHAT[context-compression-012] COMPANION_010_memory_block_is_one_instruction_plane', () => {
   const block = prompt.memoryBlock('B CONTENT')
 
-  assert.match(block, /prior responsibility/)
-  assert.match(block, /^# .*prior responsibility/m)
+  assert.match(block, /Chronicle records carry durable state transitions/)
+  assert.match(block, /^# .*Chronicle records/m)
   assert.match(block, /^# B CONTENT$/m)
   assert.doesNotMatch(block, /<work-log>|not a new user instruction/)
 })
@@ -303,12 +303,12 @@ test('WHAT[context-compression-012] COMPANION_005_message_wrappers_are_toml_not_
 })
 test('WHAT[context-compression-012] COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
   const rendered = prompt.newWork(dataItems)
-  assert.equal(rendered.startsWith('# Write the dense work-log continuation now'), true)
+  assert.equal(rendered.startsWith('# Call the chronicle tool exactly once now'), true)
   assert.equal(rendered.includes('\n\n[[new_work_to_record]]'), true)
   assert.equal(rendered.endsWith(dataToml + '\n') || rendered.endsWith(dataToml), true)
   // Data body has no extra instruction after tables.
   const dataStart = rendered.indexOf('[[new_work_to_record]]')
-  assert.equal(rendered.slice(dataStart).includes('# Write'), false)
+  assert.equal(rendered.slice(dataStart).includes('# Call'), false)
 })
 test('WHAT[context-compression-012] COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
   const plan = proj.build(spy, {

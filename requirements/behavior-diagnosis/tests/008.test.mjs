@@ -39,7 +39,7 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ign
   })
   assert.equal(result.ok, true)
   assert.equal(result.value.tip.fieldName, field)
-  assert.equal(result.value.evidence, undefined)
+  assert.equal(result.value.evidence, null)
 })
 }
 

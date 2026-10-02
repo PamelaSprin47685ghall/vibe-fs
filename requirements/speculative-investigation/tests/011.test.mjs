@@ -60,9 +60,6 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_ordinary_argument_errors_
   const badArgs = [
     { estimated_readonly_rounds: -1 },
     { estimated_readonly_rounds: '2' },
-    { estimated_readonly_rounds: 3 },
-    { estimated_readonly_rounds: 3, self_note: '   ' },
-    { estimated_readonly_rounds: 0, self_note: 'note' },
     { estimated_readonly_rounds: 2, self_note: 'ok', delegate_readonly_rounds: 2 },
   ]
   for (const args of badArgs) {

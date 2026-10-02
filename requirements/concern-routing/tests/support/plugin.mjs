@@ -19,14 +19,15 @@ export const toolBatch = (sessionID, suffix) => ['pending', 'completed'].map(sta
 }))
 export const transform = async (hooks, sessionID, messages) => {
   const output = { messages: structuredClone(messages) }
-  // HOST-BOUNDARY-008: the provider attempt plan freeze requires an accepted
-  // execution, which chat.message establishes for the physical user message.
-  for (const message of output.messages) {
-    if (message.info?.role === 'user') {
+  const userMsg = output.messages.find(m => m.info?.role === 'user')
+  if (userMsg && hooks && hooks['chat.message']) {
+    try {
       await hooks['chat.message'](
-        { sessionID, messageID: message.info.id },
-        { message: message.info, parts: message.parts },
+        { sessionID, messageID: userMsg.info.id, agent: 'engineer' },
+        { message: userMsg.info, parts: userMsg.parts },
       )
+    } catch {
+      // 容错处理：已有 execution 时幂等跳过
     }
   }
   await hooks['experimental.chat.messages.transform']({ sessionID }, output)

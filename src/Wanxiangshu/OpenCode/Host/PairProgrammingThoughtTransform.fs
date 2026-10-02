@@ -333,19 +333,19 @@ module PairProgrammingThoughtTransform =
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
     let cursorGuidanceSeparator = "\u0000\uFEFF"
 
-    let private skillContentPrefix = "<skill_content>"
-    let private skillContentSuffix = "</skill_content>"
+    let private systemBlockPrefix = "<system>"
+    let private systemBlockSuffix = "</system>"
 
-    let skillContent (body: string) : string =
+    let systemBlock (body: string) : string =
         let content = if isNull body then "" else body.Trim()
 
         if
-            content.StartsWith(skillContentPrefix, StringComparison.Ordinal)
-            && content.EndsWith(skillContentSuffix, StringComparison.Ordinal)
+            content.StartsWith(systemBlockPrefix, StringComparison.Ordinal)
+            && content.EndsWith(systemBlockSuffix, StringComparison.Ordinal)
         then
             content
         else
-            String.concat "\n" [ skillContentPrefix; content; skillContentSuffix ]
+            String.concat "\n" [ systemBlockPrefix; content; systemBlockSuffix ]
 
     let private isString (value: obj) : bool =
         not (isNull value) && emitJsExpr value "typeof $0 === 'string'"
@@ -397,7 +397,7 @@ module PairProgrammingThoughtTransform =
             ||> List.fold (fun current text ->
                 current
                     .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal)
-                    .Replace(cursorGuidanceSeparator + skillContent text, "", StringComparison.Ordinal))
+                    .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal))
 
         let originalState = originalPart?state
         let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
@@ -458,7 +458,7 @@ module PairProgrammingThoughtTransform =
 
         let suffix =
             markerTexts
-            |> List.map (fun text -> cursorGuidanceSeparator + skillContent text)
+            |> List.map (fun text -> cursorGuidanceSeparator + systemBlock text)
             |> String.concat ""
 
         match terminalTextPartIndex parts with
@@ -494,7 +494,7 @@ module PairProgrammingThoughtTransform =
             (value, suffixTexts)
             ||> List.fold (fun current text ->
                 current
-                    .Replace(cursorGuidanceSeparator + skillContent text, "", StringComparison.Ordinal)
+                    .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal)
                     .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
 
         match terminalTextPartIndex parts with

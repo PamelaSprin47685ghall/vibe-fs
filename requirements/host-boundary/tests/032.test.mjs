@@ -480,10 +480,12 @@ test('WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_an
 // contract.
 // ---------------------------------------------------------------------------
 
-test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract', () => {
+test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
+    language.refreshGlobalLanguage()
     const definition = {
       description: 'Original description of the tool',
       parameters: {
@@ -568,6 +570,7 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
     } else {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
     }
+    language.refreshGlobalLanguage()
   }
 })
 
@@ -604,34 +607,29 @@ test('WHAT[host-boundary-032] C18_budget_rejects_illegal_values_and_never_coerce
   }
 })
 
-test('WHAT[host-boundary-032] C19_self_note_requires_pairing_with_positive_budget_and_omitted_for_zero', () => {
-  // 1. 估计为 0 时：属性必须不存在（undefined/null/空串/空白/数字/对象/数组均拒绝）
+test('WHAT[host-boundary-032] C19_self_note_is_advisory_and_never_fails_the_call', () => {
+  // self_note 是建议性短记：任何形态都不构成调用失败（speculative-investigation-016）
   // 属性不存在时合法
-  const zeroOmitted = PluginHooksSurface.readonlyDelegationSelfNoteOf(0)
+  const zeroOmitted = PluginHooksSurface.readonlyDelegationSelfNoteOf({ estimated_readonly_rounds: 0 })
   assert.equal(zeroOmitted.ok, true, 'absent self_note is required when estimated_readonly_rounds is 0')
   assert.equal(zeroOmitted.note, null)
 
-  // 估计为 0 但提供了任何形式的 self_note（包括 undefined、null、空串、空白、字符串、其他类型）均拒绝
+  // 估计为 0 但提供了任何形式的 self_note 也不失败；字符串保留，非字符串按缺失读取
   for (const noteValue of [undefined, null, '', '   ', 'some note', 0, 1, true, {}, []]) {
     const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(0, noteValue)
-    assert.equal(
-      result.ok,
-      false,
-      `self_note must be rejected when rounds is 0 even if value is ${JSON.stringify(noteValue)}`,
-    )
+    assert.equal(result.ok, true, `self_note of ${JSON.stringify(noteValue)} at zero is not a failure`)
+    assert.equal(result.note, typeof noteValue === 'string' ? noteValue : null)
   }
 
-  // 2. 正数估计时：必须是非空白字符串（缺失/空串/空白/非字符串拒绝）
-  const missingForPositive = PluginHooksSurface.readonlyDelegationSelfNoteOf(2)
-  assert.equal(missingForPositive.ok, false, 'absent self_note must be rejected when rounds > 0')
+  // 2. 正数估计时：短记缺失或形态不合法也不失败
+  const missingForPositive = PluginHooksSurface.readonlyDelegationSelfNoteOf({ estimated_readonly_rounds: 2 })
+  assert.equal(missingForPositive.ok, true)
+  assert.equal(missingForPositive.note, null)
 
   for (const invalidNote of ['', '   ', '\t\n', null, undefined, 0, 123, true, {}, []]) {
     const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(2, invalidNote)
-    assert.equal(
-      result.ok,
-      false,
-      `invalid note ${JSON.stringify(invalidNote)} must be rejected when rounds > 0`,
-    )
+    assert.equal(result.ok, true, `note ${JSON.stringify(invalidNote)} at positive rounds is not a failure`)
+    assert.equal(result.note, typeof invalidNote === 'string' ? invalidNote : null)
   }
 
   // 3. 合法正数 + 非空白短记：round-trip 原样保留（包括首尾空格、换行等原始证据）
@@ -641,10 +639,12 @@ test('WHAT[host-boundary-032] C19_self_note_requires_pairing_with_positive_budge
   assert.equal(validPositive.note, noteText, 'note content must round-trip verbatim')
 })
 
-test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', () => {
+test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
+    language.refreshGlobalLanguage()
     const definition = {
       description: 'Description for js-manager',
       parameters: {
@@ -691,13 +691,16 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
     } else {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
     }
+    language.refreshGlobalLanguage()
   }
 })
 
-test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_and_switches_cleanly', () => {
+test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_and_switches_cleanly', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   try {
     process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'zh-CN'
+    language.refreshGlobalLanguage()
     const definition = {
       description: '原始工具描述',
       parameters: { type: 'object', properties: {}, required: [] },
@@ -718,6 +721,7 @@ test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_a
 
     // 语言切换后只剩当前语言一段，不叠加
     process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+    language.refreshGlobalLanguage()
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
     assert.ok(definition.description.includes('Investigation outlook: estimated_readonly_rounds estimates'))
     assert.equal(

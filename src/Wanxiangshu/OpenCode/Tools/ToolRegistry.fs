@@ -288,8 +288,25 @@ module ToolRegistry =
                 | Some perms -> perms |> Seq.tryHead
                 | None -> fallbackManagerPermission spec.Name
 
-            let denied (ctx: HostToolContext) path (subs: Map<string, string>) =
-                ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
+            /// The refusal prose follows the provider language, so it cannot serve
+            /// as a machine-readable reason. `code` carries the resource key when a
+            /// caller needs one; omitting it leaves the rendered bytes exactly as
+            /// before, which is why tools without a code contract keep prose only.
+            let denied (ctx: HostToolContext) path (subs: Map<string, string>) (code: string option) =
+                let fields =
+                    match code with
+                    | Some key -> [ "code", ToolHostCodec.TString key ]
+                    | None -> []
+
+                ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
+
+            /// mv / rm expose their refusals by code; the other tools keep the
+            /// prose-only shape their existing consumers already match on.
+            let carriesRefusalCode specName =
+                match specName with
+                | "mv"
+                | "rm" -> true
+                | _ -> false
 
             let denyRole (ctx: HostToolContext) (role: Role) =
                 let path =
@@ -298,12 +315,16 @@ module ToolRegistry =
                     else
                         Path.DeniedRole
 
-                denied ctx path (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
+                denied
+                    ctx
+                    path
+                    (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
+                    (if carriesRefusalCode spec.Name then Some path else None)
 
             // The current capability decides; the denial stays action-focused
             // and never echoes internal loop state.
             let denyTaskState (ctx: HostToolContext) =
-                denied ctx Path.DeniedTaskState (Map [ "tool", spec.Name ])
+                denied ctx Path.DeniedTaskState (Map [ "tool", spec.Name ]) None
 
             let executeManager args (ctx: HostToolContext) =
                 task {
@@ -336,7 +357,16 @@ module ToolRegistry =
                 task {
                     match! runtime.EnsureRoleFor ctx with
                     | Some role -> return! executeKnownRole officeAdmission args ctx role
-                    | None -> return denied ctx Path.DeniedUnestablished Map.empty
+                    | None ->
+                        return
+                            denied
+                                ctx
+                                Path.DeniedUnestablished
+                                Map.empty
+                                (if carriesRefusalCode spec.Name then
+                                     Some Path.DeniedUnestablished
+                                 else
+                                     None)
                 }
 
             let executeOffice officeAdmission args (ctx: HostToolContext) =
@@ -354,7 +384,7 @@ module ToolRegistry =
                     if attachmentAdmission ctx then
                         return! original args ctx
                     else
-                        return denied ctx Path.DeniedUnestablished Map.empty
+                        return denied ctx Path.DeniedUnestablished Map.empty None
                 }
 
             let executeEstablished args (ctx: HostToolContext) =
@@ -395,13 +425,13 @@ module ToolRegistry =
                     if spec.Name = "js-predictor" then
                         return! executeEstablished args ctx
                     else
-                        return denied ctx Path.DeniedStrength Map.empty
+                        return denied ctx Path.DeniedStrength Map.empty None
                 }
 
             let executeAfterBoundary args (ctx: HostToolContext) =
                 task {
                     if AblationGate.toolDenied (AblationGate.registry ()) spec.Name then
-                        return denied ctx Path.DeniedAblation (Map [ "tool", spec.Name ])
+                        return denied ctx Path.DeniedAblation (Map [ "tool", spec.Name ]) None
                     elif isStrengthReplica ctx then
                         return! executeReplica args ctx
                     else

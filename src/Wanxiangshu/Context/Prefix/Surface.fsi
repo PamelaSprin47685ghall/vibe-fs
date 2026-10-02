@@ -19,8 +19,7 @@ module PrefixSurface =
     val forChoice: choice: obj -> committed: obj -> memoryPreamble: string -> memoryBody: string -> obj
     val requiredBlob: choice: obj -> committed: obj -> obj
 
-    val desiredCutoff: k: int -> phaseTurnStarts: int array -> obj
-    val appendCheckpoint: callId: string -> retainCheckpoints: int -> window: obj array -> obj
+    val desiredCutoff: phaseTurnStarts: int array -> obj
+    val appendCheckpoint: callId: string -> window: obj array -> obj array
     val desiredCutoffOfWindow: window: obj array -> turnByCallId: obj array -> obj
     val pruneCheckpointWindow: window: obj array -> turnByCallId: obj array -> cutoffExclusive: int -> obj array
-    val validateK: k: int -> obj

@@ -202,28 +202,28 @@ module PluginHooksSurface =
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
         let jsArgs = getJsArguments ()
 
-        let target =
-            if jsArgs.Length = 1 && isPlainObject jsArgs[0] then
-                jsArgs[0]
-            elif jsArgs.Length = 1 then
-                createObj [ "estimated_readonly_rounds", jsArgs[0] ]
-            else
-                createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
-
-        match InvestigationEstimateContract.parseParticipatingArguments target with
-        | Ok(rounds, _) ->
-            let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
-
-            let noteVal =
-                if rawRounds = 0 then null
-                elif hasOwn target "self_note" then target?self_note
-                else null
-
-            box {| ok = true; note = noteVal |}
-        | Error err ->
+        if jsArgs.Length = 0 then
             box
                 {| ok = false
-                   error = InvestigationEstimateContract.errorCode err |}
+                   error = "InvalidArgumentObject" |}
+        elif jsArgs.Length = 1 && not (isPlainObject jsArgs[0]) then
+            box
+                {| ok = false
+                   error = "InvalidArgumentObject" |}
+        else
+            let target =
+                if jsArgs.Length = 1 then
+                    jsArgs[0]
+                else
+                    createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
+
+            match InvestigationEstimateContract.parseParticipatingArguments target with
+            | Ok(_, note) ->
+                box {| ok = true; note = note |> Option.toObj |}
+            | Error err ->
+                box
+                    {| ok = false
+                       error = InvestigationEstimateContract.errorCode err |}
 
     /// Production tool.execute.before calls the same hide: the business
     /// argument view drops both protocol fields while provider evidence keeps

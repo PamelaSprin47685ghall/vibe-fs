@@ -467,8 +467,6 @@ module HostSignalBootstrap =
                     scope.Sessions.OwnedSessions.Add sessionId |> ignore
                     let sid = SessionId.create sessionId
                     signalRouter.RegisterOwned sid
-                    // HOST-026: root / first-touch bind from global preference (idempotent).
-                    ProviderLanguageBinding.ensureRoot sid |> ignore
 
             let bindUserMessage (sessionId: string) (messageId: string) =
                 if

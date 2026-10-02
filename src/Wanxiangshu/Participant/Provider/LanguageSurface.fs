@@ -60,21 +60,8 @@ module ProviderLanguageSurface =
         ProviderLanguage.inheritFrom (languageOf raw) |> languageName
 
     let clearAllForTests () : unit =
-        SessionProviderLanguage.clearAllForTests ()
         Wanxiangshu.OpenCode.ProviderLanguageBinding.clearHostConfigPreferenceForTests ()
-
-    let tryGet (sessionId: string) : obj =
-        match SessionProviderLanguage.tryGet (SessionId.create sessionId) with
-        | Some language -> box (languageName language)
-        | None -> null
-
-    let bindOnce (sessionId: string) (language: string) : obj =
-        SessionProviderLanguage.bindOnce (SessionId.create sessionId) (languageOf language)
-        |> resultOf
-
-    let inheritFromOwner (ownerLanguage: string) (childSessionId: string) : obj =
-        SessionProviderLanguage.inheritFromOwner (languageOf ownerLanguage) (SessionId.create childSessionId)
-        |> resultOf
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
 
     let setHostConfigPreference (raw: string) : unit =
         Wanxiangshu.OpenCode.ProviderLanguageBinding.setHostConfigPreference raw
@@ -83,15 +70,8 @@ module ProviderLanguageSurface =
         Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference ()
         |> languageName
 
-    let ensureRoot (sessionId: string) : string =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-        |> languageName
-
-    let ensureInherited (ownerSessionId: string) (childSessionId: string) : string =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureInherited
-            (SessionId.create ownerSessionId)
-            (SessionId.create childSessionId)
-        |> languageName
+    let refreshGlobalLanguage () : unit =
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
 
     let languageOfSession (sessionId: string) : string =
         ProviderProse.languageOf (SessionId.create sessionId) |> languageName
@@ -122,8 +102,6 @@ module ProviderLanguageSurface =
     /// host-owned system bytes remain caller data and are never rewritten.
     let transformBookkeeperSystem (sessionId: string) (system: string array) : Task<obj> =
         task {
-            let sid = SessionId.create sessionId
-            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
             let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
             let output = createObj [ "system" ==> system ]
 
@@ -138,8 +116,6 @@ module ProviderLanguageSurface =
     /// only falls back to the supplied label when no profile exists.
     let transformRoleSystem (sessionId: string) (roleLabel: string) (system: string array) : Task<obj> =
         task {
-            let sid = SessionId.create sessionId
-            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
 
             let role = Roles.tryParseRole roleLabel
 
@@ -155,8 +131,6 @@ module ProviderLanguageSurface =
     /// Same boundary for a replica session of a public role.
     let transformReplicaSystem (sessionId: string) (roleLabel: string) (system: string array) : Task<obj> =
         task {
-            let sid = SessionId.create sessionId
-            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
 
             let role = Roles.tryParseRole roleLabel
 

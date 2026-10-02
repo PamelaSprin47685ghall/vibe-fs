@@ -82,7 +82,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## [020] `todowrite` 是 checkpoint，不享有永久 raw 豁免
 
-成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因当前 `retainCheckpoints` 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，未来更大的 K 也不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
+成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因固定的 K 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，任何后续 checkpoint 都不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
 
 ## [021] Y retry 由失败会话当场拥有，禁止等待未来 X material
 
@@ -118,9 +118,9 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
 
-## [028] todowrite checkpoint 的逐次 K 窗口
+## [028] todowrite checkpoint 的固定 K 窗口
 
-设成功的原生 `todowrite` checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。每次 `TN` 都必须携带自己的正整数 `retainCheckpoints = K`；K 包含本次 checkpoint，不是 session 配置，也不冻结默认值。
+设成功的原生 `todowrite` checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。K 是系统固定参数 `K = 3`，包含本次 checkpoint；它不是逐次输入，也不由模型提供，因此 checkpoint 事实只记录调用身份，不记录 K。
 
 ```text
 N = 0：不给新 cutoff，沿用当前已提交前缀与原始尾部。
@@ -128,9 +128,9 @@ N > 0：j = max(1, N − K + 1)
 desired cutoff exclusive = Bj
 ```
 
-因此 K=1 表示可直接压缩本次 `todowrite` 之前的 covered 历史；K=2 表示保留当前与上一次 `todowrite`，从上一次 checkpoint 之前开始压缩。K 每次可以不同。
+因此窗口保留最近三次 `todowrite` 所属的完整 semantic turn，从这三次里最早的一次之前开始压缩；不足三次时从最早的 checkpoint 之前开始。
 
-checkpoint projection 不能因为一次较小 K 就提前遗忘尚未被 committed prefix 越过的旧 checkpoint；只有真实 `PrefixRebaseCommitted` 才能永久裁掉其 cutoff 之前的 checkpoint。于是后续大 K 可以选择“暂不额外压缩”尚存 raw 历史，却绝不能把已经替换成 LWR 的内容恢复出来。保留调用所属整回合，绝不在 call/result 中间切断。同一 semantic turn 内多个顺序 checkpoint 可以共享 `Bi`。
+checkpoint projection 不能提前遗忘尚未被 committed prefix 越过的旧 checkpoint；只有真实 `PrefixRebaseCommitted` 才能永久裁掉其 cutoff 之前的 checkpoint。于是尚存 raw 的历史可以不额外压缩，却绝不能把已经替换成 LWR 的内容恢复出来。保留调用所属整回合，绝不在 call/result 中间切断。同一 semantic turn 内多个顺序 checkpoint 可以共享 `Bi`。
 
 ## [029] coverage 落后不丢 raw，frame 不跨界冒用，紧急 Probe 是明示例外
 
@@ -140,4 +140,4 @@ actual cutoff 必须同时满足：当前 generation、完整 semantic turn、�
 
 `assume` 是短小但高价值的判断承诺点。任何 prefix replacement 若覆盖了 `assume` tool call，都必须从原始 Host 消息中按 exact call id 找到该调用，并把承载该 call id 的调用消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数、不得用摘要替代固定结果。
 
-这条规则与 todowrite K 窗口独立：`todowrite.retainCheckpoints` 只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。
+这条规则与 todowrite K 窗口独立：todowrite 的固定 K 窗口只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。

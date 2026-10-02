@@ -26,7 +26,7 @@ Host compaction 只通过 ContextReanchored 收容：epoch 加一、清除 Snaps
 
 ## [007] 同 Life system prompt byte-identical
 
-同一 Life 的 Office system prompt 保持逐字节一致，Persona 不重绑；交托、fallback、review 和 compaction 均不例外。
+同一 Life 且全局语言不变期间，Office system prompt 保持逐字节一致，Persona 不重绑；交托、fallback、review 和 compaction 均不例外。全局语言变化是唯一允许 system prompt 随之整体变化的情形（provider-language-013）：切换后的第一次请求建立新前缀，此后恢复 byte-identical。
 
 ## [008] FrozenRecordPrefix 是 low-trust context
 
@@ -40,7 +40,7 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 ## [010] guidance 原位、原字节 replay
 
-所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 skill_content 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
+所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
 
 同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。ContextReanchored 退休旧 occurrence 的可见性：旧 occurrence 不再呈现，新 occurrence 以新序号追加到新的载体；新 horizon 下同一位置承载新字节属于退休而非改写，不构成对未重锚回放律的违反。
 
@@ -56,6 +56,8 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 ## [013] prefix identity 的比较范围
 
 比较覆盖 provider、model、variant、完整 tools、system prompt 及 message 序列。身份、工具、system 或历史 message 的变更均不能视为追加；冷边界仍须满足 [002]。
+
+唯一例外是全局语言变化（provider-language-002/013）：语言不同导致的 system prompt 与 message 语言整体差异不按前缀漂移处理，不要求 epoch 推进或冷边界声明；语言不变期间本条款照常强制。
 
 ## [014] guidance 正文不进入 trace
 

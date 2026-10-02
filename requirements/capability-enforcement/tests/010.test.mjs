@@ -339,7 +339,7 @@ const PLUGIN_TOOL_NAMES = [
   'join', 'horizon', 'fission', 'review', 'suicide', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-engineer', 'js-devops', 'js-manager',
+  'js-engineer', 'js-devops', 'js-manager', 'js-predictor',
 ]
 const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
 ]
@@ -374,6 +374,9 @@ const fullConfig = () => ({
 
 integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
   await withPlugin(async (hooks) => {
+    // js-predictor 属于插件注册面：WHAT[005] 要求副本面在 deny 全部工具后精准放行它。
+    // 它经 ToolRegistry.fs:267 的 predictorJsSpec () 与其它 js-* 同源注册；注册存在
+    // 只是导出面，其准入为 PrivateAttachment 且仅副本会话放行，不等于能力扩大。
     assert.deepEqual(Object.keys(hooks.tool).sort(), [...PLUGIN_TOOL_NAMES].sort())
     for (const toolName of PLUGIN_TOOL_NAMES) {
       assert.equal(typeof hooks.tool[toolName]?.execute, 'function', `${toolName} is registered`)

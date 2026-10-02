@@ -8,6 +8,6 @@ module ProviderLanguageBinding =
     val setHostConfigPreference: raw: string -> unit
     val clearHostConfigPreferenceForTests: unit -> unit
     val readGlobalPreference: unit -> ProviderLanguage
-    val ensureRoot: sessionId: SessionId -> ProviderLanguage
-    val ensureInherited: ownerId: SessionId -> childId: SessionId -> ProviderLanguage
+    val refreshGlobalLanguage: unit -> unit
+    val forSession: _sessionId: SessionId -> ProviderLanguage
     val forSessionText: sessionText: string -> ProviderLanguage

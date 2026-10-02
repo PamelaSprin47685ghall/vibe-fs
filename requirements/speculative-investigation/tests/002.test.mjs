@@ -4,7 +4,30 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import * as Strength from "../../../dist/Strength/Surface.js";
-import * as Contract from "../../../dist/Strength/InvestigationEstimateContract.js";
+import * as PluginHooksSurface from "../../../dist/OpenCode/Host/PluginHooksSurface.js";
+
+const ProtocolRevision = 2;
+const EstimatedReadonlyRoundsField = "estimated_readonly_rounds";
+// 生产逐工具分类的唯一合法公开观察面：schema 装饰端真实调用
+// InvestigationEstimateContract.classifyTool（ReadonlyDelegationContract.fs L418）。
+// classifyTool 与 policyCode 本身未在任何顶层 Surface 导出，而该端把 NoEstimate 与
+// Unreviewed 合并为同一“不装饰”分支，因此公开面只能观测 EstimateAfterCall 与非参与
+// 两态；NoEstimate 与 Unreviewed 之别在公开契约上不可观察，此处不伪造三态。
+function productionDecoratesProtocol(toolName) {
+  const definition = {
+    description: "original tool description",
+    parameters: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  };
+  PluginHooksSurface.decorateReadonlyDelegationToolDefinition(toolName, definition);
+  return Boolean(
+    definition.parameters?.properties?.estimated_readonly_rounds ||
+    definition.jsonSchema?.properties?.estimated_readonly_rounds
+  );
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +46,7 @@ function makeOpportunity(overrides = {}) {
     sourceProviderRun: "run-1",
     sourceToolCallIds: ["call-1", "call-2"],
     requestedRounds: 3,
-    contractRevision: Contract.ProtocolRevision,
+    contractRevision: ProtocolRevision,
     hasPrefixProbe: false,
     isReplicaOrInternalLeaf: false,
     isInteractionRepair: false,
@@ -51,7 +74,7 @@ function makeTelemetry(overrides = {}) {
   };
 }
 
-test("STRENGTH_002_admission_refuses_every_documented_dependency_gap_with_a_visible_reason", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_admission_refuses_every_documented_dependency_gap_with_a_visible_reason", () => {
   const cases = [
     {
       expected: "zero-round-budget",
@@ -141,10 +164,10 @@ test("STRENGTH_002_admission_refuses_every_documented_dependency_gap_with_a_visi
   const admitted = Strength.policyDecide(sha256, makeOpportunity());
   assert.equal(admitted.kind, "Admit", "Valid opportunity must be Admitted");
   assert.equal(admitted.request.requestedRounds, 3);
-  assert.equal(admitted.request.contractRevision, Contract.ProtocolRevision);
+  assert.equal(admitted.request.contractRevision, ProtocolRevision);
 });
 
-test("STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_zero", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_zero", () => {
   assert.deepEqual(Strength.budgetTryCreate(-1), {
     ok: false,
     error: "negative-readonly-round-budget",
@@ -157,32 +180,41 @@ test("STRENGTH_002_round_budget_rejects_negative_values_without_normalizing_to_z
   assert.deepEqual(Strength.budgetTryCreate(4), { ok: true, value: 4 });
 
   // 同步验证 Contract 层的 parseParticipatingArguments 校验逻辑
-  const negParsed = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: -1,
+  const negParsed = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: -1,
     self_note: "Checking invariants",
   });
-  assert.equal(negParsed.tag, 1, "negative rounds must be rejected by contract parser");
-  assert.equal(Contract.errorCode(negParsed.fields[0]), "InvalidRange", "error must be InvalidRange");
+  assert.equal(negParsed.ok, false, "negative rounds must be rejected by contract parser");
+  assert.equal(negParsed.error, "InvalidRange", "error must be InvalidRange");
 
-  const zeroParsed = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 0,
+  const zeroParsed = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 0,
   });
-  assert.equal(zeroParsed.tag, 0, "0 rounds omitting self_note must succeed");
-  assert.equal(Contract.EstimatedReadonlyRoundsModule_value(zeroParsed.fields[0][0]), 0);
+  assert.equal(zeroParsed.ok, true, "0 rounds omitting self_note must succeed");
+  assert.equal(zeroParsed.note, null);
 
-  const posParsed = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 4,
+  const positiveArgs = {
+    [EstimatedReadonlyRoundsField]: 4,
     self_note: "Checking invariants",
-  });
-  assert.equal(posParsed.tag, 0, "positive rounds with non-blank self_note must succeed");
-  assert.equal(Contract.EstimatedReadonlyRoundsModule_value(posParsed.fields[0][0]), 4);
-  assert.equal(
-    Contract.EstimatedReadonlyRoundsModule_toExecutionBudget(posParsed.fields[0][0]).fields[0],
-    Strength.budgetTryCreate(4).value
+  };
+  const posParsed = PluginHooksSurface.readonlyDelegationSelfNoteOf(positiveArgs);
+  assert.equal(posParsed.ok, true, "positive rounds with non-blank self_note must succeed");
+  assert.equal(posParsed.note, "Checking invariants");
+
+  // 合法的 EstimatedReadonlyRounds 经显式单向转换成为内部只读执行预算
+  // ReadonlyRoundBudget（WHAT[016] §4）。toExecutionBudget 未在任何顶层 Surface 导出，
+  // 此处经其公开投影 readonlyDelegationBudgetOf 观察转换结果。
+  const executionBudget = PluginHooksSurface.readonlyDelegationBudgetOf(
+    positiveArgs[EstimatedReadonlyRoundsField]
+  );
+  assert.deepEqual(
+    executionBudget,
+    { ok: true, rounds: 4 },
+    "a valid parsed estimate must convert to an internal readonly round budget"
   );
 });
 
-test("STRENGTH_002_round_budget_max_of_collapses_to_the_largest_budget_and_rejects_negative_batches", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_round_budget_max_of_collapses_to_the_largest_budget_and_rejects_negative_batches", () => {
   assert.deepEqual(Strength.budgetMaxOf([]), { ok: true, value: null });
   assert.deepEqual(Strength.budgetMaxOf([0, 0]), { ok: true, value: 0 });
   assert.deepEqual(Strength.budgetMaxOf([0, 3, 1]), { ok: true, value: 3 });
@@ -193,7 +225,7 @@ test("STRENGTH_002_round_budget_max_of_collapses_to_the_largest_budget_and_rejec
   });
 });
 
-test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_each_tool_by_production_policy_and_delegates_by_participating_subset_max", () => {
   // 混合批次包含：
   // 1. fork: 不参与估计的工具（NoEstimate），即使带参数也不应作为参与工具计入预算
   // 2. read: 参与工具（EstimateAfterCall），估计为 0 轮，按新合同 0 绝不能带 self_note
@@ -209,7 +241,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
           name: "fork",
           args: JSON.stringify({
             topic: "side-investigation",
-            [Contract.EstimatedReadonlyRoundsField]: 10, // 不参与工具带参数也不起效
+            [EstimatedReadonlyRoundsField]: 10, // 不参与工具带参数也不起效
           }),
         },
         {
@@ -218,7 +250,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
           name: "read",
           args: JSON.stringify({
             path: "src/Wanxiangshu/Strength/Surface.fs",
-            [Contract.EstimatedReadonlyRoundsField]: 0,
+            [EstimatedReadonlyRoundsField]: 0,
             // 0 轮次不提供 self_note
           }),
         },
@@ -229,7 +261,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
           args: JSON.stringify({
             path: "src/Wanxiangshu/Strength/Surface.fs",
             patch: "...",
-            [Contract.EstimatedReadonlyRoundsField]: 2,
+            [EstimatedReadonlyRoundsField]: 2,
             self_note: "Checking caller invariants before edit",
           }),
         },
@@ -239,7 +271,7 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
           name: "grep",
           args: JSON.stringify({
             query: "estimateCalls",
-            [Contract.EstimatedReadonlyRoundsField]: 5,
+            [EstimatedReadonlyRoundsField]: 5,
             self_note: "Locating all occurrences of batch definitions",
           }),
         },
@@ -288,31 +320,41 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     ["fork", "read", "edit", "grep"]
   );
 
-  // 2. 逐工具 Policy 分类断言：严格三态
+  // 2. 逐工具 Policy 分类：消费生产装饰端的真实判定，不在测试内另写工具名表
   assert.equal(
-    Contract.policyCode(Contract.classifyTool("fork")),
-    "NoEstimate",
-    "fork must be classified as NoEstimate"
+    productionDecoratesProtocol("read"),
+    true,
+    "read is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
-    Contract.policyCode(Contract.classifyTool("read")),
-    "EstimateAfterCall",
-    "read must be classified as EstimateAfterCall"
+    productionDecoratesProtocol("edit"),
+    true,
+    "edit is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
-    Contract.policyCode(Contract.classifyTool("edit")),
-    "EstimateAfterCall",
-    "edit must be classified as EstimateAfterCall"
+    productionDecoratesProtocol("grep"),
+    true,
+    "grep is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
-    Contract.policyCode(Contract.classifyTool("grep")),
-    "EstimateAfterCall",
-    "grep must be classified as EstimateAfterCall"
+    productionDecoratesProtocol("fork"),
+    false,
+    "fork is NoEstimate: production must add no protocol increment"
   );
 
+  // 禁止前缀匹配的反例：已知工具的近似变体一律 Unreviewed，公开面上同样不装饰。
+  // 若生产改为按 js- / read 等前缀或子串模糊匹配，这些变体会开始被装饰，此处变红。
+  for (const variant of ["readXyz", "fork-extra", "globbing"]) {
+    assert.equal(
+      productionDecoratesProtocol(variant),
+      false,
+      variant + " is Unreviewed: production must not decorate an unreviewed tool name"
+    );
+  }
+
   // 3. 取值与校验只看参与子集：筛选 EstimateAfterCall 工具
-  const participatingExchanges = batch.exchanges.filter(
-    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  const participatingExchanges = batch.exchanges.filter((e) =>
+    productionDecoratesProtocol(e.toolName)
   );
   assert.equal(
     participatingExchanges.length,
@@ -320,11 +362,22 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
     "Participating subset must filter out NoEstimate tools"
   );
 
+  // 每一步都消费生产的参数解析：readonlyDelegationSelfNoteOf 内部调用
+  // InvestigationEstimateContract.parseParticipatingArguments（PluginHooksSurface.fs L221），
+  // 轮次值再经 readonlyDelegationBudgetOf（ReadonlyRoundBudget.tryCreate）转为内部执行预算。
   const parsedEstimates = participatingExchanges.map((e) => {
     const rawArgs = JSON.parse(e.canonicalArguments);
-    const res = Contract.parseParticipatingArguments(rawArgs);
-    assert.equal(res.tag, 0, `Parsing participating arguments for ${e.toolName} must succeed`);
-    return Contract.EstimatedReadonlyRoundsModule_value(res.fields[0][0]);
+    const parsed = PluginHooksSurface.readonlyDelegationSelfNoteOf(rawArgs);
+    assert.equal(parsed.ok, true, `Parsing participating arguments for ${e.toolName} must succeed`);
+    const budget = PluginHooksSurface.readonlyDelegationBudgetOf(
+      rawArgs[EstimatedReadonlyRoundsField]
+    );
+    assert.equal(
+      budget.ok,
+      true,
+      `Parsed rounds for ${e.toolName} must be a valid readonly round budget`
+    );
+    return budget.rounds;
   });
   assert.deepEqual(parsedEstimates, [0, 2, 5], "Parsed estimates must match expected rounds");
 
@@ -344,57 +397,56 @@ test("STRENGTH_002_mixed_read_edit_batch_runs_once_then_delegates_by_batch_max",
   );
   assert.equal(admission.kind, "Admit", "Batch admission must be Admitted");
   assert.equal(admission.request.requestedRounds, 5);
-  assert.equal(admission.request.contractRevision, Contract.ProtocolRevision);
+  assert.equal(admission.request.contractRevision, ProtocolRevision);
 
   // 6. 协议不变量：旧字段 delegate_readonly_rounds 在新协议下被明确拒绝
-  const legacyAttempt = Contract.parseParticipatingArguments({
+  const legacyAttempt = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     delegate_readonly_rounds: 3,
     self_note: "old protocol call",
   });
-  assert.equal(legacyAttempt.tag, 1, "Legacy delegate_readonly_rounds must be rejected");
-  assert.equal(Contract.errorCode(legacyAttempt.fields[0]), "MixedProtocolFields", "Error must be MixedProtocolFields");
+  assert.equal(legacyAttempt.ok, false, "Legacy delegate_readonly_rounds must be rejected");
+  assert.equal(legacyAttempt.error, "MixedProtocolFields", "Error must be MixedProtocolFields");
 
   // WHAT §16.2 A16 / §16.7 守护不变量：新旧协议字段混用被拒绝为 MixedProtocolFields，旧字段绝不因新字段与合法 self_note 存在而被忽略
-  const mixedProtocolAttempt = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 2,
+  const mixedProtocolAttempt = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 2,
     delegate_readonly_rounds: 3,
     self_note: "valid note that must not mask mixed protocol fields",
   });
-  assert.equal(mixedProtocolAttempt.tag, 1, "Mixed protocol fields must be rejected as Result.Error (WHAT §16.2 A16)");
+  assert.equal(mixedProtocolAttempt.ok, false, "Mixed protocol fields must be rejected as Result.Error (WHAT §16.2 A16)");
   assert.equal(
-    Contract.errorCode(mixedProtocolAttempt.fields[0]),
+    mixedProtocolAttempt.error,
     "MixedProtocolFields",
     "Mixed protocol fields must yield MixedProtocolFields error code without ignoring legacy field"
   );
 
-  // 7. 协议不变量：0 估计时 self_note 必须不存在；正数时必须有非空 self_note
-  const zeroWithNote = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 0,
-    self_note: "should-not-be-present",
+  // 7. 协议不变量：self_note 是纯建议性短记，填与不填、填什么类型都不构成失败
+  const zeroWithNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 0,
+    self_note: "note on a zero estimate",
   });
-  assert.equal(zeroWithNote.tag, 1, "0 rounds carrying self_note must fail");
-  assert.equal(Contract.errorCode(zeroWithNote.fields[0]), "NotePresentWhenZero", "Error must be NotePresentWhenZero");
+  assert.equal(zeroWithNote.ok, true, "0 rounds carrying self_note is not a failure");
+  assert.equal(zeroWithNote.note, "note on a zero estimate");
 
-  const posWithoutNote = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 2,
+  const posWithoutNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 2,
   });
-  assert.equal(posWithoutNote.tag, 1, "positive rounds missing self_note must fail");
-  assert.equal(
-    Contract.errorCode(posWithoutNote.fields[0]),
-    "MissingOrBlankNoteWhenPositive",
-    "Error must be MissingOrBlankNoteWhenPositive"
-  );
+  assert.equal(posWithoutNote.ok, true, "positive rounds missing self_note is not a failure");
+  assert.equal(posWithoutNote.note, null);
 
-  const posWithBlankNote = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 2,
+  const posWithBlankNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 2,
     self_note: "   \t  ",
   });
-  assert.equal(posWithBlankNote.tag, 1, "positive rounds with blank self_note must fail");
-  assert.equal(
-    Contract.errorCode(posWithBlankNote.fields[0]),
-    "MissingOrBlankNoteWhenPositive",
-    "Error must be MissingOrBlankNoteWhenPositive"
-  );
+  assert.equal(posWithBlankNote.ok, true, "a blank self_note is not a failure");
+  assert.equal(posWithBlankNote.note, "   \t  ", "a string note keeps its original text");
+
+  const posWithNonStringNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 2,
+    self_note: 123,
+  });
+  assert.equal(posWithNonStringNote.ok, true, "a non-string self_note is not a failure");
+  assert.equal(posWithNonStringNote.note, null, "a non-string note is read as absent");
 });
 
 test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_estimate_fails_closed_without_subset_success", () => {
@@ -424,7 +476,7 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
           name: "read",
           args: JSON.stringify({
             path: "src/Wanxiangshu/Strength/Surface.fs",
-            [Contract.EstimatedReadonlyRoundsField]: 2,
+            [EstimatedReadonlyRoundsField]: 2,
             self_note: "Checking caller invariants before edit",
           }),
         },
@@ -435,7 +487,7 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
           args: JSON.stringify({
             path: "src/Wanxiangshu/Strength/Surface.fs",
             patch: "...",
-            [Contract.EstimatedReadonlyRoundsField]: -1,
+            [EstimatedReadonlyRoundsField]: -1,
             self_note: "Negative round budget is invalid",
           }),
         },
@@ -462,8 +514,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
   );
 
   // 2. 参与子集筛选：过滤掉 NoEstimate 工具 fork，仅保留 read 与 edit
-  const participatingExchanges = batch.exchanges.filter(
-    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  const participatingExchanges = batch.exchanges.filter((e) =>
+    productionDecoratesProtocol(e.toolName)
   );
   assert.equal(participatingExchanges.length, 2, "Participating subset must filter out NoEstimate tools");
 
@@ -471,35 +523,35 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
   const parsedByTool = new Map();
   for (const exchange of participatingExchanges) {
     const rawArgs = JSON.parse(exchange.canonicalArguments);
-    parsedByTool.set(exchange.toolName, Contract.parseParticipatingArguments(rawArgs));
+    parsedByTool.set(exchange.toolName, PluginHooksSurface.readonlyDelegationSelfNoteOf(rawArgs));
   }
 
   const readRes = parsedByTool.get("read");
-  assert.equal(readRes.tag, 0, "read in isolation must parse successfully as Ok");
-  assert.equal(Contract.EstimatedReadonlyRoundsModule_value(readRes.fields[0][0]), 2);
+  assert.equal(readRes.ok, true, "read in isolation must parse successfully as Ok");
+  assert.equal(readRes.note, "Checking caller invariants before edit");
 
   const editRes = parsedByTool.get("edit");
-  assert.equal(editRes.tag, 1, "edit with negative rounds must fail argument validation as Result.Error");
-  assert.equal(Contract.errorCode(editRes.fields[0]), "InvalidRange", "Error must be InvalidRange");
+  assert.equal(editRes.ok, false, "edit with negative rounds must fail argument validation as Result.Error");
+  assert.equal(editRes.error, "InvalidRange", "Error must be InvalidRange");
 
-  // 额外验证另一种非法形态（0 估计却携带 self_note）同样被拒绝为 NotePresentWhenZero
-  const zeroWithNoteRes = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: 0,
-    self_note: "forbidden-note-on-zero",
+  // self_note 不参与批次判定：0 估计携带短记同样解析成功
+  const zeroWithNoteRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 0,
+    self_note: "note-on-zero",
   });
-  assert.equal(zeroWithNoteRes.tag, 1, "0 rounds carrying self_note must fail");
-  assert.equal(Contract.errorCode(zeroWithNoteRes.fields[0]), "NotePresentWhenZero");
+  assert.equal(zeroWithNoteRes.ok, true, "0 rounds carrying self_note is not a failure");
+  assert.equal(zeroWithNoteRes.note, "note-on-zero");
 
   // 4. 整批一票否决与禁止“合法子集假装成功”：
   // 按照生产 Delegate.fs 中 aggregateBatchEstimate 的逻辑，批次内只要有任意参与调用解析失败，
   // firstError 命中后立即返回 BatchAggregation.ArgumentError，绝不取合法子集 [read: 2] 假装成功
   const participatingResults = participatingExchanges.map((e) => {
     const rawArgs = JSON.parse(e.canonicalArguments);
-    return Contract.parseParticipatingArguments(rawArgs);
+    return PluginHooksSurface.readonlyDelegationSelfNoteOf(rawArgs);
   });
-  const firstError = participatingResults.find((r) => r.tag === 1);
+  const firstError = participatingResults.find((r) => !r.ok);
   assert.ok(firstError, "Batch must yield an argument error on the invalid call");
-  assert.equal(Contract.errorCode(firstError.fields[0]), "InvalidRange");
+  assert.equal(firstError.error, "InvalidRange");
 
   // 若试图对批次预算求 max，包含负数预算直接失败，不产生合法 positive budget
   const batchBudgetResult = Strength.budgetMaxOf([2, -1]);
@@ -557,7 +609,7 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
       name: "read",
       args: JSON.stringify({
         path: "src/Wanxiangshu/Strength/Surface.fs",
-        [Contract.EstimatedReadonlyRoundsField]: 2,
+        [EstimatedReadonlyRoundsField]: 2,
         self_note: "Checking caller invariants",
       }),
     },
@@ -568,7 +620,7 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
       args: JSON.stringify({
         path: "src/Wanxiangshu/Strength/Surface.fs",
         patch: "...",
-        [Contract.EstimatedReadonlyRoundsField]: -1,
+        [EstimatedReadonlyRoundsField]: -1,
         self_note: "Invalid negative estimate",
       }),
     },
@@ -596,14 +648,14 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
   assert.equal(batchesFirstPass.length, 1, "First pass collects exactly 1 batch");
 
   // 校验批次内包含 ArgumentError，拒绝委托
-  const participatingFirstPass = batchesFirstPass[0].exchanges.filter(
-    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  const participatingFirstPass = batchesFirstPass[0].exchanges.filter((e) =>
+    productionDecoratesProtocol(e.toolName)
   );
   const errorsFirstPass = participatingFirstPass
-    .map((e) => Contract.parseParticipatingArguments(JSON.parse(e.canonicalArguments)))
-    .filter((r) => r.tag === 1);
+    .map((e) => PluginHooksSurface.readonlyDelegationSelfNoteOf(JSON.parse(e.canonicalArguments)))
+    .filter((r) => !r.ok);
   assert.equal(errorsFirstPass.length, 1, "ArgumentError detected in first pass");
-  assert.equal(Contract.errorCode(errorsFirstPass[0].fields[0]), "InvalidRange");
+  assert.equal(errorsFirstPass[0].error, "InvalidRange");
 
   // 投影未新增任何事件
   const projection = Strength.projectionEmpty();
@@ -625,12 +677,12 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
   assert.equal(toolExecutionCounts.read, 1, "read must NOT be re-executed on repeated processing");
   assert.equal(toolExecutionCounts.edit, 1, "edit must NOT be re-executed on repeated processing");
 
-  const participatingSecondPass = batchesSecondPass[0].exchanges.filter(
-    (e) => Contract.policyCode(Contract.classifyTool(e.toolName)) === "EstimateAfterCall"
+  const participatingSecondPass = batchesSecondPass[0].exchanges.filter((e) =>
+    productionDecoratesProtocol(e.toolName)
   );
   const errorsSecondPass = participatingSecondPass
-    .map((e) => Contract.parseParticipatingArguments(JSON.parse(e.canonicalArguments)))
-    .filter((r) => r.tag === 1);
+    .map((e) => PluginHooksSurface.readonlyDelegationSelfNoteOf(JSON.parse(e.canonicalArguments)))
+    .filter((r) => !r.ok);
   assert.equal(errorsSecondPass.length, 1, "Repeated pass must idempotently reject with same ArgumentError");
 
   // 投影依然为 0 个事件，未新增任何 Requested 事件
@@ -641,14 +693,14 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
   );
 });
 
-test("STRENGTH_002_admission_decision_shape_and_telemetry_are_pinned", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_admission_decision_shape_and_telemetry_are_pinned", () => {
   const opportunity = makeOpportunity({ requestedRounds: 4 });
   const decision = Strength.policyDecide(sha256, opportunity);
   assert.equal(decision.kind, "Admit");
   const request = decision.request;
 
   assert.equal(request.requestedRounds, 4);
-  assert.equal(request.contractRevision, Contract.ProtocolRevision);
+  assert.equal(request.contractRevision, ProtocolRevision);
   assert.equal(request.ownerSessionId, "owner");
   assert.equal(request.sourceProviderRun, "run-1");
   assert.deepEqual(request.sourceToolCallIds, ["call-1", "call-2"]);
@@ -659,7 +711,7 @@ test("STRENGTH_002_admission_decision_shape_and_telemetry_are_pinned", () => {
   assert.equal(telemetry.laneId, "lane-beta");
 });
 
-test("STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggregation_states", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggregation_states", () => {
   const delegateFsPath = path.join(
     repoRoot,
     "src/Wanxiangshu/Strength/OpenCode/Delegate.fs"
@@ -695,8 +747,8 @@ test("STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggr
   // 公开行为断言：守卫 BatchAggregation 四态可区分性（无参与机会 / 零估计 / 正估计 / 参数错误）
   // 1. 无参与机会 (NoEstimateOpportunity)：全是不参与工具时，不求 max，返回 null，policyDecide 跳过
   const noEstimateBatch = [{ toolName: "fork", arguments: {} }];
-  const noEstimateParticipating = noEstimateBatch.filter(
-    (c) => Contract.policyCode(Contract.classifyTool(c.toolName)) === "EstimateAfterCall"
+  const noEstimateParticipating = noEstimateBatch.filter((c) =>
+    productionDecoratesProtocol(c.toolName)
   );
   assert.equal(noEstimateParticipating.length, 0, "No tools in participating subset");
   const noEstimateBudget = Strength.budgetMaxOf(noEstimateParticipating.map(() => 0));
@@ -734,27 +786,34 @@ test("STRENGTH_002_delegate_fs_references_contract_symbols_and_exposes_four_aggr
   assert.equal(positiveDecision.request.requestedRounds, 3);
 
   // 4. 参数错误 (ArgumentError)：参与工具出现非法参数（负数、格式错误、短记缺失），拒绝准入且不规范化为 0
-  const invalidArgRes = Contract.parseParticipatingArguments({
-    [Contract.EstimatedReadonlyRoundsField]: -5,
+  const invalidArgRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: -5,
   });
-  assert.equal(invalidArgRes.tag, 1, "Invalid argument must be rejected");
+  assert.equal(invalidArgRes.ok, false, "Invalid argument must be rejected");
   const budgetFromNegative = Strength.budgetMaxOf([2, -5]);
   assert.equal(budgetFromNegative.ok, false, "Negative round budget in batch must fail");
   assert.equal(budgetFromNegative.error, "negative-readonly-round-budget");
 });
 
-test("STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols", () => {
+test("WHAT[speculative-investigation-002] STRENGTH_002_plugin_transforms_references_delegate_and_contract_symbols", () => {
   const pluginFsPath = path.join(
     repoRoot,
     "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
   );
   const pluginFs = fs.readFileSync(pluginFsPath, "utf8");
 
-  // 验证 PluginTransforms 引用了 StrengthDelegate.tryCapture 等公开委托入口符号
+  // 验证 PluginTransforms 引用了 StrengthDelegate 的真实公开入口 tryCaptureAndStart；
+  // 词边界必需，否则 tryCaptureAndStart 也会被 tryCapture 的前缀匹配假命中。
   assert.match(
     pluginFs,
-    /StrengthDelegate\.tryCapture/,
-    "PluginTransforms.fs must route delegation through Delegate resolution"
+    /StrengthDelegate\.tryCaptureAndStart\b/,
+    "PluginTransforms.fs must route delegation through StrengthDelegate.tryCaptureAndStart"
+  );
+  // 已退役的两阶段入口不得复活：捕获与启动必须在同一次调用中完成。
+  assert.doesNotMatch(
+    pluginFs,
+    /StrengthDelegate\.tryApply\b/,
+    "PluginTransforms.fs must NOT call the retired StrengthDelegate.tryApply entry"
   );
 });
 

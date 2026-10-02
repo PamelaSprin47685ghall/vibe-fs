@@ -92,6 +92,37 @@ module EnforcerSurface =
     /// Packaged English rulebook, in lexical order.
     let rules () : obj array = ruleArray (rulebook ())
 
+    /// Every fail-fast cause `EnforcerCatalogResource` already writes at the head
+    /// of its message for an English rulebook load. These are that resource's own
+    /// reason prefixes, not a second vocabulary invented here.
+    let private rulebookFailureCodes =
+        [ "enforcer rulebook empty"
+          "enforcer rule directory name must be lower-kebab-case"
+          "package resource missing"
+          "enforcer.md empty"
+          "main.md empty"
+          "enforcer rulebook invalid" ]
+
+    let private rulebookFailureCode (message: string) : string =
+        rulebookFailureCodes
+        |> List.tryFind (fun code -> message.Contains code)
+        |> Option.defaultValue "enforcer rulebook load failed"
+
+    /// The same packaged English rulebook as `rules`, projected as a result so a
+    /// caller can branch on a stable cause instead of matching exception prose.
+    /// The load itself is still owned by `rules`; only the failure shape differs.
+    let tryRules () : obj =
+        try
+            let loaded = rulebook ()
+
+            box
+                {| ok = true
+                   value = ruleArray loaded |}
+        with ex ->
+            box
+                {| ok = false
+                   error = rulebookFailureCode ex.Message |}
+
     let ruleCount () : int = List.length (rulebook ())
 
     let fieldNames () : string array =

@@ -11,47 +11,23 @@ type PhaseWindowDecision =
 [<RequireQualifiedAccess>]
 module PhaseWindow =
 
-    let validateK (k: int) : Result<unit, string> =
-        if k < 1 then
-            Error(sprintf "retainCheckpoints must be a positive integer; got %d (context-compression-028)" k)
-        else
-            Ok()
+    /// context-compression-028: the number of recent todowrite checkpoints whose
+    /// semantic turns stay raw. Fixed system parameter, not a session setting.
+    let retainCheckpoints = 3
 
-    type PhaseCheckpoint =
-        { ToolCallId: ToolCallId
-          RetainCheckpoints: int }
+    type PhaseCheckpoint = { ToolCallId: ToolCallId }
 
     type PhaseCommitWindow = { Checkpoints: PhaseCheckpoint list }
 
     let emptyWindow: PhaseCommitWindow = { Checkpoints = [] }
 
-    let private appendFresh callId retainCheckpoints window =
-        Ok
-            { Checkpoints =
-                window.Checkpoints
-                @ [ { ToolCallId = callId
-                      RetainCheckpoints = retainCheckpoints } ] }
-
-    let private resolveExisting callId retainCheckpoints window existing =
-        match existing with
-        | Some checkpoint when checkpoint.RetainCheckpoints = retainCheckpoints -> Ok window
-        | Some _ ->
-            Error(sprintf "todowrite checkpoint %s committed two retainCheckpoints values" (ToolCallId.value callId))
-        | None -> appendFresh callId retainCheckpoints window
-
-    /// Record one successful todowrite checkpoint without prematurely forgetting
-    /// older raw checkpoints. A real prefix rebase is what retires old evidence.
-    let appendCheckpoint
-        (callId: ToolCallId)
-        (retainCheckpoints: int)
-        (window: PhaseCommitWindow)
-        : Result<PhaseCommitWindow, string> =
-        match validateK retainCheckpoints with
-        | Error reason -> Error reason
-        | Ok() ->
-            window.Checkpoints
-            |> List.tryFind (fun checkpoint -> checkpoint.ToolCallId = callId)
-            |> resolveExisting callId retainCheckpoints window
+    /// Record one successful todowrite checkpoint. The same call identity
+    /// re-entering is a replay of the same fact, never a second checkpoint.
+    let appendCheckpoint (callId: ToolCallId) (window: PhaseCommitWindow) : PhaseCommitWindow =
+        if window.Checkpoints |> List.exists (fun checkpoint -> checkpoint.ToolCallId = callId) then
+            window
+        else
+            { Checkpoints = window.Checkpoints @ [ { ToolCallId = callId } ] }
 
     /// A committed rebase permanently removes checkpoints strictly before its
     /// cutoff. Unaddressable checkpoints are retained because XTrace capture may
@@ -68,30 +44,27 @@ module PhaseWindow =
                 | Some turn -> turn >= cutoffExclusive
                 | None -> true) }
 
-    /// Use the K supplied by the latest checkpoint. K includes the current call:
-    /// one means fold directly before the current todowrite; two keeps the current
-    /// and previous todowrite and folds before the previous one.
+    /// The window desire: keep the last `retainCheckpoints` checkpoints and fold
+    /// directly before the oldest of them. Retention is a count, so a committed
+    /// rebase is the only thing that forgets checkpoint evidence.
     let desiredCutoffOf (turnStartOf: ToolCallId -> int option) (window: PhaseCommitWindow) : PhaseWindowDecision =
         match List.tryLast window.Checkpoints with
         | None -> PhaseWindowDecision.NoPhases
-        | Some latest ->
-            let retained =
-                window.Checkpoints
-                |> List.rev
-                |> List.truncate latest.RetainCheckpoints
-                |> List.rev
-
-            retained
+        | Some _ ->
+            window.Checkpoints
+            |> List.rev
+            |> List.truncate retainCheckpoints
+            |> List.rev
             |> List.tryHead
             |> Option.bind (fun checkpoint -> turnStartOf checkpoint.ToolCallId)
             |> Option.map PhaseWindowDecision.KeepFrom
             |> Option.defaultValue PhaseWindowDecision.NoPhases
 
-    let desiredCutoff (k: int) (checkpointTurnStarts: int list) : PhaseWindowDecision =
+    let desiredCutoff (checkpointTurnStarts: int list) : PhaseWindowDecision =
         match checkpointTurnStarts with
         | [] -> PhaseWindowDecision.NoPhases
         | starts ->
             let n = List.length starts
-            let j = max 1 (n - k + 1)
+            let j = max 1 (n - retainCheckpoints + 1)
             let index = min (max j 1) n
             PhaseWindowDecision.KeepFrom(List.item (index - 1) starts)

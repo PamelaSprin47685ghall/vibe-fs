@@ -30,7 +30,7 @@
 
 ## [008] 效果家族
 
-工作区创建、分支发布与 Blogger 记录分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published、BloggerRequestMaterialized/BlogObservationCommitted 表达意图与确认。原生 `todowrite` 的待办写入由 Host executor 完成；before 只把 provider 的 `obligations` 换回 `todos`、做好参数 admission / 隐藏，after 只恢复 provider 参数。只有 Host 随后的 `message.part.updated` 明确给出该 exact call 的 `completed` ToolPart，才追加 `TodoCheckpointCommitted`；`error` 只关闭候选而不推进压缩。各领域负责具体证据。
+工作区创建、分支发布与 Blogger 记录分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published、BloggerRequestMaterialized/BlogObservationCommitted 表达意图与确认。原生 `todowrite` 的待办写入由 Host executor 完成；插件不改写其 provider 参数，不在 before/after 产生 checkpoint。只有 Host 随后的 `message.part.updated` 明确给出该 exact call 的 `completed` ToolPart，才追加 `TodoCheckpointCommitted`；`error` 只关闭候选而不推进压缩。各领域负责具体证据。
 
 ## [010] 拒绝旧通用事实
 

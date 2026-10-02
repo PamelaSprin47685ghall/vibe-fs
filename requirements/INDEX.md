@@ -40,7 +40,7 @@
 | `cognitive-workspace` | 持久认知画板已退休；只保留负向边界，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
 | `attention-regulation` | participant 必须能显式结束 evidence churn、解除自创心理债、延后非阻塞旁支，而不把这些 speech act 冒充事实或 obligation。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
-| `provider-language` | 一个 participant life 必须生活在单一、稳定的自然语言世界中，而 protocol identity 保持语言不变；核心角色双语 Prompt 语义同源一致。 |
+| `provider-language` | 语言由全局设置唯一决定，无会话绑定与持久化记录，改设置即改下一次渲染的语言；protocol identity 保持语言不变，核心角色双语 Prompt 语义同源一致。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
 
 ## 5. Interaction / effect / durability
@@ -87,7 +87,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件只增加并消费 retainCheckpoints，不维护第二份 todo 真相。 |
+| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
 | `relay-assessment` | 每任至多一次八维质量评级；Manager 可亲自只读取证或委派只读 Engineer，低分原位接责，工作区变更使旧快照证书失效。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |

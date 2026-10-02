@@ -42,7 +42,7 @@ test('WHAT[session-ontology-006] flattenedChildAdapterProbe confirms managed chi
   assert.equal(observed.workerFamily, observed.root);
 });
 
-test('WHAT[session-ontology-006] restored child owner with empty process-local map flattens physical parent to authoritative Host root and inherits immediate owner language', async () => {
+test('WHAT[session-ontology-006] restored child owner with empty process-local map flattens physical parent to authoritative Host root', async () => {
   const observed = await restoredOwnerFlatteningProbe();
   assert.equal(observed.firstOk, true);
   assert.equal(observed.secondOk, true);
@@ -51,7 +51,7 @@ test('WHAT[session-ontology-006] restored child owner with empty process-local m
   assert.deepEqual(observed.parentQueries, ['restored-child', 'intermediate-sub', 'host-family-root']);
   assert.equal(observed.queriesAfterFirst, 3);
   assert.equal(observed.queriesAfterSecond, 3, 'in-process proved ancestry must avoid extra Host queries');
-  assert.equal(observed.childLanguage, observed.ownerLanguage, 'child must inherit immediate owner language, not root language');
+  assert.equal(observed.childLanguage, observed.ownerLanguage, 'owner and child read the same live global language');
   assert.equal(observed.firstChildFamilyRoot, 'host-family-root');
   assert.equal(observed.ownerFamilyRoot, 'host-family-root');
 });

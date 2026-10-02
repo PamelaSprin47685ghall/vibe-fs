@@ -24,3 +24,13 @@ module ProviderLanguage =
             Result<ProviderLanguage, string>
 
     val inheritFrom: owner: ProviderLanguage -> ProviderLanguage
+
+[<RequireQualifiedAccess>]
+module GlobalProviderLanguage =
+    /// Re-resolve the live global preference (env → host config → locale →
+    /// English). Called at startup and whenever the host preference changes.
+    val refresh: resolve: (unit -> ProviderLanguage) -> unit
+
+    /// The live global preference. The single language authority: every Class A
+    /// render reads this, so a setting change takes effect on the next request.
+    val current: unit -> ProviderLanguage

@@ -35,7 +35,7 @@ test('WHAT[prefix-stability-009] stable identity replacement grants no per-tool 
   const raw = [
     {
       info: { id: 'todo-call-msg', role: 'assistant' },
-      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { obligations: [], retainCheckpoints: 1 } }],
+      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { todos: [] } }],
     },
     textMessage('request-local', 'assistant', 'request-local presentation only'),
     {

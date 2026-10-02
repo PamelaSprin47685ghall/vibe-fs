@@ -14,9 +14,18 @@ test('WHAT[participant-horizon-013] actual warm-start output contains hint text 
   try {
     for (const locale of ['English', 'SimplifiedChinese']) {
       const session = `hint-data-${locale}`
-      assert.equal(language.bindOnce(session, locale).ok, true)
+      const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = locale === 'English' ? 'en' : 'zh-CN'
+      language.refreshGlobalLanguage()
       const search = async () => [{ filePath: 'fixture.js', startLine: 1, endLine: 4, content }]
-      const result = await warmStart.prepareWithSearch(search, session, 'engineer', directory, 'query', charge)
+      let result
+      try {
+        result = await warmStart.prepareWithSearch(search, session, 'engineer', directory, 'query', charge)
+      } finally {
+        if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+        else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
+        language.refreshGlobalLanguage()
+      }
       assert.equal(result.ok, true)
       const data = parseToml(result.value)
       assert.equal(data.status, undefined)

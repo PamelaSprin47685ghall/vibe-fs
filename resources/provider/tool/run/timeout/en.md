@@ -1,1 +1,1 @@
-The command was still running when its allowed time ended, so it was stopped.
+The command was still running when its allowed time ended, so Termination was requested.

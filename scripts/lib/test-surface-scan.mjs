@@ -1305,6 +1305,9 @@ export const SURFACE_MANIFEST = [
       'SPEC-INV-012',
       'SPEC-INV-013',
       'SPEC-INV-014',
+      'SPEC-INV-015',
+      'SPEC-INV-016',
+      'SPEC-INV-020',
     ],
     lawOwners: {
       'DURABLE-EVENTS-019': 'durable-events',
