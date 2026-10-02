@@ -15,4 +15,4 @@
 
 v2 MCP是独立接入端口；Host原生`/sphinx question`适配器不启动/注入MCP，二者边界可以并存。工具名单存在不代表Host配置需要注入MCP。
 
-局部：`node --test requirements/sphinx-v2/tests/*.test.mjs`。本轮只完成语法核对，工作区没有Sphinx/V2新dist，未声称行为验证通过。完整实施缺口集中记于 [迁移记录](../../../proposals/20模块迁移-Sphinx与Manager-2026-09-28.md)。
+局部：`node --test requirements/sphinx-v2/tests/*.test.mjs`。本轮只完成语法核对，工作区没有Sphinx/V2新dist，未声称行为验证通过。完整实施缺口集中记于 [迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-Sphinx与Manager-2026-09-28.md)。

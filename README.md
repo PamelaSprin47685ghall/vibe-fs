@@ -183,10 +183,9 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 src/           生产源码
 resources/     随包运行时资源
 requirements/  56 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
-proposals/     deferred 未来材料（用户管理）
+proposals/     现行施工计划、未来提案与 archive 历史记录（用户管理）
 万象体系/     投资人材料（DOC.html、PPT.html）
 scripts/       构建与少量仓库检查
-docs/          项目文档与在线阅览（docs/index.html）
 dist/          最终编译输出，不提交
 artifacts/     中间产物与本地发布产物，不提交
 .github/       CI workflows
@@ -194,6 +193,7 @@ artifacts/     中间产物与本地发布产物，不提交
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
 - 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流已归档（2026-08-14 cutover；git 历史可回溯）
+- 施工与提案导航 [proposals/README.md](proposals/README.md)；旧计划与已结束批次见[归档索引](proposals/archive/README.md)
 - 测试全部包自有：`requirements/<package>/tests/`；共享 harness 在 `requirements/verification-system/tests/`（含 `support/`、unit runner、integration orchestrator、Long Stroke e2e）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
@@ -307,4 +307,4 @@ Git 工作树须干净。验证输出留存本地 `.fable-build/verify-logs/` �
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[在线文档 · docs/index.html](docs/index.html) · [requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)
+更多：[requirements/README.md](requirements/README.md) · [计划与提案](proposals/README.md) · [历史归档](proposals/archive/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)

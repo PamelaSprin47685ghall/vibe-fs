@@ -28,4 +28,4 @@ Join 的条数上限、显示窗口和 WorkRecord 本身的有界物化不是同
 
 旧角色在拒绝前创建 child 的修复及回归保留，待新基线复验（GAP-154）。完整待补范围见 GAP-153；编译额度归属沿用 22-D1，DevOps binding 与 work handle 复用沿用 34/35 待决，不在测试中另设规则。旧发布清单及fatal库存的历史状态不能代替当前真实执行证明。
 
-本次结果见[迁移记录](../../../proposals/20模块迁移-恢复与委托-2026-09-28.md)。直接 `node --test` 只用于局部调试；正式结论使用 verification-system runner，TODO 会使它返回未完成。
+本次结果见[迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-恢复与委托-2026-09-28.md)。直接 `node --test` 只用于局部调试；正式结论使用 verification-system runner，TODO 会使它返回未完成。

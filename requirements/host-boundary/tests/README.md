@@ -35,4 +35,4 @@
 TESTS_MJS_FILES="$(rg --files requirements/host-boundary/tests | rg '/[0-9]{3}\.test\.mjs$' | sort | paste -sd, -)" node requirements/verification-system/tests/run.mjs
 ```
 
-019/029/032 的 TODO 阻断完整验收。013旧基线曾出现断言后不退出，未取得本基线闭合证据。023与032需要真实Host及本机端口权限；026真实编译用例需开启integration。本轮主工作区 Fable 构建及 822 模块链接已通过（`/tmp/vibe-fs-resume-main-build.log`），完整 verification harness 为 278 通过、0 失败（`/tmp/vibe-fs-resume-harness-final.log`）。这些结果不消除上述 TODO；完整执行范围见[本轮记录](../../../proposals/20模块上游适配记录-2026-09-28.md)，残余扫描、跨包案例和物理证明缺口见[GAP](../../GAP.md)。
+019/029/032 的 TODO 阻断完整验收。013旧基线曾出现断言后不退出，未取得本基线闭合证据。023与032需要真实Host及本机端口权限；026真实编译用例需开启integration。本轮主工作区 Fable 构建及 822 模块链接已通过（`/tmp/vibe-fs-resume-main-build.log`），完整 verification harness 为 278 通过、0 失败（`/tmp/vibe-fs-resume-harness-final.log`）。这些结果不消除上述 TODO；完整执行范围见[本轮记录](../../../proposals/archive/2026-10-03/20模块上游适配记录-2026-09-28.md)，残余扫描、跨包案例和物理证明缺口见[GAP](../../GAP.md)。

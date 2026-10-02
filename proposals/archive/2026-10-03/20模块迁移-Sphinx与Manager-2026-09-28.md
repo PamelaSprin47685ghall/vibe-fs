@@ -1,5 +1,7 @@
 # Sphinx 与 Manager 六包迁移记录
 
+> **已归档（2026-10-03）：已结束批次的历史记录。** 后续施工从[现行 TODO 总计划](../../TODO施工总计划-2026-10-03.md)接手，历史定位见[归档索引](../README.md)。下文状态与结果绑定原基线；归档不关闭尚未证明的义务，当前缺口见[GAP](../../../requirements/GAP.md)。
+
 日期：2026-09-28。工作区：`requirements-upstream/vibe-fs`，分支 `codex/requirements-upstream-remainder`。本轮从35模块PR提交后的 `83cd4bf` 出发，对照 upstream `1450f49d`；旧施工备份为 `1d7098a38f8419fa8586a6f695af61a18125f959`。
 
 本轮整理47、50—54，sphinx-v2只作为取代47的必要依赖。旧根工作区未写入，未提交、推送或执行全仓构建；公共GAP、INDEX、Surface登记与工程依赖交由主任务统一处理。

@@ -1,5 +1,7 @@
 # Sphinx Clean-Break 重写指南
 
+> **已归档（2026-10-03）：这是 2026-09-23 的设计快照，旧实施任务书不再执行。** 现行合同见[sphinx-v2 WHAT](../../../requirements/sphinx-v2/WHAT.md)和[SUPERSEDES](../../../requirements/sphinx-v2/SUPERSEDES.md)，施工从[现行 TODO 总计划](../../TODO施工总计划-2026-10-03.md)及认知与 Sphinx 分册接手；历史定位见[归档索引](../README.md)。下文“实施规范”是当时的交付性质，不具有现行规范效力，也不表示实现已完成。
+
 版本：1.0  
 编写日期：2026-09-23  
 交付性质：替代旧设计稿的实施规范，不是已完成的实现报告。  

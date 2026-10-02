@@ -28,7 +28,7 @@ WHAT 是合同。这里说明当前证据，不为恢复增加隐含规则。用
 
 这些回归调用真实 journal 结算入口，没有驱动 PluginRecoveryWiring、插件 activation 或 OS crash。crash-reconciliation-018/020 的 Load Phase 表述与 durable-events-020、host-boundary-021 的延迟激活边界仍需协调；本轮不改变激活时点和等待语义，不声称已经阻止普通执行越过未完成结算。JoinDrain 的受控 append port 仍只把实际事实交 production Fold，没有写磁盘。主动取消产生可收取 completion，ChildRunVoided 不产生 completion，二者不是同一场景。Blogger 仍在同一已打开请求的投影上追加 abandon，再证明下一请求可物化，不用空投影自证。
 
-绑定/Fission 测试会在 finally 移除自己的 resolver/cache。canonical journal JSON 是持久协议载体，不是 Fable 内部 tag/fields 对象。018 的旧 `/continue` 材料链随新版合同退役；本轮逐项覆盖迁移表在 `proposals/20模块迁移-恢复与委托-2026-09-28.md`。
+绑定/Fission 测试会在 finally 移除自己的 resolver/cache。canonical journal JSON 是持久协议载体，不是 Fable 内部 tag/fields 对象。018 的旧 `/continue` 材料链随新版合同退役；本轮逐项覆盖迁移表见[历史迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-恢复与委托-2026-09-28.md)。
 
 完整进程中断、持久事实重开、物理发送/完成提交切点见 GAP-149。33 的真实 OS crash 测试可作为相关机制证据，但不替代本包所有工具、DevOps 与 family 恢复场景。provider failure 的分类和计账归 37，已移去本包重复且不相关的断言。
 

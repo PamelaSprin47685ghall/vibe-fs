@@ -24,4 +24,4 @@
 TESTS_MJS_FILES="$(rg --files requirements/structured-workflow/tests | rg '/[0-9]{3}\.test\.mjs$' | sort | paste -sd, -)" node requirements/verification-system/tests/run.mjs
 ```
 
-[本批记录](../../../proposals/35模块PR施工记录-2026-09-28.md) 保存新基线验证范围；[GAP](../../GAP.md) 保存未闭合的证明边界。编译 fixture 是被测输入，不是另一套测试语言。
+[本批记录](../../../proposals/archive/2026-10-03/35模块PR施工记录-2026-09-28.md) 保存新基线验证范围；[GAP](../../GAP.md) 保存未闭合的证明边界。编译 fixture 是被测输入，不是另一套测试语言。

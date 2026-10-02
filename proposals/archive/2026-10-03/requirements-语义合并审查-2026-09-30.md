@@ -1,5 +1,7 @@
 # requirements/ 语义合并审查报告（2026-09-30）
 
+> **已归档（2026-10-03）：该轮审查及报告所列恢复工作已交付。** 验证只绑定原审查基线，不作为今日整仓验收。后续使用[现行 TODO 总计划](../../TODO施工总计划-2026-10-03.md)，历史材料见[归档索引](../README.md)。
+
 审查范围：我们 PR 分支的完整 requirements 版本（`f7d13d919`，PR#42+#43 链）与 upstream/master（`5321fba04`）的 227 个差异文件，参照合并前历史版本判定语义合并正确性。重点：upstream replay（Kunwei Zhang 以 `a319fe1ea`/`904bbd554` 等重写）是否丢失或削弱了我们的规范与测试。
 
 方法：三态分类（PRESENT/ABSENT/DIVERGED），聚焦 ABSENT（上游完全未采纳）与语义反向的 DIVERGED；WHAT.md 约束词强度对比；测试用例增删核对。

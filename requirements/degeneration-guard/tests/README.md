@@ -17,4 +17,4 @@
 
 007 的两项 GAP-146 反例已转正式回归：interrupt 拒绝或抛错仍保留 exact run 的已尝试记录，detector reset、其它 run 的中断及 continuation 结束都不解除同 run 至多一次限制。consume 现在等待 exact run 的 owned interrupt；返回成功才认领异常并续发，拒绝或抛错则返回 External。受控 Promise 同时证明 pending 时不续发、任务仍归属原 run，以及成功后恰好一次 continuation。等待者捕获的任务身份也是消费和失败清理的条件：DropSession 后即使同 session/run 被重新观察，旧任务的成功、拒绝或抛错都不能消费或清除新任务的 anomaly。HostTurnObserver 等待异步 cause，再等待 owned continuation；完整真实 Host 场景仍待补，不把局部证据称作 Long Stroke。
 
-运行前执行 `node scripts/build.mjs`；通过正式 runner 的 `TESTS_MJS_FILES` 选择本目录13个编号文件，并设置 `WXS_TIER_INTEGRATION=1` 执行004当前仓库派生。未启用 integration 必须报告该缺失。TODO 阻断整体验收。新基线验证范围及剩余问题见[本批记录](../../../proposals/35模块PR施工记录-2026-09-28.md)和 GAP-145—147。
+运行前执行 `node scripts/build.mjs`；通过正式 runner 的 `TESTS_MJS_FILES` 选择本目录13个编号文件，并设置 `WXS_TIER_INTEGRATION=1` 执行004当前仓库派生。未启用 integration 必须报告该缺失。TODO 阻断整体验收。新基线验证范围及剩余问题见[本批记录](../../../proposals/archive/2026-10-03/35模块PR施工记录-2026-09-28.md)和 GAP-145—147。
