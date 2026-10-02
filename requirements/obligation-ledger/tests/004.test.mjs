@@ -10,15 +10,17 @@ const obligation = await import("../../../dist/Persistence/Journal/ObligationJou
 
 const emptyProjection = () => projection.AgentProjection_empty
 
-const checkpointFact = (sessionId, toolCallId, retainCheckpoints) =>
-  new ContextFactCases(4, [{ SessionId: sessionId, ToolCallId: toolCallId, RetainCheckpoints: retainCheckpoints }])
+// context-compression-028: the fact carries only the call identity; the
+// retain depth is the fixed module constant, not per-fact data.
+const checkpointFact = (sessionId, toolCallId) =>
+  new ContextFactCases(4, [{ SessionId: sessionId, ToolCallId: toolCallId }])
 
 test('WHAT[obligation-ledger-004] TodoCheckpointCommitted cannot reconstruct or overwrite Host TodoTable contents', () => {
   // The durable projection carries no TodoTable at all: the only field the
   // checkpoint fact can touch is the compression window, and the window
-  // records call identity plus retain depth — never todo list content.
+  // records call identity only — never todo list content.
   const before = emptyProjection()
-  const folded = bridge.ContextProjectionBridge_fold(before, checkpointFact('ses-a', 'call-1', 2))
+  const folded = bridge.ContextProjectionBridge_fold(before, checkpointFact('ses-a', 'call-1'))
   assert.equal(folded.tag, 0, 'checkpoint fold is Ok')
 
   const after = folded.fields[0]
@@ -29,7 +31,11 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted cannot reconstruct or 
   assert.equal(after.TodoCheckpoints.size, 1)
   const window = [...after.TodoCheckpoints.values()][0]
   assert.equal(window.Checkpoints.head.ToolCallId, 'call-1')
-  assert.equal(window.Checkpoints.head.RetainCheckpoints, 2)
+  assert.equal(
+    Object.keys(window.Checkpoints.head).includes('RetainCheckpoints'),
+    false,
+    'the checkpoint entry carries no per-fact retain depth (K is the fixed module constant)',
+  )
   assert.equal(window.Checkpoints.tail.head, null, 'exactly one checkpoint entry')
   assert.equal(
     Object.keys(after).some((key) => /todo(?!checkpoints)/i.test(key)),
@@ -39,7 +45,7 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted cannot reconstruct or 
 
   // Replaying the same checkpoint is idempotent on the window: it cannot
   // accumulate todo content by repetition either.
-  const replayed = bridge.ContextProjectionBridge_fold(after, checkpointFact('ses-a', 'call-1', 2))
+  const replayed = bridge.ContextProjectionBridge_fold(after, checkpointFact('ses-a', 'call-1'))
   assert.equal(replayed.tag, 0)
   assert.equal(replayed.fields[0].TodoCheckpoints.size, 1)
 

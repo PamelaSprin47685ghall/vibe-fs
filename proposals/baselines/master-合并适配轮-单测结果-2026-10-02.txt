@@ -1,0 +1,12 @@
+# master 合并适配轮单测结果（2026-10-02, 合并 upstream 2564a884e 后）
+# 方法: node requirements/verification-system/tests/run.mjs (815 文件)
+# 总数: 5 项失败 = 旧基线 4 项 (concern-002 复现测试[预期红]/js-semantic-surface-002[我们测试文件的 deep-dist-import 既有债务]/requirement-system-017/structured-workflow-005) + upstream 新引入 1 项 (cognitive-workspace-007, 经 worktree 纯 upstream 验证)
+# upstream 2564a884e 基线 (worktree): 3592 passed / 3 failed (cognitive-workspace-007/requirement-system-017/structured-workflow-005)
+# upstream 修复了旧基线的 27 项 (context-compression-012/024 等)
+# 本轮适配: obligation-ledger/004 (K=3 无 RetainCheckpoints), GAP-190 融合, plugin.mjs transform 融合 (不吞错+不固定 agent)
+
+✖ WHAT[cognitive-workspace-007] no TodoSink compatibility bridge survives
+✖ WHAT[concern-routing-002] already-delivered recipients do not receive the announcement again after restart
+✖ WHAT[js-semantic-surface-002] the current semantic zone passes the implemented boundary gate
+✖ WHAT[requirement-system-017] the executable verifier scans the complete requirements tree
+✖ WHAT[structured-workflow-005] SW_005_mutable_storage_discipline_and_no_workflow_state
