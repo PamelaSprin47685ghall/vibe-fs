@@ -154,6 +154,64 @@ test('WHAT[context-compression-012] CTX_013_hard_truncation_of_an_escaped_multil
   assert.equal(parsed.new_work_to_record.length, 1)
   assert.equal(parsed.new_work_to_record[0].truncated, true)
 })
+test('WHAT[context-compression-012] actual multiline truncation retains the exact fitting prefix and accounts for the final string form', () => {
+  const source = "中文 C:\\repo\\file 'value'\n".repeat(500)
+  const suffix = `\n${toml.TruncationMarker}`
+  const messages = delta.messages([{ role: 'user', parts: [delta.text(source)] }])
+  for (const limit of [171, 256, 511]) {
+    const chunk = delta.nextChunk({ limit, cursor: origin, messages })
+    const value = parseToml(chunk.toml).new_work_to_record[0].user
+    assert.ok(value.endsWith(suffix), 'the truncation marker is exact, with no writer-added LF')
+    const prefix = value.slice(0, -suffix.length)
+    assert.ok(prefix.length > 0 && source.startsWith(prefix), 'only an unchanged source prefix is retained')
+    assert.equal(chunk.bytes, Buffer.byteLength(chunk.toml, 'utf8'))
+    assert.ok(chunk.bytes <= limit)
+    const nextItem = { ...textItem(source.slice(0, prefix.length + 1) + suffix), Truncated: true }
+    assert.ok(Buffer.byteLength(toml.render([nextItem]), 'utf8') > limit, 'the next complete character would exceed the budget')
+    assert.deepEqual(chunk.nextCursor, { turn: 1, part: 0 })
+  }
+})
+for (const limit of [115, 120, 171]) {
+  test(`WHAT[context-compression-012] truncation at ${limit} bytes retains only complete emoji code points`, () => {
+    const source = '😀'.repeat(100)
+    const suffix = `\n${toml.TruncationMarker}`
+    const messages = delta.messages([{ role: 'user', parts: [delta.text(source)] }])
+    const chunk = delta.nextChunk({ limit, cursor: origin, messages })
+    const value = parseToml(chunk.toml).new_work_to_record[0].user
+    const markerStart = value.indexOf(suffix)
+    assert.ok(markerStart >= 0)
+    const prefix = value.slice(0, markerStart)
+    assert.match(prefix, /^(?:😀)*$/, 'a retained prefix cannot end halfway through a surrogate pair')
+    assert.equal(value, prefix + suffix, 'the writer preserves the exact retained data and marker')
+    assert.equal(parseToml(Buffer.from(chunk.toml, 'utf8').toString('utf8')).new_work_to_record[0].user, value)
+    assert.equal(chunk.bytes, Buffer.byteLength(chunk.toml, 'utf8'))
+    assert.ok(chunk.bytes <= limit)
+    const nextItem = { ...textItem(prefix + '😀' + suffix), Truncated: true }
+    assert.ok(Buffer.byteLength(toml.render([nextItem]), 'utf8') > limit, 'the next complete code point cannot fit')
+    assert.deepEqual(chunk.nextCursor, { turn: 1, part: 0 })
+  })
+}
+test('WHAT[context-compression-012] truncation preserves CRLF and lone CR from the original source prefix', () => {
+  const source = 'first\r\nsecond\rlast\r\n'.repeat(100)
+  const suffix = `\n${toml.TruncationMarker}`
+  const messages = delta.messages([{ role: 'user', parts: [delta.text(source)] }])
+  for (const limit of [171, 256, 511]) {
+    const chunk = delta.nextChunk({ limit, cursor: origin, messages })
+    const value = parseToml(chunk.toml).new_work_to_record[0].user
+    const markerStart = value.indexOf(suffix)
+    assert.ok(markerStart >= 0)
+    const prefix = value.slice(0, markerStart)
+    assert.ok(prefix.includes('\r\n') && prefix.includes('second\r'), 'both original newline forms survive')
+    assert.ok(source.startsWith(prefix), 'truncation retains an unchanged source prefix')
+    assert.equal(value, prefix + suffix)
+    assert.equal(chunk.bytes, Buffer.byteLength(chunk.toml, 'utf8'))
+    assert.ok(chunk.bytes <= limit)
+    const nextItem = { ...textItem(source.slice(0, prefix.length + 1) + suffix), Truncated: true }
+    assert.ok(Buffer.byteLength(toml.render([nextItem]), 'utf8') > limit, 'the next source character cannot fit')
+  }
+  const complete = delta.nextChunk({ limit: 8192, cursor: origin, messages })
+  assert.equal(parseToml(complete.toml).new_work_to_record[0].user, source)
+})
 test('WHAT[context-compression-012] CTX_013_an_omission_marker_is_never_truncated', () => {
   // It has no body to cut. A limit it cannot meet means the limit is below the
   // fixed item scaffolding — a configuration error, not something to repair by
@@ -240,15 +298,15 @@ test('WHAT[context-compression-012] CTX_013_canonical_args_pass_through_without_
 
   assert.equal(chunk.toml.includes('arguments = "{\\"zebra\\":1,\\"alpha\\":2}"'), true, 'order preserved as supplied')
 
-  // A multi-line body takes the literal form, where the bytes appear verbatim —
-  // the same guarantee without the escaping.
+  // A newline-terminated body uses the literal form without altering the arguments.
   const multiline = delta.messages([
-    { role: 'assistant', parts: [delta.toolCall('edit', '{\n  "zebra": 1,\n  "alpha": 2\n}')] },
+    { role: 'assistant', parts: [delta.toolCall('edit', '{\n  "zebra": 1,\n  "alpha": 2\n}\n')] },
   ])
 
   const literal = delta.nextChunk({ limit: 4096, cursor: origin, messages: multiline })
   assert.equal(literal.toml.includes('"zebra": 1'), true)
   assert.equal(literal.toml.indexOf('zebra') < literal.toml.indexOf('alpha'), true)
+  assert.equal(parseToml(literal.toml).new_work_to_record[0].arguments, '{\n  "zebra": 1,\n  "alpha": 2\n}\n')
 })
 }
 

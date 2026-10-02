@@ -12,3 +12,4 @@ module SyntheticTomlSurface =
     val renderKey: name: string -> string
     val renderDocument: instructions: string array -> body: string array -> string
     val byteCount: text: string -> int
+    val renderStringByteCountPrefix: text: string -> length: int -> suffix: string -> int

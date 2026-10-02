@@ -240,17 +240,10 @@ export function auditPayload(document, { origin = 'payload' } = {}) {
 
 /**
  * Round-trip one rendered string value: parse it back and compare.
- *
- * The expectation follows the renderer's own convention rather than predicting it — a multi-line
- * literal carries the newline before its closing delimiter, a single-line basic string carries none.
- * Which form an input takes is the writer's decision and is pinned by its own tests; this asserts only
- * that the value survived whichever was chosen.
  */
 export function roundTripValue(rendered, original) {
   const parsed = parseToml(`x = ${rendered}`).x;
-  const expected = rendered.startsWith("'''") ? `${original}\n` : original;
-
-  return parsed === expected
+  return parsed === original
     ? null
-    : `round trip changed the value: expected ${JSON.stringify(expected)}, got ${JSON.stringify(parsed)}`;
+    : `round trip changed the value: expected ${JSON.stringify(original)}, got ${JSON.stringify(parsed)}`;
 }

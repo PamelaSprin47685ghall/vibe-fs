@@ -90,7 +90,7 @@
 | GAP-068 | participant-identity-002/003/004/005/008/010 | PARTIAL | 保留 durable 身份与历史角色隔离回归；原子写失败、实际执行切换及全部共享解码调用者仍缺证。历史兼容不允许活跃准入复活旧身份。 |
 | GAP-079 | participant-horizon-001/002/004/006—008/011/014/015 | PARTIAL | 有真实名册、fork 拒绝、热启动与结果渲染；完整 provider 可见性、最新 Blob 读取和多 child 生命周期待证。已知信息省略与最新记录交付的范围待审。 |
 | GAP-080 | participant-horizon-011 | PARTIAL | 旧真实取消场景名册仍列未返回后果，但后续 Join 未结束；保留最终领取/Retired 的 TODO。不得扩大超时或把取消前后名册正确当作闭环。 |
-| GAP-081 | participant-horizon-013；provider-projection-008 | PARTIAL | 热启动多行正文经 SyntheticToml 后多出 LF；无尾 LF/有尾 LF 均有实际反例。公共表示所有者需统一值保真与布局，不在调用方 trim 掩盖。 |
+| GAP-081 | participant-horizon-013；provider-projection-008/012；process-execution-014 | CLOSED | 公共SyntheticToml保留原始值与键，仅原值以LF结束且literal-safe时使用literal，否则basic转义；布局仍为LF。实际warm-start与执行输出的无尾/多尾LF、CRLF/裸CR、引号及控制符先红后绿，ARCH-010不再把预期改成原值加LF。prefix字节计数与真实渲染逐项对照，含代理对拼接；实际Delta保留原始换行且不截断合法代理对。隔离Fable构建及13个关键文件正式回归205 passed、0 failed、5个其余TODO保留。 |
 | GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 保留编码、摘要、真实输入不变和组合用例；011部分证明：HostDigest.sha256Hex与参考哈希一致，timestamp/durationMs/cost/requestId不进语义投影、不影响digest（tests/011）。生产组合实际注入该哈希的接线观察、在线/重放全链、表示不取得权威及统一I/O所有权仍待证。 |
 | GAP-083 | repository-investigation-001—006/009 | OPEN | RoleLaw 词形不能证明 Agent 取证、推理、只读调查或停止时机；需要实际任务和可复核轨迹。局部热启动数据/指令隔离不代替这些行为。 |
 | GAP-084 | repository-investigation-007/008 | PARTIAL | 完整关键词与无跨调用缓存有局部证据；热启动任务字节被添加前缀的反例保留。原始任务保真及容量规则范围仍待统一。 |
