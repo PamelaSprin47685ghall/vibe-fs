@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — 修复重启后空闲伴随句柄阻塞 Manager Join
+
+- 现场根因：进程重启后，Manager 经 `horizon` 重新收养持久化的空闲 `devops` 伴随句柄时，`syncAdoptDevOps → AdoptExisting → runtime.Restore` 会新建一个 completion cell 打开、CTS 未取消的 `ChildRun`，使 `ActiveRunCount ≥ 1`，即使该句柄当前没有任何在跑任务。`HostForkJoin.parentHasJoinWork` 以 `runtime.Runtime.ActiveRunCount > 0` 短路判为有工作，Manager 的无超时 `join` 于是永久等待一个永远不会完成的幽灵运行，整条主会话挂起。
+- 修复：`parentHasJoinWork` 只在**无 journal 的纯 PTY 模式**才以进程内 `ActiveRunCount` 作为 agent 工作信号；有 journal 时真实 Host agent 运行由 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 由 journal 投影可见，重启后重新收养的空闲伴随句柄只注册身份、不误判为有工作。真实在跑的 agent 仍会经 `PendingRuns` 正确阻塞 join。
+- 回归：新增 `RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_hang`，重开同一 durable journal 后收养空闲 devops 再 `join` 必须返回 `NothingToJoin`。修复前该测试 `JOIN_HANG_DETECTED` 失败，修复后通过；完整 delegation 套件 71 通过 / 0 失败 / 22 TODO。
+
 ## Unreleased — 修复只读同伴在空正文提前停止时导致的决策挂起
 
 - 现场根因：子代理（如 gate-scout）在委托只读同伴（Strength Replica）调查时，若模型在最后回合直接以 `finish='stop'` 结束且输出正文为空（仅有 step-start/step-finish 等骨架），OpenCode 的分类器会将其判定为需要交互修复的 `TurnNeedsContinuation EmptyFormalText`。

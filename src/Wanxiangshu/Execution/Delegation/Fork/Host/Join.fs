@@ -262,11 +262,10 @@ module HostForkJoin =
 
     let private parentHasJoinWork (runtime: HostForkRuntime) =
         runtime.HasBufferedJoinItems
-        || runtime.Runtime.ActiveRunCount > 0
         || runtime.Runtime.PendingCompletionCount > 0
         || lock runtime.Gate (fun () -> runtime.PendingRuns.Count > 0 || runtime.PtyRuns.Count > 0)
         || match runtime.Journal with
-           | None -> false
+           | None -> runtime.Runtime.ActiveRunCount > 0
            | Some durable -> journalHasActiveJoinHandles runtime durable
 
     let private raceJournalArms

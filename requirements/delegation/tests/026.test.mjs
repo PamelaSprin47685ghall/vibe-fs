@@ -153,6 +153,41 @@ test('WHAT[delegation-026] IDLE_ROAD_DEVOPS_COMPANION_does_not_block_join_with_h
     rmSync(directory, { recursive: true, force: true })
   }
 })
+test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_hang', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-restart-idle-devops-'))
+  const owner = 'manager-restart-idle-devops'
+  const first = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    // 1. First process binds the durable devops handle (Active in the journal).
+    const horizon1 = await forkTool.executeHorizon(first, owner)
+    assert.match(horizon1, /devops/)
+    assert.equal(forkTool.durableLifecycleByname(first, owner, 'devops'), 'Active')
+
+    // 2. Simulate an OS restart: dispose and reopen the same durable journal.
+    forkTool.disposeRuntime(first)
+    const restarted = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+    try {
+      // 3. Horizon on the fresh runtime re-adopts the durable Active devops handle
+      //    (syncAdoptDevOps → AdoptExisting → Restore). devops stays idle: no prompt,
+      //    no pending host run, nothing joinable in the journal.
+      const horizon2 = await forkTool.executeHorizon(restarted, owner)
+      assert.match(horizon2, /devops/)
+      assert.equal(forkTool.durableLifecycleByname(restarted, owner, 'devops'), 'Active')
+
+      // 4. Join must NOT hang on the restored-but-idle devops handle.
+      const joinPromise = forkTool.executeJoin(restarted, owner)
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
+      const joinResult = await Promise.race([joinPromise, timeout])
+      assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+    } finally {
+      forkTool.disposeRuntime(restarted)
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 }
 
 test.todo('WHAT[delegation-026] actual admission and checkpoint fault cuts preserve exact durable claim and effect truth without replay or durable program counters (GAP-153)')
