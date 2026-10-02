@@ -207,7 +207,7 @@ integrationTest('WHAT[repository-programming-020] AGENT_017_mv_missing_source_re
       { source: join(directory, 'nope.txt'), destination: join(directory, 'x.txt') },
       { sessionID: 'engineer-mv-missing', agent: 'engineer' },
     )
-    assert.match(text, /No such file or directory/)
+    assert.match(text, /No such file or directory|没有那个文件或目录/)
     assert.equal(parseToml(text).error, undefined)
   })
 })
@@ -251,7 +251,7 @@ integrationTest('WHAT[repository-programming-020] AGENT_018_rm_refuses_a_non_emp
 
     const text = await hooks.tool.rm.execute({ path }, { sessionID: 'engineer-rm-nonempty', agent: 'engineer' })
 
-    assert.match(text, /directory not empty/)
+    assert.match(text, /directory not empty|目录非空/)
     assert.equal(parseToml(text).error, undefined)
     assert.equal(isDirectory(path), true, 'non-empty directory must survive rm')
     assert.equal(existsSync(join(path, 'inner.txt')), true, 'contents must survive rm')
@@ -265,7 +265,7 @@ integrationTest('WHAT[repository-programming-020] AGENT_018_rm_missing_path_retu
       { path: join(directory, 'nope.txt') },
       { sessionID: 'engineer-rm-missing', agent: 'engineer' },
     )
-    assert.match(text, /No such file or directory/)
+    assert.match(text, /No such file or directory|没有那个文件或目录/)
     assert.equal(parseToml(text).error, undefined)
   })
 })
@@ -279,11 +279,11 @@ integrationTest('WHAT[repository-programming-020] AGENT_016_mv_and_rm_are_denied
       { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
       context,
     )
-    assert.match(mvResult, /mv is not available to Manager\./)
+    assert.match(mvResult, /mv is not available to Manager\.|mv 对 Manager 不可用。/)
     assert.equal(parseToml(mvResult).error, undefined)
 
     const rmResult = await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context)
-    assert.match(rmResult, /rm is not available to Manager\./)
+    assert.match(rmResult, /rm is not available to Manager\.|rm 对 Manager 不可用。/)
     assert.equal(parseToml(rmResult).error, undefined)
   })
 })
@@ -296,11 +296,11 @@ integrationTest('WHAT[repository-programming-020] AGENT_016_mv_and_rm_are_denied
       { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
       context,
     )
-    assert.match(mvResult, /This tool is unavailable until the caller's authority is established\./)
+    assert.match(mvResult, /This tool is unavailable until the caller's authority is established\.|在调用方权威确立之前，此工具不可用。/)
     assert.equal(parseToml(mvResult).error, undefined)
 
     const rmResult = await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context)
-    assert.match(rmResult, /This tool is unavailable until the caller's authority is established\./)
+    assert.match(rmResult, /This tool is unavailable until the caller's authority is established\.|在调用方权威确立之前，此工具不可用。/)
     assert.equal(parseToml(rmResult).error, undefined)
   })
 })

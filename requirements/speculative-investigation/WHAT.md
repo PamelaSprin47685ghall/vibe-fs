@@ -214,8 +214,8 @@ E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧
 2. **逐工具判定（classifyTool）**：
    工具策略采用严格的三态联合类型，禁止任何形式的前缀匹配（如 `js-` 前缀）或名称模糊匹配（如包含 read/search）：
    - `EstimateAfterCall`（参与工具，共 12 个）：`read`、`glob`、`grep`、`js-manager`、`js-engineer`、`js-devops`、`edit`、`write`、`mv`、`rm`、`fetch`、`run`。调用完成后允许主模型提供后续只读查证估计；
-   - `NoEstimate`（不参与工具，显式白名单共 28 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`suicide`、`fission`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`skill`、`sphinx`、`assume`、`enough`、`abandon`、`defer`、`subscribe`、`publish`、`celebrate`、`regret`、`chronicle`、`js-bookkeeper`、`bash-honeypot`、`invalid`、`js-orchestrator`、`js-blogger`。本协议不向其装饰任何字段与说明；
-   - `Unreviewed`（未判定工具）：所有不在上述 40 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
+   - `NoEstimate`（不参与工具，显式白名单共 29 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`suicide`、`fission`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`skill`、`todowrite`、`sphinx`、`assume`、`enough`、`abandon`、`defer`、`subscribe`、`publish`、`celebrate`、`regret`、`chronicle`、`js-bookkeeper`、`bash-honeypot`、`invalid`、`js-orchestrator`、`js-blogger`。本协议不向其装饰任何字段与说明；
+   - `Unreviewed`（未判定工具）：所有不在上述 41 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
 
 3. **入参容器与协议混合排斥**：
    - 参与工具的参数容器必须是普通非空、非数组的 JavaScript 对象（`isPlainObject`），传入 `null`、`undefined`、数字、字符串或数组等非普通对象一律拒绝；
@@ -253,3 +253,22 @@ E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧
 
 9. **已知工具差集清点与未判定候选显式登记**：
    系统通过机械方式清点仓库已知工具名权威来源（`StaticTools.knownToolNames`）与 `classifyTool` 已判定工具名单的差集。任何未判定工具必须显式可见并登记为待审阅候选；门禁严禁 fail-open（空差集无条件放行通过），亦不得在存在差集时未经登记无条件失败，防止新工具加入仓库时通过“未知默认不加”而静默逃避协议审阅。
+
+## [020] 主副本双射恢复：骨架保序、言语还原与前缀保真
+
+常驻副本与主人之间的消息双向同步及恢复重建由纯逻辑双射机制（`TwinBijection` / `TwinBijectionSurface`）严格保证，确保在追加式增长过程中 provider 侧的前缀缓存有效复用，并在恢复投影时维系严格的因果与内容不变性：
+
+1. **骨架与主人保序（preservesOwnerOrder）**：
+   主人消息序列构成双向同步的骨架。在恢复（restore）重建生成的请求序列中，主人原始工具交换（tool-call 与 tool-result）的相对顺序与内容必须严格完整保留，不发生重排、置换或丢失。
+
+2. **言语还原不漏不造（dropsNoSpeech 与 introducesNothing）**：
+   副本自身在查证过程中产生的纯言语消息（包含 text 与 reasoning 类型的部件）必须被完备恢复到重建序列中，绝不丢失任何副本言语；同时，恢复过程除将副本言语归位到记录的间隙之外，严禁凭空构造或捏造任何未曾发生的额外消息或部件。
+
+3. **间隙因果锚定**：
+   在某一间隙（gap）内产生的副本言语消息，在恢复后必须确定性锚定在对应主人工具交换之前，保持副本调查先于后续主人决策的严格因果先后关系。
+
+4. **追加式增长前缀保真（extensionIsPrefix）**：
+   常驻会话随主人演进而只增不替换。当主人与副本历史仅发生追加式扩展（追加新的主人工具交换、副本言语或查证调用）时，后一轮次恢复出的请求消息序列必须严格以先前半程恢复出的请求消息序列为其前缀（Prefix），保证 provider 侧能够逐字节复用既有的 prompt 缓存。
+
+5. **非平衡历史容错**：
+   当副本历史与主人历史出现交换数量不对齐（如副本工具交换多于主人已记录交换）的非平衡状态时，恢复逻辑仍必须稳定产出合法的可用请求序列，且同样严格满足骨架保序与言语不丢失，不得崩溃或抛出异常。

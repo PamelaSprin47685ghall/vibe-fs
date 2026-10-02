@@ -24,8 +24,13 @@ integrationTest('WHAT[action-affordance-014] assume commits without echoing the 
       { sessionID, agent: 'engineer', callID: 'assume-1', messageID: 'message-assume-1' },
     )
 
-    assert.equal(result, 'Committed. Do not reopen the judgment merely because of hesitation without new information.')
-    assert.equal(result.includes(assumption), false)
+    // The fixed prompt is rendered in the session's bound language; the alternation pins the
+    // whole string instead of merely checking that some answer came back.
+    assert.match(
+      result,
+      /^已笃定，不再因为没有信息增量的犹豫反复改判。$|^Committed\. Do not reopen the judgment merely because of hesitation without new information\.$/,
+    )
+    assert.equal(result.includes(assumption), false, 'the committed prompt must not echo the assumption')
   })
 })
 

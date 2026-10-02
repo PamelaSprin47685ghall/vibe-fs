@@ -6,8 +6,9 @@ import test from 'node:test'
 const root = process.cwd()
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[cognitive-workspace-002] assume exposes no canvas or todo protocol in production source', () => {
+test('WHAT[cognitive-workspace-006] compression checkpoint belongs to todowrite, not assume', () => {
+  const facts = read('src/Wanxiangshu/Context/Companion/Facts.fs')
   const assume = read('src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs')
-  assert.match(assume, /"assumption"/)
-  assert.doesNotMatch(assume, /ArgUpdate|ArgTodos|jqJson|CognitiveRuntime|TodoSink/)
+  assert.match(facts, /TodoCheckpointCommitted/)
+  assert.doesNotMatch(assume, /TodoCheckpointCommitted|Context\.Prefix|PhaseWindow/)
 })

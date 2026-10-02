@@ -97,7 +97,11 @@ module StrengthProjectionIntent =
             let calls =
                 exchanges
                 |> List.map (fun (callId, exchange) ->
-                    ProviderProjection.WireToolCall(callId, displayName exchange.ToolName, exchange.CanonicalArguments))
+                    ProviderProjection.WireToolCall(
+                        callId,
+                        displayName exchange.ToolName,
+                        exchange.CanonicalArguments
+                    ))
 
             let results =
                 exchanges

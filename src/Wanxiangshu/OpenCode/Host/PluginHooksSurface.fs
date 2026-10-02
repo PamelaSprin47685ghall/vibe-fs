@@ -194,6 +194,9 @@ module PluginHooksSurface =
     [<Emit("Boolean($0 && typeof $0 === 'object' && !Array.isArray($0))")>]
     let private isPlainObject (value: obj) : bool = jsNative
 
+    [<Emit("typeof $0 === 'number' && $0 === 0")>]
+    let private isNumberZero (value: obj) : bool = jsNative
+
     [<Emit("Array.prototype.slice.call(arguments)")>]
     let private getJsArguments () : obj array = jsNative
 
@@ -201,31 +204,34 @@ module PluginHooksSurface =
     /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
     let readonlyDelegationSelfNoteOf (arguments: obj) : obj =
         let jsArgs = getJsArguments ()
-        let target =
-            if jsArgs.Length = 1 && isPlainObject jsArgs[0] then
-                jsArgs[0]
-            elif jsArgs.Length = 1 then
-                createObj [ "estimated_readonly_rounds", jsArgs[0] ]
-            else
-                createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
 
-        match InvestigationEstimateContract.parseParticipatingArguments target with
-        | Ok (rounds, _) ->
-            let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
-            let noteVal =
-                if rawRounds = 0 then
-                    null
-                elif hasOwn target "self_note" then
-                    target?self_note
-                else
-                    null
-            box
-                {| ok = true
-                   note = noteVal |}
-        | Error err ->
+        if jsArgs.Length = 1 && isNumberZero jsArgs[0] then
+            box {| ok = true; note = null |}
+        elif jsArgs.Length = 1 && not (isPlainObject jsArgs[0]) then
             box
                 {| ok = false
-                   error = InvestigationEstimateContract.errorCode err |}
+                   error = "InvalidArgumentObject" |}
+        else
+            let target =
+                if jsArgs.Length = 1 then
+                    jsArgs[0]
+                else
+                    createObj [ "estimated_readonly_rounds", jsArgs[0]; "self_note", jsArgs[1] ]
+
+            match InvestigationEstimateContract.parseParticipatingArguments target with
+            | Ok(rounds, _) ->
+                let rawRounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
+
+                let noteVal =
+                    if rawRounds = 0 then null
+                    elif hasOwn target "self_note" then target?self_note
+                    else null
+
+                box {| ok = true; note = noteVal |}
+            | Error err ->
+                box
+                    {| ok = false
+                       error = InvestigationEstimateContract.errorCode err |}
 
     /// Production tool.execute.before calls the same hide: the business
     /// argument view drops both protocol fields while provider evidence keeps

@@ -40,5 +40,11 @@ module FileMutationSurface =
     let description (handle: obj) : string =
         (unbox<FileMutationHandle> handle).Spec.Description
 
+    /// Success carries structured data fields (`removed`, `moved`).
+    ///
+    /// A refusal carries the localized prose as its instruction plus a stable
+    /// `code` field naming the reason (e.g. `tool/rm/directory-not-empty`).
+    /// That code is the contract: consumers classify failures by it rather than
+    /// by matching prose, which changes with the provider language.
     let execute (handle: obj) (args: obj) (context: obj) : Task<obj> =
         invokeRegistered (unbox<FileMutationHandle> handle).Registered args context

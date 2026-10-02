@@ -25,6 +25,16 @@ module ProviderSystemTransform =
         let c = canonical text
         c = expectedZh || c = expectedEn
 
+    let private updateConstraintLine
+        (currentSystem: string array)
+        (isConstraintLine: string -> bool)
+        (nextConstraint: string)
+        =
+        currentSystem
+        |> Array.iteri (fun index text ->
+            if isConstraintLine text then
+                currentSystem.[index] <- nextConstraint)
+
     let private applyReplicaConstraint (lang: ProviderLanguage) (currentSystem: string array) =
         let zhConstraint = replicaConstraintFor ProviderLanguage.SimplifiedChinese
         let enConstraint = replicaConstraintFor ProviderLanguage.English
@@ -40,10 +50,7 @@ module ProviderSystemTransform =
         let hasConstraint = currentSystem |> Array.exists isConstraintLine
 
         if hasConstraint then
-            currentSystem
-            |> Array.iteri (fun index text ->
-                if isConstraintLine text then
-                    currentSystem.[index] <- nextConstraint)
+            updateConstraintLine currentSystem isConstraintLine nextConstraint
         else
             emitJsExpr (currentSystem, nextConstraint) "$0.push($1)" |> ignore
 

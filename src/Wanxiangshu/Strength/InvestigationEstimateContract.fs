@@ -221,6 +221,29 @@ module InvestigationEstimateContract =
         | EstimateArgumentError.MixedProtocolFields -> "MixedProtocolFields"
         | EstimateArgumentError.InvalidArgumentObject -> "InvalidArgumentObject"
 
+    /// `errorCode` 的反向投影（WHAT[016] §6）：机器可判的稳定错误码回到唯一的
+    /// 分类，使「码 → 分类 → 文案」成为一条可观察链。码的字面量与 `errorCode`
+    /// 同一份集合，本函数不持有、不复制任何文案。
+    let tryFromCode (code: string) : EstimateArgumentError option =
+        match code with
+        | "MissingEstimate" -> Some EstimateArgumentError.MissingEstimate
+        | "WrongNumberType" -> Some EstimateArgumentError.WrongNumberType
+        | "InvalidRange" -> Some EstimateArgumentError.InvalidRange
+        | "NotePresentWhenZero" -> Some EstimateArgumentError.NotePresentWhenZero
+        | "MissingOrBlankNoteWhenPositive" -> Some EstimateArgumentError.MissingOrBlankNoteWhenPositive
+        | "NoteNotString" -> Some EstimateArgumentError.NoteNotString
+        | "MixedProtocolFields" -> Some EstimateArgumentError.MixedProtocolFields
+        | "InvalidArgumentObject" -> Some EstimateArgumentError.InvalidArgumentObject
+        | _ -> None
+
+    /// 与 `tryFromCode` 成对：未知码按 `ProviderLanguage.parse` 的既有语义
+    /// 直接抛错，绝不静默降级为任何默认分类。
+    let parseFromCode (code: string) : EstimateArgumentError =
+        match tryFromCode code with
+        | Some error -> error
+        | None ->
+            raise (System.ArgumentException(sprintf "unrecognized EstimateArgumentError code: %s (WHAT[016])" code))
+
     let policyCode (policy: InvestigationToolPolicy) : string =
         match policy with
         | InvestigationToolPolicy.EstimateAfterCall -> "EstimateAfterCall"

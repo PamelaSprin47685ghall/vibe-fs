@@ -57,7 +57,7 @@ const REQUEST_KIND_SWITCHED = body(
 // companion frame may disappear (context-compression-019 / GAP-022). Structural only:
 // typed authority-revision retention is proved by the unit projection tests and the
 // long-stroke root-only oracle.
-const GUIDANCE_SUFFIX = '\0\uFEFF<skill_content>\n# # Wait-cost calibration: priced interval.\n</skill_content>';
+const GUIDANCE_SUFFIX = '\0\uFEFF<system>\n# # Wait-cost calibration: priced interval.\n</system>';
 const MANAGER_TRAFFIC = [
   user(`Round 1${GUIDANCE_SUFFIX}`),
   assistant('assessment evidence'),

@@ -40,7 +40,7 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 ## [010] guidance 原位、原字节 replay
 
-所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 skill_content 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
+所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
 
 同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。ContextReanchored 退休旧 occurrence 的可见性：旧 occurrence 不再呈现，新 occurrence 以新序号追加到新的载体；新 horizon 下同一位置承载新字节属于退休而非改写，不构成对未重锚回放律的违反。
 

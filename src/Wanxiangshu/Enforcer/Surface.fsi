@@ -10,6 +10,13 @@ open Wanxiangshu.Resources
 module EnforcerSurface =
 
     val rules: unit -> obj array
+
+    /// Same packaged English rulebook load as `rules`, projected as
+    /// `{ ok: true, value }` / `{ ok: false, error }`. Callers and semantic tests
+    /// need to branch on a machine-readable cause rather than match exception
+    /// prose, while the rulebook load itself stays a single decision in
+    /// `rules`: `tryRules` only changes how a failure leaves the boundary.
+    val tryRules: unit -> obj
     val ruleCount: unit -> int
     val fieldNames: unit -> string array
     val chronicleExecutionContract: bool -> obj

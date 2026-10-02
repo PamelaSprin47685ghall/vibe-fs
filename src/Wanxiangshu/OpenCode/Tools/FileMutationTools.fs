@@ -56,11 +56,14 @@ module FileMutationTools =
 
     let private tString = ToolHostCodec.TString
 
-    let private error (message: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ message ] []
-
+    /// A refusal keeps the localized prose as its instruction and carries the
+    /// resource key as a stable `code` field. Callers must classify the
+    /// failure by that code: the prose follows the provider language, the
+    /// resource key does not, so matching prose would bind the contract to one
+    /// language. The key is both the localization lookup and the code — there
+    /// is no second vocabulary to keep in step.
     let private consequence lang path subs =
-        error (ProviderProse.render lang path subs)
+        ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render lang path subs ] [ "code", tString path ]
 
     let private directoryFlag (stat: obj) =
         if isNull stat || isNull stat?isDirectory then

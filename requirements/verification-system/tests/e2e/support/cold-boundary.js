@@ -144,7 +144,7 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 
 const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
-// The Host appends each guidance occurrence — a `<skill_content>` skill block or an
+// The Host appends each guidance occurrence — a `<system>` block or an
 // Enforcer tip — as a `\0\uFEFF`-separated suffix to the request's terminal part (a user
 // message or the last completed tool result; `cursorGuidanceSeparator` in
 // PairProgrammingThoughtTransform.fs). A successor iteration retires such an occurrence

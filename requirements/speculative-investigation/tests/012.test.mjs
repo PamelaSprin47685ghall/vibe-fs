@@ -6,7 +6,6 @@ const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 const Projection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
-const InvestigationEstimateContract = await import("../../../dist/Strength/InvestigationEstimateContract.js");
 const PluginHooksSurface = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
 
 const H = (text) => `H(${text})`
@@ -126,13 +125,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
   // - When estimated_readonly_rounds > 0: self_note property MUST be present with non-blank string.
   //   Missing note or blank/empty note is MissingOrBlankNoteWhenPositive; non-string note is NoteNotString.
 
-  // 1. Zero rounds: omitting self_note succeeds (returns rounds 0 and undefined note)
-  const resZero = InvestigationEstimateContract.parseParticipatingArguments({
-    estimated_readonly_rounds: 0,
-  })
-  assert.equal(resZero.tag, 0, '0 rounds omitting self_note must succeed')
-  assert.equal(resZero.fields[0][1], undefined, 'parsed note must be undefined/None')
-
+  // 1. Zero rounds: omitting self_note succeeds (returns rounds 0 and null note)
   const helperZero = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 0,
   })
@@ -140,11 +133,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
 
   // 2. Zero rounds with self_note present: rejected as NotePresentWhenZero (tag 3)
   for (const badNote of ['', '   ', null, '我自己确认一下']) {
-    const res = InvestigationEstimateContract.parseParticipatingArguments({
-      estimated_readonly_rounds: 0,
-      self_note: badNote,
-    })
-    assert.equal(res.tag, 1, `0 rounds with self_note=${JSON.stringify(badNote)} must fail`)
     const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 0,
       self_note: badNote,
@@ -158,13 +146,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     'the model checks the lock file date',
     '  leading and trailing whitespace preserved  ',
   ]) {
-    const res = InvestigationEstimateContract.parseParticipatingArguments({
-      estimated_readonly_rounds: 2,
-      self_note: goodNote,
-    })
-    assert.equal(res.tag, 0, `positive rounds with note "${goodNote}" must succeed`)
-    assert.equal(res.fields[0][1], goodNote, 'original note string must be preserved verbatim')
-
     const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 2,
       self_note: goodNote,
@@ -174,10 +155,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
 
   // 4. Positive rounds with missing or blank self_note: rejected as MissingOrBlankNoteWhenPositive (tag 4)
   // 4a. Missing self_note
-  const resMissing = InvestigationEstimateContract.parseParticipatingArguments({
-    estimated_readonly_rounds: 2,
-  })
-  assert.equal(resMissing.tag, 1, 'positive rounds missing self_note must fail')
   assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
   }), {
@@ -187,11 +164,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
 
   // 4b. Blank or empty self_note
   for (const blankNote of ['', '   ', '  \t\n  ']) {
-    const res = InvestigationEstimateContract.parseParticipatingArguments({
-      estimated_readonly_rounds: 2,
-      self_note: blankNote,
-    })
-    assert.equal(res.tag, 1, `positive rounds with blank self_note=${JSON.stringify(blankNote)} must fail`)
     assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 2,
       self_note: blankNote,
@@ -203,11 +175,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
 
   // 5. Positive rounds with non-string self_note: rejected as NoteNotString (tag 5)
   for (const nonString of [123, true, null, { note: 'obj' }, ['arr']]) {
-    const res = InvestigationEstimateContract.parseParticipatingArguments({
-      estimated_readonly_rounds: 2,
-      self_note: nonString,
-    })
-    assert.equal(res.tag, 1, `positive rounds with non-string self_note=${JSON.stringify(nonString)} must fail`)
     assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 2,
       self_note: nonString,
@@ -222,8 +189,6 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     { delegate_readonly_rounds: 2, self_note: 'note' },
     { estimated_readonly_rounds: 2, delegate_readonly_rounds: 2, self_note: 'note' },
   ]) {
-    const res = InvestigationEstimateContract.parseParticipatingArguments(mixedArgs)
-    assert.equal(res.tag, 1, 'mixing legacy field delegate_readonly_rounds must fail')
     const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf(mixedArgs)
     assert.deepEqual(helperRes, { ok: false, error: 'MixedProtocolFields' })
   }

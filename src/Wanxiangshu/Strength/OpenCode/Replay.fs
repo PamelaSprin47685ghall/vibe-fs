@@ -131,7 +131,8 @@ module StrengthReplay =
 
         match strengthDurability with
         | None -> Task.FromResult([])
-        | Some durability -> plansOrFailClosed failClosed (replayWithDurability journal durability ownerRole sessionId outObj)
+        | Some durability ->
+            plansOrFailClosed failClosed (replayWithDurability journal durability ownerRole sessionId outObj)
 
     /// Replay durable Promoted frames before XTrace. Returns plans that still
     /// need Promoted→Traced close after capture (raw-replayed only).
@@ -146,7 +147,8 @@ module StrengthReplay =
         task {
             match projectionSessionIdOpt with
             | Some sessionId ->
-                return! applyForSession journal strengthDurability strengthFailFuse (ownerRole sessionId) sessionId outObj
+                return!
+                    applyForSession journal strengthDurability strengthFailFuse (ownerRole sessionId) sessionId outObj
             | None -> return []
         }
 

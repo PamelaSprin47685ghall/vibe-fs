@@ -75,8 +75,7 @@ type CompanionLeaseRuntime(sessions: ISessionHostPort, registry: AttachmentLease
                                       AttachmentLeaseCore.Child.Title = child.Title })
                             )
                     | Error error, _
-                    | _, Error error ->
-                        return Error(sprintf "Cannot recover companion satellite: %s" error)
+                    | _, Error error -> return Error(sprintf "Cannot recover companion satellite: %s" error)
                 }
           AttachmentLeaseCore.Operations.CreateChild =
             fun ownerText _agent directory ->
@@ -91,11 +90,10 @@ type CompanionLeaseRuntime(sessions: ISessionHostPort, registry: AttachmentLease
 
                     return created |> Result.map SessionId.value
                 }
-          AttachmentLeaseCore.Operations.AbortChild =
-            fun child -> sessions.AbortSession(SessionId.create child)
+          AttachmentLeaseCore.Operations.AbortChild = fun child -> sessions.AbortSession(SessionId.create child)
           AttachmentLeaseCore.Operations.Link =
             fun owner child agent -> spec.Link (SessionId.create owner) (SessionId.create child) agent
-          AttachmentLeaseCore.Operations.Close = fun owner -> spec.Close (SessionId.create owner) }
+          AttachmentLeaseCore.Operations.Close = fun owner -> spec.Close(SessionId.create owner) }
 
     /// Exact agent+title identity; a restore hint is the journal-linked id whose
     /// absence authorizes a Replacement (managed-session-lifecycle [011]).

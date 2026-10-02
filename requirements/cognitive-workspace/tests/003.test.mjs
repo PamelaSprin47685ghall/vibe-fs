@@ -15,10 +15,3 @@ test('WHAT[cognitive-workspace-003] legacy Cognition facts decode only into a fo
   assert.match(envelope, /LegacyCognitionFact/)
   assert.match(fold, /AgentFact\.Cognition _ -> Ok projection/)
 })
-
-test('WHAT[cognitive-workspace-006] compression checkpoint belongs to todowrite, not assume', () => {
-  const facts = read('src/Wanxiangshu/Context/Companion/Facts.fs')
-  const assume = read('src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs')
-  assert.match(facts, /TodoCheckpointCommitted/)
-  assert.doesNotMatch(assume, /TodoCheckpointCommitted|Context\.Prefix|PhaseWindow/)
-})

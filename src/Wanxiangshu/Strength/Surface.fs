@@ -2286,6 +2286,41 @@ module StrengthSurface =
 
     let replicaAborted (handle: obj) : string array = (replicaOf handle).Runtime.Aborted()
 
+    /// WHAT[016]: the estimate protocol answered in JS-native values.
+    /// `classifyTool` goes through the contract's own `policyCode` and
+    /// `parseParticipatingArguments` through its `errorCode`, so neither the
+    /// union nor the Result crosses the boundary; the self note keeps its
+    /// original text and becomes null when the contract yields None.
+    let protocolRevision: int = InvestigationEstimateContract.ProtocolRevision
+
+    let classifyTool (toolName: string) : string =
+        InvestigationEstimateContract.classifyTool toolName
+        |> InvestigationEstimateContract.policyCode
+
+    let parseParticipatingArguments (arguments: obj) : obj =
+        match InvestigationEstimateContract.parseParticipatingArguments arguments with
+        | Ok(rounds, selfNote) ->
+            box
+                {| ok = true
+                   rounds = InvestigationEstimateContract.EstimatedReadonlyRounds.value rounds
+                   selfNote = selfNote |> optionToObj |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = InvestigationEstimateContract.errorCode error |}
+
+    /// WHAT[016] §6: one stable error code answered as its natural-language
+    /// explanation. The language comes from `ProviderLanguage.parse` and the
+    /// classification from the contract's own `tryFromCode`, so the prose and
+    /// the code vocabulary each keep exactly one owner; an unrecognized code is
+    /// refused outright rather than answered with a default sentence.
+    let investigationArgumentErrorText (lang: string) (errorCode: string) : string =
+        let language = Wanxiangshu.Participant.Provider.ProviderLanguage.parse lang
+
+        match InvestigationEstimateContract.tryFromCode errorCode with
+        | Some error -> InvestigationEstimateContract.describeArgumentError language error
+        | None -> failwithf "unknown investigation argument error code: %s" errorCode
+
     /// DELEGATE-5.3: the budget is the owner's own integer. Construction refuses
     /// a negative value instead of silently normalizing it to zero.
     let budgetTryCreate (value: int) : obj =
@@ -2580,3 +2615,23 @@ module StrengthSurface =
                     importedOutcome
             )
             :> obj
+
+    let TwinBijectionSurface_restore (child: obj array) (owner: obj array) : obj array =
+        TwinBijectionSurface.restore child owner
+
+    let TwinBijectionSurface_preservesOwnerOrder (child: obj array) (owner: obj array) : bool =
+        TwinBijectionSurface.preservesOwnerOrder child owner
+
+    let TwinBijectionSurface_introducesNothing (child: obj array) (owner: obj array) : bool =
+        TwinBijectionSurface.introducesNothing child owner
+
+    let TwinBijectionSurface_dropsNoSpeech (child: obj array) (owner: obj array) : bool =
+        TwinBijectionSurface.dropsNoSpeech child owner
+
+    let TwinBijectionSurface_extensionIsPrefix
+        (childBefore: obj array)
+        (ownerBefore: obj array)
+        (childAfter: obj array)
+        (ownerAfter: obj array)
+        : bool =
+        TwinBijectionSurface.extensionIsPrefix childBefore ownerBefore childAfter ownerAfter

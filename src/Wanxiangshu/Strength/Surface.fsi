@@ -159,6 +159,27 @@ module StrengthSurface =
     /// as evidence, and never yields a runnable delegation.
     val projectionImported: importId: string -> projection: obj -> obj
 
+    // Speculative-investigation estimate protocol (WHAT[016]): the revision
+    // constant, the one per-tool classifier, and the strict pairing parser.
+
+    /// The code-level protocol revision; never read from configuration.
+    val protocolRevision: int
+
+    /// The single classification source, answered as its stable policy code
+    /// so no union instance crosses into JS.
+    val classifyTool: toolName: string -> string
+
+    /// `{ ok = true; rounds; selfNote }` or `{ ok = false; error }`. The
+    /// Result, its struct tuple and its option stay on the F# side.
+    val parseParticipatingArguments: arguments: obj -> obj
+
+    /// WHAT[016] §6: the stable machine code answered as its natural-language
+    /// explanation in the requested language (§3-§5 own the per-error rules;
+    /// §6 keeps the code vocabulary and the prose apart). `lang` follows
+    /// `ProviderLanguage.parse` and the code resolves through the contract's
+    /// own reverse projection, so neither is re-decoded here.
+    val investigationArgumentErrorText: lang: string -> errorCode: string -> string
+
     // Budget: one plain non-negative integer chosen by the owner model.
 
     val budgetTryCreate: value: int -> obj
@@ -334,3 +355,14 @@ module StrengthSurface =
     val replicaAborted: handle: obj -> string array
 
     val replicaReleased: handle: obj -> string array
+
+    val TwinBijectionSurface_restore: child: obj array -> owner: obj array -> obj array
+
+    val TwinBijectionSurface_preservesOwnerOrder: child: obj array -> owner: obj array -> bool
+
+    val TwinBijectionSurface_introducesNothing: child: obj array -> owner: obj array -> bool
+
+    val TwinBijectionSurface_dropsNoSpeech: child: obj array -> owner: obj array -> bool
+
+    val TwinBijectionSurface_extensionIsPrefix:
+        childBefore: obj array -> ownerBefore: obj array -> childAfter: obj array -> ownerAfter: obj array -> bool

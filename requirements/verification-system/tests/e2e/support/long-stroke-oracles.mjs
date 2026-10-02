@@ -808,7 +808,7 @@ const incumbencyIdsIn = (payloads) => {
 };
 
 const stripGuidance = (text) => {
-  const idx = text.indexOf('\0\uFEFF<skill_content>');
+  const idx = text.indexOf('\0\uFEFF<system>');
   return idx >= 0 ? text.slice(0, idx) : text;
 };
 

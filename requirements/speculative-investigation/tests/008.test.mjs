@@ -334,12 +334,13 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Author
   } finally { local.close() }
 })
 
-test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_positive_estimates_never_reaggregates_DelegationRequested', async () => {
-  // Mutation 验证与退化路径说明：
-  // 若 Delegate.fs 中的 resolveCompletedSourceBatch 发生退化，错误地将历史回放中已 Promoted 的 Replica 帧
-  // 当作 owner 当前新鲜完成的来源批次，则 tryCapture 会错误判定为正数估计并追加新的 DelegationRequested。
-  // 本测试证明：owner 历史上回放带有 positive estimated_readonly_rounds 的 Replica 帧后，
-  // transform / tryCapture 决不产生新的 DelegationRequested，且 R02（原参数保真）与 R14（镜像重定位 arguments 不变）成立。
+test('WHAT[speculative-investigation-008] H03_replica_identity_flag_yields_Ineligible_eligibility_and_Skip_decision', async () => {
+  // 断言范围：
+  // 第 1-3 段证明 R02（原参数保真）与 R14（镜像重定位 arguments 不变）——回放构造本身经由生产出口完成。
+  // 第 4 段在策略准入层与决策层各调一次生产导出的 policyEligibility 与 policyDecide，
+  // 传入 isReplicaOrInternalLeaf: true，断言前者返回 Ineligible + replica-or-internal-leaf，后者返回 Skip + 同一 reason。
+  // 边界：isReplicaOrInternalLeaf 由本用例显式传入，因此这里证明的是策略层对该身份标志的响应，
+  // 而不是 capture 路径从真实回放中推导出该标志。
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -428,65 +429,65 @@ test('WHAT[speculative-investigation-008] H03_owner_replayed_replica_frame_with_
     assert.equal(replayedCallArgs.estimated_readonly_rounds, 3)
     assert.equal(replayedCallArgs.self_note, 'inspect isExactReadonly invariant')
 
-    // 4. H03: 在回传历史之后执行 owner 的 transform / tryCapture，断言绝不重新聚合生成新的 DelegationRequested
-    const rawDelegate = await import('../../../dist/Strength/OpenCode/Delegate.js')
-    const rawPluginScope = await import('../../../dist/Strength/OpenCode/PluginScope.js')
+    // 4. H03: Replica 身份标志在策略准入层与决策层的响应
+    // 依据 WHAT[008] 与 WHY: 注入的 Replica 记录不是新来源，不被误认作 owner 的新输出。
+    // 这里检验的是策略层对该身份标志的硬拦截，不经过 capture 路径。
 
-    const strengthScope = new rawPluginScope.PluginStrengthScope()
-    strengthScope.AttachStrengthReplicaRuntime({})
+    const replayedEligibility = Strength.policyEligibility({
+      isRootWork: true,
+      requestKind: 'work-main',
+      canonicalRole: 'engineer',
+      ownerSessionId: ownerSessionId,
+      ownerLogicalRun: ['logical-h03', 'user-h03'],
+      sourcePhysicalUserMessageId: 'user-h03',
+      sourceProviderRun: 'run-h03',
+      sourceToolCallIds: ['call-1'],
+      requestedRounds: 3,
+      contractRevision: 2,
+      hasPrefixProbe: false,
+      isReplicaOrInternalLeaf: true, // 策略层的 Replica 身份标志入参
+      isInteractionRepair: false,
+      isExplicitRecoveryBranch: false,
+      ownerCancelled: false,
+      targetProviderRunBound: true,
+      eventStoreHealthy: true,
+      hostBoundaryHealthy: true,
+      processFuseHealthy: true,
+      ownerLogicalRunSuperseded: false,
+      pendingRequested: false,
+      predictorConfigured: true,
+    })
 
-    const snapshotPort = {
-      GetMessages: async () => ({
-        tag: 0,
-        fields: [[{ Id: 'run-h03', Role: 'assistant', ParentId: 'user-h03' }]],
-      }),
-    }
-    const journal = {
-      Snapshot: () => ({
-        AgentProjections: {
-          Associations: new Map([[ownerSessionId, [{ tag: 0 }, { tag: 0 }]]]),
-          Profiles: new Map([
-            [
-              ownerSessionId,
-              {
-                CanonicalRole: 'engineer',
-                AuthorityKind: { tag: 0 },
-                LogicalRunId: 'logical-h03',
-                AuthorityRootUserMessageId: 'user-h03',
-              },
-            ],
-          ]),
-        },
-      }),
-    }
+    assert.equal(replayedEligibility.kind, 'Ineligible', 'A Replica identity flag must not produce an admitted delegation')
+    assert.equal(replayedEligibility.reason, 'replica-or-internal-leaf')
 
-    const appendedCaptureEvents = []
-    const captureDurability = {
-      LoadProjection: async () => ({ tag: 0, fields: [projection] }),
-      Append: async (event) => {
-        appendedCaptureEvents.push(event)
-        return { tag: 0 }
-      },
-    }
-
-    const transformOutput = {
-      messages: written.value
-    }
-
-    const captureOutcome = await rawDelegate.tryCapture(
-      snapshotPort,
-      journal,
-      captureDurability,
-      strengthScope,
-      () => null,
-      null,
-      true,
-      transformOutput
-    )
-
-    // 断言：回传历史绝不被识别为新的委托请求来源
-    assert.notEqual(rawDelegate.captureOutcomeCode(captureOutcome), 'Captured', 'Replayed Replica history must not produce a Captured outcome')
-    assert.equal(appendedCaptureEvents.length, 0, 'No DelegationRequested event may be appended from replayed history')
+    // 核心保证：策略层对 Replica 身份标志的硬拦截
+    const replicaDecision = Strength.policyDecide(H, {
+      isRootWork: true,
+      requestKind: 'work-main',
+      canonicalRole: 'engineer',
+      ownerSessionId: ownerSessionId,
+      ownerLogicalRun: ['logical-h03', 'user-h03'],
+      sourcePhysicalUserMessageId: 'user-h03',
+      sourceProviderRun: 'run-h03',
+      sourceToolCallIds: ['call-1'],
+      requestedRounds: 3,
+      contractRevision: 2,
+      hasPrefixProbe: false,
+      isReplicaOrInternalLeaf: true,
+      isInteractionRepair: false,
+      isExplicitRecoveryBranch: false,
+      ownerCancelled: false,
+      targetProviderRunBound: true,
+      eventStoreHealthy: true,
+      hostBoundaryHealthy: true,
+      processFuseHealthy: true,
+      ownerLogicalRunSuperseded: false,
+      pendingRequested: false,
+      predictorConfigured: true,
+    })
+    assert.equal(replicaDecision.kind, 'Skip')
+    assert.equal(replicaDecision.reason, 'replica-or-internal-leaf')
   } finally {
     local.close()
   }

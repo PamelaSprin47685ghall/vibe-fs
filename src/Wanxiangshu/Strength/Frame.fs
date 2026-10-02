@@ -51,7 +51,8 @@ module StrengthFrame =
     /// `js-predictor`, but its exchange is projected back into the owner's
     /// conversation under the owner's own `js-<role>` name, so the owner sees a
     /// tool it could have called itself. Those projected names must validate.
-    let private jsSurfaces = Roles.all |> List.map (fun role -> "js-" + Roles.roleLabel role)
+    let private jsSurfaces =
+        Roles.all |> List.map (fun role -> "js-" + Roles.roleLabel role)
 
     let private allowedTools = Set.union projectionTools (Set.ofList jsSurfaces)
 

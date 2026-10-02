@@ -35,18 +35,19 @@ module AttachmentLeaseCore =
         | Replacement
 
     type Lease =
-        { SessionId: string
-          Origin: Origin
-          /// The agent established for this child. A reuse answers with the agent
-          /// bound at create time, never with a later request's spelling.
-          Agent: string }
+        {
+            SessionId: string
+            Origin: Origin
+            /// The agent established for this child. A reuse answers with the agent
+            /// bound at create time, never with a later request's spelling.
+            Agent: string
+        }
 
     val kindKey: kind: AttachmentKind -> string
     val leaseKey: owner: SessionId -> kind: AttachmentKind -> string
 
     /// Establish (or re-establish) the kind's lease and publish its association.
-    val ensure:
-        operations: Operations -> owner: SessionId -> spec: Spec -> Task<Result<Lease, string>>
+    val ensure: operations: Operations -> owner: SessionId -> spec: Spec -> Task<Result<Lease, string>>
 
     /// Release the kind's lease: the child ends and the association closes.
     val retire: operations: Operations -> owner: SessionId -> Task<Result<unit, string>>
@@ -64,9 +65,7 @@ type AttachmentLeaseRegistry =
     member RemoveByChild: child: SessionId -> (SessionId * AttachmentKind) list
 
     member Ensure:
-        owner: SessionId *
-        kind: AttachmentKind *
-        start: (unit -> Task<Result<AttachmentLeaseCore.Lease, string>>) ->
+        owner: SessionId * kind: AttachmentKind * start: (unit -> Task<Result<AttachmentLeaseCore.Lease, string>>) ->
             Task<Result<AttachmentLeaseCore.Lease, string>>
 
     member FinishEnsure: owner: SessionId * kind: AttachmentKind -> unit

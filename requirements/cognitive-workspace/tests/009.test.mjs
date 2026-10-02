@@ -6,8 +6,7 @@ import test from 'node:test'
 const root = process.cwd()
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[cognitive-workspace-002] assume exposes no canvas or todo protocol in production source', () => {
+test('WHAT[cognitive-workspace-009] assume owns no session cache or mutable workspace state', () => {
   const assume = read('src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs')
-  assert.match(assume, /"assumption"/)
-  assert.doesNotMatch(assume, /ArgUpdate|ArgTodos|jqJson|CognitiveRuntime|TodoSink/)
+  assert.doesNotMatch(assume, /Dictionary|mutable|workspace|canvasJson|CurrentCanvas/)
 })

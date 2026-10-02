@@ -35,12 +35,14 @@ module AttachmentLeaseCore =
 
     /// Every kind's parameters. This is the whole of what a kind may differ in.
     type Spec =
-        { Kind: AttachmentKind
-          Agent: string
-          Title: string
-          Directory: string option
-          /// The child this kind's durable state says it already has, if any.
-          RestoreHint: string option }
+        {
+            Kind: AttachmentKind
+            Agent: string
+            Title: string
+            Directory: string option
+            /// The child this kind's durable state says it already has, if any.
+            RestoreHint: string option
+        }
 
     type Origin =
         | Created
@@ -48,12 +50,14 @@ module AttachmentLeaseCore =
         | Replacement
 
     type Lease =
-        { SessionId: string
-          Origin: Origin
-          /// The agent this child was established for. A reuse answers with the
-          /// agent bound at create time; a later request with a different agent
-          /// must not overwrite it, so the lease carries it rather than the caller.
-          Agent: string }
+        {
+            SessionId: string
+            Origin: Origin
+            /// The agent this child was established for. A reuse answers with the
+            /// agent bound at create time; a later request with a different agent
+            /// must not overwrite it, so the lease carries it rather than the caller.
+            Agent: string
+        }
 
     /// Stable registry key for a kind. Structural equality on F# unions would work,
     /// but a total string projection keeps the registry independent of how the
@@ -89,7 +93,12 @@ module AttachmentLeaseCore =
         let create origin =
             task {
                 match! operations.CreateChild ownerText spec.Agent spec.Directory with
-                | Ok child -> return Ok { SessionId = child; Origin = origin; Agent = spec.Agent }
+                | Ok child ->
+                    return
+                        Ok
+                            { SessionId = child
+                              Origin = origin
+                              Agent = spec.Agent }
                 | Error error -> return Error error
             }
 
@@ -98,7 +107,12 @@ module AttachmentLeaseCore =
         let resolveHint (hash: string) (children: Child list) : Task<Result<Lease, string>> =
             match children |> List.filter (fun child -> child.SessionId = hash) with
             | [ child ] when exact spec child ->
-                Task.FromResult(Ok { SessionId = child.SessionId; Origin = Reused; Agent = spec.Agent })
+                Task.FromResult(
+                    Ok
+                        { SessionId = child.SessionId
+                          Origin = Reused
+                          Agent = spec.Agent }
+                )
             | [ _ ] ->
                 Task.FromResult(
                     Error(
@@ -112,7 +126,9 @@ module AttachmentLeaseCore =
             | [] -> create Replacement
             | _ ->
                 Task.FromResult(
-                    Error(sprintf "Ambiguous %s recovery for %s: duplicate child id %s" (kindKey spec.Kind) ownerText hash)
+                    Error(
+                        sprintf "Ambiguous %s recovery for %s: duplicate child id %s" (kindKey spec.Kind) ownerText hash
+                    )
                 )
 
         match spec.RestoreHint with
@@ -262,11 +278,8 @@ type AttachmentLeaseRegistry() =
 
     /// Share one in-flight ensure per `(owner, kind)`.
     member _.Ensure
-        (
-            owner: SessionId,
-            kind: AttachmentKind,
-            start: unit -> Task<Result<AttachmentLeaseCore.Lease, string>>
-        ) : Task<Result<AttachmentLeaseCore.Lease, string>> =
+        (owner: SessionId, kind: AttachmentKind, start: unit -> Task<Result<AttachmentLeaseCore.Lease, string>>)
+        : Task<Result<AttachmentLeaseCore.Lease, string>> =
         lock gate (fun () ->
             let key = AttachmentLeaseCore.leaseKey owner kind
 

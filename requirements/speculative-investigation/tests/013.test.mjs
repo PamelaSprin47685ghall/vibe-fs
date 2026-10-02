@@ -6,7 +6,6 @@ import assert from 'node:assert/strict'
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
-const ProtocolRevision = 2;
 
 const H = (text) => `H(${text})`
 const hostText = (text) => ({ type: 'text', text })
@@ -108,7 +107,7 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owner_decisions_proje
     ownerLogicalRun: { logicalRunId: `${owner}-run`, authorityRootUserMessageId: `${owner}-root` },
     sourcePhysicalUserMessageId: `${owner}-msg`,
     sourceProviderRun: `run-${decision}`,
-    sourceToolCallIds: [`call-${decision}`], requestedRounds: rounds, contractRevision: ProtocolRevision,
+    sourceToolCallIds: [`call-${decision}`], requestedRounds: rounds, contractRevision: Strength.protocolRevision,
   })
 
   // Interleaved: owner-a requests, owner-b requests, owner-b binds, owner-a binds.
@@ -147,7 +146,6 @@ const { acceptAuthorityRoot, notifyCompleted, withExecutablePlugin, withRestarta
 const Events = await import('../../../dist/OpenCode/Host/EventsSurface.js')
 const ModelRouting = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
 const Strength = await import("../../../dist/Strength/Surface.js");
-const ProtocolRevision = 2;
 
 const hostText = (text) => ({ type: 'text', text })
 const hostToolCall = (callId, tool, input, output) => ({
@@ -540,12 +538,12 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
         'the frozen call set keeps the original batch order',
       )
       assert.equal(payload.requested_rounds, 1, 'the batch maximum is the authorized budget')
-      assert.equal(payload.contract_revision, ProtocolRevision)
+      assert.equal(payload.contract_revision, Strength.protocolRevision)
 
       const sha256 = (text) => createHash('sha256').update(text).digest('hex')
       const expectedDecisionId = Strength.delegationDeriveDecisionId(
         sha256,
-        ProtocolRevision,
+        Strength.protocolRevision,
         payload.logical_run_id,
         payload.authority_root_user_message_id,
         payload.source_provider_run,
@@ -818,7 +816,6 @@ import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/proces
 
 {
 const { default: assert } = await import('node:assert/strict')
-const ProtocolRevision = 2;
 const EstimatedReadonlyRoundsField = 'estimated_readonly_rounds';
 const PluginHooksSurface = await import('../../../dist/OpenCode/Host/PluginHooksSurface.js')
 

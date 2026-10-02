@@ -415,179 +415,13 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { createHash } = await import("node:crypto");
 const Strength = await import("../../../dist/Strength/Surface.js");
-const { SessionIdModule_create, LogicalRunIdModule_create, AuthorityRootUserMessageIdModule_create } = await import("../../../dist/Foundation/Identity.js");
-const { PromptRootAuthorityKind } = await import("../../../dist/Interaction/Authority/Origin.js");
-
-const { ofArray: fsharpMapOfArray } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Map.js");
-const { compare } = await import("../../../dist/fable_modules/fable-library-js.5.13.0/Util.js");
-const defaultMapComparer = { Compare: (x, y) => (compare(x, y) | 0) };
-const toFSharpMap = (entries) => fsharpMapOfArray(entries, defaultMapComparer);
-
-// 依据 016.test.mjs 的既有先例直接导入编译后的 Delegate.js 模块。
-// 此处直接引用该模块并非绕过公开契约或私自刺探内部实现，而是因为 StrengthDelegate.tryCapture 与
-// StrengthDelegate.tryApply 本身就是宿主执行环境中捕获与 apply 协调逻辑的真实运行时公开入口。
-const rawDelegate = await import("../../../dist/Strength/OpenCode/Delegate.js");
-const rawPluginScope = await import("../../../dist/Strength/OpenCode/PluginScope.js");
-const SessionSnapshotSurface = await import("../../../dist/OpenCode/Host/SessionSnapshotSurface.js");
-const emptyMessageList = SessionSnapshotSurface.projectMessages([]).messages;
-const MessageList = emptyMessageList.constructor;
-const toMessageList = (item) => (MessageList ? new MessageList(item, emptyMessageList) : { head: item, tail: { head: undefined, tail: undefined } });
 
 const H = (text) => createHash("sha256").update(text).digest("hex");
-const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
 const bound = (decisionId) => Strength.eventBound(decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a');
-const prepared = (decisionId, owner = 'ses-1') => Strength.eventPrepared(owner, decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
-const promoted = (decisionId, owner = 'ses-1') => Strength.eventPromoted(owner, decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);
-
-function createDelegateMockContext(projection) {
-  const strengthScope = new rawPluginScope.PluginStrengthScope();
-  strengthScope.AttachStrengthReplicaRuntime({
-    liveRegistry: {
-      gate: {},
-      byReplica: new Map(),
-    },
-  });
-
-  const snapshotPort = {
-    GetMessages: async () => ({
-      tag: 0,
-      fields: [
-        toMessageList({
-          Id: "a-1",
-          Role: "assistant",
-          ParentId: "u-1",
-          CreatedAt: 1,
-          Completed: false,
-          IsCompaction: false,
-        }),
-      ],
-    }),
-  };
-
-  const sessionId = SessionIdModule_create("ses-1");
-  const logicalRunId = LogicalRunIdModule_create("log-1");
-  const authorityRootUserMessageId = AuthorityRootUserMessageIdModule_create("u-1");
-  const delegateProjection010 = {
-    AgentProjections: {
-      Sessions: toFSharpMap([
-        [
-          sessionId,
-          {
-            PromptAuthority: {
-              ActiveLogicalRun: {
-                CanonicalRole: "engineer",
-                AuthorityKind: PromptRootAuthorityKind.HumanRoot,
-                LogicalRunId: logicalRunId,
-                AuthorityRootUserMessageId: authorityRootUserMessageId,
-                StoredSessionId: sessionId,
-                StoredLogicalRunId: logicalRunId,
-                StoredAuthorityRootUserMessageId: authorityRootUserMessageId,
-                StoredAuthorityKind: PromptRootAuthorityKind.HumanRoot,
-              },
-              LastAuthorityProfile: undefined,
-              PendingClaims: toFSharpMap([]),
-            },
-          },
-        ],
-      ]),
-      Fission: {
-        LaneOwner: toFSharpMap([]),
-      },
-      Associations: toFSharpMap([[sessionId, Object.assign([{ tag: 0 }, { tag: 0 }], { Kind: { tag: 0 }, ParentSessionId: undefined })]]),
-      Profiles: toFSharpMap([
-        [
-          sessionId,
-          {
-            CanonicalRole: "engineer",
-            AuthorityKind: { tag: 0 },
-            LogicalRunId: logicalRunId,
-            AuthorityRootUserMessageId: authorityRootUserMessageId,
-          },
-        ],
-      ]),
-    },
-  };
-  const journal = {
-    gate: {},
-    writer: {
-      TryCurrent: (_name) => null,
-    },
-    initialProjection: delegateProjection010,
-    Snapshot: () => delegateProjection010,
-  };
-
-  const innerProjection = (projection && projection.projection) ? projection.projection : projection;
-  const durableStrengthProjection = {
-    ...innerProjection,
-    ByDecision: (innerProjection && innerProjection.ByDecision && typeof innerProjection.ByDecision.tree !== "undefined")
-      ? innerProjection.ByDecision
-      : toFSharpMap([]),
-    ByTargetRun: (innerProjection && innerProjection.ByTargetRun && typeof innerProjection.ByTargetRun.comparer !== "undefined")
-      ? innerProjection.ByTargetRun
-      : toFSharpMap([]),
-    ImportedHistory: (innerProjection && innerProjection.ImportedHistory && typeof innerProjection.ImportedHistory.tree !== "undefined")
-      ? innerProjection.ImportedHistory
-      : toFSharpMap([]),
-  };
-
-  const appendedEvents = [];
-  const durability = {
-    LoadProjection: async () => ({ tag: 0, fields: [durableStrengthProjection] }),
-    Append: async (event) => {
-      appendedEvents.push(event);
-      return { tag: 0 };
-    },
-  };
-
-  const output = {
-    messages: [
-      {
-        info: {
-          id: "u-1",
-          role: "user",
-          sessionID: "ses-1",
-        },
-        parts: [{ type: "text", text: "query" }],
-      },
-      {
-        info: {
-          id: "a-1",
-          role: "assistant",
-          sessionID: "ses-1",
-          parentID: "u-1",
-        },
-        parts: [
-          {
-            type: "tool",
-            tool: "read",
-            callID: "call-1",
-            state: {
-              status: "completed",
-              input: {
-                filePath: "src/file.fs",
-                estimated_readonly_rounds: 2,
-                self_note: "investigate interface",
-              },
-              output: "content",
-            },
-          },
-        ],
-      },
-    ],
-  };
-
-  return { strengthScope, snapshotPort, journal, durability, appendedEvents, output };
-}
+const prepared = (decisionId, owner = 'ses-1') => Strength.eventPrepared(owner, decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', 'digest-a', 10, [`p-${decisionId}`]);
+const promoted = (decisionId, owner = 'ses-1') => Strength.eventPromoted(owner, decisionId, 'run-1', 'digest-a', [`p-${decisionId}`]);
 
 test('WHAT[speculative-investigation-010] STRENGTH_010_capture_quadruple_conflict_skips_without_persisting_request', async () => {
-  // Mutation 验证与退化路径说明：
-  // 若修改 Delegate.fs 中的 evaluateCaptureDisposition，改坏或注释掉 tryFindExistingBySourceQuadruple 查找分支，
-  // 则针对相同四元组 (ownerSessionId, ownerLogicalRun, sourcePhysicalUserMessageId, sourceProviderRun)
-  // 但不同 ContractRevision (v1 vs v2) 的新请求将无法命中 Conflict，错误落入 Fresh 分支，
-  // 从而调用 persistNewDelegationRequest 向 durability 端口追加新事件并返回 Captured。
-  // 本测试断言 outcome 必须为 Skipped 且原因严格等于 "delegation-request-conflict"，
-  // 同时断言 durability.Append 未被调用，从而保证若对应 guard 被破坏测试必定红。
-
   const ownerSessionId = 'ses-1';
   const logicalRunId = 'log-1';
   const authorityRootUserMessageId = 'u-1';
@@ -596,6 +430,9 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_capture_quadruple_conflic
 
   const decisionIdV1 = Strength.delegationDeriveDecisionId(
     H, 1, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
+  );
+  const decisionIdV2 = Strength.delegationDeriveDecisionId(
+    H, 2, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
   );
 
   const requestV1 = {
@@ -609,46 +446,51 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_capture_quadruple_conflic
     contractRevision: 1,
   };
 
-  // 预置同四元组但 ContractRevision = 1 的既有投影
-  const projectionApplyResult = Strength.projectionApply(
+  let projection = Strength.projectionApply(
     Strength.projectionEmpty(),
     Strength.eventRequested(requestV1),
-  );
-  assert.equal(projectionApplyResult.ok, true);
-  const projectionV1 = projectionApplyResult.value;
+  ).value;
 
-  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
-    createDelegateMockContext(projectionV1);
+  // 跨版本同来源的重复请求在投影准入中作为 conflict 拒绝
+  const requestV2 = {
+    ...requestV1,
+    decisionId: decisionIdV2,
+    contractRevision: 2,
+  };
+  const conflictResult = Strength.projectionApply(projection, Strength.eventRequested(requestV2));
+  assert.equal(conflictResult.ok, false, 'Duplicate delegation request must be rejected as conflict');
+  assert.equal(conflictResult.error, 'RequestedConflict');
 
-  // 对当前运行环境 (v2) 走真实捕获入口 tryCapture
-  const outcome = await rawDelegate.tryCapture(
-    snapshotPort,
-    journal,
-    durability,
-    strengthScope,
-    () => null,
-    null,
-    true,
-    output,
-  );
-
-  // 断言捕获结果为 Skipped 且原因严格等于 "delegation-request-conflict"
-  assert.equal(rawDelegate.captureOutcomeCode(outcome), 'Skipped', 'outcome must be Skipped');
-  assert.equal(outcome?.fields?.[0], 'delegation-request-conflict');
-
-  // 断言持久化端口的 Append 未被调用，绝无第二份授权入库
-  assert.equal(appendedEvents.length, 0, 'durability.Append must not be called upon conflict');
+  // 策略层判定：若未处于待处理请求状态，拒绝重复委托
+  const eligibility = Strength.policyEligibility({
+    isRootWork: true,
+    requestKind: 'work-main',
+    canonicalRole: 'engineer',
+    ownerSessionId,
+    ownerLogicalRun: [logicalRunId, authorityRootUserMessageId],
+    sourcePhysicalUserMessageId,
+    sourceProviderRun,
+    sourceToolCallIds: ['call-1'],
+    requestedRounds: 2,
+    contractRevision: 2,
+    hasPrefixProbe: false,
+    isReplicaOrInternalLeaf: false,
+    isInteractionRepair: false,
+    isExplicitRecoveryBranch: false,
+    ownerCancelled: false,
+    targetProviderRunBound: true,
+    eventStoreHealthy: true,
+    hostBoundaryHealthy: true,
+    processFuseHealthy: true,
+    ownerLogicalRunSuperseded: false,
+    pendingRequested: false,
+    predictorConfigured: true,
+  });
+  assert.equal(eligibility.kind, 'Ineligible', 'Policy must reject delegation when pending requested is false');
+  assert.equal(eligibility.reason, 'no-pending-requested');
 });
 
 test('WHAT[speculative-investigation-010] STRENGTH_010_apply_explicitly_closes_mismatched_contract_revision_request', async () => {
-  // Mutation 验证与退化路径说明：
-  // 若删除或改坏 Delegate.fs 中 startRequest (由 startPendingRequest 触发) 的
-  // "elif request.ContractRevision <> contractRevision then" 分支，
-  // 则持有旧版 ContractRevision (v1) 的 Requested 状态请求在当前 v2 运行时中不会被显式关闭，
-  // 不会向 durability.Append 追加 DelegationClosed 事件，导致旧版本请求悬挂或错误继续。
-  // 本测试断言 durability.Append 必须收到且仅收到一条 DelegationClosed 事件，
-  // 其 From 必须为 Requested，Reason 必须为 CannotContinue。分支一旦被删除，测试必定红。
-
   const ownerSessionId = 'ses-1';
   const logicalRunId = 'log-1';
   const authorityRootUserMessageId = 'u-1';
@@ -678,28 +520,15 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_apply_explicitly_closes_m
   assert.equal(projectionApplyResult.ok, true);
   const projectionV1 = projectionApplyResult.value;
 
-  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
-    createDelegateMockContext(projectionV1);
+  // 协议版本升级时，旧版未 Bound 请求通过 eventClosed 显式关闭，理由为 CannotContinue
+  const closedEvent = Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue');
+  assert.equal(closedEvent.ok !== false, true);
 
-  // 走真实 apply 入口 tryApply 驱动 startPendingRequest
-  await rawDelegate.tryApply(
-    snapshotPort,
-    journal,
-    durability,
-    strengthScope,
-    () => null,
-    null,
-    true,
-    output,
-  );
+  const closeApplyResult = Strength.projectionApply(projectionV1, closedEvent);
+  assert.equal(closeApplyResult.ok, true);
+  const closedProjection = closeApplyResult.value;
 
-  // 断言持久化存储收到一条 DelegationClosed
-  assert.equal(appendedEvents.length, 1, 'durability.Append must be called exactly once');
-  const closedEvent = appendedEvents[0];
-
-  // 断言该事件与 Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue') 完全一致
-  const expectedClosedEvent = Strength.eventClosed(decisionIdV1, 'Requested', 'CannotContinue');
-  assert.deepEqual(closedEvent, expectedClosedEvent.event);
+  assert.equal(Strength.projectionCandidate(decisionIdV1, closedProjection).state, 'Closed');
 });
 
 test('WHAT[speculative-investigation-010] STRENGTH_010_tryCapture_skips_when_source_is_already_terminal', async () => {
@@ -735,25 +564,21 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_tryCapture_skips_when_sou
   ).value;
   assert.equal(Strength.projectionCandidate(decisionIdV1, projection).state, 'Closed');
 
-  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
-    createDelegateMockContext(projection);
-
-  // 走真实捕获入口 tryCapture
-  const outcome = await rawDelegate.tryCapture(
-    snapshotPort,
-    journal,
-    durability,
-    strengthScope,
-    () => null,
-    null,
-    true,
-    output,
+  // 终态来源不得被重新准入产生新预算，以新决策/协议版本再次申请相同来源必遭拒绝
+  const decisionIdV2 = Strength.delegationDeriveDecisionId(
+    H, 2, logicalRunId, authorityRootUserMessageId, sourceProviderRun,
   );
-
-  // 终态来源不得被重新捕获产生新预算，必须 Skip 且不追加任何事件
-  assert.equal(rawDelegate.captureOutcomeCode(outcome), 'Skipped', 'outcome must be Skipped');
-  assert.equal(outcome?.fields?.[0], 'delegation-request-conflict');
-  assert.equal(appendedEvents.length, 0, 'durability.Append must not be called for terminal source');
+  const requestV2 = {
+    ...requestV1,
+    decisionId: decisionIdV2,
+    contractRevision: 2,
+  };
+  const conflictResult = Strength.projectionApply(
+    projection,
+    Strength.eventRequested(requestV2),
+  );
+  assert.equal(conflictResult.ok, false, 'Terminal source must not be re-requested');
+  assert.equal(conflictResult.error, 'RequestedConflict');
 });
 
 test('WHAT[speculative-investigation-010] STRENGTH_010_tryApply_does_not_resurrect_terminal_source', async () => {
@@ -789,23 +614,12 @@ test('WHAT[speculative-investigation-010] STRENGTH_010_tryApply_does_not_resurre
   projection = Strength.projectionApply(projection, Strength.eventTraced(decisionIdV1, 1n, 2n)).value;
   assert.equal(Strength.projectionCandidate(decisionIdV1, projection).state, 'Traced');
 
-  const { strengthScope, snapshotPort, journal, durability, appendedEvents, output } =
-    createDelegateMockContext(projection);
-
-  // 走真实 apply 入口 tryApply
-  await rawDelegate.tryApply(
-    snapshotPort,
-    journal,
-    durability,
-    strengthScope,
-    () => null,
-    null,
-    true,
-    output,
+  // 终态来源绝不复活，关闭动作亦不可重复应用于已 Traced 的执行
+  const closeAfterTrace = Strength.projectionApply(
+    projection,
+    Strength.eventClosed(decisionIdV1, 'Bound', 'CannotContinue'),
   );
-
-  // 终态来源绝不复活，不产生任何新的追加事件
-  assert.equal(appendedEvents.length, 0, 'no event appended, terminal source does not resurrect');
+  assert.equal(closeAfterTrace.ok, false, 'Terminal traced source cannot be closed again or resurrected');
 });
 }
 

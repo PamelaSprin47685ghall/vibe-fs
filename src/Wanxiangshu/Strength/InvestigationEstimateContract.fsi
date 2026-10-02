@@ -55,5 +55,12 @@ module InvestigationEstimateContract =
     // 机器可判的稳定错误标识（非散文文案，严禁使用 Fable 内部反射）
     val errorCode: error: EstimateArgumentError -> string
 
+    // `errorCode` 的反向投影：稳定错误码 → 唯一分类，使「码 → 分类 → 文案」可观察。
+    // 文案仍只由 `describeArgumentErrorZh` / `describeArgumentErrorEn` 持有，本函数不复制文案。
+    val tryFromCode: code: string -> EstimateArgumentError option
+
+    /// 与 `tryFromCode` 成对：未知码按 `ProviderLanguage.parse` 的既有语义抛错。
+    val parseFromCode: code: string -> EstimateArgumentError
+
     // 机器可判的稳定工具策略标识（非散文文案，严禁使用 Fable 内部反射）
     val policyCode: policy: InvestigationToolPolicy -> string

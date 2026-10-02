@@ -13,4 +13,10 @@ module FileMutationSurface =
     val name: handle: obj -> string
     val argumentNames: handle: obj -> string array
     val description: handle: obj -> string
+    /// Success carries structured data fields (`removed`, `moved`).
+    ///
+    /// A refusal carries the localized prose as its instruction plus a stable
+    /// `code` field naming the reason (e.g. `tool/rm/directory-not-empty`).
+    /// That code is the contract: consumers classify failures by it rather than
+    /// by matching prose, which changes with the provider language.
     val execute: handle: obj -> args: obj -> context: obj -> Task<obj>

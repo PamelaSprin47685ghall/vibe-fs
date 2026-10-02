@@ -19,6 +19,17 @@ export const toolBatch = (sessionID, suffix) => ['pending', 'completed'].map(sta
 }))
 export const transform = async (hooks, sessionID, messages) => {
   const output = { messages: structuredClone(messages) }
+  const userMsg = output.messages.find(m => m.info?.role === 'user')
+  if (userMsg && hooks && hooks['chat.message']) {
+    try {
+      await hooks['chat.message'](
+        { sessionID, messageID: userMsg.info.id, agent: 'engineer' },
+        { message: userMsg.info, parts: userMsg.parts },
+      )
+    } catch {
+      // 容错处理：已有 execution 时幂等跳过
+    }
+  }
   await hooks['experimental.chat.messages.transform']({ sessionID }, output)
   assert.ok(Array.isArray(output.messages))
   return output.messages

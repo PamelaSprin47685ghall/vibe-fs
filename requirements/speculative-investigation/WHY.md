@@ -108,12 +108,12 @@
 ### 为什么崩溃恢复（crash-reconciliation）不接管未 Bound 的 delegation 请求？
 
 - **约束**：`crash-reconciliation` 的 Load Phase（`requirements/crash-reconciliation/WHAT.md` 条款 [018]、[020]）在加载阶段必须一次性结算上一 runtime 遗留且本进程无法继续持有的 durable 未决工作：仍活跃的子工作 run（写入 `ExecutionFactCases.ChildRunVoided`，测试佐证见 `requirements/crash-reconciliation/tests/020.test.mjs` L36-52）与仍开着的 Blogger 请求（写入 `BloggerRequestAbandoned`，reason `stale-open-at-load`）。但对于未 Bound 的 `DelegationRequested` 请求，Load Phase 并不扫描也不关停。
-- **选择**：委托冷启动恢复的唯一入口由主模型 session 准入期的 `StrengthDelegate.tryApply` 触发，其内部 `startPendingRequest`（`src/Wanxiangshu/Strength/OpenCode/Delegate.fs` L1018-1037）扫描持久投影中属于当前主会话与权威逻辑 run 的 `Requested` 记录，并在 `startRequest`（L971-1014）中集中裁决：若遇到契约版本不符（`request.ContractRevision <> contractRevision`，例如历史 v1 请求在 v2 运行时相遇，L989-998）、Predictor 未配置或当前角色无权限，则在主会话上下文下直接追加 `Closed`（来源 `DelegationClosedFrom.Requested`，理由 `DelegationClosedReason.CannotContinue`；测试断言见 `requirements/speculative-investigation/tests/010.test.mjs` L166-198），主模型平稳继续，绝不发起旧协议子执行。
+- **选择**：委托冷启动恢复的唯一入口由主模型 session 准入期的 `StrengthDelegate.tryCaptureAndStart` 触发。捕获与启动已在这一次调用中合并完成，不再作为两个跨请求阶段存在：捕获成功（`Captured`）时本次决策就地启动；未捕获（`Skipped`）时经 `executeSkippedRecovery` → `applyOnSurface` 的 `StartPending` 分支进入 `startPendingRequest`（`src/Wanxiangshu/Strength/OpenCode/Delegate.fs` L1305-1346），由它扫描持久投影中属于当前主会话与权威逻辑 run 的 `Requested` 记录，并在 `startRequest` 中集中裁决：若遇到契约版本不符（`request.ContractRevision <> contractRevision`，例如历史 v1 请求在 v2 运行时相遇）、Predictor 未配置或当前角色无权限，则在主会话上下文下直接追加 `Closed`（来源 `DelegationClosedFrom.Requested`，理由 `DelegationClosedReason.CannotContinue`；测试断言见 `requirements/speculative-investigation/tests/010.test.mjs` L166-198），主模型平稳继续，绝不发起旧协议子执行。
 - **被否决的替代方案**：让 `crash-reconciliation` 的 Load Phase 也全局扫描 `DelegationRequested` 并就地关闭未绑定的旧请求。
 - **否决理由**：
   1. *双重写者与决策竞争*：Load Phase 与随后唤醒的主模型会话若两处都在未加互斥锁的情况下探测旧请求，会在同一决断点上形成第二个写者，极易对同一次委托决策追加两次冲突事件；
   2. *权责与 Scope 缺失*：Load Phase 是全局恢复管线，执行时并不持有特定 owner 会话的完整上下文（如 `surface.Authority`、`PluginStrengthScope` 与 `OwnerSurface`），根本无法构造出合法的持久化闭合事件（`appendClosed` 依赖于明确的 `surface.Authority.AuthorityRootUserMessageId` 和会话归属）。
-- **后果与前提假设（Consequences）**：这一裁量成立的根本前提是“委托冷启动必定会由主模型准入（`StrengthDelegate.tryApply`）经过”。由于委托必须依赖主模型的外发推理动作，未 Bound 的请求在主会话启动前处于纯静态持久事实状态，不会自行泄漏并发起外部请求；主模型冷启动时统一结算能保证所有事件拥有合法的 owner scope。后果是：如果存在一条不进入主模型准入却仍能直接读取并消费旧持久事件的绕行物理路径，该前提将失效，需要重新审视。
+- **后果与前提假设（Consequences）**：这一裁量成立的根本前提是“委托冷启动必定会由主模型准入（`StrengthDelegate.tryCaptureAndStart`）经过”。由于委托必须依赖主模型的外发推理动作，未 Bound 的请求在主会话启动前处于纯静态持久事实状态，不会自行泄漏并发起外部请求；主模型冷启动时统一结算能保证所有事件拥有合法的 owner scope。后果是：如果存在一条不进入主模型准入却仍能直接读取并消费旧持久事件的绕行物理路径，该前提将失效，需要重新审视。
 - **重新考虑的条件**：在多进程崩溃或重启场景中，若出现旧未 Bound 请求未被 `startRequest` 扫描结算、却在 durable 投影中滞留并干扰了后续主模型全新委托决策的可复现场景。
 
 ### 为什么配置存在性查询对非法配置直接抛错而非返回 false？
@@ -138,21 +138,26 @@
 ### 为什么 Surface 应用在判定为 Replica 或非 root work 时就地 Skip？
 
 - **约束**：DELEGATE §7.4 规定只读副本仅能进行只读查证，绝对禁止发起第二层委托；同时，非根工作（子会话）亦不得作为委托来源。
-- **选择**：在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs`（L1053-1058）的 `planSurfaceApplication` 中：
+- **选择**：在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs` 的 `planSurfaceApplication` 中（行号随重构漂移，以函数名为准）：
   ```fsharp
-  if surface.Ports.Runtime.IsReplica surface.Owner || not surface.IsRootWork then
+  if
+      surface.RequestKind <> ProviderRequestKind.WorkMain
+      || surface.HasPrefixProbe
+      || surface.Ports.Runtime.IsReplica surface.Owner
+      || not surface.IsRootWork
+  then
       SurfaceApplication.Skip
   else
       decideTargetAction surface.Target surface.DurableProjection
   ```
-  只要检测到会话属于 Replica 或不是根会话，直接返回 `SurfaceApplication.Skip`，跳过目标决策，不进入 `decideTargetAction`。
+  只要检测到请求不是 WorkMain、带 prefix probe、会话属于 Replica 或不是根会话，直接返回 `SurfaceApplication.Skip`，跳过目标决策，不进入 `decideTargetAction`。
 - **反事实知识：两道物理闸的纵深防御**：
   - `planSurfaceApplication` 的就地 `Skip` 是**防递归的第一道物理闸**。它直接截断了 Surface 执行入口，使得任何 Replica 会话根本无法进入决策匹配（`decideTargetAction`），从物理源头上阻止了其生成 `ConsumeBound` 或 `StartPending`；
-  - 随后在下游策略层（`StrengthPolicy.decide`，`Delegate.fs` L576-600）中，对 `isReplicaOrInternalLeaf` 施加了第二道硬拦截（独立测试见 `requirements/speculative-investigation/tests/010.test.mjs` L117-130 与 `requirements/speculative-investigation/tests/011.test.mjs` L152-175）。
+  - 随后在下游策略层（`StrengthPolicy.decide`，`src/Wanxiangshu/Strength/Policy.fs` L120 起；行号随重构漂移，以函数名为准）中，对 `isReplicaOrInternalLeaf` 施加了第二道硬拦截（独立测试见 `requirements/speculative-investigation/tests/010.test.mjs` L117-130 与 `requirements/speculative-investigation/tests/011.test.mjs` L152-175）。
   - 这两道防线独立存在、缺一不可。
 - **被否决的替代方案**：移除外层的 `planSurfaceApplication` 检查，仅依赖下游策略层（`StrengthPolicy`）做集中拦截。
 - **否决理由**：仅依赖下游策略层拦截是脆弱的。若外层不就地 `Skip`，Replica 的输出帧就会作为合法的 Surface 目标进入 `decideTargetAction`，参与决策比对与投影扫描。任何一处下游策略疏漏、分类漂移或新增加的内部动作，都会导致系统误将 Replica 输出帧当成主模型的合法业务来源进行消费，彻底击穿防递归不变量。Replica 输出在物理本质上就不是合法的 owner 来源，这与估算数值（`estimated_readonly_rounds`）大小完全无关——即使模型在副本内填写了正数，它也绝不能被当成来源。
-- **后果（Consequences）**：嵌套委托在物理与拓扑层面上彻底不可达。矩阵 H12、H13 与 H03 的测试断言以及迟到回调的物理尾部隔离均以此为确定地基。
+- **后果（Consequences）**：嵌套委托在物理与拓扑层面上彻底不可达。矩阵 H12、H13 的测试断言以及迟到回调的物理尾部隔离均以此为确定地基。H03 覆盖的是策略层对 Replica 身份标志的响应——`isReplicaOrInternalLeaf` 由用例显式传入，断言 `policyEligibility` 返回 `Ineligible + replica-or-internal-leaf`、`policyDecide` 返回 `Skip` 与同一 reason，它不经过 `planSurfaceApplication`。capture 路径侧的同源判定由 `checkCaptureEligibility` 把 `IsReplica` 与 `not IsRootWork` 压进同一个 or 分支、共用 reason `"not-root-owner-work"`，原理上不可区分；且该路径传入的 `IsReplicaOrInternalLeaf` 取自 `IsRootWork`，在 capture 路径上恒为 false。该路径的自动化覆盖不在 `requirements/**/tests/*.test.mjs` 内。
 - **重新考虑的条件**：除非产品架构发生根本性演进，正式引入了多层级、带全局配额树与防环检测的有界递归调查机制，否则外层 Surface 的就地 `Skip` 绝不允许移除或放宽。
 
 ### 当前未证边界清单：真实 Provider 容量为 1 时的父子无死锁

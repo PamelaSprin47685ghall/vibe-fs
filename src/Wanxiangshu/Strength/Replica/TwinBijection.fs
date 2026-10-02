@@ -46,13 +46,15 @@ module TwinBijection =
     /// ordinal (1-based) so the alignment is total and order-preserving.
     let private numbered (child: ProviderProjection.WireMessage list) =
         child
-        |> List.fold (fun (seen, acc) message ->
-            if hasCall message then
-                (seen + 1, (seen + 1, message) :: acc)
-            elif isSpeechOnly message then
-                (seen, (seen, message) :: acc)
-            else
-                (seen, acc)) (0, [])
+        |> List.fold
+            (fun (seen, acc) message ->
+                if hasCall message then
+                    (seen + 1, (seen + 1, message) :: acc)
+                elif isSpeechOnly message then
+                    (seen, (seen, message) :: acc)
+                else
+                    (seen, acc))
+            (0, [])
         |> snd
         |> List.rev
 
@@ -66,7 +68,10 @@ module TwinBijection =
     /// This never refuses and never drops speech: an unbalanced pair of histories
     /// still yields a usable request. Misplacement can only cost some prefix reuse,
     /// whereas dropping speech or failing would break the delegation outright.
-    let restore (child: ProviderProjection.WireMessage list) (owner: ProviderProjection.WireMessage list) : ProviderProjection.WireMessage list =
+    let restore
+        (child: ProviderProjection.WireMessage list)
+        (owner: ProviderProjection.WireMessage list)
+        : ProviderProjection.WireMessage list =
         let ownerToolPositions =
             owner
             |> List.mapi (fun index message -> index, message)
@@ -117,7 +122,8 @@ module TwinBijection =
         let speech = child |> List.filter isSpeechOnly
         let known = owner @ speech
 
-        restored |> List.forall (fun message -> known |> List.exists (fun k -> k = message))
+        restored
+        |> List.forall (fun message -> known |> List.exists (fun k -> k = message))
 
     /// Speech survives: the number of speech messages is never reduced.
     let dropsNoSpeech (child: ProviderProjection.WireMessage list) (owner: ProviderProjection.WireMessage list) =
@@ -194,7 +200,8 @@ module TwinBijectionSurface =
         |> List.toArray
         |> fun parts -> box {| role = message.Role; parts = parts |}
 
-    let private messagesOf (values: obj array) = values |> Array.toList |> List.map messageOf
+    let private messagesOf (values: obj array) =
+        values |> Array.toList |> List.map messageOf
 
     let restore (child: obj array) (owner: obj array) : obj array =
         TwinBijection.restore (messagesOf child) (messagesOf owner)
@@ -210,7 +217,12 @@ module TwinBijectionSurface =
     let dropsNoSpeech (child: obj array) (owner: obj array) : bool =
         TwinBijection.dropsNoSpeech (messagesOf child) (messagesOf owner)
 
-    let extensionIsPrefix (childBefore: obj array) (ownerBefore: obj array) (childAfter: obj array) (ownerAfter: obj array) : bool =
+    let extensionIsPrefix
+        (childBefore: obj array)
+        (ownerBefore: obj array)
+        (childAfter: obj array)
+        (ownerAfter: obj array)
+        : bool =
         TwinBijection.extensionIsPrefix
             (messagesOf childBefore)
             (messagesOf ownerBefore)

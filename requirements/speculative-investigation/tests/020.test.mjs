@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import fc from 'fast-check'
-import * as boundary from '../../../dist/Strength/Replica/TwinBijection.js'
+import * as boundary from '../../../dist/Strength/Surface.js'
 
 // The class exposes a plain-object boundary; the pure F# functions are what it
 // wraps, and the properties below are stated against that boundary.
