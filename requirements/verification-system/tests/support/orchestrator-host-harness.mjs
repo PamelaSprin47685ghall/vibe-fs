@@ -13,7 +13,7 @@ import * as hostSurface from '../../../../dist/Change/Host/Surface.js'
 import * as journalSurface from '../../../../dist/Persistence/Journal/Surface.js'
 
 export const fakeGitPort = (behaviour = {}) => ({
-  IsDirty: async () => Boolean(behaviour.dirty),
+  IsDirty: async () => ({ ok: true, value: Boolean(behaviour.dirty) }),
   CreateWorktree: async (jobId) => ({ ok: true, value: `manager/${jobId}` }),
   FreezeTargetBranch: async () =>
     behaviour.freezeError ? { ok: false, error: behaviour.freezeError } : { ok: true, value: 'refs/heads/main' },

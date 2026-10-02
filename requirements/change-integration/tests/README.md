@@ -6,7 +6,7 @@
 
 - `observeRelayProgram` 执行真实 Change Program，注入受控 Git、Relay、持久化和资源端口，记录实际调用。它能证明程序对这些端口结果的裁决与顺序，不能证明外部端口已完成持久化、真实 Agent 独立评估或整个 Orchestrator 已接线。
 - `recordFact`、`fold` 和分类用例验证事实投影与恢复裁决；重复纯 fold、重建 projection 或注入已有 claim 都不等于发生过进程崩溃和恢复。旧标题中的 `THEOREM`、`PERSIST` 也不提升证明层级。
-- Git adapter 用例调用实际适配器，以命令端口注入正常与失败结果。`002` 中另有真实临时 Git 仓库用例，证明 dirty target 不被推进；这些不能替代用户请求受理阶段的真实入口检查。
+- Git adapter 用例调用实际适配器，以命令端口注入正常与失败结果。`002` 还通过实际 Host 的 ForkManagerJob 调用实际 Git adapter，验证 cleanliness 检查失败或命令拒绝时，新 Job 不追加 worktree 请求、不创建 worktree 或 Manager；clean 正向对照确实抵达 worktree 请求和创建边界。该夹具从空的 Orchestrator 历史开始，不能证明 Host 初始化时恢复、清理旧义务没有副作用。真实临时 Git 仓库用例另证 status 失败返回错误及 dirty target 不被推进。
 - IntegrationGate 用例实际创建并释放锁；ManagerLoop 的 10,000 次 Continue 用例执行真实循环，只证明这些信号下的有限推进及资源计账，不声称完成 10,000 次发布。
 
 ## 条款对应
@@ -14,7 +14,7 @@
 | 条款 | 当前有效观察 | 尚不能据此宣称 |
 | --- | --- | --- |
 | [001] | 真实 Program 从候选到发布的调用顺序、失效与继续循环 | Relay 的 durable invalidation 已落盘、真实模型独立 assessment 的全链闭合 |
-| [002] | dirty/clean 命令观察；ff 发布遇到 dirty 或 status 失败时拒绝；真实 Git dirty target 不变 | 受理请求前的所有 Clean Gate 条件均已接入；early IsDirty 的命令失败目前仍被当成 false，见 GAP-214 |
+| [002] | dirty/clean/error 分别返回；实际 Host 在 cleanliness 错误后拒绝新 Job，保持其持久请求、worktree、Manager 和目标 HEAD 不变；ff 发布遇到 dirty 或 status 失败时拒绝 | 用户请求入口的所有 Clean Gate 条件均已接入；Host 初始化中既有义务的恢复、清理过程也没有副作用 |
 | [003] | 各事实独立投影；完整 claim 的恢复裁决；缺失字段拒绝；Published 追加失败不会伪装成功 | 任意真实崩溃点都有足够持久材料可恢复 |
 | [004] | rebase/冲突处置不持锁；ff 受锁保护；发布完成后释放门禁再清理一次；实际锁与循环 | 门内只存在 ref 重读和 CAS；durable claim/Published 写入等仍在门内，见 GAP-215 |
 | [005] | 冲突事实及 snapshot 留存、门外继续循环、worktree 清理错误传播 | 完整 Relay 失效与下一真实 incumbency 的端到端因果链；重复 fold 不是重启 |
@@ -36,4 +36,4 @@
 
 普通局部诊断可用 `WXS_TIER_INTEGRATION=1 node --test requirements/change-integration/tests/*.test.mjs`。交付仍由正式 requirement runner 执行，并保留 TODO/失败；本目录全部文件执行不等于所有合同已满足。
 
-GAP-212 登记上述生产流程证据缺口；GAP-213 登记已修的门内重复清理；GAP-214 保留 cleanliness inspection 错误反例；GAP-215 / 55-D1 保留门禁范围与持久协议的合同分岔。缺少真实执行的 TODO 不计入通过，不用测试自建事实补齐。
+GAP-212 登记上述生产流程证据缺口；GAP-213 登记已修的门内重复清理；GAP-214 对应 `002` 的 cleanliness 错误传播与新 Job 拒绝回归，不代表既有义务恢复的完整验收；GAP-215 / 55-D1 保留门禁范围与持久协议的合同分岔。缺少真实执行的 TODO 不计入通过，不用测试自建事实补齐。

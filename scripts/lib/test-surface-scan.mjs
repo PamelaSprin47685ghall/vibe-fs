@@ -1602,7 +1602,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Change/Host/Surface.js',
     owner: 'change-integration',
-    laws: ['CHGINT-003'],
+    laws: ['CHGINT-002', 'CHGINT-003'],
     source: 'src/Wanxiangshu/Change/Host/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

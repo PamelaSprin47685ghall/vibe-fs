@@ -162,7 +162,7 @@
 | GAP-211 | distribution-003/007 | PARTIAL | 归档“仅dist/resources”与必需package.json及npm根README/LICENSE存在字面冲突；需明确payload与允许根元数据边界，不由checker白名单暗定合同。 |
 | GAP-212 | change-integration | PARTIAL | 保留真实Program/Git/CAS/Gate；移除猜Job、补claim、自建跨Road失效的Surface路径。真实horizon、多Road、mutation重验、跨进程发布恢复仍TODO；四个有效Mailbox用例迁回42。 |
 | GAP-213 | change-integration-004 | PARTIAL | 真实Program曾在gate内外两次TerminateRoadResources；已迁入只留release后settleLanded的窄修复和反例，待新构建验证，未重排其它durable写入。 |
-| GAP-214 | change-integration-002 | PARTIAL | early IsDirty将status错误映为false，实际adapter失败TODO保留；完整fork后果待证。独立ff发布检查已拒绝错误且零merge，不能夸大为发布已越权。 |
+| GAP-214 | change-integration-002 | CLOSED | IsDirty现返回Result，status失败不再冒充clean；实际adapter失败先红、修复后通过。真实Host从空历史接收新Job，错误/dirty拒绝且不追加worktree请求、不创建worktree或Manager、不推进HEAD；clean对照确实追加请求并抵达创建边界，命令拒绝保留原异常。2026-10-02隔离Fable构建及四包正式runner启用integration：312 passed、0 failed、52/52文件完成，25个其余TODO保留。仅关闭新Job准入缺陷；旧义务恢复/清理与完整流程仍见GAP-212。 |
 | GAP-215 | change-integration-001/003/004 | PARTIAL | ref-only gate合同与实际CaptureSnapshot、durable claim/Published门内写入冲突；需选择最小有界可恢复事务或重设计门外提交协议，暂保留严格合同与TODO。 |
 
 ### 上游已关闭记录的本批校正

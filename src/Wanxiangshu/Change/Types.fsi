@@ -20,7 +20,7 @@ type OrchestratorHandle =
       WorktreePath: WorktreePath }
 
 type GitPort =
-    { IsDirty: WorktreePath -> Task<bool>
+    { IsDirty: WorktreePath -> Task<Result<bool, string>>
       CreateWorktree: ManagerJobId -> WorktreePath -> Task<Result<WorktreeIdentity, string>>
       FreezeTargetBranch: unit -> Task<Result<TargetRef, string>>
       Rebase: WorktreePath -> TargetRef -> Task<Result<unit, string>>
