@@ -214,7 +214,7 @@ module CausalFrontier =
         |> List.distinctBy ownerKey
         |> List.filter (fun owner -> not (Set.contains (ownerKey owner) produced))
 
-    let private walk (byOwner: Map<string, DiagnosticWait list>) (start: CausalOwnerRef) : CausalFrontier =
+    let private walk (byOwner: Map<string, DiagnosticWait list>) (start: CausalOwnerRef) : CausalFrontier list =
         let rec go (owner: CausalOwnerRef) (chain: CausalFrontierNode list) (seen: Set<string>) =
             let key = ownerKey owner
 
@@ -226,11 +226,11 @@ module CausalFrontier =
                     |> List.skipWhile (fun o -> ownerKey o <> key)
                     |> fun prefix -> prefix @ [ owner ]
 
-                { Kind = CausalWaitCycle
-                  Chain = List.rev chain
-                  FrontierProducer = None
-                  Cycle = cycle
-                  Detail = "CAUSAL WAIT CYCLE" }
+                [ { Kind = CausalWaitCycle
+                    Chain = List.rev chain
+                    FrontierProducer = None
+                    Cycle = cycle
+                    Detail = "CAUSAL WAIT CYCLE" } ]
             else
                 resolveOwner byOwner go owner chain seen
 
@@ -239,61 +239,70 @@ module CausalFrontier =
 
             match Map.tryFind key byOwner with
             | None ->
-                { Kind = BrokenCausalEdge
-                  Chain = List.rev ({ Owner = owner; Wait = None } :: chain)
-                  FrontierProducer = None
-                  Cycle = []
-                  Detail =
-                    "BROKEN CAUSAL EDGE: consumer waits for "
-                    + key
-                    + " but no active wait declares that owner" }
+                [ { Kind = BrokenCausalEdge
+                    Chain = List.rev ({ Owner = owner; Wait = None } :: chain)
+                    FrontierProducer = None
+                    Cycle = []
+                    Detail =
+                      "BROKEN CAUSAL EDGE: consumer waits for "
+                      + key
+                      + " but no active wait declares that owner" } ]
             | Some [] ->
-                { Kind = ProducerRunningWithoutWait
-                  Chain = List.rev ({ Owner = owner; Wait = None } :: chain)
-                  FrontierProducer = None
-                  Cycle = []
-                  Detail = "PRODUCER RUNNING WITHOUT DECLARED WAIT: " + key }
-            | Some(wait :: _) ->
-                let node = { Owner = owner; Wait = Some wait }
-                let nextChain = node :: chain
+                [ { Kind = ProducerRunningWithoutWait
+                    Chain = List.rev ({ Owner = owner; Wait = None } :: chain)
+                    FrontierProducer = None
+                    Cycle = []
+                    Detail = "PRODUCER RUNNING WITHOUT DECLARED WAIT: " + key } ]
+            | Some waits ->
                 let nextSeen = Set.add key seen
-                resolveProducer byOwner continueWalk key wait nextChain nextSeen
+
+                waits
+                |> List.collect (fun wait ->
+                    let nextChain = { Owner = owner; Wait = Some wait } :: chain
+                    resolveProducer byOwner continueWalk key wait nextChain nextSeen)
 
         and resolveProducer byOwner continueWalk key wait nextChain nextSeen =
             match wait.Producer with
             | ExternalProducer _ as producer ->
-                { Kind = ExternalProducerFrontier
-                  Chain = List.rev nextChain
-                  FrontierProducer = Some producer
-                  Cycle = []
-                  Detail = "FRONTIER: waiting for external producer " + CausalProducer.key producer }
+                [ { Kind = ExternalProducerFrontier
+                    Chain = List.rev nextChain
+                    FrontierProducer = Some producer
+                    Cycle = []
+                    Detail = "FRONTIER: waiting for external producer " + CausalProducer.key producer } ]
             | WorkflowProducer next -> resolveWorkflow byOwner continueWalk key wait next nextChain nextSeen
 
         and resolveWorkflow byOwner continueWalk key wait next nextChain nextSeen =
             match Map.tryFind (ownerKey next) byOwner with
             | None ->
-                { Kind = BrokenCausalEdge
-                  Chain = List.rev ({ Owner = next; Wait = None } :: nextChain)
-                  FrontierProducer = Some wait.Producer
-                  Cycle = []
-                  Detail =
-                    "BROKEN CAUSAL EDGE: "
-                    + key
-                    + " waits for "
-                    + ownerKey next
-                    + " but no active wait exists for that producer" }
+                [ { Kind = BrokenCausalEdge
+                    Chain = List.rev ({ Owner = next; Wait = None } :: nextChain)
+                    FrontierProducer = Some wait.Producer
+                    Cycle = []
+                    Detail =
+                      "BROKEN CAUSAL EDGE: "
+                      + key
+                      + " waits for "
+                      + ownerKey next
+                      + " but no active wait exists for that producer" } ]
             | Some _ -> continueWalk next nextChain nextSeen
 
         go start [] Set.empty
 
-    let private startsForSnapshot (active: DiagnosticWait list) (roots: CausalOwnerRef list) : CausalOwnerRef list =
-        if List.isEmpty roots then
-            active |> List.map (fun wait -> wait.Owner) |> List.distinctBy ownerKey
+    let private walkUnvisited byOwner (frontiers, visited) owner =
+        if Set.contains (ownerKey owner) visited then
+            frontiers, visited
         else
-            roots
+            let found = walk byOwner owner
+
+            let reached =
+                found
+                |> List.collect (fun frontier -> frontier.Chain)
+                |> List.fold (fun seen node -> Set.add (ownerKey node.Owner) seen) visited
+
+            frontiers @ found, reached
 
     /// Pure diagnostic algorithm: from living root owners, follow consumer→producer
-    /// edges until the first unexplained frontier.
+    /// edges to every unsatisfied branch, then include disconnected cyclic components.
     let ofSnapshot (snapshot: DiagnosticWaitSnapshot) : CausalFrontier list =
         match snapshot.Active with
         | [] ->
@@ -304,5 +313,5 @@ module CausalFrontier =
                 Detail = "no active waits" } ]
         | active ->
             let byOwner = waitsByOwner active
-            let starts = startsForSnapshot active (rootOwners active)
-            starts |> List.map (fun root -> walk byOwner root)
+            let starts = rootOwners active @ (active |> List.map (fun wait -> wait.Owner))
+            starts |> List.fold (walkUnvisited byOwner) ([], Set.empty) |> fst

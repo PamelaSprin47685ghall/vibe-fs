@@ -492,23 +492,166 @@ export const scanFeatureHistoryLoop = (text, file = '<synthetic>') => {
     }
   }
 
-  // Catch a hand-rolled stream merge without pretending every ordinary List.fold
-  // is history interpretation. Both signals are required in the same file.
-  const joined = codeLines.join('\n')
-  const flattensWriterStreams =
-    /\b(?:List|Seq|Array)\.collect\s+snd\b|\b(?:List|Seq|Array)\.(?:concat|collect)\b/.test(joined)
-  if (!observer && /\b(?:streams|history)\b/i.test(joined) && flattensWriterStreams) {
-    const lineIdx = codeLines.findIndex((line) => /\b(?:List|Seq|Array)\.sortBy\b/.test(line))
-    if (lineIdx >= 0) {
-      push(
-        lineIdx,
-        'manual merge',
-        "feature history loop token 'manual merge' is forbidden; only CanonicalIntegrator derives business Current",
-      )
+  // A diagnostic History field must not lend durable ownership to an unrelated
+  // collection. Follow lexical bindings and their referenced local helpers.
+  if (!observer) {
+    for (const lineIdx of manualHistoryMergeLines(lines)) {
+      push(lineIdx, 'manual merge',
+        "feature history loop token 'manual merge' is forbidden; only CanonicalIntegrator derives business Current")
     }
   }
 
   return hits
+}
+
+const historyBindings = (lines) => {
+  const bindings = []
+  for (let start = 0; start < lines.length; start++) {
+    const declaration = lines[start].match(/^(\s*)(let|and|(?:static\s+)?member|override|default|do|new|type|module|namespace|interface)\b/)
+    if (!declaration) continue
+    const [, indentation, kind] = declaration
+    const indent = indentation.length
+    const flatModule = /^(?:module|namespace)$/.test(kind) && !lines[start].includes('=')
+    let end = start + 1
+    for (; end < lines.length; end++) {
+      if (!lines[end].trim()) continue
+      if (flatModule && (!/^\s*(?:module|namespace)\b/.test(lines[end]) || lines[end].includes('='))) continue
+      if (lines[end].match(/^\s*/)[0].length <= indent) break
+    }
+    const parent = bindings.findLast((binding) => binding.start < start && start < binding.end) ?? null
+    const body = lines.slice(start, end).join('\n').slice(declaration[0].length)
+    const separator = kind === 'do' ? -1 : body.indexOf('=')
+    const header = separator < 0 ? '' : body.slice(0, separator)
+    const named = /^(?:let|and)$/.test(kind)
+      ? header.match(/^\s*(?:(?:rec|inline|private|internal|public|mutable)\s+)*([A-Za-z_][\w']*)/)
+      : null
+    const moduleName = /^(?:module|namespace)$/.test(kind)
+      ? lines[start].slice(declaration[0].length).match(/^\s*(?:(?:rec|private|internal|public)\s+)*([A-Za-z_][\w']*)/)?.[1]
+      : null
+    const previous = bindings.findLast((binding) => binding.parent === parent)
+    bindings.push({
+      start, end, parent,
+      name: named?.[1] ?? moduleName ?? null,
+      module: Boolean(moduleName),
+      visibleFrom: kind === 'and' ? previous?.visibleFrom ?? start : start,
+      parameters: new Set(moduleName ? [] : (header.slice(named?.[0].length ?? 0).match(/[A-Za-z_][\w']*/g) ?? [])),
+      expressionOffset: declaration[0].length + separator + 1,
+      scopeOnly: /^(?:type|module|namespace|interface)$/.test(kind),
+      history: false,
+      collection: false,
+      sortLines: new Set(),
+      helpers: new Set(),
+    })
+  }
+  return bindings
+}
+
+const referencedHistoryHelper = (bindings, owner, name, line) => {
+  for (let scope = owner; ; scope = scope.parent) {
+    const helper = bindings.findLast((binding) =>
+      binding.name === name && binding.parent === scope && binding.visibleFrom <= line)
+    if (helper) return helper
+    if (!scope || scope.parameters.has(name)) return null
+  }
+}
+
+const referencedQualifiedHistoryHelper = (bindings, owner, reference, line) => {
+  const [name, ...members] = reference.split('.')
+  let helper = referencedHistoryHelper(bindings, owner, name, line)
+  for (const member of members) {
+    if (!helper?.module) return null
+    helper = bindings.findLast((binding) =>
+      binding.name === member && binding.parent === helper && binding.visibleFrom <= line)
+  }
+  return helper?.scopeOnly ? null : helper
+}
+
+const historyLambdaShadows = (lines, bindings) => {
+  const text = lines.join('\n')
+  const offsets = [0]
+  for (const line of lines) offsets.push(offsets.at(-1) + line.length + 1)
+  const openings = []
+  const pairs = []
+  for (const token of text.matchAll(/[()[\]{}]/g)) {
+    if ('([{'.includes(token[0])) openings.push(token.index)
+    else if (openings.length) pairs.push({ start: openings.pop(), end: token.index })
+  }
+  const scopes = []
+  for (const lambda of text.matchAll(/\bfun\s+([\s\S]*?)\s*->/g)) {
+    const line = offsets.findLastIndex((offset) => offset <= lambda.index)
+    const owner = bindings.findLast((binding) => binding.start <= line && line < binding.end)
+    let end = offsets[owner?.end] ?? text.length
+    for (const pair of pairs) {
+      if (pair.start < lambda.index && lambda.index < pair.end) end = Math.min(end, pair.end)
+    }
+    scopes.push({
+      start: lambda.index, end,
+      parameters: new Set(lambda[1].match(/[A-Za-z_][\w']*/g) ?? []),
+    })
+  }
+  return (name, line, column) => {
+    const position = offsets[line] + column
+    return scopes.some((scope) => scope.start <= position && position < scope.end && scope.parameters.has(name))
+  }
+}
+
+const manualHistoryMergeLines = (sourceLines) => {
+  // Mask literals and comments while retaining line/column coordinates.
+  const lines = sourceLines.join('\n')
+    .replace(/"""[\s\S]*?"""|@"(?:[^"]|"")*"|"(?:\\.|[^"\\])*"|\/\/[^\n]*|\(\*[\s\S]*?\*\)/g,
+      (literal) => literal.replace(/[^\n]/g, ' '))
+    .split('\n')
+  const bindings = historyBindings(lines)
+  const lambdaShadows = historyLambdaShadows(lines, bindings)
+  const owners = []
+  for (const binding of bindings) {
+    for (let line = binding.start; line < binding.end; line++) owners[line] = binding
+  }
+  for (const binding of bindings) {
+    if (binding.scopeOnly) continue
+    let offset = 0
+    for (let line = binding.start; line < binding.end; line++) {
+      const code = lines[line]
+      const expressionStart = Math.max(0, binding.expressionOffset - offset)
+      const expression = code.slice(expressionStart)
+      offset += code.length + 1
+      if (owners[line] !== binding) continue
+      binding.history ||= /\b(?:streams|history)\b/i.test(code)
+      binding.collection ||= /\b(?:List|Seq|Array)\.(?:concat|collect)\b/.test(expression)
+      if (/\b(?:List|Seq|Array)\.sortBy\b/.test(expression)) binding.sortLines.add(line)
+      for (const match of expression.matchAll(/(?<![\w'.])\b([A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*)\b/g)) {
+        if (lambdaShadows(match[1].split('.')[0], line, expressionStart + match.index)) continue
+        const helper = referencedQualifiedHistoryHelper(bindings, binding, match[1], line)
+        if (helper) binding.helpers.add(helper)
+      }
+    }
+  }
+
+  // The finite binding graph includes recursive helper groups.
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const binding of bindings) {
+      for (const helper of binding.helpers) {
+        const previousHistory = binding.history
+        const previousCollection = binding.collection
+        const previousSortCount = binding.sortLines.size
+        binding.history ||= helper.history
+        binding.collection ||= helper.collection
+        for (const line of helper.sortLines) binding.sortLines.add(line)
+        changed ||= previousHistory !== binding.history
+          || previousCollection !== binding.collection
+          || previousSortCount !== binding.sortLines.size
+      }
+    }
+  }
+  const hits = new Set()
+  for (const binding of bindings) {
+    if (binding.history && binding.collection) {
+      for (const line of binding.sortLines) hits.add(line)
+    }
+  }
+  return [...hits].sort((left, right) => left - right)
 }
 
 /**

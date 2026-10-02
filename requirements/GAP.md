@@ -101,7 +101,7 @@
 | GAP-091 | process-execution-001—013 | PARTIAL | 真实控制/单子进程不覆盖全部后代树收束；纯词汇与物理实现同编译单元、query-shell 旧角色/资源仍有反例和待决。PTY 局部顺序不代替 Agent 交付全链。 |
 | GAP-092 | process-execution-015 | PARTIAL | 原实现只限制日志正文，完整 wire 连说明可能超过字节预算；失败 TODO 比较完整结果。需明确小预算拒绝/外部承载及正文与总预算的合同。 |
 | GAP-093 | process-execution-014/015 | PARTIAL | 已迁入超时不能宣称已终止、截断说明应在数据平面的修复与反例；待新构建验证，不据此关闭物理终结或完整预算缺口。 |
-| GAP-094 | causal-wait-001/002/007/009 | PARTIAL | registry、诊断非干扰及独立进程已有局部证据；Last progress 因果关联、同 owner 多等待分支、ProducerRunningWithoutWait 与真实注入仍缺证。 |
+| GAP-094 | causal-wait-001/002/007/009 | PARTIAL | 007已修同owner多等待分支与断开循环遗漏；正式先红反例覆盖外部/缺失/循环分支、注册顺序、菱形汇聚，并补多root共享producer仍保留完整链。registry、诊断非干扰及独立进程证据保留；Last progress因果关联、ProducerRunningWithoutWait所需活跃producer信息与真实生产注入仍缺证。 |
 | GAP-095 | causal-wait-008 | PARTIAL | 合同说不落持久介质，Bridge 却写可遗留 JSON；非权威不等于不落盘。需裁决可丢弃诊断快照例外及进程/新鲜度约束。 |
 | GAP-096 | causal-wait | PARTIAL | 异常等待的错误分类/未取消 deadline，以及逆序链误提取循环已有先红修复；新基线须复核同一正式回归，不把诊断算法用于业务裁决。 |
 | GAP-097 | durable-events-019—025 | PARTIAL | 磁盘重开、Current 与损坏历史已有证据；完整 boot 激活、物理 fatal 和跨进程 cut 仍待证。IdentityCollision/StorageInvalid/普通 Rejected 都不自动等于 semantic cut 已结算。 |
