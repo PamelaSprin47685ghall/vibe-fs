@@ -178,10 +178,8 @@ integrationTest('WHAT[obligation-ledger-005] distinct sessions and calls never c
 })
 const { renameSync, writeFileSync } = await import("node:fs");
 
-// A causal barrier around the blocked append: the events directory is
-// stashed and replaced with a plain file so the writer cannot create its
-// lock, and the stash is restored in finally. Only the fixture directory
-// is touched.
+// Refuse physical appends in the fixture workspace, restoring its events
+// directory even when the tested operation fails.
 const withBlockedEvents = async (directory, action) => {
   const eventsDir = join(directory, '.git', 'wanxiang', 'events')
   const { mkdtempSync: mkStash, rmSync: rmStash } = await import("node:fs")
@@ -196,6 +194,7 @@ const withBlockedEvents = async (directory, action) => {
     renameSync(join(stash, 'events'), eventsDir)
     rmStash(stash, { recursive: true, force: true })
   }
+}
 
 integrationTest('WHAT[obligation-ledger-005] concurrent duplicate terminals share one append outcome instead of an early success', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -217,8 +216,9 @@ integrationTest('WHAT[obligation-ledger-005] concurrent duplicate terminals shar
       // The blocked append fails; both callers must see that failure.
       assert.deepEqual(statuses, ['rejected', 'rejected'], 'both duplicate terminals observe the append failure')
       for (const outcome of outcomes) {
-        assert.match(String(outcome.reason), /append|write|EEXIST/i, 'the rejection carries the append failure')
+        assert.match(String(outcome.reason), /append outcome unknown/i, 'the rejection carries the unknown append outcome')
       }
+      assert.equal(String(outcomes[1].reason), String(outcomes[0].reason), 'both callers observe the same failed event identity and outcome')
     })
 
     // After the blockage is removed the durable log carries no checkpoint
@@ -226,8 +226,6 @@ integrationTest('WHAT[obligation-ledger-005] concurrent duplicate terminals shar
     assert.equal(countCheckpointFacts(directory), 0, 'no checkpoint fact was committed while the append was blocked')
   })
 })
-}
-
 
 integrationTest('WHAT[obligation-ledger-005] concurrent duplicates of a successful terminal share the one append and commit exactly one fact', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -263,16 +261,24 @@ integrationTest('WHAT[obligation-ledger-005] a WriteUnknown append outcome is ne
       // The blocked append reports an unknown outcome: the event may already
       // be durable, so repeating it is unsafe. The first caller observes the
       // failure...
+      let firstFailure
       await assert.rejects(
         () => hooks.event(terminalEvent(sessionID, callID, 'completed')),
-        /append outcome unknown/i,
+        (failure) => {
+          firstFailure = String(failure)
+          assert.match(firstFailure, /append outcome unknown/i)
+          return true
+        },
         'the first terminal observes the WriteUnknown failure',
       )
       // ...and a duplicate terminal for the same call observes the same
       // failure instead of silently succeeding or re-attempting the append.
       await assert.rejects(
         () => hooks.event(terminalEvent(sessionID, callID, 'completed')),
-        /append outcome unknown/i,
+        (failure) => {
+          assert.equal(String(failure), firstFailure, 'the retry preserves the original uncertain event identity and failure')
+          return true
+        },
         'the duplicate terminal observes the same unknown outcome, never an early success',
       )
     })
@@ -283,7 +289,7 @@ integrationTest('WHAT[obligation-ledger-005] a WriteUnknown append outcome is ne
   })
 })
 
-integrationTest('WHAT[obligation-ledger-005] a WriterUnavailable outcome releases the call so a retry gets a real second attempt', async () => {
+integrationTest('WHAT[obligation-ledger-005] a WriterUnavailable outcome releases the call so a retry reaches a fresh writer admission', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ol005-writer-unavailable'
     const firstCall = 'ol005-wu-call-1'
@@ -304,18 +310,28 @@ integrationTest('WHAT[obligation-ledger-005] a WriterUnavailable outcome release
     const secondCall = 'ol005-wu-call-2'
     await todoCall(hooks, sessionID, secondCall)
     // The poisoned writer refuses the new call's append as NotAttempted.
+    let firstRefusedEvent
     await assert.rejects(
       () => hooks.event(terminalEvent(sessionID, secondCall, 'completed')),
-      /append not attempted.*writer poisoned/i,
+      (failure) => {
+        const matched = String(failure).match(/append not attempted for ([^:]+): writer poisoned/i)
+        assert.ok(matched, 'the first refusal includes the attempted admission identity')
+        firstRefusedEvent = matched[1]
+        return true
+      },
       'the poisoned writer reports the append as not attempted',
     )
-    // NotAttempted releases the call: a retry reaches the real append path
-    // again (it fails again with the same typed refusal, not an early
-    // success and not a silently dropped event).
+    // A new refusal identity distinguishes fresh writer admission from
+    // replaying a cached error. The poisoned writer performs no new write.
     await assert.rejects(
       () => hooks.event(terminalEvent(sessionID, secondCall, 'completed')),
-      /append not attempted.*writer poisoned/i,
-      'the retry gets a real second append attempt',
+      (failure) => {
+        const matched = String(failure).match(/append not attempted for ([^:]+): writer poisoned/i)
+        assert.ok(matched, 'the retry is explicitly refused before physical append')
+        assert.notEqual(matched[1], firstRefusedEvent, 'the retry reaches writer admission with a new event identity')
+        return true
+      },
+      'the retry gets a fresh writer refusal, not a cached failure',
     )
     assert.equal(countCheckpointFacts(directory), 0, 'no fact was committed through the poisoned writer')
   })
