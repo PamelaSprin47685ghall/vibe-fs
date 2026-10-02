@@ -148,8 +148,7 @@ module PluginSessionWiring =
             |> Map.iter (fun sessionId sessionProj ->
                 sessionProj.PromptAuthority
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                |> Option.iter (fun _ ->
-                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore))
+                |> Option.iter (fun _ -> scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore))
 
         match journal with
         | Some durable ->

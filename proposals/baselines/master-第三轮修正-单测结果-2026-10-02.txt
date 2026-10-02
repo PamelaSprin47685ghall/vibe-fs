@@ -1,0 +1,6 @@
+# master 第三轮修正单测结果（2026-10-02）
+# 方法: node requirements/verification-system/tests/run.mjs (816 文件)
+# 结果: 3614 passed / 0 failed — 基线唯一失败 (js-semantic-surface-002) 由 19 处边界违规清理转绿
+# js-boundary-gate: 0 违规
+# 本轮: 025 观察点前置 + 004/011/026 Surface 化 (FoldSurface/hostSha256Hex/guaranteeKind 扩展)
+

@@ -388,11 +388,11 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     )
   })
 })
-test('WHAT[capability-enforcement-025] denial at the admission gate keeps the tool body, file reads and durable ledger untouched', async () => {
-  const { mkdirSync, writeFileSync, readFileSync } = await import('node:fs')
+test('WHAT[capability-enforcement-025] denial at the admission gate keeps the tool body, physical reads and durable appends at zero', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs')
   const { join } = await import('node:path')
   const { parse: parseToml } = await import('smol-toml')
-  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const revisionSurface = await import('../../../dist/Persistence/Journal/RevisionSurface.js')
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-p15'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
@@ -403,15 +403,28 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
     const program = "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }"
     const tool = hooks.tool['js-manager']
 
-    // Positive control (the observation point is valid): before review
-    // acceptance the same program drives the full call chain
-    // (before → execute → after) and the interpreter really reads the file —
-    // the executed result carries the file's bytes.
+    // Observation points are installed BEFORE the positive control, so the
+    // same instrumented path serves both scenarios:
+    // - executions: every call that reaches the tool interpreter;
+    // - journal revision: every durable append (each append advances it).
+    let executions = 0
+    const originalExecute = tool.execute.bind(tool)
+    tool.execute = (...callArgs) => {
+      executions += 1
+      return originalExecute(...callArgs)
+    }
+    const revisionOf = () => revisionSurface.revision(runtime.journal)
+
+    // Positive control: before review acceptance the same program drives the
+    // full call chain (before → execute → after). The interpreter really
+    // reads the file — the executed result carries the file's bytes — and
+    // the durable revision advances, proving both observation points fire.
     const admittedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
     await hooks['tool.execute.before'](
       { tool: 'js-manager', sessionID, callID: 'call-p15-control' },
       admittedOutput,
     )
+    const revisionBeforeControl = revisionOf()
     const controlResult = await tool.execute(
       admittedOutput.args,
       { sessionID, agent: 'manager', callID: 'call-p15-control', messageID: 'msg-p15-control' },
@@ -425,20 +438,22 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
       { tool: 'js-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
       { title: 'js-manager', output: controlResult, metadata: {} },
     )
+    assert.equal(executions, 1, 'positive control: exactly one interpreter call was observed')
 
-    // Now the review is accepted: the same call must be denied at the
-    // admission gate, before the interpreter is ever reached.
+    // Denied scenario: the review is accepted, so the same call must be
+    // rejected at the admission gate — before the interpreter is reached
+    // and before any durable append happens.
+    // The revision observation itself is validated by a known append:
+    // accepting the assessment writes a durable fact, so the revision must
+    // advance here — otherwise "unchanged" in the denial scenario would be
+    // vacuous.
+    const revisionBeforeAssessment = revisionOf()
     await injectAcceptedAssessment(runtime, sessionID)
+    assert.ok(revisionOf() > revisionBeforeAssessment, 'observation check: a real append advances the revision')
     const deniedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
     const argsSnapshot = JSON.stringify(deniedOutput.args)
-    const ledgerBefore = journal.JournalSurface_snapshot(runtime.journal)
-
-    let executions = 0
-    const originalExecute = tool.execute.bind(tool)
-    tool.execute = (...callArgs) => {
-      executions += 1
-      return originalExecute(...callArgs)
-    }
+    const executionsBeforeDenial = executions
+    const revisionBeforeDenial = revisionOf()
 
     await assert.rejects(
       async () => {
@@ -450,14 +465,12 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
       /not permitted under current manager capability facts/i,
     )
 
-    assert.equal(executions, 0, 'denial never reaches the tool interpreter')
+    assert.equal(executions, executionsBeforeDenial, 'denial never reaches the tool interpreter (physical read path stays at zero)')
     assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial does not mutate the caller arguments')
-    // The file the program would have read keeps its exact bytes.
-    assert.equal(readFileSync(join(directory, 'src/App.fs'), 'utf8'), 'review evidence')
-    // The durable ledger is unchanged: the denial appended no fact.
-    const ledgerAfter = journal.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(ledgerAfter, ledgerBefore)
+    assert.equal(revisionOf(), revisionBeforeDenial, 'denial appends no durable fact (revision unchanged)')
   })
 })
+
+test.todo('WHAT[capability-enforcement-025] denial keeps the physical file-read boundary at zero through the production interpreter entry (GAP-075: the execute-counter observation covers the registered tool body; the interpreter-internal fs adapter is not separately instrumented)')
 
 test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')

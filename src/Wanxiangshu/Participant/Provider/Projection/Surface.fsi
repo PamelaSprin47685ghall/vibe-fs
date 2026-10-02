@@ -16,6 +16,8 @@ module ProjectionSurface =
     val renderSemantic: projection: obj -> string
     val semanticallyEqual: left: obj -> right: obj -> bool
     val cutoffDigest: sha256: (string -> string) -> snapshot: obj -> cutoff: int -> string
+    /// provider-projection-011: the production Host crypto adapter.
+    val hostSha256Hex: input: string -> string
     val sealDigest: sha256: (string -> string) -> projection: obj -> string
     val toolResultDigests: sha256: (string -> string) -> projection: obj -> string array
     val pureContractNames: string array

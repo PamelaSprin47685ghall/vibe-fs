@@ -13,5 +13,4 @@ module SessionProviderLanguage =
     /// Language of a session: always the live global preference. The session
     /// id is accepted so call sites keep one resolution shape; it decides
     /// nothing.
-    let languageOf (_sessionId: SessionId) : ProviderLanguage =
-        GlobalProviderLanguage.current ()
+    let languageOf (_sessionId: SessionId) : ProviderLanguage = GlobalProviderLanguage.current ()
