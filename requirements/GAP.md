@@ -151,7 +151,7 @@
 | GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留；手工retire纯测试不证明正式终结驱动durable MailboxRetired，需接通完成/放弃/replacement及恢复。 |
 | GAP-158 | intra-participant-parallelism | PARTIAL | participant-identity/008部分证明：InheritedFromOwner缺任一owner字段（空串/空白/null/undefined）全部typed fail-closed，完整witness正常准入；真实Fission lane的identity传递仍待证。已有admission、parser、bundle/ring与权限拒绝局部测试保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
 | GAP-159 | intra-participant-parallelism-017；speculative-investigation-004 | PARTIAL | Predictor配置映射Engineer并暴露Fission；真实authority准入也接受，但actual根Fission被origin gate拒绝。保留分别取证的失败TODO，不宣称已发生完整越权。 |
-| GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；终结自动归档、全部工具访问、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。删除假维护接口，不补空实现凑绿。 |
+| GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；006新增成功零setter仍推进maintenance基线、completion不变、重开不重复维护及下次精确差分，阻止推进的隔离生产变异被击红。终结自动归档、全部工具访问、真实仓库权限拒绝、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。权限调查只静态定位到共享JsSandbox注入宿主对象的边界，未运行实际越权探针；既不能据此宣称越权成立，也不能把prompt/schema当拒绝证据。删除假维护接口，不补空实现凑绿。 |
 | GAP-161 | knowledge-reuse-005/015/016 | CLOSED | 实际fetch读取不可变旧payload并验证完整UTF-8字节/hash，一次目标捕获同时形成真实多hunk diff与待提交基线；B→C捕获后物理文件变D，本次仍保存C、下次才比较C→D。先红反例覆盖旧hash冒充正文、二次读取、无关Git变化、不变中段泄漏、BOM丢失和旧payload损坏；225对独立小域oracle核对最小增删及重建。隔离Fable构建与关键正式回归通过。非法UTF-8拒绝，历史已丢BOM不自动恢复；本条不关闭GAP-160的归档、权限、并发副本和完整预算义务。 |
 | GAP-180 | institutional-learning | PARTIAL | 真插件收据、冻结消费和重开有证据；Enhancer次数、完整BIRTH、学习闭合前不消费、各故障零部分效果仍缺证。 |
 | GAP-181 | institutional-learning-002—006 | OPEN | 当前evaluator仅按规则名匹配ABSORB，否则DISCARD；通用机制提炼、BIRTH、准入和revision重评尚未实现，不能以保守舍弃当作完整学习能力。 |
@@ -198,7 +198,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |
 | GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
 | GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
-| GAP-104 | context-compression | PARTIAL | 保留真实mailbox、flight、生产解码及XWire局部窗口证明；撤下布尔透传、手算floor、旧续传协议。027部分证明：wire描述符经validating constructor，伪造DeltaDigest被SHA256(Toml)重算覆盖，next≤prev与空Squash覆盖拒绝且无部分状态，requestId缺省时为确定性canonical hash。F# record私有构造的编译级证明、Opening恢复、持续追平、当前载体、紧急Probe前置失败、恢复旧epoch拒绝及端到端退休仍待证。 |
+| GAP-104 | context-compression | PARTIAL | 保留真实mailbox、flight、生产解码及XWire局部窗口证明；撤下布尔透传、手算floor、旧续传协议。027证明wire描述符经validating constructor、摘要重算、非法覆盖拒绝及canonical requestId；新增真实owner源码闭包的Fable正反编译，外部工厂调用/公开读取通过，Main与Squash私有record直接构造均在指定消费者位置被拒绝，3项通过。Opening恢复、持续追平、当前载体、紧急Probe前置失败、恢复旧epoch拒绝及端到端退休仍待证。 |
 | GAP-122 | interaction-authority | PARTIAL | 011部分证明：accepted root的session/logicalRun/authorityRoot/authorityKind/identitySeed/participantIdentity与同进程投影逐字段一致。per-physical target/lease原子携带与重启重放仍待证。身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
 | GAP-123 | interaction-authority、managed-session-lifecycle | OPEN | 五类durable authority closure尚缺完整生产执行与归还证据；不得用描述字段代替已发生的关闭。 |
 | GAP-124 | interaction-authority历史身份 | PARTIAL | 历史Inspector材料与活跃准入必须分别验证；不靠放宽当前身份恢复旧测试。 |
@@ -229,8 +229,8 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-196 | 旧ProjectionCut删owner请求 | RETIRED | 上游改为完整历史，不再要求旧裁剪；新实现保全历史的真实证据仍归GAP-195。 |
 | GAP-197 | relay-retirement | PARTIAL | 真实工具scope与受控资源收束用例保留；跨进程终止、递归live资源与完整退休不等于纯分类结果。 |
 | GAP-216 | 全局构建 | CLOSED | 2026-10-02复核：node scripts/build.mjs 全局构建通过（822模块链接加载），原「plugin-composition引用已删除Vault」阻断已解除。原记录中「部分独立闭包缺CanvasCodec等依赖」的编译失败未在当前构建复现；如再现按新证据重开。 |
-| GAP-217 | host-boundary-032 | PARTIAL | 现在精确断言值、对象身份、原键序和真实Host终态；现源码删除contract后尾部defineProperty，静态分析预示中间/首位键序反例，尚未执行。异常路径TODO保留，canary不再默认成功。 |
-| GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 上游load结算忽略append Error，TargetAgent空值又回退Byname；新接缝不补造成功事实。需在真实加载入口保留失败并验证合法历史材料边界。 |
+| GAP-217 | host-boundary-032 | PARTIAL | 已执行反例并修复readonly键序、删除中途失败回滚、重加review contract后的键序；两个独立暂存绑定exact session/call/tool，before在await前后复查，迟到或缺身份after不释放其他call暂存；Vault先按字段所有权判断再读取，不触发业务同名getter。16项新真实hook回归通过，断言原对象、完整描述符及键序。修正旧C11自抛异常冒充Host异常路径的标题；安装版Host executor抛错后自动after仍TODO，canary不默认成功，整条款不关闭。 |
+| GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | ChildWorkRecovery不再吞append Error，失败传播JournalAppendException；真实Dispatcher建立子run并重开journal后，成功仅追加两条void且无completion，WriteUnknown/poisoned WriterUnavailable失败均保留旧Current/磁盘，再换writer可结算，旧实现已红。直接结算不证明plugin activation门禁；Load Phase条款与延迟durability激活的语义仍待协调，TargetAgent空值回退Byname仍未修复。 |
 | GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。026部分证明：经注册Core Surface（guaranteeKind类别区分），posterior-credible独立类别，非法mass验证拒绝，bound独立验证；runtime跨算子传播仍被实现阻断。 |
 | GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 插件已不改写todowrite的provider定义与参数，todos原样交给Host；checkpoint由exact message.part.updated的completed终态确认。仍缺安装版OpenCode对当前session TodoTable的真实替换/清空物理canary。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
