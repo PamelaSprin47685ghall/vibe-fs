@@ -486,7 +486,117 @@ test('WHAT[knowledge-reuse-006] refresh prompt renders the supplied old case and
 })
 }
 
-test.todo('WHAT[knowledge-reuse-006] GAP-160: actual Bookkeeper repository access is rejected and a zero-change successful program advances the durable maintenance baseline')
+test.todo('WHAT[knowledge-reuse-006] GAP-160: actual Bookkeeper repository access is rejected')
+
+test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the captured baseline across store reopen', async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { createHash } = await import('node:crypto')
+  const { createCase, casebook, eventStore, parse } = await import('./support/casebook.mjs')
+  const { installBookkeeperRuntime } = await import('./support/bookkeeper-session-support.mjs')
+  const fetchSurface = await import('../../../dist/Repository/Knowledge/Casebook/FetchSurface.js')
+  const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-bookkeeper-zero-setter-'))
+  const prompts = []
+  const programs = []
+  const children = []
+  const terminals = new Set()
+  let store
+  const port = {
+    CreateChildSession: async () => { throw new Error('Bookkeeper must use its private sibling session') },
+    CreateSiblingSession: async () => {
+      const child = `zero-setter-${children.length + 1}`
+      children.push(child)
+      return bookkeeper.acceptedSession(child)
+    },
+    AbortSession: async () => bookkeeper.aborted(),
+    SubscribeTerminal: (_child, callback) => {
+      terminals.add(callback)
+      return { Dispose: () => terminals.delete(callback) }
+    },
+    SendPrompt: async (child, prompt) => {
+      prompts.push(prompt)
+      const session = bookkeeper.sessionValue(child)
+      assert.notEqual(bookkeeper.txIdFor(session), '', 'the real runtime binds the transaction before dispatch')
+      const output = await bookkeeper.runProgram(session, `class Js extends JsProgram {
+        async run() {
+          return { changed: false, question: this.question().text(), answer: this.answer().text() };
+        }
+      }`)
+      assert.deepEqual(parse(output), { data: { changed: false, question: 'Question?', answer: 'Answer B' } })
+      programs.push(output)
+      for (const callback of terminals) callback(bookkeeper.sessionId(session), bookkeeper.completed(session))
+      return bookkeeper.acceptedPrompt()
+    },
+  }
+  const fetch = (shelfmark) => fetchSurface.contract(
+    { tool: { schema: { string: () => ({}) } } }, directory, store,
+  ).execute({ shelfmark }, { sessionID: 'zero-setter-reader', agent: 'engineer' })
+  const expectedDiff = (before, after) => [
+    'diff --git a/subject.txt b/subject.txt',
+    '--- a/subject.txt',
+    '+++ b/subject.txt',
+    '@@ -1,1 +1,1 @@',
+    `-${before}`, `+${after}`, '',
+  ].join('\n')
+  const assertCapturedState = async (state, text) => {
+    const entry = JSON.parse(state)['subject.txt']
+    assert.equal(entry.kind, 'Present')
+    assert.equal(entry.sha256, createHash('sha256').update(text).digest('hex'))
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(store, entry.payloadRef)), Buffer.from(text))
+  }
+  try {
+    mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+    store = eventStore.create(directory, 'zero-setter-before-reopen')
+    const { identity, baseline, shelfmark } = await createCase({ dir: directory, store }, 'zero-setter', 'version-B\n')
+    installBookkeeperRuntime(port, [identity])
+    writeFileSync(join(directory, 'subject.txt'), 'version-C\n')
+
+    assert.equal(parse(await fetch(shelfmark)).answer, 'Answer B')
+    assert.equal(programs.length, 1)
+    assert.equal(children.length, 1)
+    assert.equal(parse(prompts[0]).diff.content, expectedDiff('version-B', 'version-C'))
+    const maintained = await casebook.fetchCaseByIdentity(store, identity)
+    assert.equal(maintained.q, 'Question?')
+    assert.equal(maintained.a, 'Answer B')
+    assert.equal(maintained.completionFileState, baseline)
+    await assertCapturedState(maintained.maintenanceFileState, 'version-C\n')
+
+    bookkeeper.resetRuntime()
+    eventStore.dispose(store)
+    store = undefined
+    store = eventStore.create(directory, 'zero-setter-after-reopen')
+    installBookkeeperRuntime(port, [identity])
+    const reopened = await casebook.fetchCaseByIdentity(store, identity)
+    assert.equal(reopened.q, maintained.q)
+    assert.equal(reopened.a, maintained.a)
+    assert.equal(reopened.completionFileState, baseline)
+    assert.equal(reopened.maintenanceFileState, maintained.maintenanceFileState)
+    await assertCapturedState(reopened.completionFileState, 'version-B\n')
+    await assertCapturedState(reopened.maintenanceFileState, 'version-C\n')
+    const unchanged = await fetch(shelfmark)
+    assert.equal(parse(unchanged).answer, 'Answer B')
+    assert.match(unchanged, /No change was found|没有变化/)
+    assert.equal(programs.length, 1, 'reopened maintenance must not repeat a diff already accepted without setters')
+    assert.equal(children.length, 1)
+
+    writeFileSync(join(directory, 'subject.txt'), 'version-D\n')
+    assert.equal(parse(await fetch(shelfmark)).answer, 'Answer B')
+    assert.equal(programs.length, 2)
+    assert.equal(children.length, 2)
+    assert.equal(parse(prompts[1]).diff.content, expectedDiff('version-C', 'version-D'))
+    const latest = await casebook.fetchCaseByIdentity(store, identity)
+    assert.equal(latest.q, 'Question?')
+    assert.equal(latest.a, 'Answer B')
+    assert.equal(latest.completionFileState, baseline)
+    await assertCapturedState(latest.maintenanceFileState, 'version-D\n')
+  } finally {
+    bookkeeper.resetRuntime()
+    if (store) eventStore.dispose(store)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[knowledge-reuse-006] duplicate answer setter rolls back both staged fields', async () => {
   const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
