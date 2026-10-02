@@ -19,7 +19,7 @@ if (!process.env.WIREIT_PARALLEL || Number(process.env.WIREIT_PARALLEL) < 1) {
 }
 
 export function getTestEnv({ verbose = false, hostEnv = process.env, extra = {} } = {}) {
-  const { TESTS_MJS_FILES, ...cleanEnv } = hostEnv
+  const { TESTS_MJS_FILES, NODE_TEST_VERBOSE, ...cleanEnv } = hostEnv
   return {
     ...cleanEnv,
     ...(verbose ? { NODE_TEST_VERBOSE: '1' } : {}),

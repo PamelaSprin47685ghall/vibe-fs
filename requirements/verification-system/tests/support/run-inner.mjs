@@ -133,6 +133,7 @@ export async function runTestFiles({
     active.add(controller)
     try {
       const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal })
+      send({ type: 'runner:file-start', data: { entryFile: resolve(file) } })
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
       const attribute = (event) => {
@@ -163,6 +164,7 @@ export async function runTestFiles({
       } catch (error) { reportError(error) }
       const completion = await drained
       if (!completion.drained) reportError(completion.error)
+      else send({ type: 'runner:file-drained', data: { entryFile: resolve(file) } })
     } finally { active.delete(controller) }
   }
   const pending = files[Symbol.iterator]()

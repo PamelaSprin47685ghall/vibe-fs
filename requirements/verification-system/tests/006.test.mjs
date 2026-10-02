@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createWatchdogHarness } from './support/watchdog-harness.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
+import * as testSupervisor from './e2e/support/supervise-node-test.mjs'
 import { observeCausalProgress } from './e2e/support/causal-observation.js'
 import { gatherDiagnostics } from './e2e/support/diagnostics-collect.js'
 import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
@@ -174,12 +177,80 @@ test('WHAT[verification-system-006] completed verdicts renew the window while re
 test('WHAT[verification-system-006] scheduling events do not renew the silence window', async () => {
   const h = createWatchdogHarness()
   await h.advance(400)
-  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan', 'inner:drained', 'runner:error']) {
+  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan',
+    'runner:file-start', 'runner:file-drained', 'inner:drained', 'runner:error']) {
     const progress = classifyVerdict({ type, data: { file: 'x.mjs' } })
     if (progress) h.watchdog.advance(progress)
   }
   await h.advance(100)
   assert.equal(h.terminated, true)
+})
+
+test('WHAT[verification-system-006] file waits distinguish queued, active and verdicts awaiting stream drain', () => {
+  const files = ['drained.mjs', 'verdict.mjs', 'active.mjs', 'queued.mjs'].map((file) => path.resolve(file))
+  const waits = testSupervisor.createFileWaitTracker(files)
+  const event = (type, file, name) => ({ type, data: { entryFile: file, name } })
+  waits.observe(event('runner:file-start', files[0]))
+  waits.observe(event('test:pass', files[0], 'finished leaf'))
+  waits.observe(event('runner:file-drained', files[0]))
+  waits.observe(event('runner:file-start', files[1]))
+  waits.observe(event('test:pass', files[1], 'passed but still alive'))
+  waits.observe(event('runner:file-start', files[2]))
+  assert.deepEqual(waits.snapshot(), {
+    queued: [files[3]],
+    active: [
+      { file: files[1], lastVerdict: 'test:pass:passed but still alive' },
+      { file: files[2], lastVerdict: null },
+    ],
+    drained: [files[0]],
+  })
+  waits.observe(event('runner:file-drained', files[1]))
+  assert.deepEqual(waits.snapshot().active, [{ file: files[2], lastVerdict: null }])
+})
+
+test('WHAT[verification-system-006] file lifecycle facts reject unknown entries and impossible transitions', () => {
+  const file = path.resolve('planned.mjs')
+  const waits = testSupervisor.createFileWaitTracker([file])
+  const event = (type, entryFile = file) => ({ type, data: { entryFile } })
+  assert.throws(() => waits.observe(event('runner:file-start', path.resolve('unknown.mjs'))), /unplanned/)
+  assert.throws(() => waits.observe(event('runner:file-drained')), /queued/)
+  assert.throws(() => waits.observe({ type: 'runner:file-start', data: {} }), /entryFile/)
+  waits.observe(event('runner:file-start'))
+  assert.throws(() => waits.observe(event('runner:file-start')), /active/)
+  waits.observe(event('runner:file-drained'))
+  assert.throws(() => waits.observe(event('test:pass')), /drained/)
+  assert.deepEqual(waits.snapshot(), { queued: [], active: [], drained: [file] })
+})
+
+test('WHAT[verification-system-006] real silence diagnostics identify active waits separately from queued files', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'file-wait-diagnostics-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: process.argv.slice(2), label: 'file-wait-fixture', silenceMs: 1000 })
+`)
+    const files = ['all-pass.fixture.mjs', 'leaks-handle-after-pass.fixture.mjs', 'two-leaf.fixture.mjs']
+      .map((file) => fileURLToPath(new URL(`./support/fixtures/${file}`, import.meta.url)))
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, ...files], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let diagnostics = ''
+    child.stdout.resume()
+    child.stderr.on('data', (chunk) => { diagnostics += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 1, diagnostics)
+    assert.match(diagnostics, /file streams: 1 drained, 1 active, 1 queued/)
+    const activeWaits = diagnostics.split('\n').filter((line) => line.includes('active file '))
+    assert.equal(activeWaits.length, 1, diagnostics)
+    assert.match(activeWaits[0], /leaks-handle-after-pass\.fixture\.mjs.*waiting for stream drain.*passes and leaks/)
+    assert.match(diagnostics, /1 queued file\(s\) have not started/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[verification-system-006] repeat observations of one causal state do not renew twice', async () => {

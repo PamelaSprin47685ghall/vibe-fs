@@ -18,6 +18,40 @@ import { isFileCompletionEvent, testEntryFile } from '../../support/test-run-sta
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
 
+export function createFileWaitTracker(files) {
+  const entries = new Map(files.map((file) => [resolve(file), { phase: 'queued', lastVerdict: null }]))
+  return {
+    observe(event) {
+      const starts = event?.type === 'runner:file-start'
+      const drains = event?.type === 'runner:file-drained'
+      const verdict = classifyVerdict(event)
+      if (!starts && !drains && !verdict?.blocking) return
+      const entryFile = starts || drains ? event?.data?.entryFile : testEntryFile(event)
+      if (typeof entryFile !== 'string' || entryFile.length === 0) {
+        throw new Error('File lifecycle event requires entryFile')
+      }
+      const file = resolve(entryFile)
+      const entry = entries.get(file)
+      if (!entry) throw new Error(`File lifecycle event names unplanned entry ${file}`)
+      const expected = starts ? 'queued' : 'active'
+      if (entry.phase !== expected) {
+        throw new Error(`File lifecycle event ${event.type} received while ${file} is ${entry.phase}`)
+      }
+      if (starts) entry.phase = 'active'
+      else if (drains) entry.phase = 'drained'
+      else entry.lastVerdict = verdict.reason
+    },
+    snapshot() {
+      const snapshot = { queued: [], active: [], drained: [] }
+      for (const [file, entry] of entries) {
+        if (entry.phase === 'active') snapshot.active.push({ file, lastVerdict: entry.lastVerdict })
+        else snapshot[entry.phase].push(file)
+      }
+      return snapshot
+    },
+  }
+}
+
 function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') {
     throw new Error(`process-group verification is unsupported on ${process.platform}`)
@@ -104,6 +138,7 @@ export async function superviseNodeTest({
 
   // Absolute paths: test:complete reports absolute `data.file`.
   const outstanding = new Set(files.map((file) => resolve(file)))
+  const fileWaits = createFileWaitTracker(files)
   let runnerSummary = null
   let drained = false
   let runnerError = null
@@ -120,9 +155,16 @@ export async function superviseNodeTest({
         )
       } else {
         console.error(
-          `${logPrefix}: ${outstanding.size} file(s) had not reported completion: ` +
-            `${[...outstanding].map((file) => relative(process.cwd(), file)).join(', ')}`,
+          `${logPrefix}: ${outstanding.size} file(s) had not reported completion`,
         )
+      }
+      const waits = fileWaits.snapshot()
+      console.error(`${logPrefix}: file streams: ${waits.drained.length} drained, ${waits.active.length} active, ${waits.queued.length} queued`)
+      for (const { file, lastVerdict } of waits.active) {
+        console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
+      }
+      if (waits.queued.length > 0) {
+        console.error(`${logPrefix}: ${waits.queued.length} queued file(s) have not started`)
       }
       console.error(runnerSummary
         ? `${logPrefix}: ${runnerSummary.passed} passed, ${runnerSummary.failed} failed before the silence`
@@ -163,6 +205,16 @@ export async function superviseNodeTest({
     }
     if (event?.type === 'runner:error') {
       runnerError = event?.data
+      return
+    }
+    try {
+      fileWaits.observe(event)
+    } catch (error) {
+      runnerError = { message: error.message }
+      console.error(`${logPrefix}: invalid file lifecycle: ${error.message}`)
+      try {
+        if (child?.pid) process.kill(-child.pid, 'SIGKILL')
+      } catch {}
       return
     }
     if (isFileCompletionEvent(event)) {
@@ -235,6 +287,11 @@ export async function superviseNodeTest({
 
   if (!drained) {
     console.error(`${logPrefix}: the inner runner exited without draining its result stream`)
+    fail(1)
+  }
+
+  if (fileWaits.snapshot().drained.length !== files.length) {
+    console.error(`${logPrefix}: incomplete run; not every planned file stream drained`)
     fail(1)
   }
 

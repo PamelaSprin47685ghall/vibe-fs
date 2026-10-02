@@ -16,8 +16,10 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
 
 process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
-const { default: plugin } = await import('wanxiangshu')
-const initSpikePlugin = plugin.server
+const initSpikePlugin = async (input) => {
+  const { default: plugin } = await import('wanxiangshu')
+  return plugin.server(input)
+}
 const { requiredNames: managedAgentNames } = await import('../../../../dist/Participant/Persona/Surface.js')
 const journalSurface = await import('../../../../dist/Persistence/Journal/Surface.js')
 const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceSharedJournal.js')

@@ -151,6 +151,7 @@ test('WHAT[verification-system-017] daily verification executes each stage in or
 test('WHAT[verification-system-017] formal verification cannot inherit a narrowed test selection', () => {
   const hostEnvWithOverride = {
     ...process.env,
+    NODE_TEST_VERBOSE: '1',
     TESTS_MJS_FILES: 'requirements/verification-system/tests/fake.test.mjs',
   }
 

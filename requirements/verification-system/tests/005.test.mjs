@@ -1,11 +1,66 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import * as fixtureFs from 'node:fs'
 import * as fixturePath from 'node:path'
 import { tmpdir as fixtureTmpdir } from 'node:os'
 import { Readable } from 'node:stream'
+import { fileURLToPath } from 'node:url'
 import { reportTestStream } from './support/run-inner.mjs'
+
+const runPluginLoadingFixture = (mode, rejectPlugin) => new Promise((resolve, reject) => {
+  const env = {
+    ...process.env,
+    WXS_TIER_INTEGRATION: '0',
+    WXS_TIER_RELEASE: '0',
+    WXS_FIXTURE_REJECT_PLUGIN: rejectPlugin ? '1' : '0',
+  }
+  delete env.NODE_TEST_CONTEXT
+  const child = spawn(process.execPath, [
+    '--loader', new URL('./support/fixtures/plugin-entry-loader.fixture.mjs', import.meta.url).href,
+    fileURLToPath(new URL('./support/fixtures/plugin-loading.fixture.mjs', import.meta.url)),
+    mode,
+  ], {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let stdout = ''
+  let stderr = ''
+  child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk })
+  child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk })
+  child.on('error', reject)
+  child.on('close', (status, signal) => resolve({ status, signal, stdout, stderr }))
+})
+
+test('WHAT[verification-system-005] unused plugin fixtures defer production entry failures until activation', async (t) => {
+  for (const mode of ['import', 'skip']) {
+    await t.test(`WHAT[verification-system-005] ${mode} does not activate the rejected plugin entry`, async () => {
+      const result = await runPluginLoadingFixture(mode, true)
+      assert.equal(result.signal, null, result.stderr)
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.stdout, /plugin fixture imported/)
+      assert.doesNotMatch(result.stderr, /PLUGIN_ENTRY_RESOLVED|controlled plugin entry rejection/)
+      if (mode === 'skip') assert.match(result.stdout, /integration tier not enabled/)
+    })
+  }
+
+  const activated = await runPluginLoadingFixture('create', true)
+  assert.equal(activated.signal, null, activated.stderr)
+  assert.equal(activated.status, 1, activated.stderr)
+  assert.match(activated.stdout, /plugin fixture imported/)
+  assert.match(activated.stderr, /PLUGIN_ENTRY_RESOLVED/)
+  assert.match(activated.stderr, /controlled plugin entry rejection/)
+  assert.doesNotMatch(activated.stdout, /plugin fixture created/)
+})
+
+test('WHAT[verification-system-005] activating the fixture still loads and creates the real plugin', async () => {
+  const result = await runPluginLoadingFixture('create', false)
+  assert.equal(result.signal, null, result.stderr)
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stderr.match(/PLUGIN_ENTRY_RESOLVED/g)?.length, 1, result.stderr)
+  assert.match(result.stdout, /plugin fixture imported/)
+  assert.match(result.stdout, /plugin fixture created/)
+})
 
 test('WHAT[verification-system-005] reporter failure during consumption cannot strand the runner after source close', async () => {
   const failure = new Error('controlled reporter failure during consumption')
