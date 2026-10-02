@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
@@ -63,17 +62,6 @@ module FetchTool =
     let private unavailable language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
-    let private extractPaths (case: Case) : string list =
-        if not (List.isEmpty case.RelatedPaths) then
-            case.RelatedPaths
-        else
-            case.Observations
-            |> List.choose (function
-                | Observation.FileRead(path, _) -> Some path
-                | _ -> None)
-            |> List.distinct
-            |> List.sort
-
     /// Serve the maintained body of a case reported as changed, or stay stale.
     let private serveMaintained language workspaceRoot store identity (cachedAnswer: string) =
         task {
@@ -93,37 +81,14 @@ module FetchTool =
 
             match changed with
             | Ok true -> return! serveMaintained language workspaceRoot store identity cachedAnswer
-            | Ok false -> return fresh language cachedAnswer
+            | Ok false ->
+                do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                return fresh language cachedAnswer
             | Error _ -> return stale language cachedAnswer
         }
 
     let private handleResolvedCase language workspaceRoot store (case: Case) =
-        task {
-            let identity = case.Identity
-
-            let baseline =
-                if
-                    not (String.IsNullOrWhiteSpace case.MaintenanceFileState)
-                    && case.MaintenanceFileState <> "state-initial"
-                then
-                    box case.MaintenanceFileState
-                elif
-                    not (String.IsNullOrWhiteSpace case.CompletionFileState)
-                    && case.CompletionFileState <> "state-initial"
-                then
-                    box case.CompletionFileState
-                else
-                    CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
-
-            let! diffObj = CasebookCapture.computeMaintenanceDiff workspaceRoot baseline
-            let hasDiff = unbox<bool> (diffObj?hasDiff)
-
-            if not hasDiff then
-                do! CasebookLifecycle.touchAccess workspaceRoot store identity
-                return fresh language case.A
-            else
-                return! refreshFromDiff language workspaceRoot store identity case.A
-        }
+        refreshFromDiff language workspaceRoot store case.Identity case.A
 
     let private runFetch
         (language: ProviderLanguage)

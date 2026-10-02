@@ -9,8 +9,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Repository.Programming.Js
 open Thoth.Json
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Git
 
 /// Access tracker for substantive file access collection.
 type AccessTracker() =
@@ -63,6 +63,20 @@ type AccessTracker() =
 
 /// CASE-003 / KR-003 / KR-014: typed observation capture and substantive access.
 module CasebookCapture =
+
+    type MaintenanceCapture =
+        { DiffSummary: string
+          TargetState: string }
+
+    [<RequireQualifiedAccess>]
+    type private StoredFileState =
+        | Missing
+        | Present of sha256: string * payload: PayloadRef
+
+    type private CapturedFile =
+        { Bytes: byte[]
+          Text: string
+          Sha256: string }
 
     /// Stable content fingerprint for FileRead observations (CASE-003).
     let contentHash (text: string) : string =
@@ -200,31 +214,6 @@ module CasebookCapture =
 
     let createAccessTracker () : AccessTracker = AccessTracker()
 
-    let private observationPathAndHash (obs: Observation) : string * string =
-        match obs with
-        | Observation.FileRead(p, h) -> p, h
-        | Observation.GlobResult(p, _)
-        | Observation.GrepResult(p, _) -> p, ""
-
-    let private setPresentIfAbsent (m: obj) (p: string) (h: string) : unit =
-        if not (String.IsNullOrWhiteSpace p) && not (emitJsExpr (m, p) "$0.has($1)") then
-            emitJsExpr (m, p, h) "$0.set($1, { kind: 'Present', contentHash: $2, content: '' })"
-            |> ignore
-
-    /// Baseline map for diff maintenance: observed files first, then every
-    /// related path the case associates, each as a whole-file Present entry.
-    let baselineFromObservations (observations: Observation list) (relatedPaths: string list) : obj =
-        let m = emitJsExpr () "new Map()"
-
-        for obs in observations do
-            let p, h = observationPathAndHash obs
-            setPresentIfAbsent m p h
-
-        for p in relatedPaths do
-            setPresentIfAbsent m p ""
-
-        m
-
     let private withPathArg (args: obj) (record: string -> unit) : unit =
         match pathArg args with
         | Some p -> record p
@@ -288,75 +277,48 @@ module CasebookCapture =
                    isTruncated = true
                    notice = "diff truncated to budget" |}
 
-    [<Emit("new Map()")>]
-    let private newJsMap () : obj = jsNative
+    [<Import("readFileSync", "node:fs")>]
+    let private readFileBytes (path: string) : byte[] = jsNative
 
-    [<Emit("$0.set($1, $2)")>]
-    let private jsMapSet (map: obj) (key: obj) (value: obj) : unit = jsNative
+    [<Emit("new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode($0)")>]
+    let private decodeFileUtf8 (bytes: byte[]) : string = jsNative
 
-    [<Emit("$0.get($1)")>]
-    let private jsMapGet (map: obj) (key: obj) : obj = jsNative
-
-    [<Emit("$0.keys()")>]
-    let private jsMapKeys (map: obj) : obj = jsNative
-
-    [<Emit("Array.from($0)")>]
-    let private jsArrayFrom (iterable: obj) : obj array = jsNative
-
-    [<Emit("$0 && typeof $0.get === 'function'")>]
-    let private isJsMap (value: obj) : bool = jsNative
-
-    let private completionEntry (fullPath: string) : obj =
-        match JsUtf8Fs.readUtf8Classified fullPath with
-        | Ok text ->
-            box
-                {| kind = "Present"
-                   contentHash = contentHash text
-                   content = text |}
-        | Error _ -> box {| kind = "Missing" |}
-
-    let private completionEntryAt (workspaceRoot: string) (relPath: string) : obj =
-        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
-
-        if JsMutationFs.existsPath fullPath then
-            completionEntry fullPath
+    let private capturedFileContent path (bytes: byte[]) (text: string) : Result<CapturedFile, string> =
+        if System.Text.Encoding.UTF8.GetBytes text <> bytes then
+            Error(sprintf "file %s did not preserve its UTF-8 bytes" path)
         else
-            box {| kind = "Missing" |}
+            Ok
+                { Bytes = bytes
+                  Text = text
+                  Sha256 = contentHash text }
 
-    let private readClassifiedEntry fullPath =
-        match JsUtf8Fs.readUtf8Classified fullPath with
-        | Ok text ->
-            box
-                {| kind = "Present"
-                   contentHash = contentHash text
-                   content = text |}
-        | Error _ -> box {| kind = "Missing" |}
+    let private decodeFileContent path (bytes: byte[]) : Result<CapturedFile, string> =
+        try
+            decodeFileUtf8 bytes |> capturedFileContent path bytes
+        with _ ->
+            Error(sprintf "failed to read file %s: invalid UTF-8" path)
 
-    let private captureFileStateEntry (workspaceRoot: string) (relPath: string) : obj =
+    let private classifyFileReadFailure path (error: exn) =
+        if string (error?code) = "ENOENT" then
+            Ok None
+        else
+            Error(sprintf "failed to read file %s: %s" path error.Message)
+
+    let private readFileState (workspaceRoot: string) (relPath: string) : Result<CapturedFile option, string> =
         let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
 
-        match JsMutationFs.existsPath fullPath with
-        | false -> box {| kind = "Missing" |}
-        | true -> readClassifiedEntry fullPath
-
-    let captureBaselineFileStateMap (workspaceRoot: string) (paths: string list) : obj =
-        let resultMap = newJsMap ()
-
-        for relPath in paths do
-            jsMapSet resultMap (box relPath) (captureFileStateEntry workspaceRoot relPath)
-
-        resultMap
+        try
+            readFileBytes fullPath |> decodeFileContent relPath |> Result.map Some
+        with ex ->
+            classifyFileReadFailure relPath ex
 
     let private writePayloadEntry
         (store: IEventStore)
         (relPath: string)
-        (text: string)
+        (content: CapturedFile)
         : Task<Result<string * JsonValue, string>> =
         task {
-            let sha = contentHash text
-            let bytes = System.Text.Encoding.UTF8.GetBytes text
-
-            match! store.WritePayload bytes with
+            match! store.WritePayload content.Bytes with
             | Error err -> return Error(sprintf "failed to write payload for %s: %s" relPath err)
             | Ok payloadRef ->
                 let entryObj =
@@ -364,31 +326,25 @@ module CasebookCapture =
                         [ "kind", Encode.string "Present"
                           "payloadRef", Encode.string (PayloadRef.value payloadRef)
                           "payload_ref", Encode.string (PayloadRef.value payloadRef)
-                          "sha256", Encode.string sha
-                          "contentHash", Encode.string sha ]
+                          "sha256", Encode.string content.Sha256
+                          "contentHash", Encode.string content.Sha256 ]
 
                 return Ok(relPath, entryObj)
         }
 
-    let private readAndWritePayload
-        (store: IEventStore)
-        (relPath: string)
-        (fullPath: string)
-        : Task<Result<string * JsonValue, string>> =
-        match JsUtf8Fs.readUtf8Classified fullPath with
-        | Error err -> Task.FromResult(Error(sprintf "failed to read file %s: %A" relPath err))
-        | Ok text -> writePayloadEntry store relPath text
+    let private writeFileState (store: IEventStore) (relPath: string) (content: CapturedFile option) =
+        match content with
+        | None -> Task.FromResult(Ok(relPath, Encode.object [ "kind", Encode.string "Missing" ]))
+        | Some captured -> writePayloadEntry store relPath captured
 
     let private freezeSinglePath
         (store: IEventStore)
         (workspaceRoot: string)
         (relPath: string)
         : Task<Result<string * JsonValue, string>> =
-        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
-
-        match JsMutationFs.existsPath fullPath with
-        | false -> Task.FromResult(Ok(relPath, Encode.object [ "kind", Encode.string "Missing" ]))
-        | true -> readAndWritePayload store relPath fullPath
+        match readFileState workspaceRoot relPath with
+        | Error err -> Task.FromResult(Error err)
+        | Ok content -> writeFileState store relPath content
 
     let rec private continueFreezeLoop store workspaceRoot rest (entries: ResizeArray<string * JsonValue>) =
         function
@@ -424,162 +380,349 @@ module CasebookCapture =
         let entries = ResizeArray<string * JsonValue>()
         freezePathsLoop store workspaceRoot distinctPaths entries
 
-    let private kindOfEntry (entry: obj) : string =
-        if isNull entry || isNull (entry?kind) then
-            "Missing"
+    let private storedEntryDecoder: Decoder<StoredFileState> =
+        Decode.field "kind" Decode.string
+        |> Decode.andThen (function
+            | "Missing" -> Decode.succeed StoredFileState.Missing
+            | "Present" ->
+                Decode.map2
+                    (fun hash payload -> StoredFileState.Present(hash, PayloadRef.create payload))
+                    (Decode.field "sha256" Decode.string)
+                    (Decode.field "payloadRef" Decode.string)
+            | kind -> Decode.fail (sprintf "unknown file state %s" kind))
+
+    let private decodeBaseline paths baseline =
+        match Decode.fromString (Decode.keyValuePairs storedEntryDecoder) baseline with
+        | Error err -> Error("invalid maintenance baseline: " + err)
+        | Ok entries when Set.ofList (List.map fst entries) <> Set.ofList paths ->
+            Error "maintenance baseline does not cover the related paths"
+        | Ok entries -> Ok(List.sortBy fst entries)
+
+    let private requireStoredPayload path =
+        function
+        | None -> Error(sprintf "missing baseline payload for %s" path)
+        | Some bytes -> Ok bytes
+
+    let private validateStoredHash path hash (content: CapturedFile) =
+        if content.Sha256 = hash then
+            Ok()
         else
-            string (entry?kind)
+            Error(sprintf "baseline payload digest mismatch for %s" path)
 
-    let private hashOfEntry (entry: obj) : string =
-        if isNull entry || isNull (entry?contentHash) then
-            ""
+    let private readPresentContent (store: IEventStore) path hash payload =
+        taskResult {
+            let! stored = store.ReadPayload payload
+            let! bytes = requireStoredPayload path stored |> Task.FromResult
+            let! content = decodeFileContent path bytes |> Task.FromResult
+            do! validateStoredHash path hash content |> Task.FromResult
+            return Some content.Text
+        }
+
+    let private readStoredContent store path =
+        function
+        | StoredFileState.Missing -> Task.FromResult(Ok None)
+        | StoredFileState.Present(hash, payload) -> readPresentContent store path hash payload
+
+    let private diffLines (text: string) =
+        let lines = text.Split '\n'
+
+        match text with
+        | "" -> [||]
+        | text when text.EndsWith "\n" -> lines.[.. lines.Length - 2] |> Array.map (fun line -> line + "\n")
+        | _ ->
+            lines
+            |> Array.mapi (fun index line -> if index = lines.Length - 1 then line else line + "\n")
+
+    let private renderDiffLine prefix (line: string) =
+        if line.EndsWith "\n" then
+            prefix + line
         else
-            string (entry?contentHash)
+            prefix + line + "\n\\ No newline at end of file\n"
 
-    let private contentOfEntry (entry: obj) : string =
-        if isNull entry || isNull (entry?content) then
-            ""
-        else
-            string (entry?content)
+    let private fileChangeKind before after =
+        match before, after with
+        | None, _ -> "new file\n"
+        | _, None -> "deleted file\n"
+        | _ -> ""
 
-    let private addedFileDiff (relPath: string) (curText: string) : string =
-        sprintf "diff --git a/%s b/%s\nnew file\n--- /dev/null\n+++ b/%s\n+%s" relPath relPath relPath curText
+    type private LineRangePair =
+        { OldStart: int
+          OldEnd: int
+          NewStart: int
+          NewEnd: int }
 
-    let private changedFileDiff (relPath: string) (baseContent: string) (curText: string) : string =
-        sprintf "diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n-%s\n+%s" relPath relPath relPath relPath baseContent curText
+    let private followEqualLines (oldLines: string[]) (newLines: string[]) range backwards diagonal start =
+        let oldLength = range.OldEnd - range.OldStart
+        let newLength = range.NewEnd - range.NewStart
 
-    let private deletedFileDiff (relPath: string) (baseContent: string) : string =
-        sprintf "diff --git a/%s b/%s\ndeleted file\n--- a/%s\n+++ /dev/null\n-%s" relPath relPath relPath baseContent
+        let oldLine index =
+            oldLines.[if backwards then
+                          range.OldEnd - index - 1
+                      else
+                          range.OldStart + index]
 
-    let private parseFallbackHash (valObj: JsonValue) =
-        match Decode.fromValue "$" (Decode.field "contentHash" Decode.string) valObj with
-        | Ok h2 -> h2
-        | Error _ -> ""
+        let newLine index =
+            newLines.[if backwards then
+                          range.NewEnd - index - 1
+                      else
+                          range.NewStart + index]
+        // DSL-MUTABLE: algorithm-scratch — end of the equal-line run on this diagonal.
+        let mutable position = start
 
-    let private parseEntryHash (valObj: JsonValue) =
-        match Decode.fromValue "$" (Decode.field "sha256" Decode.string) valObj with
-        | Ok h -> h
-        | Error _ -> parseFallbackHash valObj
+        while position >= 0
+              && position < oldLength
+              && position - diagonal < newLength
+              && oldLine position = newLine (position - diagonal) do
+            position <- position + 1
 
-    let private parseEntryKind (valObj: JsonValue) =
-        match Decode.fromValue "$" (Decode.field "kind" Decode.string) valObj with
-        | Ok k -> k
-        | Error _ -> "Missing"
+        position
 
-    let private decodeBaselinePairs (str: string) =
-        match Decode.fromString (Decode.keyValuePairs Decode.value) str with
-        | Ok pairs ->
-            pairs
-            |> List.map (fun (path, valObj) -> path, parseEntryKind valObj, parseEntryHash valObj)
-        | Error _ -> []
+    let private tryDiffOverlap oldLength newLength backwards diagonal oldPosition (opposite: int[]) oppositeDepth =
+        let otherDiagonal = oldLength - newLength - diagonal
+        let offset = opposite.Length / 2
 
-    let private parseJsonBaselineEntries (str: string) =
-        if String.IsNullOrWhiteSpace str || str = "state-initial" then
-            []
-        else
-            decodeBaselinePairs str
+        let otherPosition =
+            match oppositeDepth with
+            | Some otherDepth when oldPosition >= 0 && abs otherDiagonal <= otherDepth ->
+                opposite.[offset + otherDiagonal]
+            | _ -> -1
 
-    let private diffFileEntry
-        (workspaceRoot: string)
-        (relPath: string)
-        (baseKind: string)
-        (baseHash: string)
-        (baseContent: string)
-        =
-        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+        match otherPosition with
+        | position when position < 0 || oldPosition + position < oldLength -> None
+        | position when backwards -> Some(position, position - otherDiagonal)
+        | _ -> Some(oldPosition, oldPosition - diagonal)
 
-        let current =
-            if JsMutationFs.existsPath fullPath then
-                JsUtf8Fs.readUtf8Classified fullPath |> Result.toOption
+    let private nextDiffPosition oldLength newLength depth diagonal (frontier: int[]) =
+        let offset = frontier.Length / 2
+
+        let insertion =
+            if diagonal < depth then
+                frontier.[offset + diagonal + 1]
             else
-                None
+                -1
 
-        match current, baseKind with
-        | Some curText, "Missing" -> Some(addedFileDiff relPath curText)
-        | Some curText, "Present" when baseHash <> "" && baseHash <> contentHash curText ->
-            Some(
-                changedFileDiff
-                    relPath
-                    (if String.IsNullOrEmpty baseContent then
-                         baseHash
-                     else
-                         baseContent)
-                    curText
-            )
-        | Some curText, _ when baseHash <> "" && baseHash <> contentHash curText ->
-            Some(changedFileDiff relPath baseContent curText)
-        | None, "Present" ->
-            Some(
-                deletedFileDiff
-                    relPath
-                    (if String.IsNullOrEmpty baseContent then
-                         baseHash
-                     else
-                         baseContent)
-            )
-        | _ -> None
+        let deletion =
+            if diagonal > -depth then
+                frontier.[offset + diagonal - 1]
+            else
+                -1
 
-    let private diffJsMapEntry (workspaceRoot: string) (baseline: obj) (relPath: string) =
-        let baseEntry = jsMapGet baseline (box relPath)
-        let baseKind = kindOfEntry baseEntry
-        let baseHash = hashOfEntry baseEntry
-        let baseContent = contentOfEntry baseEntry
-        diffFileEntry workspaceRoot relPath baseKind baseHash baseContent
+        let afterInsertion =
+            if insertion >= 0 && insertion - diagonal - 1 < newLength then
+                insertion
+            else
+                -1
 
-    let private recordJsMapDiffs workspaceRoot (baseline: obj) record =
-        let keys = jsArrayFrom (jsMapKeys baseline) |> Array.map string |> Array.toList
+        let afterDeletion =
+            if deletion >= 0 && deletion < oldLength then
+                deletion + 1
+            else
+                -1
 
-        for relPath in keys do
-            diffJsMapEntry workspaceRoot baseline relPath |> Option.iter record
+        if depth = 0 then 0 else max afterInsertion afterDeletion
 
-    let private parseBaselineEntries (baseline: obj) : (string * string * string) list =
-        if isNull baseline then
-            []
-        elif isJsMap baseline then
-            jsArrayFrom (jsMapKeys baseline)
-            |> Array.map (fun k ->
-                let path = string k
-                let entry = jsMapGet baseline k
-                let kind = kindOfEntry entry
-                let hash = hashOfEntry entry
-                path, kind, hash)
-            |> Array.toList
-        elif emitJsExpr baseline "typeof $0 === 'string'" then
-            parseJsonBaselineEntries (unbox<string> baseline)
+    let private advanceDiffFrontier
+        (oldLines: string[])
+        (newLines: string[])
+        range
+        backwards
+        depth
+        (frontier: int[])
+        (opposite: int[])
+        oppositeDepth
+        =
+        let oldLength = range.OldEnd - range.OldStart
+        let newLength = range.NewEnd - range.NewStart
+        let offset = frontier.Length / 2
+        // DSL-MUTABLE: algorithm-scratch — current Myers wavefront diagonal.
+        let mutable diagonal = -depth
+        // DSL-MUTABLE: algorithm-scratch — first overlapping forward/reverse path.
+        let mutable split = None
+
+        while diagonal <= depth && split.IsNone do
+            let start = nextDiffPosition oldLength newLength depth diagonal frontier
+            let oldPosition = followEqualLines oldLines newLines range backwards diagonal start
+            frontier.[offset + diagonal] <- oldPosition
+            split <- tryDiffOverlap oldLength newLength backwards diagonal oldPosition opposite oppositeDepth
+            diagonal <- diagonal + 2
+
+        split
+
+    let private middleDiffSplit oldLines newLines range =
+        let oldLength = range.OldEnd - range.OldStart
+        let newLength = range.NewEnd - range.NewStart
+        let maxDepth = (oldLength + newLength + 1) / 2
+        let forward = Array.create (2 * maxDepth + 3) -1
+        let backward = Array.create forward.Length -1
+        let oddDistance = (oldLength - newLength) % 2 <> 0
+        // DSL-MUTABLE: algorithm-scratch — bidirectional edit distance.
+        let mutable depth = 0
+        // DSL-MUTABLE: algorithm-scratch — first meeting point at the shortest distance.
+        let mutable split = None
+
+        while split.IsNone && depth <= maxDepth do
+            split <-
+                advanceDiffFrontier
+                    oldLines
+                    newLines
+                    range
+                    false
+                    depth
+                    forward
+                    backward
+                    (if oddDistance then Some(depth - 1) else None)
+                |> Option.orElseWith (fun () ->
+                    advanceDiffFrontier
+                        oldLines
+                        newLines
+                        range
+                        true
+                        depth
+                        backward
+                        forward
+                        (if oddDistance then None else Some depth))
+
+            depth <- depth + 1
+
+        match split with
+        | Some(oldPosition, newPosition) when
+            (oldPosition > 0 || newPosition > 0)
+            && (oldPosition < oldLength || newPosition < newLength)
+            ->
+            range.OldStart + oldPosition, range.NewStart + newPosition
+        | _ -> invalidOp "line diff bisection did not make progress"
+
+    let private trimEqualLines (oldLines: string[]) (newLines: string[]) range =
+        let commonLength =
+            min (range.OldEnd - range.OldStart) (range.NewEnd - range.NewStart)
+
+        let prefix =
+            Seq.init commonLength id
+            |> Seq.takeWhile (fun index -> oldLines.[range.OldStart + index] = newLines.[range.NewStart + index])
+            |> Seq.length
+
+        let suffix =
+            Seq.init (commonLength - prefix) id
+            |> Seq.takeWhile (fun index -> oldLines.[range.OldEnd - index - 1] = newLines.[range.NewEnd - index - 1])
+            |> Seq.length
+
+        { OldStart = range.OldStart + prefix
+          OldEnd = range.OldEnd - suffix
+          NewStart = range.NewStart + prefix
+          NewEnd = range.NewEnd - suffix }
+
+    let private haveCommonLine (oldLines: string[]) (newLines: string[]) range =
+        let oldSet =
+            HashSet<string>(seq { for index in range.OldStart .. range.OldEnd - 1 -> oldLines.[index] })
+
+        seq { for index in range.NewStart .. range.NewEnd - 1 -> newLines.[index] }
+        |> Seq.exists oldSet.Contains
+
+    let private appendChangedRange (changes: ResizeArray<LineRangePair>) range =
+        if
+            changes.Count > 0
+            && changes.[changes.Count - 1].OldEnd = range.OldStart
+            && changes.[changes.Count - 1].NewEnd = range.NewStart
+        then
+            changes.[changes.Count - 1] <-
+                { changes.[changes.Count - 1] with
+                    OldEnd = range.OldEnd
+                    NewEnd = range.NewEnd }
         else
-            []
+            changes.Add range
 
-    let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
-        task {
-            // DSL-MUTABLE: algorithm-scratch — maintenance diff presence accumulator
-            let mutable hasDiff = false
-            let diffLines = ResizeArray<string>()
+    let private enqueueDiffHalves oldLines newLines (pending: ResizeArray<LineRangePair>) range =
+        let oldSplit, newSplit = middleDiffSplit oldLines newLines range
 
-            let record (line: string) =
-                hasDiff <- true
-                diffLines.Add line
+        pending.Add
+            { range with
+                OldStart = oldSplit
+                NewStart = newSplit }
 
-            let gitDiff =
-                try
-                    GitSubject.diffHeadBinary workspaceRoot
-                with _ ->
-                    ""
+        pending.Add
+            { range with
+                OldEnd = oldSplit
+                NewEnd = newSplit }
 
-            if not (String.IsNullOrWhiteSpace gitDiff) then
-                record gitDiff
+    let private processDiffRange oldLines newLines pending changes range =
+        match range with
+        | range when range.OldStart = range.OldEnd && range.NewStart = range.NewEnd -> ()
+        | range when
+            range.OldStart = range.OldEnd
+            || range.NewStart = range.NewEnd
+            || not (haveCommonLine oldLines newLines range)
+            ->
+            appendChangedRange changes range
+        | range -> enqueueDiffHalves oldLines newLines pending range
 
-            let entries = parseBaselineEntries baseline
+    let private changedLineRanges (oldLines: string[]) (newLines: string[]) =
+        let pending = ResizeArray<LineRangePair>()
+        let changes = ResizeArray<LineRangePair>()
 
-            for (relPath, baseKind, baseHash) in entries do
-                diffFileEntry workspaceRoot relPath baseKind baseHash "" |> Option.iter record
+        pending.Add
+            { OldStart = 0
+              OldEnd = oldLines.Length
+              NewStart = 0
+              NewEnd = newLines.Length }
 
-            if isJsMap baseline then
-                recordJsMapDiffs workspaceRoot baseline record
+        while pending.Count > 0 do
+            let range = pending.[pending.Count - 1] |> trimEqualLines oldLines newLines
+            pending.RemoveAt(pending.Count - 1)
+            processDiffRange oldLines newLines pending changes range
 
-            let diffSummary = String.concat "\n" diffLines
+        changes |> Seq.toList
 
-            return
-                box
-                    {| hasDiff = hasDiff
-                       diffSummary = diffSummary |}
+    let private renderDiffHunk (oldLines: string[]) (newLines: string[]) range =
+        let removed = range.OldEnd - range.OldStart
+        let added = range.NewEnd - range.NewStart
+
+        let start position count =
+            if count = 0 then position else position + 1
+
+        sprintf "@@ -%d,%d +%d,%d @@\n" (start range.OldStart removed) removed (start range.NewStart added) added
+        + (oldLines.[range.OldStart .. range.OldEnd - 1]
+           |> Array.map (renderDiffLine "-")
+           |> String.concat "")
+        + (newLines.[range.NewStart .. range.NewEnd - 1]
+           |> Array.map (renderDiffLine "+")
+           |> String.concat "")
+
+    let private fileDiff path (before: string option) (after: string option) =
+        if before = after then
+            ""
+        else
+            let oldLines = before |> Option.defaultValue "" |> diffLines
+            let newLines = after |> Option.defaultValue "" |> diffLines
+            let oldPath = if before.IsSome then "a/" + path else "/dev/null"
+            let newPath = if after.IsSome then "b/" + path else "/dev/null"
+
+            sprintf "diff --git a/%s b/%s\n%s--- %s\n+++ %s\n" path path (fileChangeKind before after) oldPath newPath
+            + (changedLineRanges oldLines newLines
+               |> List.map (renderDiffHunk oldLines newLines)
+               |> String.concat "")
+
+    let rec private captureMaintenancePaths store workspaceRoot entries captured diffs =
+        taskResult {
+            match entries with
+            | [] ->
+                return
+                    { DiffSummary = diffs |> List.rev |> String.concat ""
+                      TargetState = captured |> List.rev |> Encode.object |> Encode.toString 0 }
+            | (path, state) :: rest ->
+                let! before = readStoredContent store path state
+                let! target = readFileState workspaceRoot path |> Task.FromResult
+                let! stored = writeFileState store path target
+                let diff = fileDiff path before (target |> Option.map (fun content -> content.Text))
+                return! captureMaintenancePaths store workspaceRoot rest (stored :: captured) (diff :: diffs)
+        }
+
+    let computeMaintenanceDiff
+        (store: IEventStore)
+        (workspaceRoot: string)
+        (paths: string list)
+        (baseline: string)
+        : Task<Result<MaintenanceCapture, string>> =
+        taskResult {
+            let! entries = decodeBaseline paths baseline |> Task.FromResult
+            return! captureMaintenancePaths store workspaceRoot entries [] []
         }

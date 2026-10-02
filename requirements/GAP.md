@@ -152,7 +152,7 @@
 | GAP-158 | intra-participant-parallelism | PARTIAL | participant-identity/008部分证明：InheritedFromOwner缺任一owner字段（空串/空白/null/undefined）全部typed fail-closed，完整witness正常准入；真实Fission lane的identity传递仍待证。已有admission、parser、bundle/ring与权限拒绝局部测试保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
 | GAP-159 | intra-participant-parallelism-017；speculative-investigation-004 | PARTIAL | Predictor配置映射Engineer并暴露Fission；真实authority准入也接受，但actual根Fission被origin gate拒绝。保留分别取证的失败TODO，不宣称已发生完整越权。 |
 | GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；终结自动归档、全部工具访问、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。删除假维护接口，不补空实现凑绿。 |
-| GAP-161 | knowledge-reuse-005/015/016 | PARTIAL | 持久baseline的diff用旧hash代替payload原文；实际失败TODO保留。生产分别计算diff与冻结目标，须让同次捕获和不可变旧材料同时支撑维护及基线。 |
+| GAP-161 | knowledge-reuse-005/015/016 | CLOSED | 实际fetch读取不可变旧payload并验证完整UTF-8字节/hash，一次目标捕获同时形成真实多hunk diff与待提交基线；B→C捕获后物理文件变D，本次仍保存C、下次才比较C→D。先红反例覆盖旧hash冒充正文、二次读取、无关Git变化、不变中段泄漏、BOM丢失和旧payload损坏；225对独立小域oracle核对最小增删及重建。隔离Fable构建与关键正式回归通过。非法UTF-8拒绝，历史已丢BOM不自动恢复；本条不关闭GAP-160的归档、权限、并发副本和完整预算义务。 |
 | GAP-180 | institutional-learning | PARTIAL | 真插件收据、冻结消费和重开有证据；Enhancer次数、完整BIRTH、学习闭合前不消费、各故障零部分效果仍缺证。 |
 | GAP-181 | institutional-learning-002—006 | OPEN | 当前evaluator仅按规则名匹配ABSORB，否则DISCARD；通用机制提炼、BIRTH、准入和revision重评尚未实现，不能以保守舍弃当作完整学习能力。 |
 | GAP-182 | institutional-learning-008 | PARTIAL | 合同要求LearningDispositionCommitted与必要DeferredWorkResurfaced同批；实际单事实携带消费ID并原子投影。需裁决是否允许完整单事实承载，不为实现方便删义务。 |

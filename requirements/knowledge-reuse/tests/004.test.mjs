@@ -27,13 +27,13 @@ test('WHAT[knowledge-reuse-004] explicit completion freezing preserves B while l
   } finally { local.close() }
 })
 
-test('WHAT[knowledge-reuse-004] supplied in-memory baseline produces the actual old and new file content', async () => {
+test('WHAT[knowledge-reuse-004] supplied durable baseline produces the actual old and new file content', async () => {
   const local = sandbox()
   try {
     await createCase(local)
-    const baseline = await casebook.freezeCompletionState(local.dir, ['subject.txt'])
+    const baseline = await casebook.freezeCompletionState(local.store, local.dir, ['subject.txt'])
     writeFileSync(join(local.dir, 'subject.txt'), 'version-C')
-    const diff = await casebook.computeMaintenanceDiff(local.dir, baseline)
+    const diff = await casebook.computeMaintenanceDiff(local.store, local.dir, ['subject.txt'], baseline)
     assert.equal(diff.hasDiff, true)
     assert.match(diff.diffSummary, /-version-B/)
     assert.match(diff.diffSummary, /\+version-C/)

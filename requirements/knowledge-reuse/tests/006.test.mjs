@@ -1,4 +1,13 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import * as casebookState from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+
+const archiveWithBaseline = async (store, directory, record) => {
+  const relatedPaths = record.observations.filter(observation => observation.kind === 'file-read').map(observation => observation.path)
+  const baseline = await casebookState.freezeCompletionState(store, directory, relatedPaths)
+  assert.equal(typeof baseline, 'string')
+  return casebookState.archive(store, { ...record, relatedPaths, completionFileState: baseline, maintenanceFileState: baseline })
+}
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -32,7 +41,7 @@ test('WHAT[knowledge-reuse-006] CASE006_synthesis_refresh_publishes_refreshed_wi
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    assert.equal((await casebook.archive(handle, record('s-mech-1', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-mech-1', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     assert.equal((await bookkeeperRefresh.refreshStale(handle, dir, 's-mech-1')).value, false)
     assert.equal(createCalls.length, 0)
 
@@ -69,7 +78,7 @@ test('WHAT[knowledge-reuse-006] CASE006_mechanical_refresh_missing_file_still_pu
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'gone.txt'), 'x', 'utf8')
-    assert.equal((await casebook.archive(handle, record('s-gone', 'Q', 'A', [fileRead('gone.txt', casebook.contentHash('x'))]))).ok, true)
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-gone', 'Q', 'A', [fileRead('gone.txt', casebook.contentHash('x'))]))).ok, true)
     rmSync(join(dir, 'gone.txt'), { force: true })
     await installBookkeeperRuntime(port, ['s-gone'])
     const result = await bookkeeperRefresh.refreshStale(handle, dir, 's-gone')
@@ -162,7 +171,7 @@ test('WHAT[knowledge-reuse-006] CASE006_create_child_once_per_refresh_via_js_boo
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    assert.equal((await casebook.archive(handle, record('s-session-refresh', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-session-refresh', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     await installBookkeeperRuntime(port, ['s-session-refresh'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-session-refresh')
@@ -221,7 +230,7 @@ test('WHAT[knowledge-reuse-006] CASE006_injected_synthesizer_error_keeps_old_cas
   const { port } = failingPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    assert.equal((await casebook.archive(handle, record('s-err-1', 'Q keep', FAIL_A, [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-err-1', 'Q keep', FAIL_A, [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     await installBookkeeperRuntime(port, ['s-err-1'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-err-1')
@@ -243,7 +252,7 @@ test('WHAT[knowledge-reuse-006] CASE006_synthesizer_runs_once_per_stale_refresh'
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    assert.equal((await casebook.archive(handle, record('s-once', 'Q-count-synth-once', 'A once', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-once', 'Q-count-synth-once', 'A once', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     await installBookkeeperRuntime(port, ['s-once'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-once')

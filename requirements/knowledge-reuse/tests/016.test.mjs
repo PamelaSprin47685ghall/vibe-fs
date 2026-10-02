@@ -6,10 +6,14 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import { sandbox, createCase, index, parse } from './support/casebook.mjs'
+import { CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
 
 test('WHAT[knowledge-reuse-016] present_entry_maintains_immutable_content_addressing_and_storage_reuse', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-kr-016-present-'))
@@ -74,12 +78,12 @@ test('WHAT[knowledge-reuse-016] missing_entry_records_nonexistent_file_as_missin
     assert.equal(parsed[nonExistentPath]?.payloadRef, undefined, 'Missing entry must not have a payloadRef')
 
     // Computing diff against Missing baseline when file remains missing -> no diff
-    const diffBefore = await casebook.computeMaintenanceDiff(dir, baselineJson)
+    const diffBefore = await casebook.computeMaintenanceDiff(store, dir, [nonExistentPath], baselineJson)
     assert.equal(diffBefore.hasDiff, false)
 
     // When the file is subsequently created on disk, diff must identify it as an added file (new file)
     writeFileSync(join(dir, nonExistentPath), 'let created = true', 'utf8')
-    const diffAfter = await casebook.computeMaintenanceDiff(dir, baselineJson)
+    const diffAfter = await casebook.computeMaintenanceDiff(store, dir, [nonExistentPath], baselineJson)
     assert.equal(diffAfter.hasDiff, true)
     assert.match(diffAfter.diffSummary, /new file/i)
     assert.match(diffAfter.diffSummary, /let created = true/)
@@ -108,5 +112,151 @@ test('WHAT[knowledge-reuse-016] io_failure_on_directory_or_unreadable_path_fails
   } finally {
     eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[knowledge-reuse-016] missing, corrupt and unreadable old payloads cannot authorize actual maintenance', async (t) => {
+  for (const failure of ['missing', 'corrupt', 'unreadable', 'added-bom', 'invalid-utf8']) {
+    await t.test(`WHAT[knowledge-reuse-016] ${failure} old payload retains both baselines and the old body`, async () => {
+      const local = sandbox()
+      try {
+        const originalText = failure === 'invalid-utf8' ? '\uFFFD' : 'version-B'
+        const { identity, baseline, shelfmark } = await createCase(local, 'case-1', originalText)
+        const stored = JSON.parse(baseline)['subject.txt']
+        const payload = join(local.dir, 'wanxiang', 'payloads', stored.payloadRef)
+        if (failure === 'corrupt') writeFileSync(payload, 'different old bytes')
+        else if (failure === 'added-bom') writeFileSync(payload, '\uFEFFversion-B')
+        else if (failure === 'invalid-utf8') writeFileSync(payload, Buffer.from([0xFF]))
+        else {
+          rmSync(payload)
+          if (failure === 'unreadable') mkdirSync(payload)
+        }
+        writeFileSync(join(local.dir, 'subject.txt'), 'version-C')
+        const { port, createCalls } = scriptedBookkeeperPort()
+        installBookkeeperRuntime(port, [identity])
+        const result = await local.fetch(shelfmark)
+        assert.equal(parse(result).answer, 'Answer B')
+        assert.match(result, /could not|unable|未|无法/i)
+        assert.equal(createCalls.length, 0)
+        const current = await casebook.fetchCaseByIdentity(local.store, identity)
+        assert.equal(current.q, 'Question?')
+        assert.equal(current.a, 'Answer B')
+        assert.equal(current.completionFileState, baseline)
+        assert.equal(current.maintenanceFileState, baseline)
+      } finally { bookkeeper.resetRuntime(); local.close() }
+    })
+  }
+})
+
+test('WHAT[knowledge-reuse-016] completion preserves every valid UTF-8 byte including BOM and line endings', async () => {
+  const local = sandbox()
+  try {
+    const bytes = Buffer.from('\uFEFF完整内容\r\nlast line', 'utf8')
+    writeFileSync(join(local.dir, 'subject.txt'), bytes)
+    const baseline = await casebook.freezeCompletionState(local.store, local.dir, ['subject.txt'])
+    assert.equal(typeof baseline, 'string')
+    const stored = JSON.parse(baseline)['subject.txt']
+    assert.equal(stored.sha256, createHash('sha256').update(bytes).digest('hex'))
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(local.store, stored.payloadRef)), bytes)
+  } finally { local.close() }
+})
+
+test('WHAT[knowledge-reuse-016] actual fetch observes BOM removal and retains the original completion payload', async () => {
+  const local = sandbox()
+  try {
+    const { identity, baseline, shelfmark } = await createCase(local, 'bom-removal', '\uFEFFsame text')
+    writeFileSync(join(local.dir, 'subject.txt'), 'same text')
+    const { port, prompts } = scriptedBookkeeperPort()
+    installBookkeeperRuntime(port, [identity])
+    assert.equal(parse(await local.fetch(shelfmark)).answer, CANONICAL_A)
+    assert.equal(prompts.length, 1)
+    const diff = parse(prompts[0]).diff.content
+    assert.ok(diff.includes('-\uFEFFsame text'), diff)
+    assert.ok(diff.includes('+same text'), diff)
+    const current = await casebook.fetchCaseByIdentity(local.store, identity)
+    assert.equal(current.completionFileState, baseline)
+    const completion = JSON.parse(baseline)['subject.txt']
+    const maintenance = JSON.parse(current.maintenanceFileState)['subject.txt']
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(local.store, completion.payloadRef)), Buffer.from('\uFEFFsame text'))
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(local.store, maintenance.payloadRef)), Buffer.from('same text'))
+  } finally { bookkeeper.resetRuntime(); local.close() }
+})
+
+test('WHAT[knowledge-reuse-016] invalid UTF-8 cannot be frozen or maintained as replacement text', async () => {
+  const local = sandbox()
+  try {
+    const { identity, baseline, shelfmark } = await createCase(local)
+    writeFileSync(join(local.dir, 'subject.txt'), Buffer.from([0xFF]))
+    const frozen = await casebook.freezeCompletionState(local.store, local.dir, ['subject.txt'])
+    assert.equal(frozen.ok, false)
+    const { port, createCalls } = scriptedBookkeeperPort()
+    installBookkeeperRuntime(port, [identity])
+    const result = await local.fetch(shelfmark)
+    assert.equal(parse(result).answer, 'Answer B')
+    assert.match(result, /could not|unable|未|无法/i)
+    assert.equal(createCalls.length, 0)
+    const current = await casebook.fetchCaseByIdentity(local.store, identity)
+    assert.equal(current.completionFileState, baseline)
+    assert.equal(current.maintenanceFileState, baseline)
+  } finally { bookkeeper.resetRuntime(); local.close() }
+})
+
+test('WHAT[knowledge-reuse-016] an unreadable current target is not a deletion and cannot advance actual maintenance', async () => {
+  const local = sandbox()
+  try {
+    const { identity, baseline, shelfmark } = await createCase(local)
+    rmSync(join(local.dir, 'subject.txt'))
+    mkdirSync(join(local.dir, 'subject.txt'))
+    const { port, createCalls } = scriptedBookkeeperPort()
+    installBookkeeperRuntime(port, [identity])
+    const result = await local.fetch(shelfmark)
+    assert.equal(parse(result).answer, 'Answer B')
+    assert.match(result, /could not|unable|未|无法/i)
+    assert.equal(createCalls.length, 0)
+    const current = await casebook.fetchCaseByIdentity(local.store, identity)
+    assert.equal(current.completionFileState, baseline)
+    assert.equal(current.maintenanceFileState, baseline)
+  } finally { bookkeeper.resetRuntime(); local.close() }
+})
+
+test('WHAT[knowledge-reuse-016] actual maintenance distinguishes empty content, additions and deletions', async (t) => {
+  const transitions = [
+    { name: 'empty to text', before: '', after: 'created text', removed: null, added: '+created text', marker: null },
+    { name: 'text to empty', before: 'removed text', after: '', removed: '-removed text', added: null, marker: null },
+    { name: 'present to missing', before: 'deleted text', after: null, removed: '-deleted text', added: null, marker: 'deleted file' },
+    { name: 'missing to present', before: null, after: 'new text', removed: null, added: '+new text', marker: 'new file' },
+  ]
+  for (const transition of transitions) {
+    await t.test(`WHAT[knowledge-reuse-016] ${transition.name} preserves exact persistent state`, async () => {
+      const local = sandbox()
+      try {
+        const path = join(local.dir, 'subject.txt')
+        if (transition.before !== null) writeFileSync(path, transition.before)
+        const baseline = await casebook.freezeCompletionState(local.store, local.dir, ['subject.txt'])
+        const identity = transition.name
+        assert.equal((await casebook.finalizeEngineerCase(local.store, identity, 'trace', 'Question?', 'Answer B', ['subject.txt'], baseline)).kind, 'finalized')
+        if (transition.after === null) rmSync(path)
+        else writeFileSync(path, transition.after)
+        const { port, prompts } = scriptedBookkeeperPort()
+        installBookkeeperRuntime(port, [identity])
+        assert.equal(parse(await local.fetch(index.shelfmarkFor(identity, 'Question?'))).answer, CANONICAL_A)
+        assert.equal(prompts.length, 1)
+        const diff = parse(prompts[0]).diff.content
+        if (transition.removed) assert.ok(diff.includes(transition.removed), diff)
+        if (transition.added) assert.ok(diff.includes(transition.added), diff)
+        if (transition.marker) assert.ok(diff.includes(transition.marker), diff)
+        else assert.doesNotMatch(diff, /new file|deleted file/)
+        assert.doesNotMatch(diff, new RegExp(casebook.contentHash('')))
+        const current = await casebook.fetchCaseByIdentity(local.store, identity)
+        assert.equal(current.completionFileState, baseline)
+        const target = JSON.parse(current.maintenanceFileState)['subject.txt']
+        if (transition.after === null) assert.deepEqual(target, { kind: 'Missing' })
+        else {
+          assert.equal(target.kind, 'Present')
+          assert.equal(target.sha256, casebook.contentHash(transition.after))
+          assert.equal(new TextDecoder().decode(await eventStore.readPayload(local.store, target.payloadRef)), transition.after)
+        }
+      } finally { bookkeeper.resetRuntime(); local.close() }
+    })
   }
 })

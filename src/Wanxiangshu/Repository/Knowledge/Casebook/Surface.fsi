@@ -59,9 +59,9 @@ module CasebookSurface =
 
     val isSubstantiveTool: toolName: string -> bool
 
-    val freezeCompletionState: workspaceRootOrStore: obj -> pathsOrWorkspaceRoot: obj -> Task<obj>
+    val freezeCompletionState: store: obj -> workspaceRoot: string -> pathsRaw: obj -> Task<obj>
 
-    val computeMaintenanceDiff: workspaceRoot: string -> baseline: obj -> Task<obj>
+    val computeMaintenanceDiff: store: obj -> workspaceRoot: string -> pathsRaw: obj -> baseline: string -> Task<obj>
 
     val caseIdentityForInvocation: sessionId: string -> invocationId: string -> string
 
