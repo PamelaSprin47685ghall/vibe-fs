@@ -8,13 +8,15 @@ const obligation = await import("../../../dist/Persistence/Journal/ObligationJou
 
 // All envelopes cross the registered FoldSurface. The checkpoint fact carries
 // only the call identity (context-compression-028: K is the fixed module
-// constant, not per-fact data).
-const envelope = (seq, session, fact) => ({
+// constant, not per-fact data). Sequence fields use BigInt like the
+// durable-events/015 fixtures they are modelled on.
+const envelope = (seq, session, fact, run = null) => ({
   runtime: 'rt-004',
   seq,
   observedAt: '2026-01-01T00:00:00Z',
   id: `evt-004-${seq}`,
   session,
+  run,
   fact,
 })
 
@@ -50,25 +52,80 @@ const tracePartAppended = (session) => ({
   },
 })
 
+const terminalCaptured = (session) => ({
+  family: 'Companion',
+  case: 'TerminalOutputCaptured',
+  payload: { SessionId: session, TextRef: 'blob-terminal-004', TextDigest: 'sha-terminal-004', ProviderRun: 'msg-terminal-004' },
+})
+
+const blogEntry = (session, bloggerSession) => ({
+  family: 'Context',
+  case: 'BlogObservationCommitted',
+  payload: {
+    SessionId: session,
+    BloggerSessionId: bloggerSession,
+    RequestId: 'req-004-entry',
+    FrameEpochId: 0,
+    PreviousIngestedThroughSequence: 0n,
+    NextIngestedThroughSequence: 1n,
+    PreviousCoverableTurnCutoffExclusive: 0,
+    NextCoverableTurnCutoffExclusive: 1,
+    NextCoveredPrefixDigest: 'digest-004',
+    TextRef: 'blob-entry-004',
+    TextDigest: 'sha-entry-004',
+    ProviderRun: 'msg-entry-004',
+    ToolCallIds: [],
+    TipRuleId: 'tip-004',
+    FieldNameAtCommit: 'field-004',
+    EvidenceRef: null,
+    ObservedPrefixEpochId: 0,
+  },
+})
+
+const prefixRebase = (session) => ({
+  family: 'Context',
+  case: 'PrefixRebaseCommitted',
+  payload: {
+    SessionId: session,
+    PreviousEpochId: 0,
+    NextEpochId: 1,
+    FrozenRecordPrefixRef: 'blob-frozen-004',
+    FrozenRecordPrefixDigest: 'frozen-004',
+    CutoffExclusive: 1,
+    CoveredPrefixDigest: 'prefix-004',
+    SealRoot: 'seal-004',
+    SyntheticMessageId: 'synthetic-004',
+    ProbeId: 'probe-004',
+    SolvingProviderRun: 'msg-rebase-004',
+  },
+})
+
 const checkpoint = (session, toolCallId) => ({
   family: 'Context',
   case: 'TodoCheckpointCommitted',
   payload: { SessionId: session, ToolCallId: toolCallId },
 })
 
-test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable companion and trace state and isolates checkpoint windows', () => {
+test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable companion, trace, blog, prefix-epoch and terminal state and isolates checkpoint windows', () => {
   // A non-empty, observable pre-state: the session already carries a linked
-  // companion, a captured opening and a trace part (real state the checkpoint
-  // must not touch). Folding the same prefix without the checkpoint gives
-  // the reference state to compare against.
+  // companion, a captured opening, a trace part, a terminal capture, a blog
+  // entry and a committed prefix rebase (real state the checkpoint must not
+  // touch). Folding the same prefix without the checkpoint gives the
+  // reference state to compare against.
   const prefix = [
     envelope(1, 'ses-a', bloggerLinked('ses-a', 'ses-blog')),
     envelope(2, 'ses-a', openingCaptured('ses-a', 'do the entrusted work')),
     envelope(3, 'ses-a', tracePartAppended('ses-a')),
+    envelope(4, 'ses-a', terminalCaptured('ses-a'), 'msg-terminal-004'),
+    envelope(5, 'ses-a', blogEntry('ses-a', 'ses-blog'), 'msg-entry-004'),
+    envelope(6, 'ses-a', prefixRebase('ses-a'), 'msg-rebase-004'),
   ]
   const before = foldSurface.fold(prefix)
   assert.equal(before.ok, true, 'the pre-state folds Ok')
   const beforeSession = before.value.sessions['ses-a']
+
+  // The pre-state really carries the expected content — an empty or null
+  // view would make the later preservation claims vacuous.
   assert.equal(beforeSession.Companion.BloggerSessionId, 'ses-blog', 'the pre-state carries a linked companion')
   assert.deepEqual(
     beforeSession.XTrace.Opening,
@@ -83,12 +140,27 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
     TextRef: 'blob-004',
     TextDigest: 'digest-004',
   }], 'the pre-state carries a non-empty trace part')
+  assert.deepEqual(
+    beforeSession.XTrace.LatestTerminal,
+    { FrontierSequence: 2n, ProviderRun: 'msg-terminal-004', TextDigest: 'sha-terminal-004', TextRef: 'blob-terminal-004' },
+    'the pre-state carries a terminal capture',
+  )
+  assert.ok(beforeSession.Blog, 'the pre-state carries a blog projection')
+  assert.equal(beforeSession.Blog.FrameCount, 1, 'the blog projection has one frame')
+  assert.deepEqual(
+    beforeSession.Blog.Coverage,
+    { CoverableTurnCutoffExclusive: 1, CoveredPrefixDigest: 'digest-004', IngestedThroughSequence: 1n },
+    'the blog projection carries the entry coverage',
+  )
+  assert.ok(beforeSession.PrefixEpoch, 'the pre-state carries a prefix epoch')
+  assert.equal(Number(beforeSession.PrefixEpoch.EpochId), 1, 'the prefix epoch advanced to 1')
+  assert.equal(beforeSession.PrefixEpoch.Snapshot.CutoffExclusive, 1, 'the prefix snapshot carries the rebase cutoff')
 
   // Fold the checkpoint on top of the same prefix: the compression window
-  // records the checkpoint call identity, and the protected domain state
-  // keeps its exact values — an implementation that cleared or overwrote
-  // the existing state would make these comparisons fail.
-  const after = foldSurface.fold([...prefix, envelope(4, 'ses-a', checkpoint('ses-a', 'call-1'))])
+  // records the checkpoint call identity, and every protected slice keeps
+  // its exact values — an implementation that cleared or overwrote the
+  // existing state would make these comparisons fail.
+  const after = foldSurface.fold([...prefix, envelope(7, 'ses-a', checkpoint('ses-a', 'call-1'))])
   assert.equal(after.ok, true, 'checkpoint fold is Ok')
 
   const window = after.value.todoCheckpoints['ses-a']
@@ -97,36 +169,39 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
 
   const afterSession = after.value.sessions['ses-a']
   assert.equal(afterSession.Companion.BloggerSessionId, 'ses-blog', 'the linked companion survives the checkpoint untouched')
-  assert.deepEqual(
-    afterSession.XTrace.Opening,
-    beforeSession.XTrace.Opening,
-    'the captured opening survives the checkpoint untouched',
-  )
+  assert.deepEqual(afterSession.XTrace.Opening, beforeSession.XTrace.Opening, 'the captured opening survives the checkpoint untouched')
   assert.deepEqual(afterSession.XTrace.Parts, beforeSession.XTrace.Parts, 'the trace parts survive the checkpoint untouched')
+  assert.deepEqual(afterSession.XTrace.LatestTerminal, beforeSession.XTrace.LatestTerminal, 'the terminal capture survives the checkpoint untouched')
+  assert.deepEqual(afterSession.Blog, beforeSession.Blog, 'the blog projection survives the checkpoint untouched')
+  assert.deepEqual(afterSession.PrefixEpoch, beforeSession.PrefixEpoch, 'the prefix epoch survives the checkpoint untouched')
 
   // A checkpoint for another session writes only that session's window.
   const crossSession = foldSurface.fold([
     ...prefix,
-    envelope(4, 'ses-a', checkpoint('ses-a', 'call-1')),
-    envelope(5, 'ses-b', checkpoint('ses-b', 'call-b')),
+    envelope(7, 'ses-a', checkpoint('ses-a', 'call-1')),
+    envelope(8, 'ses-b', checkpoint('ses-b', 'call-b')),
   ])
   assert.equal(crossSession.ok, true)
   assert.deepEqual(crossSession.value.todoCheckpoints['ses-b'].checkpoints, [{ callId: 'call-b' }])
   assert.deepEqual(crossSession.value.todoCheckpoints['ses-a'], window, 'another session\'s checkpoint preserves the existing window')
   assert.deepEqual(crossSession.value.sessions['ses-a'].Companion, beforeSession.Companion, 'another session\'s checkpoint preserves the companion')
   assert.deepEqual(crossSession.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'another session\'s checkpoint preserves the trace')
+  assert.deepEqual(crossSession.value.sessions['ses-a'].Blog, beforeSession.Blog, 'another session\'s checkpoint preserves the blog')
+  assert.deepEqual(crossSession.value.sessions['ses-a'].PrefixEpoch, beforeSession.PrefixEpoch, 'another session\'s checkpoint preserves the prefix epoch')
 
   // Replaying the same checkpoint is idempotent on the window: it cannot
   // accumulate entries by repetition, and the protected state stays put.
   const replayed = foldSurface.replay([
     ...prefix,
-    envelope(4, 'ses-a', checkpoint('ses-a', 'call-1')),
-    envelope(5, 'ses-a', checkpoint('ses-a', 'call-1')),
+    envelope(7, 'ses-a', checkpoint('ses-a', 'call-1')),
+    envelope(8, 'ses-a', checkpoint('ses-a', 'call-1')),
   ])
   assert.equal(replayed.ok, true)
   assert.deepEqual(replayed.value.todoCheckpoints['ses-a'].checkpoints, [{ callId: 'call-1' }], 'replay keeps exactly one checkpoint entry')
   assert.deepEqual(replayed.value.sessions['ses-a'].Companion, beforeSession.Companion, 'replay keeps the protected companion state')
   assert.deepEqual(replayed.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'replay keeps the protected trace state')
+  assert.deepEqual(replayed.value.sessions['ses-a'].Blog, beforeSession.Blog, 'replay keeps the protected blog state')
+  assert.deepEqual(replayed.value.sessions['ses-a'].PrefixEpoch, beforeSession.PrefixEpoch, 'replay keeps the protected prefix epoch')
 
   // The retired magic-todo surface cannot write or read a todo list from
   // facts: append refuses and snapshot yields nothing (obligation-ledger-007).
@@ -136,5 +211,5 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
   assert.equal(obligation.snapshotMagicTodo({}), null)
 })
 
-test.todo('WHAT[obligation-ledger-004] the checkpoint fact leaves every remaining non-checkpoint projection slice untouched (GAP-190: blog, prefix epoch and terminal evidence still need non-empty fixtures; handles, enforcement, relay, guidelines and other state are not exposed by FoldSurface)')
+test.todo('WHAT[obligation-ledger-004] the checkpoint fact leaves every remaining non-checkpoint projection slice untouched (GAP-190: handles, enforcement, relay, guidelines and other state are not exposed by the registered FoldSurface, so their preservation is not proven here)')
 }
