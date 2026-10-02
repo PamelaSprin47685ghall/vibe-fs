@@ -77,8 +77,50 @@ module StrengthReplay =
                 return plans
         }
 
+    let private appendConsumption (durability: StrengthDurabilityPort) event =
+        task {
+            match! durability.Append event with
+            | StrengthDurableAppend.Applied -> return Ok()
+            | StrengthDurableAppend.SemanticRejected error
+            | StrengthDurableAppend.StorageFailed error
+            | StrengthDurableAppend.StorageInvalid error ->
+                return Error("Strength request consumption commit failed: " + error)
+        }
+
+    let private commitCompletedRequest durability owner projection message =
+        match StrengthLifecycle.reconcileCompletedRequest owner projection message with
+        | None -> Task.FromResult(Ok())
+        | Some event -> appendConsumption durability event
+
+    let private promoteFromSnapshot
+        (snapshots: ISessionSnapshotPort)
+        (durability: StrengthDurabilityPort)
+        (owner: SessionId)
+        (projection: StrengthProjection)
+        : Task<Result<StrengthProjection, string>> =
+        taskResult {
+            let! messages = snapshots.GetMessages owner
+
+            for message in messages do
+                do! commitCompletedRequest durability owner projection message
+
+            return! durability.LoadProjection()
+        }
+
+    let private promoteCompletedRequests snapshotPort durability owner (projection: StrengthProjection) =
+        let hasPrepared =
+            projection.ByDecision
+            |> Map.exists (fun _ view ->
+                view.Request.OwnerSessionId = owner
+                && view.State = StrengthCandidateState.Prepared)
+
+        match snapshotPort, hasPrepared with
+        | Some snapshots, true -> promoteFromSnapshot snapshots durability owner projection
+        | _ -> Task.FromResult(Ok projection)
+
     let private replayWithDurability
         (journal: AgentJournal option)
+        (snapshotPort: ISessionSnapshotPort option)
         (durability: StrengthDurabilityPort)
         (ownerRole: Role option)
         (sessionId: string)
@@ -92,6 +134,8 @@ module StrengthReplay =
             let! strengthProjection =
                 durability.LoadProjection()
                 |> TaskValue.map (Result.mapError (fun error -> "Strength replay projection failed: " + error))
+
+            let! strengthProjection = promoteCompletedRequests snapshotPort durability owner strengthProjection
 
             let! plans =
                 StrengthLifecycle.replayPlans
@@ -119,6 +163,7 @@ module StrengthReplay =
 
     let private applyForSession
         (journal: AgentJournal option)
+        (snapshotPort: ISessionSnapshotPort option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailFuse: string -> unit)
         (ownerRole: Role option)
@@ -132,12 +177,15 @@ module StrengthReplay =
         match strengthDurability with
         | None -> Task.FromResult([])
         | Some durability ->
-            plansOrFailClosed failClosed (replayWithDurability journal durability ownerRole sessionId outObj)
+            plansOrFailClosed
+                failClosed
+                (replayWithDurability journal snapshotPort durability ownerRole sessionId outObj)
 
     /// Replay durable Promoted frames before XTrace. Returns plans that still
     /// need Promoted→Traced close after capture (raw-replayed only).
     let applyBeforeXTrace
         (journal: AgentJournal option)
+        (snapshotPort: ISessionSnapshotPort option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailFuse: string -> unit)
         (ownerRole: string -> Role option)
@@ -148,7 +196,14 @@ module StrengthReplay =
             match projectionSessionIdOpt with
             | Some sessionId ->
                 return!
-                    applyForSession journal strengthDurability strengthFailFuse (ownerRole sessionId) sessionId outObj
+                    applyForSession
+                        journal
+                        snapshotPort
+                        strengthDurability
+                        strengthFailFuse
+                        (ownerRole sessionId)
+                        sessionId
+                        outObj
             | None -> return []
         }
 

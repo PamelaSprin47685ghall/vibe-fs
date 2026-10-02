@@ -61,6 +61,7 @@ module StrengthDelegate =
 
     let private renderCandidate
         (owner: SessionId)
+        (ownerRole: Role)
         (target: ProviderRunIdentity)
         (decision: StrengthDecisionId)
         (bundle: StrengthFrameBundle)
@@ -70,8 +71,14 @@ module StrengthDelegate =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let wire = ProviderWireCapture.decodeMessageView rawMessages
 
+            let displayName tool =
+                if tool = "js-predictor" then
+                    "js-" + Roles.roleLabel ownerRole
+                else
+                    tool
+
             let! intent =
-                StrengthProjectionIntent.candidate HostDigest.sha256Hex owner decision target target id bundle
+                StrengthProjectionIntent.candidate HostDigest.sha256Hex owner decision target target displayName bundle
                 |> Result.mapError (fun error -> sprintf "Strength Candidate intent refused: %A" error)
 
             let snapshot = { CurrentProjection = ProviderProjection.toSemantic wire }
@@ -963,12 +970,13 @@ module StrengthDelegate =
     let private renderCandidateOrThrow
         (strengthScope: PluginStrengthScope)
         (owner: SessionId)
+        (ownerRole: Role)
         (target: ProviderRunIdentity)
         (decisionId: StrengthDecisionId)
         (bundle: StrengthFrameBundle)
         (output: obj)
         : unit =
-        match renderCandidate owner target decisionId bundle output with
+        match renderCandidate owner ownerRole target decisionId bundle output with
         | Ok() -> ()
         | Error error -> failClosed strengthScope ("Strength Candidate render failed closed: " + error)
 
@@ -994,7 +1002,15 @@ module StrengthDelegate =
                 return failClosed strengthScope ("Strength Prepared storage invalid: " + error)
             | StrengthPreparedPublish.Rejected _ -> return ()
             | StrengthPreparedPublish.Published ->
-                renderCandidateOrThrow strengthScope surface.Owner surface.Target decisionId bundle surface.Output
+                renderCandidateOrThrow
+                    strengthScope
+                    surface.Owner
+                    surface.Authority.CanonicalRole
+                    surface.Target
+                    decisionId
+                    bundle
+                    surface.Output
+
                 return ()
         }
 
@@ -1020,6 +1036,7 @@ module StrengthDelegate =
                 renderCandidateOrThrow
                     strengthScope
                     surface.Owner
+                    surface.Authority.CanonicalRole
                     surface.Target
                     prepared.DecisionId
                     bundle

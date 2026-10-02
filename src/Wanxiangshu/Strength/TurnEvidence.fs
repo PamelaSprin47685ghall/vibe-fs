@@ -49,3 +49,36 @@ module StrengthTurnEvidence =
             StrengthPromotionDecision.IgnoreWrongRun
         else
             promoteOutcome targetProviderRun turn
+
+    let completedRequestDecision
+        (targetProviderRun: ProviderRunIdentity)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (assistant: SessionMessage)
+        : StrengthPromotionDecision =
+        let settled =
+            assistant.Completed
+            && assistant.ErrorName.IsNone
+            && (assistant.Finish = Some "tool-calls"
+                || assistant.Finish = Some "stop"
+                || assistant.Finish = Some "length")
+
+        let exact =
+            assistant.Role = "assistant"
+            && assistant.ParentId = Some(PhysicalUserMessageId.value physicalUserMessageId)
+
+        let hasCall =
+            assistant.ToolParts
+            |> Array.exists (fun part ->
+                not (String.IsNullOrWhiteSpace(ToolCallId.value part.ToolCallId))
+                && not (String.IsNullOrWhiteSpace part.ToolName))
+
+        let evidence =
+            if hasCall then
+                StrengthProviderOutputEvidence.RealOutput
+            else
+                classifyParts assistant.Parts
+
+        if settled && exact then
+            StrengthPromotion.decide targetProviderRun (ProviderRunIdentity.create assistant.Id) evidence
+        else
+            StrengthPromotionDecision.AwaitOrAbandon

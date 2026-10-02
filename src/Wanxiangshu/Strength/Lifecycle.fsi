@@ -19,6 +19,12 @@ type StrengthReplayPlan =
 module StrengthLifecycle =
     val reconcileEvent: projection: StrengthProjection -> turn: ReconciledTurn -> StrengthEvent option
 
+    val reconcileCompletedRequest:
+        owner: SessionId ->
+        projection: StrengthProjection ->
+        assistant: Wanxiangshu.OpenCode.SessionMessage ->
+            StrengthEvent option
+
     val replayPlans:
         ownerSessionId: SessionId ->
         messageIdOf: ('message -> string option) ->

@@ -130,6 +130,55 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_dele
   assert.deepEqual(applied.value[1].parts.map((part) => part.state.input), [{ filePath: 'README.md' }, { pattern: 'Strength' }])
   assert.deepEqual(applied.value[1].parts.map((part) => part.state.output), ['alpha', 'beta'])
 })
+test('WHAT[speculative-investigation-009] native completed tool output preserves JSON-looking result bytes as text', () => {
+  for (const output of ['[]', '{"value": 1}', '"quoted"', 'null', '42']) {
+    const applied = Strength.tryApplyRenderedMessages('owner', H, {
+      messages: [msg('assistant', [call('c1', 'js-manager', '{"program":"inspect"}')]),
+        msg('tool', [result('c1', output)])],
+      hostMessageIds: ['call', 'result'], hostIsPhysical: [false, false],
+    })
+    assert.equal(applied.ok, true, applied.error)
+    assert.equal(applied.value[0].parts[0].state.output, output)
+  }
+})
+test('WHAT[speculative-investigation-009] final owner encoding preserves physical rows and parallel exchange order', () => {
+  const physical = { info: { id: 'physical', sessionID: 'owner', role: 'user' }, parts: [
+    { type: 'text', text: 'inspect both files', id: 'original-part' },
+    { type: 'file', url: 'file:///fixture.png', mime: 'image/png' },
+  ] }
+  const native = { info: { id: 'native', sessionID: 'owner', role: 'assistant' }, parts: [
+    { type: 'tool', callID: 'native-call', tool: 'js-manager', state: {
+      status: 'completed', input: { program: 'original' }, output: 'original result',
+    } },
+  ] }
+  const logical = Wire.tryApplyRenderedMessages('owner', H, {
+    messages: [msg('assistant', [
+      call('first', 'js-manager', '{"program":"read first"}'),
+      call('second', 'js-manager', '{"program":"read second"}'),
+    ]), msg('tool', [result('first', 'first evidence'), result('second', 'second evidence')])],
+    hostMessageIds: ['batch-call', 'batch-result'], hostIsPhysical: [false, false],
+  })
+  assert.equal(logical.ok, true, logical.error)
+  const encoded = Strength.tryEncodeOwnerMessages(H, [physical, ...logical.value, native])
+  assert.equal(encoded.ok, true, encoded.error)
+  assert.equal(encoded.value[0], physical, 'physical objects and media are not reconstructed')
+  assert.equal(encoded.value[2], native, 'native tools retain their original metadata')
+  assert.equal(encoded.value[1].info.id, 'batch-call')
+  assert.deepEqual(encoded.value[1].parts.map(part => [
+    part.type, part.callID, part.tool, part.state.status, part.state.input.program, part.state.output,
+  ]), [
+    ['tool', 'first', 'js-manager', 'completed', 'read first', 'first evidence'],
+    ['tool', 'second', 'js-manager', 'completed', 'read second', 'second evidence'],
+  ])
+  const incomplete = Strength.tryEncodeOwnerMessages(H, [physical, logical.value[0]])
+  assert.equal(incomplete.ok, false)
+  assert.match(incomplete.error, /incomplete/i)
+  const orphan = structuredClone(logical.value[1])
+  orphan.parts[0].callID = 'unmatched'
+  const rejected = Strength.tryEncodeOwnerMessages(H, [physical, logical.value[0], orphan])
+  assert.equal(rejected.ok, false)
+  assert.match(rejected.error, /orphan/i)
+})
 test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
     { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },

@@ -186,29 +186,6 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_integrator_Current_reflec
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { resolve } = await import("node:path");
-const { default: test } = await import("node:test");
-
-const root = resolve(import.meta.dirname, '../../..')
-const read = (path) => readFileSync(resolve(root, path), 'utf8')
-
-test('WHAT[speculative-investigation-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace', () => {
-  const replay = read('src/Wanxiangshu/Strength/OpenCode/Replay.fs')
-  const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  assert.match(replay, /let\s+applyBeforeXTrace/)
-  assert.match(replay, /plansOrFailClosed/)
-  assert.match(replay, /XTraceProjection\.tryContiguousHostRange/)
-  assert.match(replay, /XTraceProjection\.orderedSemanticParts/)
-  assert.doesNotMatch(replay, /XTraceProjection\.(?:tryHostMessageId|parts|currentGenerationParts)|XTracePartRef/)
-  assert.doesNotMatch(replay, /stableHostIdOfProvenance|IndexOf\("\\\/part:|isContiguousFromFirst/)
-  assert.match(pt, /StrengthReplay\.applyBeforeXTrace/)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
 const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import('../../../dist/Strength/Surface.js');

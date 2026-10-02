@@ -203,6 +203,46 @@ test('WHAT[speculative-investigation-003] resident history cannot be republished
   assert.deepEqual(transformed.batches.map(batch => batch.exchanges.map(exchange => exchange.canonicalResult)), [['current-evidence']])
 })
 
+test('WHAT[speculative-investigation-003] initial non-readonly batches or intermediate filtered batches re-index contiguously to valid frame ordinals', async () => {
+  const replica = 'replica-mixed-readonly'
+  const runtime = registered(replica, 3)
+
+  // Scenario 1: First batch is non-readonly (e.g. bash/edit), second batch is readonly (read).
+  // Under the old code, second batch retains requestOrdinal = 2, causing InvalidRequestOrdinal (1, 2).
+  // Under contiguous re-indexing, it becomes batch with requestOrdinal = 1.
+  const firstNonReadonlySecondReadonly = await Strength.transformApply(H, runtime, { messages: [
+    user('u1', replica, [hostText('Continue.')]),
+    assistant('a1', replica, [hostResult('c1', 'bash', { command: 'pwd' }, '/app')]),
+    assistant('a2', replica, [hostResult('c2', 'read', { filePath: 'a' }, 'alpha')]),
+  ] }, true)
+  assert.equal(firstNonReadonlySecondReadonly.kind, 'Ready')
+  assert.equal(firstNonReadonlySecondReadonly.batches.length, 1)
+  assert.equal(firstNonReadonlySecondReadonly.batches[0].requestOrdinal, 1)
+  assert.equal(firstNonReadonlySecondReadonly.batches[0].exchanges[0].toolName, 'read')
+  assert.equal(firstNonReadonlySecondReadonly.batches[0].exchanges[0].canonicalResult, 'alpha')
+
+  // Frame build on the resulting batches must succeed without InvalidRequestOrdinal
+  const frame1 = Strength.frameTryBuild(H, firstNonReadonlySecondReadonly.batches)
+  assert.equal(frame1.ok, true, `Frame build failed: ${frame1.error}`)
+
+  // Scenario 2: Batch 1 is readonly, Batch 2 is non-readonly, Batch 3 is readonly.
+  // Intermediate batch 2 is filtered out; batches 1 & 3 must have ordinals 1 & 2 contiguously.
+  const middleFiltered = await Strength.transformApply(H, runtime, { messages: [
+    user('u1', replica, [hostText('Continue.')]),
+    assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a2', replica, [hostResult('c2', 'write', { filePath: 'b', content: 'test' }, 'ok')]),
+    assistant('a3', replica, [hostResult('c3', 'grep', { pattern: 'x' }, 'hit')]),
+  ] }, true)
+  assert.equal(middleFiltered.kind, 'Ready')
+  assert.equal(middleFiltered.batches.length, 2)
+  assert.deepEqual(middleFiltered.batches.map(b => b.requestOrdinal), [1, 2])
+  assert.equal(middleFiltered.batches[0].exchanges[0].toolName, 'read')
+  assert.equal(middleFiltered.batches[1].exchanges[0].toolName, 'grep')
+
+  const frame2 = Strength.frameTryBuild(H, middleFiltered.batches)
+  assert.equal(frame2.ok, true, `Frame build failed: ${frame2.error}`)
+})
+
 test('WHAT[speculative-investigation-003] STRENGTH_003_outbound_gate_is_the_admission_not_the_visible_batch_count', async () => {
   const runtime = registered('replica-gate', 1)
   const admitted = await Strength.transformApply(H, runtime, { messages: [

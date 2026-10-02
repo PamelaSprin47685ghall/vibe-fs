@@ -48,6 +48,34 @@ const apply = (state, event) => {
 const turn = (providerRun, parts, outcome = 'completed') => ({ sessionId: 'owner', physicalUserMessageId: 'user-1', authorityRootUserMessageId: 'user-1', providerRun, parts, outcome })
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 
+test('WHAT[speculative-investigation-007] completed native tool request proves exact candidate consumption before the whole tool loop ends', () => {
+  const projection = apply(apply(apply(Strength.projectionEmpty(), request()), bound()), prepared())
+  const message = {
+    info: { id: 'run-1', sessionID: 'owner', role: 'assistant', parentID: 'user-1',
+      finish: 'tool-calls', time: { created: 1, completed: 2 } },
+    parts: [{ type: 'tool', tool: 'read', callID: 'actual-model-call',
+      state: { status: 'completed', input: { filePath: 'next' }, output: 'next evidence' } }],
+  }
+  const promoted = Strength.lifecycleReconcileCompletedRequest('owner', projection, message)
+  assert.equal(promoted.kind, 'Promoted')
+  assert.equal(promoted.decisionId, 'd1')
+  assert.equal(promoted.frameDigest, bundle.digest)
+  for (const info of [
+    { ...message.info, id: 'other-run' },
+    { ...message.info, parentID: 'other-physical' },
+    { ...message.info, time: { created: 1 } },
+    { ...message.info, finish: 'error' },
+    { ...message.info, finish: 'aborted' },
+    { ...message.info, error: { name: 'APIError', message: 'upstream failed' } },
+  ]) {
+    assert.equal(Strength.lifecycleReconcileCompletedRequest('owner', projection, { ...message, info }), null)
+  }
+  assert.equal(Strength.lifecycleReconcileCompletedRequest('other-owner', projection, message), null)
+  assert.equal(Strength.lifecycleReconcileCompletedRequest('owner', projection, { ...message, parts: [] }), null)
+  assert.equal(Strength.lifecycleReconcileCompletedRequest('owner', apply(projection, Strength.eventPromoted(
+    'owner', 'd1', 'run-1', bundle.digest, ['p-d1'])), message), null)
+})
+
 test('WHAT[speculative-investigation-007] STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output', () => {
   let projection = apply(apply(apply(Strength.projectionEmpty(), request()), bound()), prepared())
   const realTurn = turn('run-1', [call('c1', 'read', '{}')])

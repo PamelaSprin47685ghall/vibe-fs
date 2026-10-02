@@ -456,7 +456,7 @@ module PluginTransforms =
                         PromptAuthorityProjectionQueries.lastAuthorityProfile sid projections))
                 |> Option.map (fun profile -> profile.CanonicalRole)
 
-            StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse ownerRole
+            StrengthReplay.applyBeforeXTrace journal snapshotOpt strengthDurability strengthFailFuse ownerRole
           RestoreProtocolArguments = restoreProtocolArguments
           ApplyRelayProjection =
             fun sidOpt outObj ->
@@ -668,7 +668,15 @@ module PluginTransforms =
                         let replaced = SyncDelegateBatching.applyReplacedResults currentMessages
                         HostMessageProjection.replaceMessagesInPlace outObj replaced
                 }
-          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages }
+          SanitizeMessages =
+            fun outObj ->
+                let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+                match StrengthReplicaTransform.tryEncodeOwnerMessages HostDigest.sha256Hex rawMessages with
+                | Error error -> raiseFailClosed strengthFailFuse error
+                | Ok encoded ->
+                    HostMessageProjection.replaceMessagesInPlace outObj encoded
+                    HostMessageProjection.sanitizeOutputMessages outObj }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
