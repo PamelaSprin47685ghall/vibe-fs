@@ -15,6 +15,13 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Participant.Provider
+
+[<RequireQualifiedAccess>]
+type ManagedChatSupersessionError =
+    | MissingAccepted of ChatExecutionKey
+    | PreProviderSettlementFailed of PreProviderSettlementError
+    | ProviderSettlementFailed of ManagedChatProviderLifecycleError
 
 /// Durable binding of ChatExecution persistence records to the shared
 /// `AgentJournal`. Every operation replays through the same snapshot+append
@@ -109,7 +116,7 @@ module ManagedChatAcceptance =
 [<RequireQualifiedAccess>]
 module ManagedChatProviderLifecycle =
 
-    let private forJournal (journal: AgentJournal) : ManagedChatProviderLifecyclePersistence =
+    let internal forJournal (journal: AgentJournal) : ManagedChatProviderLifecyclePersistence =
         { ReadExact =
             fun key ->
                 AgentJournal.snapshot journal
@@ -157,7 +164,7 @@ module ManagedChatProviderLifecycle =
 [<RequireQualifiedAccess>]
 module PreProviderSettlement =
 
-    let private forJournal (journal: AgentJournal) : PreProviderSettlementPersistence =
+    let internal forJournal (journal: AgentJournal) : PreProviderSettlementPersistence =
         { ReadExact =
             fun key ->
                 AgentJournal.snapshot journal
@@ -189,4 +196,58 @@ module PreProviderSettlement =
         (evidence: AcceptedChatExecutionEvidence)
         (disposition: ChatExecutionTerminalDisposition)
         =
-        PreProviderSettlement.settleWith (forJournal journal) key evidence disposition
+        ManagedChatExecutionFlight'.run (AgentJournal.runtimeId journal) key (fun () ->
+            PreProviderSettlement.settleWith (forJournal journal) key evidence disposition)
+
+[<RequireQualifiedAccess>]
+module ManagedChatSupersession =
+
+    let settle (journal: AgentJournal) (key: ChatExecutionKey) =
+        ManagedChatExecutionFlight'.run (AgentJournal.runtimeId journal) key (fun () ->
+            task {
+                match
+                    (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+                    |> ChatExecutionProjection.byKey key
+                with
+                | None -> return Error(ManagedChatSupersessionError.MissingAccepted key)
+                | Some state ->
+                    let lifecycle =
+                        match state with
+                        | ChatExecutionState.Accepted _ -> DurableExecutionLifecycle.AcceptedBeforeProvider
+                        | ChatExecutionState.Started _ -> DurableExecutionLifecycle.ProviderStarted
+                        | ChatExecutionState.EndedBeforeStart _
+                        | ChatExecutionState.EndedAfterStart _ -> DurableExecutionLifecycle.Terminal
+
+                    let decision =
+                        ExecutionFailurePolicy.decideSupersession key lifecycle CapacityOwnership.NoCapacityFence
+
+                    match decision.Resolution, state with
+                    | ExecutionFailureResolution.TerminalizeAcceptedPreProvider(_, disposition),
+                      ChatExecutionState.Accepted accepted ->
+                        let! settled =
+                            PreProviderSettlement.settleWith
+                                (PreProviderSettlement.forJournal journal)
+                                key
+                                accepted
+                                disposition
+
+                        return
+                            settled
+                            |> Result.map ignore
+                            |> Result.mapError ManagedChatSupersessionError.PreProviderSettlementFailed
+                    | ExecutionFailureResolution.TerminalizeProviderStarted(_, disposition),
+                      ChatExecutionState.Started started ->
+                        let! settled =
+                            ManagedChatProviderLifecycle.terminalWith
+                                (ManagedChatProviderLifecycle.forJournal journal)
+                                key
+                                started
+                                disposition
+
+                        return
+                            settled
+                            |> Result.map ignore
+                            |> Result.mapError ManagedChatSupersessionError.ProviderSettlementFailed
+                    | ExecutionFailureResolution.PreserveCurrentFact, _ -> return Ok()
+                    | _ -> return invalidOp "supersession policy produced an incompatible execution disposition"
+            })

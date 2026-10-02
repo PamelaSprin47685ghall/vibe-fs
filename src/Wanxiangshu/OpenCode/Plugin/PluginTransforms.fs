@@ -95,6 +95,35 @@ module PluginTransforms =
 
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
+    [<RequireQualifiedAccess>]
+    type private ProviderStartBoundaryFailure =
+        | SnapshotUnavailable of ChatExecutionKey * string
+        | HostRunUnavailable of ChatExecutionKey * ProviderRunBinding.Rejection
+        | CommittedAdmissionUnavailable of ChatExecutionKey
+        | LifecycleRejected of ProviderLifecycle.ProviderStartObservationError<unit>
+
+    let private providerStartBoundaryErrorCode =
+        function
+        | ProviderStartBoundaryFailure.SnapshotUnavailable _ -> "host-snapshot-unavailable"
+        | ProviderStartBoundaryFailure.HostRunUnavailable _ -> "host-run-unavailable"
+        | ProviderStartBoundaryFailure.CommittedAdmissionUnavailable _ -> "committed-admission-unavailable"
+        | ProviderStartBoundaryFailure.LifecycleRejected error ->
+            ProviderLifecycle.providerStartObservationErrorCode error
+
+    type private ProviderStartBoundaryException(failure: ProviderStartBoundaryFailure) =
+        inherit
+            Exception(
+                sprintf
+                    "MANAGED-CHAT-005: provider start boundary rejected (%s): %A"
+                    (providerStartBoundaryErrorCode failure)
+                    failure
+            )
+
+        member _.Failure = failure
+
+    let private rejectProviderStartBoundary failure =
+        raise (ProviderStartBoundaryException failure)
+
     type TraceTransformCapture =
         { RawMessages: obj list
           Current: XTraceProjectionState option }
@@ -181,6 +210,71 @@ module PluginTransforms =
         let wired = host.Wired
         let strengthFailFuse = boot.StrengthFailClosed
 
+        let requireProviderAdmission key =
+            if ModelRouting.readExecutionAdmission key |> Option.isNone then
+                rejectProviderStartBoundary (ProviderStartBoundaryFailure.CommittedAdmissionUnavailable key)
+
+        let observeProviderRun (key: ChatExecutionKey) =
+            task {
+                let snapshot =
+                    snapshotOpt
+                    |> Option.defaultWith (fun () ->
+                        rejectProviderStartBoundary (
+                            ProviderStartBoundaryFailure.SnapshotUnavailable(key, "snapshot port unavailable")
+                        ))
+
+                let! messages = snapshot.GetMessages key.SessionId
+
+                let observed =
+                    messages
+                    |> Result.mapError (fun reason -> ProviderStartBoundaryFailure.SnapshotUnavailable(key, reason))
+                    |> Result.bind (fun messages ->
+                        ProviderRunBinding.bindableRun (PhysicalUserMessageId.value key.PhysicalUserMessageId) messages
+                        |> Result.mapError (fun rejection ->
+                            ProviderStartBoundaryFailure.HostRunUnavailable(key, rejection)))
+
+                match observed with
+                | Error failure -> return rejectProviderStartBoundary failure
+                | Ok assistant ->
+                    return
+                        { SessionId = key.SessionId
+                          PhysicalUserMessageId = key.PhysicalUserMessageId
+                          ProviderRun = ProviderRunIdentity.create assistant.Id }
+            }
+
+        let persistProviderRun key observed =
+            task {
+                let! persisted =
+                    ProviderLifecycle.persistProviderStartedFromObservation journal scope.TryBindAttemptPlan observed
+
+                match persisted with
+                | Error error ->
+                    return rejectProviderStartBoundary (ProviderStartBoundaryFailure.LifecycleRejected error)
+                | Ok _ ->
+                    requireProviderAdmission key
+                    do! wired.ConfirmProviderStarted observed
+                    requireProviderAdmission key
+            }
+
+        let confirmProviderStarted projectionSessionIdOpt outObj =
+            task {
+                let physical =
+                    outObj
+                    |> ProviderWireDecode.messagesFromTransformOutput
+                    |> ProviderWireCapture.lastUserMessageId
+
+                match projectionSessionIdOpt, physical with
+                | Some sessionText, Some physical ->
+                    let key =
+                        { SessionId = SessionId.create sessionText
+                          PhysicalUserMessageId = physical }
+
+                    requireProviderAdmission key
+                    let! observed = observeProviderRun key
+                    do! persistProviderRun key observed
+                | _ -> return ()
+            }
+
         let drainTermination sessionId =
             function
             | Error error -> Task.FromResult(Error error)
@@ -262,7 +356,7 @@ module PluginTransforms =
                         projectionSessionIdOpt
                         outObj
                 with
-                | Ok _ -> return ()
+                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt outObj
                 | Error error ->
                     return
                         invalidOp (
@@ -758,9 +852,8 @@ module PluginTransforms =
             let! prefixHorizon = caps.ApplyXWire relayProjection outObj
 
             // 10. ProviderLifecycle.freezeProviderAttemptPlanForTransform
-            // The transform sees the accepted user message only. Freeze the
-            // exact request plan; a later public assistant observation owns
-            // ProviderRunIdentity binding and ProviderStarted persistence.
+            // Freeze the exact plan, then confirm the Host's real assistant
+            // identity and durable ProviderStarted before returning its body.
             do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
 
             // 11. EnforcerContinuation.applyContinuation

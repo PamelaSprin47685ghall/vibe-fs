@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Composition.Durable
 
 /// Optional Host capability bound to exact already-accepted physical material.
@@ -36,13 +37,19 @@ type SessionRecoveryHost
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(started, _) -> Some(keyOfStarted started)
         | ChatExecutionRecoveryLifecycleEvent.SessionAborted key -> Some key
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted key
-        | ChatExecutionRecoveryLifecycleEvent.SessionCancelled key -> Some key
+        | ChatExecutionRecoveryLifecycleEvent.SessionCancelled key
+        | ChatExecutionRecoveryLifecycleEvent.SessionSuperseded key
+        | ChatExecutionRecoveryLifecycleEvent.PhysicalExecutionQuiesced key -> Some key
         | _ -> None
 
     let statesFor (event: ChatExecutionRecoveryLifecycleEvent) =
         let projection = (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
 
         match event with
+        | ChatExecutionRecoveryLifecycleEvent.PhysicalExecutionQuiesced key ->
+            ChatExecutionProjection.byKey key projection
+            |> Option.filter (fun state -> state.startedEvidence.IsNone && state.terminalDisposition.IsNone)
+            |> Option.toList
         | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId ->
             // provider-attempt-recovery-023: the obligation is exactly `Accepted ∧ ¬ProviderStarted` for
             // that session. Executions that already reached the provider belong to
@@ -124,7 +131,8 @@ type SessionRecoveryHost
 
     let eventIsIdleSweep (event: ChatExecutionRecoveryLifecycleEvent) =
         match event with
-        | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced _ -> true
+        | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced _
+        | ChatExecutionRecoveryLifecycleEvent.PhysicalExecutionQuiesced _ -> true
         | _ -> false
 
     let currentState (state: ChatExecutionState) =
@@ -292,6 +300,17 @@ type SessionRecoveryHost
     let finalize (request: TerminalFinalizationRequest) =
         persistTerminal request.ExecutionKey request.TerminalEvidence request.TerminalDisposition
 
+    let settleSuperseded (state: ChatExecutionState) =
+        task {
+            let! settled = ManagedChatSupersession.settle journal state.key
+
+            match settled with
+            | Ok() ->
+                do! release state.key
+                scope.RevokeManualIntervention state.key
+            | Error failure -> invalidOp $"supersession settlement failed: {failure}"
+        }
+
     let resume (request: PreProviderResumeRequest) =
         // Non-sweep callers keep the original semantics: publish the manual
         // intervention fact and leave further settlement to the owner events.
@@ -383,10 +402,21 @@ type SessionRecoveryHost
                 drainWaiters.[key] <- completion
                 completion.Task :> Task)
 
+    let settleOwnedSupersession (state: ChatExecutionState) =
+        if ModelRouting.wasExecutionSuperseded state.key then
+            settleSuperseded (currentState state) :> Task
+        else
+            invalidOp "supersession settlement requires the capacity owner's exact replacement evidence"
+
+    let recoverSignalledState event state =
+        match event with
+        | ChatExecutionRecoveryLifecycleEvent.SessionSuperseded _ -> settleOwnedSupersession state
+        | _ -> recoverState event state :> Task
+
     member _.Signal(event: ChatExecutionRecoveryLifecycleEvent) : Task =
         task {
             for state in statesFor event do
-                do! recoverState event state
+                do! recoverSignalledState event state
 
             sessionsToPulse event |> List.iter pulseDrain
         }

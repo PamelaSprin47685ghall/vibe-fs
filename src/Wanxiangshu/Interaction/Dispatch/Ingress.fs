@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Session.ChatExecution
 
 [<RequireQualifiedAccess>]
 module PromptIngress =
@@ -28,6 +29,16 @@ module PromptIngress =
                 ExplicitAgent = Some agent }
         | None -> message
 
+    let private acceptedExecutionEvidence (journal: AgentJournal option) (message: PromptIngressCodec.DecodedMessage) =
+        match journal, message.SessionId, message.PhysicalUserMessageId with
+        | Some durable, Some sessionId, Some physicalId ->
+            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.byKey
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalId }
+            |> Option.map _.acceptedEvidence
+        | _ -> None
+
     let resolveDecision (journal: AgentJournal option) (message: PromptIngressCodec.DecodedMessage) =
         let authority =
             match journal, message.SessionId with
@@ -39,6 +50,15 @@ module PromptIngress =
 
         // interaction-authority-009: When host message omits explicit agent,
         // Ingress boundary projects active participant to admit as HumanMessage continuation
-        let enrichedMessage = enrichHostMessage authority message
+        let accepted = acceptedExecutionEvidence journal message
 
-        ChatAdmissionIntent.resolve enrichedMessage { Authority = authority }
+        let enrichedMessage =
+            if accepted.IsSome then
+                message
+            else
+                enrichHostMessage authority message
+
+        ChatAdmissionIntent.resolve
+            enrichedMessage
+            { Authority = authority
+              AcceptedExecutionEvidence = accepted }

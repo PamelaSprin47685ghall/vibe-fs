@@ -11,6 +11,7 @@ open Wanxiangshu.Persistence.Journal
 module ManagerWorkflow =
 
     val observeIdle:
+        quiescence: ISessionQuiescenceGate ->
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
@@ -21,6 +22,7 @@ module ManagerWorkflow =
     /// non-Manager terminal semantics are delegated through the injected ordinary
     /// workflow rather than returned as a handled-bool program counter.
     val observe:
+        quiescence: ISessionQuiescenceGate ->
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->

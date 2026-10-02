@@ -64,6 +64,8 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；suicide 在任期 committed 退休后，可凭退休事实终止该 run 的残余尝试。
 
+真实外部物理用户输入由准入 owner 建立 durable `Accepted` 后，可以作为唯一 successor 精确取代前次物理执行。此路径必须携带 owner-issued 的外部 `HumanRoot` 或 `HumanMessage` acceptance evidence，以及容量 owner 明确建立的旧执行 supersession 和当前 replacement 的 `Admitted` lease 或 `Queued` pending demand；仅有 `Accepted` 或没有旧 lease 均不构成该授权。同一 session 的不同输入由一个准入 owner 串行处理有限的 accept、acquire 与旧物理 attempt 交接，容量 pending 的完成等待不阻挡后来的输入入场与替代。新输入返回 Host、保存物理消息或开始 provider effect 前，必须确认旧物理 Host attempt 已排空，旧执行按 `Superseded` policy 精确结算；迟到的旧回调不得取消或释放新执行。此授权不逻辑取消根会话、不级联 children，`PendingPromptIntent`、Guard、retry 与 HostInternal 均不得借此中断根会话。原有自动 `InterruptAttempt` 与 `AbortSession` 的根会话禁令保持有效。
+
 ## [017] 中断必须有后继
 
 内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。

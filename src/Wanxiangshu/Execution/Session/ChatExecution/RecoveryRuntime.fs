@@ -13,6 +13,8 @@ type ChatExecutionRecoveryLifecycleEvent =
     | SessionAborted of ChatExecutionKey
     | SessionDeleted of ChatExecutionKey
     | SessionCancelled of ChatExecutionKey
+    | SessionSuperseded of ChatExecutionKey
+    | PhysicalExecutionQuiesced of ChatExecutionKey
     | CapacityProjectionReplayed
 
     /// provider-attempt-recovery-023：宿主发布 session idle 后，本 session 的 `Accepted` 且无

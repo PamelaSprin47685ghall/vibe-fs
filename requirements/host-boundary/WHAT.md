@@ -10,7 +10,7 @@
 
 ## [003] 传输与领域分离且信号仅作唤醒
 
-宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。coarse `AttemptAborted(SessionId)` 只能撤销当前物理 attempt 的 quiescence capability 并唤醒 reconciler；它没有 exact `PhysicalUserMessageId`，不得把该 session 的全部 current chat execution 投影为 `SessionAborted`，尤其不得终结已被更新 user message 接纳的新 execution。
+宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。coarse `AttemptAborted(SessionId)` 只唤醒 reconciler；撤销 quiescence、取消 Strength owner 与推进 attempt stop fence 必须依据 SDK 快照或公开 exact cancelled assistant receipt，校验本次 `PhysicalUserMessageId` 仍拥有对应执行。coarse 信号没有 exact `PhysicalUserMessageId`，不得把该 session 的全部 current chat execution 投影为 `SessionAborted`，也不得撤销或终结已被更新 user message 接纳的新 execution。真正的当前 operator abort 仍由其 exact cancelled observation 撤销本次能力，旧执行迟到的 abort 不影响新执行。
 
 ## [004] TurnUnknown 为对齐私有观测而非业务结局
 

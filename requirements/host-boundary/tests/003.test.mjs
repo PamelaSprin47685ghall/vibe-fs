@@ -20,21 +20,39 @@ test('WHAT[host-boundary-003] HOST_003_retry_signal_is_a_typed_wake_never_a_run_
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { readFileSync } = await import("node:fs");
-const { join } = await import("node:path");
-const { fileURLToPath } = await import("node:url");
+const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+const recovery = await import('../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js')
 
-const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
-
-test('WHAT[host-boundary-003] coarse attempt abort never aborts every current chat execution', () => {
-  const bootstrapSource = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const abortBranch = bootstrapSource.match(/\| AttemptAborted failure ->([\s\S]*?)\| SessionDeleted/)
-
-  assert.ok(abortBranch, 'AttemptAborted branch must remain explicit')
-  assert.doesNotMatch(abortBranch[1], /SignalChatRecoverySession|ChatExecutionRecoveryLifecycleEvent\.SessionAborted/)
-  assert.match(abortBranch[1], /FissionHost\.routeAttemptAborted/)
-  assert.match(abortBranch[1], /reconciler\.Signal signal/)
+test('WHAT[host-boundary-003] coarse abort is only a wake while an exact operator cancellation settles its own accepted execution', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sessionID = 'ses-exact-operator-cancel'
+    const message = { id: 'msg-current', sessionID, role: 'user', agent: 'engineer', model: {} }
+    await hooks['chat.message']({ sessionID, messageID: message.id, agent: 'engineer' }, {
+      message, parts: [{ type: 'text', text: 'operator input' }],
+    })
+    const before = routing.sharedCapacitySnapshot()
+    await hooks.event({ event: { type: 'session.error', properties: {
+      sessionID, error: { name: 'MessageAbortedError', data: { message: 'operator interrupted' } },
+    } } })
+    assert.deepEqual(routing.sharedCapacitySnapshot(), before)
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, message.id), {
+      phase: 'Accepted', disposition: null,
+    })
+    await hooks['chat.params']({ sessionID, message, agent: 'engineer', model: {
+      providerID: 'provider', id: 'engineer-model', capabilities: {},
+    } }, {})
+    await hooks.event({ event: { type: 'message.updated', properties: { info: {
+      id: 'assistant-current', parentID: message.id, sessionID, role: 'assistant', agent: 'engineer',
+      providerID: 'provider', modelID: 'engineer-model', time: { created: 1, completed: 2 },
+      error: { name: 'MessageAbortedError', data: { message: 'operator interrupted' } },
+    } } } })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, message.id), {
+      phase: 'Terminal', disposition: 'Cancelled',
+    })
+    assert.equal(routing.sharedCapacitySnapshot().executions.some((owner) => owner.sessionId === sessionID), false)
+    assert.equal(runtime.prompts.length, 0)
+  })
 })
 }
 

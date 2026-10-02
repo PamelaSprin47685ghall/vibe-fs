@@ -2,7 +2,7 @@
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
-本分册只做只读规划，没有修改生产代码、测试或规范，没有运行测试或构建。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。范围是下列 12 个包；以当前默认全量输出 `/tmp/vibe-fs-plan-runtime-todos.txt` 为待证清单，并用测试声明核对，合计 **64 个编号文件、71 项实际 TODO**。测试夹具字符串中的 `todo` 不计入；`verification-system/tests/009`、`021` 和 `support/tier-gate` 不由此增加产品 TODO。
+本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。下一批为VS-016的T418/T419；本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
 
 ## 使用这份分册
 
@@ -52,7 +52,7 @@
 
 - **已有/欠缺**：C44–55 已证明参数描述符/键序/对象身份、部分隐藏失败回滚、精确调用 owner、重复 before/after、并发共用对象和业务 getter 不读取；16 个新增真实 hook 回归已有绿色。C11/C12 是显式 after，不能证明 Host 执行器异常必然调用 after。
 - **先决项**：先读最新 canary 失败诊断；以真实目标 call 的 chat.message 接收/完成/拒绝、SDK parent/status、provider route 阶段区分丢协议与夹具关联错误。此调查是稳定证据前提，不是扩展产品功能。
-- **S02 本轮增量**：已发现collector旧idle误关联与provider请求计数串阶段；参数canary改为正常同物理turn自然followup，业务错误与取消各独立目标，严格核对before的session/physical parent。这不证明真实executor throw后的自动after，也不关闭调查中新增的GAP-223（Guard与新用户输入交错）；该项按W3、分册06另开受控supersession结算红例，禁止在读取hook补租约。
+- **S02及后续增量**：collector旧idle误关联与请求计数串阶段已修；032正常同物理turn自然followup、业务错误、取消分别核对before的exact身份，原断言在最终完整integration通过。032本身不证明executor throw后的自动after；独立033与R01—R04随后关闭GAP-223，不是在读取hook补租约。T180保持待证。
 - **先红/独立观察**：安装版 Host 真正执行一个受控抛 sentinel Error 的参与工具；观察器仅记录，不手调 after。before 已隐藏协议字段，执行器看不到它们；异常后 SDK 保存参数/after 观察应恢复原完整值与顺序。并列正常、业务 Error 返回和真实 throw，不能互换。
 - **施工**：先证明 Host 的异常 callback 合同；若 Host 不调用 after，找真实可用 finally/恢复归属并补最小协议实现，或提交 Host 兼容裁决。不得以全局异常 handler 偷恢复其它调用的 stash。
 - **验收/停止**：真实异常路线上自动恢复且错误仍可见，同 owner 恢复、foreign owner 保持隐藏；现有 C44–55 全保留。Host 缺此能力时保留明确 TODO/兼容阻塞，不能用手动 after 替代。
@@ -458,7 +458,7 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 - **006/全阶段**：本批 worker start/drain诊断、判决续期、背景不续期、active/queued区分已补；仍要按构建/检查/打包/LongStroke各阶段核对是否只有总时限而没有合法进展监测。新增受控挂起/持续噪声/合法进展反例，不放宽5000ms或调并发掩盖问题。
 - **006 本轮增量**：已定位连续同步操作/微任务使Node原生reporter延迟投递判决；完成叶后单次调度让步恢复传输，正式健康、挂起噪声、after异常反例在Node22/26先红后绿。此修复不关闭全阶段审阅债，也不把任意输出变为进展。
-- **Host 就绪余项**：本批完整integration的032参数canary已通过，但resident Predictor首次项目健康检查未取得响应，独立driver两次约1.4秒就绪；根因未分类。先补原预算内每次请求异常/响应状态和初始化阶段的有限诊断，再受控安排集成并发；不得用独立绿色覆盖全量失败，也不把健康端口任何HTTP状态等同成功。证据见总计划链接的本批记录。
+- **Host就绪已证增量**：100ms请求截断、响应验证和canonical路径缺陷已修，原health/path各5000ms阶段预算不变。正式物理回归Node22/26各10/10，最终完整integration的resident通过，harness285/285；保留旧失败及受控并发日志，不断言旧全量失败的唯一原因。此卡不用重做，GAP-054其余阶段仍按上文逐项审阅。
 - **008/020**：逐测试命题审阅完整结果/副作用、独立oracle、生成器seed和收缩重放；不能按assert数量或JSON字段数机械判充分。
 - **009/021**：现有发现集、真实文件完成、结果流排空、skip/TODO非通过已证；继续核对父entry→子entry→CI/release报告，TODO/skip/取消不会被外层“exit 0”抹掉。报告链受控注入真实todo文件，而不是把fixture字符串误算全仓债务。
 - **验收**：每条审阅记录链接真实入口/反例；保留已证明边界，没发现新缺陷不要求生产修改。VS-016是发布同候选证据的前置，不让其它本地绿色冒充其完成。

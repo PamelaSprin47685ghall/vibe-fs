@@ -1484,6 +1484,8 @@ Foundation/OutcomeSurface.fsi
 Foundation/OutcomeSurface.fs
 Interaction/Dispatch/DispatchSurface.fsi
 Interaction/Dispatch/DispatchSurface.fs
+Mission/Manager/WorkflowSurface.fsi
+Mission/Manager/WorkflowSurface.fs
 Interaction/Dispatch/JoinGuardSurface.fsi
 Interaction/Dispatch/JoinGuardSurface.fs
 OpenCode/Host/PluginHooksSurface.fsi

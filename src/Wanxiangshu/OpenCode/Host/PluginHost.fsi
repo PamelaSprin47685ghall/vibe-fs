@@ -24,6 +24,7 @@ module PluginHost =
             Result<
                 IEventObservationPort *
                 ISessionHostPort *
+                IExternalInputSupersessionPort *
                 ISessionSnapshotPort option *
                 string option *
                 Events.HostEventPort option,

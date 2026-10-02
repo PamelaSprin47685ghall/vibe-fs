@@ -91,6 +91,12 @@ module OpenCodePortAdapter =
         else
             Fable.Core.JS.JSON.parse text
 
+    let private sdkAbortOutcome (response: obj) =
+        if not (isNull response) && not (isNull response?error) then
+            Error(sprintf "Host rejected session abort: %A" response?error)
+        else
+            Ok()
+
     let private parseGetBody (body: string) =
         if String.IsNullOrWhiteSpace body then
             box [||]
@@ -208,8 +214,9 @@ module OpenCodePortAdapter =
                         let payload =
                             createObj [ "path", box (createObj [ "id", box sId ]); "headers", box (headersObj None) ]
 
-                        let! _ = unbox<Task<obj>> (abortFn?call (sessObj, payload)) |> TaskResultCE.ofTask
-                        return ()
+                        let! response = unbox<Task<obj>> (abortFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+
+                        return! sdkAbortOutcome response
                     with ex ->
                         return! Error ex.Message
                 }

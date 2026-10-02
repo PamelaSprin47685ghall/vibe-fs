@@ -41,6 +41,17 @@ type internal ChatAdmissionReleaseOutcome =
     | BoundaryFailed of exn
 
 [<RequireQualifiedAccess>]
+type internal ChatAdmissionHandoffSettlement =
+    | TerminalCommitted of ChatAdmissionReleaseOutcome
+    | SettlementIncomplete of PreProviderSettlementError
+    | SettlementBoundaryFailed of exn
+
+type internal ChatAdmissionLeaseHandoffException(cause: exn, acquisition: ExecutionAdmissionAcquisition) =
+    inherit Exception("external input failed to drain its superseded Host attempt", cause)
+    member _.Cause = cause
+    member _.Acquisition = acquisition
+
+[<RequireQualifiedAccess>]
 /// DSL-class: Evidence
 type internal ChatAdmissionTransactionError =
     | AdmissionRejected of ChatAdmissionError
@@ -49,12 +60,19 @@ type internal ChatAdmissionTransactionError =
     | PreProviderSettlementFailed of PreProviderSettlementError
     | PreProviderSettlementBoundaryFailed of exn
     | LeaseAcquisitionFailed of exn
+    | LeaseHandoffFailed of cause: exn * settlement: ChatAdmissionHandoffSettlement
+    | SupersessionSettlementFailed of ManagedChatSupersessionError
     | LeaseTargetFailed of ExecutionAdmissionRejection * release: ChatAdmissionReleaseOutcome
     | LeaseTargetBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseTargetProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | HostProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseCommitFailed of commit: CapacityTransitionOutcome * release: ChatAdmissionReleaseOutcome
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
+
+type internal ChatAdmissionLeaseOwner =
+    ManagedChatAcceptanceWitness
+        -> (unit -> Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>)
+        -> Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
 
 type internal ChatAdmissionTransactionPorts =
     { Accept:
@@ -95,6 +113,11 @@ type private TargetPreparationError =
 type private CommitError =
     | OwnerRejected of CapacityTransitionOutcome
     | BoundaryFailed of exn
+
+[<RequireQualifiedAccess>]
+type private AcquisitionError =
+    | BeforeGrant of ChatAdmissionTransactionError
+    | AfterGrant of exn * ExecutionAdmissionAcquisition
 
 [<RequireQualifiedAccess>]
 module internal ChatAdmissionTransaction =
@@ -178,9 +201,18 @@ module internal ChatAdmissionTransaction =
         task {
             try
                 let! acquired = ports.Acquire profile
-                return acquired |> Result.mapError ChatAdmissionTransactionError.LeaseAcquisitionFailed
-            with error ->
-                return Error(ChatAdmissionTransactionError.LeaseAcquisitionFailed error)
+
+                return
+                    acquired
+                    |> Result.mapError (
+                        ChatAdmissionTransactionError.LeaseAcquisitionFailed
+                        >> AcquisitionError.BeforeGrant
+                    )
+            with
+            | :? ChatAdmissionLeaseHandoffException as error ->
+                return Error(AcquisitionError.AfterGrant(error.Cause, error.Acquisition))
+            | error ->
+                return Error(AcquisitionError.BeforeGrant(ChatAdmissionTransactionError.LeaseAcquisitionFailed error))
         }
 
     let private effectValue invocation =
@@ -278,13 +310,50 @@ module internal ChatAdmissionTransaction =
             }
         | outcome -> stoppedAdmissionSettlement witness outcome |> settleAdmission observe ports
 
+    let private cancelQueuedAdmission key =
+        try
+            ModelRouting.cancelPendingPhysicalExecution key
+            |> ChatAdmissionReleaseOutcome.Settled
+        with error ->
+            ChatAdmissionReleaseOutcome.BoundaryFailed error
+
+    let private releaseHandoffAdmission observe ports key =
+        function
+        | ExecutionAdmissionAcquisition.Admitted lease -> release observe ports lease
+        | ExecutionAdmissionAcquisition.Queued _ -> cancelQueuedAdmission key
+        | _ -> invalidOp "handoff failure did not carry an owned admission"
+
+    let private handoffSettlement observe ports key acquisition =
+        function
+        | Error error -> ChatAdmissionHandoffSettlement.SettlementIncomplete error
+        | Ok _ ->
+            releaseHandoffAdmission observe ports key acquisition
+            |> ChatAdmissionHandoffSettlement.TerminalCommitted
+
+    let private settleFailedHandoff observe ports witness acquisition =
+        let evidence = ManagedChatAcceptanceWitness.evidence witness
+        let key = ManagedChatAcceptanceWitness.key witness
+
+        task {
+            observe ChatAdmissionTransactionStep.TerminalizeAccepted
+
+            try
+                let! settled = ports.SettlePreProvider key evidence ChatExecutionTerminalDisposition.Failed
+                return handoffSettlement observe ports key acquisition settled
+            with error ->
+                return ChatAdmissionHandoffSettlement.SettlementBoundaryFailed error
+        }
+
     let private acquireAdmission observe ports witness =
         task {
             observe ChatAdmissionTransactionStep.AcquireLease
             let! acquired = acquire ports witness
 
             match acquired with
-            | Error error ->
+            | Error(AcquisitionError.AfterGrant(cause, acquisition)) ->
+                let! settlement = settleFailedHandoff observe ports witness acquisition
+                return Error(ChatAdmissionTransactionError.LeaseHandoffFailed(cause, settlement))
+            | Error(AcquisitionError.BeforeGrant error) ->
                 let decision =
                     { Evidence = ManagedChatAcceptanceWitness.evidence witness
                       Disposition = ChatExecutionTerminalDisposition.Failed
@@ -372,7 +441,7 @@ module internal ChatAdmissionTransaction =
         | Error error ->
             compensate observe ports witness lease ChatExecutionTerminalDisposition.Failed (commitError error)
 
-    let private executeAdmission observe ports managed =
+    let private executeAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) ports managed =
         taskResult {
             let! witness = acceptAdmission observe ports managed
             let! acquisition = acquireAdmission observe ports witness
@@ -380,13 +449,18 @@ module internal ChatAdmissionTransaction =
             match acquisition with
             | AdmissionAcquisitionOutcome.AdmissionStopped outcome -> return outcome
             | AdmissionAcquisitionOutcome.LeaseAcquired lease ->
-                let! target, identity, model = targetAdmission observe ports witness lease
-                let! _ = projectAdmission observe ports witness lease model
-                return! commitAdmission observe ports witness lease identity
+                return!
+                    withLeaseOwner witness (fun () ->
+                        taskResult {
+                            let! target, identity, model = targetAdmission observe ports witness lease
+                            let! _ = projectAdmission observe ports witness lease model
+                            return! commitAdmission observe ports witness lease identity
+                        })
         }
 
-    let executeWith
+    let executeWithLeaseOwner
         (observe: ChatAdmissionTransactionStep -> unit)
+        (withLeaseOwner: ChatAdmissionLeaseOwner)
         (ports: ChatAdmissionTransactionPorts)
         (managed: ChatAdmissionIntent.ManagedIntent)
         : Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =
@@ -394,8 +468,11 @@ module internal ChatAdmissionTransaction =
             match resolve observe ports (intentKey managed) with
             | Error error -> return Error error
             | Ok(ExistingOutcome outcome) -> return Ok outcome
-            | Ok AdmissionRequired -> return! executeAdmission observe ports managed
+            | Ok AdmissionRequired -> return! executeAdmission observe withLeaseOwner ports managed
         }
+
+    let executeWith observe ports managed =
+        executeWithLeaseOwner observe (fun _ operation -> operation ()) ports managed
 
     let production
         (journal: AgentJournal)

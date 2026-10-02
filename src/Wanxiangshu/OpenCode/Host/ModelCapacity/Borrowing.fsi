@@ -13,7 +13,8 @@ type internal BorrowingCapacity<'target> =
         oldPhysicalUserMessageId: string option *
         newPhysicalUserMessageId: string *
         lenderSessionId: string option *
-        route: ('target array -> 'target option) ->
+        route: ('target array -> 'target option) *
+        ?retireOnUnavailable: bool ->
             'target option
 
     member ReserveFresh:

@@ -1,4 +1,7 @@
 import test from 'node:test'
+import * as managerWorkflow from '../../../dist/Mission/Manager/WorkflowSurface.js'
+import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
+import * as relayJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -288,3 +291,84 @@ test('WHAT[dispatch-protocol-002] HOST_004_stale_idle_repair_is_abandoned_at_the
 }
 
 test.todo('WHAT[dispatch-protocol-002] held and failed actual claim append prevents Host send, including crash between durable registration and transport invocation (GAP-136)')
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, readFileSync, rmSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+
+for (const newPhysicalInput of [false, true]) {
+  test(`WHAT[dispatch-protocol-002] WHAT[crash-reconciliation-006] production Manager idle dispatch ${newPhysicalInput ? 'abandons a captured permit revoked by Human physical ingress before SDK send' : 'sends with the same road and fresh captured permit'}`, async () => {
+    const base = mkdtempSync(join(tmpdir(), 'wxs-manager-idle-send-'))
+    const writer = 'writer-manager-idle-send'
+    let opened
+    try {
+      opened = await journal.JournalSurface_bootWithWriterId(base, writer, 'rt-manager-idle-send', 4242, '2026-01-01T00:00:00Z')
+      assert.equal(opened.ok, true, JSON.stringify(opened.error))
+      const session = 'ses-manager-idle-send'
+      const rootPhysical = 'msg-manager-root'
+      const root = await dispatch.acceptHumanRoot(opened.journal, session, rootPhysical, 'manager')
+      assert.equal(root.ok, true, root.error)
+      const opening = await relayJournal.openIncumbency(opened.journal, session, 'inc-manager-idle-send')
+      assert.equal(opening.ok, true, JSON.stringify(opening.error))
+
+      const gate = quiescence.create()
+      quiescence.beginAttempt(gate, session)
+      const permit = quiescence.observeIdle(gate, session)
+      let sends = 0
+      const port = {
+        SubscribeTerminal: () => ({ Dispose() {} }),
+        SendPrompt: async () => {
+          sends += 1
+          return dispatch.admittedWithReceipt('receipt-manager-idle-send')
+        },
+      }
+
+      const held = Promise.withResolvers()
+      const waiting = Promise.withResolvers()
+      const pending = (async () => {
+        waiting.resolve()
+        await held.promise
+        await managerWorkflow.observeIdle(port, opened.journal, gate, permit, session, rootPhysical, rootPhysical, 'provider-manager-idle-send', base)
+      })()
+      await waiting.promise
+      assert.equal(sends, 0, 'the captured Manager idle owner is held before invocation')
+      if (newPhysicalInput) quiescence.observePhysicalMessage(gate, session, 'msg-new-human')
+      held.resolve()
+      await pending
+
+      const projection = dispatch.projectionObservation(opened.journal, session)
+      assert.equal(projection.claimSequences.length, 1, 'the actual Manager workflow must reach the durable dispatch owner')
+      assert.equal(sends, newPhysicalInput ? 0 : 1, 'only the still fresh idle owner may enter Host SendPrompt')
+      assert.deepEqual(quiescence.tryConsume(gate, permit), {
+        accepted: false,
+        failure: newPhysicalInput ? 'Revoked' : 'AlreadyConsumed',
+      })
+      if (newPhysicalInput) {
+        assert.equal(projection.pendingClaims.length, 0, 'the rejected dispatch must leave no pending claim')
+        const facts = readFileSync(join(base, 'wanxiang', 'events', `${writer}.ndjson`), 'utf8')
+          .trim().split('\n').map(line => JSON.parse(line).payload.Fact)
+          .filter(fact => fact[0] === 'Agent' && fact[1][0] === 'Prompt')
+          .map(fact => fact[1][1])
+        const claimed = facts.filter(fact => fact[0] === 'PluginPromptClaimed')
+        const abandoned = facts.filter(fact => fact[0] === 'PluginPromptAbandoned')
+        assert.equal(claimed.length, 1)
+        assert.equal(claimed[0][1].ContinuationKind, 'ManagerGuard')
+        assert.equal(abandoned.length, 1)
+        assert.deepEqual(abandoned[0][1].PromptKey, claimed[0][1].PromptKey)
+        assert.equal(abandoned[0][1].Reason, 'SupersededBeforePhysicalSend')
+        assert.equal(facts.filter(fact => fact[0] === 'PluginPromptSubmitted' || fact[0] === 'PluginPromptPhysicalAccepted').length, 0)
+      }
+    } finally {
+      try {
+        if (opened?.ok) journal.JournalSurface_dispose(opened.journal)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    }
+  })
+}
+}

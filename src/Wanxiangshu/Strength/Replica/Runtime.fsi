@@ -30,11 +30,16 @@ type StrengthReplicaRequestKey =
     { ReplicaSessionId: SessionId
       PriorProviderRun: ProviderRunIdentity option }
 
-/// DELEGATE-6.2: prepared-stage handle. The empty replica child exists with
-/// internal identity, but no prompt was sent and no model capacity reserved.
+/// Only the first preparation owns bootstrap; repeats observe its completion.
+[<RequireQualifiedAccess>]
+type StrengthReplicaStartAuthority =
+    | BootstrapRequired
+    | SharedCompletion
+
 type StrengthReplicaPreparation =
     { ReplicaSessionId: SessionId
-      Completion: Task<StrengthReplicaOutcome> }
+      Completion: Task<StrengthReplicaOutcome>
+      StartAuthority: StrengthReplicaStartAuthority }
 
 type StrengthReplicaPeek =
     { RequestsAdmitted: int

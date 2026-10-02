@@ -39,6 +39,8 @@ WXS_TIER_INTEGRATION=1 node --test requirements/speculative-investigation/tests/
 
 ## 2026-09-28 上游迁移说明
 
+2026-10-03增量：004增加实际active preparation的同Decision重入、不同Decision拒绝与已退休语义结果复用；013保留两个插件实例真正并行transform，核对一次Replica bootstrap、Requested/Bound/Prepared/Closed事实及卸载一个实例后另一实例的资源和后续决定。生产以`BootstrapRequired / SharedCompletion`区分首启动与共享完成，避免prepare flight结束后误关闭已Bound决定。该修复包含在255文件定向验收（0 fail）及35文件完整integration（376 pass、0 fail、15 TODO）中；不关闭GAP-183其余全链义务。详细红例与物理证据见[本批记录](../../../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。
+
 基于 upstream `1450f49d` 重新核对 [013]/[014]。该版本的 WHAT [013]、StrengthSettings、Replica runtime 和公开签名仍保留 DryRun；`runtimeBinding` 仍接收九个参数。上游新加的 [013] 测试却断言 DryRun 已删除，并调用七参数 binding 和尚不存在的 DelegationRequested 协议，二者不一致。本次保留实际 DryRun coordinator 的 exact owner/target 正反例和启动全链 TODO，不导入这些错误签名或源码词形断言；也没有恢复旧 Sphinx runtime。
 
 [014] 使用新上游 `resetRegistry` 接口，保留真实合法 ablation DAG 与 Off/Shadow/DryRun/Treatment 的优先级矩阵。上游的新只读委托 schema canary 针对另一套尚未在此版本落地的协议，不能作为当前 DryRun 条款的通过证据。以上是迁移兼容判断，最终测试结果以本工作区统一构建后的正式执行为准。

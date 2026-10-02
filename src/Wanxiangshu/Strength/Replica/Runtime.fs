@@ -52,12 +52,16 @@ type StrengthReplicaRequestKey =
     { ReplicaSessionId: SessionId
       PriorProviderRun: ProviderRunIdentity option }
 
-/// DELEGATE-6.2: the prepared-stage handle. The empty replica child exists and
-/// carries internal identity, but no prompt was sent and no model capacity was
-/// reserved. The caller persists DelegationBound before sending the prompt.
+/// Only the first preparation owns bootstrap; repeats observe its completion.
+[<RequireQualifiedAccess>]
+type StrengthReplicaStartAuthority =
+    | BootstrapRequired
+    | SharedCompletion
+
 type StrengthReplicaPreparation =
     { ReplicaSessionId: SessionId
-      Completion: Task<StrengthReplicaOutcome> }
+      Completion: Task<StrengthReplicaOutcome>
+      StartAuthority: StrengthReplicaStartAuthority }
 
 /// Read-only peek at live decision state: admitted request count, completed
 /// batches and the first (immutable) semantic terminal when published.
@@ -652,7 +656,7 @@ type StrengthReplicaRuntime
     let preparingOwners = Dictionary<string, StrengthReplicaPreparationFlight>()
     // DSL-MUTABLE: resource — semantic outcomes retained until durable publication
     let decisionOutcomes =
-        Dictionary<string, SessionId * Task<StrengthReplicaOutcome>>()
+        Dictionary<string, StrengthReplicaBinding * Task<StrengthReplicaOutcome>>()
     // DSL-MUTABLE: resource — irreversible coordinator disposal
     let mutable disposed = false
     let directory = workspaceDirectory
@@ -1086,6 +1090,37 @@ type StrengthReplicaRuntime
         finishPreparation owner flight pending |> ignore
         flight.Completion.Task
 
+    let trySharedPreparation owner decisionId targetProviderRun requestedRounds replicaAgent mirrorSemanticDigest =
+        match decisionOutcomes.TryGetValue(StrengthDecisionId.value decisionId) with
+        | true, (binding, completion) when
+            binding.OwnerSessionId = owner
+            && binding.TargetProviderRun = targetProviderRun
+            && binding.RequestedRounds = requestedRounds
+            && Roles.roleLabel binding.CanonicalRole = replicaAgent
+            && binding.SemanticDigest = mirrorSemanticDigest
+            ->
+            Some(
+                Ok
+                    { ReplicaSessionId = binding.ReplicaSessionId
+                      Completion = completion
+                      StartAuthority = StrengthReplicaStartAuthority.SharedCompletion }
+            )
+        | true, _ -> Some(Error "StrengthReplica repeated decision identity disagrees with preparation")
+        | _ -> None
+
+    let claimPreparationFlight owner decisionId =
+        match preparingOwners.TryGetValue(key owner) with
+        | true, flight when flight.DecisionId = decisionId -> Choice1Of3 flight.Completion.Task
+        | true, _ -> Choice2Of3 "StrengthReplica owner already has a preparing decision"
+        | _ ->
+            let flight =
+                { DecisionId = decisionId
+                  Completion = TaskCompletionSource<Result<StrengthReplicaPreparation, string>>()
+                  Cancelled = false }
+
+            preparingOwners.[key owner] <- flight
+            Choice3Of3 flight
+
     member _.IsReplica(sessionId: SessionId) =
         liveRegistry.TryFindByReplica sessionId |> Option.isSome
 
@@ -1109,7 +1144,7 @@ type StrengthReplicaRuntime
     member _.TryDecisionOutcome(replicaSessionId: SessionId, decisionId: StrengthDecisionId) =
         lock gate (fun () ->
             match decisionOutcomes.TryGetValue(StrengthDecisionId.value decisionId) with
-            | true, (replica, completion) when replica = replicaSessionId -> Some completion
+            | true, (binding, completion) when binding.ReplicaSessionId = replicaSessionId -> Some completion
             | _ -> None)
 
     member _.ReleaseDecisionOutcome(decisionId: StrengthDecisionId) =
@@ -1153,8 +1188,7 @@ type StrengthReplicaRuntime
                     (Roles.roleLabel binding.CanonicalRole)
                     None
 
-            lock gate (fun () ->
-                decisionOutcomes.[StrengthDecisionId.value binding.DecisionId] <- binding.ReplicaSessionId, completion)
+            lock gate (fun () -> decisionOutcomes.[StrengthDecisionId.value binding.DecisionId] <- binding, completion)
 
             return completion
         }
@@ -1333,13 +1367,14 @@ type StrengthReplicaRuntime
                     state
 
             lock gate (fun () ->
-                decisionOutcomes.[StrengthDecisionId.value decisionId] <- replica, state.Completion.Task)
+                decisionOutcomes.[StrengthDecisionId.value decisionId] <- binding, state.Completion.Task)
 
             subscribeDecisionTerminal state
 
             return
                 { ReplicaSessionId = replica
-                  Completion = state.Completion.Task }
+                  Completion = state.Completion.Task
+                  StartAuthority = StrengthReplicaStartAuthority.BootstrapRequired }
         }
 
     member this.PrepareReplicaStart
@@ -1354,21 +1389,29 @@ type StrengthReplicaRuntime
         ) : Task<Result<StrengthReplicaPreparation, string>> =
         let claim =
             lock gate (fun () ->
-                match disposed, preparingOwners.TryGetValue(key owner) with
-                | true, _ -> Choice2Of3 "StrengthReplica runtime is disposed"
-                | false, (true, flight) when flight.DecisionId = decisionId -> Choice1Of3 flight.Completion.Task
-                | false, (true, _) -> Choice2Of3 "StrengthReplica owner already has a preparing decision"
-                | _ ->
-                    let flight =
-                        { DecisionId = decisionId
-                          Completion = TaskCompletionSource<Result<StrengthReplicaPreparation, string>>()
-                          Cancelled = false }
-
-                    preparingOwners.[key owner] <- flight
-                    Choice3Of3 flight)
+                if disposed then
+                    Choice2Of3 "StrengthReplica runtime is disposed"
+                else
+                    match
+                        trySharedPreparation
+                            owner
+                            decisionId
+                            targetProviderRun
+                            requestedRounds
+                            replicaAgent
+                            mirrorSemanticDigest
+                    with
+                    | Some prepared -> Choice1Of3(Task.FromResult prepared)
+                    | None -> claimPreparationFlight owner decisionId)
 
         match claim with
-        | Choice1Of3 pending -> pending
+        | Choice1Of3 pending ->
+            pending
+            |> TaskValue.map (
+                Result.map (fun prepared ->
+                    { prepared with
+                        StartAuthority = StrengthReplicaStartAuthority.SharedCompletion })
+            )
         | Choice2Of3 reason -> Task.FromResult(Error reason)
         | Choice3Of3 flight ->
             this.PrepareReplicaStartCore(
@@ -1418,7 +1461,11 @@ type StrengthReplicaRuntime
                         mirrorSemanticDigest
                     )
 
-                do! this.SendPreparedPrompt prepared.ReplicaSessionId
+                match prepared.StartAuthority with
+                | StrengthReplicaStartAuthority.BootstrapRequired ->
+                    do! this.SendPreparedPrompt prepared.ReplicaSessionId
+                | StrengthReplicaStartAuthority.SharedCompletion -> ()
+
                 let! outcome = prepared.Completion |> TaskValue.map Ok
                 return outcome
             }

@@ -90,6 +90,7 @@ module PluginHostWiring =
             let completeHost
                 eventPort
                 (sessionPort: ISessionHostPort)
+                (externalInput: IExternalInputSupersessionPort)
                 snapshotOpt
                 terminalKey
                 sharedTerminalPort
@@ -184,6 +185,7 @@ module PluginHostWiring =
                         HostSignalBootstrap.wire
                             (observeTurnWorkflowFor sessionPort eventPort rootWorkspace.Reader)
                             sessionPort
+                            externalInput
                             eventPort
                             snapshotOpt
                             boot.Journal
@@ -243,6 +245,6 @@ module PluginHostWiring =
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)
-            | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
-                return! completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort
+            | Ok(eventPort, sessionPort, externalInput, snapshotOpt, terminalKey, sharedTerminalPort) ->
+                return! completeHost eventPort sessionPort externalInput snapshotOpt terminalKey sharedTerminalPort
         }

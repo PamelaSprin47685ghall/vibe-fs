@@ -1196,6 +1196,38 @@ module StrengthDelegate =
                 surface.Ports.Runtime.ReleaseDecisionOutcome request.DecisionId
         }
 
+    let private consumeSharedPreparation
+        (strengthScope: PluginStrengthScope)
+        (surface: OwnerSurface)
+        (decisionId: StrengthDecisionId)
+        (preparation: StrengthReplicaPreparation)
+        : Task<unit> =
+        task {
+            let! completed = preparation.Completion
+            let! current = loadDurableProjectionOrThrow surface.Ports strengthScope "shared-completion"
+
+            match StrengthProjection.tryCandidate decisionId current with
+            | Some view when
+                view.State = StrengthCandidateState.Bound
+                && (view.Binding
+                    |> Option.exists (fun binding ->
+                        binding.TargetProviderRun = surface.Target
+                        && binding.ReplicaSessionId = preparation.ReplicaSessionId))
+                ->
+                return! handleReplicaCompletion strengthScope surface decisionId completed
+            | Some view when view.State = StrengthCandidateState.Requested ->
+                return! failClosed strengthScope "Strength shared completion has no durable binding"
+            | Some view when
+                view.Binding
+                |> Option.exists (fun binding ->
+                    binding.TargetProviderRun = surface.Target
+                    && binding.ReplicaSessionId = preparation.ReplicaSessionId)
+                ->
+                return! consumeBoundDecision strengthScope surface view
+            | Some _ -> return ()
+            | None -> return! failClosed strengthScope "Strength shared completion has no durable decision"
+        }
+
     let private startWithMirror
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
@@ -1220,14 +1252,30 @@ module StrengthDelegate =
                     "strength-replica-prepare-failed"
                     [ "session_id", SessionId.value surface.Owner; "result", reason ]
 
-                return!
-                    appendClosed
-                        strengthScope
-                        surface
-                        request.DecisionId
-                        DelegationClosedFrom.Requested
-                        DelegationClosedReason.CannotContinue
-            | Ok preparation -> return! appendBoundAndExecute strengthScope surface request preparation
+                let! current = loadDurableProjectionOrThrow surface.Ports strengthScope "prepare-failure"
+
+                match StrengthProjection.tryCandidate request.DecisionId current with
+                | Some view when view.State = StrengthCandidateState.Requested ->
+                    return!
+                        appendClosed
+                            strengthScope
+                            surface
+                            request.DecisionId
+                            DelegationClosedFrom.Requested
+                            DelegationClosedReason.CannotContinue
+                | Some view when
+                    view.Binding
+                    |> Option.exists (fun binding -> binding.TargetProviderRun = surface.Target)
+                    ->
+                    return! consumeBoundDecision strengthScope surface view
+                | Some _ -> return ()
+                | None -> return ()
+            | Ok preparation ->
+                match preparation.StartAuthority with
+                | StrengthReplicaStartAuthority.BootstrapRequired ->
+                    return! appendBoundAndExecute strengthScope surface request preparation
+                | StrengthReplicaStartAuthority.SharedCompletion ->
+                    return! consumeSharedPreparation strengthScope surface request.DecisionId preparation
         }
 
     let private prepareAndStartReplica
@@ -1259,7 +1307,7 @@ module StrengthDelegate =
                 DelegationClosedReason.CannotContinue
         | Ok replicaMirror -> startWithMirror strengthScope surface request replicaAgent replicaMirror
 
-    let private startRequest
+    let private startRequested
         (strengthScope: PluginStrengthScope)
         (predictorConfigured: bool)
         (surface: OwnerSurface)
@@ -1311,6 +1359,27 @@ module StrengthDelegate =
                 DelegationClosedReason.CannotContinue
         else
             prepareAndStartReplica strengthScope surface request
+
+    let private startRequest
+        (strengthScope: PluginStrengthScope)
+        (predictorConfigured: bool)
+        (surface: OwnerSurface)
+        (request: DelegationRequest)
+        : Task<unit> =
+        task {
+            let! current = loadDurableProjectionOrThrow surface.Ports strengthScope "start-request"
+
+            match StrengthProjection.tryCandidate request.DecisionId current with
+            | Some view when view.State = StrengthCandidateState.Requested ->
+                return! startRequested strengthScope predictorConfigured surface view.Request
+            | Some view when
+                view.Binding
+                |> Option.exists (fun binding -> binding.TargetProviderRun = surface.Target)
+                ->
+                return! consumeBoundDecision strengthScope surface view
+            | Some _ -> return ()
+            | None -> return ()
+        }
 
     /// DELEGATE-10: recovery reads the pending request from persisted facts. A
     /// new user input or authority replacement closes the old request; the

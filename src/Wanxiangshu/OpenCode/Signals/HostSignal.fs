@@ -27,8 +27,8 @@ type RetrySignal =
 /// typed physical failure witness; it becomes TurnFailed only when reconciliation
 /// independently sees the exact current assistant for the physical material.
 ///
-/// `AttemptAborted` is only a typed physical wake that revokes continuation
-/// capability. The business `TurnAborted` outcome still comes from the full
+/// `AttemptAborted` is only a typed physical wake. Revocation requires the
+/// exact cancelled assistant observation; `TurnAborted` still comes from the full
 /// assistant snapshot (HOST-002/004).
 type HostSignal =
     | SessionIdle of SessionId
@@ -36,8 +36,7 @@ type HostSignal =
     | ProviderFailure of HostFailureObservation
     | SessionDeleted of sessionId: SessionId * parentSessionId: SessionId option
     /// HOST-002/004: operator abort (MessageAbortedError / AbortError) is a
-    /// typed signal that revokes the current attempt's idle-derived continuation
-    /// capability. It is NOT ProviderFailure (it never advances the failure budget); it
-    /// only means the attempt is no longer eligible to mint/consume a
-    /// QuiescencePermit for a missing-final-report / interaction repair.
+    /// typed wake without physical message identity. The exact cancelled
+    /// assistant observation owns capability revocation. This signal is not
+    /// ProviderFailure and never advances the failure budget.
     | AttemptAborted of HostFailureObservation

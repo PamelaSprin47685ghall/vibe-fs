@@ -42,7 +42,6 @@ export function resetOpencodeSpawnCount() {
 }
 
 export const READY_POLL_INTERVAL_MS = 100;
-export const READY_POLL_MAX_TRIES = 50;
 
 function cleanupAllActiveChildren() {
   for (const pid of activeChildPids) {

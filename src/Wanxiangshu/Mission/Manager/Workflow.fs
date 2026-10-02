@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
@@ -94,6 +95,8 @@ module ManagerWorkflow =
         view |> Option.bind resourceForCurrentAction
 
     let private sendNudge
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal)
@@ -106,7 +109,9 @@ module ManagerWorkflow =
             else
                 Map.empty
 
-        HostSessionNudge.trySendGateContinuation
+        HostSessionNudge.trySendIdleGateContinuation
+            quiescence
+            permit
             sessionPort
             rootWorkspace
             turn.SessionId
@@ -116,8 +121,11 @@ module ManagerWorkflow =
             (Some journal)
             (resourcePath + ":" + ProviderRunIdentity.value turn.ProviderRun)
             turn.ProviderRun
+            PromptDispatcher.AwaitMode.Detached
 
     let private scheduleNudge
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal)
@@ -130,7 +138,7 @@ module ManagerWorkflow =
             | Some resourcePath ->
                 // Durable PromptAuthority gate is the sole dedupe/source of truth:
                 // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
-                let! _ = sendNudge sessionPort rootWorkspace journal turn resourcePath
+                let! _ = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
                 return ()
             | None -> return ()
         }
@@ -434,17 +442,19 @@ module ManagerWorkflow =
         }
 
     let observeIdle
+        (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (context: ReconciledTurnContext)
         : Task =
-        match journal, context.Failure, context.Turn.Outcome with
-        | Some durable, None, ReconcileProgram.TurnCompleted ->
-            scheduleNudge sessionPort rootWorkspace durable context.Turn
+        match journal, context.Failure, context.Turn.Outcome, context.Quiescence with
+        | Some durable, None, ReconcileProgram.TurnCompleted, Some permit ->
+            scheduleNudge quiescence permit sessionPort rootWorkspace durable context.Turn
         | _ -> Task.FromResult()
 
     let observe
+        (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
@@ -463,5 +473,6 @@ module ManagerWorkflow =
         // reason to stop. It earns the same bounded Interaction Repair as every
         // other repairable role instead of being silently dropped.
         | false, None, ReconcileProgram.TurnNeedsContinuation _ -> observeOrdinary context
-        | false, None, ReconcileProgram.TurnCompleted -> observeIdle sessionPort rootWorkspace journal context
+        | false, None, ReconcileProgram.TurnCompleted ->
+            observeIdle quiescence sessionPort rootWorkspace journal context
         | false, None, _ -> observeOrdinary context

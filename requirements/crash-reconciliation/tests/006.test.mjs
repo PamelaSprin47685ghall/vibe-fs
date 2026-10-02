@@ -78,4 +78,21 @@ test('WHAT[crash-reconciliation-006] session deletion revokes its permit without
   assert.deepEqual(quiescence.tryConsume(gate, other), accepted)
 })
 
+test('WHAT[crash-reconciliation-006] a delayed Host idle snapshot cannot grant a later attempt its idle right', () => {
+  for (const change of ['provider-step', 'physical-input', 'operator-abort']) {
+    const gate = quiescence.create()
+    quiescence.beginAttempt(gate, session)
+    const observation = quiescence.captureCurrentAttempt(gate, session)
+    if (change === 'provider-step') quiescence.beginAttempt(gate, session)
+    else if (change === 'physical-input') quiescence.observePhysicalMessage(gate, session, 'new-physical')
+    else quiescence.revoke(gate, session)
+    assert.equal(quiescence.observeIdleFor(gate, observation), undefined, change)
+    assert.equal(quiescence.tryConsume(gate, observation).accepted, false, change)
+    const current = quiescence.captureCurrentAttempt(gate, session)
+    const permit = quiescence.observeIdleFor(gate, current)
+    if (change === 'provider-step') assert.deepEqual(quiescence.tryConsume(gate, permit), accepted)
+    else assert.deepEqual(quiescence.tryConsume(gate, permit), rejected('Revoked'))
+  }
+})
+
 test.todo('WHAT[crash-reconciliation-006] real sending boundary returns a permit only for proven pre-acceptance rejection and never for acceptance unknown (GAP-149)')

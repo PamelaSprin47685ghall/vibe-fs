@@ -12,10 +12,11 @@ export const withReview = async body => withExecutablePlugin(async (hooks, direc
     parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}],
   })
   assert.equal((await journal.openIncumbency(runtime.journal, session, 'review-incumbent')).ok, true)
-  runtime.pushHostMessage(session, {info: {id: 'user-root', role: 'user'}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]})
+  runtime.pushHostMessage(session, {info: {id: 'user-root', role: 'user', sessionID: session, time: {created: 1}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]})
+  let createdAt = 1
   const execute = async (input, {call = 'review-call', run = 'review-run', before = 'I independently inspected the current workspace.', after = 'after review'} = {}) => {
     runtime.pushHostMessage(session, {
-      info: {id: run, role: 'assistant'},
+      info: {id: run, role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: ++createdAt}},
       parts: [
         {type: 'reasoning', text: 'private reasoning is not public evidence'},
         {type: 'text', text: before},

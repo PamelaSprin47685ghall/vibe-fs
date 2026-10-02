@@ -10,6 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Enforcer
@@ -243,6 +244,28 @@ module PluginHostInterop =
         | PreProviderSettlementError.ProjectionConflictAfterCommit _ ->
             ExecutionFailure.LocalInvariant, HookSettlementEvidence.SettlementIncomplete
 
+    let private handoffFailure =
+        function
+        | ChatAdmissionHandoffSettlement.TerminalCommitted release ->
+            ExecutionFailure.LocalInvariant, releaseCompleted release
+        | ChatAdmissionHandoffSettlement.SettlementIncomplete failure -> settlementFailure failure
+        | ChatAdmissionHandoffSettlement.SettlementBoundaryFailed _ ->
+            ExecutionFailure.LocalInvariant, HookSettlementEvidence.SettlementIncomplete
+
+    let private supersessionSettlementFailure =
+        function
+        | ManagedChatSupersessionError.PreProviderSettlementFailed error -> settlementFailure error
+        | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.NotAttempted _) ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted,
+            HookSettlementEvidence.SettlementIncomplete
+        | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.CommitUnknown _) ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown,
+            HookSettlementEvidence.SettlementIncomplete
+        | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.FactRejected _) ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed,
+            HookSettlementEvidence.SettlementIncomplete
+        | _ -> ExecutionFailure.LocalInvariant, HookSettlementEvidence.SettlementIncomplete
+
     let private transactionFailure =
         function
         | ChatAdmissionTransactionError.AdmissionRejected _ ->
@@ -255,6 +278,8 @@ module PluginHostInterop =
             ExecutionFailure.AcceptanceUnknown, HookSettlementEvidence.SettlementIncomplete
         | ChatAdmissionTransactionError.LeaseAcquisitionFailed _ ->
             ExecutionFailure.LocalInvariant, HookSettlementEvidence.ExactSettlementComplete
+        | ChatAdmissionTransactionError.LeaseHandoffFailed(_, settlement) -> handoffFailure settlement
+        | ChatAdmissionTransactionError.SupersessionSettlementFailed failure -> supersessionSettlementFailure failure
         | ChatAdmissionTransactionError.LeaseTargetFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetBoundaryFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetProjectionFailed(_, release)

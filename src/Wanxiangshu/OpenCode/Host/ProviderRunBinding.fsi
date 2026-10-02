@@ -23,6 +23,8 @@ module ProviderRunBinding =
 
     val projectionCatchupDelayMilliseconds: int
 
+    val quiescedRun: messages: SessionMessage list -> Result<SessionMessage, Rejection>
+
     /// Bind one physical user message to exactly one unsealed assistant child
     /// run. Returns the latest assistant run when there is exactly one
     /// non-compaction child; otherwise returns a typed rejection.

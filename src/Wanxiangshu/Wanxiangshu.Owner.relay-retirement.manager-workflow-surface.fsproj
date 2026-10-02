@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>manager-workflow-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>manager-workflow-surface</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.composition-turn-workflow.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
+    <Compile Include="Mission/Manager/WorkflowSurface.fsi"/>
+    <Compile Include="Mission/Manager/WorkflowSurface.fs"/>
+  </ItemGroup>
+</Project>

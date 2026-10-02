@@ -1575,6 +1575,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Mission/Manager/WorkflowSurface.js',
+    owner: 'relay-retirement',
+    laws: ['DISPATCH-PROTOCOL-002', 'CRASH-RECONCILIATION-006'],
+    lawOwners: { 'DISPATCH-PROTOCOL-002': 'dispatch-protocol', 'CRASH-RECONCILIATION-006': 'crash-reconciliation' },
+    source: 'src/Wanxiangshu/Mission/Manager/WorkflowSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Interaction/Dispatch/JoinGuardSurface.js',
     owner: 'dispatch-protocol',
     laws: ['DISPATCH-PROTOCOL-007'],

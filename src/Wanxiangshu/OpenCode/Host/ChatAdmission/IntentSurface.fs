@@ -139,7 +139,8 @@ module ChatAdmissionIntentSurface =
         (snapshot: obj)
         : ChatAdmissionIntent.DurableSnapshot =
         if isNull snapshot || snapshot?available = box false then
-            { ChatAdmissionIntent.DurableSnapshot.Authority = None }
+            { ChatAdmissionIntent.DurableSnapshot.Authority = None
+              AcceptedExecutionEvidence = None }
         else
             let sessionId =
                 decoded.SessionId
@@ -167,7 +168,8 @@ module ChatAdmissionIntentSurface =
                         |> Map.ofArray
                     AcceptedContinuationIds = accepted |> Array.map acceptedContinuationOf |> Map.ofArray }
 
-            { ChatAdmissionIntent.DurableSnapshot.Authority = Some projection }
+            { ChatAdmissionIntent.DurableSnapshot.Authority = Some projection
+              AcceptedExecutionEvidence = None }
 
     let private decodedMessage (value: obj) : ChatAdmissionIntent.DecodedMessage =
         { InvalidIdentityCarrier = None
@@ -199,6 +201,7 @@ module ChatAdmissionIntentSurface =
             "ManagedIntentMissingPhysicalUserMessageId"
         | ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable -> "DurableAuthorityUnavailable"
         | ChatAdmissionIntent.Rejection.InvalidExplicitAgent _ -> "InvalidExplicitAgent"
+        | ChatAdmissionIntent.Rejection.AcceptedParticipantConflict _ -> "AcceptedParticipantConflict"
         | ChatAdmissionIntent.Rejection.PromptKeyNotClaimed _ -> "PromptKeyNotClaimed"
         | ChatAdmissionIntent.Rejection.AgentOwnerRootPromptNotClaimed _ -> "AgentOwnerRootPromptNotClaimed"
         | ChatAdmissionIntent.Rejection.PromptClaimSessionMismatch _ -> "PromptClaimSessionMismatch"

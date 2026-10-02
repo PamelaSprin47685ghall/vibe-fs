@@ -188,6 +188,23 @@ type SessionQuiescenceGate() as this =
                 permit
             | None, _ -> issuePermit sessionId serial)
 
+    member _.CaptureCurrentAttempt(sessionId: SessionId) : QuiescencePermit =
+        lock gate (fun () ->
+            let serial =
+                Map.tryFind (SessionId.value sessionId) serials |> Option.defaultValue 0L
+
+            issuePermit sessionId serial)
+
+    member _.ObserveIdleFor(observation: QuiescencePermit) : QuiescencePermit option =
+        lock gate (fun () ->
+            match observation with
+            | :? QuiescencePermitToken as opaque when
+                obj.ReferenceEquals(opaque.Owner, owner)
+                && opaque.Serial = (Map.tryFind (SessionId.value opaque.SessionId) serials |> Option.defaultValue 0L)
+                ->
+                Some(this.ObserveIdle opaque.SessionId)
+            | _ -> None)
+
     /// Atomically consume one fresh idle capability. Every rejection is typed
     /// and leaves gate state unchanged.
     member _.TryConsume(permit: QuiescencePermit) : Result<unit, QuiescencePermitFailure> =

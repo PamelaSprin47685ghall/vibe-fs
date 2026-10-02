@@ -64,6 +64,9 @@ export default function route(role, running, previous, purpose) {
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
     globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
   }
+  if (typeof globalThis.__wanxiangshu_test_routing_decision === 'function') {
+    return globalThis.__wanxiangshu_test_routing_decision(role, running, previous, purpose)
+  }
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }
 
@@ -262,6 +265,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
         journal: journalResult.journal,
         runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
         terminalPort,
+        client,
         prompts,
         messages,
         abortedIds,

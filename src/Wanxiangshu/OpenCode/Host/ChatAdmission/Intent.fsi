@@ -23,7 +23,8 @@ module ChatAdmissionIntent =
           Text: string option }
 
     type DurableSnapshot =
-        { Authority: PromptAuthority.PromptAuthorityProjection option }
+        { Authority: PromptAuthority.PromptAuthorityProjection option
+          AcceptedExecutionEvidence: AcceptedChatExecutionEvidence option }
 
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
@@ -37,6 +38,7 @@ module ChatAdmissionIntent =
         | ManagedIntentMissingPhysicalUserMessageId
         | DurableAuthorityUnavailable
         | InvalidExplicitAgent of string
+        | AcceptedParticipantConflict of ChatExecutionKey * acceptedAgent: string * requestedAgent: string
         | PromptKeyNotClaimed of PromptKey
         | AgentOwnerRootPromptNotClaimed of PromptKey * PromptAuthority.IdentitySeed
         | PromptClaimSessionMismatch of expectedSessionId: SessionId * claimedSessionId: SessionId

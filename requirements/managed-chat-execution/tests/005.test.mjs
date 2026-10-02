@@ -43,6 +43,7 @@ const acceptedWire = (physicalUserMessageId, overrides = {}) => {
     SchemaVersion: overrides.SchemaVersion ?? 1,
   })
 }
+
 const startedWire = (physicalUserMessageId, providerRun = `provider-${physicalUserMessageId}`, sessionId = 'ses-chat') =>
   factWire('ProviderStarted', {
     Evidence: {
@@ -247,5 +248,90 @@ test('WHAT[managed-chat-execution-005] exact public assistant observation alone 
   assert.match(recoverySource, /TryBindAttemptPlan[\s\S]*?established\.Profile\.PhysicalUserMessageId = physicalUserMessageId/)
   assert.match(recoverySource, /\| Some _ -> None[\s\S]*?\| None -> this\.BindPendingAttemptPlan/)
   assert.match(providerLifecycleSource, /ManagedChatProviderLifecycle\.providerStarted/)
+})
+}
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+const status = await import('../../../dist/Execution/Session/ChatExecution/StatusSurface.js')
+const { readdirSync, readFileSync } = await import('node:fs')
+const { join } = await import('node:path')
+
+const acceptedRequest = async (hooks, sessionID, messageID) => {
+  const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: {} }
+  const parts = [{ type: 'text', text: 'controlled provider request' }]
+  await hooks['chat.message']({ sessionID, messageID, agent: 'engineer' }, { message, parts })
+  return { messages: [{ info: message, parts }] }
+}
+const assistantMessage = (sessionID, parentID, id) => ({
+  info: {
+    id, sessionID, parentID, role: 'assistant', agent: 'engineer',
+    providerID: 'provider', modelID: 'engineer-model', time: { created: 2 },
+  },
+  parts: [],
+})
+const providerStartFacts = (directory) => {
+  const events = join(directory, '.git', 'wanxiang', 'events')
+  return readdirSync(events)
+    .filter(name => name.endsWith('.ndjson'))
+    .flatMap(name => readFileSync(join(events, name), 'utf8').trim().split('\n'))
+    .map(line => JSON.parse(line).payload.Fact)
+    .filter(fact => fact[0] === 'Agent' && fact[1][0] === 'ChatExecution' && fact[1][1][0] === 'ProviderStarted')
+    .map(fact => fact[1][1][1])
+}
+const assertNoReplacementPrompt = (runtime, created, sessionID) => {
+  assert.equal(runtime.prompts.filter(prompt => prompt.path?.id === sessionID).length, 0,
+    'provider identity confirmation must not dispatch a replacement prompt to this physical execution')
+  for (const prompt of runtime.prompts) {
+    assert.equal(created.includes(prompt.path?.id), true)
+    assert.equal(prompt.body?.agent, 'blogger')
+    assert.equal(prompt.body?.metadata?.wanxiangshu_origin, 'AgentOwnerRoot')
+  }
+}
+
+test('WHAT[managed-chat-execution-005] transform durably starts the real assistant observed before its attempt plan existed', async () => {
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    const sessionID = 'ses-start-before-transform'
+    const messageID = 'msg-start-before-transform'
+    const request = await acceptedRequest(hooks, sessionID, messageID)
+    const assistant = assistantMessage(sessionID, messageID, 'assistant-start-before-transform')
+    runtime.pushHostMessage(sessionID, assistant)
+    await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+    assert.equal(status.query(runtime.journal, sessionID, messageID).providerStarted, false)
+
+    await hooks['experimental.chat.messages.transform']({}, request)
+
+    assert.deepEqual(status.query(runtime.journal, sessionID, messageID), {
+      accepted: true, providerStarted: true, terminal: false, disposition: null,
+    }, 'transform must await durable ProviderStarted before the Host may send the provider body')
+    const firstStarts = providerStartFacts(directory)
+    assert.equal(firstStarts.length, 1)
+    assert.deepEqual(firstStarts[0].Evidence.ProviderRun, ['ProviderRunIdentity', assistant.info.id])
+
+    assistant.info.time.completed = 3
+    runtime.pushHostMessage(sessionID, assistantMessage(sessionID, messageID, 'assistant-tool-followup'))
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [{ info: request.messages[0].info, parts: [{ type: 'text', text: 'controlled tool result' }] }],
+    })
+    assert.equal(providerStartFacts(directory).length, 1, 'the next Host assistant run reuses the physical execution phase')
+    assertNoReplacementPrompt(runtime, created, sessionID)
+  })
+})
+
+test('WHAT[managed-chat-execution-005] transform rejects missing or foreign public assistant identity before the provider boundary', async () => {
+  for (const snapshot of ['missing', 'foreign']) {
+    await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
+      const sessionID = `ses-start-${snapshot}`
+      const messageID = `msg-start-${snapshot}`
+      const request = await acceptedRequest(hooks, sessionID, messageID)
+      if (snapshot === 'foreign') {
+        runtime.pushHostMessage(sessionID, assistantMessage(sessionID, 'msg-other', 'assistant-foreign'))
+      }
+      await assert.rejects(hooks['experimental.chat.messages.transform']({}, request), /host-run-unavailable/)
+      assert.equal(status.query(runtime.journal, sessionID, messageID).providerStarted, false)
+      assertNoReplacementPrompt(runtime, created, sessionID)
+    })
+  }
 })
 }
