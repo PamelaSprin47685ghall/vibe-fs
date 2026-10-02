@@ -131,7 +131,7 @@ module PluginHooks =
             // The Host-native todowrite remains the physical executor, schema and
             // description included. The plugin records one durable compression
             // checkpoint per successfully completed call, keyed by exact call id.
-            let settledTodoCheckpointCalls = HashSet<string>()
+            let settledTodoCheckpointCalls = HashSet<SessionId * ToolCallId>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -319,12 +319,6 @@ module PluginHooks =
                 else
                     string toolInput?(name)
 
-            /// obligation-ledger-005: a separator keeps the dedup key
-            /// injective — concatenating without one let ("ab","c") and
-            /// ("a","bc") collide and silently drop the second checkpoint.
-            let todoCheckpointKey sessionId callId =
-                sessionId + ":" + ToolCallId.value callId
-
             let appendTodoCheckpoint durable sessionText callId =
                 task {
                     let fact =
@@ -385,12 +379,9 @@ module PluginHooks =
 
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
-            /// obligation-ledger-005: the settled mark is only kept after the
-            /// durable append succeeds — a failed append rethrows and removes
-            /// the mark, so the Host's retry of the same terminal event gets a
-            /// real second attempt instead of a silently dropped checkpoint.
+            /// A failed append releases the local mark and propagates its error.
             let settleTodoTerminal (sessionText, callId, status) =
-                let key = todoCheckpointKey sessionText callId
+                let key = SessionId.create sessionText, callId
 
                 if not (settledTodoCheckpointCalls.Add(key)) then
                     Task.FromResult(())

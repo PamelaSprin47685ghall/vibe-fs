@@ -8,16 +8,18 @@ const { join } = await import("node:path");
 const journalSurface = await import("../../../dist/Persistence/Journal/Surface.js");
 const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
+const { countFactCase } = await import("../../verification-system/tests/e2e/support/journal-observer.js");
 
 // Count the durable TodoCheckpointCommitted facts in the plugin workspace's
 // event log — the projection deduping alone cannot prove append idempotence.
 const countCheckpointFacts = (directory) => {
   const eventsDir = join(directory, '.git', 'wanxiang', 'events')
   let count = 0
-  for (const file of readdirSync(eventsDir)) {
-    for (const line of readFileSync(join(eventsDir, file), 'utf8').trim().split('\n')) {
-      if (line.includes('TodoCheckpointCommitted')) count += 1
-    }
+  for (const file of readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
+    const content = readFileSync(join(eventsDir, file), 'utf8')
+    assert.ok(content === '' || content.endsWith('\n'), 'durable facts must be complete NDJSON lines')
+    const events = content.split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    count += countFactCase(events, 'TodoCheckpointCommitted')
   }
   return count
 }
@@ -71,10 +73,11 @@ integrationTest('WHAT[obligation-ledger-005] no checkpoint before the exact comp
 
 integrationTest('WHAT[obligation-ledger-005] the exact completed terminal commits exactly one durable checkpoint', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const sessionID = 'ol005-complete'
+    const sessionID = 'ol005-TodoCheckpointCommitted-complete'
     const callID = 'ol005-call-complete'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await todoCall(hooks, sessionID, callID)
+    assert.equal(countCheckpointFacts(directory), 0, 'a fact name inside an identity is not a checkpoint fact')
 
     await hooks.event(terminalEvent(sessionID, callID, 'completed'))
 
@@ -158,8 +161,21 @@ integrationTest('WHAT[obligation-ledger-005] distinct sessions and calls never c
     assert.deepEqual(windowA.checkpoints, [{ callId: 'c' }])
     assert.deepEqual(windowB.checkpoints, [{ callId: 'bc' }])
     assert.equal(countCheckpointFacts(directory), 4, 'all four identities append their own fact')
+
+    const colonA = 'ol005-colon:a'
+    const colonB = 'ol005-colon'
+    await acceptAuthorityRoot(runtime, colonA, 'engineer')
+    await acceptAuthorityRoot(runtime, colonB, 'engineer')
+    await todoCall(hooks, colonA, 'b')
+    await todoCall(hooks, colonB, 'a:b')
+    await hooks.event(terminalEvent(colonA, 'b', 'completed'))
+    await hooks.event(terminalEvent(colonB, 'a:b', 'completed'))
+    const colonWindows = journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints
+    assert.deepEqual(colonWindows.find((entry) => entry.sessionId === colonA)?.checkpoints, [{ callId: 'b' }])
+    assert.deepEqual(colonWindows.find((entry) => entry.sessionId === colonB)?.checkpoints, [{ callId: 'a:b' }])
+    assert.equal(countCheckpointFacts(directory), 6, 'identities containing the old separator remain independent')
   })
 })
 }
 
-test.todo('WHAT[obligation-ledger-005] a failed durable append is not remembered as committed and the Host retry gets a real second attempt (GAP-190: the settled mark is now removed on append failure in the implementation; a controlled failure-injection fixture for the journal append path is still needed to prove the retry end to end)')
+test.todo('WHAT[obligation-ledger-005] duplicate terminals share the pending append outcome and failed appends are not remembered as committed (GAP-190: concurrent failure currently rejects the first caller but fulfills the duplicate; prove NotAttempted and WriteUnknown separately without treating an unknown commit as safe to repeat)')
