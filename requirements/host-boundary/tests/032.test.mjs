@@ -12,7 +12,7 @@ import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/proces
 
 const REVIEW_TOOLS = ['js-manager']
 
-test('WHAT[host-boundary-032] C01_tool_definition_decorates_four_dedicated_tools_with_contract_enum', async () => {
+test('WHAT[host-boundary-032] C01_tool_definition_decorates_the_review_tool_with_contract_enum', async () => {
   await withExecutablePlugin(async (hooks) => {
     for (const toolID of REVIEW_TOOLS) {
       const output = {
@@ -25,8 +25,6 @@ test('WHAT[host-boundary-032] C01_tool_definition_decorates_four_dedicated_tools
           required: ['path'],
         },
       }
-      // WHAT[host-boundary-032]: definition 装饰四专用工具后 contract 为 required string 且 enum 恰一个值
-      // 当前生产代码中 toolDefinition 是空实现 () => {}，输出对象未被装饰，此处必将失败飘红。
       await hooks['tool.definition']({ toolID }, output)
       assert.ok(
         output.parameters.properties?.contract,
@@ -326,7 +324,7 @@ test('WHAT[host-boundary-032] C10_model_submitted_pseudo_contract_fields_not_tre
   })
 })
 
-test('WHAT[host-boundary-032] C11_business_execution_failure_or_rejection_restores_contract_and_preserves_error', async () => {
+test('WHAT[host-boundary-032] C11_reported_failure_after_callback_restores_contract_and_preserves_error', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-c11'
     await openIncumbency(runtime, sessionID)
@@ -337,23 +335,19 @@ test('WHAT[host-boundary-032] C11_business_execution_failure_or_rejection_restor
     await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
     assert.equal('contract' in beforeOutput.args, false)
 
-    // 模拟业务执行失败 / 抛出异常
-    const executionError = new Error('Simulated file system IO failure')
-    try {
-      throw executionError
-    } catch (err) {
-      // 宿主在 try...finally 或 catch 中必须同源触发 after hook 进行清理恢复
-      await hooks['tool.execute.after'](
-        { tool: 'js-manager', sessionID, callID, args: beforeOutput.args },
-        { title: 'js-manager', output: 'error', metadata: { error: err } },
-      )
-    }
+    const executionError = new Error('Reported file system IO failure')
+    const afterOutput = { title: 'js-manager', output: 'error', metadata: { error: executionError } }
+    await hooks['tool.execute.after'](
+      { tool: 'js-manager', sessionID, callID, args: beforeOutput.args },
+      afterOutput,
+    )
 
-    assert.equal(beforeOutput.args.contract, originalContract, 'contract must be safely restored upon business execution failure')
+    assert.equal(beforeOutput.args.contract, originalContract)
+    assert.equal(afterOutput.metadata.error, executionError)
   })
 })
 
-test('WHAT[host-boundary-032] C12_after_hook_grounding_failure_does_not_affect_already_restored_args', async () => {
+test('WHAT[host-boundary-032] C12_after_hook_returns_with_original_contract_restored', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-c12'
     await openIncumbency(runtime, sessionID)
@@ -364,12 +358,11 @@ test('WHAT[host-boundary-032] C12_after_hook_grounding_failure_does_not_affect_a
     await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
     assert.equal('contract' in beforeOutput.args, false)
 
-    // after 回调中，首先完成 contract 恢复；即便后续 downstream 审计或观察报错，参数恢复不被破坏
     await hooks['tool.execute.after'](
       { tool: 'js-manager', sessionID, callID, args: beforeOutput.args },
       { title: 'js-manager', output: 'content', metadata: {} },
     )
-    assert.equal(beforeOutput.args.contract, originalContract, 'args.contract must be intact regardless of subsequent observation outcome')
+    assert.equal(beforeOutput.args.contract, originalContract)
   })
 })
 
@@ -424,21 +417,27 @@ test('WHAT[host-boundary-032] C15_contract_position_first_middle_or_last_restore
 
     // 1. contract 在第一个位置
     const objFirst = { contract: 'first-token', a: 1, b: 2 }
+    const firstKeys = Object.keys(objFirst)
     await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-1' }, { args: objFirst })
     await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-1', args: objFirst }, { title: 'js-manager', output: '', metadata: {} })
     assert.equal(objFirst.contract, 'first-token')
+    assert.deepEqual(Object.keys(objFirst), firstKeys)
 
     // 2. contract 在中间位置
     const objMid = { a: 1, contract: 'mid-token', b: 2 }
+    const middleKeys = Object.keys(objMid)
     await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-2' }, { args: objMid })
     await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-2', args: objMid }, { title: 'js-manager', output: '', metadata: {} })
     assert.equal(objMid.contract, 'mid-token')
+    assert.deepEqual(Object.keys(objMid), middleKeys)
 
     // 3. contract 在最后位置
     const objLast = { a: 1, b: 2, contract: 'last-token' }
+    const lastKeys = Object.keys(objLast)
     await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-3' }, { args: objLast })
     await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-3', args: objLast }, { title: 'js-manager', output: '', metadata: {} })
     assert.equal(objLast.contract, 'last-token')
+    assert.deepEqual(Object.keys(objLast), lastKeys)
   })
 })
 
@@ -1338,6 +1337,127 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
         'integer',
         'reconfiguring must resume decoration without a second enabled truth',
       )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C44_registered_hooks_restore_exact_argument_identity_values_and_key_order', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const calls = [
+        { tool: 'read', args: { estimated_readonly_rounds: 2, path: 'first.txt', self_note: 'first', limit: 10 } },
+        { tool: 'read', args: { path: 'middle.txt', self_note: 'middle', limit: 20, estimated_readonly_rounds: 3 } },
+        { tool: 'js-manager', args: { self_note: 'review', path: 'review.txt', contract: { original: true }, estimated_readonly_rounds: 4, limit: 30 } },
+      ].map((call, index) => ({
+        ...call,
+        sessionID: `ses-c44-${index}`,
+        callID: 'same-call-id',
+        original: structuredClone(call.args),
+        descriptors: Object.getOwnPropertyDescriptors(call.args),
+        keys: Reflect.ownKeys(call.args),
+        output: { args: call.args },
+      }))
+      await Promise.all(calls.map((call) => openIncumbency(runtime, call.sessionID)))
+      await Promise.all(calls.map((call) => hooks['tool.execute.before'](call, call.output)))
+      for (const call of calls) {
+        assert.equal(call.output.args, call.args, 'before preserves the original argument object')
+        assert.equal(Object.hasOwn(call.args, 'estimated_readonly_rounds'), false)
+        assert.equal(Object.hasOwn(call.args, 'self_note'), false)
+        assert.equal(Object.hasOwn(call.args, 'contract'), false)
+      }
+      for (const call of calls.toReversed()) {
+        const output = { title: call.tool, output: 'original result', metadata: {} }
+        await hooks['tool.execute.after'](call, output)
+        await hooks['tool.execute.after'](call, output)
+        assert.equal(call.output.args, call.args, 'after restores in the same object')
+        assert.deepEqual(call.args, call.original, 'each session recovers its own complete arguments')
+        assert.deepEqual(Reflect.ownKeys(call.args), call.keys, 'original key order and private cleanup are exact')
+        for (const key of call.keys) assert.equal(call.args[key], call.descriptors[key].value)
+        assert.equal(output.output, 'original result')
+      }
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C45_unrestorable_delegation_key_order_is_rejected_before_any_argument_mutation', () => {
+  const args = { self_note: 'original', path: 'fixed.txt', estimated_readonly_rounds: 2 }
+  Object.defineProperty(args, 'path', { configurable: false })
+  const descriptors = Object.getOwnPropertyDescriptors(args)
+  const keys = Reflect.ownKeys(args)
+  assert.throws(() => PluginHooksSurface.hideReadonlyDelegationArgs(args), TypeError)
+  assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+  assert.deepEqual(Reflect.ownKeys(args), keys)
+  PluginHooksSurface.restoreReadonlyDelegationArgs(args)
+  assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+
+  const preceding = { path: 'fixed.txt', estimated_readonly_rounds: 0 }
+  Object.defineProperty(preceding, 'path', { configurable: false })
+  const precedingDescriptors = Object.getOwnPropertyDescriptors(preceding)
+  PluginHooksSurface.hideReadonlyDelegationArgs(preceding)
+  PluginHooksSurface.restoreReadonlyDelegationArgs(preceding)
+  assert.deepEqual(Object.getOwnPropertyDescriptors(preceding), precedingDescriptors)
+  assert.deepEqual(Object.keys(preceding), ['path', 'estimated_readonly_rounds'])
+})
+
+test('WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidden_review_contract', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c46'
+      await openIncumbency(runtime, sessionID)
+      const args = { estimated_readonly_rounds: 2, contract: 'original', self_note: 'original note', path: 'file.txt' }
+      Object.defineProperty(args, 'estimated_readonly_rounds', { configurable: false })
+      const descriptors = Object.getOwnPropertyDescriptors(args)
+      const keys = Reflect.ownKeys(args)
+      const output = { args }
+      await assert.rejects(
+        hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c46' }, output),
+        TypeError,
+      )
+      assert.equal(output.args, args)
+      assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors, 'rejected before leaves no half-hidden protocol')
+      assert.deepEqual(Reflect.ownKeys(args), keys)
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test.todo('WHAT[host-boundary-032] installed Host executor exception restores original arguments without a manually invoked after callback')
+
+test('WHAT[host-boundary-032] C47_interrupted_field_deletion_restores_arguments_and_rethrows_the_original_error', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c47'
+      await openIncumbency(runtime, sessionID)
+      const sentinel = new Error('first note deletion failed')
+      let failNoteDeletion = true
+      const args = new Proxy({ estimated_readonly_rounds: 2, contract: 'original', self_note: 'keep note', path: 'file.txt' }, {
+        deleteProperty(target, key) {
+          if (key === 'self_note' && failNoteDeletion) {
+            failNoteDeletion = false
+            throw sentinel
+          }
+          return Reflect.deleteProperty(target, key)
+        },
+      })
+      const descriptors = Object.getOwnPropertyDescriptors(args)
+      const keys = Reflect.ownKeys(args)
+      const output = { args }
+      await assert.rejects(
+        hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c47' }, output),
+        (error) => error === sentinel,
+      )
+      assert.equal(failNoteDeletion, false, 'the failure occurred after the earlier field deletion')
+      assert.equal(output.args, args)
+      assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+      assert.deepEqual(Reflect.ownKeys(args), keys)
     })
   } finally {
     clearPredictorState()
@@ -2340,3 +2460,256 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
     clearPredictorState()
   }
 })
+
+test('WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hidden_arguments_and_call', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c48'
+      await openIncumbency(runtime, sessionID)
+      for (const tool of ['read', 'js-manager']) {
+        const args = { self_note: 'original note', path: 'file.txt', estimated_readonly_rounds: 2 }
+        const businessContract = { native: true }
+        args.contract = tool === 'js-manager' ? 'original review' : businessContract
+        const original = structuredClone(args)
+        const keys = Reflect.ownKeys(args)
+        const input = { tool, sessionID, callID: `call-c48-${tool}` }
+        const output = { args }
+        await hooks['tool.execute.before'](input, output)
+        await hooks['tool.execute.before']({ ...input }, output)
+        assert.equal(output.args, args)
+        const businessView = tool === 'js-manager' ? { path: 'file.txt' } : { path: 'file.txt', contract: businessContract }
+        assert.deepEqual(args, businessView, 'the repeated callback keeps only the business view')
+        if (tool === 'read') assert.equal(args.contract, businessContract, 'a non-review contract belongs to the business tool')
+        await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: 'result', metadata: {} })
+        assert.deepEqual(args, original)
+        assert.deepEqual(Reflect.ownKeys(args), keys)
+        if (tool === 'read') assert.equal(args.contract, businessContract)
+      }
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_identities_or_other_objects_from_validation', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      await Promise.all(['ses-c49', 'ses-c49-other'].map((sessionID) => openIncumbency(runtime, sessionID)))
+      const input = { tool: 'read', sessionID: 'ses-c49', callID: 'call-c49' }
+      const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
+      const original = structuredClone(args)
+      const keys = Reflect.ownKeys(args)
+      await hooks['tool.execute.before'](input, { args })
+      const attempts = [
+        [{ ...input, callID: 'other-call' }, args],
+        [{ ...input, sessionID: 'ses-c49-other' }, args],
+        [{ ...input, tool: 'glob' }, args],
+        [input, { path: 'other-object.txt' }],
+        [{ ...input, callID: 'fresh-call' }, { path: 'missing-estimate.txt' }],
+      ]
+      for (const [otherInput, otherArgs] of attempts) {
+        await assert.rejects(hooks['tool.execute.before'](otherInput, { args: otherArgs }), /Invalid investigation estimate arguments:/)
+        assert.equal(Object.hasOwn(args, 'estimated_readonly_rounds'), false, 'rejection leaves the original pending call hidden')
+      }
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+      assert.deepEqual(args, original)
+      assert.deepEqual(Reflect.ownKeys(args), keys)
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C50_same_call_with_reintroduced_protocol_fields_is_not_a_hidden_repeat', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c50'
+      await openIncumbency(runtime, sessionID)
+      for (const estimate of ['not a number', 0]) {
+        const input = { tool: 'read', sessionID, callID: `call-c50-${estimate}` }
+        const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
+        const original = structuredClone(args)
+        const keys = Reflect.ownKeys(args)
+        await hooks['tool.execute.before'](input, { args })
+        args.estimated_readonly_rounds = estimate
+        await assert.rejects(hooks['tool.execute.before'](input, { args }), /Invalid investigation estimate arguments:/)
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+        assert.deepEqual(args, original)
+        assert.deepEqual(Reflect.ownKeys(args), keys)
+      }
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C51_missing_call_identity_does_not_grant_hidden_repeat_exemption', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c51'
+      await openIncumbency(runtime, sessionID)
+      for (const input of [{ tool: 'read', sessionID }, { tool: 'read', callID: 'call-c51' }]) {
+        const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
+        const original = structuredClone(args)
+        await hooks['tool.execute.before'](input, { args })
+        await assert.rejects(hooks['tool.execute.before'](input, { args }), /Invalid investigation estimate arguments:/)
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+        assert.deepEqual(args, original)
+      }
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C52_review_contract_reintroduced_on_the_same_call_is_not_a_hidden_repeat', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c52'
+      await openIncumbency(runtime, sessionID)
+      const input = { tool: 'js-manager', sessionID, callID: 'call-c52' }
+      const args = { estimated_readonly_rounds: 2, contract: 'original review', self_note: 'original note', path: 'file.txt' }
+      const original = structuredClone(args)
+      const keys = Reflect.ownKeys(args)
+      const output = { args }
+      await hooks['tool.execute.before'](input, output)
+      args.contract = 'reintroduced review'
+      await assert.rejects(hooks['tool.execute.before'](input, output), /Invalid investigation estimate arguments:/)
+      assert.equal(output.args, args)
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'js-manager', output: 'result', metadata: {} })
+      assert.deepEqual(args, original)
+      assert.deepEqual(Reflect.ownKeys(args), keys)
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_one_hidden_owner', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const sessionID = 'ses-c53'
+      await openIncumbency(runtime, sessionID)
+      const args = { estimated_readonly_rounds: 2, contract: 'original review', self_note: 'original note', path: 'file.txt' }
+      const descriptors = Object.getOwnPropertyDescriptors(args)
+      const keys = Reflect.ownKeys(args)
+      const calls = ['first', 'second'].map((suffix) => ({
+        input: { tool: 'js-manager', sessionID, callID: `call-c53-${suffix}` },
+        output: { args },
+      }))
+      const results = await Promise.allSettled(calls.map(({ input, output }) => hooks['tool.execute.before'](input, output)))
+      assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'], 'one parameter object cannot belong to two pending calls')
+      const winner = calls[results.findIndex((result) => result.status === 'fulfilled')]
+      const loser = calls[results.findIndex((result) => result.status === 'rejected')]
+      assert.match(String(results.find((result) => result.status === 'rejected').reason), /Invalid investigation estimate arguments:/)
+      assert.deepEqual(args, { path: 'file.txt' }, 'the losing call must not restore the winning call\'s hidden arguments')
+      await hooks['tool.execute.before']({ ...winner.input }, winner.output)
+      await assert.rejects(hooks['tool.execute.before']({ ...loser.input }, loser.output), /Invalid investigation estimate arguments:/)
+      assert.deepEqual(args, { path: 'file.txt' })
+      await hooks['tool.execute.after']({ ...winner.input, args }, { title: 'js-manager', output: 'result', metadata: {} })
+      for (const call of calls) assert.equal(call.output.args, args)
+      assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+      assert.deepEqual(Reflect.ownKeys(args), keys)
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+for (const [predictor, tool] of [['unconfigured', 'js-manager'], ['configured', 'js-manager'], ['configured', 'read']]) {
+  test(`WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_${predictor}_${tool}`, async () => {
+    setPredictorState(predictor)
+    try {
+      await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+        const sessionID = `ses-c54-${predictor}-${tool}`
+        await openIncumbency(runtime, sessionID)
+        const args = { estimated_readonly_rounds: 2, contract: 'original contract', self_note: 'original note', path: 'first.txt' }
+        const first = { tool, sessionID, callID: 'call-c54-first' }
+        const second = { tool, sessionID, callID: 'call-c54-second' }
+        const output = { args }
+        await hooks['tool.execute.before'](first, output)
+        await hooks['tool.execute.after']({ ...first, args }, { title: tool, output: 'first result', metadata: {} })
+
+        args.path = 'second.txt'
+        args.contract = 'second contract'
+        args.estimated_readonly_rounds = 3
+        const secondDescriptors = Object.getOwnPropertyDescriptors(args)
+        const secondKeys = Reflect.ownKeys(args)
+        await hooks['tool.execute.before'](second, output)
+        const executingDescriptors = Object.getOwnPropertyDescriptors(args)
+        const executingKeys = Reflect.ownKeys(args)
+
+        await hooks['tool.execute.after']({ ...first, args }, { title: tool, output: 'late first result', metadata: {} })
+        assert.deepEqual(Object.getOwnPropertyDescriptors(args), executingDescriptors, 'a late input-side after leaves the new owner hidden')
+        assert.deepEqual(Reflect.ownKeys(args), executingKeys)
+        await hooks['tool.execute.after'](first, { args, title: tool, output: 'duplicate first result', metadata: {} })
+        assert.deepEqual(Object.getOwnPropertyDescriptors(args), executingDescriptors, 'a late output-side after also leaves the new owner hidden')
+        assert.deepEqual(Reflect.ownKeys(args), executingKeys)
+        for (const unknown of [{ tool, sessionID }, { tool, callID: 'unknown-call' }, { tool, sessionID, callID: 'never-started' }]) {
+          await hooks['tool.execute.after']({ ...unknown, args }, { title: tool, output: 'unowned result', metadata: {} })
+          assert.deepEqual(Object.getOwnPropertyDescriptors(args), executingDescriptors, 'an unknown or incomplete call identity cannot restore another owner')
+          assert.deepEqual(Reflect.ownKeys(args), executingKeys)
+        }
+
+        await hooks['tool.execute.after']({ ...second, args }, { title: tool, output: 'second result', metadata: {} })
+        assert.equal(output.args, args)
+        assert.deepEqual(Object.getOwnPropertyDescriptors(args), secondDescriptors)
+        assert.deepEqual(Reflect.ownKeys(args), secondKeys)
+      })
+    } finally {
+      clearPredictorState()
+    }
+  })
+}
+
+for (const [tool, field] of [['join', 'estimated_readonly_rounds'], ['join', 'self_note'], ['read', 'contract']]) {
+  test(`WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_${tool}_${field}`, async () => {
+    setPredictorState('configured')
+    try {
+      await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+        const sessionID = `ses-c55-${tool}-${field}`
+        await openIncumbency(runtime, sessionID)
+        const args = tool === 'read'
+          ? { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
+          : { taskID: 'native-task' }
+        let reads = 0
+        Object.defineProperty(args, field, {
+          enumerable: true,
+          configurable: true,
+          get() {
+            reads += 1
+            throw new Error(`business getter ${tool}.${field} must not be read by the protocol`)
+          },
+        })
+        const descriptors = Object.getOwnPropertyDescriptors(args)
+        const keys = Reflect.ownKeys(args)
+        const input = { tool, sessionID, callID: `call-c55-${field}` }
+        const output = { args }
+        await hooks['tool.execute.before'](input, output)
+        assert.equal(reads, 0)
+        assert.equal(output.args, args)
+        assert.deepEqual(Object.getOwnPropertyDescriptor(args, field), descriptors[field])
+        if (tool === 'read') {
+          assert.equal(Object.hasOwn(args, 'estimated_readonly_rounds'), false)
+          assert.equal(Object.hasOwn(args, 'self_note'), false)
+        } else {
+          assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+          assert.deepEqual(Reflect.ownKeys(args), keys)
+        }
+        await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: 'result', metadata: {} })
+        assert.equal(reads, 0)
+        assert.equal(output.args, args)
+        assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
+        assert.deepEqual(Reflect.ownKeys(args), keys)
+      })
+    } finally {
+      clearPredictorState()
+    }
+  })
+}

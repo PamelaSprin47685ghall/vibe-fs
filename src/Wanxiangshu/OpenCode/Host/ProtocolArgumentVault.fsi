@@ -2,6 +2,10 @@ namespace Wanxiangshu.OpenCode.Host
 
 module ProtocolArgumentVault =
 
+    type FieldOwnership =
+        { ReviewContract: bool
+          InvestigationEstimate: bool }
+
     /// One snapshot of the protocol fields, verbatim from the tool arguments.
     type Snapshot =
         { Contract: obj option
@@ -19,8 +23,8 @@ module ProtocolArgumentVault =
 
     val clear: vault: Vault -> unit
 
-    /// Read the protocol fields out of raw tool arguments; None when absent.
-    val snapshotOfArguments: args: obj -> Snapshot option
+    /// Read only owned protocol fields; unowned fields are not inspected.
+    val snapshotOfArguments: ownership: FieldOwnership -> args: obj -> Snapshot option
 
     /// Pure merge decision: business arguments verbatim, protocol fields
     /// appended when missing or different; same reference when nothing changes.

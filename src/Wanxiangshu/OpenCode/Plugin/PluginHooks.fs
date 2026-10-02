@@ -464,32 +464,11 @@ module PluginHooks =
             // The call id is read from the hook input itself: WHAT[009]'s
             // both-halves pairing lives in decodeContext, and this hook input
             // carries no messageID, so decodeContext would always answer None.
-            let sanitizeSnapshot (toolName: string) (snapshot: ProtocolArgumentVault.Snapshot) =
-                let isReview = ManagerReviewTools.isReviewTool toolName
-
-                let isDelegationActive =
+            let protocolFieldOwnership (toolName: string) : ProtocolArgumentVault.FieldOwnership =
+                { ReviewContract = ManagerReviewTools.isReviewTool toolName
+                  InvestigationEstimate =
                     readonlyDelegationPredictorConfigured ()
-                    && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
-
-                { ProtocolArgumentVault.Snapshot.Contract = (if isReview then snapshot.Contract else None)
-                  ProtocolArgumentVault.Snapshot.ReadonlyRounds =
-                    (if isDelegationActive then snapshot.ReadonlyRounds else None)
-                  ProtocolArgumentVault.Snapshot.SelfNote = (if isDelegationActive then snapshot.SelfNote else None) }
-
-            let commitRecordedSnapshot
-                (vault: ProtocolArgumentVault.Vault)
-                (sessionId: string)
-                (toolCallId: ToolCallId)
-                (recorded: ProtocolArgumentVault.Snapshot)
-                =
-                if
-                    recorded.Contract.IsNone
-                    && recorded.ReadonlyRounds.IsNone
-                    && recorded.SelfNote.IsNone
-                then
-                    ()
-                else
-                    ProtocolArgumentVault.record vault sessionId (ToolCallId.value toolCallId) recorded
+                    && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall }
 
             let recordSnapshotIfPresent
                 (vault: ProtocolArgumentVault.Vault)
@@ -498,9 +477,8 @@ module PluginHooks =
                 (toolName: string)
                 (args: obj)
                 =
-                match ProtocolArgumentVault.snapshotOfArguments args with
-                | Some snapshot ->
-                    commitRecordedSnapshot vault sessionId toolCallId (sanitizeSnapshot toolName snapshot)
+                match ProtocolArgumentVault.snapshotOfArguments (protocolFieldOwnership toolName) args with
+                | Some snapshot -> ProtocolArgumentVault.record vault sessionId (ToolCallId.value toolCallId) snapshot
                 | None -> ()
 
             let tryRecordVaultEntry
@@ -551,9 +529,113 @@ module PluginHooks =
 
                 ManagerReviewContract.restore args
 
+            let hideReviewArguments owner toolName args =
+                if ManagerReviewTools.isReviewTool toolName then
+                    ManagerReviewContract.hideForCall owner args
+
+            let hideDelegationArguments owner isDelegationActive args =
+                if isDelegationActive then
+                    ReadonlyDelegationContract.hideForCall owner args
+
+            let hideProtocolArguments owner toolName isDelegationActive args =
+                try
+                    hideReviewArguments owner toolName args
+                    hideDelegationArguments owner isDelegationActive args
+                with error ->
+                    restoreParticipatingArguments isDelegationActive args
+                    raise error
+
             let requireDelegationEstimateArguments (toolInput: obj) (toolOutput: obj) =
                 if not (isNull toolOutput) && not (isNull toolOutput?args) then
                     rejectInvalidEstimateArguments toolInput toolOutput?args
+
+            let argumentCallOwner toolName toolInput : ProtocolArgumentCall option =
+                let context = ToolHostCodec.decodeContext toolInput
+
+                match ToolHostCodec.hookCallId toolInput with
+                | Some callId when not (String.IsNullOrWhiteSpace context.SessionId) ->
+                    Some
+                        { SessionId = SessionId.create context.SessionId
+                          ToolCallId = callId
+                          Tool = toolName }
+                | _ -> None
+
+            let observeDelegatedToolEstimate toolInput =
+                task {
+                    let context = ToolHostCodec.decodeContext toolInput
+
+                    match journal, ToolHostCodec.hookCallId toolInput with
+                    | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
+                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
+                        do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
+                    | _ -> ()
+                }
+
+            let hiddenReviewState owner isReview args =
+                if isReview then
+                    ManagerReviewContract.classifyHiddenArguments owner args
+                else
+                    HiddenProtocolArguments.SameCall
+
+            let hiddenDelegationState owner isDelegationActive args =
+                if isDelegationActive then
+                    ReadonlyDelegationContract.classifyHiddenArguments owner args
+                else
+                    HiddenProtocolArguments.SameCall
+
+            let combineHiddenStates review delegation =
+                match review, delegation with
+                | HiddenProtocolArguments.DifferentCallOrChangedArguments, _
+                | _, HiddenProtocolArguments.DifferentCallOrChangedArguments ->
+                    HiddenProtocolArguments.DifferentCallOrChangedArguments
+                | HiddenProtocolArguments.SameCall, HiddenProtocolArguments.SameCall -> HiddenProtocolArguments.SameCall
+                | _ -> HiddenProtocolArguments.NotHidden
+
+            let hiddenArgumentState owner toolName isDelegationActive (toolOutput: obj) =
+                let isReview = ManagerReviewTools.isReviewTool toolName
+
+                if
+                    (not isReview && not isDelegationActive)
+                    || isNull toolOutput
+                    || isNull toolOutput?args
+                then
+                    HiddenProtocolArguments.NotHidden
+                else
+                    combineHiddenStates
+                        (hiddenReviewState owner isReview toolOutput?args)
+                        (hiddenDelegationState owner isDelegationActive toolOutput?args)
+
+            let protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput =
+                match hiddenArgumentState owner toolName isDelegationActive toolOutput with
+                | HiddenProtocolArguments.SameCall -> true
+                | HiddenProtocolArguments.DifferentCallOrChangedArguments ->
+                    invalidOp
+                        "Invalid investigation estimate arguments: hidden arguments belong to another call or were changed before restoration"
+                | HiddenProtocolArguments.NotHidden -> false
+
+            let prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput =
+                task {
+                    if isDelegationActive then
+                        requireDelegationEstimateArguments toolInput toolOutput
+
+                    recordProtocolArgumentVault toolInput toolOutput
+                    do! observeDelegatedToolEstimate toolInput
+
+                    if
+                        not (protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput)
+                        && not (isNull toolOutput)
+                        && not (isNull toolOutput?args)
+                    then
+                        hideProtocolArguments owner toolName isDelegationActive toolOutput?args
+                }
+
+            let prepareProtocolArguments toolName isDelegationActive toolInput toolOutput =
+                let owner = argumentCallOwner toolName toolInput
+
+                if protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput then
+                    Task.FromResult(())
+                else
+                    prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -565,7 +647,6 @@ module PluginHooks =
                             toolOutput
 
                     let toolName = toolField toolInput "tool"
-
                     checkManagerReviewPermissions toolName toolInput
 
                     let isParticipatingTool =
@@ -574,45 +655,26 @@ module PluginHooks =
                     let isDelegationActive =
                         readonlyDelegationPredictorConfigured () && isParticipatingTool
 
-                    if isDelegationActive then
-                        requireDelegationEstimateArguments toolInput toolOutput
-
-                    recordProtocolArgumentVault toolInput toolOutput
-
-                    let context = ToolHostCodec.decodeContext toolInput
-
-                    // Same hook-shaped call id as the vault above:
-                    // the decodeContext ToolCallId is None on this hook input.
-                    match journal, ToolHostCodec.hookCallId toolInput with
-                    | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
-                        do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
-                    | _ -> ()
-
-                    if
-                        ManagerReviewTools.isReviewTool toolName
-                        && not (isNull toolOutput)
-                        && not (isNull toolOutput?args)
-                    then
-                        ManagerReviewContract.hide toolOutput?args
-
-                    // host-boundary-032: narrow hide to participating tools only when predictor is configured.
-                    // Non-participating and unreviewed tools are untouched, leaving their own business
-                    // arguments intact. Unconfigured predictor leaves all tools untouched.
-                    if isDelegationActive && not (isNull toolOutput) && not (isNull toolOutput?args) then
-                        ReadonlyDelegationContract.hide toolOutput?args
+                    do! prepareProtocolArguments toolName isDelegationActive toolInput toolOutput
                 }
+
+            let restoreOwnedArguments owner isParticipatingTool args =
+                if isParticipatingTool then
+                    ReadonlyDelegationContract.restoreForCall owner args
+
+                ManagerReviewContract.restoreForCall owner args
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     let toolName = toolField toolInput "tool"
+                    let owner = argumentCallOwner toolName toolInput
 
                     let isParticipatingTool =
                         InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
 
                     let restoreTarget (target: obj) =
                         if not (isNull target) && not (isNull target?args) then
-                            restoreParticipatingArguments isParticipatingTool target?args
+                            restoreOwnedArguments owner isParticipatingTool target?args
 
                     restoreTarget toolInput
                     restoreTarget toolOutput

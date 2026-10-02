@@ -3,7 +3,19 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+
+type ProtocolArgumentCall =
+    { SessionId: SessionId
+      ToolCallId: ToolCallId
+      Tool: string }
+
+[<RequireQualifiedAccess>]
+type HiddenProtocolArguments =
+    | NotHidden
+    | SameCall
+    | DifferentCallOrChangedArguments
 
 module ManagerReviewContract =
 
@@ -99,15 +111,52 @@ module ManagerReviewContract =
         if not (hasOwn args savedContractKey) then
             hideContractProperty args
 
-    let private applyRestoredDescriptor (args: obj) (descriptor: obj) : unit =
-        let deleted =
-            if isNull descriptor then
-                deleteProperty args "contract"
-            else
-                defineProperty args "contract" descriptor
-                true
+    let private hasSavedContract (args: obj) =
+        not (isNull args) && isPlainObject args && hasOwn args savedContractKey
 
+    let private hasExactCallIdentity (owner: ProtocolArgumentCall) =
+        not (String.IsNullOrWhiteSpace(SessionId.value owner.SessionId))
+        && not (String.IsNullOrWhiteSpace(ToolCallId.value owner.ToolCallId))
+        && not (String.IsNullOrWhiteSpace owner.Tool)
+
+    let private bindCallOwner (owner: ProtocolArgumentCall option) (args: obj) =
+        match owner with
+        | Some call when hasExactCallIdentity call ->
+            let saved = args?(savedContractKey)
+            saved?owner <- box call
+        | _ -> ()
+
+    let hideForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
+        let alreadyHidden = hasSavedContract args
+        hide args
+
+        if not alreadyHidden then
+            bindCallOwner owner args
+
+    let private classifySavedCall (owner: ProtocolArgumentCall option) (saved: obj) =
+        match owner with
+        | Some call when
+            hasExactCallIdentity call
+            && hasOwn saved "owner"
+            && call = unbox<ProtocolArgumentCall> saved?owner
+            ->
+            HiddenProtocolArguments.SameCall
+        | _ -> HiddenProtocolArguments.DifferentCallOrChangedArguments
+
+    let classifyHiddenArguments (owner: ProtocolArgumentCall option) (args: obj) : HiddenProtocolArguments =
+        if not (hasSavedContract args) then
+            HiddenProtocolArguments.NotHidden
+        elif hasOwn args "contract" then
+            HiddenProtocolArguments.DifferentCallOrChangedArguments
+        else
+            classifySavedCall owner args?(savedContractKey)
+
+    let private applyRestoredDescriptor (args: obj) (descriptor: obj) : unit =
+        let deleted = deleteProperty args "contract"
         assertPropertyDeleted deleted "Failed to delete contract property during restore"
+
+        if not (isNull descriptor) then
+            defineProperty args "contract" descriptor
 
     let private restoreContractInOriginalOrder (args: obj) (saved: obj) : unit =
         let followingKeys: string array = saved?followingKeys
@@ -143,6 +192,14 @@ module ManagerReviewContract =
 
     let restore (args: obj) : unit =
         if not (isNull args) && isPlainObject args && hasOwn args savedContractKey then
+            restoreSavedContract args
+
+    let private ownsSavedCall (owner: ProtocolArgumentCall option) (saved: obj) =
+        (owner.IsNone && not (hasOwn saved "owner"))
+        || classifySavedCall owner saved = HiddenProtocolArguments.SameCall
+
+    let restoreForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
+        if hasSavedContract args && ownsSavedCall owner args?(savedContractKey) then
             restoreSavedContract args
 
     [<Literal>]

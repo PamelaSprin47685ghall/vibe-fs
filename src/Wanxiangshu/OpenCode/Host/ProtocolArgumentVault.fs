@@ -29,6 +29,10 @@ module ProtocolArgumentVault =
     [<Literal>]
     let private noteField = "self_note"
 
+    type FieldOwnership =
+        { ReviewContract: bool
+          InvestigationEstimate: bool }
+
     /// One snapshot of the protocol fields, verbatim from the tool arguments.
     type Snapshot =
         { Contract: obj option
@@ -69,8 +73,8 @@ module ProtocolArgumentVault =
     /// Snapshot the protocol fields from raw tool arguments. Returns None when
     /// no protocol field is present; a call that never carried the protocol
     /// needs no vault entry.
-    let private tryReadField (args: obj) (fieldName: string) =
-        if hasOwn args fieldName then
+    let private tryReadField owned (args: obj) (fieldName: string) =
+        if owned && hasOwn args fieldName then
             Some(args?(fieldName))
         else
             None
@@ -84,16 +88,15 @@ module ProtocolArgumentVault =
                   ReadonlyRounds = rounds
                   SelfNote = note }
 
-    /// Read-only snapshot of business protocol fields. Returns None when
-    /// no protocol field is present; a call that never carried the protocol
-    /// needs no vault entry.
-    let snapshotOfArguments (args: obj) : Snapshot option =
+    /// Read only fields owned by this call's protocols. Unowned fields are
+    /// not inspected; absent owned fields need no vault entry.
+    let snapshotOfArguments (ownership: FieldOwnership) (args: obj) : Snapshot option =
         if isNull args then
             None
         else
-            let contract = tryReadField args contractField
-            let rounds = tryReadField args roundsField
-            let note = tryReadField args noteField
+            let contract = tryReadField ownership.ReviewContract args contractField
+            let rounds = tryReadField ownership.InvestigationEstimate args roundsField
+            let note = tryReadField ownership.InvestigationEstimate args noteField
             toSnapshot contract rounds note
 
     /// Pure merge decision: the arguments object the wire should carry.
