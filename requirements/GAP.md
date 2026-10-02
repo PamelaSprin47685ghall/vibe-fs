@@ -132,7 +132,7 @@
 | GAP-129 | execution-model-routing-019 | PARTIAL | DevOps 现行实现可随策略覆盖旧绑定，与合同永不更换冲突；真实失败TODO保留，需要明确固定作用域与恢复来源。 |
 | GAP-130 | execution-model-routing-004/005 | PARTIAL | optional reservation 可在Host承接前占容量；不能因optional名称默认豁免零前置占用。需删除提前占用或正式裁决受限reservation例外。 |
 | GAP-131 | execution-model-routing-011 | PARTIAL | 合同target解析先于durable accept，实际接受后进入模型调度；null scheduler排队与前置选择如何共存待决，不能为null虚构已解析target。 |
-| GAP-133 | managed-session-lifecycle | PARTIAL | fold、attachment、journal、受控终止顺序有局部用例；005已通过同一真实owner证明scope/role键隔离、同键singleflight及独立移除重绑，不开放旧角色活跃准入。完整替换、取消、删除/fatal单次结算、真实DevOps恢复和OS PTY排空仍待证。025受控PTY端口不等于TERM→exit→KILL。 |
+| GAP-133 | managed-session-lifecycle | PARTIAL | fold、attachment、journal、受控终止顺序有局部用例；005证明scope/role键隔离、singleflight及独立重绑，不开放旧角色活跃准入。018新增实际Scope受权取消：目标child durable Abandoned、另一owner同名child仍Active，持有Host abort时取消不提前返回；漏写abandon和丢弃等待两项隔离变异均准确报红，恢复后通过。完整替换、所有取消/删除/fatal结算、真实DevOps恢复及OS PTY排空仍待证；端口Promise完成不等于TERM→exit→KILL。 |
 | GAP-136 | dispatch-protocol | PARTIAL | 010部分证明：root/rootAwait/managedAssignment/continuation/gateNudges/idleContinuation六个send producer的wire model=null，模型选择留给admission（tests/010）；F#编译级拒绝给root加model authority仍待证。保留真实claim-before-Host、receipt与journal重开；完整生产者、模糊接受、OS crash、handoff、历史激活和invariant fatal仍缺证。端口返回值不等于SDK/HTTP已接受。 |
 | GAP-137 | dispatch-protocol-007/009 | PARTIAL | 确定Retryable/Fatal未发送可Abandon与晚到Fatal保Pending并熔断的文字边界冲突；需区分外部拒绝和内部typed invariant，当前不暗改任一合同。 |
 | GAP-138 | dispatch-protocol；chat admission | PARTIAL | 非法PromptKey/Agent被当Missing而获得权限的真实反例及封闭错误类型修复已迁入；待新基线验证合法Missing和历史读取兼容。 |
@@ -205,7 +205,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-125 | managed-chat-execution continuation | OPEN | 发送前对目标active run的真实核对仍缺完整证据；持久事实存在不等于当前可发送。 |
 | GAP-126 | managed-chat-execution | PARTIAL | 保留真实journal/准入；Host请求链、物理承接和失败后果仍缺。显式/continue已退役，恢复归加载阶段。 |
 | GAP-127 | managed-chat-execution恢复 | PARTIAL | 新接缝驱动实际admission序列，撤去只传restart标签的证明；受控调用仍不是OS进程死亡与重开。 |
-| GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | handle重放可能复活Completed/Retired；一次工作墓碑与固定道路执行者延续的身份边界仍待裁决，保留反例。 |
+| GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | 一次工作墓碑与稳定participant handle的边界仍待裁决。006/007失败TODO调用相同link命令，未证明真实同event重放；actual resume在新prompt已Accepted后也走同一link材料，delegation-027允许未Join即承接新工作。当前fact缺区分历史重放与新work准入的exact因果身份，简单禁止Completed/Retired重开会破坏正常resume；保留反例，不用纯fold改动冒充已修。 |
 | GAP-134 | managed-session-lifecycle测试接缝 | PARTIAL | 首批关联源码已迁入真实端口观察；实际生命周期用例待新产物执行，自写时间整数不算Temporal。 |
 | GAP-135 | managed-session-lifecycle终止 | PARTIAL | Host abort明确拒绝的传播需本次产物复验；不能把端口调用完成当成退出成功。 |
 | GAP-148 | crash-reconciliation测试资源 | PARTIAL | 旧接缝主动结束自身请求的修正保留；本基线仍需验证文件完成，不扩大业务超时。 |

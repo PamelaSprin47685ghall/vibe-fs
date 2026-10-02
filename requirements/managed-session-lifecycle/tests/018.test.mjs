@@ -3,6 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate } from 'node:timers/promises'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import * as status from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
@@ -44,7 +45,63 @@ test('WHAT[managed-session-lifecycle-018] actual tool runtime detach preserves d
 })
 
 test.todo('WHAT[managed-session-lifecycle-018] real TurnAborted, retry, Fission and unknown stops preserve durable handles and permit re-enlist after process restart (GAP-133)')
-test.todo('WHAT[managed-session-lifecycle-018] authorized logical cancellation alone abandons the durable child and waits for held physical cleanup (GAP-133)')
+test('WHAT[managed-session-lifecycle-018] authorized owner cancellation durably abandons only its child and awaits the held Host abort', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-logical-cancel-'))
+  const entered = Promise.withResolvers()
+  const release = Promise.withResolvers()
+  const aborts = []
+  const owners = ['manager-cancel', 'manager-preserved']
+  let runtime
+  let cancellation
+  try {
+    runtime = await forkTool.createRuntimeWithAbort(directory,
+      owners.map(sessionId => ({ sessionId, agent: 'manager' })),
+      async sessionId => {
+        aborts.push(sessionId)
+        entered.resolve()
+        await release.promise
+        return { ok: true }
+      })
+    const children = []
+    for (const owner of owners) {
+      forkTool.nextPromptAdmittedWithReceipt(runtime, `accepted-child:${owner}`)
+      assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'REVIEW-ONE-CHANGE'), /Ada/)
+      children.push(forkTool.child(runtime))
+      assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
+    }
+    let completed = false
+    cancellation = forkTool.cancelOwnerChildren(runtime, owners[0])
+    cancellation.then(() => { completed = true }, () => { completed = true })
+    await entered.promise
+    await setImmediate()
+    assert.equal(completed, false, 'logical cancellation must retain the pending Host cleanup')
+    assert.deepEqual(aborts, [children[0]])
+    assert.equal(forkTool.durableLifecycleByname(runtime, owners[0], 'Ada'), 'Abandoned')
+    assert.equal(forkTool.durableLifecycleByname(runtime, owners[1], 'Ada'), 'Active')
+
+    release.resolve()
+    await cancellation
+    assert.equal(completed, true)
+    assert.deepEqual(aborts, [children[0]])
+    assert.equal(forkTool.durableLifecycleByname(runtime, owners[0], 'Ada'), 'Abandoned')
+    assert.equal(forkTool.durableLifecycleByname(runtime, owners[1], 'Ada'), 'Active')
+  } finally {
+    release.resolve()
+    try {
+      if (cancellation) await cancellation
+    } finally {
+      try {
+        if (runtime) await forkTool.detachToolRuntime(runtime)
+      } finally {
+        try {
+          if (runtime) forkTool.disposeRuntime(runtime)
+        } finally {
+          rmSync(directory, { recursive: true, force: true })
+        }
+      }
+    }
+  }
+})
 
 test.todo('WHAT[managed-session-lifecycle-018] plugin shutdown waits for already admitted provider transforms and terminal callbacks without logical cancellation (GAP-133)')
 

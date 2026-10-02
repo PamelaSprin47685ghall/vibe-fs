@@ -8,6 +8,7 @@ open System.Threading.Tasks
 module ForkToolSurface =
 
     val createRuntime: directory: string -> owners: obj -> Task<obj>
+    val createRuntimeWithAbort: directory: string -> owners: obj -> abortSession: (string -> Task<obj>) -> Task<obj>
 
     val executeManagerFork:
         value: obj ->

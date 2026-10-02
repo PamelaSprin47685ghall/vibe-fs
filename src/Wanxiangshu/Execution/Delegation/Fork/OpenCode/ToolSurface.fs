@@ -29,7 +29,7 @@ open Wanxiangshu.Foundation.Identity
 /// supplies a physical Host boundary for executable requirement proofs.
 module ForkToolSurface =
 
-    type private ForkSessionPort() =
+    type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>) =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
@@ -259,9 +259,9 @@ module ForkToolSurface =
                     acceptancesOf key |> fun values -> values.Add acceptance
                     acceptance.Task
 
-            member _.AbortSession _ =
+            member _.AbortSession sessionId =
                 abortCount <- abortCount + 1
-                Task.FromResult(Ok())
+                abortSession sessionId
 
             member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.IsManagedChild _ = true
@@ -416,7 +416,7 @@ module ForkToolSurface =
                         )
         }
 
-    let createRuntime (directory: string) (owners: obj) : Task<obj> =
+    let private createRuntimeUsingAbort directory owners abortSession : Task<obj> =
         emitJsExpr () "process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'" |> ignore
 
         task {
@@ -439,7 +439,7 @@ module ForkToolSurface =
             for (sessionId, _, _, agent) in admissions do
                 ownerAgents.Add(SessionId.value sessionId, agent)
 
-            let sessionPort = ForkSessionPort()
+            let sessionPort = ForkSessionPort(abortSession)
             let sessions = sessionPort :> ISessionHostPort
 
             let childWorkRecordForRun sessionId range providerRun =
@@ -480,6 +480,23 @@ module ForkToolSurface =
 
             return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
         }
+
+    let createRuntime (directory: string) (owners: obj) : Task<obj> =
+        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok()))
+
+    let createRuntimeWithAbort (directory: string) (owners: obj) (abortSession: string -> Task<obj>) : Task<obj> =
+        let abort sessionId =
+            task {
+                let! result = abortSession (SessionId.value sessionId)
+
+                return
+                    if unbox<bool> result?ok then
+                        Ok()
+                    else
+                        Error(string result?error)
+            }
+
+        createRuntimeUsingAbort directory owners abort
 
     let private managerContext (harness: ForkHarness) owner =
         { SessionId = SessionId.value (harness.OwnerSession owner)
