@@ -75,7 +75,7 @@
 |---|---|---|---|
 | GAP-052 | requirement-system-001/002/005/007/008/010 | PARTIAL | 格式检查不能判定语义重复、隐性规则、组织权或历史编号复用；001、004—008、011、017、018 保留可识别形式的正反例，其余人工审阅。 |
 | GAP-053 | feature-ablation-002 | PARTIAL | registry、执行/schema/事实/角色 gate 的行为有反例；尚未证明每个业务包关闭后全链零副作用及借用面完整。新 registry 接口不改变此证明限制。 |
-| GAP-054 | verification-system-004/005/006/007/010/012/018/019 | PARTIAL | 保留真实监督与门禁反例；尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
+| GAP-054 | verification-system-004/005/006/007/010/012/018/019 | PARTIAL | 保留真实监督与门禁反例；2026-10-03补正式同步工作/微任务反例并修复Node原生reporter输送饥饿：已完成叶afterEach单次让步，不自造进展、不改5000ms，挂起噪声及after异常仍失败，Node22/26先红后绿。尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
 | GAP-055 | verification-system-006/016 | PARTIAL | 已补真实corpus输入闭包：tracked proposals内容与Git跟踪集合身份参与验证digest，Git inventory失败阻止任何阶段启动；6项反例先红后绿。运行器仍只检查步骤边界，阶段中途修改再恢复仍可能通过。固定快照还缺准备一致性、真正不可写输入、外部依赖隔离、各阶段同源及结论绑定，两个TODO保留；copy、chmod或fs.watch均不当作完整隔离证明。 |
 | GAP-056 | verification-system-008/020 | PARTIAL | 用户已确认断言完整性按规范要求的结果和副作用判断；精确结构/文本仍完整比较。生成器设施的重放成功不等于全仓 oracle 独立、充分，继续人工审阅。 |
 | GAP-057 | verification-system-021 | PARTIAL | 计数、容器失败、结果流与文件完成已有回归；其它入口对未完成原因和范围的传播仍待证，TODO 应阻断完整验收。 |
@@ -235,3 +235,4 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 插件已不改写todowrite的provider定义与参数，todos原样交给Host；checkpoint由exact message.part.updated的completed终态确认。仍缺安装版OpenCode对当前session TodoTable的真实替换/清空物理canary。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
+| GAP-223 | Host自动Manager接续与新用户消息交错；host-boundary-033、execution-model-routing-006、managed-chat-execution | OPEN | 2026-10-03真实OpenCode1.18.29 canary诊断：Guard与下一用户消息的chat.message交错后，旧Guard provider观察缺exact committed lease，发生自动retry；另一次新用户/message返回HTTP500。尚未确定Host兼容、发送准入、superseded settlement与失败分类各自责任，不把只读查询重建旧lease当修复。需受控证明旧G接受→新H接受→旧G迟到provider观察时H租约/执行保全、旧G按正式终态政策结算且不会以重试污染H。032参数canary隔离三种物理目标不能关闭本项；原取消超时亦不能直接等同此缺陷。 |

@@ -1,0 +1,29 @@
+export function isCanaryTurnSettled({ sessionID, messageID, status, messages }) {
+  if (status !== undefined && status?.type !== 'idle') return false;
+  return messages.some(({ info }) => info?.sessionID === sessionID && info?.role === 'assistant'
+    && info?.parentID === messageID && info?.finish === 'stop'
+    && typeof info?.time?.completed === 'number' && info?.error === undefined);
+}
+
+export function managerReviewStage(body) {
+  const prompts = new Map([
+    ['READ_SAMPLE', [1, 2, 'call_read_norm_1']],
+    ['TRIGGER_ERROR', [4, 5, 'call_read_err_1']],
+    ['TRIGGER_CANCEL', [6, 6, null]],
+    ['VERIFY_CANCEL_HISTORY', [7, 7, null]],
+  ]);
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== 'user') continue;
+    if (typeof message.content !== 'string') return null;
+    const prompt = message.content.split('\u0000')[0];
+    const stages = prompts.get(prompt);
+    if (!stages) return null;
+    const [beforeCall, afterCall, callID] = stages;
+    const executed = callID !== null && messages.slice(index + 1).some((row) =>
+      (row.tool_calls ?? []).some((call) => call.id === callID));
+    return executed ? afterCall : beforeCall;
+  }
+  return null;
+}

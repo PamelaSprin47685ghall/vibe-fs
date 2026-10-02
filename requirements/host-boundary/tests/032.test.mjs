@@ -9,6 +9,54 @@ import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSu
 import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/process-host-utils.js'
+import { isCanaryTurnSettled, managerReviewStage } from './support/manager-review-canary-turn.mjs'
+
+test('WHAT[host-boundary-032] canary does not advance on a delayed idle from a previous physical turn', () => {
+  const state = {
+    sessionID: 'ses-canary', messageID: 'msg-current',
+    status: { type: 'busy' },
+    messages: [{ info: { sessionID: 'ses-canary', role: 'assistant', parentID: 'msg-previous',
+      finish: 'stop', time: { completed: 1 } } }],
+  }
+  assert.equal(isCanaryTurnSettled(state), false)
+  assert.equal(isCanaryTurnSettled({ ...state, status: undefined }), false)
+  const current = { info: { sessionID: 'ses-canary', role: 'assistant', parentID: 'msg-current',
+    finish: 'stop', time: { completed: 2 } } }
+  assert.equal(isCanaryTurnSettled({ ...state, messages: [current] }), false)
+  assert.equal(isCanaryTurnSettled({ ...state, messages: [current], status: { type: 'retry' } }), false)
+  assert.equal(isCanaryTurnSettled({ ...state, messages: [current], status: { type: 'idle' } }), true)
+  assert.equal(isCanaryTurnSettled({ ...state, messages: [current], status: undefined }), true)
+  for (const info of [
+    { ...current.info, sessionID: 'ses-foreign' },
+    { ...current.info, finish: 'tool-calls' },
+    { ...current.info, time: { created: 1 } },
+    { ...current.info, error: { name: 'MessageAbortedError' } },
+  ]) {
+    assert.equal(isCanaryTurnSettled({ ...state, messages: [{ info }], status: { type: 'idle' } }), false)
+  }
+})
+
+test('WHAT[host-boundary-032] canary provider routes repeated requests by physical prompt and call history', () => {
+  const body = { messages: [{ role: 'user', content: 'READ_SAMPLE' }] }
+  assert.equal(managerReviewStage(body), 1)
+  assert.equal(managerReviewStage(body), 1)
+  body.messages.push({ role: 'assistant', tool_calls: [{ id: 'call_read_norm_1' }] })
+  assert.equal(managerReviewStage(body), 2)
+  body.messages.push({ role: 'user', content: 'TRIGGER_ERROR' })
+  assert.equal(managerReviewStage(body), 4)
+  body.messages.push({ role: 'assistant', tool_calls: [{ id: 'call_read_err_1' }] })
+  assert.equal(managerReviewStage(body), 5)
+  body.messages.push({ role: 'user', content: '# A network failure just interrupted you. Continue the work.' })
+  assert.equal(managerReviewStage(body), null)
+  body.messages.push({ role: 'user', content: [{ type: 'text', text: 'READ_SAMPLE' }] })
+  assert.equal(managerReviewStage(body), null)
+  body.messages.push({ role: 'user', content: 'TRIGGER_CANCEL\u0000<system>wait-cost calibration</system>' })
+  assert.equal(managerReviewStage(body), 6)
+  body.messages.push({ role: 'assistant', tool_calls: [{ id: 'call_js_cancel_1' }] })
+  body.messages.push({ role: 'user', content: 'VERIFY_CANCEL_HISTORY' })
+  assert.equal(managerReviewStage(body), 7)
+  assert.equal(managerReviewStage({ messages: [{ role: 'user', content: 'unrelated Manager work' }] }), null)
+})
 
 const REVIEW_TOOLS = ['js-manager']
 

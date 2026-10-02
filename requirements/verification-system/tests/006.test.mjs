@@ -253,6 +253,55 @@ await superviseNodeTest({ files: process.argv.slice(2), label: 'file-wait-fixtur
   }
 })
 
+async function superviseSynchronousVerdicts(probe) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'synchronous-verdicts-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: process.argv.slice(2), label: 'synchronous-verdicts', silenceMs: 1000 })
+`)
+    const fixture = fileURLToPath(new URL('./support/fixtures/synchronous-verdicts.fixture.mjs', import.meta.url))
+    const env = { ...process.env, VERDICT_TRANSPORT_PROBE: probe, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, fixture], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', (chunk) => { output += chunk })
+    child.stderr.on('data', (chunk) => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    return { code, output }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+test('WHAT[verification-system-006] synchronous work and microtasks deliver completed verdicts before the file ends', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('healthy')
+  assert.equal(code, 0, output)
+  assert.match(output, /8 passed, 0 failed; 1\/1 planned file\(s\) completed/)
+  assert.doesNotMatch(output, /WATCHDOG/)
+})
+
+test('WHAT[verification-system-006] transport scheduling cannot renew unfinished work or background noise', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('hang')
+  assert.equal(code, 1, output)
+  assert.match(output, /WATCHDOG.*silent for/)
+  assert.match(output, /last progress: test:(?:pass|complete):synchronous work 7/)
+  assert.match(output, /background progress.*none of them renewals/)
+  assert.match(output, /verdict counts unavailable; no authoritative summary/)
+})
+
+test('WHAT[verification-system-006] transport scheduling preserves after-hook failure verdicts', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('after-failure')
+  assert.equal(code, 1, output)
+  assert.match(output, /7 passed, 1 failed; 1\/1 planned file\(s\) completed/)
+  assert.match(output, /after hook failure remains visible/)
+  assert.doesNotMatch(output, /WATCHDOG/)
+})
+
 test('WHAT[verification-system-006] repeat observations of one causal state do not renew twice', async () => {
   const h = createWatchdogHarness()
   const scenario = { watchdog: h.watchdog }

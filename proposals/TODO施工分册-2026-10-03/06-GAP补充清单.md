@@ -2,6 +2,8 @@
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)。来源为基线 `8cf51cc84` 的 [GAP 台账](../../requirements/GAP.md)，本次没有修改其状态。逐行核对得到 **137 项未闭合记录：10 OPEN、127 PARTIAL**。它们与 424 个 TODO 是多对多关系，不能相加作为任务数。
 
+2026-10-03实施增量：新增 GAP-223（真实 Host 自动接续与新用户消息交错），当前合计 **138 项：11 OPEN、127 PARTIAL**；原137项保留作为计划创建时的截面。006判决输送修复只补齐GAP-054的一项物理证明，不关闭全阶段审阅债。
+
 下表保留台账原意并给出责任入口；表中的历史“本轮”“待新构建”等属于登记时语境，不是本次运行结果。实施时先核对最新 WHAT 和主计划当前基线，已补的局部证明不重做，剩余证明逐条结算。同一 GAP 跨包时由一个主 owner 牵头，相关包共同验收。
 
 ## 无占位也要开工的工作卡
@@ -173,9 +175,10 @@
 | GAP-219 · OPEN | sphinx-v2真实入口 | [sphinx-v2](04-认知与Sphinx.md)：001/004/010/011/012/013/017/021/022/026/034/036 | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。026部分证明：经注册Core Surface（guaranteeKind类别区分），posterior-credible独立类别，非法mass验证拒绝，bound独立验证；runtime跨算子传播仍被实现阻断。 |
 | GAP-220 · PARTIAL | obligation-ledger-001/002/006 | [obligation-ledger](02-权限与生命周期.md)：002/003/004/006/007 | 插件已不改写todowrite的provider定义与参数，todos原样交给Host；checkpoint由exact message.part.updated的completed终态确认。仍缺安装版OpenCode对当前session TodoTable的真实替换/清空物理canary。 |
 | GAP-222 · OPEN | sphinx-v2替代合同 | [sphinx-v2](04-认知与Sphinx.md)：001/004/010/011/012/013/017/021/022/026/034/036 | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
+| GAP-223 · OPEN | Host自动Manager接续与新用户消息交错 | W3；host-boundary-033、execution-model-routing-006、managed-chat-execution、provider失败所有者 | 真实1.18.29观察到旧Guard缺exact lease后自动retry，以及新用户/message HTTP500。先取得受控G接受→H接受→G迟到provider观察红例，证明H租约/执行保全、G的supersession正式结算、不生成污染H的错误重试。另覆盖H已入场而旧idle Guard尚未发送的调度。只读hook不得重建G租约；032 canary分离物理目标与按prompt/history路由仅修夹具，不关闭本项。 |
 
 ## 已退出与已关闭项的边界
 
 GAP-170—175 和 GAP-196/191 等 RETIRED 项保持历史语义，不重新施工旧内核、旧 ProjectionCut 或旧 todo 账本。GAP-216（构建）、214（Git cleanliness）、146（guard owned interrupt）、081（TOML 原值）及 161（Casebook 同次捕获差分）已关闭；保留回归，不把它们当新未实现前提。GAP-221 的持久 canvas 等旧路径不得回生。其它历史 CLOSED 记录若有后来 PARTIAL/OPEN 的具体范围，以最新证据和现行条款对照，不从 CLOSED 标签推导整个包完整。
 
-最终归档要求：每个上表条目有“对应现行条款、负责 owner、正式证据/人工审阅、剩余边界、结果提交”五项。仅消除 424 个 TODO 而没有处理这 137 条记录，不能宣告本计划全部完成。
+最终归档要求：每个上表条目有“对应现行条款、负责 owner、正式证据/人工审阅、剩余边界、结果提交”五项。仅消除 424 个 TODO 而没有处理基线137条及后续增量记录，不能宣告本计划全部完成。

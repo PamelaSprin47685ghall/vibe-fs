@@ -128,11 +128,16 @@ export async function runTestFiles({
     'test:start', 'test:pass', 'test:fail', 'test:complete',
     'test:diagnostic', 'test:stderr', 'test:stdout',
   ]
+  const transportUrl = new URL('./verdict-transport.mjs', import.meta.url).href
+  const hasTransport = process.execArgv.some((argument, index) =>
+    argument === `--import=${transportUrl}` ||
+    (argument === '--import' && process.execArgv[index + 1] === transportUrl))
+  const execArgv = hasTransport ? process.execArgv : [...process.execArgv, `--import=${transportUrl}`]
   const runFile = async (file) => {
     const controller = new AbortController()
     active.add(controller)
     try {
-      const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal })
+      const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal, execArgv })
       send({ type: 'runner:file-start', data: { entryFile: resolve(file) } })
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
