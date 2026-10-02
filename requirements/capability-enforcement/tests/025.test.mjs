@@ -465,6 +465,6 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
   })
 })
 
-test.todo('WHAT[capability-enforcement-025] denial performs zero physical reads and write attempts through the production invocation (GAP-075: the current rejecting scenario only calls before; the body counter and published journal revision do not observe physical I/O attempts)')
+test.todo('WHAT[capability-enforcement-025] denial performs zero physical reads and write attempts through the production invocation (GAP-075: investigation 2026-10-03 — the production chain ToolRegistry → JsToolSpec → ToolWorkflow keeps read snapshots internal; the only wired observation port is RequirementGrounding.programObservation, which fires solely for paths that have grounding materials in the workspace, so a generic physical-read observer does not exist. Needed: a read-path observation port on JsToolSpec/ToolWorkflow (or an equivalent production entry) that the test fixture can subscribe to; the execute counter and journal revision in the passing test above remain the closest available proxies)')
 
 test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')

@@ -391,6 +391,7 @@ module PluginHooks =
             /// real second attempt instead of a silently dropped checkpoint.
             let settleTodoTerminal (sessionText, callId, status) =
                 let key = todoCheckpointKey sessionText callId
+
                 if not (settledTodoCheckpointCalls.Add(key)) then
                     Task.FromResult(())
                 elif status = "completed" then
