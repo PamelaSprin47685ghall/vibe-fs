@@ -2,7 +2,7 @@
 
 ## [001] 八维评级
 
-`review` 必填 `language_algorithms`、`simplicity`、`structure`、`granularity`、`tests_evidence`、`logic_reliability_boundaries`、`caller_ergonomics`、`completeness`，值仅为 `PERFECT | REVISE | N/A`。不得缺项、增加未知字段、使用数值或总评分。可选 `note` 仅为不返回、不参与裁决的字符串。
+`review` 必填 `language_algorithms`、`simplicity`、`structure`、`granularity`、`tests_evidence`、`logic_reliability_boundaries`、`caller_ergonomics`、`completeness`，值仅为 `PERFECT | REVISE | N/A`。不得缺项、增加未知字段、使用数值或总评分。可选字符串 `note` 只作文本说明，不返回或参与其他行为。
 
 ## [002] 同任一次评估
 
@@ -38,4 +38,4 @@ Manager 可亲自使用评审专用只读工具，也可委派只读 Engineer �
 
 ## [010] 改动使旧证据过期
 
-DevOps 验证可包含其角色授权内的非架构源码修复，不得假定其只读。快照一旦改变，旧测试结果、评估和证书即不能证明新快照；须由下一独立任期在最新快照重新评估。
+DevOps 验证可包含其角色授权内的非架构源码修复，不得假定其只读。快照一旦改变，旧测试结果、评估和证书立即失效，不得作为新改动的验证；须由下一独立任期在最新快照重新评估。

@@ -13,12 +13,14 @@ test('WHAT[delegation-007] new sync invocations reject historical Coder and Insp
     for (const role of ['Coder', 'Inspector']) {
       const result = await sync.invoke(runtime, owner, role, 'new research')
       assert.equal(result.ok, false)
+      assert.equal(sync.childCount(runtime), 0)
+      assert.equal(sync.promptCount(runtime, owner, role), 0)
       assert.match(result.error, /retired sync delegate role/)
       const batch = await sync.invokeBatch(runtime, owner, role, 'new batch research', 'retired-run', 'call-one', ['call-one'])
       assert.equal(batch.kind, 'Error')
-      assert.match(batch.error, /retired sync delegate role/)
       assert.equal(sync.childCount(runtime), 0)
       assert.equal(sync.promptCount(runtime, owner, role), 0)
+      assert.match(batch.error, /retired sync delegate role/)
     }
     const work = sync.invoke(runtime, owner, 'Engineer', 'current research')
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)

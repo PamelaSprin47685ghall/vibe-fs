@@ -18,7 +18,7 @@ Dedicated 会话在同一作用域跨调用复用，调用完成不销毁。OneS
 
 ## [005] ReuseScope 绑定
 
-Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`，每个键至多一个活动会话。兼容续问在同 scope 复用，不同 scope 隔离。
+Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`。同一 scope 内每个 Role 至多一个活动会话，兼容续问按此键复用，不同 scope 隔离。
 
 ## [006] Handle 四态
 

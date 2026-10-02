@@ -111,9 +111,19 @@ test('WHAT[verification-system-006] missing and corrupt wait snapshots disclose 
   }
 })
 
+async function assertSingleTermination(h, timeoutMs) {
+  assert.equal(h.terminateCount, 1)
+  h.watchdog.advance({ reason: 'late verdict', lane: 'worker', blocking: true })
+  await h.advance(Math.max(DIAGNOSTIC_RACE_MS, timeoutMs))
+  assert.equal(h.terminateCount, 1, 'late progress must not restart a terminated watchdog')
+  h.watchdog.setWindow(timeoutMs)
+  await h.advance(timeoutMs)
+  assert.equal(h.terminateCount, 1, 'window changes must not restart a terminated watchdog')
+}
+
 test('WHAT[verification-system-006] the initial silence window covers execution before its first progress', async () => {
-  const h = createWatchdogHarness()
-  await h.advance(499)
+  const h = createWatchdogHarness({ timeoutMs: WATCHDOG_TIMEOUT_MS })
+  await h.advance(WATCHDOG_TIMEOUT_MS - 1)
   assert.equal(h.terminated, false)
   assert.deepEqual(h.diagnostics, [])
   await h.advance(1)
@@ -122,6 +132,7 @@ test('WHAT[verification-system-006] the initial silence window covers execution 
   assert.match(h.diagnostics.join('\n'), /last progress/)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable/i)
   assert.equal(h.trace.at(-1), 'terminate')
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] continuing progress outlives a window and silence is measured from its last advance', async () => {
@@ -221,36 +232,61 @@ test('WHAT[verification-system-006] restoring the default window retains the ori
 })
 
 test('WHAT[verification-system-006] failed diagnostic collection discloses its cause before exit', async () => {
-  const h = createWatchdogHarness({ onTimeout: async () => { throw new Error('host unavailable') } })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { throw new Error('host unavailable') },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.equal(h.terminateCount, 1)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable.*host unavailable/i)
   assert.equal(h.trace.at(-1), 'terminate')
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] hung diagnostic collection discloses missing information and cannot prevent exit', async () => {
-  const h = createWatchdogHarness({ onTimeout: () => new Promise(() => {}) })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: () => new Promise(() => {}),
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.equal(h.terminated, false)
   await h.advance(DIAGNOSTIC_RACE_MS - 1)
   assert.equal(h.terminated, false)
   await h.advance(1)
   assert.equal(h.terminateCount, 1)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable.*deadline/i)
-  await h.advance(DIAGNOSTIC_RACE_MS)
-  assert.equal(h.terminateCount, 1)
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] successful diagnostic collection completes before a single exit', async () => {
   const calls = []
-  const h = createWatchdogHarness({ onTimeout: async () => { calls.push('waits collected') } })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { calls.push('waits collected') },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.deepEqual(calls, ['waits collected'])
   assert.equal(h.terminateCount, 1)
   assert.equal(h.trace.at(-1), 'terminate')
   assert.doesNotMatch(h.diagnostics.join('\n'), /unavailable/)
-  await h.advance(DIAGNOSTIC_RACE_MS)
-  assert.equal(h.terminateCount, 1)
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
+})
+
+test('WHAT[verification-system-006] a diagnostic output failure still terminates once and cannot restart monitoring', async () => {
+  let collectionCount = 0
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { collectionCount++ },
+    deps: { diagnostic: { write() { throw new Error('diagnostic sink unavailable') } } },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS - 1)
+  assert.equal(h.terminateCount, 0)
+  await h.advance(1)
+  assert.equal(collectionCount, 0, 'diagnostic output failed before collection could start')
+  assert.equal(h.diagnostics.length, 1)
+  assert.match(h.diagnostics[0], /WATCHDOG: 'test-target'/)
+  assert.deepEqual(h.trace, ['diagnostic', 'terminate'])
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] consumed expectation observations preserve the matched physical attempt', () => {

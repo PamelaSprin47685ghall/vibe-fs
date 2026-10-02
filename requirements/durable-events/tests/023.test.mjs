@@ -72,7 +72,6 @@ test('WHAT[durable-events-023] canonical codec surface keeps encode decode UTF-8
   assert.deepEqual(eventCodec.decodeUtf8Text(invalidUtf8), invalidUtf8Error)
   assert.deepEqual(eventCodec.decodeUtf8(invalidUtf8), invalidUtf8Error)
 })
-test.todo('WHAT[durable-events-023] real isolated compilation rejects physical-store authority in codec and aggregate authority in domain folds')
 test('WHAT[durable-events-023] single-field family folds own their slice and declare no aggregate dependency', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
@@ -222,4 +221,101 @@ test('WHAT[durable-events-023] EXEC_unknown_append_poisons_and_is_never_confirme
       assert.ok(result.afterOutcome.startsWith('Poisoned:'), `a poisoned writer must refuse later appends, got ${result.afterOutcome}`)
     }),
   ))
+test('WHAT[durable-events-023] isolated compilation rejects physical-store authority in the codec closure', async () => {
+  const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { compileOwnerProject, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const ROOT = resolveRoot(import.meta.dirname, '../../..')
+  const SOURCE_ROOT = joinPath(ROOT, 'src/Wanxiangshu')
+  const CODEC_SHARD = joinPath(SOURCE_ROOT, 'Wanxiangshu.Owner.durable-events.persistence-eventstore-canonicalcodec.fsproj')
+  const STORE_SHARD = joinPath(SOURCE_ROOT, 'Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj')
+
+  // The probe references the real physical-store factory
+  // (Wanxiangshu.Persistence.EventStore.EventStore.createLocal, a
+  // RequireQualifiedAccess module member). The same probe source is used in
+  // both closures so the only variable is which dependencies are in scope.
+  const PROBE_SOURCE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Persistence.EventStore',
+    '',
+    'module ProbeStoreUsage =',
+    '    let factory = EventStore.createLocal',
+    '',
+  ].join('\n')
+
+  // Source isolation: every compile input resolves to a copy under a temp
+  // root, so the real workspace is never written and a crash mid-test cannot
+  // leave the tree mutated. compileOwnerProject's scratchRoot only isolates
+  // outputs; the compile items themselves are remapped here.
+  const isolate = (plan) => {
+    const iso = mkdtempSync(joinPath(tmpdir(), 'wxs-023-iso-'))
+    const items = plan.compileItems.map((item) => {
+      const dest = joinPath(iso, 'src', relativeOf(SOURCE_ROOT, item))
+      mkdirSync(dirnameOf(dest), { recursive: true })
+      cpSync(item, dest)
+      return dest
+    })
+    const probe = joinPath(iso, 'probe-store-usage.fs')
+    writeFileSync(probe, PROBE_SOURCE)
+    return { plan: { ...plan, compileItems: [...items, probe] }, iso }
+  }
+
+  // Isolation evidence: the real codec source keeps its bytes and mtime, and
+  // the generated project references only isolated copies.
+  const realCodec = joinPath(SOURCE_ROOT, 'Persistence/EventStore/CanonicalEventCodec.fs')
+  const before = { hash: createHash('sha256').update(readFileSync(realCodec)).digest('hex'), mtime: statSync(realCodec).mtimeMs }
+
+  const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-023-compile-'))
+  const positiveIso = isolate(planOwnerCompile({ projectPath: STORE_SHARD }))
+  const negativeIso = isolate(planOwnerCompile({ projectPath: CODEC_SHARD }))
+  try {
+    // Positive: the store closure legitimately contains Store.fs, so the
+    // probe compiles — the symbol and its qualified usage are valid.
+    const positive = await compileOwnerProject({
+      projectPath: STORE_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: positiveIso.plan,
+    })
+    assert.equal(positive.ok, true, 'probe compiles in the store closure (symbol and usage are valid): ' + String(positive.stdout ?? '').slice(-200))
+
+    // Negative: the codec closure has no Store.fs, so the same probe fails.
+    // The diagnostic must name the target symbol, not just any error.
+    const negative = await compileOwnerProject({
+      projectPath: CODEC_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: negativeIso.plan,
+    })
+    assert.equal(negative.ok, false, 'the same probe must fail in the codec closure')
+    assert.match(
+      String(negative.stdout ?? '') + String(negative.stderr ?? ''),
+      /'EventStore' is not defined/,
+      'the diagnostic names the physical-store module',
+    )
+
+    // Isolation evidence: the real source was never touched.
+    const after = { hash: createHash('sha256').update(readFileSync(realCodec)).digest('hex'), mtime: statSync(realCodec).mtimeMs }
+    assert.deepEqual(after, before, 'the real codec source is untouched (bytes and mtime)')
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+    rmSync(positiveIso.iso, { recursive: true, force: true })
+    rmSync(negativeIso.iso, { recursive: true, force: true })
+  }
+
+  // Static boundary supplement (read-only): the codec shard declares no
+  // reference to the physical store family.
+  const { readCompileShardInventory } = await import('../../../scripts/lib/compile-shards.mjs')
+  const inventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const codec = [...inventory.projects.values()].find((p) => p.explicitCompileShard === 'eventstore-canonical-codec')
+  assert.ok(codec, 'codec shard resolves in the inventory')
+  const forbidden = codec.references.filter((reference) =>
+    /eventstore-(store|merge-runtime|integrator-engine|process-log|git|writer|handle)\b/i.test(reference))
+  assert.deepEqual(forbidden, [], 'codec shard declares no physical-store reference')
+})
+
+test.todo('WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds (GAP-149: domain-fold compile proof pending — the codec closure proof above does not cover domain folds)')
 }

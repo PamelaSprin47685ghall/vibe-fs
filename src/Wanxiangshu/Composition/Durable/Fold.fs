@@ -46,6 +46,23 @@ module Fold =
             let sessionId = SessionId.create (RoadId.value payload.RoadId)
             let events = RelayTransaction.events payload.Transaction
 
+            let completesRoad =
+                events
+                |> List.exists (function
+                    | RelayEvent.RetirementCommitted retirement ->
+                        match retirement.Outcome with
+                        | RetirementOutcome.Accepted _ -> true
+                        | RetirementOutcome.Continue -> false
+                    | _ -> false)
+
+            // ATTENTION-004: a completed life takes its un-resurfaced deferred
+            // work with it, so a reused SessionId cannot inherit it.
+            let attentionAfterClosure =
+                if completesRoad then
+                    Wanxiangshu.Interaction.Attention.AttentionProjection.closeLife sessionId projection.Attention
+                else
+                    projection.Attention
+
             AgentProjection.tryUpdate
                 sessionId
                 (fun session ->
@@ -60,6 +77,9 @@ module Fold =
                             Relay = Some updated
                             PromptAuthority = updatedPromptAuthority }))
                 projection
+            |> Result.map (fun updated ->
+                { updated with
+                    Attention = attentionAfterClosure })
             |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =

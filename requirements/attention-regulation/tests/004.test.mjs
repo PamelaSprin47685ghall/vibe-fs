@@ -54,4 +54,39 @@ test('WHAT[attention-regulation-004] real plugin restart preserves each particip
   })
 })
 
-test.todo('WHAT[attention-regulation-004] GAP-118 exact life closure then SessionId reuse never inherits old pending work')
+test('WHAT[attention-regulation-004] exact life closure then SessionId reuse never inherits old pending work', async () => {
+  const { appendManagerLifecycle } = await import('../../../dist/Persistence/Journal/ObligationJournalSurface.js')
+  await withRestartablePlugin(async (start, _directory, fixture) => {
+    const boot = async () => {
+      const hooks = await start()
+      await configureManagedPlugin(hooks)
+      return hooks
+    }
+    const ctx = (sessionID, callID) => ({ sessionID, agent: 'manager', messageID: `run-${sessionID}`, callID })
+    let hooks = await boot()
+    const session = 'attention-life-reuse'
+    await fixture.withRuntime(async (runtime) => {
+      await acceptAuthorityRoot(runtime, session, 'manager', `root-${session}`)
+      await activateLife(runtime, session, `root-${session}`)
+    })
+    await hooks.tool.defer.execute({ new_work: 'OLD LIFE WORK' }, ctx(session, 'defer-1'))
+
+    // Exact life closure: the life completes durably.
+    await fixture.withRuntime(async (runtime) => {
+      const closed = await appendManagerLifecycle(runtime.journal, session, 'LifeCompleted', {
+        sessionId: session, lifeId: `life-${session}`, closingCursorSequence: 1,
+      })
+      assert.equal(closed?.ok, true, JSON.stringify(closed?.error))
+    })
+    await fixture.stop(hooks)
+
+    // SessionId reuse: a fresh boot on the same session must not inherit the
+    // old life's pending work (WHAT 004: 不继承到新 life).
+    hooks = await boot()
+    const first = await hooks.tool.celebrate.execute({ experience: 'Fresh life begins.' }, ctx(session, 'celebrate-fresh'))
+    assert.equal(first.includes('OLD LIFE WORK'), false, 'closed-life pending work must not resurface for a reused SessionId')
+    const next = await hooks.tool.celebrate.execute({ experience: 'Still fresh.' }, ctx(session, 'celebrate-fresh-2'))
+    assert.equal(next.includes('OLD LIFE WORK'), false)
+    await fixture.stop(hooks)
+  })
+})

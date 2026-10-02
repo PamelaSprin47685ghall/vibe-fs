@@ -335,6 +335,45 @@ test('WHAT[interaction-authority-011] CHAT_PARAMS_agentless_root_does_not_invent
   assert.equal(observed.temperature, undefined)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
+
+test('WHAT[interaction-authority-011] accepted root identity and its projection agree field by field', async () => {
+  const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+  const { withJournal, acceptOwner, hostPort } = await import('./support/authority.mjs')
+  await withJournal('ia011-atomic-profile', async (handle) => {
+    const owner = await acceptOwner(handle)
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner)
+    assert.equal(seed.ok, true, seed.error)
+    const sent = await dispatch.sendAgentOwnerRootAwait(
+      hostPort(async () => dispatch.admittedWithReceipt('msg-ia011-physical')),
+      handle, 'child-ia011', 'a bounded assignment', seed.value,
+    )
+    assert.equal(sent.ok, true, sent.error)
+    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'child-ia011', sent.key, 'actual-ia011-physical')
+    assert.equal(accepted.ok, true, accepted.error)
+
+    // The attempt profile is one atomic record: every identity field the
+    // Authority fold exposes comes from the accepted root, never assembled
+    // from session caches or scattered messages (WHAT 011).
+    const profile = accepted.profile
+    for (const field of ['session', 'logicalRun', 'authorityRoot', 'authorityKind']) {
+      assert.ok(profile[field], 'profile.' + field + ' must be present and non-empty')
+    }
+    assert.equal(profile.session, 'child-ia011')
+    assert.equal(profile.authorityRoot, 'actual-ia011-physical')
+    assert.equal(profile.authorityKind, 'AgentOwnerRoot')
+    assert.deepEqual(profile.identitySeed, seed.value)
+    assert.ok(profile.participantIdentity)
+    assert.equal(profile.participantIdentity.participant, 'engineer')
+
+    // The projection serves the same record: no field-level drift between
+    // the acceptance and the durable observation (same-process only).
+    const observed = dispatch.projectionObservation(handle, 'child-ia011').activeLogicalRun
+    assert.deepEqual(observed, profile)
+  })
+})
 }
 
-test.todo('WHAT[interaction-authority-011] GAP-122 actual attempt profile carries exact accepted identity and per-physical target lease atomically across restart')
+
+
+test.todo('WHAT[interaction-authority-011] per-physical target/lease is carried atomically in the attempt profile and survives restart (GAP-122: lease atomicity and restart replay pending — the identity-agreement test above covers the same-process projection only)')

@@ -388,5 +388,76 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     )
   })
 })
+test('WHAT[capability-enforcement-025] denial at the admission gate keeps the tool body, file reads and durable ledger untouched', async () => {
+  const { mkdirSync, writeFileSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { parse: parseToml } = await import('smol-toml')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ses-p15'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await openIncumbency(runtime, sessionID)
+    mkdirSync(join(directory, 'src'), { recursive: true })
+    writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
 
-test.todo('WHAT[capability-enforcement-025] runtime denial performs zero reads and mutations, and an in-flight admitted read finishes across review acceptance; the current sequential case does not prove overlap')
+    const program = "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }"
+    const tool = hooks.tool['js-manager']
+
+    // Positive control (the observation point is valid): before review
+    // acceptance the same program drives the full call chain
+    // (before → execute → after) and the interpreter really reads the file —
+    // the executed result carries the file's bytes.
+    const admittedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
+    await hooks['tool.execute.before'](
+      { tool: 'js-manager', sessionID, callID: 'call-p15-control' },
+      admittedOutput,
+    )
+    const controlResult = await tool.execute(
+      admittedOutput.args,
+      { sessionID, agent: 'manager', callID: 'call-p15-control', messageID: 'msg-p15-control' },
+    )
+    assert.deepEqual(
+      parseToml(String(controlResult)).data,
+      { text: 'review evidence' },
+      'positive control: the admitted call really reads the file through the full chain',
+    )
+    await hooks['tool.execute.after'](
+      { tool: 'js-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
+      { title: 'js-manager', output: controlResult, metadata: {} },
+    )
+
+    // Now the review is accepted: the same call must be denied at the
+    // admission gate, before the interpreter is ever reached.
+    await injectAcceptedAssessment(runtime, sessionID)
+    const deniedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
+    const argsSnapshot = JSON.stringify(deniedOutput.args)
+    const ledgerBefore = journal.JournalSurface_snapshot(runtime.journal)
+
+    let executions = 0
+    const originalExecute = tool.execute.bind(tool)
+    tool.execute = (...callArgs) => {
+      executions += 1
+      return originalExecute(...callArgs)
+    }
+
+    await assert.rejects(
+      async () => {
+        await hooks['tool.execute.before'](
+          { tool: 'js-manager', sessionID, callID: 'call-p15-denied' },
+          deniedOutput,
+        )
+      },
+      /not permitted under current manager capability facts/i,
+    )
+
+    assert.equal(executions, 0, 'denial never reaches the tool interpreter')
+    assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial does not mutate the caller arguments')
+    // The file the program would have read keeps its exact bytes.
+    assert.equal(readFileSync(join(directory, 'src/App.fs'), 'utf8'), 'review evidence')
+    // The durable ledger is unchanged: the denial appended no fact.
+    const ledgerAfter = journal.JournalSurface_snapshot(runtime.journal)
+    assert.deepEqual(ledgerAfter, ledgerBefore)
+  })
+})
+
+test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')
