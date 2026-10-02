@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条守住Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004部分证明：经注册FoldSurface fold非空前态（linked companion+captured opening）后checkpoint，受保护状态逐值保留（受控违约清空变异即红）；同call重放幂等；跨session隔离；退役API拒绝。FoldSurface视图未暴露的切片（handles/enforcement/relay等）保留未证TODO。实际安装版Host TodoTable物理替换仍见GAP-220。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条规定Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004部分证明：注册FoldSurface以linked companion、captured opening及非空trace parts建立前态，checkpoint后逐值保留；同call重放幂等并保留上述状态；先建立本session窗口再追加另一session checkpoint，两窗口及既有companion/trace均保留；退役API拒绝。隔离副本中清空sessions、清空parts、覆盖其他session窗口均触发失败，恢复实现后通过。blog、prefix epoch、terminal evidence的非空状态及Surface未暴露的handles/enforcement/relay等仍待证。实际安装版Host TodoTable物理替换仍见GAP-220。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
