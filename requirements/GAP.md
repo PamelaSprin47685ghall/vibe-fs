@@ -115,7 +115,7 @@
 | GAP-106 | prefix-stability | PARTIAL | 保留真实 candidate 历史拒绝/tail 正例、stable identity 与局部渲染；重建 provider wire、旧字符串或成员缺失不证明真实 seal/重启/冷边界全链。 |
 | GAP-107 | prefix-stability-002/008/013 | PARTIAL | 身份变化不自动产生第四种合法 epoch 来源；low-trust 要在完整请求呈现中成立。保留 NUL+BOM、首轮例外和 occurrence 必要一致性，不用关键词制造隔离证明。 |
 | GAP-108 | prefix-stability-014 | PARTIAL | 将实际 guidance 注入输出送到 capture，重开后仍含后缀的反例保留；尚未贯通 Host 原始输入回流，不能扩大为所有正常请求污染，也不能按文本关键字删除业务正文。 |
-| GAP-109 | work-record-005/008/009/013/015/017 | PARTIAL | 真 Opening 与原始完整区间仍缺完整生命周期证据；context-compression-017/028/029 现以成功 native todowrite checkpoint、逐次 retainCheckpoints、coverage 与完整 semantic turn 裁剪，同时永久保留所有真实用户消息。旧 BlindPlan/T1/Assume 阶段都不再是 cutoff 来源；Opening/P0/跨界 frame 的材料与截断权仍需联审。 |
+| GAP-109 | work-record-005/008/009/013/015/017 | PARTIAL | 真 Opening 与原始完整区间仍缺完整生命周期证据；context-compression-017/028/029 现以成功 native todowrite checkpoint、固定 K=3 窗口、coverage 与完整 semantic turn 裁剪，同时永久保留所有真实用户消息。旧 BlindPlan/T1/Assume 阶段都不再是 cutoff 来源；Opening/P0/跨界 frame 的材料与截断权仍需联审。 |
 | GAP-110 | work-record-002/008 | PARTIAL | 已迁入真实 payload 损坏拒绝与原要求编号保真回归；缺失 frame 不应静默省略，Opening 不应额外编号。待新构建验证；完整原始 Opening 来源另见109。 |
 | GAP-111 | work-record-004/007 | PARTIAL | 相交 frame 可把旧 invocation 摘要带入新 bounded record，失败 TODO 保留。不能简单丢 frame 后继续沿用 coverage；新 context-compression-029 也要求可验证完整子集，否则不前移，需统一重物化或拒绝边界。 |
 | GAP-112 | behavior-diagnosis | PARTIAL | 保留真实 loader、codec、journal/coordinator；规则同义、BIRTH/revision、fresh life、原子多投影、fatal结算仍缺独立全链证据。固定数量/词形与自建分类器已撤下。 |
@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条只守住 Host-native todowrite 边界：provider 名单 `obligations` 换回 `todos`、数组原样交给宿主，插件只处理换名与 retainCheckpoints；实际安装版 Host TodoTable 物理替换仍见 GAP-220。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条只守住 Host-native todowrite 边界：provider 定义与参数保持宿主原样、`todos` 数组原样交给宿主，插件只在 Host 终态后追加压缩 checkpoint；实际安装版 Host TodoTable 物理替换仍见 GAP-220。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
@@ -232,6 +232,6 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-217 | host-boundary-032 | PARTIAL | 现在精确断言值、对象身份、原键序和真实Host终态；现源码删除contract后尾部defineProperty，静态分析预示中间/首位键序反例，尚未执行。异常路径TODO保留，canary不再默认成功。 |
 | GAP-218 | crash-reconciliation-018/020/021 | PARTIAL | 上游load结算忽略append Error，TargetAgent空值又回退Byname；新接缝不补造成功事实。需在真实加载入口保留失败并验证合法历史材料边界。 |
 | GAP-219 | sphinx-v2真实入口 | OPEN | Wire Surface模板不能证明runtime执行；MCP工具handler忽略各工具输入，OpenCode状态/结果适配仍为占位。局部算法断言保留，真实创建、调度、取消、恢复和结果交付TODO不关闭。 |
-| GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 已证明插件 before 把 `obligations` 换名为 `todos`、只剥离 retainCheckpoints，数组对象与内容原样交给 Host（上游 Effect schema 解码已在 throwaway smoke 验证）；仍缺安装版 OpenCode 对当前 session TodoTable 的真实替换/清空物理 canary。 |
+| GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 插件已不改写 todowrite 的 provider 定义与参数，宿主 `todos` 原样交给 Host；checkpoint 由 Host 终态 `message.part.updated` 确认。仍缺安装版 OpenCode 对当前 session TodoTable 的真实替换/清空物理 canary。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |

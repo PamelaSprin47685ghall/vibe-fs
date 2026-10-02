@@ -420,34 +420,33 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_ea
     "Mixed protocol fields must yield MixedProtocolFields error code without ignoring legacy field"
   );
 
-  // 7. 协议不变量：0 估计时 self_note 必须不存在；正数时必须有非空 self_note
+  // 7. 协议不变量：self_note 是纯建议性短记，填与不填、填什么类型都不构成失败
   const zeroWithNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     [EstimatedReadonlyRoundsField]: 0,
-    self_note: "should-not-be-present",
+    self_note: "note on a zero estimate",
   });
-  assert.equal(zeroWithNote.ok, false, "0 rounds carrying self_note must fail");
-  assert.equal(zeroWithNote.error, "NotePresentWhenZero", "Error must be NotePresentWhenZero");
+  assert.equal(zeroWithNote.ok, true, "0 rounds carrying self_note is not a failure");
+  assert.equal(zeroWithNote.note, "note on a zero estimate");
 
   const posWithoutNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     [EstimatedReadonlyRoundsField]: 2,
   });
-  assert.equal(posWithoutNote.ok, false, "positive rounds missing self_note must fail");
-  assert.equal(
-    posWithoutNote.error,
-    "MissingOrBlankNoteWhenPositive",
-    "Error must be MissingOrBlankNoteWhenPositive"
-  );
+  assert.equal(posWithoutNote.ok, true, "positive rounds missing self_note is not a failure");
+  assert.equal(posWithoutNote.note, null);
 
   const posWithBlankNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     [EstimatedReadonlyRoundsField]: 2,
     self_note: "   \t  ",
   });
-  assert.equal(posWithBlankNote.ok, false, "positive rounds with blank self_note must fail");
-  assert.equal(
-    posWithBlankNote.error,
-    "MissingOrBlankNoteWhenPositive",
-    "Error must be MissingOrBlankNoteWhenPositive"
-  );
+  assert.equal(posWithBlankNote.ok, true, "a blank self_note is not a failure");
+  assert.equal(posWithBlankNote.note, "   \t  ", "a string note keeps its original text");
+
+  const posWithNonStringNote = PluginHooksSurface.readonlyDelegationSelfNoteOf({
+    [EstimatedReadonlyRoundsField]: 2,
+    self_note: 123,
+  });
+  assert.equal(posWithNonStringNote.ok, true, "a non-string self_note is not a failure");
+  assert.equal(posWithNonStringNote.note, null, "a non-string note is read as absent");
 });
 
 test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_estimate_fails_closed_without_subset_success", () => {
@@ -535,13 +534,13 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
   assert.equal(editRes.ok, false, "edit with negative rounds must fail argument validation as Result.Error");
   assert.equal(editRes.error, "InvalidRange", "Error must be InvalidRange");
 
-  // 额外验证另一种非法形态（0 估计却携带 self_note）同样被拒绝为 NotePresentWhenZero
+  // self_note 不参与批次判定：0 估计携带短记同样解析成功
   const zeroWithNoteRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     [EstimatedReadonlyRoundsField]: 0,
-    self_note: "forbidden-note-on-zero",
+    self_note: "note-on-zero",
   });
-  assert.equal(zeroWithNoteRes.ok, false, "0 rounds carrying self_note must fail");
-  assert.equal(zeroWithNoteRes.error, "NotePresentWhenZero");
+  assert.equal(zeroWithNoteRes.ok, true, "0 rounds carrying self_note is not a failure");
+  assert.equal(zeroWithNoteRes.note, "note-on-zero");
 
   // 4. 整批一票否决与禁止“合法子集假装成功”：
   // 按照生产 Delegate.fs 中 aggregateBatchEstimate 的逻辑，批次内只要有任意参与调用解析失败，

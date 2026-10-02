@@ -4,7 +4,7 @@
 
 未配置 Predictor 模型时，系统对本机制保持无功能基线：不装饰任何工具 schema、不追加说明、不产生委托授权、不创建 Replica，全部会话的 provider 可见字节、工具权限、retry 流程、评审终结逻辑与控制流与不存在本机制时完全一致。
 
-已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/js-manager/js-engineer/js-devops/edit/write/mv/rm/fetch/run 共 12 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与条件参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
+已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/js-manager/js-engineer/js-devops/edit/write/mv/rm/fetch/run 共 12 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
 
 所有未参与工具（如 fork/join/chronicle/horizon/review/fission/terminal 类工具/assume/enough 等）及未判定动态工具均保持原有定义，无任何本协议增量，也不截取其同名业务字段。
 
@@ -26,7 +26,7 @@
 
 来源身份取完成批次的 emitting assistant，不能取下一次外发请求的 assistant placeholder。来源 assistant 的 Host parent physical user message 必须与当前合法输入相符；新用户输入之后，旧批次中的正数估计不得冒充新来源。
 
-准入不含任何经济或统计判断：不存在收益估计、成本模型、证据样本量、holdout 分组或预测得分作为条件。同批参与调用出现非法值（缺失、null、字符串、负数、小数、布尔、越界、或条件短记不符）按新调用参数错误处理：整批不产生新执行，不取合法子集假装成功，也不把非法值静默规范化为 0。非只读的来源批次不否决委托——当前操作照常做完，委托针对的是接下来；Replica 输出中的正预算不能产生二次委托。
+准入不含任何经济或统计判断：不存在收益估计、成本模型、证据样本量、holdout 分组或预测得分作为条件。同批参与调用出现非法估计值（缺失、null、字符串、负数、小数、布尔、越界）按新调用参数错误处理：整批不产生新执行，不取合法子集假装成功，也不把非法值静默规范化为 0；短记形态不构成非法值。非只读的来源批次不否决委托——当前操作照常做完，委托针对的是接下来；Replica 输出中的正预算不能产生二次委托。
 
 ## [003] 事实性估计到只读执行上限的转换
 
@@ -103,7 +103,7 @@ Delegate 不新增压缩阈值，不主动"压到可以委托为止"，不禁用
 
 ## [009] 镜像、ID 重定位与未来调查展望短记
 
-同伴的 provider 消息基础是 owner 冻结点上的语义投影加本决策已完成的局部批次：完整 call/result、原始 arguments（含条件 `self_note`）与调用顺序全部保留；owner 的 wire-local call id 不得复制，必须确定性重定位为决策内局部标识并保证语义不变。
+同伴的 provider 消息基础是 owner 冻结点上的语义投影加本决策已完成的局部批次：完整 call/result、原始 arguments（含 `self_note`）与调用顺序全部保留；owner 的 wire-local call id 不得复制，必须确定性重定位为决策内局部标识并保证语义不变。
 
 `self_note` 定义为面向未来调查的简明展望（一至三句，聚焦于准备核对的材料、关系及停点），只沿一条既有路径自然可见：原始工具调用记录 → 冻结 owner 对话 → ID 重定位 → 同伴可见对话。不得复制到 system prompt、bootstrap、额外 user 消息、子会话启动参数或新 hint 事件；不为短记保留特殊上下文窗口、补发消息或独立缓存。
 
@@ -128,7 +128,7 @@ Bound 之后崩溃但尚未得到 Prepared，允许损失本次同伴调查机�
 ## [011] 失败、取消、熔断与参数错误边界
 
 严格区分普通参数错误与严重不变量错误：
-- 参与调用的参数类型错误、范围非法、正数缺失短记、正数短记为空白、0 携带短记、或新旧字段混用，均属于新调用参数错误，仅拒绝当前调用/批次的准入，不执行委托，绝不触发全进程 fuse；
+- 参与调用的估计字段类型错误、范围非法、或新旧字段混用，均属于新调用参数错误，仅拒绝当前调用/批次的准入，不执行委托，绝不触发全进程 fuse；短记形态不构成参数错误；
 - 只有出现持久化歧义、投影冲突、权限突破、材料 digest 不一致等严重不变量失败时，才执行进程全局熔断；熔断在当前进程生命周期内保持生效，已完成的 Promoted 历史不受影响。
 
 终止只来自显式因果事件：达到上限、真实 provider turn terminal、owner/operator 取消或删除、授权按明确原因关闭。不得以 elapsed time、deadline race、sleep 或超时先后决定是否收集或取消；不增加 deadline、按毫秒竞争的提前结束或新 failure budget。
@@ -143,15 +143,15 @@ owner 取消或删除时级联取消并释放 Replica 与 capacity fence，未�
 
 带有真实 assistant parent 证据的完成通知若先于 physical 绑定到达，按 physical 暂存；实际 dispatch acceptance 或 transform 确认绑定后，只重放相符终态。通知不能自行指定本决策的 physical，也不能让已完成的请求多发一轮。实例卸载只释放该实例拥有的模型租约；常驻 predictor 及其仍需继续的 owner 的租约受共享协调器保留，不能被某个实例的通用 session 清理提前释放。最后一个实例卸载时，协调器同时交还这些 owner 与 resident 的租约。
 
-## [012] 模型可见协议：事实性估计与条件短记
+## [012] 模型可见协议：事实性估计与建议性短记
 
 面向模型的协议完全剥离任何执行分工、信任建立、保留控制权或同伴指派的动机叙事，不要求模型理解宿主的 max 调度算法。
 
 参与工具可见 schema 严格定义为：
 1. `estimated_readonly_rounds`：必选原生非负整数（0..2147483647），表示当前整批工具完成后，预期后续连续只读查证的模型请求次数。0 表示当前批次完成后没有可合理展望的连续只读查证，或下一步已到达实质修改、命令执行、用户确认、关键权衡或结论边界。
-2. `self_note`：条件性未来调查展望（string）。
-   - 当 `estimated_readonly_rounds > 0` 时，必须提供非空白字符串（一至三句，说明准备核对的材料、消除的疑问与停点），验证时保留原始文本（含空白换行引号）；
-   - 当 `estimated_readonly_rounds == 0` 时，该属性必须不存在（省略）；若出现任何形式的短记（包含空串、空白、null、undefined 或普通字符串）均属参数错误；
+2. `self_note`：可选的未来调查展望（string）。
+   - 该填不填、不该填填了、填了空白或非字符串，一律不视为失败：字符串短记原样保留，其余按缺失读取；
+   - 建议在 `estimated_readonly_rounds > 0` 时用一至三句话说明准备核对的材料、消除的疑问与停点；
    - 未参与工具无此两字段，亦不接纳此类输入。
 
 中英文工具说明幂等追加在原描述之后且保持稳定：不含剩余轮数、随机标识、价格或时间戳；只回传真实工具结果，同伴推理与总结不回传。
@@ -161,7 +161,7 @@ owner 取消或删除时级联取消并释放 Replica 与 capacity fence，未�
 本版不提供生产 DryRun / 影子执行模式；交付正确性只能由本版真实 Host 集成证据证明。只在 mock 对象上增加字段、只写 canary 日志而无断言，均不算证明。
 
 真实 Host canary 必须按第 5 节的逐工具判定清单进行独立断言，不再要求对每个可见工具全量加字段：
-- 证明已配置 Predictor 时，仅第 5.2 节参与工具带有必填估计与条件短记；
+- 证明已配置 Predictor 时，仅第 5.2 节参与工具带有必填估计与可选短记；
 - 证明所有不参与工具（fork/join/chronicle/terminal/fission 等）原样无增量；
 - 证明未参与工具的同名业务字段不被侵犯；
 - 证明同一工具在真实 provider wire 上原参数执行，且原始 arguments（含协议字段）同源恢复进入下一次历史。
@@ -209,7 +209,7 @@ E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧
 
 1. **协议常量与字段标识**：
    - 协议修订版本 `ProtocolRevision` 是代码中确定的稳定整数常量 `2`（严格大于 1），由代码确定，不得从环境变量、模型参数或运行时配置读取；
-   - 轮次估计字段名为 `estimated_readonly_rounds`，条件短记字段名为 `self_note`。
+   - 轮次估计字段名为 `estimated_readonly_rounds`，建议性短记字段名为 `self_note`。
 
 2. **逐工具判定（classifyTool）**：
    工具策略采用严格的三态联合类型，禁止任何形式的前缀匹配（如 `js-` 前缀）或名称模糊匹配（如包含 read/search）：
@@ -229,24 +229,21 @@ E2E 同时覆盖正常完成、提前结束、自然截断/压缩与恢复。旧
    - `-0`（负零）按原生浮点比较等价于 `0.0`，在语义上归一为整数 `0`；
    - 合法的 `EstimatedReadonlyRounds` 值可通过显式单向转换 `toExecutionBudget` 转换为内部只读执行预算 `ReadonlyRoundBudget`。
 
-5. **成对短记关系与原始文本保真**：
-   - 当 `estimated_readonly_rounds == 0` 时：入参对象中 `self_note` 属性必须完全不存在（`hasOwnProperty` 为 false）。若出现任何自有 `self_note` 属性——即使值为空字符串、纯空白字符、`null`、或显式赋值为 `undefined`（如 `{ self_note: undefined }`）——均判定为零估计携带短记错误并予拒绝；
-   - 当 `estimated_readonly_rounds > 0` 时：入参对象必须包含 `self_note` 自有属性，且其值必须是字符串类型。该短记经 `trim` 去除两端空白后长度必须大于 0；若缺失短记、短记为空串、纯空白、或为非字符串类型（数字、布尔、对象、数组、null 等），均予以拒绝；
-   - 验证通过的正数短记文本完整保留原始字符串（含首尾空格、制表符、换行与特殊字符），不进行 trim 截断或任何修改。
+5. **建议性短记与原始文本保真**：
+   - `self_note` 是纯建议性短记：该填不填（估计为正却缺失）、不该填填了（估计为 0 却携带）、填空白或非字符串，一律不视为失败；
+   - 字符串短记完整保留原始字符串（含首尾空格、制表符、换行与特殊字符），不进行 trim 截断或任何修改；非字符串短记按缺失读取，不报错、不修正；
+   - 短记不参与批次判定：同批任何调用因短记形态产生的差异，不影响该调用估计的合法性。
 
 6. **错误类型辨识度**：
    解析错误至少能精准区分以下独立失败原因：
    - `MissingEstimate`：缺失 `estimated_readonly_rounds` 估计字段；
    - `WrongNumberType`：估计值不是 JavaScript 原生数字类型（如为字符串、布尔、对象、数组、null）；
    - `InvalidRange`：估计值不在合法范围（负数、小数、NaN、Infinity、超过 2147483647）；
-   - `NotePresentWhenZero`：估计为 0 时出现任何自有 `self_note` 属性；
-   - `MissingOrBlankNoteWhenPositive`：估计大于 0 时缺失 `self_note` 属性，或短记为空白字符串；
-   - `NoteNotString`：短记存在但不是字符串类型；
    - `MixedProtocolFields`：入参携带旧协议字段 `delegate_readonly_rounds`；
    - `InvalidArgumentObject`：入参不是合法的普通对象。
 
 7. **字段所有权与透传**：
-   协议字段 `estimated_readonly_rounds` 与条件字段 `self_note` 的解析与校验责任仅归本协议及 12 个参与工具所有；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
+   协议字段 `estimated_readonly_rounds` 与建议性字段 `self_note` 的解析责任仅归本协议及 12 个参与工具所有；短记本身不校验、不拒绝；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
 
 8. **三消费端单一判定来源与行为一致性**：
    逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `read`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。在协议未开启（未配置 Predictor）时，调用边界端与来源批次端均不拦截、不剥离、不校验任何工具的参数，参数原样透传；在协议开启（已配置 Predictor）时，调用边界端仅对参与工具执行必选校验与剥离隐藏，且对完全缺失估计字段的参与调用无条件按参数错误拒绝，绝不带缺陷放行或静默退化为无估计机会。

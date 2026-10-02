@@ -76,4 +76,4 @@ Manager assessment 的提示由 Role Law、Quality Ledger（八维准则）与�
 
 ## [016] Pair Hint 不重复工具手册
 
-Pair Hint 不承载 `assume`、`todowrite` 等微原语的行为提醒；工具语义与参数（含 `retainCheckpoints` 的填 1/填 2 含义）归各工具自身的 provider 描述资源。不得重新注入 jq、画板 schema、Magic Todo 字段或已经退役的协作协议。
+Pair Hint 不承载 `assume`、`todowrite` 等微原语的行为提醒；工具语义与参数归各工具自身的 provider 描述资源。不得重新注入 jq、画板 schema、Magic Todo 字段或已经退役的协作协议。

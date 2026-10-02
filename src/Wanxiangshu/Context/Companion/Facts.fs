@@ -84,8 +84,7 @@ type ContextFactCases =
            Reason: string |}
     | TodoCheckpointCommitted of
         {| SessionId: SessionId
-           ToolCallId: ToolCallId
-           RetainCheckpoints: int |}
+           ToolCallId: ToolCallId |}
     | PrefixRebaseCommitted of
         {| SessionId: SessionId
            PreviousEpochId: PrefixEpochId

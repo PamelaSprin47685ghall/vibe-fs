@@ -8,9 +8,9 @@
  * ── why the wrapper-plugin membrane canary is gone ──────────────────────────
  *
  * The old Magic Todo membrane is gone. The Host-native `todowrite` remains the
- * physical executor; production only decorates its provider schema with
- * `retainCheckpoints` and strips that protocol field before execution. The
- * independent `assume` tool is stateless.
+ * physical executor and keeps its host-shaped schema; the plugin no longer
+ * decorates it with a compression field. The independent `assume` tool is
+ * stateless.
  */
 
 const extractToolNamesFromRequest = (request) => {

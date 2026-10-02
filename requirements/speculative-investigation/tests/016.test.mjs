@@ -96,11 +96,11 @@ test('WHAT[speculative-investigation-016] the revision constant and the pairing 
 
   // The pairing parser is production's own, so the documented field name is the
   // only one it accepts and the conditional note is read underneath it. An absent
-  // note arrives through the surface option projection, which Fable emits as
-  // undefined rather than null.
+  // note arrives through the surface option projection, which answers a missing
+  // note as null rather than undefined.
   assert.deepEqual(
     Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 0 }),
-    { ok: true, rounds: 0, selfNote: undefined },
+    { ok: true, rounds: 0, selfNote: null },
     'a zero estimate carries neither a value nor a note'
   );
   assert.equal(
@@ -118,15 +118,20 @@ test('WHAT[speculative-investigation-016] the revision constant and the pairing 
     { ok: true, rounds: 2, selfNote: noteText },
     'a positive estimate returns its exact note text with whitespace preserved'
   );
-  assert.equal(
-    Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 1 }).error,
-    'MissingOrBlankNoteWhenPositive',
-    'a positive estimate without a note is a production argument error'
+  assert.deepEqual(
+    Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 1 }),
+    { ok: true, rounds: 1, selfNote: null },
+    'a positive estimate without a note is not a failure'
   );
-  assert.equal(
-    Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 0, [SelfNoteField]: '' }).error,
-    'NotePresentWhenZero',
-    'any own note field at zero is a production argument error'
+  assert.deepEqual(
+    Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 0, [SelfNoteField]: '' }),
+    { ok: true, rounds: 0, selfNote: '' },
+    'any own note field at zero is not a failure'
+  );
+  assert.deepEqual(
+    Strength.parseParticipatingArguments({ [EstimatedReadonlyRoundsField]: 0, [SelfNoteField]: 123 }),
+    { ok: true, rounds: 0, selfNote: null },
+    'a non-string self_note is read as absent, never a failure'
   );
 });
 
@@ -205,105 +210,102 @@ test('WHAT[speculative-investigation-016] positive integers with non-blank self_
   }
 });
 
-test('WHAT[speculative-investigation-016] 0 rounds rejects any present self_note (including empty, whitespace, null, undefined own-property)', () => {
+test('WHAT[speculative-investigation-016] 0 rounds accepts any present self_note without failure', () => {
   // empty string
   const resEmpty = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 0,
     self_note: ''
   });
-  assert.equal(resEmpty.ok, false, 'should fail');
-  assert.equal(resEmpty.error, 'NotePresentWhenZero');
+  assert.equal(resEmpty.ok, true, 'an empty string note at zero is not a failure');
+  assert.equal(resEmpty.note, '');
 
   // whitespace
   const resWs = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 0,
     self_note: '   '
   });
-  assert.equal(resWs.ok, false);
-  assert.equal(resWs.error, 'NotePresentWhenZero');
+  assert.equal(resWs.ok, true);
+  assert.equal(resWs.note, '   ');
 
   // null
   const resNull = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 0,
     self_note: null
   });
-  assert.equal(resNull.ok, false);
-  assert.equal(resNull.error, 'NotePresentWhenZero');
+  assert.equal(resNull.ok, true);
+  assert.equal(resNull.note, null, 'a non-string note is read as absent');
 
   // own-property with undefined value
   const objWithUndef = { estimated_readonly_rounds: 0 };
   objWithUndef.self_note = undefined;
   const resUndef = PluginHooksSurface.readonlyDelegationSelfNoteOf(objWithUndef);
-  assert.equal(resUndef.ok, false);
-  assert.equal(resUndef.error, 'NotePresentWhenZero', 'own-property undefined must be rejected as NotePresentWhenZero');
-
-  const helperUndef = PluginHooksSurface.readonlyDelegationSelfNoteOf(objWithUndef);
-  assert.deepEqual(helperUndef, { ok: false, error: 'NotePresentWhenZero' });
+  assert.equal(resUndef.ok, true);
+  assert.equal(resUndef.note, null, 'own-property undefined is read as absent');
 });
 
-test('WHAT[speculative-investigation-016] positive rounds rejects missing, blank or non-string self_note', () => {
+test('WHAT[speculative-investigation-016] positive rounds never fails over a missing, blank or non-string self_note', () => {
   // missing note
   const resMissing = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2
   });
-  assert.equal(resMissing.ok, false);
-  assert.equal(resMissing.error, 'MissingOrBlankNoteWhenPositive');
+  assert.equal(resMissing.ok, true);
+  assert.equal(resMissing.note, null);
 
   // empty string note
   const resEmpty = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: ''
   });
-  assert.equal(resEmpty.ok, false);
-  assert.equal(resEmpty.error, 'MissingOrBlankNoteWhenPositive');
+  assert.equal(resEmpty.ok, true);
+  assert.equal(resEmpty.note, '');
 
   // blank whitespace note
   const resBlank = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: '  \t\n  '
   });
-  assert.equal(resBlank.ok, false);
-  assert.equal(resBlank.error, 'MissingOrBlankNoteWhenPositive');
+  assert.equal(resBlank.ok, true);
+  assert.equal(resBlank.note, '  \t\n  ');
 
   // non-string note: number
   const resNum = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: 123
   });
-  assert.equal(resNum.ok, false);
-  assert.equal(resNum.error, 'NoteNotString');
+  assert.equal(resNum.ok, true);
+  assert.equal(resNum.note, null, 'a non-string note is read as absent');
 
   // non-string note: boolean
   const resBool = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: true
   });
-  assert.equal(resBool.ok, false);
-  assert.equal(resBool.error, 'NoteNotString');
+  assert.equal(resBool.ok, true);
+  assert.equal(resBool.note, null, 'a boolean note is read as absent');
 
   // non-string note: object
   const resObj = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: { text: "note" }
   });
-  assert.equal(resObj.ok, false);
-  assert.equal(resObj.error, 'NoteNotString');
+  assert.equal(resObj.ok, true);
+  assert.equal(resObj.note, null, 'an object note is read as absent');
 
   // non-string note: array
   const resArr = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: ["note"]
   });
-  assert.equal(resArr.ok, false);
-  assert.equal(resArr.error, 'NoteNotString');
+  assert.equal(resArr.ok, true);
+  assert.equal(resArr.note, null, 'an array note is read as absent');
 
   // non-string note: null
   const resNull = PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
     self_note: null
   });
-  assert.equal(resNull.ok, false);
-  assert.equal(resNull.error, 'NoteNotString');
+  assert.equal(resNull.ok, true);
+  assert.equal(resNull.note, null, 'a null note is read as absent');
 });
 
 test('WHAT[speculative-investigation-016] native number checks and range validation reject invalid values', () => {
@@ -419,7 +421,7 @@ test('WHAT[speculative-investigation-016] invalid argument container (not a plai
   }
 });
 
-test('WHAT[speculative-investigation-016] the 8 argument-error categories come from the production projection and stay told apart', () => {
+test('WHAT[speculative-investigation-016] the 5 argument-error categories come from the production projection and stay told apart', () => {
   // 每个输入各触发一个独立的失败原因。分类标识取自生产投影：
   // readonlyDelegationSelfNoteOf 返回的 { ok: false, error }，其 error 由
   // InvestigationEstimateContract.errorCode 从判别联合投影为稳定字符串
@@ -431,9 +433,6 @@ test('WHAT[speculative-investigation-016] the 8 argument-error categories come f
     { args: {}, expected: 'MissingEstimate' },
     { args: { [EstimatedReadonlyRoundsField]: '1', [SelfNoteField]: 'note' }, expected: 'WrongNumberType' },
     { args: { [EstimatedReadonlyRoundsField]: -1 }, expected: 'InvalidRange' },
-    { args: { [EstimatedReadonlyRoundsField]: 0, [SelfNoteField]: 'note' }, expected: 'NotePresentWhenZero' },
-    { args: { [EstimatedReadonlyRoundsField]: 2 }, expected: 'MissingOrBlankNoteWhenPositive' },
-    { args: { [EstimatedReadonlyRoundsField]: 2, [SelfNoteField]: 123 }, expected: 'NoteNotString' },
     {
       args: {
         [EstimatedReadonlyRoundsField]: 1,
@@ -454,8 +453,8 @@ test('WHAT[speculative-investigation-016] the 8 argument-error categories come f
   }
   assert.equal(
     observed.size,
-    8,
-    'WHAT[016] §6 requires the eight failure reasons to be told apart; production must return eight distinct categories'
+    5,
+    'WHAT[016] §6 requires the five failure reasons to be told apart; production must return five distinct categories'
   );
 });
 
@@ -471,13 +470,13 @@ test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive
   // 3. 抛错文案只内联在 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs 里，
   //    没有作为可调用的 JS 契约发射。
   // 因此这里只断言公开 Surface 真正能证明的那一半：拒绝给出稳定机器分类，
-  // 且该分类标识本身不参与自然语言文案。
+  // 且该分类标识本身不参与自然语言文案。短记不构成失败，只有估计字段本身非法。
   const errZero = PluginHooksSurface.readonlyDelegationSelfNoteOf({
-    estimated_readonly_rounds: 0,
+    estimated_readonly_rounds: -1,
     self_note: 'bad note'
   });
   assert.equal(errZero.ok, false);
-  assert.equal(errZero.error, 'NotePresentWhenZero');
+  assert.equal(errZero.error, 'InvalidRange');
 
   const errMissing = PluginHooksSurface.readonlyDelegationSelfNoteOf({});
   assert.equal(errMissing.ok, false);

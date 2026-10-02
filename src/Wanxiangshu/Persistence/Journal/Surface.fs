@@ -163,9 +163,7 @@ module JournalSurface =
                        checkpoints =
                         window.Checkpoints
                         |> List.map (fun checkpoint ->
-                            box
-                                {| callId = ToolCallId.value checkpoint.ToolCallId
-                                   retainCheckpoints = checkpoint.RetainCheckpoints |})
+                            box {| callId = ToolCallId.value checkpoint.ToolCallId |})
                         |> List.toArray |})
             |> List.toArray
 

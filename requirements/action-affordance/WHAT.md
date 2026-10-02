@@ -69,8 +69,8 @@
 
 成功返回固定的笃定提示，不回显 `assumption`，避免把同一句判断再塞回上下文。描述保留“先抽象→笃定→执行→验证；只有新增证据才重开判断”的纪律，但不得把该纪律扩张成持久记忆或事实证明。
 
-## [015] todowrite 的列表在 provider 面叫 obligations
+## [015] todowrite 完全保持宿主形状
 
-原生 `todowrite` 仍由 Host executor 物理执行，其待办行 schema 与语义不变（见 obligation-ledger）。provider 面把这个工作列表发布为必填 `obligations`，与必填 `retainCheckpoints` 并列；模型只读写 `obligations`。
+原生 `todowrite` 由 Host executor 物理执行，其工具名、参数 schema、待办行字段与描述完全保持宿主原样，模型直接读写 Host 的 `todos`。
 
-插件在 `tool.execute.before` 把该字段换名为 Host 的 `todos` 后交给 executor，换名以同一个数组对象完成，不复制、不改写行内容；换名与隐藏保留在参数对象内部完成，不经由可序列化的中间产物，以保证 after 能原样恢复 provider 形状。`tool.execute.after` 删除 `todos` 并恢复 `obligations`，使 provider wire 历史继续携带模型实际提交的字段名。同一个调用同时携带两个字段名必须被明确拒绝，不得静默二选一。
+插件不得为它改写、重命名、增补或隐藏任何参数与描述，也不得注入压缩协议字段；成功的调用只让插件在 Host 终态之后追加一条压缩 checkpoint 事实（见 obligation-ledger）。

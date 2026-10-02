@@ -144,13 +144,10 @@ module ContextProjectionBridge =
         { projection with
             TodoCheckpoints = checkpoints }
 
-    let private appendCheckpoint projection sessionId callId retainCheckpoints =
+    let private appendCheckpoint projection sessionId callId =
         checkpointWindowOf projection sessionId
-        |> PhaseWindow.appendCheckpoint callId retainCheckpoints
-        |> Result.map (fun updated -> setCheckpointWindow sessionId updated projection)
-        |> Result.mapError (fun reason ->
-            { Fact = "TodoCheckpointCommitted"
-              Reason = reason })
+        |> PhaseWindow.appendCheckpoint callId
+        |> fun updated -> setCheckpointWindow sessionId updated projection
 
     let private pruneCommittedPrefix projection sessionId cutoffExclusive =
         checkpointWindowOf projection sessionId
@@ -215,7 +212,7 @@ module ContextProjectionBridge =
     let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         | ContextFactCases.TodoCheckpointCommitted payload ->
-            appendCheckpoint projection payload.SessionId payload.ToolCallId payload.RetainCheckpoints
+            Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
         | ContextFactCases.PrefixRebaseCommitted payload ->
             foldOwned projection fact
             |> Result.map (fun updated -> pruneCommittedPrefix updated payload.SessionId payload.CutoffExclusive)

@@ -1464,8 +1464,6 @@ OpenCode/Host/ManagerReviewContract.fsi
 OpenCode/Host/ManagerReviewContract.fs
 OpenCode/Host/ReadonlyDelegationContract.fsi
 OpenCode/Host/ReadonlyDelegationContract.fs
-OpenCode/Host/TodoWriteCompressionContract.fsi
-OpenCode/Host/TodoWriteCompressionContract.fs
 OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi

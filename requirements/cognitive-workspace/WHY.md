@@ -5,7 +5,7 @@
 现在三件事各归其位：
 
 - `assume` 只负责“已笃定”的认知承诺点；
-- OpenCode 原生 `todowrite` 负责当前待办，并携带本次 `retainCheckpoints`；
+- OpenCode 原生 `todowrite` 负责当前待办，插件不改写其定义与参数；
 - context-compression 只消费成功的 todowrite checkpoint 与 durable coverage。
 
 旧 Cognition journal 仍须可读，是为了诚实恢复历史，不是为了保留产品能力。兼容读取必须停在 no-op tombstone，不能借迁移之名重新生成 canvas projection。

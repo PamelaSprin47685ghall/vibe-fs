@@ -118,12 +118,10 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_a_plain_text_answer_ends_
   assert.deepEqual(outcome.batches, [], 'and it still materialises nothing')
 })
 
-test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_paired_with_estimated_readonly_rounds', () => {
-  // WHAT[012] & [016]: Conditional pairing:
-  // - When estimated_readonly_rounds == 0: self_note property must NOT be present (omitted).
-  //   Providing empty string, whitespace, null, undefined or any value is NotePresentWhenZero error.
-  // - When estimated_readonly_rounds > 0: self_note property MUST be present with non-blank string.
-  //   Missing note or blank/empty note is MissingOrBlankNoteWhenPositive; non-string note is NoteNotString.
+test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_advisory_and_never_a_failure', () => {
+  // WHAT[012] & [016]: self_note is an optional advisory note. Whether it is
+  // filled, omitted, blank or non-string is never a call failure; only the
+  // estimate field itself can fail.
 
   // 1. Zero rounds: omitting self_note succeeds (returns rounds 0 and null note)
   const helperZero = PluginHooksSurface.readonlyDelegationSelfNoteOf({
@@ -131,13 +129,14 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
   })
   assert.deepEqual(helperZero, { ok: true, note: null })
 
-  // 2. Zero rounds with self_note present: rejected as NotePresentWhenZero (tag 3)
-  for (const badNote of ['', '   ', null, '我自己确认一下']) {
+  // 2. Zero rounds with any self_note present: still succeeds; strings keep text
+  for (const badNote of ['', '   ', null, 123, '我自己确认一下']) {
     const helperRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 0,
       self_note: badNote,
     })
-    assert.deepEqual(helperRes, { ok: false, error: 'NotePresentWhenZero' })
+    assert.equal(helperRes.ok, true)
+    assert.equal(helperRes.note, typeof badNote === 'string' ? badNote : null)
   }
 
   // 3. Positive rounds with non-blank string: succeeds and preserves original string
@@ -153,35 +152,26 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_self_note_is_strictly_pai
     assert.deepEqual(helperRes, { ok: true, note: goodNote })
   }
 
-  // 4. Positive rounds with missing or blank self_note: rejected as MissingOrBlankNoteWhenPositive (tag 4)
+  // 4. Positive rounds with missing or blank self_note: still succeeds
   // 4a. Missing self_note
   assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
     estimated_readonly_rounds: 2,
-  }), {
-    ok: false,
-    error: 'MissingOrBlankNoteWhenPositive',
-  })
+  }), { ok: true, note: null })
 
   // 4b. Blank or empty self_note
   for (const blankNote of ['', '   ', '  \t\n  ']) {
     assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 2,
       self_note: blankNote,
-    }), {
-      ok: false,
-      error: 'MissingOrBlankNoteWhenPositive',
-    })
+    }), { ok: true, note: blankNote })
   }
 
-  // 5. Positive rounds with non-string self_note: rejected as NoteNotString (tag 5)
+  // 5. Positive rounds with non-string self_note: still succeeds, note read as absent
   for (const nonString of [123, true, null, { note: 'obj' }, ['arr']]) {
     assert.deepEqual(PluginHooksSurface.readonlyDelegationSelfNoteOf({
       estimated_readonly_rounds: 2,
       self_note: nonString,
-    }), {
-      ok: false,
-      error: 'NoteNotString',
-    })
+    }), { ok: true, note: null })
   }
 
   // 6. Sentinel: legacy field delegate_readonly_rounds is strictly rejected as MixedProtocolFields under current v2 contract
@@ -260,8 +250,8 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   )
   assert.match(
     english.description,
-    /Include self_note only for a positive estimate, stating what to inspect next and what finding will make the next step possible; omit the note for 0\./,
-    'English prose must explain conditional self_note',
+    /self_note is an optional brief outlook of what to inspect next; fill it or not as it helps you\./,
+    'English prose must explain advisory self_note',
   )
   assert.equal(english.parameters.properties.estimated_readonly_rounds.type, 'integer')
   assert.equal(english.parameters.properties.estimated_readonly_rounds.minimum, 0)
@@ -273,7 +263,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   assert.equal(english.parameters.properties.self_note.type, 'string')
   assert.match(
     english.parameters.properties.self_note.description,
-    /Provide this field only when this call's estimated_readonly_rounds is greater than 0; otherwise omit the field entirely/,
+    /^Optional\./,
   )
   assert.ok(english.parameters.required.includes('estimated_readonly_rounds'))
   assert.equal(english.parameters.required.includes('self_note'), false, 'only budget joins required, note never does')
@@ -286,7 +276,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   )
   assert.match(
     chinese.description,
-    /只在本次估计大于 0 时填写 self_note，简述接下来查什么、查到什么即可进入下一步；估计为 0 时省略短记。/,
+    /self_note 是可选短记，简述接下来查什么、查到什么即可进入下一步；填与不填都行。/,
     'Chinese prose must explain conditional self_note',
   )
   assert.match(
@@ -295,7 +285,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   )
   assert.match(
     chinese.parameters.properties.self_note.description,
-    /仅当本次调用的 estimated_readonly_rounds 大于 0 时填写；否则完全省略本字段，不填空串或 null。/,
+    /^可选。本次调用的 estimated_readonly_rounds 大于 0 时，可以用一至三句话给自己留下后续调查的展望/,
   )
   assert.ok(chinese.parameters.required.includes('estimated_readonly_rounds'))
   assert.equal(chinese.parameters.required.includes('self_note'), false, 'only budget joins required, note never does')

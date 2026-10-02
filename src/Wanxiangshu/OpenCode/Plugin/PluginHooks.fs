@@ -128,10 +128,10 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
-            // The Host-native todowrite remains the physical executor. The plugin
-            // owns only its provider-visible compression field and the durable
-            // checkpoint recorded after physical success.
-            let todoCheckpointDepths = Dictionary<string, int>()
+            // The Host-native todowrite remains the physical executor, schema and
+            // description included. The plugin records one durable compression
+            // checkpoint per successfully completed call, keyed by exact call id.
+            let settledTodoCheckpointCalls = HashSet<string>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -291,7 +291,6 @@ module PluginHooks =
                     )
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                TodoWriteCompressionContract.decorateDefinition toolInput toolOutput
                 ManagerReviewContract.decorateDefinition toolInput toolOutput
 
                 if readonlyDelegationPredictorConfigured () then
@@ -321,61 +320,14 @@ module PluginHooks =
                     string toolInput?(name)
 
             let todoCheckpointKey sessionId callId =
-                sessionId + "" + ToolCallId.value callId
+                sessionId + "" + ToolCallId.value callId
 
-            let isTodoWrite toolInput =
-                String.Equals(toolField toolInput "tool", "todowrite", StringComparison.OrdinalIgnoreCase)
-
-            let requireTodoWriteAdmission toolInput =
-                let sessionText = toolField toolInput "sessionID"
-
-                if String.IsNullOrWhiteSpace sessionText then
-                    invalidOp "todowrite requires a session identity"
-
-                match roleFor (SessionId.create sessionText) with
-                | Some role when StaticTools.cognitiveUtilityRoleAllowed role -> ()
-                | Some role -> invalidOp (sprintf "todowrite is not permitted for role %A" role)
-                | None -> invalidOp "todowrite requires an established office role"
-
-            let rememberTodoCheckpointAtKey key retainCheckpoints =
-                match todoCheckpointDepths.TryGetValue key with
-                | true, existing when existing <> retainCheckpoints ->
-                    invalidOp "todowrite call changed retainCheckpoints before completion"
-                | _ -> todoCheckpointDepths[key] <- retainCheckpoints
-
-            let rememberTodoCheckpoint toolInput retainCheckpoints =
-                let sessionText = toolField toolInput "sessionID"
-
-                match ToolHostCodec.hookCallId toolInput with
-                | None -> invalidOp "todowrite requires an exact tool call identity"
-                | Some callId ->
-                    let key = todoCheckpointKey sessionText callId
-                    rememberTodoCheckpointAtKey key retainCheckpoints
-
-            let captureTodoWrite toolInput toolOutput =
-                requireTodoWriteAdmission toolInput
-
-                if Option.isNone journal then
-                    invalidOp "todowrite compression checkpoint requires a durable journal"
-
-                if isNull toolOutput || isNull toolOutput?args then
-                    invalidOp "todowrite before hook requires tool arguments"
-
-                match TodoWriteCompressionContract.captureAndHide toolOutput?args with
-                | Ok retainCheckpoints -> rememberTodoCheckpoint toolInput retainCheckpoints
-                | Error reason -> invalidOp reason
-
-            let captureTodoCheckpoint toolInput toolOutput =
-                if isTodoWrite toolInput then
-                    captureTodoWrite toolInput toolOutput
-
-            let appendTodoCheckpoint durable sessionText callId retainCheckpoints =
+            let appendTodoCheckpoint durable sessionText callId =
                 task {
                     let fact =
                         ContextFact.TodoCheckpointCommitted
                             {| SessionId = SessionId.create sessionText
-                               ToolCallId = callId
-                               RetainCheckpoints = retainCheckpoints |}
+                               ToolCallId = callId |}
 
                     match!
                         AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionText)) None fact durable
@@ -423,29 +375,23 @@ module PluginHooks =
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
-            let takeTodoCheckpoint sessionText callId status =
-                let key = todoCheckpointKey sessionText callId
-
-                match todoCheckpointDepths.TryGetValue key with
-                | true, retainCheckpoints ->
-                    todoCheckpointDepths.Remove key |> ignore
-                    Some(sessionText, callId, status, retainCheckpoints)
-                | false, _ -> None
-
             let requiredTodoJournal () =
                 journal
                 |> Option.defaultWith (fun () ->
                     invalidOp "todowrite compression checkpoint requires a durable journal")
 
-            let settleTodoTerminal (sessionText, callId, status, retainCheckpoints) =
-                if status = "completed" then
-                    appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId retainCheckpoints
+            /// One durable checkpoint per exact terminal call. A repeated Host
+            /// part update for the same call id is a replay, not a second fact.
+            let settleTodoTerminal (sessionText, callId, status) =
+                if not (settledTodoCheckpointCalls.Add(todoCheckpointKey sessionText callId)) then
+                    Task.FromResult(())
+                elif status = "completed" then
+                    appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
                 else
                     Task.FromResult(())
 
             let settleTodoEvent rawInput =
                 todoTerminalObservation rawInput
-                |> Option.bind (fun (sessionText, callId, status) -> takeTodoCheckpoint sessionText callId status)
                 |> Option.map settleTodoTerminal
                 |> Option.defaultValue (Task.FromResult(()))
 
@@ -549,7 +495,6 @@ module PluginHooks =
                     ReadonlyDelegationContract.restore args
 
                 ManagerReviewContract.restore args
-                TodoWriteCompressionContract.restore args
 
             let requireDelegationEstimateArguments (toolInput: obj) (toolOutput: obj) =
                 if not (isNull toolOutput) && not (isNull toolOutput?args) then
@@ -578,8 +523,6 @@ module PluginHooks =
                         requireDelegationEstimateArguments toolInput toolOutput
 
                     recordProtocolArgumentVault toolInput toolOutput
-
-                    captureTodoCheckpoint toolInput toolOutput
 
                     let context = ToolHostCodec.decodeContext toolInput
 

@@ -109,8 +109,7 @@ module ContextFact =
     val inline TodoCheckpointCommitted:
         payload:
             {| SessionId: SessionId
-               ToolCallId: ToolCallId
-               RetainCheckpoints: int |} ->
+               ToolCallId: ToolCallId |} ->
             AgentFact
 
     val inline PrefixRebaseCommitted:

@@ -191,8 +191,8 @@ module XWire =
             return LifecycleWorkRecord.materialize opening frameBodies "" false
         }
 
-    /// context-compression-028: the boundary selected by the latest successful
-    /// todowrite checkpoint's retainCheckpoints value.
+    /// context-compression-028: the boundary selected by the fixed-K window of
+    /// successful todowrite checkpoints.
     let internal checkpointWindowDesire (state: WireSessionState) : int option =
         let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 

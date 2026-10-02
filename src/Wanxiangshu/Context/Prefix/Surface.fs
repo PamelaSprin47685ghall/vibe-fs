@@ -306,13 +306,14 @@ module PrefixSurface =
         |> Option.map BlobRef.value
         |> optionObj
 
-    /// context-compression-028/029: the K-window decision across the JS boundary.
+    /// context-compression-028/029: the fixed-K checkpoint window decision across
+    /// the JS boundary.
     ///
     /// The surface translates shapes only. It must not clamp, default or re-derive
     /// anything: the clamp against real coverage is the one place the clause's
     /// "desire vs. evidence" split would silently disappear.
-    let desiredCutoff (k: int) (phaseTurnStarts: int array) : obj =
-        match Wanxiangshu.Context.Prefix.PhaseWindow.desiredCutoff k (Array.toList phaseTurnStarts) with
+    let desiredCutoff (phaseTurnStarts: int array) : obj =
+        match Wanxiangshu.Context.Prefix.PhaseWindow.desiredCutoff (Array.toList phaseTurnStarts) with
         | Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases -> box {| kind = "NoPhases" |}
         | Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom cutoff ->
             box
@@ -320,37 +321,20 @@ module PrefixSurface =
                    cutoffExclusive = cutoff |}
 
     let private checkpointOfJs (item: obj) : Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint =
-        { ToolCallId = ToolCallId.create (string item?callId)
-          RetainCheckpoints = int item?retainCheckpoints }
+        { ToolCallId = ToolCallId.create (string item?callId) }
 
     let private checkpointToJs (checkpoint: Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint) : obj =
-        box
-            {| callId = ToolCallId.value checkpoint.ToolCallId
-               retainCheckpoints = checkpoint.RetainCheckpoints |}
+        box {| callId = ToolCallId.value checkpoint.ToolCallId |}
 
     /// Append one successful todowrite checkpoint. The window is not trimmed by K;
     /// only a committed prefix rebase can make older checkpoints unrecoverable.
-    let appendCheckpoint (callId: string) (retainCheckpoints: int) (window: obj array) : obj =
+    let appendCheckpoint (callId: string) (window: obj array) : obj array =
         let committed =
             { Wanxiangshu.Context.Prefix.PhaseWindow.Checkpoints =
                 (if isNull window then [] else Array.toList window) |> List.map checkpointOfJs }
 
-        match
-            Wanxiangshu.Context.Prefix.PhaseWindow.appendCheckpoint
-                (ToolCallId.create callId)
-                retainCheckpoints
-                committed
-        with
-        | Ok next ->
-            box
-                {| ok = true
-                   value = next.Checkpoints |> List.map checkpointToJs |> List.toArray
-                   error = null |}
-        | Error reason ->
-            box
-                {| ok = false
-                   value = [||]
-                   error = reason |}
+        Wanxiangshu.Context.Prefix.PhaseWindow.appendCheckpoint (ToolCallId.create callId) committed
+        |> fun next -> next.Checkpoints |> List.map checkpointToJs |> List.toArray
 
     /// The window's desire, with `turnByCallId[i]` the canonical turn of
     /// `window[i]` (null = no addressable turn in the current generation).
@@ -404,8 +388,3 @@ module PrefixSurface =
             Wanxiangshu.Context.Prefix.PhaseWindow.pruneBefore turnOf cutoffExclusive committed
 
         pruned.Checkpoints |> List.map checkpointToJs |> List.toArray
-
-    let validateK (k: int) : obj =
-        match Wanxiangshu.Context.Prefix.PhaseWindow.validateK k with
-        | Ok() -> box {| ok = true; error = null |}
-        | Error reason -> box {| ok = false; error = reason |}

@@ -36,9 +36,6 @@ module InvestigationEstimateContract =
         | MissingEstimate
         | WrongNumberType
         | InvalidRange
-        | NotePresentWhenZero
-        | MissingOrBlankNoteWhenPositive
-        | NoteNotString
         | MixedProtocolFields
         | InvalidArgumentObject
 

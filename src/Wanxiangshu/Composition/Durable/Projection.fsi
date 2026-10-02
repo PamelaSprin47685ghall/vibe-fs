@@ -48,7 +48,7 @@ type AgentProjectionSet =
         Fission: FissionProjectionState
         ChatExecutions: ChatExecutionProjectionState
         /// Successful native todowrite checkpoints still on the raw side of the
-        /// committed prefix, with the per-call retainCheckpoints value.
+        /// committed prefix. The retain window (K) is a fixed system parameter.
         TodoCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         DelegationCompletedHandoffs: Map<string, int64>
         Attention: AttentionProjectionState

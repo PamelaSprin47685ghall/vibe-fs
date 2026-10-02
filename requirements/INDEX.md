@@ -87,7 +87,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件只增加并消费 retainCheckpoints，不维护第二份 todo 真相。 |
+| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
 | `relay-assessment` | 每任至多一次八维质量评级；Manager 可亲自只读取证或委派只读 Engineer，低分原位接责，工作区变更使旧快照证书失效。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |

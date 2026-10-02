@@ -12,8 +12,7 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
 
     const beforeOutput = {
       args: {
-        obligations: [{ content: 'verify effect boundary', status: 'in_progress', priority: 'high' }],
-        retainCheckpoints: 2,
+        todos: [{ content: 'verify effect boundary', status: 'in_progress', priority: 'high' }],
       },
     }
 
@@ -47,7 +46,7 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
     assert.deepEqual(afterSnapshot.todoCheckpoints, [
       {
         sessionId: sessionID,
-        checkpoints: [{ callId: callID, retainCheckpoints: 2 }],
+        checkpoints: [{ callId: callID }],
       },
     ])
   })
@@ -61,20 +60,16 @@ integrationTest('WHAT[effect-accounting-008] todowrite executor failure restores
 
     const beforeOutput = {
       args: {
-        obligations: [{ content: 'this native write fails', status: 'in_progress', priority: 'high' }],
-        retainCheckpoints: 1,
+        todos: [{ content: 'this native write fails', status: 'in_progress', priority: 'high' }],
       },
     }
 
     await hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, beforeOutput)
-    assert.equal('retainCheckpoints' in beforeOutput.args, false)
 
     await hooks['tool.execute.after'](
       { tool: 'todowrite', sessionID, callID, args: beforeOutput.args },
       { title: 'todowrite', output: 'native todo failure', metadata: {} },
     )
-
-    assert.equal(beforeOutput.args.retainCheckpoints, 1, 'after restores the provider argument on failure too')
 
     await hooks.event({
       event: {
