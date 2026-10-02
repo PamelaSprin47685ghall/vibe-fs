@@ -1,8 +1,10 @@
 # master 合并适配轮单测结果（2026-10-02, 合并 upstream 2564a884e 后）
 # 方法: node requirements/verification-system/tests/run.mjs (815 文件)
-# 总数: 5 项失败 = 旧基线 4 项 (concern-002 复现测试[预期红]/js-semantic-surface-002[我们测试文件的 deep-dist-import 既有债务]/requirement-system-017/structured-workflow-005) + upstream 新引入 1 项 (cognitive-workspace-007, 经 worktree 纯 upstream 验证)
+# 受审提交: d62f86656；独立复核: 815/815 文件完成，3609 passed / 5 failed / 68 skipped / 433 todo，进程组检查通过
+# 后续归因: concern-002 是冻结重放判据错误；js-semantic-surface-002 命中三个施工文件的 19 处违规；其余三项为过时模块断言、条款测试文件归属和语言缓存用途标注
+# 该文件保留修改前失败集合；本次局部修正后的结果另见 master-复核轮-单测结果-2026-10-02.txt
 # upstream 2564a884e 基线 (worktree): 3592 passed / 3 failed (cognitive-workspace-007/requirement-system-017/structured-workflow-005)
-# upstream 修复了旧基线的 27 项 (context-compression-012/024 等)
+# 与 dde72867e 的 31 项失败按标题比对：3 项仍失败、28 项不再出现在失败集合；不将差集直接等同于产品缺陷修复数
 # 本轮适配: obligation-ledger/004 (K=3 无 RetainCheckpoints), GAP-190 融合, plugin.mjs transform 融合 (不吞错+不固定 agent)
 
 ✖ WHAT[cognitive-workspace-007] no TodoSink compatibility bridge survives

@@ -95,8 +95,7 @@ test('WHAT[concern-routing-002] eligible participant kinds receive each live gen
   })
 })
 
-
-test('WHAT[concern-routing-002] already-delivered recipients do not receive the announcement again after restart (reproduced defect: plugin-internal journal replay does not restore AnnouncementCoverage)', async () => {
+test('WHAT[concern-routing-002] restart replays frozen hints and does not repeat announcements in new occurrences', async () => {
   const { withRestartablePlugin, configureManagedPlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
   await withRestartablePlugin(async (start, _directory, fixture) => {
     const boot = async () => {
@@ -119,9 +118,11 @@ test('WHAT[concern-routing-002] already-delivered recipients do not receive the 
     await fixture.withRuntime(async (runtime) => {
       for (const [session, role] of eligible) await admit(runtime, session, role)
     })
+    const deliveredHints = new Map()
     for (const [session] of eligible) {
       const first = await transform(hooks, session, [user(session)])
       assert.match(JSON.stringify(hints(first)), /REPRO-GENERATION/, session + ' receives the announcement before restart')
+      deliveredHints.set(session, hints(first))
     }
 
     // Restart the plugin incarnation over the same Git-private journal
@@ -129,15 +130,16 @@ test('WHAT[concern-routing-002] already-delivered recipients do not receive the 
     await fixture.stop(hooks)
     hooks = await boot()
 
-    // New transform occurrences for already-delivered recipients must not
-    // re-announce. Evidence gathered while reproducing: the durable event
-    // order is correct (MailboxSubscribed precedes the Host facts), a
-    // separately-acquired journal replays to AnnouncementCoverage = 3, and
-    // the re-delivering transform appends no new Host fact — the plugin's
-    // internal journal view simply does not carry the restored coverage.
     for (const [session] of eligible) {
-      const after = await transform(hooks, session, [user(session)])
-      assert.doesNotMatch(JSON.stringify(hints(after)), /REPRO-GENERATION/, session + ' does not receive it twice across restart')
+      const frozen = deliveredHints.get(session)
+      const replay = await transform(hooks, session, [user(session)])
+      assert.deepEqual(hints(replay), frozen, session + ' replays the frozen hint byte-for-byte')
+
+      const next = await transform(hooks, session, [...replay, ...toolBatch(session, 'after-restart')])
+      const nextHints = hints(next)
+      assert.deepEqual(nextHints.slice(0, frozen.length), frozen, session + ' keeps historical hints unchanged')
+      assert.ok(nextHints.length > frozen.length, session + ' reaches a new Pair Hint occurrence')
+      assert.doesNotMatch(JSON.stringify(nextHints.slice(frozen.length)), /REPRO-GENERATION/, session + ' does not repeat the announcement in the new occurrence')
     }
     await fixture.stop(hooks)
   })

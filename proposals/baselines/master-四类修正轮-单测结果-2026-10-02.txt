@@ -1,6 +1,7 @@
 # master 四类修正轮单测结果（2026-10-02）
 # 方法: node requirements/verification-system/tests/run.mjs (810 文件)
-# 总数: 32 项失败 = 基线 31 项 (逐项一致) + 1 项 concern-routing/002 复现测试 (预期红, 真实缺陷证据)
+# 历史提交: 6a7f6fbe2；总数: 32 项失败 = 基线 31 项 (逐项一致) + 1 项 concern-routing/002 测试失败
+# 后续复核更正: concern 测试把同一 occurrence 的合法冻结重放误判为重复投递；撤销“真实恢复缺陷”解释，保留当时失败集合
 # 本轮改动: 023 隔离编译正反例 / 006 隔离探针 / 025 正对照完整链 / 002 可执行复现
 # 注意: durable-events/023 编译测试含两次 compileOwnerProject (约 20s), 属最慢用例
 
