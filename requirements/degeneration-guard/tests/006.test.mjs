@@ -20,8 +20,8 @@ test('WHAT[degeneration-guard-006] explicit detector reset preserves the armed c
   sensor.resetDetector(handle, 'session')
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   assert.deepEqual(aborts, ['session'])
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
-  await awaitOwned(handle, 'session', 'run')
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
+  await sensor.activeTask(handle, 'session', 'run')
 })
 
 test('WHAT[degeneration-guard-006] dropping a session after its interrupt completed removes local ownership', async () => {
@@ -29,7 +29,7 @@ test('WHAT[degeneration-guard-006] dropping a session after its interrupt comple
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   await awaitOwned(handle, 'session', 'run')
   sensor.dropSession(handle, 'session')
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
   assert.equal(sensor.activeTask(handle, 'session', 'run'), null)
 })
 

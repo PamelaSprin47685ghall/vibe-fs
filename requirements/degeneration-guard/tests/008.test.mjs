@@ -9,9 +9,9 @@ test('WHAT[degeneration-guard-008] separately constructed sensor instances do no
   const second = createSensor(options)
   sensor.observe(first, sensor.textDelta('session', repetitiveText(), 'run'))
   await awaitOwned(first, 'session', 'run')
-  assert.deepEqual(sensor.consumeAbortCause(second, 'session', 'run'), { cause: 'External' })
-  assert.deepEqual(sensor.consumeAbortCause(first, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
-  await awaitOwned(first, 'session', 'run')
+  assert.deepEqual(await sensor.consumeAbortCause(second, 'session', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(first, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
+  await sensor.activeTask(first, 'session', 'run')
 })
 
 test('WHAT[degeneration-guard-008] wrong run and wrong session cannot consume the exact armed cause or its owned task', async () => {
@@ -20,17 +20,17 @@ test('WHAT[degeneration-guard-008] wrong run and wrong session cannot consume th
   sensor.observe(handle, rawDelta('session', 'text', repetitiveText(), 'run'))
   await awaitOwned(handle, 'session', 'run')
   for (const [id, run] of [['session', 'old-run'], ['other', 'run']]) {
-    assert.deepEqual(sensor.consumeAbortCause(handle, id, run), { cause: 'External' })
+    assert.deepEqual(await sensor.consumeAbortCause(handle, id, run), { cause: 'External' })
     assert.equal(sensor.activeTask(handle, id, run), null)
   }
   assert.notEqual(sensor.activeTask(handle, 'session', 'run'), null)
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
-  await awaitOwned(handle, 'session', 'run')
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
+  await sensor.activeTask(handle, 'session', 'run')
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
   assert.deepEqual(continuations, [['session', 'TooRepetitive']])
 })
 
-test('WHAT[degeneration-guard-008] deltas without a physical message identity cannot arm or interrupt', () => {
+test('WHAT[degeneration-guard-008] deltas without a physical message identity cannot arm or interrupt', async () => {
   const aborts = []
   const handle = createSensor({ owned: ['session'], abort: id => aborts.push(id), continue: () => {} })
   for (const message of [undefined, null]) sensor.observe(handle, sensor.textDelta('session', repetitiveText(), message))
@@ -38,7 +38,7 @@ test('WHAT[degeneration-guard-008] deltas without a physical message identity ca
   delete missing.properties.messageID
   sensor.observe(handle, missing)
   assert.deepEqual(aborts, [])
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'session', 'never-observed'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'never-observed'), { cause: 'External' })
   assert.equal(sensor.activeTask(handle, 'session', 'never-observed'), null)
 })
 

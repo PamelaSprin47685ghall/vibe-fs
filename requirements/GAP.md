@@ -143,7 +143,7 @@
 | GAP-143 | host-provider-failure-ownership | PARTIAL | 真实配置hook和安装版canary保留；纯呈现分类器尚无生产消费证据，不能证明实际UI、持久终态、停止admission与exact一次处理。 |
 | GAP-144 | host-provider-failure-ownership-002 | PARTIAL | 旧固定OpenCode/plugin1.18.29在配置0重试时，一次assistant run仍发两次provider请求；真实canary失败TODO保留。需区分SDK与Host外层重试，选择兼容Host或裁决恢复所有权，不修改个人配置绕过。 |
 | GAP-145 | degeneration-guard | PARTIAL | 保留真实算法、仓库派生和受控sensor；assistant-only、run切换、在途清理、物理重启、全部豁免、continuation权限与唯一恢复仍缺全链证据。 |
-| GAP-146 | degeneration-guard-007 | PARTIAL | interrupt拒绝后同run可再次中断；interrupt仍pending时可启动continuation。真实失败TODO保留，须沿actual任务先后和清理修复，不放宽至多一次合同。 |
+| GAP-146 | degeneration-guard-007 | CLOSED | 实际sensor保留已尝试run，拒绝/抛错、detector reset与续发结束后均不重新中断同run；consume等待原owned interrupt成功才认领并续发。先红回归还证明DropSession后同session/run重建时，旧任务成功/拒绝/抛错都不能消费或清除新任务。007共11项正式回归，隔离Fable构建及四包integration runner：312 passed、0 failed、52/52文件完成，25个其余TODO保留。只关闭局部sensor时序缺陷；真实Host取消、transport acceptance及重启链仍见GAP-145。 |
 | GAP-147 | degeneration-guard-003/004/005 | PARTIAL | runtime逐delta tokenize与仓库连续流包络可能因分块产生不同度量；需明确传输分块是否影响语义及有界缓冲，有限样本分数不同不等于已证明误杀。 |
 | GAP-153 | delegation | PARTIAL | 实际fork/resume、批次、接收、队列和交接用例保留；Sphinx标准Engineer的完整权限链、全局注册、绑定恢复、重复terminal及fatal settlement→mandatory fuse仍待证。55转入42的四个Mailbox用例仅证明领取顺序和中断；旧只读Sphinx政策已退役。 |
 | GAP-155 | concern-routing | PARTIAL | 002证明engineer/manager/devops各收一次、blogger不收、新合格者重开后仍收到。新增重开测试证明旧occurrence冻结提示byte-identical、新occurrence不重复公告。原“coverage未恢复”声明撤销：原测试将同一placement的合法重放误判为新投递。插件重开不等于OS crash；真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |

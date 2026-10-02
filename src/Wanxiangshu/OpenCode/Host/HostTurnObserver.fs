@@ -35,7 +35,7 @@ module HostTurnObserver =
 
     /// Host boundary consumes the guard's one-shot armed anomaly. Consumption
     /// also schedules the guard-owned continuation at this existing reconcile point.
-    let private abortCauseOfTurn (scope: PluginRuntimeScope) (context: ReconciledTurnContext) : AbortCause =
+    let private abortCauseOfTurn (scope: PluginRuntimeScope) (context: ReconciledTurnContext) : Task<AbortCause> =
         match context.Turn.Outcome with
         | ReconcileProgram.TurnAborted _ ->
             // DEG-OWN: exact-run owned consumption. Only an anomaly armed for this
@@ -43,7 +43,7 @@ module HostTurnObserver =
             // consume a newer attempt's anomaly and session-only recovery is
             // never authorized.
             scope.LoopSensor.ConsumeAbortCause(context.Turn.SessionId, context.Turn.ProviderRun, context.Turn.Directory)
-        | _ -> AbortCause.External
+        | _ -> Task.FromResult AbortCause.External
 
     /// DEG-OWN: settle the owned interrupt/continuation task before admitting
     /// later continuation/business observation. The owned task is awaited,
@@ -169,7 +169,7 @@ module HostTurnObserver =
         : Task =
         task {
             let turn = context.Turn
-            let abortCause = abortCauseOfTurn scope context
+            let! abortCause = abortCauseOfTurn scope context
 
             // DEG-OWN: the owned interrupt/continuation settles before later
             // business observation is admitted.

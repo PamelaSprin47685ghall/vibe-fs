@@ -16,7 +16,7 @@ type LoopSensor =
     member Observe: raw: obj -> unit
 
     member ConsumeAbortCause:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> AbortCause
+        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> Task<AbortCause>
 
     member DropSession: sessionId: SessionId -> unit
     member ResetDetector: sessionId: SessionId -> unit
