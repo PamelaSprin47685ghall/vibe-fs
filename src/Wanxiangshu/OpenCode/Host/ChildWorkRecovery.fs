@@ -84,14 +84,15 @@ module ChildWorkRecovery =
             let projections = (AgentJournal.snapshot journal).AgentProjections
 
             for orphaned in orphanedChildRuns projections do
-                let! _ =
+                match!
                     AgentJournal.appendAgent
                         (StreamId.Session orphaned.ParentSessionId)
                         None
                         (AgentFact.Execution(settlementFact orphaned))
                         journal
-
-                ()
+                with
+                | Ok _ -> ()
+                | Error failure -> raise (JournalAppendException failure)
 
             return ()
         }
