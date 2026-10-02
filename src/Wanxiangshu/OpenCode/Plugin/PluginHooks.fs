@@ -319,8 +319,11 @@ module PluginHooks =
                 else
                     string toolInput?(name)
 
+            /// obligation-ledger-005: a separator keeps the dedup key
+            /// injective — concatenating without one let ("ab","c") and
+            /// ("a","bc") collide and silently drop the second checkpoint.
             let todoCheckpointKey sessionId callId =
-                sessionId + "" + ToolCallId.value callId
+                sessionId + ":" + ToolCallId.value callId
 
             let appendTodoCheckpoint durable sessionText callId =
                 task {
@@ -382,11 +385,22 @@ module PluginHooks =
 
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
+            /// obligation-ledger-005: the settled mark is only kept after the
+            /// durable append succeeds — a failed append rethrows and removes
+            /// the mark, so the Host's retry of the same terminal event gets a
+            /// real second attempt instead of a silently dropped checkpoint.
             let settleTodoTerminal (sessionText, callId, status) =
-                if not (settledTodoCheckpointCalls.Add(todoCheckpointKey sessionText callId)) then
+                let key = todoCheckpointKey sessionText callId
+                if not (settledTodoCheckpointCalls.Add(key)) then
                     Task.FromResult(())
                 elif status = "completed" then
-                    appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
+                    task {
+                        try
+                            do! appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
+                        with ex ->
+                            settledTodoCheckpointCalls.Remove(key) |> ignore
+                            return raise ex
+                    }
                 else
                     Task.FromResult(())
 
