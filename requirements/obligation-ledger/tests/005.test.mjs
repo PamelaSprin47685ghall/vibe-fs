@@ -176,6 +176,149 @@ integrationTest('WHAT[obligation-ledger-005] distinct sessions and calls never c
     assert.equal(countCheckpointFacts(directory), 6, 'identities containing the old separator remain independent')
   })
 })
+const { renameSync, writeFileSync } = await import("node:fs");
+
+// A causal barrier around the blocked append: the events directory is
+// stashed and replaced with a plain file so the writer cannot create its
+// lock, and the stash is restored in finally. Only the fixture directory
+// is touched.
+const withBlockedEvents = async (directory, action) => {
+  const eventsDir = join(directory, '.git', 'wanxiang', 'events')
+  const { mkdtempSync: mkStash, rmSync: rmStash } = await import("node:fs")
+  const osModule = await import('node:os')
+  const stash = mkStash(join(osModule.tmpdir(), 'wxs-005-stash-'))
+  renameSync(eventsDir, join(stash, 'events'))
+  writeFileSync(eventsDir, 'blocked: not a directory')
+  try {
+    return await action()
+  } finally {
+    rmStash(eventsDir, { force: true })
+    renameSync(join(stash, 'events'), eventsDir)
+    rmStash(stash, { recursive: true, force: true })
+  }
+
+integrationTest('WHAT[obligation-ledger-005] concurrent duplicate terminals share one append outcome instead of an early success', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ol005-concurrent'
+    const callID = 'ol005-concurrent-call'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    await todoCall(hooks, sessionID, callID)
+
+    await withBlockedEvents(directory, async () => {
+      // Two completed events for the same exact call race on the same
+      // blocked append. Both callers must observe the append outcome —
+      // an early fulfilled duplicate would claim a checkpoint that was
+      // never committed.
+      const first = hooks.event(terminalEvent(sessionID, callID, 'completed'))
+      const second = hooks.event(terminalEvent(sessionID, callID, 'completed'))
+      const outcomes = await Promise.allSettled([first, second])
+      const statuses = outcomes.map((outcome) => outcome.status)
+
+      // The blocked append fails; both callers must see that failure.
+      assert.deepEqual(statuses, ['rejected', 'rejected'], 'both duplicate terminals observe the append failure')
+      for (const outcome of outcomes) {
+        assert.match(String(outcome.reason), /append|write|EEXIST/i, 'the rejection carries the append failure')
+      }
+    })
+
+    // After the blockage is removed the durable log carries no checkpoint
+    // fact for the call — nothing was silently committed.
+    assert.equal(countCheckpointFacts(directory), 0, 'no checkpoint fact was committed while the append was blocked')
+  })
+})
 }
 
-test.todo('WHAT[obligation-ledger-005] duplicate terminals share the pending append outcome and failed appends are not remembered as committed (GAP-190: concurrent failure currently rejects the first caller but fulfills the duplicate; prove NotAttempted and WriteUnknown separately without treating an unknown commit as safe to repeat)')
+
+integrationTest('WHAT[obligation-ledger-005] concurrent duplicates of a successful terminal share the one append and commit exactly one fact', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ol005-concurrent-ok'
+    const callID = 'ol005-concurrent-ok-call'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    await todoCall(hooks, sessionID, callID)
+
+    // Two completed events for the same exact call race on the same append;
+    // both must observe the success and the durable log must carry exactly
+    // one checkpoint fact.
+    const first = hooks.event(terminalEvent(sessionID, callID, 'completed'))
+    const second = hooks.event(terminalEvent(sessionID, callID, 'completed'))
+    await Promise.all([first, second])
+
+    assert.equal(countCheckpointFacts(directory), 1, 'the shared append commits exactly one durable fact')
+    assert.deepEqual(
+      journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints,
+      [{ sessionId: sessionID, checkpoints: [{ callId: callID }] }],
+      'the projection carries the single checkpoint',
+    )
+  })
+})
+
+integrationTest('WHAT[obligation-ledger-005] a WriteUnknown append outcome is never retried for the same call', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ol005-write-unknown'
+    const callID = 'ol005-write-unknown-call'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    await todoCall(hooks, sessionID, callID)
+
+    await withBlockedEvents(directory, async () => {
+      // The blocked append reports an unknown outcome: the event may already
+      // be durable, so repeating it is unsafe. The first caller observes the
+      // failure...
+      await assert.rejects(
+        () => hooks.event(terminalEvent(sessionID, callID, 'completed')),
+        /append outcome unknown/i,
+        'the first terminal observes the WriteUnknown failure',
+      )
+      // ...and a duplicate terminal for the same call observes the same
+      // failure instead of silently succeeding or re-attempting the append.
+      await assert.rejects(
+        () => hooks.event(terminalEvent(sessionID, callID, 'completed')),
+        /append outcome unknown/i,
+        'the duplicate terminal observes the same unknown outcome, never an early success',
+      )
+    })
+
+    // After the blockage is removed no fact was committed and no re-attempt
+    // happened: the unknown outcome stays settled for the call.
+    assert.equal(countCheckpointFacts(directory), 0, 'no fact was committed or re-attempted for the unknown outcome')
+  })
+})
+
+integrationTest('WHAT[obligation-ledger-005] a WriterUnavailable outcome releases the call so a retry gets a real second attempt', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ol005-writer-unavailable'
+    const firstCall = 'ol005-wu-call-1'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    await todoCall(hooks, sessionID, firstCall)
+
+    // The first blocked append poisons the writer with WriteUnknown; after
+    // the blockage is removed the writer stays poisoned, so a later call's
+    // append is explicitly NotAttempted (WriterUnavailable).
+    await withBlockedEvents(directory, async () => {
+      await assert.rejects(
+        () => hooks.event(terminalEvent(sessionID, firstCall, 'completed')),
+        /append outcome unknown/i,
+        'the blocked append reports an unknown outcome',
+      )
+    })
+
+    const secondCall = 'ol005-wu-call-2'
+    await todoCall(hooks, sessionID, secondCall)
+    // The poisoned writer refuses the new call's append as NotAttempted.
+    await assert.rejects(
+      () => hooks.event(terminalEvent(sessionID, secondCall, 'completed')),
+      /append not attempted.*writer poisoned/i,
+      'the poisoned writer reports the append as not attempted',
+    )
+    // NotAttempted releases the call: a retry reaches the real append path
+    // again (it fails again with the same typed refusal, not an early
+    // success and not a silently dropped event).
+    await assert.rejects(
+      () => hooks.event(terminalEvent(sessionID, secondCall, 'completed')),
+      /append not attempted.*writer poisoned/i,
+      'the retry gets a real second append attempt',
+    )
+    assert.equal(countCheckpointFacts(directory), 0, 'no fact was committed through the poisoned writer')
+  })
+})
+
+}

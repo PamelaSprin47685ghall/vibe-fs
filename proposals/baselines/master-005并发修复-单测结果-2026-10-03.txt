@@ -1,0 +1,6 @@
+# master 005 并发修复单测结果（2026-10-03）
+# 方法: node requirements/verification-system/tests/run.mjs (816 文件)
+# 结果: 3617 passed / 0 failed — 与上轮一致 (005 新增 3 测试, 旧 TODO 1 移除, 净 +2 已计入上轮后基线)
+# js-boundary-gate: 0 违规; format:check 通过
+# 本轮: 005 追加失败与并发重复终态 (joinPending 共享 + 失败分类处理)
+

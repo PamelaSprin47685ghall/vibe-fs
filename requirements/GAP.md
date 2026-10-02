@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条规定Host-native todowrite边界（K固定=3，checkpoint只含ToolCallId）。004已证非空companion/opening/part/terminal/blog/prefix epoch在checkpoint、跨session与重放后逐值保留；未暴露handles/enforcement/relay等仍TODO。005正常及error终态局部证明保留；身份键已改为SessionId与ToolCallId类型化配对，含冒号碰撞反例；物理日志按Fact结构计数，含关键词身份反例。失败处理尚未闭合：真实临时workspace的物理追加失败下，并发重复completed产生[rejected, fulfilled]，第二个调用未等待共同追加结果。业务追加失败会WriteUnknown并poison writer，后续同writer为NotAttempted；删除settled标记不构成安全重试证明。须补正式失败/并发回归并修复，TODO保留。安装版Host TodoTable物理替换仍见GAP-220。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条守住Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004部分证明：非空前态（companion/opening/part/terminal/blog entry/prefix rebase）后checkpoint全部受保护状态逐值保留（受控违约清空变异即红）；同call重放幂等；跨session隔离；退役API拒绝。005部分证明：before/after/running/异工具终态无checkpoint；exact completed产生且重复completed在durable日志仅一条事实（事件文件计数非仅投影去重）；error不产生且不阻塞后续合法call；身份隔离（含拼接碰撞与冒号反例）各自独立事实。追加失败与并发重复终态已证：并发同call重复终态共享同一in-flight追加并观察同一最终结果（成功时两调用正常结束且durable仅一条事实；失败时两调用均观察到失败——修复了第二个调用错误提前成功的缺陷）；WriteUnknown保留pending/settled（同call重试观察同一未知结果，不重复可能已提交的事件）；WriterUnavailable释放pending/settled（重试走真实新追加路径）；成功后pending清除settled保留（后续走幂等分支）。受控违约（joinPending失效）即红。实际安装版Host TodoTable物理替换仍见GAP-220。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
