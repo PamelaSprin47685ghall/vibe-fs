@@ -388,7 +388,7 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     )
   })
 })
-test('WHAT[capability-enforcement-025] denial at the admission gate keeps the tool body, physical reads and durable appends at zero', async () => {
+test('WHAT[capability-enforcement-025] an admitted call reads the file and before-hook denial preserves arguments and journal revision', async () => {
   const { mkdirSync, writeFileSync } = await import('node:fs')
   const { join } = await import('node:path')
   const { parse: parseToml } = await import('smol-toml')
@@ -403,10 +403,8 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
     const program = "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }"
     const tool = hooks.tool['js-manager']
 
-    // Observation points are installed BEFORE the positive control, so the
-    // same instrumented path serves both scenarios:
-    // - executions: every call that reaches the tool interpreter;
-    // - journal revision: every durable append (each append advances it).
+    // The counter observes this registered tool body. Revision observes
+    // successful commits published by this journal, not physical I/O attempts.
     let executions = 0
     const originalExecute = tool.execute.bind(tool)
     tool.execute = (...callArgs) => {
@@ -416,15 +414,13 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
     const revisionOf = () => revisionSurface.revision(runtime.journal)
 
     // Positive control: before review acceptance the same program drives the
-    // full call chain (before → execute → after). The interpreter really
-    // reads the file — the executed result carries the file's bytes — and
-    // the durable revision advances, proving both observation points fire.
+    // full call chain (before → execute → after). The executed result carries
+    // the file's bytes, and the counter must observe this registered body.
     const admittedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
     await hooks['tool.execute.before'](
       { tool: 'js-manager', sessionID, callID: 'call-p15-control' },
       admittedOutput,
     )
-    const revisionBeforeControl = revisionOf()
     const controlResult = await tool.execute(
       admittedOutput.args,
       { sessionID, agent: 'manager', callID: 'call-p15-control', messageID: 'msg-p15-control' },
@@ -438,12 +434,10 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
       { tool: 'js-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
       { title: 'js-manager', output: controlResult, metadata: {} },
     )
-    assert.equal(executions, 1, 'positive control: exactly one interpreter call was observed')
+    assert.equal(executions, 1, 'positive control: exactly one registered tool call was observed')
 
-    // Denied scenario: the review is accepted, so the same call must be
-    // rejected at the admission gate — before the interpreter is reached
-    // and before any durable append happens.
-    // The revision observation itself is validated by a known append:
+    // This scenario exercises the rejecting before hook, not the full Host
+    // invocation. The revision observation is validated by a known commit:
     // accepting the assessment writes a durable fact, so the revision must
     // advance here — otherwise "unchanged" in the denial scenario would be
     // vacuous.
@@ -465,12 +459,12 @@ test('WHAT[capability-enforcement-025] denial at the admission gate keeps the to
       /not permitted under current manager capability facts/i,
     )
 
-    assert.equal(executions, executionsBeforeDenial, 'denial never reaches the tool interpreter (physical read path stays at zero)')
+    assert.equal(executions, executionsBeforeDenial, 'the rejecting before hook does not call the wrapped tool body')
     assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial does not mutate the caller arguments')
-    assert.equal(revisionOf(), revisionBeforeDenial, 'denial appends no durable fact (revision unchanged)')
+    assert.equal(revisionOf(), revisionBeforeDenial, 'the rejecting before hook leaves the observed journal revision unchanged')
   })
 })
 
-test.todo('WHAT[capability-enforcement-025] denial keeps the physical file-read boundary at zero through the production interpreter entry (GAP-075: the execute-counter observation covers the registered tool body; the interpreter-internal fs adapter is not separately instrumented)')
+test.todo('WHAT[capability-enforcement-025] denial performs zero physical reads and write attempts through the production invocation (GAP-075: the current rejecting scenario only calls before; the body counter and published journal revision do not observe physical I/O attempts)')
 
 test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')

@@ -36,11 +36,6 @@ test('WHAT[provider-projection-011] the Host crypto adapter agrees with the refe
   // adapter); composition injects it into the journal (DelegationJournalAdapter).
   // It must agree byte-for-byte with the reference implementation the injected
   // tests used, so the boundary tests were not proving a different digest.
-  // The production adapter is the Host crypto adapter exposed through the
-  // registered Projection Surface; composition injects it into the journal
-  // (DelegationJournalAdapter). It must agree byte-for-byte with the reference
-  // implementation the injected tests used, so the boundary tests were not
-  // proving a different digest.
   const hostSha256Hex = Projection.hostSha256Hex
   assert.equal(hostSha256Hex('boundary-agreement'), sha256('boundary-agreement'))
 

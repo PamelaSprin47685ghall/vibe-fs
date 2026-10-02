@@ -192,7 +192,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-072 | office-capability-003/005/011 | PARTIAL | 上游已区分稳定权能与当前准入，旧歧义不再待决；跨投影语义同源及完整执行证明仍缺。 |
 | GAP-073 | office-capability | PARTIAL | 权限函数和有限样例判别器不证明Agent实际职责履行。标准Engineer的Sphinx新权限、Manager只读取证窗口、接力与在途PTY需真实调用链。 |
 | GAP-074 | capability-enforcement-001/013/014/017/018 | PARTIAL | 一次性permit与消费→释放→再消费仍有合同分岔；manifest和全链authority证明未闭合。 |
-| GAP-075 | capability-enforcement | PARTIAL | 配置、门禁、沙箱读写有局部证据；025正常准入正对照经before→execute→after读取真实文件；拒绝分支仍只调用before，execute计数器在正对照之后安装，未验证其能观察执行。caller参数、文件字节及journal投影不变不能证明零物理读取或零append。真实拒绝路径观察、已准入读取与评审接纳的并发overlap、026零durable append及跨进程能力隔离仍待证。 |
+| GAP-075 | capability-enforcement | PARTIAL | 025观察点已前置：正常准入经before→execute→after读取文件，计数器观察到一次注册工具调用；assessment的已知提交验证revision会推进。拒绝分支只调用before，证明参数、注册工具调用次数及该journal已发布revision不变；revision只观察成功提交的发布，不能代替物理读写尝试计数。完整生产调用的零物理I/O与真实并发overlap均保留TODO；026零durable append及跨进程能力隔离仍待证。 |
 | GAP-076 | cognitive-environment | PARTIAL | 资源组装不证明认知纪律、职责和完整双语语义；关键词伪证明已撤，有限材料审阅及真实行为仍须补齐。 |
 | GAP-077 | cognitive-environment-015 | OPEN | Blogger临时提示仍内联，白名单、重复注入、历史不变和真实Host路径缺证；不以源码词形计入通过。 |
 | GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |
@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条守住Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004部分证明：经注册FoldSurface fold，只写压缩窗口（checkpoint仅含callId，K为固定常量非逐事实数据），其余投影字段不变，重放幂等，投影无TodoTable字段，退役appendMagicTodo/snapshotMagicTodo拒绝读写。实际安装版Host TodoTable物理替换仍见GAP-220。 |
+| GAP-190 | obligation-ledger | PARTIAL | provider定义与参数保持Host原样，checkpoint由Host终态后确认，K固定为3。004已改用注册FoldSurface，证明checkpoint视图含callId、同call重放去重及退役API拒绝；但Surface只暴露筛选视图，测试检查DTO字段不存在不能证明真实投影无TodoTable，从空状态开始也不能证明已有内容不被覆盖。“其余投影字段不变”断言在迁移中丢失，须补有非空前态和真实语义观察的回归。实际安装版Host TodoTable物理替换仍见GAP-220。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
