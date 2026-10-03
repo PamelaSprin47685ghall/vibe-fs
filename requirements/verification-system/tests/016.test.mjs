@@ -2,10 +2,13 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { Header } from 'tar'
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
@@ -35,6 +38,153 @@ function setupFixtureRepo(objectFormat = 'sha1') {
 
 const prepareSource = async options => (await import('../../../scripts/lib/verification-source-candidate.mjs')).prepareGitSourceCandidate(options)
 const fixtureGit = (root, ...args) => execFileSync('git', ['-C', root, ...args]).toString().trim()
+
+function dependencyArchive(root, members) {
+  const blocks = []
+  for (const member of members) {
+    const bytes = Buffer.from(member.bytes ?? '')
+    const header = new Header({ path: member.path, type: member.type ?? 'File', mode: member.mode ?? 0o644, size: bytes.length, linkpath: member.target })
+    header.encode()
+    blocks.push(header.block, bytes, Buffer.alloc((512 - bytes.length % 512) % 512))
+  }
+  blocks.push(Buffer.alloc(1024))
+  const archivePath = path.join(root, 'dependencies.tar')
+  fs.writeFileSync(archivePath, Buffer.concat(blocks))
+  return { archivePath, archiveSha256: computeFileDigest(fs.readFileSync(archivePath)) }
+}
+
+function computeFileDigest(bytes) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
+
+const prepareDependencies = async options => (await import('../../../scripts/lib/verification-dependency-candidate.mjs')).prepareVerificationDependencies(options)
+const dependencyMembers = () => [
+  { path: 'node_modules/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/.package-lock.json', bytes: '{"hidden":true}\n' },
+  { path: 'node_modules/demo/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/demo/package.json', bytes: '{"type":"module","exports":"./index.js"}' },
+  { path: 'node_modules/demo/index.js', bytes: 'export default 42\n' },
+  { path: 'node_modules/demo/cli.js', bytes: '#!/usr/bin/env node\n', mode: 0o755 },
+  { path: 'node_modules/.bin/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/.bin/demo', type: 'SymbolicLink', target: '../demo/cli.js' },
+]
+
+test('WHAT[verification-system-016] explicit dependency archive identity preserves complete bytes modes and internal links independently of its origin', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-candidate-parent-'))
+  const candidates = []
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    for (let i = 0; i < 2; i++) candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    assert.equal(candidates[0].dependencyDigest, candidates[1].dependencyDigest)
+    assert.notEqual(candidates[0].dependencyRoot, candidates[1].dependencyRoot)
+    fs.unlinkSync(archive.archivePath)
+    fs.writeFileSync(path.join(fixture, 'package-lock.json'), 'changed after selection')
+    const candidate = candidates[0]
+    assert.equal(candidate.lockfileSha256, computeFileDigest(Buffer.from('{"lockfileVersion":3}\n')))
+    assert.equal(candidate.archiveSha256, archive.archiveSha256)
+    assert.equal(candidate.entries.length, 8)
+    assert.equal(fs.readFileSync(path.join(candidate.dependencyRoot, 'node_modules/.package-lock.json'), 'utf8'), '{"hidden":true}\n')
+    assert.deepEqual(fs.readFileSync(path.join(candidate.dependencyRoot, 'node_modules/demo/index.js')), Buffer.from('export default 42\n'))
+    assert.equal(fs.statSync(path.join(candidate.dependencyRoot, 'node_modules/demo/cli.js')).mode & 0o777, 0o755)
+    assert.equal(fs.readlinkSync(path.join(candidate.dependencyRoot, 'node_modules/.bin/demo')), '../demo/cli.js')
+    assert.equal(fs.realpathSync(path.join(candidate.dependencyRoot, 'node_modules/.bin/demo')), path.join(candidate.dependencyRoot, 'node_modules/demo/cli.js'))
+    const result = execFileSync(process.execPath, ['--input-type=module', '-e', 'console.log((await import("demo")).default)'], { cwd: candidate.dependencyRoot, env: { ...process.env, NODE_PATH: '' } }).toString()
+    assert.equal(result, '42\n')
+    candidate.dispose()
+    candidate.dispose()
+    assert.equal(fs.existsSync(candidate.dependencyRoot), false)
+  } finally {
+    for (const candidate of candidates) candidate.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency preparation rejects an unselected archive and binds lockfile and executable bytes to identity', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-identity-parent-'))
+  const candidates = []
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive, archiveSha256: '0'.repeat(64) }), { code: 'dependency-candidate-integrity-invalid' })
+    assert.deepEqual(fs.readdirSync(parent), [])
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    fs.writeFileSync(path.join(fixture, 'package-lock.json'), '{"lockfileVersion":3,"changed":true}\n')
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    assert.notEqual(candidates[0].dependencyDigest, candidates[1].dependencyDigest)
+    const changed = dependencyMembers()
+    changed.find(member => member.path === 'node_modules/demo/index.js').bytes = 'export default 43\n'
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, changed) }))
+    assert.notEqual(candidates[1].dependencyDigest, candidates[2].dependencyDigest)
+    const modeChanged = dependencyMembers()
+    modeChanged.find(member => member.path === 'node_modules/demo/index.js').mode = 0o755
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, modeChanged) }))
+    assert.notEqual(candidates[1].dependencyDigest, candidates[3].dependencyDigest)
+  } finally {
+    for (const candidate of candidates) candidate.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency archives reject external dangling cyclic aliasing and special entries without publishing or escaping their owned root', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-invalid-parent-'))
+  try {
+    const cases = [
+      { path: 'node_modules/escape', type: 'SymbolicLink', target: '../../outside' },
+      { path: 'node_modules/absolute', type: 'SymbolicLink', target: path.join(fixture, 'resources/r.txt') },
+      { path: 'node_modules/missing', type: 'SymbolicLink', target: 'absent' },
+      { path: 'node_modules/cycle', type: 'SymbolicLink', target: 'cycle' },
+      { path: 'node_modules/demo/index.js', bytes: 'duplicate' },
+      { path: 'node_modules/../outside', bytes: 'escaped' },
+      { path: 'node_modules/demo/hard', type: 'Link', target: 'node_modules/demo/index.js' },
+      { path: 'node_modules/pipe', type: 'FIFO' },
+      { path: 'node_modules/device', type: 'CharacterDevice' },
+      { path: 'node_modules/ambiguous', type: 'SymbolicLink', target: 'demo/../demo/index.js' },
+      { path: 'node_modules/suid', mode: 0o4644, bytes: 'special permissions' },
+      { path: 'node_modules/.bin/demo/nested', bytes: 'symlink parent' },
+    ]
+    for (const invalid of cases) {
+      await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, [...dependencyMembers(), invalid]) }), { code: 'dependency-candidate-entry-invalid' }, JSON.stringify(invalid))
+      assert.deepEqual(fs.readdirSync(parent), [])
+      assert.equal(fs.readFileSync(path.join(fixture, 'resources/r.txt'), 'utf8'), 'resource\n')
+    }
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency preparation fully consumes compressed archives and refuses malformed or truncated input and linked lockfiles', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-parser-parent-'))
+  let candidate
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    const tarBytes = fs.readFileSync(archive.archivePath)
+    const compressed = gzipSync(tarBytes)
+    fs.writeFileSync(archive.archivePath, compressed)
+    candidate = await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, archivePath: archive.archivePath, archiveSha256: computeFileDigest(compressed) })
+    assert.equal(candidate.archiveSha256, computeFileDigest(compressed))
+    candidate.dispose()
+    for (const invalid of [Buffer.from('not tar'), compressed.subarray(0, compressed.length - 12), tarBytes.subarray(0, 1900), tarBytes.subarray(0, tarBytes.length - 1024), Buffer.concat([tarBytes, Buffer.alloc(512, 1)]), Buffer.concat([tarBytes, tarBytes])]) {
+      fs.writeFileSync(archive.archivePath, invalid)
+      await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, archivePath: archive.archivePath, archiveSha256: computeFileDigest(invalid) }))
+      assert.deepEqual(fs.readdirSync(parent), [])
+    }
+    fs.writeFileSync(archive.archivePath, tarBytes)
+    fs.unlinkSync(path.join(fixture, 'package-lock.json'))
+    fs.symlinkSync('resources/r.txt', path.join(fixture, 'package-lock.json'))
+    await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }), { code: 'verification-inputs-symbolic-link' })
+    assert.deepEqual(fs.readdirSync(parent), [])
+  } finally {
+    candidate?.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[verification-system-016] a selected Git tree preserves complete raw source bytes and its own corpus inventory despite later workspace and index edits', async () => {
   const fixture = setupFixtureRepo()

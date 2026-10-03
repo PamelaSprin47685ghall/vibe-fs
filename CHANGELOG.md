@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 明确身份的依赖归档准备
+
+- 新增依赖准备owner：完整读取调用者指定SHA-256的安装归档，解析后独立物化node_modules，复核全部目录、字节、权限和闭合内部链接，摘要绑定归档与源码锁文件字节。拒绝外部/悬空/循环链接、重复路径、链接祖先、特殊文件及截断归档。
+- 本批不执行npm安装，不证明归档符合锁文件来源，也未接入实际verify或只读执行。T418/T419保留；见[依赖准备记录](proposals/archive/2026-10-04/S03依赖归档准备-2026-10-04.md)。
+
 ## Unreleased — S03 指定 Git tree 源码准备
 
 - 从明确指定的Git tree读取完整原始blob，保留路径、执行位和字节；在自有Git目录重新构造index/tree核对身份，避免工作区、attributes、replace refs和继承Git环境改变候选。缺对象、promisor仓、不支持的类型或无法忠实物化的路径均失败。

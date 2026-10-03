@@ -52,6 +52,8 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 
 016的2026-10-04准备增量使用真实Git tree/blob/index证明指定源码身份：工作区/index后改不污染原tree，特殊路径/二进制/执行位保留，SHA1/SHA256均可重构；attributes与replace refs不改原blob，继承Git环境不重定向读取或写回，缺对象/不支持的entry/promisor仓/无法忠实物化的tree都拒绝并回收自有root。该API尚未接实际verify；源码receipt不证明运行期不可改、依赖封闭或全阶段同源，两个TODO仍保留。
 
+接续依赖准备回归校验明确SHA-256归档、gzip/tar完整性和独立物化目录；真实Node import与完整字节/mode/隐藏文件/内部.bin链接证明所选依赖可独立读取。外部、悬空、循环、重复、特殊entry、链接祖先及受限语法外的路径拒绝，失败不发布root。摘要绑定lock字节，但不证明安装来源符合lock，也不证明工具链、实际verify或运行期只读；两个TODO不变。
+
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 
 009 的仓库封闭反例先证明合规输入通过，再分别验证未归属生产源与不合规打包白名单被拒绝。白名单直接运行 distribution-004 的同一测试，核对实际断言失败及用例计数；加载失败或未匹配到测试不能冒充违约被识别。该用例不证明真实 tarball 或独立消费者验收。
