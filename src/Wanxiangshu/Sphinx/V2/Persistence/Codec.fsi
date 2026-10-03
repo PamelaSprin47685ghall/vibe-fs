@@ -12,31 +12,30 @@ open Wanxiangshu.Sphinx.V2.Core
 /// thing, so a partial transition can never become the accepted current.
 module Codec =
 
-    /// The registered canonical event type. Only this type is accepted by the v2 rule.
+    /// New writes use @2. @1 keeps its identity and is explicitly rejected/cut, not reinterpreted.
     val transitionEventType: string
+    val legacyTransitionEventType: string
 
-    /// The wire form of one event body. Tag and payload are separate so the Integrator
-    /// can route without re-deriving which event it is.
-    type EventBodyWire = { Tag: string; Payload: string }
+    type CodecError = { Code: string; Message: string }
 
-    /// The wire form of one transition batch.
-    type TransitionBatchWire =
-        { SchemaVersion: string
-          Inquiry: string
-          PreviousRevision: string
-          PreviousHead: string option
-          Revision: string
-          CommandId: string
-          CommandFingerprint: string
-          PostStateFingerprint: string option
-          Events: EventBodyWire list }
+    val decodeBody: obj -> Result<InquiryEventBody, CodecError>
+    val decodeInput: obj -> Result<TransitionBatch, CodecError>
+    val decode: (string -> string) -> EventEnvelope -> Result<TransitionBatch, CodecError>
 
     /// The event body tag the Integrator routes on.
     val bodyTag: InquiryEventBody -> string
 
-    /// The wire form of a batch.
-    val toWire: TransitionBatch -> TransitionBatchWire
+    /// Native @2 payload: schemaVersion/inquiry/previousRevision/previousHead/revision,
+    /// commandId/commandFingerprint/postStateFingerprint/events. Revisions are exact
+    /// int64 decimal strings; bodies are { case: string, payload: native DTO }; all
+    /// collections are arrays, and optional fields are explicit null. Persisted @2
+    /// requires a complete sealed post-state fingerprint; preparation may carry null.
+    val toWire: TransitionBatch -> obj
+    val eventIdentity: (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId
+    val seal: (string -> string) -> InquiryState option -> TransitionBatch -> Result<EventEnvelope, CoreError>
 
-    /// Encodes one transition as one canonical envelope. The same transition always
-    /// yields the same envelope id, so a retried append is idempotent at the store.
-    val encode: (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId option -> EventEnvelope
+    /// Encodes one sealed transition. Id derives from immutable command identity,
+    /// not post-state, so altered bytes at the same identity remain a shared-engine
+    /// collision. Parents must agree; only inline payloads are supported. ArtifactRef
+    /// never becomes PayloadRef by spelling or hash guessing.
+    val encode: (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId option -> Result<EventEnvelope, CodecError>

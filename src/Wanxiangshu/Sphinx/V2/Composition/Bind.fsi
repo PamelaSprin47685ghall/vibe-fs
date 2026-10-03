@@ -2,6 +2,7 @@ namespace Wanxiangshu.Sphinx.V2.Composition
 
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Sphinx.V2.Core
+open Wanxiangshu.Sphinx.V2.Persistence
 
 [<RequireQualifiedAccess>]
 module Bind =
@@ -16,4 +17,4 @@ module Bind =
     val createDurableStore: commonDir: string -> writerId: string -> Result<IEventStore, string>
 
     /// Reads the published state for one inquiry.
-    val tryInquiry: IEventStore -> InquiryId -> InquiryState option
+    val tryInquiry: IEventStore -> InquiryId -> Result<InquiryState option, CurrentError>

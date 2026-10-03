@@ -2,6 +2,7 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
+open Wanxiangshu.Interaction.Authority
 
 /// DSL-003 / delegation-029 / durable-events-023: Durable composition bridge for
 /// delegation-owned folds.
@@ -11,6 +12,7 @@ open Wanxiangshu.Foundation
 /// assembly point that routes `AgentProjectionSet` into bounded slices and applies
 /// fold changes back to aggregate projection state.
 module DelegationProjectionBridge =
+    val admitAuthority: AgentProjectionSet -> PromptFactCases -> Result<AgentProjectionSet, FoldRejection>
 
     val foldExecution:
         projection: AgentProjectionSet -> fact: ExecutionFactCases -> Result<AgentProjectionSet, FoldRejection>

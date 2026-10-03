@@ -336,20 +336,6 @@ module HostForkAgent =
             | Some sendAgent ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
-                let relink () =
-                    let journalPort =
-                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
-
-                    HandleController.linkNamed
-                        journalPort
-                        runtime.ParentId
-                        agentId
-                        childId
-                        sendAgent
-                        sendAgent
-                        role
-                        runtime.HandleOwnership
-
                 return!
                     HostForkChildDispatch.sendToExistingChild
                         runtime.Gate
@@ -365,7 +351,6 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -462,20 +447,6 @@ module HostForkAgent =
             match providerBynameOpt with
             | None -> return Error(sprintf "Agent handle '%s' has no provider byname" agentId)
             | Some providerByname ->
-                let relink () =
-                    let journalPort =
-                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
-
-                    HandleController.linkNamed
-                        journalPort
-                        runtime.ParentId
-                        agentId
-                        childId
-                        agentName
-                        providerByname
-                        role
-                        runtime.HandleOwnership
-
                 runtime.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
                 let! enriched = resolveReuseEnrichedPrompt runtime prompt renderedPrompt
 
@@ -494,7 +465,6 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        relink
                         preparedHandoff
                         agentId
                         childId

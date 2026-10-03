@@ -158,8 +158,7 @@ type PluginSessionScope
     /// No-op: language follows the live global preference, so there is no
     /// per-session identity left to drop. Kept as the deletion boundary's
     /// stable call shape.
-    member _.DropSessionIdentity(sessionId: string) =
-        ignore sessionId
+    member _.DropSessionIdentity(sessionId: string) = ignore sessionId
 
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup). Always drops

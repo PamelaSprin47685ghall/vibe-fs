@@ -1,4 +1,30 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { withForkRuntime, toolModule } from './support/fork-runtime.mjs'
+import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+
+test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecords', async () => {
+  const owner = 'prejoin-retained-delivery'
+  await withForkRuntime(owner, async runtime => {
+    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'FIRST')
+    await forkTool.awaitPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await first, /Ada/)
+    const child = forkTool.child(runtime)
+    assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-A', 'provider-a'), true)
+    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'SECOND')
+    await forkTool.awaitPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    assert.match(await second, /Ada/)
+    assert.equal(forkTool.child(runtime), child)
+    assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-B', 'provider-b'), true)
+    const result = await forkTool.executeJoin(runtime, owner)
+    assert.match(result, /RETAINED-ANSWER-A/)
+    assert.match(result, /RETAINED-ANSWER-B/)
+    assert.equal((result.match(/RETAINED-ANSWER-A/g) ?? []).length, 1)
+    assert.equal((result.match(/RETAINED-ANSWER-B/g) ?? []).length, 1)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

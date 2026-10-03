@@ -143,10 +143,15 @@ type HostForkRuntime
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first runtime-owned callback failure for shutdown propagation.
     let mutable ownedWorkFailure: exn option = None
+    // DSL-MUTABLE: resource — acknowledgement for observed callbacks without closing admission.
+    let mutable observedWorkWaiter: TaskCompletionSource<unit> option = None
 
     let finishOwnedWork () =
         lock ownedWorkGate (fun () ->
             ownedWorkCount <- ownedWorkCount - 1
+            if ownedWorkCount = 0 then
+                observedWorkWaiter |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore)
+                observedWorkWaiter <- None
 
             if not acceptingOwnedWork && ownedWorkCount = 0 then
                 ownedWorkDrainWaiter
@@ -780,6 +785,23 @@ type HostForkRuntime
 
     member this.OwnsPty(id: PtyId) =
         lock gate (fun () -> ptyRuns.Contains id.Value)
+
+    member this.AwaitObservedWork() : Task<unit> =
+        let waiting = lock ownedWorkGate (fun () ->
+            if ownedWorkCount = 0 then Task.FromResult(())
+            else
+                match observedWorkWaiter with
+                | Some waiter -> waiter.Task
+                | None ->
+                    let waiter = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+                    observedWorkWaiter <- Some waiter
+                    waiter.Task)
+        task {
+            do! waiting
+            match lock ownedWorkGate (fun () -> ownedWorkFailure) with
+            | Some failure -> return raise failure
+            | None -> return ()
+        }
 
     member this.DrainOwnedWork() : Task<unit> =
         task {

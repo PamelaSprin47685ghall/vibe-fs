@@ -7,7 +7,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -716,6 +718,139 @@ module ForkToolSurface =
                             match! runtime.AwaitCurrentWorkRecord agent.AgentId with
                             | Ok _ -> return true
                             | Error _ -> return false
+        }
+
+    let private workView (record: HandleRecord) : obj =
+        let root = record.Work |> Option.map (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot)
+        let lifecycle = match record.Lifecycle with Active -> "Active" | CompletedAwaitingJoin _ -> "CompletedAwaitingJoin" | Abandoned _ -> "Abandoned" | Retired -> "Retired"
+        box {| root = root; handle = HandleId.describe record.Handle; child = SessionId.value record.ChildSessionId
+               targetAgent = record.TargetAgent; byname = record.Byname; role = Roles.roleLabel record.CanonicalRole
+               lifecycle = lifecycle; completionRef = record.LastCompletion |> Option.bind _.CompletionRef |> Option.map BlobRef.value
+               completionDigest = record.LastCompletion |> Option.bind _.CompletionDigest |> Option.map BlobDigest.value |}
+
+    let workSnapshot (value: obj) (owner: string) : obj array =
+        let harness = unbox<ForkHarness> value
+        AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+        |> HandleProjection.workRecords |> List.map workView |> List.toArray
+
+    let coldWorkSnapshot (directory: string) (owner: string) : Task<obj array> =
+        task {
+            let! journal = createJournal directory
+            try
+                return AgentJournal.handleProjection journal (SessionId.create owner)
+                       |> HandleProjection.workRecords |> List.map workView |> List.toArray
+            finally
+                (journal :> IDisposable).Dispose()
+        }
+
+    let replayBinding (value: obj) (owner: string) (byname: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let projection = AgentJournal.handleProjection harness.Journal parent
+            match HandleProjection.tryFindByByname byname projection with
+            | None -> return box {| ok = false; error = "binding not found" |}
+            | Some record ->
+                match HandleId.tryAgent record.Handle with
+                | None -> return box {| ok = false; error = "not an agent binding" |}
+                | Some id ->
+                    let! result =
+                        Wanxiangshu.Execution.Delegation.Handle.HandleController.linkNamed
+                            (Some(AgentJournalPortAdapter.fromAgentJournal harness.Journal)) parent (AgentHandleId.value id)
+                            record.ChildSessionId record.TargetAgent record.Byname record.CanonicalRole record.Ownership
+                    let error = match result with Ok() -> None | Error reason -> Some reason
+                    return box {| ok = Result.isOk result; error = error |}
+        }
+
+    let emitTerminalForRoot (value: obj) (owner: string) (root: string) (answer: string) (providerRun: string) : Task =
+        task {
+            let harness = unbox<ForkHarness> value
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                harness.Sessions.Notify(childId, TerminalOutcome.Completed
+                    { SessionId = childId; AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                      ProviderRun = ProviderRunIdentity.create providerRun; Role = Role.Engineer
+                      Directory = None; TerminalText = answer; TurnFormalText = answer })
+                do! runtime.AwaitObservedWork()
+            | _ -> invalidOp "no owned child work"
+        } :> Task
+
+    let startUnprepared (value: obj) (owner: string) (charge: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            match harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Error error -> return box {| ok = false; error = sprintf "%A" error |}
+            | Ok runtime ->
+                let! result = runtime.Fork("plain-child", Role.Engineer, "engineer", charge, None, byname = "Plain")
+                return box {| ok = Result.isOk result |}
+        }
+
+    let emitStopForRoot (value: obj) (owner: string) (root: string) (kind: string) : Task =
+        task {
+            let harness = unbox<ForkHarness> value
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                let stop = TerminalStop.forAuthority (AuthorityRootUserMessageId.create root) "old work stop"
+                let outcome = match kind with "Failed" -> TerminalOutcome.Failed stop | "Aborted" -> TerminalOutcome.Aborted stop | _ -> invalidArg "kind" "unknown stop"
+                harness.Sessions.Notify(childId, outcome)
+                do! runtime.AwaitObservedWork()
+            | _ -> invalidOp "no owned child work"
+        } :> Task
+
+    let replayWorkCompletion (value: obj) (owner: string) (root: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let handles = AgentJournal.handleProjection harness.Journal parent
+            let candidate = HandleProjection.workRecords handles
+                            |> List.tryFind (fun record -> record.Work |> Option.exists (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot = root))
+            match candidate |> Option.bind (fun record -> record.LastCompletion |> Option.map (fun cell -> record, cell)) with
+            | None -> return box {| ok = false |}
+            | Some(record, cell) ->
+                let! result =
+                    (AgentJournalPortAdapter.fromAgentJournal harness.Journal).AppendExecutionFact parent
+                        (ExecutionFactCases.HandleWorkCompleted
+                            {| ParentSessionId = parent; Work = record.Work |> Option.get; Kind = HandleCompletionKind.SendFailure
+                               CompletionRef = cell.CompletionRef; CompletionDigest = cell.CompletionDigest |})
+                return box {| ok = Result.isOk result |}
+        }
+
+    let consumeWorkWithOutcome (value: obj) (owner: string) (root: string) (commitment: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let journal = AgentJournalPortAdapter.fromAgentJournal harness.Journal
+            let capability =
+                match commitment with
+                | "confirmed" -> journal
+                | "before" -> { journal with AppendExecutionFact = fun _ _ -> Task.FromResult(Error "known-not-committed") }
+                | "after" ->
+                    { journal with
+                        AppendExecutionFact = fun session fact ->
+                            task {
+                                let! outcome = journal.AppendExecutionFact session fact
+                                return outcome |> Result.bind (fun () -> Error "commit-unknown-after-append")
+                            } }
+                | _ -> invalidArg "commitment" "unknown commitment scenario"
+            let candidate = HandleProjection.workRecords (journal.HandleProjection parent)
+                            |> List.tryFind (fun record -> record.Work |> Option.exists (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot = root))
+            match candidate with
+            | None -> return box {| ok = false; error = "WorkNotAdmitted" |}
+            | Some record ->
+                let! payload =
+                    Wanxiangshu.Execution.Delegation.Handle.HandleCompletionCodec.tryRead journal record
+                        (HandleId.tryAgent record.Handle |> Option.map AgentHandleId.value |> Option.defaultValue "") DateTimeOffset.MinValue
+                let consumption =
+                    match payload with
+                    | Error reason -> Task.FromResult(Error(Wanxiangshu.Execution.Delegation.Handle.AppendFailed reason))
+                    | Ok _ -> Wanxiangshu.Execution.Delegation.Handle.HandleController.consumeWork capability parent record
+                match! consumption with
+                | Error reason -> return box {| ok = false; error = sprintf "%A" reason |}
+                | Ok consumed ->
+                    match payload with
+                    | Ok(Some { Outcome = AgentCompleted completion }) ->
+                        return box {| ok = true; root = root; workRecord = completion.WorkRecord |}
+                    | _ -> return box {| ok = false; error = "materialization failed" |}
         }
 
     let injectAcceptedAssessment (value: obj) (owner: string) : Task =

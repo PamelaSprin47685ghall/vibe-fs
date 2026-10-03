@@ -15,6 +15,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Interaction.Authority
 
 /// Local payload writer for EventStore journals.
 /// `BlobRef` keeps the long-standing `blobs/<handle>` application shape, while
@@ -132,6 +133,12 @@ module JournalPayloadClosure =
         let refs =
             match fact with
             | Fact.Runtime _ -> []
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleWorkCompleted p)) ->
+                (p.CompletionRef |> Option.toList |> List.choose payloadRefOfBlobRef)
+                @ (p.CompletionDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleWorkConsumed p)) ->
+                (p.CompletionRef |> Option.toList |> List.choose payloadRefOfBlobRef)
+                @ (p.CompletionDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
             | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted p)) ->
                 (p.CompletionRef |> Option.toList |> List.choose payloadRefOfBlobRef)
                 @ (p.CompletionDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
@@ -236,6 +243,19 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
                 let heads = store.AllHeads()
                 if List.isEmpty heads then [] else heads
             | _ -> store.TryHead streamId |> Option.toList
+
+        let dependencySession =
+            match envelope.Fact with
+            | Fact.Agent(AgentFact.Prompt(Wanxiangshu.Interaction.Authority.PromptFactCases.AuthorityRootAccepted p)) ->
+                PromptIdentitySeed.owner p.IdentitySeed |> Option.map (fun (owner, _, _) -> owner)
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleLinked p)) -> Some p.ChildSessionId
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleWorkCompleted p)) -> Some p.Work.ChildSessionId
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleWorkConsumed p)) -> Some p.Work.ChildSessionId
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleWorkAbandoned p)) -> Some p.Work.ChildSessionId
+            | Fact.Agent(AgentFact.Execution(ExecutionFactCases.ChildWorkVoided p)) -> Some p.Work.ChildSessionId
+            | _ -> None
+        let parents = parents @ (dependencySession |> Option.bind (fun session ->
+            store.TryHead(EventStoreJournalCodec.encodeStreamId (StreamId.Session session))) |> Option.toList)
 
         let encoded =
             EventStoreJournalCodec.encode parents (JournalPayloadClosure.ofFact envelope.Fact) envelope

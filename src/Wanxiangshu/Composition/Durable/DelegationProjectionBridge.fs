@@ -39,13 +39,24 @@ module DelegationProjectionBridge =
             { projection with
                 DelegationCompletedHandoffs = Map.add key endExclusive projection.DelegationCompletedHandoffs }
 
-        | TerminatedChildHandle childSessionId ->
+        | TerminatedChildWork(work, logicalRunId) ->
+            let session = Map.tryFind work.ChildSessionId projection.Sessions |> Option.defaultValue AgentProjection.emptySession
+            let authority =
+                session.PromptAuthority
+                |> Option.bind (fun current ->
+                    PromptAuthorityRun.closeCompletedAgentOwnerChildWork logicalRunId work.AuthorityRoot current |> Result.toOption)
+                |> Option.orElse session.PromptAuthority
+            { projection with Sessions = Map.add work.ChildSessionId { session with PromptAuthority = authority } projection.Sessions }
+        | TerminatedChildHandle(parentId, childSessionId) ->
             let session =
                 Map.tryFind childSessionId projection.Sessions
                 |> Option.defaultValue AgentProjection.emptySession
 
+            let scopedChild =
+                sessionState projection parentId |> Option.bind _.Handles
+                |> Option.exists (fun handles -> handles.Works |> Map.exists (fun key _ -> key.ChildSessionId = childSessionId))
             let updatedAuthority =
-                session.PromptAuthority
+                (if scopedChild then None else session.PromptAuthority)
                 |> Option.bind (fun current ->
                     current.ActiveLogicalRun
                     |> Option.bind (fun active ->
@@ -64,12 +75,39 @@ module DelegationProjectionBridge =
                             PromptAuthority = updatedAuthority }
                         projection.Sessions }
 
+    let private admitBinding parentId handle childId (projection: AgentProjectionSet) =
+        let authority = Map.tryFind childId projection.Sessions |> Option.bind _.PromptAuthority
+        let state = sessionState projection parentId |> Option.defaultValue DelegationSessionState.empty
+        let handles = state.Handles |> Option.defaultValue HandleProjection.empty
+        match authority with
+        | None -> Ok projection
+        | Some authority when authority.ActiveLogicalRun.IsNone -> Ok projection
+        | Some authority ->
+            match HandleProjection.admitWork parentId handle authority handles with
+            | Error reason -> FoldRejection.reject "HandleWorkAdmission" (sprintf "%A" reason)
+            | Ok updated ->
+                let next = applyChange projection (ReplaceSessionState(parentId, { state with Handles = Some updated }))
+                Ok(applyChange next (IndexChildHandle(childId, HandleProjection.tryFind handle updated |> Option.get)))
+
+    let admitAuthority (projection: AgentProjectionSet) (fact: PromptFactCases) =
+        match fact with
+        | PromptFactCases.AuthorityRootAccepted payload when payload.AuthorityKind = "AgentOwnerRoot" ->
+            match PromptAuthority.identitySeedOwner payload.IdentitySeed, Map.tryFind payload.SessionId projection.HandleByChildSession with
+            | Some(parentId, _, _), Some binding -> admitBinding parentId binding.Handle payload.SessionId projection
+            | _, None -> Ok projection
+            | _ -> FoldRejection.reject "HandleWorkAdmission" "exact owner authority is missing"
+        | _ -> Ok projection
+
     let foldExecution
         (projection: AgentProjectionSet)
         (fact: ExecutionFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
         match ExecutionFactFold.fold (sessionState projection) fact with
-        | Ok changes -> Ok(List.fold applyChange projection changes)
+        | Ok changes ->
+            let updated = List.fold applyChange projection changes
+            match fact with
+            | ExecutionFactCases.HandleLinked payload -> admitBinding payload.ParentSessionId payload.Handle payload.ChildSessionId updated
+            | _ -> Ok updated
         | Error rejection ->
             FoldRejection.reject (DelegationFoldRejection.fact rejection) (DelegationFoldRejection.message rejection)
 

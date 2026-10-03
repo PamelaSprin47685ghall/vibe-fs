@@ -53,6 +53,12 @@ type PhysicalBinding =
       PhysicalRef: string option
       Receipt: string option }
 
+/// One durable command identity owns its content fingerprint and original receipt.
+type CommandReceipt =
+    { Fingerprint: string
+      Revision: Revision
+      EventId: EventId }
+
 type InquiryState =
     {
         Id: InquiryId
@@ -80,8 +86,8 @@ type InquiryState =
         Rounds: Map<RoundId, RoundRecord>
         Decisions: Map<string, string>
         Answer: AnswerCommittedBody option
-        /// Command identity -> revision, for idempotent retry of a control command.
-        CommandReceipts: Map<string, Revision>
+        /// Command identity -> immutable content-bound receipt, rebuilt from transitions.
+        CommandReceipts: Map<string, CommandReceipt>
         PhysicalBindings: Map<string, PhysicalBinding>
         Status: InquiryStatus
     }
@@ -92,6 +98,9 @@ module InquiryState =
     /// network retry of an already-applied command must return the original receipt
     /// rather than turn into a conflict.
     let commandRevision (state: InquiryState) (commandId: string) : Revision option =
+        state.CommandReceipts |> Map.tryFind commandId |> Option.map (fun receipt -> receipt.Revision)
+
+    let commandReceipt (state: InquiryState) (commandId: string) : CommandReceipt option =
         state.CommandReceipts |> Map.tryFind commandId
 
     /// Certificate lookup by the full scope address. A certificate addressed only by

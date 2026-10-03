@@ -151,11 +151,6 @@ const rootSelection = (participant) => {
     },
   }
 }
-const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', participant = 'engineer') => {
-  const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(participant))
-  assert.equal(built.ok, true, built.ok ? '' : built.error)
-  return built.value
-}
 const acceptOwner = async (handle, session = 'ses_owner') => {
   const accepted = await dispatch.acceptHumanRootSelection(
     handle,
@@ -250,9 +245,19 @@ test('WHAT[dispatch-protocol-012] DP_012_continuation_inherits_identity_from_pro
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const session = 'ses_dp012_cont'
-      // The immutable authority profile is the only identity authority here:
-      // no Host session cache and no process-local binding exists for it.
-      const profile = profileFor('rt-dp012-cont', session, 'msg_dp012_cont', 'manager')
+      // The durable authority profile is the only identity authority here: no
+      // Host session cache and no process-local binding exists for it. The root
+      // is established through the production writer first, because a
+      // continuation may only attach to the target's own active Logical Run
+      // (interaction-authority-017).
+      const accepted = await dispatch.acceptHumanRootSelection(
+        opened.journal,
+        session,
+        'msg_dp012_cont',
+        rootSelection('manager'),
+      )
+      assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+      const profile = accepted.profile
       const captured = []
       const port = {
         SubscribeTerminal: () => ({ Dispose: () => {} }),

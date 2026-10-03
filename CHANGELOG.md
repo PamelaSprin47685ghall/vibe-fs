@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — 原工作区迁移代码编译修复
+
+- 补齐 Sphinx Representation、BodyDto、Persistence Surface 的编译登记，调整 completion codec 的声明和实现顺序；修正直接阻塞编译的局部缩进、元组、保留字、缺失声明/引用，以及类型和参数名不一致。
+- 直接在原工作区通过 Fable 构建，并验证 predictor 正文降为 reasoning、原生 reasoning 不回传、重启及子 owner 往复；未回退现有迁移或扩展同步逻辑。
+
 ## Unreleased — predictor 正文降格回传与往复恢复
 
 - predictor → Main 现在回传 assistant 正文并降为 reasoning，原生 reasoning 不回传；混合工具消息与无后续请求的终止正文都纳入 frame 的持久化、校验、重放和 XTrace 覆盖。

@@ -159,7 +159,6 @@ module HostForkChildDispatch =
         (childId: SessionId)
         (role: Role)
         (identitySeed: PromptAuthority.IdentitySeed)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (prompt: string)
         (agent: string)
@@ -174,8 +173,6 @@ module HostForkChildDispatch =
 
             match sent with
             | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-                let! _ = relink ()
-
                 let run =
                     HostForkRunLifecycle.installRun
                         gate
@@ -224,7 +221,6 @@ module HostForkChildDispatch =
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (onRunStarted: SessionId -> Role -> unit)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -257,7 +253,6 @@ module HostForkChildDispatch =
                         childId
                         role
                         identitySeed
-                        relink
                         preparedHandoff
                         prompt
                         agent
@@ -292,7 +287,6 @@ module HostForkChildDispatch =
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -330,7 +324,6 @@ module HostForkChildDispatch =
                         handoffPort
                         sendChildPrompt
                         onRunStarted
-                        relink
                         preparedHandoff
                         agentId
                         childId

@@ -20,8 +20,8 @@ type HandleConsumeRejection =
     /// Journal append failed (includes CommitUnknown). Must not deliver.
     | AppendFailed of string
 
-/// EXEC-009: the only writer of `HandleLinked`, `HandleCompleted`,
-/// `HandleAbandoned` and `HandleRetired`.
+/// Single writer of stable HandleLinked and exact scoped work settlements.
+/// Unscoped historical terminals remain readable but have no new writer.
 ///
 /// One lifecycle, one writer. Progressions are
 /// `Active → CompletedAwaitingJoin → Retired` or `Active|CompletedAwaitingJoin →
@@ -30,7 +30,7 @@ type HandleConsumeRejection =
 /// meant three modules each knew part of that order, and none of them could see
 /// whether the other two agreed.
 ///
-/// P0-RECOVERY-JOIN-001: `recordCompletion` accepts only `JoinableCompletion`.
+/// `recordWorkCompletion` requires canonical AdmittedWork and JoinableCompletion.
 /// Raw Aborted / bare kind+body cannot claim the completion cell.
 module HandleController =
 
@@ -63,17 +63,11 @@ module HandleController =
         match journal with
         | None -> Task.FromResult(Ok())
         | Some durable ->
-            append
-                durable
-                parentId
-                (ExecutionFactCases.HandleLinked
-                    {| ParentSessionId = parentId
-                       ChildSessionId = childSessionId
-                       Handle = agentHandle agentId
-                       TargetAgent = targetAgent
-                       Byname = byname
-                       CanonicalRole = role
-                       Ownership = ownership |})
+            match HandleProjection.linkNamed (agentHandle agentId) childSessionId targetAgent byname role ownership (durable.HandleProjection parentId) with
+            | Error reason -> Task.FromResult(Error(sprintf "binding rejected: %A" reason))
+            | Ok _ -> append durable parentId (ExecutionFactCases.HandleLinked
+                {| ParentSessionId = parentId; ChildSessionId = childSessionId; Handle = agentHandle agentId
+                   TargetAgent = targetAgent; Byname = byname; CanonicalRole = role; Ownership = ownership |})
 
     /// Internal compatibility: when no distinct provider presentation identity
     /// exists, use the Host target name as the byname too.
@@ -114,29 +108,36 @@ module HandleController =
             | Some content -> return! writeCompletionBlob durable content
         }
 
-    let private recordCompletionWithJournal
-        (durable: AgentJournalPort)
-        parentId
+    let recordWorkCompletion
+        (journal: AgentJournalPort option)
+        (parentId: SessionId)
+        (admitted: AdmittedWork)
         (completion: JoinableCompletion)
         : Task<Result<unit, string>> =
         task {
-            let agentId = JoinableCompletion.agentId completion
-            let kind = JoinableCompletion.kind completion
-            let! refs = completionBlobRefs durable (JoinableCompletion.body completion)
-
-            match refs with
-            | Error err -> return Error err
-            | Ok(completionRef, completionDigest) ->
-                return!
-                    append
-                        durable
-                        parentId
-                        (ExecutionFactCases.HandleCompleted
-                            {| ParentSessionId = parentId
-                               Handle = agentHandle agentId
-                               Kind = kind
-                               CompletionRef = completionRef
-                               CompletionDigest = completionDigest |})
+            let work = AdmittedWork.id admitted
+            match journal with
+            | None -> return Error "scoped work completion requires its canonical journal"
+            | Some durable when JoinableCompletion.handle completion <> work.Handle || JoinableCompletion.childSession completion <> work.ChildSessionId ->
+                return Error "completion belongs to another child work"
+            | Some durable ->
+                match HandleProjection.tryWork work (durable.HandleProjection parentId) with
+                | None -> return Error "completion work was never canonically admitted"
+                | Some prior when prior.LogicalRunId <> AdmittedWork.logicalRunId admitted -> return Error "completion logical run mismatch"
+                | Some { Lifecycle = Retired; LastCompletion = None } -> return Error "voided work cannot produce a completion"
+                | Some { Lifecycle = Active } when JoinableCompletion.body completion |> Option.exists (fun body ->
+                    match HandleCompletionCodec.decodeBody body with
+                    | Current decoded -> HandleCompletionCodec.belongsToWork work decoded
+                    | _ -> false) ->
+                    let! refs = completionBlobRefs durable (JoinableCompletion.body completion)
+                    match refs with
+                    | Error err -> return Error err
+                    | Ok(completionRef, completionDigest) ->
+                        return! append durable parentId (ExecutionFactCases.HandleWorkCompleted
+                            {| ParentSessionId = parentId; Work = work; Kind = JoinableCompletion.kind completion
+                               CompletionRef = completionRef; CompletionDigest = completionDigest |})
+                | Some { Lifecycle = Active } -> return Error "completion body is not an exact work terminal"
+                | Some _ -> return Ok()
         }
 
     let recordCompletion
@@ -147,7 +148,12 @@ module HandleController =
         task {
             match journal with
             | None -> return Ok()
-            | Some durable -> return! recordCompletionWithJournal durable parentId completion
+            | Some durable ->
+                let projection = durable.HandleProjection parentId
+                match HandleProjection.tryBinding (JoinableCompletion.handle completion) projection with
+                | Some { Lifecycle = CompletedAwaitingJoin _ }
+                | Some { Lifecycle = Retired } -> return Ok()
+                | _ -> return Error "legacy unscoped completion is read-only; exact admitted work is required"
         }
 
     /// EXEC-009: durable abandon. Single-assignment via fold CAS.
@@ -168,83 +174,60 @@ module HandleController =
         match journal with
         | None -> Task.FromResult(Ok())
         | Some durable ->
-            append
-                durable
-                parentId
-                (ExecutionFactCases.HandleAbandoned
-                    {| ParentSessionId = parentId
-                       Handle = agentHandle agentId
-                       Reason = reason
-                       AbandonedAt = abandonedAt |})
+            let records = HandleProjection.workRecords (durable.HandleProjection parentId)
+            match records |> List.tryFind (fun record -> record.Handle = agentHandle agentId && record.Lifecycle = Active) |> Option.bind _.Work with
+            | Some work -> append durable parentId (ExecutionFactCases.HandleWorkAbandoned
+                {| ParentSessionId = parentId; Work = work; Reason = reason |})
+            | None -> Task.FromResult(Error "unscoped historical work cannot authorize a new abandonment")
 
-    /// EXEC-004/EXEC-009: `join` consumed the completion, so write the tombstone.
-    ///
-    /// Retirement is what makes a consumed completion unreturnable. Without it the
-    /// handle stays `CompletedAwaitingJoin` in the durable projection, so a restart
-    /// restores it as joinable and the same completion is delivered twice.
+    /// Historical unscoped entry points never emit new retirement facts.
     let retire (journal: AgentJournalPort option) (parentId: SessionId) (agentId: string) : Task<Result<unit, string>> =
-        match journal with
-        | None -> Task.FromResult(Ok())
-        | Some durable ->
-            append
-                durable
-                parentId
-                (ExecutionFactCases.HandleRetired
-                    {| ParentSessionId = parentId
-                       Handle = agentHandle agentId |})
+        Task.FromResult(Error "unscoped retirement is read-only; consume an exact admitted work")
 
-    /// EXEC-009: one controlled consume. Projection must show
-    /// `CompletedAwaitingJoin` (completion report) or `Abandoned` (single batch
-    /// report). Success writes `HandleRetired`. Concurrent callers race on the
-    /// journal gate — the loser sees `AlreadyRetired`.
-    ///
-    /// CommitUnknown must not hand the payload out: the caller would treat the
-    /// work as consumed while a later restart might still show it joinable.
-    let private retirementFailure
-        (journal: AgentJournalPort)
-        (parentId: SessionId)
-        (handle: HandleId)
-        (failure: string)
-        =
-        let after = journal.HandleProjection parentId
+    let consume (journal: AgentJournalPort) (parentId: SessionId) (handle: HandleId)
+        : Task<Result<HandleRecord, HandleConsumeRejection>> =
+        let result =
+            match HandleProjection.tryBinding handle (journal.HandleProjection parentId) with
+            | None -> Error(NotJoinable UnknownHandle)
+            | Some { Lifecycle = Retired } -> Error AlreadyRetired
+            | Some { Lifecycle = Active } -> Error(NotJoinable NotCompleted)
+            | Some _ -> Error(AppendFailed "unscoped completion is audit-only; exact settlement evidence is required")
+        Task.FromResult result
 
-        match HandleProjection.tryFind handle after with
-        | Some { Lifecycle = Retired } -> Error AlreadyRetired
-        | _ -> Error(AppendFailed failure)
-
-    let private retireRecord
-        (journal: AgentJournalPort)
-        (parentId: SessionId)
-        (handle: HandleId)
-        (record: HandleRecord)
+    let consumeWork (journal: AgentJournalPort) (parentId: SessionId) (record: HandleRecord)
         : Task<Result<HandleRecord, HandleConsumeRejection>> =
         task {
-            match!
-                journal.AppendExecutionFact
-                    parentId
-                    (ExecutionFactCases.HandleRetired
-                        {| ParentSessionId = parentId
-                           Handle = handle |})
-            with
-            | Ok _ -> return Ok record
-            | Error failure -> return retirementFailure journal parentId handle failure
+            match record.Work with
+            | None -> return Error(AppendFailed "unscoped historical completion is audit-only; explicit settlement evidence is required")
+            | Some work when Set.contains work.Handle (journal.HandleProjection parentId).LegacyWorkHandles ->
+                return Error(AppendFailed "ambiguous unscoped work history is quarantined")
+            | Some work ->
+                let expected =
+                    match record.Lifecycle with
+                    | CompletedAwaitingJoin cell -> Some cell
+                    | Abandoned _ -> Some { Kind = HandleCompletionKind.Cancelled; CompletionRef = None; CompletionDigest = None }
+                    | _ -> None
+                match HandleProjection.tryWork work (journal.HandleProjection parentId), expected with
+                | Some { Lifecycle = Retired }, _ -> return Error AlreadyRetired
+                | None, _ -> return Error(NotJoinable WorkNotAdmitted)
+                | _, None -> return Error(NotJoinable NotCompleted)
+                | Some _, Some cell ->
+                    // Identifies this consumption attempt, not a work generation or ordering key.
+                    let consumptionId = System.Guid.NewGuid().ToString("N")
+                    match! journal.AppendExecutionFact parentId (ExecutionFactCases.HandleWorkConsumed
+                        {| ParentSessionId = parentId; Work = work; ConsumptionId = consumptionId
+                           Kind = cell.Kind; CompletionRef = cell.CompletionRef; CompletionDigest = cell.CompletionDigest |}) with
+                    | Error err -> return Error(AppendFailed err)
+                    | Ok() ->
+                        match HandleProjection.tryWork work (journal.HandleProjection parentId) with
+                        | Some consumed when consumed.ConsumptionId = Some consumptionId -> return Ok record
+                        | Some { Lifecycle = Retired } -> return Error AlreadyRetired
+                        | _ -> return Error(AppendFailed "exact consumption receipt was not confirmed")
         }
 
-    let consume
-        (journal: AgentJournalPort)
-        (parentId: SessionId)
-        (handle: HandleId)
-        : Task<Result<HandleRecord, HandleConsumeRejection>> =
-        task {
-            let projection = journal.HandleProjection parentId
-
-            match HandleProjection.tryFind handle projection with
-            | None -> return Error(NotJoinable UnknownHandle)
-            | Some { Lifecycle = Retired } -> return Error AlreadyRetired
-            | Some { Lifecycle = Active } -> return Error(NotJoinable NotCompleted)
-            | Some({ Lifecycle = CompletedAwaitingJoin _ } as record)
-            | Some({ Lifecycle = Abandoned _ } as record) -> return! retireRecord journal parentId handle record
-        }
+    let abandonWork (journal: AgentJournalPort) parentId (work: HandleWorkId) reason =
+        append journal parentId (ExecutionFactCases.HandleWorkAbandoned
+            {| ParentSessionId = parentId; Work = work; Reason = reason |})
 
     /// Parent cancel: durable `HandleAbandoned` (ParentCancelled) per owned agent.
     ///
@@ -265,12 +248,21 @@ module HandleController =
         (agentIds: string list)
         (abandonedAt: System.DateTimeOffset)
         : Task<Result<unit, string>> =
+        let abandonOwned agentId =
+            match journal with
+            | None -> abandonChild journal parentId agentId abandonedAt
+            | Some durable ->
+                let active = HandleProjection.workRecords (durable.HandleProjection parentId)
+                             |> List.tryFind (fun record -> record.Handle = agentHandle agentId && record.Lifecycle = Active)
+                match active |> Option.bind _.Work with
+                | Some work -> abandonWork durable parentId work HandleAbandonReason.ParentCancelled
+                | None -> Task.FromResult(Error "legacy active work requires explicit settlement evidence")
         let rec loop ids =
             task {
                 match ids with
                 | [] -> return Ok()
                 | agentId :: rest ->
-                    let! result = abandonChild journal parentId agentId abandonedAt
+                    let! result = abandonOwned agentId
                     return! continueAbandon rest result
             }
 

@@ -21,7 +21,7 @@ open Wanxiangshu.Sphinx.V2.Persistence
 module Bind =
 
     /// The v2 rule list, ready for `CanonicalIntegrator.createWithRules`.
-    let rules: IntegrationRule list = [ Integrator.rule ]
+    let rules: IntegrationRule list = [ Integrator.rule Wanxiangshu.Host.HostDigest.sha256Hex ]
 
     /// The `Current` key v2 publishes under.
     let currentKey = Integrator.currentKey
@@ -39,12 +39,13 @@ module Bind =
             let integrator =
                 CanonicalIntegrator.createWithRules (CanonicalIntegrator.baseRules @ rules) (fun eventType ->
                     AuthoritativeEventTypes.isKnown eventType
-                    || eventType = Codec.transitionEventType)
+                    || SphinxV2EventTypes.isKnown eventType)
 
             Ok(EventStore.createLocal commonDir writerId integrator)
 
     /// Reads the published state for one inquiry. `None` means the inquiry is not in the
     /// durable record; it never means "empty inquiry".
-    let tryInquiry (store: IEventStore) (inquiryId: InquiryId) : InquiryState option =
+    let tryInquiry (store: IEventStore) (inquiryId: InquiryId) : Result<InquiryState option, CurrentError> =
         store.TryCurrent currentKey
-        |> Option.bind (fun current -> Integrator.tryState current inquiryId)
+        |> Option.map (fun current -> Integrator.tryState current inquiryId)
+        |> Option.defaultValue (Ok None)

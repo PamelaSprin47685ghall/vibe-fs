@@ -25,7 +25,7 @@ module ModelRoutingSurface =
     let private executionAdmissionTokens = createWeakMap ()
     let private queuedAdmissionNodes = createWeakMap ()
 
-    [<Emit("Object.freeze(Object.create(null))")>]
+    [<Emit("Object.freeze(Object.defineProperty(Object.create(null), 'toJSON', { value: function () { throw new Error('ExecutionAdmissionToken is process-local and cannot be serialized'); } }))")>]
     let private opaqueLeaseToken () : obj = jsNative
 
     [<Emit("$0.set($1, $2)")>]

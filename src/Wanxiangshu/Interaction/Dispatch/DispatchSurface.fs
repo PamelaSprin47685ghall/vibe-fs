@@ -377,6 +377,20 @@ module DispatchSurface =
             | "Detached" -> PromptDispatcher.AwaitMode.Detached
             | _ -> PromptDispatcher.AwaitMode.Await
 
+    /// Continuation may only attach to the target's own active Logical Run
+    /// (interaction-authority-017). This Surface always holds a JournalHandle, so
+    /// the journal-less branch HostSessionNudge must handle cannot occur here;
+    /// the two reachable rejections keep that path's wording verbatim.
+    let private activeProfileAt (handle: JournalHandle) (sessionId: SessionId) : Result<unit, string> =
+        let projections = (AgentJournal.snapshot handle.Journal).AgentProjections
+
+        match Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner sessionId projections.Fission with
+        | Some _ -> Error "Session is retired by Fission"
+        | None ->
+            match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
+            | Some _ -> Ok()
+            | None -> Error "No active authority profile"
+
     let sendContinuation
         (port: obj)
         (handle: JournalHandle)
@@ -389,36 +403,48 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime =
-                    PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
-
-                let adapter = PlainSessionPort(port)
-
-                let! result =
-                    runtime.SendContinuation
-                        adapter.DispatchPort
-                        (SessionId.create session)
-                        text
-                        kind
-                        authorityProfile
-                        None
-                        (awaitModeOf awaitMode)
-                        None
-
-                return
-                    match result with
-                    | Ok key ->
-                        box
-                            {| ok = true
-                               key = PromptKey.value key
-                               error = null
-                               observation = adapter.LastObservation |}
-                    | Error error ->
+                // Active-run validation is read-only and happens before any runtime
+                // is built, so a rejected target never reaches PromptDispatcher and
+                // never records a durable claim.
+                match activeProfileAt handle (SessionId.create session) with
+                | Error error ->
+                    return
                         box
                             {| ok = false
                                key = null
                                error = error
-                               observation = adapter.LastObservation |}
+                               observation = null |}
+                | Ok _ ->
+                    let runtime =
+                        PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
+                    let adapter = PlainSessionPort(port)
+
+                    let! result =
+                        runtime.SendContinuation
+                            adapter.DispatchPort
+                            (SessionId.create session)
+                            text
+                            kind
+                            authorityProfile
+                            None
+                            (awaitModeOf awaitMode)
+                            None
+
+                    return
+                        match result with
+                        | Ok key ->
+                            box
+                                {| ok = true
+                                   key = PromptKey.value key
+                                   error = null
+                                   observation = adapter.LastObservation |}
+                        | Error error ->
+                            box
+                                {| ok = false
+                                   key = null
+                                   error = error
+                                   observation = adapter.LastObservation |}
             | None, _ ->
                 return
                     box

@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 
 module HandleCompletionCodec =
+    val belongsToWork: HandleWorkId -> DurableAgentCompletionV2 -> bool
     val encodeOutcome: runId: string -> outcome: AgentCompletionOutcome -> string
     val decodeBody: json: string -> DurableCompletionDecode
 

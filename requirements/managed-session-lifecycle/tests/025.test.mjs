@@ -20,7 +20,31 @@ test('WHAT[managed-session-lifecycle-025] controlled PTY port completion clears 
   assert.equal(res.byNameAfter, undefined, 'TryPtyByName must be None after exit')
 })
 
-test.todo('WHAT[managed-session-lifecycle-025] actual DevOps return sends TERM, awaits physical exit and escalates to KILL when needed without touching other sessions or waiting for resume (GAP-133)')
+test('WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary', async () => {
+  // Observable boundary: the PTY backend port is where owner-initiated cleanup
+  // becomes a physical effect. The DevOps child's own PTY must receive that
+  // terminate effect and be gone from its runtime; the engineer session keeps its
+  // own PTY alive. Asserting the effect and the resulting counts — not which
+  // helper issued it — keeps this test honest under internal refactors.
+  const res = await PtySurface.scenario('devops-return-drain', '', '')
+  assert.equal(res.ok, true, 'devops-return-drain scenario must succeed')
+
+  assert.ok(res.devopsBefore.includes(res.devopsPtyId), 'DevOps must own a PTY before the run returns')
+  assert.ok(res.engineerBefore.includes(res.engineerPtyId), 'Engineer must own a PTY before the DevOps run returns')
+
+  assert.deepEqual(
+    res.devopsAfter, [],
+    'every PTY the DevOps child owns must be released when its run reaches its terminal settlement',
+  )
+  assert.ok(res.engineerAfter.includes(res.engineerPtyId), 'the engineer session PTY must survive the DevOps run settlement')
+
+  const devopsTerminate = res.calls.filter(call => call.kind === 'signal' && call.signal === 'SIGTERM')
+  assert.equal(
+    devopsTerminate.length >= 1,
+    true,
+    'settling the DevOps run must terminate its owned PTY at the port boundary instead of leaving the process alive',
+  )
+})
 
 test('WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes', async () => {
   // Scenario 2: DevOps session holds an active PTY, another session (engineer) holds an active PTY.
@@ -60,3 +84,5 @@ test('WHAT[managed-session-lifecycle-025] ToolRuntimeScope production wiring dra
   assert.equal(res.devopsAfter.length, 0, 'DevOps child PTY must be drained on run complete via ToolRuntimeScope wiring')
   assert.ok(res.engineerAfter.includes('eng-pty-1'), 'Engineer child PTY must remain alive and unaffected')
 })
+
+test.todo('WHAT[managed-session-lifecycle-025] TERM must be followed by real process exit, and escalate to KILL when the grace window elapses; the controlled PTY port starts no OS process, so real exit and the KILL escalation cannot be observed in this harness (GAP-133)')

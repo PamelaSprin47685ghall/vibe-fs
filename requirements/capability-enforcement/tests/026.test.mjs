@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -260,4 +260,71 @@ test('WHAT[capability-enforcement-026] D06_fork_devops_or_creating_alternative_d
   }
 })
 
-test.todo('WHAT[capability-enforcement-026] rejecting pre-review DevOps dispatch appends no durable facts; zero child and prompt counts do not establish zero journal effects')
+test('WHAT[capability-enforcement-026] D07_pre_review_devops_refusal_preserves_all_durable_bytes_and_accepted_review_admits_the_same_charge', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-d07-'))
+  const owner = 'manager-devops-d07'
+  const charge = 'D07-VERIFY-THE-SAME-CHARGE'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  const durableSnapshot = () => {
+    const snapshot = []
+    const visit = (relativePath) => {
+      const entries = readdirSync(join(directory, relativePath), { withFileTypes: true })
+        .sort((left, right) => left.name.localeCompare(right.name))
+      for (const entry of entries) {
+        const path = join(relativePath, entry.name)
+        if (entry.isDirectory()) {
+          snapshot.push({ path, kind: 'directory' })
+          visit(path)
+        } else {
+          assert.equal(entry.isFile(), true, 'the isolated durable boundary must contain only directories and regular files')
+          snapshot.push({ path, kind: 'file', bytes: readFileSync(join(directory, path)).toString('base64') })
+        }
+      }
+    }
+    visit('')
+    return snapshot
+  }
+
+  try {
+    const initial = durableSnapshot()
+    await forkTool.injectAuditPendingIncumbency(runtime, owner)
+    const beforeReview = durableSnapshot()
+    assert.notDeepEqual(beforeReview, initial, 'current incumbency admission must really reach the durable boundary')
+    assert.ok(beforeReview.some((entry) => entry.kind === 'file' && entry.bytes.length > 0), 'the snapshot must observe a nonempty real store')
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), null)
+
+    for (const name of ['devops', 'DEVOPS', ' DevOps ']) {
+      const pending = forkTool.executeManagerResume(runtime, toolModule, owner, '', name, charge)
+      const result = await Promise.race([
+        pending,
+        forkTool.awaitPromptCount(runtime, 1).then(() => {
+          throw new Error('Pre-review DevOps dispatch reached the physical prompt boundary')
+        }),
+      ])
+      assert.match(result, /review|评审/i, 'refusal must identify the missing review admission, not an unknown person or broken harness')
+      assert.doesNotMatch(result, /carries this charge now|现已接下这项托付/i)
+      assert.deepEqual(durableSnapshot(), beforeReview, 'rejected ' + name + ' must not append, create, remove or rewrite any durable file')
+      assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), null)
+      assert.equal(forkTool.childCount(runtime), 0)
+      assert.equal(forkTool.promptCount(runtime), 0)
+      assert.equal(forkTool.child(runtime), null)
+    }
+
+    await forkTool.injectAcceptedAssessment(runtime, owner)
+    const afterReview = durableSnapshot()
+    assert.notDeepEqual(afterReview, beforeReview, 'review acceptance must be a real durable transition')
+
+    const pending = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'devops', charge)
+    await acceptNextPrompt(runtime, 0, pending)
+    const result = await pending
+    assert.match(result, /carries this charge now|现已接下这项托付/i)
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
+    assert.equal(forkTool.childCount(runtime), 1)
+    assert.equal(forkTool.promptCount(runtime), 1)
+    assert.notDeepEqual(durableSnapshot(), afterReview, 'the same admitted charge must reach real persistence, excluding an inert store or blanket refusal')
+  } finally {
+    forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

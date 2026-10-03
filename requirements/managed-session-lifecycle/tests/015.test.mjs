@@ -1,4 +1,53 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+
+test('WHAT[managed-session-lifecycle-015] actual admissions and replay retain exact handle child participant binding', async () => {
+  const owner = 'scope-stable-binding'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'FIRST')
+    const before = forkTool.workSnapshot(runtime, owner)
+    const forged = await forkTool.consumeWorkWithOutcome(runtime, owner, 'not-an-accepted-root', 'confirmed')
+    assert.equal(forged.ok, false)
+    assert.equal(forged.error, 'WorkNotAdmitted')
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), before)
+    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
+    const b = await admit(runtime, owner, 2, 'SECOND')
+    for (const key of ['handle', 'child', 'targetAgent', 'byname', 'role']) assert.equal(b[key], a[key])
+    assert.notEqual(b.root, a.root)
+    assert.equal(forkTool.childCount(runtime), 1)
+    await assertCold(runtime, directory, owner)
+    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-ANSWER', 'provider-b'), true)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-015] a bare Root string is not work admission in the production fold', async () => {
+  const fold = await import('../../../dist/Execution/Delegation/Handle/FoldSurface.js')
+  const linked = fold.foldApply(fold.foldEmpty(), [{ fact: { case: 'HandleLinked', payload: {
+    ParentSessionId: 'owner', ChildSessionId: 'child', Handle: 'agent:unadmitted',
+    TargetAgent: 'engineer', CanonicalRole: 'Engineer', Ownership: 'DurableParentHandle',
+  } } }])
+  assert.equal(linked.ok, true)
+  const claimed = fold.foldApply(linked.state, [{ fact: { case: 'HandleWorkCompleted', payload: {
+    ParentSessionId: 'owner', Work: { Handle: 'agent:unadmitted', ChildSessionId: 'child', AuthorityRoot: 'made-up-root' },
+    Kind: 'Terminal', CompletionRef: 'unbacked', CompletionDigest: 'unbacked',
+  } } }])
+  assert.equal(claimed.ok, false)
+  assert.equal(claimed.error.Fact, 'HandleWorkCompleted')
+  assert.match(claimed.error.Reason, /WorkNotAdmitted/)
+})
+
+test('WHAT[managed-session-lifecycle-015] a retired DevOps link is not permanent-loss proof for physical replacement', async () => {
+  const handles = await import('../../../dist/Execution/Delegation/Handle/Surface.js')
+  const link = { op: 'link', handle: 'agent:devops', child: 'original', agent: 'devops', role: 'DevOps' }
+  const active = handles.apply(handles.empty(), link)
+  const completed = handles.apply(active.state, { op: 'complete', handle: link.handle, kind: 'Terminal' })
+  const retired = handles.apply(completed.state, { op: 'retire', handle: link.handle })
+  const replacement = handles.apply(retired.state, { ...link, child: 'replacement' })
+  assert.equal(replacement.ok, false)
+  assert.equal(replacement.error.reason, 'HandleIdentityConflict')
+  assert.equal(handles.read(retired.state, link.handle).child, 'original')
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

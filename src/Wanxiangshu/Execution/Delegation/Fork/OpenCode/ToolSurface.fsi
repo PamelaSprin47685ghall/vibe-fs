@@ -46,4 +46,13 @@ module ForkToolSurface =
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
     val injectAcceptedAssessment: value: obj -> owner: string -> Task
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
+    val startUnprepared: obj -> string -> string -> Task<obj>
+    val emitStopForRoot: obj -> string -> string -> string -> Task
+    val replayWorkCompletion: obj -> string -> string -> Task<obj>
+    val workSnapshot: obj -> string -> obj array
+    val coldWorkSnapshot: string -> string -> Task<obj array>
+    val replayBinding: obj -> string -> string -> Task<obj>
+    val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task
+    val consumeWorkWithOutcome: obj -> string -> string -> string -> Task<obj>
+
     val disposeRuntime: value: obj -> unit

@@ -82,6 +82,7 @@ Sphinx/V2/Core/Work.fsi
 Sphinx/V2/Core/Budget.fsi
 Sphinx/V2/Core/Events.fsi
 Sphinx/V2/Core/State.fsi
+Sphinx/V2/Core/Representation.fsi
 Sphinx/V2/Core/Reducer.fsi
 Sphinx/V2/Core/Projection.fsi
 Sphinx/V2/Core/Surface.fsi
@@ -126,6 +127,7 @@ Sphinx/V2/Core/Work.fs
 Sphinx/V2/Core/Budget.fs
 Sphinx/V2/Core/Events.fs
 Sphinx/V2/Core/State.fs
+Sphinx/V2/Core/Representation.fs
 Sphinx/V2/Core/Reducer.fs
 Sphinx/V2/Core/Projection.fs
 Sphinx/V2/Core/Surface.fs
@@ -175,6 +177,8 @@ Sphinx/V2/Hosts/Mcp/Contract.fs
 Sphinx/V2/Wire/Decode.fs
 Sphinx/V2/Wire/Encode.fs
 Sphinx/V2/Wire/Surface.fs
+Sphinx/V2/Hosts/Mcp/Tool.fsi
+Sphinx/V2/Hosts/Mcp/Tool.fs
 Resources/PackageMetadata.fs
 Repository/Investigation/Semble/Mcp.fsi
 Repository/Investigation/Semble/Mcp.fs
@@ -670,6 +674,8 @@ Execution/Delegation/Fork/Model.fsi
 Execution/Delegation/Fork/Model.fs
 Execution/Session/AgentCompletion.fsi
 Execution/Session/AgentCompletion.fs
+Execution/Delegation/Handle/CompletionCodec.fsi
+Execution/Delegation/Handle/CompletionCodec.fs
 Execution/Delegation/Handle/Controller.fsi
 Execution/Delegation/Handle/Controller.fs
 Execution/Delegation/Fork/ChildRun.fsi
@@ -1018,8 +1024,6 @@ Execution/Delegation/Fork/Host/PendingRun.fsi
 Execution/Delegation/Fork/Host/PendingRun.fs
 Execution/Delegation/Fork/Host/BusyNudge.fsi
 Execution/Delegation/Fork/Host/BusyNudge.fs
-Execution/Delegation/Handle/CompletionCodec.fsi
-Execution/Delegation/Handle/CompletionCodec.fs
 Execution/Delegation/Handle/JoinDrain.fsi
 Execution/Delegation/Handle/JoinDrain.fs
 Execution/Delegation/ChildRecoveryWorkflow.fsi
@@ -1302,10 +1306,14 @@ Composition/Durable/JournalIntegration.fsi
 Composition/Durable/JournalIntegration.fs
 Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
+Sphinx/V2/Persistence/BodyDto.fsi
+Sphinx/V2/Persistence/BodyDto.fs
 Sphinx/V2/Persistence/Codec.fsi
 Sphinx/V2/Persistence/Codec.fs
 Sphinx/V2/Persistence/Integrator.fsi
 Sphinx/V2/Persistence/Integrator.fs
+Sphinx/V2/Persistence/Surface.fsi
+Sphinx/V2/Persistence/Surface.fs
 Sphinx/V2/Persistence/Export.fsi
 Sphinx/V2/Persistence/Export.fs
 Sphinx/V2/Composition/Bind.fsi
@@ -1314,6 +1322,8 @@ Sphinx/V2/Hosts/Mcp/Server.fsi
 Sphinx/V2/Hosts/Mcp/Server.fs
 Sphinx/V2/Hosts/OpenCode/Adapter.fsi
 Sphinx/V2/Hosts/OpenCode/Adapter.fs
+Sphinx/V2/Hosts/OpenCode/Surface.fsi
+Sphinx/V2/Hosts/OpenCode/Surface.fs
 Sphinx/V2/ServeEntry.fsi
 Sphinx/V2/ServeEntry.fs
 Strength/IntegrationRules.fsi

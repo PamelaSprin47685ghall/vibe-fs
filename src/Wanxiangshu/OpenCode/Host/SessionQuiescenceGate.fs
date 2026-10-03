@@ -11,6 +11,10 @@ type private QuiescencePermitToken(owner: obj, sessionId: SessionId, serial: int
     member _.Owner = owner
     member _.SessionId = sessionId
     member _.Serial = serial
+
+    member _.toJSON() : obj =
+        invalidOp "QuiescencePermit is process-local and cannot be serialized"
+
     interface QuiescencePermit
 
 /// Per-session process-local activity state. Transport status is a wake, not a

@@ -13,4 +13,3 @@
 /src/Wanxiangshu/Strength/Persistence/**
 /resources/git/wanxiang-hook.mjs
 /scripts/checks/unified-store-gate.mjs
-/scripts/checks/legacy-horizon-census.mjs

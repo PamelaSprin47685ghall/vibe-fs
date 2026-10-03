@@ -143,6 +143,7 @@ type HostForkRuntime =
     member RegisterPtySnapshot: id: PtyId -> command: string -> unit
     member UntrackPtyRun: id: string -> unit
     member OwnsPty: id: PtyId -> bool
+    member AwaitObservedWork: unit -> Task<unit>
     member DrainOwnedWork: unit -> Task<unit>
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool

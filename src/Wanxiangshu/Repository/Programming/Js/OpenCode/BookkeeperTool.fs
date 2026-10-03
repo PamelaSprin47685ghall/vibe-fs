@@ -61,8 +61,7 @@ module JsBookkeeperTool =
     [<Emit("typeof($0)==='string'")>]
     let private isString (value: obj) : bool = jsNative
 
-    let private lang (ctx: HostToolContext) =
-        GlobalProviderLanguage.current ()
+    let private lang (ctx: HostToolContext) = GlobalProviderLanguage.current ()
 
     let private prose language path =
         ProviderProse.render language path Map.empty

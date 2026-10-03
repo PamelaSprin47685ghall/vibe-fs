@@ -536,6 +536,22 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Hosts/Mcp/Tool.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-018', 'SPHINX-V2-036'],
+    source: 'src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Tool.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Sphinx/V2/Hosts/OpenCode/Surface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-034'],
+    source: 'src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Sphinx/V2/Wire/Surface.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-036'],

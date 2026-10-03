@@ -38,6 +38,7 @@ module CleanBreakSurface =
                   CompletionRef = None
                   CompletionDigest = None }
           CreationOrder = 1
+          Work = None
           LastCompletion =
             Some
                 { Kind = HandleCompletionKind.SendFailure

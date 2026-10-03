@@ -19,23 +19,12 @@ module Codec =
 
     /// The registered canonical event type. Derived from the Core vocabulary so the
     /// reducer, the codec and the shared whitelist cannot drift apart.
-    let transitionEventType = SphinxV2EventTypes.transition
+    let transitionEventType = SphinxV2EventTypes.strictTransition
+    let legacyTransitionEventType = SphinxV2EventTypes.transition
 
-    /// The wire form of one event body. Tag and payload are separate so the Integrator
-    /// can route without re-deriving which event it is.
-    type EventBodyWire = { Tag: string; Payload: string }
+    type CodecError = { Code: string; Message: string }
 
-    /// The wire form of one transition batch.
-    type TransitionBatchWire =
-        { SchemaVersion: string
-          Inquiry: string
-          PreviousRevision: string
-          PreviousHead: string option
-          Revision: string
-          CommandId: string
-          CommandFingerprint: string
-          PostStateFingerprint: string option
-          Events: EventBodyWire list }
+    let private error code message : Result<'value, CodecError> = Error { Code = code; Message = message }
 
     let private inquiryStream (inquiryId: InquiryId) : EventStreamId =
         EventStreamId.create ("sphinx-v2/" + InquiryId.value inquiryId)
@@ -62,7 +51,7 @@ module Codec =
         | InquiryEventBody.ResultAccepted _ -> "ResultAccepted"
         | InquiryEventBody.InterpretationPending _ -> "InterpretationPending"
         | InquiryEventBody.InterpretationApplied _ -> "InterpretationApplied"
-        | InquiryEventBody.InterpretationFailed _ -> "InterpretFailed"
+        | InquiryEventBody.InterpretationFailed _ -> "InterpretationFailed"
         | InquiryEventBody.GraphPatched _ -> "GraphPatched"
         | InquiryEventBody.CertificateSlotsPatched _ -> "CertificateSlotsPatched"
         | InquiryEventBody.CertificateInvalidated _ -> "CertificateInvalidated"
@@ -75,55 +64,99 @@ module Codec =
         | InquiryEventBody.InquiryFailed _ -> "InquiryFailed"
         | InquiryEventBody.InquiryStatusChanged _ -> "InquiryStatusChanged"
 
-    /// Each body's canonical bytes are carried through so the Integrator can rebuild
-    /// exactly what the Runtime produced.
-    let private bodyCanonical (body: InquiryEventBody) : string =
-        let payload = body |> box |> unbox<obj>
-        CanonicalJson.canonicalJson payload
+    let private batchDecoder : Decoder<TransitionBatch> =
+        BodyDto.exact [ "schemaVersion"; "inquiry"; "previousRevision"; "previousHead"; "revision"; "commandId"; "commandFingerprint"; "postStateFingerprint"; "events" ]
+            (Decode.object (fun get ->
+                { SchemaVersion = get.Required.Field "schemaVersion" (Decode.string |> Decode.andThen (fun value ->
+                    if value = "2" then Decode.succeed value else Decode.fail "unsupported Sphinx API version"))
+                  InquiryId = get.Required.Field "inquiry" (BodyDto.nonBlank |> Decode.andThen (fun value ->
+                    match InquiryId.tryCreate value with Ok id -> Decode.succeed id | Error reason -> Decode.fail reason))
+                  PreviousRevision = get.Required.Field "previousRevision" BodyDto.revision
+                  PreviousHead = get.Required.Field "previousHead" (Decode.option (BodyDto.nonBlank |> Decode.andThen (fun value ->
+                    match Wanxiangshu.Sphinx.V2.Core.EventId.tryCreate value with Ok id -> Decode.succeed id | Error reason -> Decode.fail reason)))
+                  Revision = get.Required.Field "revision" BodyDto.revision
+                  CommandId = get.Required.Field "commandId" BodyDto.nonBlank
+                  CommandFingerprint = get.Required.Field "commandFingerprint" BodyDto.hash
+                  PostStateFingerprint = get.Required.Field "postStateFingerprint" (Decode.option BodyDto.hash)
+                  Events = get.Required.Field "events" (Decode.list BodyDto.decoder |> Decode.andThen (fun values ->
+                    if List.isEmpty values then Decode.fail "empty transition batch" else Decode.succeed values)) }))
 
-    /// The wire form of a batch.
-    let toWire (batch: TransitionBatch) : TransitionBatchWire =
-        { SchemaVersion = batch.SchemaVersion
-          Inquiry = InquiryId.value batch.InquiryId
-          PreviousRevision = string (Revision.value batch.PreviousRevision)
-          PreviousHead = batch.PreviousHead |> Option.map Wanxiangshu.Sphinx.V2.Core.EventId.value
-          Revision = string (Revision.value batch.Revision)
-          CommandId = batch.CommandId
-          CommandFingerprint = batch.CommandFingerprint
-          PostStateFingerprint = batch.PostStateFingerprint
-          Events =
-            batch.Events
-            |> List.map (fun body ->
-                { Tag = bodyTag body
-                  Payload = bodyCanonical body }) }
+    /// This is the only raw-to-domain ingress. Unknown fields/tags and malformed
+    /// values fail as a whole; a caller cannot recover a prefix of the bodies.
+    let decodeInput (raw: obj) : Result<TransitionBatch, CodecError> =
+        Decode.fromValue "sphinx-transition@2" batchDecoder (unbox<JsonValue> raw)
+        |> Result.mapError (fun reason -> { Code = "INVALID_TRANSITION_DTO"; Message = reason })
 
-    /// Encodes one transition as one canonical envelope. The envelope id is derived
-    /// from the inquiry, the revision and the command, so the same transition always
-    /// produces the same id — which makes an append retry idempotent at the store.
+    let decodeBody (raw: obj) : Result<InquiryEventBody, CodecError> =
+        Decode.fromValue "sphinx-body@2" BodyDto.decoder (unbox<JsonValue> raw)
+        |> Result.mapError (fun reason -> { Code = "INVALID_BODY_DTO"; Message = reason })
+
+    /// One native representation is used in input, durable payload and output.
+    let toWire (batch: TransitionBatch) : obj =
+        createObj [
+            "schemaVersion" ==> batch.SchemaVersion
+            "inquiry" ==> InquiryId.value batch.InquiryId
+            "previousRevision" ==> string (Revision.value batch.PreviousRevision)
+            "previousHead" ==> (batch.PreviousHead |> Option.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> box) |> Option.defaultValue null)
+            "revision" ==> string (Revision.value batch.Revision)
+            "commandId" ==> batch.CommandId
+            "commandFingerprint" ==> batch.CommandFingerprint
+            "postStateFingerprint" ==> (batch.PostStateFingerprint |> Option.map box |> Option.defaultValue null)
+            "events" ==> (batch.Events |> List.map Representation.body |> List.toArray) ]
+
+    /// The complete post-state contains this identity. Deriving the identity from
+    /// post-state would therefore be circular; only immutable command identity is used.
+    let eventIdentity (digest: string -> string) (batch: TransitionBatch) : Identity.EventId =
+        let derivation = createObj [
+            "eventType" ==> transitionEventType
+            "inquiry" ==> InquiryId.value batch.InquiryId
+            "revision" ==> string (Revision.value batch.Revision)
+            "commandId" ==> batch.CommandId
+            "commandFingerprint" ==> batch.CommandFingerprint ]
+        Identity.EventId.create ("ev" + digest (CanonicalJson.canonicalJson derivation))
+
     let encode
         (digest: string -> string)
         (batch: TransitionBatch)
         (previousHead: Identity.EventId option)
-        : EventEnvelope =
-        let wire = toWire batch
+        : Result<EventEnvelope, CodecError> =
+        let parents = batch.PreviousHead |> Option.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> Identity.EventId.create) |> Option.toList
+        if batch.SchemaVersion <> "2" then error "UNSUPPORTED_TRANSITION_VERSION" "new writes require strict @2"
+        elif (previousHead |> Option.toList) <> parents then error "PARENT_MISMATCH" "envelope and batch must name the same parent"
+        elif batch.PostStateFingerprint.IsNone then error "MISSING_POST_STATE_FINGERPRINT" "a durable @2 transition must be sealed against its complete post-state"
+        else
+            Ok {
+                EventId = eventIdentity digest batch
+                StreamId = inquiryStream batch.InquiryId
+                EventType = transitionEventType
+                Parents = parents
+                Payload = toWire batch |> unbox<JsonValue>
+                // ArtifactRef is not PayloadRef. No external blob DTO is defined here.
+                PayloadRefs = [] }
 
-        let payloadText = CanonicalJson.canonicalJson wire
+    let decode (digest: string -> string) (envelope: EventEnvelope) : Result<TransitionBatch, CodecError> =
+        if envelope.EventType = legacyTransitionEventType then
+            error "LEGACY_TRANSITION_UNSUPPORTED" "@1 bytes are frozen and cannot be proved to reconstruct a complete inquiry; explicit offline recovery is required"
+        elif envelope.EventType <> transitionEventType then
+            error "UNSUPPORTED_TRANSITION_TYPE" "expected sphinx/v2-transition@2"
+        elif not (List.isEmpty envelope.PayloadRefs) then
+            error "UNSUPPORTED_PAYLOAD_DEPENDENCY" "@2 has inline canonical payloads only; no artifact string is interpreted as an external blob hash"
+        else
+            decodeInput (box envelope.Payload)
+            |> Result.bind (fun batch ->
+                let parents = batch.PreviousHead |> Option.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> Identity.EventId.create) |> Option.toList
+                if envelope.StreamId <> inquiryStream batch.InquiryId then error "STREAM_MISMATCH" "envelope stream does not match its inquiry"
+                elif EventParents.canonicalize envelope.Parents <> parents then error "PARENT_MISMATCH" "inner and outer parent edges disagree"
+                elif envelope.EventId <> eventIdentity digest batch then error "EVENT_ID_MISMATCH" "envelope identity does not match its immutable command identity"
+                elif batch.PostStateFingerprint.IsNone then error "MISSING_POST_STATE_FINGERPRINT" "a durable @2 transition is not sealed"
+                else Ok batch)
 
-        let derivation =
-            {| inquiry = wire.Inquiry
-               revision = wire.Revision
-               commandId = wire.CommandId
-               commandFingerprint = wire.CommandFingerprint |}
-
-        let eventId =
-            Identity.EventId.create ("ev" + digest (CanonicalJson.canonicalJson derivation))
-
-        // The payload is canonical JSON already; parsing it back is exact.
-        let payloadValue = emitJsExpr payloadText "JSON.parse($0)" |> unbox<JsonValue>
-
-        { EventId = eventId
-          StreamId = inquiryStream batch.InquiryId
-          EventType = transitionEventType
-          Parents = previousHead |> Option.toList
-          Payload = payloadValue
-          PayloadRefs = [] }
+    /// Pure preparation, not publication. The same Core operation later validates the
+    /// sealed bytes under the shared engine. No Current is changed before append.
+    let seal (digest: string -> string) (prior: InquiryState option) (batch: TransitionBatch) : Result<EventEnvelope, CoreError> =
+        let eventId = eventIdentity digest batch |> Identity.EventId.value |> Wanxiangshu.Sphinx.V2.Core.EventId.create
+        Reducer.applyTransition digest eventId prior batch
+        |> Result.bind (fun next ->
+            let sealedBatch = { batch with PostStateFingerprint = Some(Representation.fingerprint digest next) }
+            let parent = batch.PreviousHead |> Option.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> Identity.EventId.create)
+            encode digest sealedBatch parent |> Result.mapError (fun fault -> { Code = fault.Code; Message = fault.Message } : CoreError))

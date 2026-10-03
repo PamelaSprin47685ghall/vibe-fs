@@ -76,11 +76,12 @@ module Admission =
             else
                 error "invalid-command" "command payload is not admissible"
 
-        let replay = InquiryState.commandRevision state commandId
+        let replay = InquiryState.commandReceipt state commandId
 
         let admit () =
             match replay with
-            | Some revision -> Ok(IdempotencyOutcome.Replay revision)
+            | Some receipt when receipt.Fingerprint = fingerprint -> Ok(IdempotencyOutcome.Replay receipt.Revision)
+            | Some _ -> Ok(IdempotencyOutcome.Conflict "command id is already committed with different content")
             | None -> Ok(IdempotencyOutcome.Fresh command)
 
         match blankCommand || blankFingerprint || invalidPayload with

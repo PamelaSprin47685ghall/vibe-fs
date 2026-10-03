@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Sphinx.V2.Hosts
 
-open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -12,15 +11,20 @@ open Wanxiangshu.Sphinx.V2.Runtime
 type OpenCodeHostPort =
     new: sessions: ISessionHostPort -> OpenCodeHostPort
 
+    /// The capabilities this adapter can actually honour.
     member Capabilities: unit -> string list
 
     /// Dispatches already-persisted work to a real session and returns its receipt.
     member Dispatch: InquiryId -> WorkSpec -> JsonEnvelope -> JsonEnvelope -> Task<Result<DispatchReceipt, string>>
 
-    /// A Host "idle" is a physical notification, so it is reported as still running.
+    /// The session port exposes no status query, so the status is not established here.
     member ReadStatus: InquiryId -> WorkId -> Attempt -> string -> Task<PhysicalStatus>
+
+    /// Fails: the session port exposes no message or tool-result read.
     member ReadResult: InquiryId -> WorkId -> Attempt -> string -> Task<Result<string option, string>>
 
     /// An unconfirmed abort is an error, so the inquiry stays cancelling.
     member RequestCancel: InquiryId -> WorkId -> Attempt -> string -> Task<Result<Unit, string>>
+
+    /// Fails: the session port exposes no dispatch lookup.
     member Reconcile: InquiryId -> string -> Task<Result<string option, string>>

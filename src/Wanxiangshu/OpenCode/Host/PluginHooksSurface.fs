@@ -219,7 +219,9 @@ module PluginHooksSurface =
 
             match InvestigationEstimateContract.parseParticipatingArguments target with
             | Ok(_, note) ->
-                box {| ok = true; note = note |> Option.toObj |}
+                box
+                    {| ok = true
+                       note = note |> Option.toObj |}
             | Error err ->
                 box
                     {| ok = false

@@ -7,7 +7,6 @@
 
 /src/Wanxiangshu/**/*.fs
 /scripts/check.mjs
-/scripts/compile-impact.mjs
 /scripts/compile-owner.mjs
 /scripts/lib/owner-compile.mjs
 /scripts/lib/compile-shards.mjs

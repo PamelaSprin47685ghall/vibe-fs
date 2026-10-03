@@ -9,8 +9,8 @@ open System
 /// model. That property is what lets the semantic projection claim Host-independence.
 ///
 /// WHAT[sphinx-v2-018]: physical bindings are folded into the state because recovery
-/// needs them, but the projection below excludes them, so a state hash computed over
-/// the projection is not sensitive to which Host ran the work.
+/// needs them. Semantic projection excludes them; the complete durable state
+/// fingerprint deliberately includes them.
 
 module Reducer =
 
@@ -722,9 +722,10 @@ module Reducer =
         | InquiryEventBody.AnswerPrepared _ -> Ok state
         | InquiryEventBody.AnswerCommitted committed -> applyAnswer state committed
         | InquiryEventBody.CancelRequested _ ->
+            // A late request may be booked, but never resurrects a terminal inquiry.
             Ok
                 { state with
-                    Status = InquiryStatus.Cancelling }
+                    Status = if InquiryState.isTerminal state.Status then state.Status else InquiryStatus.Cancelling }
         | InquiryEventBody.InquiryCancelled reason ->
             Ok
                 { state with
@@ -763,8 +764,68 @@ module Reducer =
         | false, InquiryEventBody.InquiryCreated created -> emptyState event created
         | false, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
 
-    /// Fold a whole transition batch. The batch is the unit of durability, so a failure
-    /// anywhere means no event in it is applied: the previous state is the only outcome.
+    let private transitionBase (prior: InquiryState option) (batch: TransitionBatch) : Result<unit, CoreError> =
+        if batch.SchemaVersion <> "2" then
+            Error(coreError "unsupported-transition" "strict transitions require Sphinx API version 2")
+        elif String.IsNullOrWhiteSpace batch.CommandId || String.IsNullOrWhiteSpace batch.CommandFingerprint then
+            Error(coreError "invalid-command" "transition requires a command identity and content fingerprint")
+        elif List.isEmpty batch.Events then
+            Error(coreError "empty-batch" "transition must carry at least one body")
+        else
+            match prior with
+            | None when batch.PreviousHead.IsSome || batch.PreviousRevision <> Revision.origin || batch.Revision <> Revision.origin ->
+                Error(coreError "invalid-origin" "creation has no parent and uses revision zero")
+            | None -> Ok()
+            | Some state when state.Id <> batch.InquiryId ->
+                Error(coreError "inquiry-mismatch" "transition belongs to another inquiry")
+            | Some state when state.EventHead <> batch.PreviousHead ->
+                Error(coreError "parent-conflict" "transition parent does not name its base state")
+            | Some state when state.Revision <> batch.PreviousRevision || Revision.value state.Revision = Int64.MaxValue || batch.Revision <> Revision.next state.Revision ->
+                Error(coreError "revision-conflict" "one atomic transition must advance its parent's revision exactly once")
+            | Some state when Map.containsKey batch.CommandId state.CommandReceipts ->
+                Error(coreError "command-already-applied" "a committed command must be replayed through admission, not applied again")
+            | Some _ -> Ok()
+
+    /// All bodies share the envelope identity and one revision. Intermediate values
+    /// are private; the receipt and head are published only after every body succeeds.
+    let applyTransition
+        (digest: string -> string)
+        (eventId: EventId)
+        (prior: InquiryState option)
+        (batch: TransitionBatch)
+        : Result<InquiryState, CoreError> =
+        let step carried (index, body) =
+            carried |> Result.bind (fun state ->
+                match state with
+                | None ->
+                    let origin =
+                        { Id = eventId; InquiryId = batch.InquiryId; Revision = batch.Revision
+                          Parent = batch.PreviousHead; BatchIndex = index; Body = body }
+                    apply None origin |> Result.map Some
+                | Some current ->
+                    admitBusinessEvent current body
+                    |> Result.bind (fun () -> dispatchHandler current body)
+                    |> Result.map Some)
+        transitionBase prior batch
+        |> Result.bind (fun () ->
+            batch.Events |> List.indexed |> List.fold step (Ok prior))
+        |> Result.bind (function
+            | None -> Error(coreError "empty-batch" "transition produced no state")
+            | Some folded ->
+                let next =
+                    { folded with
+                        Revision = batch.Revision
+                        EventHead = Some eventId
+                        CommandReceipts = Map.add batch.CommandId
+                            { Fingerprint = batch.CommandFingerprint; Revision = batch.Revision; EventId = eventId }
+                            folded.CommandReceipts }
+                match batch.PostStateFingerprint with
+                | Some expected when expected <> Representation.fingerprint digest next ->
+                    Error(coreError "post-state-mismatch" "transition fingerprint does not match the complete materialized state")
+                | Some _ | None -> Ok next)
+
+    /// Fold a standalone typed-event history. Durable TransitionBatch ingress uses
+    /// applyTransition above, not this per-event revision convenience.
     let foldBatch (events: InquiryEvent list) : Result<InquiryState, CoreError> =
         let emptyBatch () =
             Error(coreError "empty-batch" "transition batch must carry at least one event")

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
     <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>sphinx-v2-core</WanxiangshuCompileShard><WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>sphinx-v2-core</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
     <Compile Include="Sphinx/V2/Core/Ids.fsi"/><Compile Include="Sphinx/V2/Core/Ids.fs"/>
     <Compile Include="Sphinx/V2/Core/Envelope.fsi"/><Compile Include="Sphinx/V2/Core/Envelope.fs"/>
@@ -12,6 +12,7 @@
     <Compile Include="Sphinx/V2/Core/Budget.fsi"/><Compile Include="Sphinx/V2/Core/Budget.fs"/>
     <Compile Include="Sphinx/V2/Core/Events.fsi"/><Compile Include="Sphinx/V2/Core/Events.fs"/>
     <Compile Include="Sphinx/V2/Core/State.fsi"/><Compile Include="Sphinx/V2/Core/State.fs"/>
+    <Compile Include="Sphinx/V2/Core/Representation.fsi"/><Compile Include="Sphinx/V2/Core/Representation.fs"/>
     <Compile Include="Sphinx/V2/Core/Reducer.fsi"/><Compile Include="Sphinx/V2/Core/Reducer.fs"/>
     <Compile Include="Sphinx/V2/Core/Projection.fsi"/><Compile Include="Sphinx/V2/Core/Projection.fs"/>
     <Compile Include="Sphinx/V2/Core/Surface.fsi"/><Compile Include="Sphinx/V2/Core/Surface.fs"/>
@@ -54,4 +55,5 @@
     <Compile Include="Sphinx/V2/Wire/Decode.fsi"/><Compile Include="Sphinx/V2/Wire/Decode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Encode.fsi"/><Compile Include="Sphinx/V2/Wire/Encode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Surface.fsi"/><Compile Include="Sphinx/V2/Wire/Surface.fs"/>
+    <Compile Include="Sphinx/V2/Hosts/Mcp/Tool.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Tool.fs"/>
   </ItemGroup></Project>

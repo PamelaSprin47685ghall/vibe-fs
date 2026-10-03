@@ -16,6 +16,7 @@ type PendingHostRun =
       StartCursor: XTraceCursor
       Handoff: PreparedDelegationHandoff option
       AuthorityRoot: AuthorityRootUserMessageId
+      Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool }

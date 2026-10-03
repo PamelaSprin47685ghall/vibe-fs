@@ -1,4 +1,29 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+
+test('WHAT[managed-session-lifecycle-006] exact admission resumes the road without reviving its consumed work', async () => {
+  const owner = 'scope-retired-road'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'WORK-A')
+    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-A', 'provider-a'), true)
+    const consumed = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
+    assert.equal(consumed.ok, true)
+    assert.match(consumed.workRecord, /ANSWER-A/)
+    const tombstone = forkTool.workSnapshot(runtime, owner)
+    assert.equal(tombstone[0].lifecycle, 'Retired')
+    assert.equal((await forkTool.replayBinding(runtime, owner, 'Ada')).ok, true)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), tombstone)
+    await assertCold(runtime, directory, owner)
+    const b = await admit(runtime, owner, 2, 'WORK-B')
+    assert.notEqual(b.root, a.root)
+    assert.equal(b.handle, a.handle)
+    assert.equal(b.child, a.child)
+    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root).lifecycle, 'Retired')
+    await assertCold(runtime, directory, owner)
+    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-B', 'provider-b'), true)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -161,9 +186,9 @@ test('WHAT[managed-session-lifecycle-006] EXEC_009_a_retired_handle_answers_reti
     agent: 'coder',
     role: 'Coder',
   })
-  assert.equal(reopened.ok, true, `same binding must accept a new work unit: ${JSON.stringify(reopened)}`)
-  assert.equal(HandleSurface.isRetired(reopened.ok ? reopened.state : retired, HANDLE), false)
-  assert.equal(stateOf(reopened.ok ? reopened.state : retired).lifecycle, 'Active')
+  assert.equal(reopened.ok, true, `same binding replay is idempotent: ${JSON.stringify(reopened)}`)
+  assert.equal(HandleSurface.isRetired(reopened.state, HANDLE), true)
+  assert.equal(stateOf(reopened.state).lifecycle, 'Retired')
 })
 test('WHAT[managed-session-lifecycle-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
   // The exact confusion the tombstone prevents. If the record were deleted on
@@ -382,7 +407,7 @@ test('WHAT[managed-session-lifecycle-006] TPOL_outstanding_without_durable_work_
   const { default: assert } = await import('node:assert/strict')
   const handles = await import('../../../dist/Execution/Delegation/Handle/Surface.js')
   for (const role of ['Engineer', 'DevOps']) {
-    test(`WHAT[managed-session-lifecycle-006] replay cannot revive a retired ${role} handle`, { todo: 'GAP-132: replayExistingLink restores Active' }, () => {
+    test(`WHAT[managed-session-lifecycle-006] replay cannot revive a retired ${role} handle`, () => {
       const link = { op: 'link', handle: 'agent:terminal', child: 'child', agent: role.toLowerCase(), role }
       const active = handles.apply(handles.empty(), link)
       assert.equal(active.ok, true)

@@ -186,6 +186,14 @@ module HandleCompletionCodec =
         with ex ->
             Invalid(CompletionDecodeError.InvalidJson ex.Message)
 
+    let belongsToWork (work: HandleWorkId) decoded =
+        match decoded with
+        | CompletedV2 payload ->
+            payload.ChildSessionId = SessionId.value work.ChildSessionId
+            && payload.AuthorityRoot = AuthorityRootUserMessageId.value work.AuthorityRoot
+            && not (String.IsNullOrWhiteSpace payload.ProviderRun)
+        | FailedV2 payload -> payload.ChildSessionId = SessionId.value work.ChildSessionId
+
     /// Materialise RunCompletion only from Current v2 (or pre-v2 completed/failed).
     /// `completedAt` is caller-minted — codec must not invent wall time.
     let tryMaterialiseRunCompletion
@@ -249,7 +257,9 @@ module HandleCompletionCodec =
         (completedAt: DateTimeOffset)
         : Result<RunCompletion, string> =
         match decodeBody json with
-        | Current decoded -> Ok(tryMaterialiseRunCompletion record agentId decoded completedAt)
+        | Current decoded when record.Work |> Option.forall (fun work -> belongsToWork work decoded) ->
+            Ok(tryMaterialiseRunCompletion record agentId decoded completedAt)
+        | Current _ -> Error "completion body does not belong to its exact work"
         | LegacyFalseAbort _ -> Error "legacy false abort is not a joinable completion"
         | Invalid err -> Error(sprintf "completion blob decode failed: %s" (decodeErrorReason err))
 
