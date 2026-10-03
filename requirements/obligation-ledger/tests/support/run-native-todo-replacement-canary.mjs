@@ -172,6 +172,15 @@ try {
   const aAfterClear = await fetchTodos(host.baseUrl, sessionA)
   const bAfterAClear = await fetchTodos(host.baseUrl, sessionB)
 
+  // Diagnostic fork only — never consumed by assertions. The first read above
+  // is the oracle point; this settled re-read after a quiescence window
+  // distinguishes "clear landed late" (asynchronous projection) from "table
+  // never cleared" (executor path interrupted). hostStderrTail surfaces any
+  // plugin hook exception (journal append failure, event hook crash) that the
+  // swallowed tool-result path would otherwise hide.
+  await delay(1000)
+  const aAfterClearSettled = await fetchTodos(host.baseUrl, sessionA)
+
   process.stdout.write(`${JSON.stringify({
     schemaVersion: 1,
     launched: `${OPENCODE_BIN} serve --port 0 --hostname 127.0.0.1`,
@@ -182,7 +191,9 @@ try {
       afterASet: { sessionA: aAfterSet },
       afterBSet: { sessionA: aAfterBSet, sessionB: bAfterSet },
       afterAClear: { sessionA: aAfterClear, sessionB: bAfterAClear },
+      afterAClearSettled: { sessionA: aAfterClearSettled },
     },
+    hostStderrTail: host.stderrLog.slice(-4000),
     providerRequests: providerRequests.length,
   }, null, 2)}\n`)
 } finally {

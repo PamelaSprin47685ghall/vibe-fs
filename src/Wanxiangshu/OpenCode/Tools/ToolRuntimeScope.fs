@@ -239,8 +239,7 @@ type ToolRuntimeScope
 
     let adoptExistingIntoRuntime (parentSessionId: SessionId) (record: HandleRecord) agentId =
         getOrCreateRuntime (SessionId.value parentSessionId)
-        |> Result.map (fun runtime ->
-            runtime.AdoptExisting(agentId, record.ChildSessionId, record.CanonicalRole, record.TargetAgent))
+        |> Result.map (fun runtime -> runtime.AdoptExisting(agentId, record.ChildSessionId))
 
     let sessionIdOf (ctx: HostToolContext) =
         if String.IsNullOrWhiteSpace ctx.SessionId then

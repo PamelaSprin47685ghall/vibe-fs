@@ -264,7 +264,7 @@ test('WHAT[managed-session-lifecycle-015] TPOL_linked_child_keeps_exact_handle_a
 })
 }
 
-test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)', { todo: 'B 冷重开 runtime 的 settle 挂起（AwaitCurrentWorkRecord 永不完成、60s 超时）——真实生产缺陷待修。前置断言已实证通过：resume /Ada/、childCount=0、child===first.child、handle/byname 继承、unknown byname typed 拒绝、cold snapshot deepEqual。调查方向：Host terminal settlement 链的冷重开态——AwaitCurrentWorkRecord 的等待条件在冷 runtime 上于何处等待（Notify 已发出但 work record 事件未到达等待者）。' }, async () => {
+test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)', async () => {
   const owner = 'scope-cold-rebind'
   const directory = mkdtempSync(join(tmpdir(), 'wxs-delegation-fork-'))
   const owners = [{ sessionId: owner, agent: 'manager' }]
