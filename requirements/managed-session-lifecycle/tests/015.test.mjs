@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+import { toolModule } from '../../delegation/tests/support/fork-runtime.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 test('WHAT[managed-session-lifecycle-015] actual admissions and replay retain exact handle child participant binding', async () => {
   const owner = 'scope-stable-binding'
@@ -260,4 +264,58 @@ test('WHAT[managed-session-lifecycle-015] TPOL_linked_child_keeps_exact_handle_a
 })
 }
 
-test.todo('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)')
+test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)', { todo: 'B 冷重开 runtime 的 settle 挂起（AwaitCurrentWorkRecord 永不完成、60s 超时）——真实生产缺陷待修。前置断言已实证通过：resume /Ada/、childCount=0、child===first.child、handle/byname 继承、unknown byname typed 拒绝、cold snapshot deepEqual。调查方向：Host terminal settlement 链的冷重开态——AwaitCurrentWorkRecord 的等待条件在冷 runtime 上于何处等待（Notify 已发出但 work record 事件未到达等待者）。' }, async () => {
+  const owner = 'scope-cold-rebind'
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-delegation-fork-'))
+  const owners = [{ sessionId: owner, agent: 'manager' }]
+
+  // A is the first process: a real fork leaves the runtime Agent ID handle and
+  // the physical child session on the canonical journal, then A exits.
+  const a = await forkTool.createRuntime(directory, owners)
+  const first = await admit(a, owner, 1, 'COLD-A')
+  assert.equal(await forkTool.settle(a, owner, 'COLD-ANSWER-A', 'provider-a'), true)
+  const durableAtExit = forkTool.workSnapshot(a, owner)
+  forkTool.disposeRuntime(a)
+
+  try {
+    // A cold-reopened journal (fresh writer, full replay — the shape a
+    // restarted process takes) sees the exact same durable handle facts.
+    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), durableAtExit)
+
+    // B is the restarted process: empty process tables, same journal.
+    const b = await forkTool.createRuntime(directory, owners)
+
+    try {
+      const invocation = forkTool.executeManagerResume(b, toolModule, owner, '', 'Ada', 'COLD-B')
+      await forkTool.awaitPromptCount(b, 1)
+      assert.equal(forkTool.acceptPrompt(b, 0), true)
+      assert.match(await invocation, /Ada/)
+
+      // No new physical child was created for the cache miss: B adopted the
+      // durable binding and drove the same child session the fork made.
+      assert.equal(forkTool.childCount(b), 0)
+      assert.equal(forkTool.child(b), first.child)
+
+      const works = forkTool.workSnapshot(b, owner)
+      assert.equal(works.length, 2)
+      assert.equal(works.find(work => work.root === first.root).lifecycle, 'CompletedAwaitingJoin')
+      const second = works.find(work => work.lifecycle === 'Active')
+      assert.equal(second.handle, first.handle)
+      assert.equal(second.child, first.child)
+      assert.equal(second.byname, first.byname)
+      assert.notEqual(second.root, first.root)
+
+      // An unknown byname is a typed refusal, never a silent new person.
+      const unknown = await forkTool.executeManagerResume(b, toolModule, owner, '', 'Nobody', 'COLD-X')
+      assert.doesNotMatch(unknown, /Nobody/)
+      assert.equal(forkTool.childCount(b), 0)
+      assert.deepEqual(forkTool.workSnapshot(b, owner), works)
+
+      assert.equal(await forkTool.settle(b, owner, 'COLD-ANSWER-B', 'provider-b'), true)
+    } finally {
+      forkTool.disposeRuntime(b)
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
