@@ -1,12 +1,16 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// File-private representation: owner and scope are visible only to the
 /// issuing gate. Keeping them in the opaque handle lets the gate retire its
 /// live-resource entry without losing typed stale-handle diagnostics.
+/// AttachMembers keeps toJSON on the JS prototype so JSON.stringify refuses
+/// the live permit (Fable would otherwise emit a free function).
+[<AttachMembers>]
 type private QuiescencePermitToken(owner: obj, sessionId: SessionId, serial: int64) =
     member _.Owner = owner
     member _.SessionId = sessionId

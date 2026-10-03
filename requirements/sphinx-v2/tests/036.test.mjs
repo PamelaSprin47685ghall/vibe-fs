@@ -10,7 +10,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js'
 import {ErrorCode, McpError} from '@modelcontextprotocol/sdk/types.js'
 import {Watchdog} from '../../verification-system/tests/e2e/support/watchdog.js'
 import {Surface_isTool as isTool} from '../../../dist/Sphinx/V2/Wire/Surface.js'
-import {Surface_isOk as isOk, Surface_isError as isError, Surface_errorValue as errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
+import {isOk, isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
   Tool_decodeStart as decodeStart,
   Tool_decodeWorkNext as decodeWorkNext,

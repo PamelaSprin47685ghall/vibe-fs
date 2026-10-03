@@ -552,6 +552,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Persistence/Surface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-019'],
+    source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Sphinx/V2/Wire/Surface.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-036'],
