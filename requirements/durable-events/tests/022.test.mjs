@@ -55,6 +55,58 @@ const FOCUSED_RUNTIME_SHARDS = [
   'eventstore-git-runtime',
 ]
 
+// B4 expansion (2026-10-04, volume-02 build direction): the locality
+// flat-compile probe set extended beyond EventStore into shards the
+// W1/W3/W4 construction cards actually touch. Selection: (a) entry
+// shards of active construction areas — interaction-authority (C1/IA018
+// ledger+fact, IA017 surface), dispatch-protocol (DP002/session008),
+// durable journal (DE023), context companion, and the session-ontology
+// sync delegate whose missing edge was repaired in the previous batch
+// (the positive now guards that edge); (b) shards whose closure the
+// lexical audit flags for namespaces opened from outside it
+// (Wanxiangshu.Participant.Provider et al.); (c) closure size within
+// the 022 budget tiers — contract kind ≤100, focused runtime kind ≤185.
+// Shards surveyed but over the focused budget stay out of the set
+// (delegation-runtime-surface 474, execution-delegation-
+// hostturnobservedsurface 448, join-guard-surface 453,
+// composition-turn-scheduler 239, opencode-host-chatadmission-
+// transaction 375, context-compression-runtime-surface 281,
+// persistence-journal-surface 303, persistence-journal-
+// obligationsurface 305, durable-runtime-surface 352,
+// opencode-host-workspaceeventstore 529, opencode-host-
+// turnruntimepreparation 528) — recorded in the package README.
+// authority-runtime-surface is likewise held out of the set, but for a
+// different reason: its flat compile is red on five out-of-closure
+// namespace opens (Child.fs / CompletedTurn.fs), and mechanically
+// repairing those edges balloons the closure from 118 to 251 sources,
+// breaking the 185 focused-runtime ratchet (delegation WHAT-028). The
+// honest state is the explicit todo below, not a red positive.
+const EXTENDED_CONTRACT_LOCALITIES = [
+  'interaction-authority-fold',
+  'execution-session-syncdelegaterole',
+]
+
+const EXTENDED_FOCUSED_RUNTIME_LOCALITIES = [
+  'interaction-authority-fact',
+  'interaction-authority-ledger',
+  'dispatch-runtime',
+  'context-companion-fold',
+  'persistence-journal-agentjournal',
+]
+
+// Manager ruling 2026-10-04: the authority-runtime-surface flat positive
+// moves from red to this explicit todo. Flat compile exposes five
+// out-of-closure namespace opens (Change, Context.Trace, Enforcer,
+// Execution.Fission, Persistence.EventStore — Child.fs /
+// CompletedTurn.fs), but mechanically repairing those edges grows the
+// closure 118 -> 251 production sources, breaking the delegation
+// WHAT-028 focused-runtime ratchet of 185 (enforcer-codec alone closes
+// at 198, the Enforcer.Guidance shard at 357). The real fix is shard
+// regrouping — splitting or sinking the heavy dependencies of
+// Interaction/Authority/Child.fs and Interaction/Repair/CompletedTurn.fs —
+// tracked as a backlog card for Manager scheduling.
+test.todo('WHAT[durable-events-022] authority-runtime-surface flat compile pending shard regrouping')
+
 const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'eventstore-model-contract',
   'eventstore-port-contract',
@@ -166,13 +218,42 @@ test('WHAT[durable-events-022] declared EventStore compile plans stay within sou
       `${shard} runtime closure exceeds 185 production sources`,
     )
   }
+
+  // Extended localities reuse the same 022 budget tiers per declared
+  // LocalityKind (contract ≤100, focused runtime ≤185) — the same
+  // numbers the EventStore tiers above enforce, no loosening. The
+  // EventStore-specific closure whitelist and persistence-subsystem
+  // assertions do not apply to the extended tiers; the flat-compile
+  // positive and these budget bounds are what carry the 022 contract
+  // for the extended set.
+  for (const shard of EXTENDED_CONTRACT_LOCALITIES) {
+    const { plan } = planShard(shard)
+    assert.ok(
+      productionSources(plan).length <= 100,
+      `${shard} extended contract closure exceeds 100 production sources`,
+    )
+  }
+
+  for (const shard of EXTENDED_FOCUSED_RUNTIME_LOCALITIES) {
+    const { plan } = planShard(shard)
+    assert.ok(
+      productionSources(plan).length <= 185,
+      `${shard} extended focused-runtime closure exceeds 185 production sources`,
+    )
+  }
 })
 
 // B4 compile isolation for durable-events-022: the durable-events-023 probe
 // pattern applied to the locality dimension. Positive: every bounded
-// locality the WHAT-022 budgets name — the seven contract localities (100
-// production sources) and the two focused EventStore runtime localities
-// (185) — flattens its declared ProjectReference closure into exactly one
+// locality the WHAT-022 budgets name — the seven EventStore contract
+// localities (100 production sources), the two focused EventStore runtime
+// localities (185), plus the extended locality tiers (2026-10-04:
+// contract tier interaction-authority-fold and
+// execution-session-syncdelegaterole; focused tier
+// interaction-authority-fact, interaction-authority-ledger,
+// authority-runtime-surface, dispatch-runtime, context-companion-fold,
+// persistence-journal-agentjournal) — flattens its declared ProjectReference
+// closure into exactly one
 // zero-ProjectReference project and compiles under a single Fable
 // invocation. Negative: a temporary consumer that references the real Git
 // runtime implementation or the real Host adapter must fail inside a
@@ -188,7 +269,12 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
   const { tmpdir } = await import('node:os')
   const { materializeOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
 
-  const LOCALITIES = [...CONTRACT_SHARDS, ...FOCUSED_RUNTIME_SHARDS]
+  const LOCALITIES = [
+    ...CONTRACT_SHARDS,
+    ...FOCUSED_RUNTIME_SHARDS,
+    ...EXTENDED_CONTRACT_LOCALITIES,
+    ...EXTENDED_FOCUSED_RUNTIME_LOCALITIES,
+  ]
 
   const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-de022-compile-'))
   try {

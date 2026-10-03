@@ -64,5 +64,6 @@ module ForkToolSurface =
     val replayBinding: obj -> string -> string -> Task<obj>
     val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task
     val consumeWorkWithOutcome: obj -> string -> string -> string -> Task<obj>
+    val coldConsumeWorkWithOutcome: string -> string -> string -> string -> Task<obj>
 
     val disposeRuntime: value: obj -> unit

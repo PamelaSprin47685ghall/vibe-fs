@@ -233,4 +233,47 @@ test('WHAT[managed-session-lifecycle-008] EXEC_009_consume_abandoned_writes_Hand
 })
 }
 
-test.todo('WHAT[managed-session-lifecycle-008] actual join withholds payload until retirement append confirms and survives each crash cut with one delivery (GAP-133)')
+test('WHAT[managed-session-lifecycle-008] actual join withholds payload until retirement append confirms and survives each crash cut with one delivery (GAP-133)', async () => {
+  const owner = 'scope-consume-crash-cut'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'CRASH-CUT-A')
+    assert.equal(await forkTool.settle(runtime, owner, 'CRASH-ANSWER-A', 'provider-a'), true)
+    const b = await admit(runtime, owner, 2, 'CRASH-CUT-B')
+    assert.equal(await forkTool.settle(runtime, owner, 'CRASH-ANSWER-B', 'provider-b'), true)
+    let deliveries = 0
+
+    // Crash cut before the retirement append: the dying caller attempted a
+    // consume whose append never committed, so it received nothing and no
+    // tombstone reached the disk. A cold-reopened journal (fresh writer, full
+    // replay — the shape a restarted process takes) still finds the work
+    // unconsumed and must deliver exactly once, only after its own append
+    // confirms.
+    const dyingBefore = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'before')
+    assert.equal(dyingBefore.ok, false)
+    assert.equal(Object.hasOwn(dyingBefore, 'workRecord'), false)
+    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'CompletedAwaitingJoin')
+    const recovered = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
+    assert.equal(recovered.ok, true)
+    assert.match(recovered.workRecord, /CRASH-ANSWER-A/)
+    deliveries += 1
+    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'Retired')
+    const repeat = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
+    assert.equal(repeat.ok, false)
+    assert.match(repeat.error, /AlreadyRetired/)
+
+    // Crash cut after the retirement append: this time the tombstone did
+    // commit before the caller died, but the receipt never came back and the
+    // payload was never delivered. The unknown commit stays conservative — no
+    // fabricated re-claim — and every later cold consumer meets the durable
+    // tombstone instead of a second delivery.
+    const dyingAfter = await forkTool.coldConsumeWorkWithOutcome(directory, owner, b.root, 'after')
+    assert.equal(dyingAfter.ok, false)
+    assert.equal(Object.hasOwn(dyingAfter, 'workRecord'), false)
+    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === b.root).lifecycle, 'Retired')
+    const reclaimer = await forkTool.coldConsumeWorkWithOutcome(directory, owner, b.root, 'confirmed')
+    assert.equal(reclaimer.ok, false)
+    assert.match(reclaimer.error, /AlreadyRetired/)
+
+    assert.equal(deliveries, 1, 'exactly one payload delivery reaches an independent caller across both crash cuts')
+  })
+})
