@@ -216,4 +216,5 @@ module StrengthLifecycle =
                 plan.Bundle)
 
     let framePartCount (bundle: StrengthFrameBundle) =
-        bundle.Batches |> List.sumBy (fun batch -> batch.Exchanges.Length * 2)
+        bundle.Batches
+        |> List.sumBy (fun batch -> batch.AssistantText.Length + batch.Exchanges.Length * 2)

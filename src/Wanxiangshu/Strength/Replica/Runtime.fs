@@ -864,6 +864,31 @@ type StrengthReplicaRuntime
         | None -> ()
 
     let observeReplicaTurn state (turn: ReconciledTurn) =
+        let texts =
+            turn.Parts
+            |> Array.choose (function
+                | MessagePart.Text text -> Some text
+                | _ -> None)
+            |> Array.toList
+
+        let alreadyCollected =
+            state.Batches
+            |> List.tryLast
+            |> Option.exists (fun batch -> List.isEmpty batch.Exchanges && batch.AssistantText = texts)
+
+        match turn.Outcome, state.SemanticTerminal, texts with
+        | ReconcileProgram.TurnCompleted, None, _ :: _ when not alreadyCollected ->
+            replaceState
+                state
+                { state with
+                    Batches =
+                        state.Batches
+                        @ [ { RequestOrdinal = state.Batches.Length + 1
+                              AssistantText = texts
+                              Exchanges = [] } ] }
+            |> ignore
+        | _ -> ()
+
         StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state turn turn.Outcome
 
         if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal turn then
@@ -885,9 +910,12 @@ type StrengthReplicaRuntime
         | None -> bufferPendingTurn state turn
 
     let applyCompletedSnapshot (state: StrengthReplicaDecisionState) providerRun messages =
-        let physical =
+        let assistant =
             messages
             |> List.tryFind (fun (message: SessionMessage) -> message.Id = ProviderRunIdentity.value providerRun)
+
+        let physical =
+            assistant
             |> Option.bind (fun message -> message.ParentId)
             |> Option.map PhysicalUserMessageId.create
 
@@ -900,7 +928,10 @@ type StrengthReplicaRuntime
                   ProviderRun = providerRun
                   Role = None
                   Directory = None
-                  Parts = [||]
+                  Parts =
+                    assistant
+                    |> Option.map (fun message -> message.Parts)
+                    |> Option.defaultValue [||]
                   Finish = Some "stop"
                   ErrorName = None
                   Model = None
@@ -1269,6 +1300,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string,
             flight: StrengthReplicaPreparationFlight
         ) : Task<Result<StrengthReplicaPreparation, string>> =
@@ -1325,6 +1357,7 @@ type StrengthReplicaRuntime
                   RequestedRounds = requestedRounds
                   SemanticDigest = mirrorSemanticDigest
                   LocalizedMirrorMessages = localizedMirror
+                  SynchronizedTextMessages = synchronizedTextMessages
                   ToolCapabilitySet = capabilities }
 
             do!
@@ -1372,6 +1405,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaPreparation, string>> =
         let claim =
@@ -1400,6 +1434,7 @@ type StrengthReplicaRuntime
                 requestedRounds,
                 replicaAgent,
                 localizedMirror,
+                synchronizedTextMessages,
                 mirrorSemanticDigest,
                 flight
             )
@@ -1425,6 +1460,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaOutcome, string>> =
         let work =
@@ -1437,6 +1473,7 @@ type StrengthReplicaRuntime
                         requestedRounds,
                         replicaAgent,
                         localizedMirror,
+                        synchronizedTextMessages,
                         mirrorSemanticDigest
                     )
 

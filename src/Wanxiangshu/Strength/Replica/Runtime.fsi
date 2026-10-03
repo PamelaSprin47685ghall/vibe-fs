@@ -74,6 +74,7 @@ type StrengthReplicaRuntime =
         requestedRounds: ReadonlyRoundBudget *
         replicaAgent: string *
         localizedMirror: WireMessage list *
+        synchronizedTextMessages: Set<int> *
         mirrorSemanticDigest: string ->
             Task<Result<StrengthReplicaPreparation, string>>
 
@@ -98,6 +99,7 @@ type StrengthReplicaRuntime =
         requestedRounds: ReadonlyRoundBudget *
         replicaAgent: string *
         localizedMirror: WireMessage list *
+        synchronizedTextMessages: Set<int> *
         mirrorSemanticDigest: string ->
             Task<Result<StrengthReplicaOutcome, string>>
 

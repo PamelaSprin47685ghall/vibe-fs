@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — predictor 正文降格回传与往复恢复
+
+- predictor → Main 现在回传 assistant 正文并降为 reasoning，原生 reasoning 不回传；混合工具消息与无后续请求的终止正文都纳入 frame 的持久化、校验、重放和 XTrace 覆盖。
+- 最终 Host 编码补齐模型传输坐标，防止合成 reasoning 被 Host 再转为普通正文。Main → predictor 保持普通正文与思考的原语义；已同步正文恢复原类型，合并 predictor 自身 reasoning，且不重复插入。
+- 补充往复前缀性质、重复正文次数、EventStore 重开与终止正文回归；真实 Host 验证常驻 predictor、重启重放和子 owner 的 reasoning_content 外发。
+
 ## Unreleased — 修复重启后空闲伴随句柄阻塞 Manager Join
 
 - 现场根因：进程重启后，Manager 经 `horizon` 重新收养持久化的空闲 `devops` 伴随句柄时，`syncAdoptDevOps → AdoptExisting → runtime.Restore` 会新建一个 completion cell 打开、CTS 未取消的 `ChildRun`，使 `ActiveRunCount ≥ 1`，即使该句柄当前没有任何在跑任务。`HostForkJoin.parentHasJoinWork` 以 `runtime.Runtime.ActiveRunCount > 0` 短路判为有工作，Manager 的无超时 `join` 于是永久等待一个永远不会完成的幽灵运行，整条主会话挂起。

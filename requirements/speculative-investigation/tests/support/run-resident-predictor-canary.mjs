@@ -13,6 +13,14 @@ const replicaRequests = []
 let ownerStep = 0
 let replicaStep = 0
 let subOwnerStep = 0
+const predictorConclusion = step => `Predictor conclusion ${step}.`
+const predictorTextChunks = step => {
+  const chunks = buildTextChunks(`replica-done-${step}`, predictorConclusion(step), 20)
+  return [{
+    ...chunks[0],
+    choices: [{ index: 0, delta: { role: 'assistant', reasoning_content: `Predictor private ${step}.` }, finish_reason: null }],
+  }, ...chunks]
+}
 const provider = http.createServer(async (req, res) => {
   if (req.method === 'GET') {
     sendJSON(res, 200, { object: 'list', data: [{ id: 'test-model', object: 'model' }] })
@@ -33,7 +41,7 @@ const provider = http.createServer(async (req, res) => {
       return
     }
     if (replicaStep === 3) {
-      sendSSE(res, buildTextChunks(`replica-done-${replicaStep}`, 'The evidence is sufficient.', 20))
+      sendSSE(res, predictorTextChunks(replicaStep))
       return
     }
     // Decision 2 (replicaStep 4..5, budget 2):
@@ -56,7 +64,7 @@ const provider = http.createServer(async (req, res) => {
       return
     }
     if (replicaStep === 7) {
-      sendSSE(res, buildTextChunks(`replica-done-${replicaStep}`, 'The evidence is sufficient.', 20))
+      sendSSE(res, predictorTextChunks(replicaStep))
       return
     }
     // Decision 4 (sub-owner, replicaStep 8..9):
@@ -66,7 +74,7 @@ const provider = http.createServer(async (req, res) => {
       return
     }
     if (replicaStep === 9) {
-      sendSSE(res, buildTextChunks(`replica-done-${replicaStep}`, 'The evidence is sufficient.', 20))
+      sendSSE(res, predictorTextChunks(replicaStep))
       return
     }
     return
@@ -106,6 +114,11 @@ const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-assignment-smoke-
 const workspace = path.join(scenarioDir, 'workspace')
 fs.mkdirSync(workspace)
 fs.writeFileSync(path.join(workspace, 'fixture.txt'), 'verified fixture evidence\n')
+fs.writeFileSync(path.join(workspace, 'opencode.json'), JSON.stringify({
+  provider: { test: { models: { 'test-model': {
+    reasoning: true, interleaved: { field: 'reasoning_content' },
+  } } } },
+}))
 await initGitWorkspace(workspace)
 let currentHost = new ProcessHost()
 const request = async (hostInstance, method, pathname, body) => {
@@ -224,22 +237,26 @@ try {
     const ref = row.payload_refs[0]
     assert.match(ref, /^[a-f0-9]{64}$/)
     const bundle = JSON.parse(fs.readFileSync(path.join(payloadsDir, ref), 'utf8'))
-    assert.equal(bundle.version, 1)
+    assert.doesNotMatch(JSON.stringify(bundle), /Predictor private/, 'native reasoning is never published')
+    const toolBatches = bundle.batches.filter(batch => batch.exchanges.length > 0)
+    const terminalStep = new Map([['owner-1', 3], ['owner-4', 7]]).get(sourceCallId)
+    assert.deepEqual(bundle.batches.flatMap(batch => batch.assistant_text ?? []),
+      terminalStep ? [predictorConclusion(terminalStep)] : [])
     if (sourceCallId === 'owner-1') {
-      assert.equal(bundle.batches.length, 2, 'decision 1 carries two rounds of tool batches')
-      assert.deepEqual(bundle.batches.map(b => b.request_ordinal), [1, 2], 'sequential request ordinals 1 and 2')
+      assert.equal(toolBatches.length, 2, 'decision 1 carries two rounds of tool batches')
+      assert.deepEqual(toolBatches.map(b => b.request_ordinal), [1, 2], 'sequential request ordinals 1 and 2')
     } else if (sourceCallId === 'owner-2') {
       // Decision 2: round 1 was unknown tool (filtered out, not a readonly exchange), round 2 was js-predictor
       // Its single completed exchange came from host round 2.
       const exchange = exchangeParts.find(part => part.callID === 'replica-5')
       assert.equal(exchange.state.status, 'completed')
-      assert.deepEqual(bundle.batches.map(batch => ({
+      assert.deepEqual(toolBatches.map(batch => ({
         results: batch.exchanges.map(exchange => exchange.result),
       })), [{ results: [exchange.state.output] }], 'Prepared contains only evidence from this decision')
     } else {
       const exchange = exchangeParts.find(part => part.callID === `replica-${ordinal}`)
       assert.equal(exchange.state.status, 'completed')
-      assert.deepEqual(bundle.batches.map(batch => ({
+      assert.deepEqual(toolBatches.map(batch => ({
         ordinal: batch.request_ordinal,
         results: batch.exchanges.map(exchange => exchange.result),
       })), [{ ordinal: 1, results: [exchange.state.output] }], 'Prepared contains only evidence from this decision')
@@ -275,6 +292,11 @@ try {
   assert.deepEqual(subRequested[0].payload.source_tool_call_ids, ['owner-sub'])
   assert.notEqual(subSource.info.id, subBinding[0].payload.target_provider_run)
   const subTranscript = await request(currentHost, 'GET', `/session/${subReplica}/message`)
+  for (const messages of [transcripts[0].messages, subTranscript]) {
+    assert.equal(messages.flatMap(message => message.parts ?? []).some(part =>
+      part.type === 'reasoning' && part.text.includes('Predictor private')), true,
+    'native predictor thinking was actually produced, so its exclusion is observable')
+  }
   assert.deepEqual(
     subTranscript.filter(message => message.info.role === 'user').flatMap(message => message.parts).map(part => part.text),
     [instruction],
@@ -288,7 +310,8 @@ try {
   assert.equal(subPrepared.length, 1)
   assert.equal(subPrepared[0].payload_refs.length, 1)
   const subBundle = JSON.parse(fs.readFileSync(path.join(payloadsDir, subPrepared[0].payload_refs[0]), 'utf8'))
-  assert.deepEqual(subBundle.batches.map(batch => batch.exchanges.map(exchange => exchange.result)), [[subExchange.state.output]])
+  assert.deepEqual(subBundle.batches.flatMap(batch => batch.exchanges.map(exchange => exchange.result)), [subExchange.state.output])
+  assert.deepEqual(subBundle.batches.flatMap(batch => batch.assistant_text ?? []), [predictorConclusion(9)])
   for (const body of replicaRequests.slice(7)) {
     assert.deepEqual(body.tools.map(tool => tool.function?.name ?? tool.name), ['js-predictor'])
   }
@@ -305,7 +328,7 @@ try {
   // Main model requests must observe the injected candidate/replay tool exchanges
   // under the owner's own js-<role> name (js-manager or js-engineer), not js-predictor,
   // paired as tool_calls with corresponding tool results, preserving original program args,
-  // and without predictor self-talk (pure text/reasoning from replica).
+  // Text crosses as reasoning; the predictor's original reasoning stays private.
   const mainRequests = allProviderRequests.filter(req => {
     const names = (req.tools ?? []).map(t => t.function?.name ?? t.name)
     return !names.includes('js-predictor')
@@ -314,10 +337,10 @@ try {
 
   for (const req of mainRequests) {
     for (const msg of req.messages ?? []) {
-      // No predictor self-talk or plain text summary leakage in main messages
-      if (typeof msg.content === 'string') {
-        assert.doesNotMatch(msg.content, /The evidence is sufficient\./, 'predictor plain text completion must not leak into main wire')
+      if (msg.role === 'assistant' && typeof msg.content === 'string') {
+        assert.doesNotMatch(msg.content, /Predictor conclusion/, 'predictor text is not main assistant speech')
       }
+      assert.doesNotMatch(JSON.stringify(msg), /Predictor private/, 'native predictor reasoning does not cross')
       // Tool calls on main wire must only use owner-visible tool names, NEVER js-predictor
       if (Array.isArray(msg.tool_calls)) {
         for (const call of msg.tool_calls) {
@@ -332,6 +355,14 @@ try {
     req.tools?.some(tool => tool.function?.name === 'js-manager'))
   const engineerRequests = mainRequests.filter(req =>
     req.tools?.some(tool => tool.function?.name === 'js-engineer'))
+  for (const [body, step] of [[managerRequests[1], 3], [managerRequests[4], 7], [engineerRequests[1], 9]]) {
+    const demoted = body.messages.filter(message => message.reasoning_content?.includes(predictorConclusion(step)))
+    assert.equal(demoted.length, 1, `main receives predictor conclusion ${step} exactly once as reasoning`)
+  }
+  for (const body of replicaRequests.slice(3, 7)) {
+    const ownText = body.messages.filter(message => message.content?.includes?.(predictorConclusion(3)))
+    assert.equal(ownText.length, 1, 'mirrored conclusion returns to predictor once as original text')
+  }
   const originalCallIds = new Set(['owner-1', 'owner-2', 'owner-4', 'owner-sub',
     ...transcripts[0].messages.flatMap(message => message.parts).map(part => part.callID),
     ...subTranscript.flatMap(message => message.parts).map(part => part.callID)])
@@ -364,7 +395,7 @@ try {
   // Stderr must be clean of errors, fuses, or invalid bundles
   assert.doesNotMatch(currentHost.stderrLog, /failed ref=|fuse|bundle invalid|InvalidRequestOrdinal/i, 'stderr must contain no failed ref, fuse, or bundle invalid')
 
-  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['js-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true })}`)
+  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['js-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true, textDemotedToReasoning: true, nativeReasoningExcluded: true, textRoundtripExact: true })}`)
 } catch (error) {
   console.error(currentHost.stdoutLog.slice(-5000))
   console.error(currentHost.stderrLog.slice(-5000))

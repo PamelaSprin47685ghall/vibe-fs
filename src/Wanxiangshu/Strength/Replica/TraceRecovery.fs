@@ -30,7 +30,9 @@ module StrengthTraceRecovery =
                 batch.Exchanges
                 |> List.map (fun exchange -> "tool_result", None, exchange.CanonicalResult)
 
-            calls @ results)
+            (batch.AssistantText |> List.map (fun text -> "reasoning", None, text))
+            @ calls
+            @ results)
 
     let private matchesAt expected observed width index =
         let window = observed |> List.skip index |> List.truncate width

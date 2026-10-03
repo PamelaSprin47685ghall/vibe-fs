@@ -75,6 +75,7 @@ module StrengthProjectionIntent =
         (ownerSessionId: SessionId)
         (decisionId: StrengthDecisionId)
         (displayName: string -> string)
+        (ownerFacing: bool)
         (bundle: StrengthFrameBundle)
         : ProjectionMessageRow list =
         bundle.Batches
@@ -108,30 +109,43 @@ module StrengthProjectionIntent =
                 |> List.map (fun (callId, exchange) ->
                     ProviderProjection.WireToolResult(callId, exchange.CanonicalResult))
 
-            [ { Message = { Role = "assistant"; Parts = calls }
-                HostMessageId =
-                  Some(
-                      StrengthFrame.hostMessageId
-                          sha256
-                          ownerSessionId
-                          decisionId
-                          batch.RequestOrdinal
-                          "call"
-                          bundle.Digest
-                  )
-                HostIsPhysical = false }
-              { Message = { Role = "tool"; Parts = results }
-                HostMessageId =
-                  Some(
-                      StrengthFrame.hostMessageId
-                          sha256
-                          ownerSessionId
-                          decisionId
-                          batch.RequestOrdinal
-                          "result"
-                          bundle.Digest
-                  )
-                HostIsPhysical = false } ])
+            let textParts =
+                batch.AssistantText
+                |> List.map (
+                    if ownerFacing then
+                        ProviderProjection.WireReasoning
+                    else
+                        ProviderProjection.WireText
+                )
+
+            [ if ownerFacing || not (List.isEmpty exchanges) then
+                  { Message =
+                      { Role = "assistant"
+                        Parts = textParts @ calls }
+                    HostMessageId =
+                      Some(
+                          StrengthFrame.hostMessageId
+                              sha256
+                              ownerSessionId
+                              decisionId
+                              batch.RequestOrdinal
+                              "call"
+                              bundle.Digest
+                      )
+                    HostIsPhysical = false }
+              if not (List.isEmpty exchanges) then
+                  { Message = { Role = "tool"; Parts = results }
+                    HostMessageId =
+                      Some(
+                          StrengthFrame.hostMessageId
+                              sha256
+                              ownerSessionId
+                              decisionId
+                              batch.RequestOrdinal
+                              "result"
+                              bundle.Digest
+                      )
+                    HostIsPhysical = false } ])
 
     let private insertion
         (sha256: string -> string)
@@ -139,12 +153,13 @@ module StrengthProjectionIntent =
         (decisionId: StrengthDecisionId)
         (anchor: ProjectionMessageAnchor)
         (displayName: string -> string)
+        (ownerFacing: bool)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
         if not (digestMatches sha256 bundle) then
             Error(StrengthProjectionIntentError.FrameDigestMismatch decisionId)
         else
-            frameRows sha256 ownerSessionId decisionId displayName bundle
+            frameRows sha256 ownerSessionId decisionId displayName ownerFacing bundle
             |> ProjectionIntent.insertMessageRows (key decisionId) anchor
             |> Ok
 
@@ -160,7 +175,7 @@ module StrengthProjectionIntent =
         if targetProviderRun <> currentProviderRun then
             Error(StrengthProjectionIntentError.CandidateWrongTarget decisionId)
         else
-            insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append displayName bundle
+            insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append displayName true bundle
 
     let promoted
         (sha256: string -> string)
@@ -182,6 +197,7 @@ module StrengthProjectionIntent =
                 decisionId
                 (ProjectionMessageAnchor.BeforeMessageIndex beforeMessageIndex)
                 displayName
+                true
                 bundle
 
     let replicaLocal
@@ -190,7 +206,7 @@ module StrengthProjectionIntent =
         (decisionId: StrengthDecisionId)
         (bundle: StrengthFrameBundle)
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
-        insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append id bundle
+        insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append id false bundle
 
 /// DSL-class: Decision — Strength delegation fold refusals.
 [<RequireQualifiedAccess>]

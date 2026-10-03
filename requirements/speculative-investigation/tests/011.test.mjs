@@ -128,6 +128,29 @@ const attach = (replica, rounds, owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, physicalUserMessageId: 'u1', providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
+test('WHAT[speculative-investigation-011] exact terminal collects text even without a subsequent predictor request', async () => {
+  const { handle, completion } = attach('replica-text-stop', 2)
+  try {
+    await Strength.replicaHandleTransform(handle, {
+      messages: [user('u1', 'replica-text-stop', [hostText('readonly assignment')])],
+    })
+    const terminal = {
+      ...turn('replica-text-stop', 'completed', 'text-response'),
+      finish: 'stop',
+      parts: [{ kind: 'reasoning', text: 'private thinking' }, { kind: 'text', text: 'visible conclusion' }],
+    }
+    Strength.replicaHandleTurn(handle, { ...terminal, physicalUserMessageId: 'old-decision' })
+    assert.equal(Strength.replicaPeek(handle, 'replica-text-stop').terminal, null)
+    Strength.replicaHandleTurn(handle, terminal)
+    const result = await Strength.replicaAwaitOutcome(completion)
+    assert.deepEqual(result.batches, [{ requestOrdinal: 1, assistantText: ['visible conclusion'], exchanges: [] }])
+    assert.equal(result.requestsAdmitted, 1)
+    assert.equal(result.terminal.kind, 'TextCompleted')
+  } finally {
+    Strength.replicaDispose(handle)
+  }
+})
+
 test('WHAT[speculative-investigation-011] STRENGTH_011_replica_semantic_vs_physical_tail_lifecycle_split', () => {
   const runtime = Strength.runtimeCreate()
   const live = binding('owner-life', 'replica-life', 'd-life', 1)

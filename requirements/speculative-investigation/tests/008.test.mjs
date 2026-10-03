@@ -222,6 +222,66 @@ const append = async (durability, event) => {
   assert.equal(result.ok, true, result.error)
 }
 
+test('WHAT[speculative-investigation-008] demoted predictor text survives durable reopen and exact reasoning trace recovery', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const directory = mkdtempSync(join(tmpdir(), 'predictor-text-'))
+  let local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'before' })
+  const value = Strength.frameTryBuild(H, [
+    { requestOrdinal: 1, assistantText: ['核对结果𠀀'], exchanges: [
+      { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
+    ] },
+    { requestOrdinal: 2, assistantText: ['conclusion'], exchanges: [] },
+  ]).value
+  try {
+    let durability = Strength.durabilityCreate(local.store)
+    await append(durability, Strength.eventRequested({
+      decisionId: 'text-decision', ownerSessionId: 'owner',
+      ownerLogicalRun: { logicalRunId: 'logical', authorityRootUserMessageId: 'root' },
+      sourcePhysicalUserMessageId: 'root', sourceProviderRun: 'source',
+      sourceToolCallIds: ['source-call'], requestedRounds: 2, contractRevision: Strength.protocolRevision,
+    }))
+    await append(durability, Strength.eventBound('text-decision', 'target', 'replica', 'anchor'))
+    assert.deepEqual(await Strength.durabilityPublishPrepared(durability, {
+      ownerSessionId: 'owner', decisionId: 'text-decision', targetProviderRun: 'target',
+      replicaSessionId: 'replica', anchorDigest: 'anchor', bundle: value,
+    }), { kind: 'Published' })
+    let projection = (await Strength.durabilityLoadProjection(durability)).value
+    const promotion = Strength.lifecycleReconcileHandle(projection, {
+      sessionId: 'owner', physicalUserMessageId: 'root', authorityRootUserMessageId: 'root',
+      providerRun: 'target', parts: [{ kind: 'text', text: 'main output' }], outcome: 'completed',
+    })
+    await append(durability, promotion.event)
+    local.close()
+    local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'after' })
+    durability = Strength.durabilityCreate(local.store)
+    projection = (await Strength.durabilityLoadProjection(durability)).value
+    const loaded = await Strength.durabilityLoadBundleForDecision(durability, projection, 'text-decision')
+    assert.equal(loaded.ok, true, loaded.error)
+    assert.deepEqual(loaded.value, value)
+    const plans = await Strength.lifecycleReplayPlans('owner', [{ id: 'root' }, { id: 'target' }], loaded.value, projection)
+    assert.equal(plans.ok, true, plans.error)
+    const intents = Strength.lifecycleReplayIntents(H, plans.value, 'engineer')
+    assert.equal(intents.ok, true, intents.error)
+    const base = [message('user', [text('assignment')]), message('assistant', [text('main output')])]
+    const replayed = Projection.renderMessages(snapshot(base), base, intents.value)
+    assert.deepEqual(replayed.map(row => row.role), ['user', 'assistant', 'tool', 'assistant', 'assistant'])
+    assert.deepEqual(replayed.flatMap(row => row.parts).filter(part => part.kind === 'reasoning'),
+      [{ kind: 'reasoning', text: '核对结果𠀀' }, { kind: 'reasoning', text: 'conclusion' }])
+    const expected = Strength.traceExpectedParts(loaded.value)
+    assert.deepEqual(expected.map(part => part.kind), ['reasoning', 'tool_call', 'tool_result', 'reasoning'])
+    const observed = expected.map((part, index) => ({ ...part, cursorSequence: 10n + BigInt(index) }))
+    assert.deepEqual(Strength.traceRecoverRange(loaded.value, observed),
+      { ok: true, value: { startInclusive: 10n, endExclusive: 14n } })
+    assert.equal(Strength.traceRecoverRange(loaded.value, observed.map(part =>
+      part.kind === 'reasoning' ? { ...part, kind: 'text' } : part)).value, null)
+  } finally {
+    local.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Authorization_Bound_Prepared_consumption_Promoted_restart_replay_Traced', async () => {
   const local = createLocalEventStore()
   try {

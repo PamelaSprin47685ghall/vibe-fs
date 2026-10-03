@@ -39,6 +39,12 @@ module StrengthBatchCollector =
             | ProviderProjection.WireToolResult(callId, result) -> Some(callId, result)
             | _ -> None)
 
+    let private textParts (message: ProviderProjection.WireMessage) =
+        message.Parts
+        |> List.choose (function
+            | ProviderProjection.WireText text -> Some text
+            | _ -> None)
+
     let private isRequestBoundary (message: ProviderProjection.WireMessage) =
         String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
         || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
@@ -104,6 +110,7 @@ module StrengthBatchCollector =
                 nextIndex
                 nextOrdinal
                 ({ RequestOrdinal = nextOrdinal
+                   AssistantText = textParts all.[index]
                    Exchanges = exchanges }
                  :: collected)
 
@@ -115,10 +122,16 @@ module StrengthBatchCollector =
         (calls: Call list)
         (recurse: int -> int -> StrengthRequestBatch list -> StrengthRequestBatch list)
         : StrengthRequestBatch list =
-        if List.isEmpty calls then
-            List.rev collected
-        else
-            completeAssistant all index (requestOrdinal + 1) collected calls recurse
+        match calls, textParts all.[index], resultParts all.[index] with
+        | [], texts, [] when not (List.isEmpty texts) ->
+            List.rev (
+                { RequestOrdinal = requestOrdinal + 1
+                  AssistantText = texts
+                  Exchanges = [] }
+                :: collected
+            )
+        | [], _, _ -> List.rev collected
+        | _ -> completeAssistant all index (requestOrdinal + 1) collected calls recurse
 
     let private advanceBatch
         (all: ProviderProjection.WireMessage array)

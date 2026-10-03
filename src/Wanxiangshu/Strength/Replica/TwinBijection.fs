@@ -10,14 +10,12 @@ open Wanxiangshu.Participant.Provider.Projection
 ///
 /// A resident read-only replica and its owner are twins. The owner's transcript is
 /// the authority: it is what main actually sends. The replica additionally has its
-/// OWN speech — assistant text that main never receives, because the projection
-/// emits tool calls and results only. That speech is recorded in the child session
-/// and must be restored at the gap it originally occurred in, which is the whole
-/// difficulty of the mapping.
+/// OWN reasoning, which never crosses to main. Its text crosses as reasoning;
+/// Host-only synchronization coordinates restore that text to its original kind
+/// without treating ordinary owner reasoning as replica speech.
 ///
-/// This module states and proves that restoration as pure functions of two message
-/// lists, so it can be exercised directly by property tests instead of being
-/// re-derived at each call site.
+/// Pure restoration of two histories with Host-only synchronization coordinates,
+/// exercised directly by property tests.
 [<RequireQualifiedAccess>]
 module TwinBijection =
 
@@ -28,13 +26,21 @@ module TwinBijection =
             | ProviderProjection.WireToolCall _ -> true
             | _ -> false)
 
+    let private hasExchange (message: ProviderProjection.WireMessage) =
+        hasCall message
+        || (message.Role.ToLowerInvariant() = "assistant"
+            && (message.Parts
+                |> List.exists (function
+                    | ProviderProjection.WireToolResult _ -> true
+                    | _ -> false)))
+
     /// Speech: an ASSISTANT message carrying text or reasoning and no tool call.
     /// Only such messages are replica material that main never receives — the role
     /// matters, because a `user` text message is a prompt (the bootstrap or a
     /// harness-injected turn), not something the replica said.
     let isSpeechOnly (message: ProviderProjection.WireMessage) =
         message.Role.ToLowerInvariant() = "assistant"
-        && not (hasCall message)
+        && not (hasExchange message)
         && (message.Parts
             |> List.exists (function
                 | ProviderProjection.WireText _
@@ -48,7 +54,7 @@ module TwinBijection =
         child
         |> List.fold
             (fun (seen, acc) message ->
-                if hasCall message then
+                if hasExchange message then
                     (seen + 1, (seen + 1, message) :: acc)
                 elif isSpeechOnly message then
                     (seen, (seen, message) :: acc)
@@ -71,11 +77,90 @@ module TwinBijection =
     let restore
         (child: ProviderProjection.WireMessage list)
         (owner: ProviderProjection.WireMessage list)
+        (synchronizedTextMessages: Set<int>)
         : ProviderProjection.WireMessage list =
-        let ownerToolPositions =
+        let childNumbered =
+            numbered child |> List.mapi (fun index (gap, message) -> index, gap, message)
+
+        let textsOf (message: ProviderProjection.WireMessage) =
+            message.Parts
+            |> List.choose (function
+                | ProviderProjection.WireText text -> Some text
+                | _ -> None)
+
+        let resultsById messages =
+            messages
+            |> List.collect (fun (message: ProviderProjection.WireMessage) -> message.Parts)
+            |> List.choose (function
+                | ProviderProjection.WireToolResult(callId, body) -> Some(callId, body)
+                | _ -> None)
+            |> Map.ofList
+
+        let exchangeResults results (message: ProviderProjection.WireMessage) =
+            message.Parts
+            |> List.choose (function
+                | ProviderProjection.WireToolCall(callId, _, _) -> Map.tryFind callId results
+                | ProviderProjection.WireToolResult(_, body) -> Some body
+                | _ -> None)
+
+        let childResults = resultsById child
+        let ownerResults = resultsById owner
+
+        let restoreSynchronized (message: ProviderProjection.WireMessage) used =
+            let original =
+                { message with
+                    Parts =
+                        message.Parts
+                        |> List.map (function
+                            | ProviderProjection.WireReasoning text -> ProviderProjection.WireText text
+                            | part -> part) }
+
+            let ownSpeech =
+                childNumbered
+                |> List.tryFind (fun (childIndex, _, candidate) ->
+                    not (Set.contains childIndex used)
+                    && hasExchange candidate = hasExchange original
+                    && textsOf candidate = textsOf original
+                    && exchangeResults childResults candidate = exchangeResults ownerResults original)
+
+            match ownSpeech with
+            | Some(childIndex, _, candidate) ->
+                let originalParts =
+                    candidate.Parts
+                    |> List.filter (function
+                        | ProviderProjection.WireText _
+                        | ProviderProjection.WireReasoning _ -> true
+                        | _ -> false)
+
+                let exchangeParts =
+                    original.Parts
+                    |> List.filter (function
+                        | ProviderProjection.WireText _
+                        | ProviderProjection.WireReasoning _ -> false
+                        | _ -> true)
+
+                { original with
+                    Parts = originalParts @ exchangeParts },
+                Set.add childIndex used
+            | None -> original, used
+
+        let restoredOwner, synchronizedSpeech =
             owner
             |> List.mapi (fun index message -> index, message)
-            |> List.filter (fun (_, message) -> hasCall message)
+            |> List.fold
+                (fun (restored, used) (index, message) ->
+                    if not (Set.contains index synchronizedTextMessages) then
+                        message :: restored, used
+                    else
+                        let original, nextUsed = restoreSynchronized message used
+                        original :: restored, nextUsed)
+                ([], Set.empty)
+            |> fun (restored, used) -> List.rev restored, used
+
+        let ownerToolPositions =
+            restoredOwner
+            |> List.mapi (fun index message -> index, message)
+            |> List.filter (fun (_, message) -> hasExchange message)
             |> List.map fst
 
         let gapAnchor gap =
@@ -84,24 +169,31 @@ module TwinBijection =
             else
                 None
 
-        let childNumbered = numbered child
-
         let speechAt index =
             childNumbered
-            |> List.choose (fun (gap, message) ->
+            |> List.choose (fun (childIndex, gap, message) ->
                 match gapAnchor gap with
-                | Some anchor when isSpeechOnly message && anchor = index -> Some message
+                | Some anchor when
+                    isSpeechOnly message
+                    && anchor = index
+                    && not (Set.contains childIndex synchronizedSpeech)
+                    ->
+                    Some message
                 | _ -> None)
 
         let trailing =
             childNumbered
-            |> List.choose (fun (gap, message) ->
-                if isSpeechOnly message && Option.isNone (gapAnchor gap) then
+            |> List.choose (fun (childIndex, gap, message) ->
+                if
+                    isSpeechOnly message
+                    && Option.isNone (gapAnchor gap)
+                    && not (Set.contains childIndex synchronizedSpeech)
+                then
                     Some message
                 else
                     None)
 
-        (owner
+        (restoredOwner
          |> List.mapi (fun index message -> speechAt index @ [ message ])
          |> List.concat)
         @ trailing
@@ -109,7 +201,7 @@ module TwinBijection =
     /// Every message the owner sent is present, in order, exactly once: restoration
     /// adds the replica's speech but never alters the owner's own sequence.
     let preservesOwnerOrder (child: ProviderProjection.WireMessage list) (owner: ProviderProjection.WireMessage list) =
-        let restored = restore child owner
+        let restored = restore child owner Set.empty
         let ownerProjection = restored |> List.filter hasCall
         let ownerCalls = owner |> List.filter hasCall
 
@@ -118,7 +210,7 @@ module TwinBijection =
     /// No message of the result is fabricated: every message is either an owner
     /// message or a child speech message.
     let introducesNothing (child: ProviderProjection.WireMessage list) (owner: ProviderProjection.WireMessage list) =
-        let restored = restore child owner
+        let restored = restore child owner Set.empty
         let speech = child |> List.filter isSpeechOnly
         let known = owner @ speech
 
@@ -127,7 +219,7 @@ module TwinBijection =
 
     /// Speech survives: the number of speech messages is never reduced.
     let dropsNoSpeech (child: ProviderProjection.WireMessage list) (owner: ProviderProjection.WireMessage list) =
-        let restored = restore child owner
+        let restored = restore child owner Set.empty
         let speech = child |> List.filter isSpeechOnly
         let kept = restored |> List.filter isSpeechOnly
 
@@ -148,7 +240,7 @@ module TwinBijection =
             | head :: tail, other :: rest when head = other -> prefixOf tail rest
             | _ -> false
 
-        prefixOf (restore childBefore ownerBefore) (restore childAfter ownerAfter)
+        prefixOf (restore childBefore ownerBefore Set.empty) (restore childAfter ownerAfter Set.empty)
 
 /// JS boundary for the bijection. The properties are proved against the pure
 /// functions above; this face exists so a test can drive them with plain objects.
@@ -203,8 +295,11 @@ module TwinBijectionSurface =
     let private messagesOf (values: obj array) =
         values |> Array.toList |> List.map messageOf
 
-    let restore (child: obj array) (owner: obj array) : obj array =
-        TwinBijection.restore (messagesOf child) (messagesOf owner)
+    let restore (child: obj array) (owner: obj array) (synchronizedTextMessages: obj array) : obj array =
+        let coordinates: int array =
+            emitJsExpr synchronizedTextMessages "Array.isArray($0) ? $0 : []"
+
+        TwinBijection.restore (messagesOf child) (messagesOf owner) (Set.ofArray coordinates)
         |> List.map messageToJs
         |> List.toArray
 

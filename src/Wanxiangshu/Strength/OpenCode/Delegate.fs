@@ -1202,6 +1202,7 @@ module StrengthDelegate =
         (request: DelegationRequest)
         (replicaAgent: string)
         (replicaMirror: ProviderProjection.WireMessage list)
+        (synchronizedTextMessages: Set<int>)
         : Task<unit> =
         task {
             match!
@@ -1212,6 +1213,7 @@ module StrengthDelegate =
                     request.RequestedRounds,
                     replicaAgent,
                     replicaMirror,
+                    synchronizedTextMessages,
                     surface.AnchorDigest
                 )
             with
@@ -1228,6 +1230,65 @@ module StrengthDelegate =
                         DelegationClosedFrom.Requested
                         DelegationClosedReason.CannotContinue
             | Ok preparation -> return! appendBoundAndExecute strengthScope surface request preparation
+        }
+
+    let private synchronizedTextMessages (surface: OwnerSurface) : Task<Result<Set<int>, string>> =
+        taskResult {
+            let prepared =
+                surface.DurableProjection.ByDecision
+                |> Map.toList
+                |> List.choose (fun (_, view) ->
+                    match view.State, view.Prepared with
+                    | (StrengthCandidateState.Promoted | StrengthCandidateState.Traced), Some prepared when
+                        prepared.OwnerSessionId = surface.Owner
+                        ->
+                        Some prepared
+                    | _ -> None)
+
+            let rec collect remaining hostIds =
+                taskResult {
+                    match remaining with
+                    | [] -> return hostIds
+                    | prepared :: tail ->
+                        let! bundle = surface.Ports.Durability.LoadFrameBundle prepared
+
+                        let ids =
+                            bundle.Batches
+                            |> List.filter (fun batch -> not (List.isEmpty batch.AssistantText))
+                            |> List.map (fun batch ->
+                                StrengthFrame.hostMessageId
+                                    HostDigest.sha256Hex
+                                    surface.Owner
+                                    prepared.DecisionId
+                                    batch.RequestOrdinal
+                                    "call"
+                                    bundle.Digest)
+
+                        return! collect tail (Set.union hostIds (Set.ofList ids))
+                }
+
+            let! hostIds = collect prepared Set.empty
+
+            return
+                surface.RawMessages
+                |> List.choose (fun raw ->
+                    ProviderWireCapture.decodeMessage raw
+                    |> Option.map (fun _ -> ProviderWireDecode.hostMessageId raw))
+                |> List.mapi (fun index id -> index, id)
+                |> List.choose (fun (index, id) ->
+                    if id |> Option.exists (fun value -> Set.contains value hostIds) then
+                        Some index
+                    else
+                        None)
+                |> Set.ofList
+        }
+
+    let private startSynchronizedMirror strengthScope surface request replicaAgent replicaMirror =
+        task {
+            match! synchronizedTextMessages surface with
+            | Error error -> return failClosed strengthScope ("Strength mirror synchronization failed: " + error)
+            | Ok synchronized ->
+                return! startWithMirror strengthScope surface request replicaAgent replicaMirror synchronized
         }
 
     let private prepareAndStartReplica
@@ -1257,7 +1318,7 @@ module StrengthDelegate =
                 request.DecisionId
                 DelegationClosedFrom.Requested
                 DelegationClosedReason.CannotContinue
-        | Ok replicaMirror -> startWithMirror strengthScope surface request replicaAgent replicaMirror
+        | Ok replicaMirror -> startSynchronizedMirror strengthScope surface request replicaAgent replicaMirror
 
     let private startRequest
         (strengthScope: PluginStrengthScope)

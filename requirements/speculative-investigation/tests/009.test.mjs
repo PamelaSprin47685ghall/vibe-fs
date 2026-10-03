@@ -15,7 +15,11 @@ const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: r
 
 test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
   const ownerMessages = [
-    { role: 'assistant', parts: [call('owner-a', 'read', '{"filePath":"a"}'), call('owner-b', 'grep', '{"pattern":"x"}')] },
+    { role: 'assistant', parts: [
+      { kind: 'text', text: 'ordinary main response' },
+      { kind: 'reasoning', text: 'ordinary main thinking' },
+      call('owner-a', 'read', '{"filePath":"a"}'), call('owner-b', 'grep', '{"pattern":"x"}'),
+    ] },
     { role: 'tool', parts: [result('owner-b', 'hit'), result('owner-a', 'alpha')] },
   ]
   const digest = H(Strength.renderSemantic(ownerMessages))

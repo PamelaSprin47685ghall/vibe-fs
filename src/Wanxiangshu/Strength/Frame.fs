@@ -18,6 +18,7 @@ type StrengthToolExchange =
 /// the runtime accounts for provider requests independently.
 type StrengthRequestBatch =
     { RequestOrdinal: int
+      AssistantText: string list
       Exchanges: StrengthToolExchange list }
 
 /// Cross-session semantic material. It deliberately contains no Replica call id,
@@ -119,7 +120,14 @@ module StrengthFrame =
             |> List.mapi (fun index exchange -> canonicalExchange (index + 1) exchange)
             |> String.concat "\u001e"
 
-        String.concat "\u001d" [ string batch.RequestOrdinal; exchanges ]
+        let toolMaterial = String.concat "\u001d" [ string batch.RequestOrdinal; exchanges ]
+
+        match batch.AssistantText with
+        | [] -> toolMaterial
+        | texts ->
+            toolMaterial
+            + "\u001dtext\u001d"
+            + (texts |> List.map canonicalField |> String.concat "\u001e")
 
     let canonicalText (batches: StrengthRequestBatch list) =
         batches |> List.map canonicalBatch |> String.concat "\u001c"
@@ -133,7 +141,8 @@ module StrengthFrame =
             | [] -> Ok()
             | batch :: tail when batch.RequestOrdinal <> expected ->
                 Error(StrengthFrameError.InvalidRequestOrdinal(expected, batch.RequestOrdinal))
-            | batch :: _ when List.isEmpty batch.Exchanges -> Error(StrengthFrameError.EmptyBatch batch.RequestOrdinal)
+            | batch :: _ when List.isEmpty batch.Exchanges && List.isEmpty batch.AssistantText ->
+                Error(StrengthFrameError.EmptyBatch batch.RequestOrdinal)
             | batch :: tail ->
                 batch.Exchanges
                 |> List.tryFind (fun exchange -> not (isAllowedTool exchange.ToolName))
