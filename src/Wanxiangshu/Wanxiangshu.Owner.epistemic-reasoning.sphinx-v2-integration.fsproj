@@ -5,6 +5,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.runtime.fsproj"/>
     <Compile Include="Sphinx/V2/Persistence/BodyDto.fsi"/><Compile Include="Sphinx/V2/Persistence/BodyDto.fs"/>
     <Compile Include="Sphinx/V2/Persistence/Codec.fsi"/><Compile Include="Sphinx/V2/Persistence/Codec.fs"/>
     <Compile Include="Sphinx/V2/Persistence/Integrator.fsi"/><Compile Include="Sphinx/V2/Persistence/Integrator.fs"/>

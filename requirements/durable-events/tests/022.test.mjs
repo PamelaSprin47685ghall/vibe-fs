@@ -168,7 +168,188 @@ test('WHAT[durable-events-022] declared EventStore compile plans stay within sou
   }
 })
 
-test.todo('WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected')
+// B4 compile isolation for durable-events-022: the durable-events-023 probe
+// pattern applied to the locality dimension. Positive: every bounded
+// locality the WHAT-022 budgets name — the seven contract localities (100
+// production sources) and the two focused EventStore runtime localities
+// (185) — flattens its declared ProjectReference closure into exactly one
+// zero-ProjectReference project and compiles under a single Fable
+// invocation. Negative: a temporary consumer that references the real Git
+// runtime implementation or the real Host adapter must fail inside a
+// contract locality's closure, because that reversed dependency is not part
+// of the closure. Each probe first compiles green in the closure that
+// legitimately owns the symbol, so the only remaining cause of each negative
+// failure is the locality boundary — not probe syntax, not a missing
+// reference, not toolchain drift.
+integrationTest('WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected', async () => {
+  const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname: dirnameOf, join: joinPath, relative: relativeOf } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { materializeOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+
+  const LOCALITIES = [...CONTRACT_SHARDS, ...FOCUSED_RUNTIME_SHARDS]
+
+  const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-de022-compile-'))
+  try {
+    // Positive: one flat project per locality. planOwnerCompile derives the
+    // ordered compile list purely from the declared ProjectReference closure;
+    // materializeOwnerCompile emits the flat fsproj; compileOwnerProject runs
+    // one `dotnet tool run fable` invocation against it. A locality whose
+    // closure is missing a declared edge fails here for real — that is a
+    // shard-graph gap, not a test defect, and it must surface as red.
+    for (const shard of LOCALITIES) {
+      const project = requireShard(shard)
+      const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null })
+      const materialized = materializeOwnerCompile(plan, { scratchRoot: scratch })
+      const flatXml = readFileSync(materialized.projectPath, 'utf8')
+      assert.ok(
+        !flatXml.includes('<ProjectReference'),
+        `${shard} flat project must carry zero ProjectReference`,
+      )
+      assert.equal(
+        (flatXml.match(/<Compile Include=/g) ?? []).length,
+        plan.compileItems.length,
+        `${shard} flat project must carry the full closure compile list`,
+      )
+      const result = await compileOwnerProject({
+        projectPath: project.projectPath,
+        aggregatePath: null,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: plan,
+      })
+      assert.equal(
+        result.ok,
+        true,
+        `${shard} locality must compile as one flat project\n${result.stdout}\n${result.stderr}`,
+      )
+    }
+
+    // Negative probes (WHAT-022: a business consumer's transitive compile
+    // input must contain neither the Git object/ref implementation nor the
+    // Host adapter; IGitRawStore stays in the physical-port contract and is
+    // never exposed through EventStore.Port.Contract). Each probe names a
+    // real public member of the higher layer.
+    const GIT_RUNTIME_PROBE = [
+      'namespace Wanxiangshu.Probe',
+      '',
+      'open Wanxiangshu.Persistence.EventStore',
+      '',
+      'module ProbeGitRuntimeUsage =',
+      '    let runner = ProcessGitRawStore.createDefaultRunner',
+      '',
+    ].join('\n')
+
+    const HOST_ADAPTER_PROBE = [
+      'namespace Wanxiangshu.Probe',
+      '',
+      'open Wanxiangshu.OpenCode',
+      '',
+      'module ProbeHostAdapterUsage =',
+      '    let program = WorkspaceEventStore.programWithoutRegistration',
+      '',
+    ].join('\n')
+
+    // Source isolation: every compile input resolves to a copy under a temp
+    // root, so the real workspace is never written and a crash mid-test
+    // cannot leave the tree mutated. compileOwnerProject's scratchRoot only
+    // isolates outputs; the compile items themselves are remapped here.
+    const isolate = (shard, probeSource) => {
+      const plan = planOwnerCompile({ projectPath: requireShard(shard).projectPath, aggregatePath: null })
+      const iso = mkdtempSync(joinPath(tmpdir(), 'wxs-de022-iso-'))
+      const items = plan.compileItems.map((item) => {
+        const dest = joinPath(iso, 'src', relativeOf(SOURCE_ROOT, item))
+        mkdirSync(dirnameOf(dest), { recursive: true })
+        cpSync(item, dest)
+        return dest
+      })
+      const probe = joinPath(iso, 'probe-reversed-dependency.fs')
+      writeFileSync(probe, probeSource)
+      return { shard, plan: { ...plan, compileItems: [...items, probe] }, iso }
+    }
+
+    const digestOf = (file) => ({
+      hash: createHash('sha256').update(readFileSync(file)).digest('hex'),
+      mtime: statSync(file).mtimeMs,
+    })
+
+    // Isolation evidence: the real owner sources keep their bytes and mtime.
+    const realStoreTypes = joinPath(SOURCE_ROOT, 'Persistence/EventStore/StoreTypes.fs')
+    const realModel = joinPath(SOURCE_ROOT, 'Persistence/EventStore/Model.fs')
+    const realGitRuntime = joinPath(SOURCE_ROOT, 'Persistence/EventStore/ProcessGitRawStore.fs')
+    const realHostAdapter = joinPath(SOURCE_ROOT, 'OpenCode/Host/WorkspaceEventStore.fs')
+    const before = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realGitRuntime), digestOf(realHostAdapter)]
+
+    // Negative A: the port contract must not admit the Git runtime
+    // implementation. Positive control: the same probe compiles in the
+    // eventstore-git-runtime closure, so the symbol and its qualified usage
+    // are valid.
+    const gitRuntimePositive = isolate('eventstore-git-runtime', GIT_RUNTIME_PROBE)
+    const gitRuntimeNegative = isolate('eventstore-port-contract', GIT_RUNTIME_PROBE)
+    // Negative B: the model contract must not admit the Host adapter.
+    // Positive control: the same probe compiles in the host workspace
+    // event-store closure that owns the adapter.
+    const hostAdapterPositive = isolate('opencode-host-workspaceeventstore', HOST_ADAPTER_PROBE)
+    const hostAdapterNegative = isolate('eventstore-model-contract', HOST_ADAPTER_PROBE)
+    try {
+      const compileIsolated = async ({ shard, plan }) => compileOwnerProject({
+        projectPath: requireShard(shard).projectPath,
+        aggregatePath: null,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: plan,
+      })
+
+      const gitPositive = await compileIsolated(gitRuntimePositive)
+      assert.equal(
+        gitPositive.ok,
+        true,
+        'probe compiles in the git-runtime closure (symbol and usage are valid): '
+          + String(gitPositive.stdout ?? '').slice(-400),
+      )
+
+      const gitNegative = await compileIsolated(gitRuntimeNegative)
+      assert.equal(
+        gitNegative.ok,
+        false,
+        'the git-runtime probe must fail in the eventstore-port-contract closure',
+      )
+      const gitOutput = String(gitNegative.stdout ?? '') + String(gitNegative.stderr ?? '')
+      assert.match(gitOutput, /ProcessGitRawStore/, 'the diagnostic names the git runtime implementation module')
+      assert.match(gitOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
+
+      const hostPositive = await compileIsolated(hostAdapterPositive)
+      assert.equal(
+        hostPositive.ok,
+        true,
+        'probe compiles in the host workspace-event-store closure (symbol and usage are valid): '
+          + String(hostPositive.stdout ?? '').slice(-400),
+      )
+
+      const hostNegative = await compileIsolated(hostAdapterNegative)
+      assert.equal(
+        hostNegative.ok,
+        false,
+        'the host-adapter probe must fail in the eventstore-model-contract closure',
+      )
+      const hostOutput = String(hostNegative.stdout ?? '') + String(hostNegative.stderr ?? '')
+      assert.match(hostOutput, /OpenCode|WorkspaceEventStore/, 'the diagnostic names the host adapter namespace or module')
+      assert.match(hostOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
+
+      // Isolation evidence: the real owner sources were never touched.
+      const after = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realGitRuntime), digestOf(realHostAdapter)]
+      assert.deepEqual(after, before, 'the real owner sources are untouched (bytes and mtime)')
+    } finally {
+      rmSync(gitRuntimePositive.iso, { recursive: true, force: true })
+      rmSync(gitRuntimeNegative.iso, { recursive: true, force: true })
+      rmSync(hostAdapterPositive.iso, { recursive: true, force: true })
+      rmSync(hostAdapterNegative.iso, { recursive: true, force: true })
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+})
 
 integrationTest('WHAT[durable-events-022] real Fable compiles the journal observation owner using its declared closure', async () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-journal-owner-compile-'))
