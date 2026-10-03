@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 输入枚举前置
+
+- 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。
+- 新增正式WHAT016反例；不可变候选、同阶段改后恢复及依赖隔离仍待完成，两项TODO保留。见[S03记录](proposals/archive/2026-10-03/S03输入链接边界-2026-10-03.md)。
+
 ## Unreleased — upstream fcfba389e 与 PR 合并冲突
 
 - 普通合并上游 `3f9aa1636` / `fcfba389e`，清理误提交的零字节工程临时文件，吸收 CI 镜像依赖和经过复核的工程接线。保留既有 exact work、Guard 交接和固定 DevOps 取消边界。

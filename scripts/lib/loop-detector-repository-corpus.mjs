@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { compareCanonicalTextV1 } from './canonical-json-v1.mjs'
+import { verificationInputExists } from './verification-input-path.mjs'
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -58,7 +58,7 @@ export const loopDetectorRepositoryInputFiles = (root = defaultRoot) => {
     .split('\0')
     .filter(Boolean)
     .filter(isSourceDocumentPath)
-    .filter((repositoryPath) => existsSync(path.join(repositoryRoot, repositoryPath)))
+    .filter((repositoryPath) => verificationInputExists(repositoryRoot, path.join(repositoryRoot, repositoryPath)))
     .sort(compareCanonicalTextV1)
     .map((repositoryPath) => path.join(repositoryRoot, repositoryPath))
 }

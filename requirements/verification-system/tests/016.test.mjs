@@ -33,6 +33,86 @@ function setupFixtureRepo() {
   return dir
 }
 
+for (const relativePath of ['src', '.github', 'package.json', 'resources/linked.txt', 'requirements/p/linked', 'resources/obj']) {
+  test(`WHAT[verification-system-016] verification rejects an unsealed symbolic input at ${relativePath} before running stages`, async () => {
+    const fixture = setupFixtureRepo()
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-input-'))
+    const stages = []
+    try {
+      const target = path.join(fixture, relativePath)
+      const isDirectory = ['src', '.github', 'requirements/p/linked'].includes(relativePath)
+      const source = path.join(external, isDirectory ? 'directory' : 'file')
+      if (isDirectory) {
+        fs.mkdirSync(source)
+        fs.writeFileSync(path.join(source, 'input.fs'), 'module External\n')
+      } else {
+        fs.writeFileSync(source, 'external input\n')
+      }
+      fs.rmSync(target, { recursive: true, force: true })
+      fs.symlinkSync(source, target, isDirectory ? 'dir' : 'file')
+
+      const result = await verify({
+        root: fixture,
+        logDirectory: path.join(external, 'logs'),
+        output: { write() {} },
+        runStep: async ({ label }) => {
+          stages.push(label)
+          return { label, ok: true, exitCode: 0 }
+        },
+      })
+      assert.equal(result.exitCode, 1)
+      assert.match(result.failureReason, /symbolic verification input/)
+      assert.deepEqual(stages, [])
+      assert.ok(result.steps.every(step => step.status === 'not-run'))
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+      fs.rmSync(external, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[verification-system-016] output directory names do not exclude ordinary input files, while root output links stay outside the closure', () => {
+  const fixture = setupFixtureRepo()
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-output-link-'))
+  try {
+    fs.writeFileSync(path.join(fixture, 'scripts/obj'), 'ordinary input\n')
+    for (const name of ['dist', 'node_modules', '.fable-build']) {
+      fs.symlinkSync(external, path.join(fixture, name), 'dir')
+    }
+    const inputs = collectVerificationInputs(fixture)
+    assert.ok(inputs.some(entry => entry.path === 'scripts/obj'))
+    assert.ok(inputs.every(entry => !['dist', 'node_modules', '.fable-build'].includes(entry.path.split('/')[0])))
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(external, { recursive: true, force: true })
+  }
+})
+
+for (const [linkDirectory, dangling] of [[false, false], [true, false], [false, true], [true, true]]) {
+  test(`WHAT[verification-system-016] tracked corpus rejects a ${dangling ? 'dangling ' : ''}symbolic ${linkDirectory ? 'ancestor' : 'file'} outside ordinary input roots`, () => {
+    const fixture = setupFixtureRepo()
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-corpus-'))
+    try {
+      fs.writeFileSync(path.join(external, 'decision.md'), '# External\n')
+      if (linkDirectory) {
+        fs.symlinkSync(dangling ? path.join(external, 'missing') : external, path.join(fixture, 'proposals'), 'dir')
+        execFileSync('git', ['-C', fixture, 'update-index', '--add', '--cacheinfo',
+          `100644,${execFileSync('git', ['-C', fixture, 'hash-object', '-w', path.join(external, 'decision.md')]).toString().trim()},proposals/decision.md`])
+      } else {
+        fs.mkdirSync(path.join(fixture, 'proposals'))
+        fs.symlinkSync(path.join(external, dangling ? 'missing.md' : 'decision.md'), path.join(fixture, 'proposals/decision.md'))
+        execFileSync('git', ['-C', fixture, 'add', 'proposals/decision.md'])
+      }
+      for (const collect of [collectGeneratedInputs, collectVerificationInputs]) {
+        assert.throws(() => collect(fixture), error => error.code === 'verification-inputs-symbolic-link')
+      }
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+      fs.rmSync(external, { recursive: true, force: true })
+    }
+  })
+}
+
 test('WHAT[verification-system-016] tracked corpus proposals contribute their actual content to verification inputs', () => {
   const fixture = setupFixtureRepo()
   try {

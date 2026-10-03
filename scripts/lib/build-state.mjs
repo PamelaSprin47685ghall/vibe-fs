@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process'
 
 import { loopDetectorRepositoryInputFiles } from './loop-detector-repository-corpus.mjs'
 import { collectTrackedInputs, computeFileHash } from './owner-compile.mjs'
+import { rejectSymbolicVerificationInput } from './verification-input-path.mjs'
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(MODULE_DIR, '../..')
@@ -56,9 +57,11 @@ function isIgnoredVerificationFile(fileName) {
 
 export function collectVerificationInputs(root = REPO_ROOT) {
   const resolvedRoot = path.resolve(root)
+  rejectSymbolicVerificationInput(resolvedRoot)
 
   for (const dirName of REQUIRED_VERIFICATION_DIRS) {
     const dirPath = path.join(resolvedRoot, dirName)
+    if (fs.existsSync(dirPath)) rejectSymbolicVerificationInput(dirPath)
     if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
       const err = new Error(`Verification inputs required root directory missing: ${dirPath}`)
       err.code = 'verification-inputs-root-missing'
@@ -71,6 +74,9 @@ export function collectVerificationInputs(root = REPO_ROOT) {
 
   const rootEntries = fs.readdirSync(resolvedRoot, { withFileTypes: true })
   for (const entry of rootEntries) {
+    if (entry.isSymbolicLink() && !SKIP_DIR_NAMES.has(entry.name) && !isIgnoredVerificationFile(entry.name)) {
+      rejectSymbolicVerificationInput(path.join(resolvedRoot, entry.name))
+    }
     if (entry.isFile() && !isIgnoredVerificationFile(entry.name)) {
       const absPath = path.join(resolvedRoot, entry.name)
       const rel = relPath(resolvedRoot, absPath)
@@ -89,6 +95,10 @@ export function collectVerificationInputs(root = REPO_ROOT) {
     const entries = fs.readdirSync(currentDir, { withFileTypes: true })
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name)
+      if (entry.isSymbolicLink()) {
+        if (isIgnoredVerificationFile(entry.name)) continue
+        rejectSymbolicVerificationInput(fullPath)
+      }
       if (entry.isDirectory()) {
         if (SKIP_DIR_NAMES.has(entry.name)) continue
         walk(fullPath)
@@ -113,6 +123,7 @@ export function collectVerificationInputs(root = REPO_ROOT) {
 
   for (const dirName of OPTIONAL_VERIFICATION_DIRS) {
     const dirPath = path.join(resolvedRoot, dirName)
+    if (fs.existsSync(dirPath)) rejectSymbolicVerificationInput(dirPath)
     if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
       walk(dirPath)
     }
