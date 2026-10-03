@@ -261,8 +261,9 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   // WHAT[009] + host-boundary-006: a completed call/result pair is written back
   // as one native completed tool part inside the assistant row, so the wire view
   // holds the mirror plus one folded row per completed batch — never a separate
-  // tool message, and never the owner's raw call id.
-  assert.deepEqual(decoded.messages.map((item) => item.role), ['user', 'assistant'])
+  // tool message, and never the owner's raw call id. The request is closed by a
+  // user turn because providers reject a request ending on a model turn.
+  assert.deepEqual(decoded.messages.map((item) => item.role), ['user', 'assistant', 'user'])
   assert.equal(decoded.messages[0].parts[0].text, 'owner mirror')
   const localParts = decoded.messages[1].parts
   assert.equal(localParts.length, 1)
@@ -274,5 +275,26 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   assert.equal(localPart.tool, 'read')
   assert.deepEqual(localPart.state.input, { filePath: 'a' })
   assert.equal(localPart.state.output, 'alpha')
+})
+test('WHAT[speculative-investigation-009] replica request never ends on an assistant turn and the closing user turn is stable across repeated transforms', async () => {
+  const runtime = Strength.runtimeCreate()
+  const binding = Strength.runtimeBinding('owner', 'replica-tail', 'decision-replica-tail', 'target-replica-tail', 'Engineer', 2, 'semantic-replica-tail', [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }])
+  assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
+  const input = () => ({ messages: [
+    user('u1', 'replica-tail', [hostText('Continue.')]),
+    assistant('a1', 'replica-tail', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+  ] })
+  const first = await Strength.transformApply(H, runtime, input(), true)
+  const second = await Strength.transformApply(H, runtime, input(), false)
+  for (const outcome of [first, second]) {
+    assert.equal(outcome.kind, 'Ready')
+    const roles = outcome.output.map((message) => message.info.role)
+    assert.equal(roles.at(-1), 'user')
+    assert.match(outcome.output.at(-1).parts[0].text, /read-only investigation|只读查证/)
+  }
+  assert.equal(first.output.at(-1).info.id, second.output.at(-1).info.id)
+  // A mirror already ending on a user turn is left alone.
+  const fresh = await Strength.transformApply(H, runtime, { messages: [user('u9', 'replica-tail', [hostText('Continue.')])] }, false)
+  assert.deepEqual(fresh.output.map((message) => message.info.role), ['user'])
 })
 }
