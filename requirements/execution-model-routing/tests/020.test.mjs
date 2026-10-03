@@ -1,6 +1,6 @@
 {
 const { default: assert } = await import("node:assert/strict");
-const { mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
+const { mkdir, mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
@@ -98,5 +98,42 @@ test('WHAT[execution-model-routing-020] EMR_020_template_readonly_delegate_reads
   // Predictor slot.
   const normal = invokeScheduler(scheduler, 'engineer', [], null, 'normal')
   assert.equal(normal.model, 'cursor/cursor-grok-4.6-xhigh')
+})
+
+test('WHAT[execution-model-routing-020] EMR_020_shared_predictor_configuration_is_owned_by_the_loaded_module', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'wanxiangshu-shared-predictor-'))
+  const configDirectory = join(root, '.config', 'opencode')
+  const previousHome = process.env.HOME
+  const previousProfile = process.env.USERPROFILE
+  const previousOverride = globalThis.__wanxiangshu_test_predictor_state
+  const previousConfiguration = globalThis.__wxs_owned_predictor_configuration
+  try {
+    await mkdir(configDirectory, { recursive: true })
+    await writeFile(join(configDirectory, 'wanxiangshu.mjs'), `export const routingProtocol = 2
+export default function route() { return { model: 'provider/model', reasoning: 'none' } }
+export const predictorConfiguration = () => ({ state: globalThis.__wxs_owned_predictor_configuration, reason: null })
+`)
+    process.env.HOME = root
+    process.env.USERPROFILE = root
+    globalThis.__wxs_owned_predictor_configuration = 'unconfigured'
+    await routing.initialize()
+    globalThis.__wanxiangshu_test_predictor_state = 'configured'
+    assert.deepEqual(routing.sharedPredictorConfiguration(), { kind: 'NotConfigured', reason: null },
+      'an unrelated global flag cannot invent a configured Predictor')
+    globalThis.__wxs_owned_predictor_configuration = 'configured'
+    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
+    assert.deepEqual(routing.sharedPredictorConfiguration(), { kind: 'Configured', reason: null },
+      'an unrelated global flag cannot disable the actual configured slot')
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousProfile
+    if (previousOverride === undefined) delete globalThis.__wanxiangshu_test_predictor_state
+    else globalThis.__wanxiangshu_test_predictor_state = previousOverride
+    if (previousConfiguration === undefined) delete globalThis.__wxs_owned_predictor_configuration
+    else globalThis.__wxs_owned_predictor_configuration = previousConfiguration
+    await rm(root, { recursive: true, force: true })
+  }
 })
 }

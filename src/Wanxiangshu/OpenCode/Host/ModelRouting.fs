@@ -415,16 +415,6 @@ module ModelRouting =
         | Some _ when String.IsNullOrWhiteSpace physicalUserMessageId -> None
         | Some normSessionId -> Some(normSessionId, physicalUserMessageId.Trim())
 
-    /// A provider run this process never observed has no step to record; a blank
-    /// run id is such a run, and normalizing the physical key decides the rest.
-    let private normalizeProviderStepRecording sessionId physicalUserMessageId providerRun =
-        if String.IsNullOrWhiteSpace providerRun then
-            None
-        else
-            normalizePhysicalExecutionKey sessionId physicalUserMessageId
-            |> Option.map (fun (normSessionId, normPhysicalUserMessageId) ->
-                normSessionId, normPhysicalUserMessageId, providerRun.Trim())
-
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
 
@@ -1617,10 +1607,15 @@ module ModelRouting =
         /// from the authoritative Host start observation, so the tool boundary
         /// can end this run's step without reading any session-current binding.
         member _.RememberProviderStepIdentity(sessionId: string, physicalUserMessageId: string, providerRun: string) =
-            normalizeProviderStepRecording sessionId physicalUserMessageId providerRun
-            |> Option.iter (fun (normSessionId, normPhysicalUserMessageId, normProviderRun) ->
-                lock gate (fun () ->
-                    rememberProviderStepIdentity normSessionId normPhysicalUserMessageId normProviderRun))
+            let trimmedRun = if isNull providerRun then "" else providerRun.Trim()
+
+            if not (String.IsNullOrEmpty trimmedRun) then
+                let keyOpt = normalizePhysicalExecutionKey sessionId physicalUserMessageId
+
+                keyOpt
+                |> Option.iter (fun (normSessionId, normPhysicalUserMessageId) ->
+                    lock gate (fun () ->
+                        rememberProviderStepIdentity normSessionId normPhysicalUserMessageId trimmedRun))
 
         /// Read-only exact lookup: no run, or a run this process never observed,
         /// yields None. The query allocates nothing and never falls back to the

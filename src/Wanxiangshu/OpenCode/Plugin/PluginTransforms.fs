@@ -141,7 +141,7 @@ module PluginTransforms =
           ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          CaptureAndStartReadonlyDelegation: obj -> Task<unit>
+          ApplyReadonlyDelegation: string option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
@@ -517,7 +517,7 @@ module PluginTransforms =
                         (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
-        let captureAndStartReadonlyDelegation outObj =
+        let applyReadonlyDelegation projectionSessionIdOpt outObj =
             StrengthDelegate.tryCaptureAndStart
                 snapshotOpt
                 journal
@@ -526,6 +526,8 @@ module PluginTransforms =
                 scope.TryAttemptPlan
                 scope.SyncDelegateRuntime
                 (predictorConfigured ())
+                projectionSessionIdOpt
+                (Some boot.Timer)
                 outObj
 
         { BeginPhysicalProviderAttempt =
@@ -727,7 +729,7 @@ module PluginTransforms =
                             outObj
                 }
 
-          CaptureAndStartReadonlyDelegation = captureAndStartReadonlyDelegation
+          ApplyReadonlyDelegation = applyReadonlyDelegation
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -860,18 +862,15 @@ module PluginTransforms =
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
             if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 13. PairProgrammingThoughtTransform.maybeInjectGuideline
+                // 12. PairProgrammingThoughtTransform.maybeInjectGuideline
                 do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
 
-                // 14. RequirementGroundingTransform.projectOrTerminate
+                // 13. RequirementGroundingTransform.projectOrTerminate
                 do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
-                // 17. StrengthDelegate.tryCaptureAndStart — capture and start in ONE
-                // call on the FINAL outgoing request. This replaces the old two-phase
-                // hand-off (4.5 early capture + 12 late start on a subsequent request),
-                // which stranded 44 of 201 decisions whenever a subsequent request
-                // carried a tentative cold prefix or switched logical runs.
-                do! caps.CaptureAndStartReadonlyDelegation outObj
+                // Capture and start on the final outgoing request so the
+                // preparation owns the same mirror and provider attempt plan.
+                do! caps.ApplyReadonlyDelegation projectionSessionIdOpt outObj
 
             // 15. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj

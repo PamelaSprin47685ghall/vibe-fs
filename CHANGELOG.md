@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — upstream fcfba389e 与 PR 合并冲突
+
+- 普通合并上游 `3f9aa1636` / `fcfba389e`，清理误提交的零字节工程临时文件，吸收 CI 镜像依赖和经过复核的工程接线。保留既有 exact work、Guard 交接和固定 DevOps 取消边界。
+- 正式回归阻止 `WXS_ACCEPT_TODO` 将欠证判成完整通过；保持单次真实 canary、精确版本围栏及完整 Long Stroke。cold-boundary 改匹配完整双语资源及合成 ack，不以 Chronicle 关键词删普通用户历史。
+- 更新同步和施工入口；本批验证范围、吸收/拒绝依据与原始证据见[同步记录](proposals/archive/2026-10-03/Upstream增量-fcfba389e-2026-10-03.md)。既有 GAP 状态不因上游 CI 绿或统计自述而关闭。
+
 ## Unreleased — upstream b7768f478 增量
 
 - 合并 Blogger 双语提示资源和真实 journal/lease 注入观察，以及制度学习 candidate 机械准入、Born 持久事实/投影和 revision 计算。GAP-077/181 仅进入 PARTIAL，保留真实 Host、语义提炼、生产并发及原子提交义务。

@@ -6,7 +6,7 @@ export const admit = async (runtime, session, role = 'engineer') => {
   await activateLife(runtime, session, `root-${session}`)
 }
 export const context = (sessionID, callID, agent = 'engineer') => ({ sessionID, callID, agent, messageID: `run-${sessionID}` })
-export const user = sessionID => ({ info: { id: `root-${sessionID}`, sessionID, role: 'user', model: { providerID: 'anthropic', modelID: 'fixture' } }, parts: [{ type: 'text', text: 'Investigate current facts.' }] })
+export const user = (sessionID, messageID = `root-${sessionID}`) => ({ info: { id: messageID, sessionID, role: 'user', model: { providerID: 'anthropic', modelID: 'fixture' } }, parts: [{ type: 'text', text: 'Investigate current facts.' }] })
 export const toolBatch = (sessionID, suffix) => ['pending', 'completed'].map(status => ({
   info: { id: `${status}-${suffix}`, sessionID, role: 'assistant', providerID: 'anthropic' },
   parts: [{
@@ -17,18 +17,35 @@ export const toolBatch = (sessionID, suffix) => ['pending', 'completed'].map(sta
     },
   }],
 }))
-export const transform = async (hooks, sessionID, messages) => {
+export const transform = async (hooks, host, sessionID, messages) => {
   const output = { messages: structuredClone(messages) }
-  // HOST-BOUNDARY-008: the provider attempt plan freeze requires an accepted
-  // execution, which chat.message establishes for the physical user message.
-  // Errors propagate: a swallowed admission failure would silently leave the
-  // transform without an execution and misreport downstream assertions.
+  // Each new SDK physical message crosses chat.message once. Historical
+  // replay keeps the stored ingress; admission errors propagate unchanged.
   for (const message of output.messages) {
     if (message.info?.role === 'user') {
-      await hooks['chat.message'](
-        { sessionID, messageID: message.info.id },
-        { message: message.info, parts: message.parts },
-      )
+      const physicalID = message.info.id
+      const hasPhysical = host.messages.some(candidate =>
+        (candidate.info ?? candidate).sessionID === sessionID &&
+        (candidate.info ?? candidate).id === physicalID)
+      if (!hasPhysical) {
+        await hooks['chat.message'](
+          { sessionID, messageID: physicalID },
+          { message: message.info, parts: message.parts },
+        )
+        host.pushHostMessage(sessionID, structuredClone(message))
+      }
+      const providerID = `provider-${physicalID}`
+      const hasProvider = host.messages.some(candidate =>
+        (candidate.info ?? candidate).sessionID === sessionID &&
+        (candidate.info ?? candidate).id === providerID)
+      if (!hasProvider) {
+        // The SDK creates this exact unfinished assistant before requesting
+        // its provider body; transform must confirm durable ProviderStarted.
+        host.pushHostMessage(sessionID, {
+          info: { id: providerID, sessionID, role: 'assistant', parentID: physicalID, time: { created: host.messages.length + 1 } },
+          parts: [],
+        })
+      }
     }
   }
   await hooks['experimental.chat.messages.transform']({ sessionID }, output)

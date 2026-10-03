@@ -107,7 +107,8 @@ module StrengthDelegate =
         { Snapshots: ISessionSnapshotPort
           Durable: AgentJournal
           Runtime: StrengthReplicaRuntime
-          Durability: StrengthDurabilityPort }
+          Durability: StrengthDurabilityPort
+          Timer: ITimerPort option }
 
     type private OwnerSurface =
         { Owner: SessionId
@@ -147,6 +148,8 @@ module StrengthDelegate =
         (snapshotPort: ISessionSnapshotPort option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthScope: PluginStrengthScope)
+        (projectionSessionIdOpt: string option)
+        (timerPort: ITimerPort option)
         (output: obj)
         : Result<BoundPorts * SessionId, string> =
         let candidates =
@@ -154,7 +157,8 @@ module StrengthDelegate =
             snapshotPort,
             strengthScope.StrengthReplicaRuntime,
             strengthDurability,
-            ProviderWireDecode.projectionSessionIdFromMessages output
+            (projectionSessionIdOpt
+             |> Option.orElseWith (fun () -> ProviderWireDecode.projectionSessionIdFromMessages output))
 
         match candidates with
         | Some durable, Some snapshots, Some runtime, Some durability, Some sessionIdText ->
@@ -162,7 +166,8 @@ module StrengthDelegate =
                 { Snapshots = snapshots
                   Durable = durable
                   Runtime = runtime
-                  Durability = durability },
+                  Durability = durability
+                  Timer = timerPort },
                 SessionId.create sessionIdText
             )
         | _ -> Error "Strength ports are not fully bound"
@@ -172,13 +177,52 @@ module StrengthDelegate =
         | Some physical -> Ok physical
         | None -> Error "owner transform has no physical user message"
 
+    let private awaitProjectionCatchup (timer: ITimerPort option) : Task<unit> =
+        task {
+            match timer with
+            | None -> return ()
+            | Some port ->
+                let deadline = port.Delay ProviderRunBinding.projectionCatchupDelayMilliseconds
+                do! deadline.Delay
+        }
+
+    let private rereadOwnerMessagesAfterCatchup
+        (ports: BoundPorts)
+        (owner: SessionId)
+        (readsLeft: int)
+        (loop: int -> SessionMessage list -> Task<Result<SessionMessage list * ProviderRunIdentity, string>>)
+        : Task<Result<SessionMessage list * ProviderRunIdentity, string>> =
+        task {
+            do! awaitProjectionCatchup ports.Timer
+
+            match! ports.Snapshots.GetMessages owner with
+            | Ok reloaded -> return! loop (readsLeft - 1) reloaded
+            | Error err -> return Error(sprintf "owner snapshot reread failed: %s" err)
+        }
+
     let private tryResolveAssistantRun
+        (ports: BoundPorts)
+        (owner: SessionId)
         (physical: PhysicalUserMessageId)
-        (messages: SessionMessage list)
-        : Result<ProviderRunIdentity, string> =
-        match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
-        | Ok assistant -> Ok(ProviderRunIdentity.create assistant.Id)
-        | Error _ -> Error "owner provider run is not uniquely bound"
+        (initialMessages: SessionMessage list)
+        : Task<Result<SessionMessage list * ProviderRunIdentity, string>> =
+        task {
+            let rec loop (readsLeft: int) (currentMessages: SessionMessage list) =
+                task {
+                    match
+                        ProviderRunBinding.observeBindableRun (PhysicalUserMessageId.value physical) currentMessages
+                    with
+                    | ProviderRunBinding.Observation.Bound assistant ->
+                        return Ok(currentMessages, ProviderRunIdentity.create assistant.Id)
+                    | ProviderRunBinding.Observation.ProjectionNotVisibleYet when readsLeft > 0 ->
+                        return! rereadOwnerMessagesAfterCatchup ports owner readsLeft loop
+                    | ProviderRunBinding.Observation.ProjectionNotVisibleYet
+                    | ProviderRunBinding.Observation.Rejected _ ->
+                        return Error "owner provider run is not uniquely bound"
+                }
+
+            return! loop (ProviderRunBinding.projectionCatchupMaxReads - 1) initialMessages
+        }
 
     let private tryResolveAuthorityProfile
         (owner: SessionId)
@@ -200,8 +244,8 @@ module StrengthDelegate =
             let ports, owner = bound
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let! physical = tryResolvePhysicalUserMessage rawMessages
-            let! messages = ports.Snapshots.GetMessages owner
-            let! target = tryResolveAssistantRun physical messages
+            let! initialMessages = ports.Snapshots.GetMessages owner
+            let! messages, target = tryResolveAssistantRun ports owner physical initialMessages
             let projections = AgentJournal.snapshot ports.Durable
             let! authority = tryResolveAuthorityProfile owner projections
             let requestKind, hasPrefixProbe = planEvidence tryAttemptPlan owner target
@@ -542,62 +586,100 @@ module StrengthDelegate =
         | false -> List.forall isToolPartCompleted rawTools
         | true -> checkWireTailComplete wire
 
+    let private isAssistantRawMessage (raw: obj) : bool =
+        let info = ProviderWireDecode.infoObject raw
+
+        let role =
+            ProviderWireDecode.firstString info [ "role" ]
+            |> Option.orElse (ProviderWireDecode.firstString raw [ "role" ])
+            |> Option.defaultValue ""
+
+        String.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase)
+
+    /// WHAT[speculative-investigation-002]: source identity is the emitting
+    /// assistant that completed the batch, never the next outbound placeholder.
+    /// Trailing assistants with no parts are placeholders and are skipped.
+    /// An assistant whose tools are present but incomplete fails closed and must
+    /// not fall back to an earlier completed batch (013 trailing-integrity).
+    [<RequireQualifiedAccess>]
+    type private SourceAssistantTail =
+        | Completed of raw: obj
+        | Incomplete
+        | Absent
+
+    let private decideSourceAssistantTail
+        (last: obj)
+        (continueEarlier: unit -> SourceAssistantTail)
+        : SourceAssistantTail =
+        let tools = rawToolParts last
+
+        if List.isEmpty (ProviderWireDecode.rawPartsOf last) then
+            continueEarlier ()
+        elif not (List.isEmpty tools) && List.forall isToolPartCompleted tools then
+            SourceAssistantTail.Completed last
+        else
+            SourceAssistantTail.Incomplete
+
+    let private classifySourceAssistantTail (rawMessages: obj list) : SourceAssistantTail =
+        let assistants = rawMessages |> List.filter isAssistantRawMessage |> List.rev
+
+        let rec loop remaining =
+            match remaining with
+            | [] -> SourceAssistantTail.Absent
+            | last :: earlier -> decideSourceAssistantTail last (fun () -> loop earlier)
+
+        loop assistants
+
     let private tailBatchIsComplete (rawMessages: obj list) (wire: ProviderProjection.ProviderWireProjection) : bool =
-        let fromRawAssistant =
-            rawMessages
-            |> List.choose (fun raw ->
-                let info = ProviderWireDecode.infoObject raw
+        match classifySourceAssistantTail rawMessages with
+        | SourceAssistantTail.Completed lastRaw -> checkRawTailComplete (rawToolParts lastRaw) wire
+        | SourceAssistantTail.Incomplete -> false
+        | SourceAssistantTail.Absent -> checkWireTailComplete wire
 
-                let role =
-                    ProviderWireDecode.firstString info [ "role" ]
-                    |> Option.orElse (ProviderWireDecode.firstString raw [ "role" ])
-                    |> Option.defaultValue ""
+    let private pairCompletedCallsWithRun
+        (calls: SourceToolCall list option)
+        (run: ProviderRunIdentity option)
+        : (SourceToolCall list * ProviderRunIdentity) option =
+        match calls, run with
+        | Some complete, Some source -> Some(complete, source)
+        | _ -> None
 
-                if String.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) then
-                    Some raw
-                else
-                    None)
-            |> List.tryLast
+    let private providerRunOfRawAssistant (raw: obj) : ProviderRunIdentity option =
+        ProviderWireCapture.decodeCapturedMessage raw
+        |> Option.bind (fun captured -> captured.ProviderRun)
 
-        match fromRawAssistant with
-        | Some lastRaw -> checkRawTailComplete (rawToolParts lastRaw) wire
-        | None -> checkWireTailComplete wire
+    /// No host-session emitting tool batch: fall back to the last raw assistant
+    /// (if any) solely for ProviderRun, paired with a wire-shaped completed batch.
+    /// Host completed parts never appear as WireToolCall, so this path only serves
+    /// multi-message wire history.
+    let private batchFromAbsentAssistantTail
+        (rawMessages: obj list)
+        (wire: ProviderProjection.ProviderWireProjection)
+        : (SourceToolCall list * ProviderRunIdentity) option =
+        match rawMessages |> List.filter isAssistantRawMessage |> List.tryLast with
+        | None -> None
+        | Some raw -> pairCompletedCallsWithRun (tryExtractWireCompletedBatch wire) (providerRunOfRawAssistant raw)
+
+    let private batchFromCompletedAssistantTail
+        (raw: obj)
+        (wire: ProviderProjection.ProviderWireProjection)
+        : (SourceToolCall list * ProviderRunIdentity) option =
+        let calls =
+            tryExtractRawAssistantBatch raw
+            |> Option.orElseWith (fun () -> tryExtractWireCompletedBatch wire)
+
+        pairCompletedCallsWithRun calls (providerRunOfRawAssistant raw)
 
     let private extractCompletedSourceBatch
         (rawMessages: obj list)
         (wire: ProviderProjection.ProviderWireProjection)
         : (SourceToolCall list * ProviderRunIdentity) option =
-        let fromRaw =
-            rawMessages
-            |> List.choose (fun raw ->
-                let info = ProviderWireDecode.infoObject raw
+        match classifySourceAssistantTail rawMessages with
+        | SourceAssistantTail.Incomplete -> None
+        | SourceAssistantTail.Absent -> batchFromAbsentAssistantTail rawMessages wire
+        | SourceAssistantTail.Completed raw -> batchFromCompletedAssistantTail raw wire
 
-                let role =
-                    ProviderWireDecode.firstString info [ "role" ]
-                    |> Option.orElse (ProviderWireDecode.firstString raw [ "role" ])
-                    |> Option.defaultValue ""
-
-                if String.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) then
-                    Some raw
-                else
-                    None)
-            |> List.tryLast
-            |> Option.bind (fun raw ->
-                let calls =
-                    tryExtractRawAssistantBatch raw
-                    |> Option.orElseWith (fun () -> tryExtractWireCompletedBatch wire)
-
-                let run =
-                    ProviderWireCapture.decodeCapturedMessage raw
-                    |> Option.bind (fun captured -> captured.ProviderRun)
-
-                match calls, run with
-                | Some complete, Some source -> Some(complete, source)
-                | _ -> None)
-
-        fromRaw
-
-    /// Resolves the completed source batch of the tail assistant message.
+    /// Resolves the completed source batch of the emitting assistant.
     /// Supports both:
     /// 1. Host session-shaped tool parts (single assistant message where all tool parts are completed with output)
     /// 2. Wire-level multi-message parts (assistant WireToolCall messages followed by WireToolResult messages)
@@ -929,10 +1011,14 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (projectionSessionIdOpt: string option)
+        (timerPort: ITimerPort option)
         (output: obj)
         : Task<CaptureOutcome> =
         task {
-            match tryBind journal snapshotPort strengthDurability strengthScope output with
+            match
+                tryBind journal snapshotPort strengthDurability strengthScope projectionSessionIdOpt timerPort output
+            with
             | Error reason -> return CaptureOutcome.Skipped reason
             | Ok _ when strengthScope.StrengthFuseReason |> Option.isSome ->
                 return CaptureOutcome.Skipped "strength-fuse-tripped"
@@ -1150,7 +1236,7 @@ module StrengthDelegate =
                     "strength-replica-prepare-failed"
                     [ "session_id", SessionId.value surface.Owner
                       "replica_session_id", SessionId.value preparation.ReplicaSessionId
-                      "result", err ]
+                      "result", "send-error:" + err ]
 
                 return!
                     appendClosed
@@ -1252,7 +1338,8 @@ module StrengthDelegate =
             | Error reason ->
                 Diagnostic.emit
                     "strength-replica-prepare-failed"
-                    [ "session_id", SessionId.value surface.Owner; "result", reason ]
+                    [ "session_id", SessionId.value surface.Owner
+                      "result", "prepare-error:" + reason ]
 
                 let! current = loadDurableProjectionOrThrow surface.Ports strengthScope "prepare-failure"
 
@@ -1543,7 +1630,13 @@ module StrengthDelegate =
             let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "start"
 
             match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
-            | Error _ -> return ()
+            | Error err ->
+                Diagnostic.emit
+                    "strength-delegation-skip"
+                    [ "session_id", SessionId.value (snd bound)
+                      "result", "apply-surface-failed:" + err ]
+
+                return ()
             | Ok surface -> return! applyOnSurface strengthScope predictorConfigured surface
         }
 
@@ -1586,7 +1679,12 @@ module StrengthDelegate =
                 resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
 
             match surfaceResult with
-            | Error _ -> return ()
+            | Error err ->
+                Diagnostic.emit
+                    "strength-start-surface-failed"
+                    [ "session_id", SessionId.value request.OwnerSessionId; "result", err ]
+
+                return ()
             | Ok surface ->
                 return! startCanonicalRequest strengthScope predictorConfigured request durableStrength surface
         }
@@ -1602,7 +1700,15 @@ module StrengthDelegate =
         match boundResult with
         | Ok bound when strengthScope.StrengthFuseReason.IsNone ->
             executeApplyOnBound bound strengthScope tryAttemptPlan syncDelegateRuntime predictorConfigured output
-        | _ -> Task.FromResult()
+        | Ok(_, sessionId) ->
+            Diagnostic.emit
+                "strength-delegation-skip"
+                [ "session_id", SessionId.value sessionId; "result", "skipped-recovery-fuse" ]
+
+            Task.FromResult()
+        | Error err ->
+            Diagnostic.emit "strength-delegation-skip" [ "session_id", ""; "result", "skipped-recovery-bind:" + err ]
+            Task.FromResult()
 
     let private tryStartCapturedRequest
         (snapshotPort: ISessionSnapshotPort option)
@@ -1612,11 +1718,18 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (projectionSessionIdOpt: string option)
+        (timerPort: ITimerPort option)
         (output: obj)
         (request: DelegationRequest)
         : Task<unit> =
-        match tryBind journal snapshotPort strengthDurability strengthScope output with
-        | Error _ -> Task.FromResult()
+        match tryBind journal snapshotPort strengthDurability strengthScope projectionSessionIdOpt timerPort output with
+        | Error err ->
+            Diagnostic.emit
+                "strength-start-captured-bind-failed"
+                [ "session_id", SessionId.value request.OwnerSessionId; "result", err ]
+
+            Task.FromResult()
         | Ok bound ->
             tryStartBoundRequest
                 strengthScope
@@ -1635,6 +1748,8 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (projectionSessionIdOpt: string option)
+        (timerPort: ITimerPort option)
         (output: obj)
         : Task<unit> =
         task {
@@ -1647,18 +1762,28 @@ module StrengthDelegate =
                     tryAttemptPlan
                     syncDelegateRuntime
                     predictorConfigured
+                    projectionSessionIdOpt
+                    timerPort
                     output
 
             match captured with
             | CaptureOutcome.Skipped reason ->
                 let sessionId =
-                    ProviderWireDecode.projectionSessionIdFromMessages output
+                    projectionSessionIdOpt
+                    |> Option.orElseWith (fun () -> ProviderWireDecode.projectionSessionIdFromMessages output)
                     |> Option.defaultValue ""
 
                 Diagnostic.emit "strength-delegation-skip" [ "session_id", sessionId; "result", reason ]
 
                 let boundResult =
-                    tryBind journal snapshotPort strengthDurability strengthScope output
+                    tryBind
+                        journal
+                        snapshotPort
+                        strengthDurability
+                        strengthScope
+                        projectionSessionIdOpt
+                        timerPort
+                        output
 
                 return!
                     executeSkippedRecovery
@@ -1672,6 +1797,7 @@ module StrengthDelegate =
                 Diagnostic.emit
                     "strength-delegation-requested"
                     [ "session_id", SessionId.value request.OwnerSessionId
+                      "decision_id", StrengthDecisionId.value request.DecisionId
                       "result", string (ReadonlyRoundBudget.value request.RequestedRounds) ]
 
                 return!
@@ -1683,6 +1809,8 @@ module StrengthDelegate =
                         tryAttemptPlan
                         syncDelegateRuntime
                         predictorConfigured
+                        projectionSessionIdOpt
+                        timerPort
                         output
                         request
         }

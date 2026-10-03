@@ -18,14 +18,14 @@ test('WHAT[concern-routing-002] projection announcement coverage is per recipien
 
 test('WHAT[concern-routing-002] actual newly eligible peer receives address discovery once and never receives the owner’s message', async () => {
   await withExecutablePlugin(async (hooks, directory, created, runtime) => {
-    await admit(runtime, 'discovery-owner')
+    await admit(runtime, 'discovery-owner', 'engineer')
     await hooks.tool.subscribe.execute({ id: 'build', concern: 'DISCOVERY-CONCERN' }, context('discovery-owner', 'subscription'))
     await hooks.tool.publish.execute({ id: 'build', message: 'OWNER-ONLY-MESSAGE' }, context('discovery-owner', 'publication'))
-    await admit(runtime, 'discovery-peer')
-    const first = await transform(hooks, 'discovery-peer', [user('discovery-peer')])
+    await admit(runtime, 'discovery-peer', 'engineer')
+    const first = await transform(hooks, runtime, 'discovery-peer', [user('discovery-peer')])
     assert.match(JSON.stringify(hints(first)), /DISCOVERY-CONCERN/)
     assert.doesNotMatch(JSON.stringify(first), /OWNER-ONLY-MESSAGE|discovery-owner/)
-    const next = await transform(hooks, 'discovery-peer', [...first, ...toolBatch('discovery-peer', 'second')])
+    const next = await transform(hooks, runtime, 'discovery-peer', [...first, ...toolBatch('discovery-peer', 'second')])
     assert.ok(hints(next).length > hints(first).length)
     assert.doesNotMatch(JSON.stringify(hints(next).slice(hints(first).length)), /DISCOVERY-CONCERN|OWNER-ONLY-MESSAGE/)
   })
@@ -67,10 +67,10 @@ test('WHAT[concern-routing-002] eligible participant kinds receive each live gen
     }
     const delivered = []
     for (const [session] of eligible) {
-      const first = await transform(hooks, session, [user(session)])
+      const first = await transform(hooks, fixture, session, [user(session)])
       assert.match(JSON.stringify(hints(first)), /RESTART-GENERATION/, `${session} receives the announcement`)
       delivered.push(session)
-      const next = await transform(hooks, session, [...first, ...toolBatch(session, 'second')])
+      const next = await transform(hooks, fixture, session, [...first, ...toolBatch(session, 'second')])
       assert.doesNotMatch(JSON.stringify(hints(next).slice(hints(first).length)), /RESTART-GENERATION/, 'no repeat within the same life')
     }
     assert.deepEqual(delivered, eligible.map(([session]) => session))
@@ -82,20 +82,20 @@ test('WHAT[concern-routing-002] eligible participant kinds receive each live gen
     await fixture.withRuntime(async (runtime) => {
       await admit(runtime, 'restart-newcomer')
     })
-    const newcomer = await transform(hooks, 'restart-newcomer', [user('restart-newcomer')])
+    const newcomer = await transform(hooks, fixture, 'restart-newcomer', [user('restart-newcomer')])
     assert.match(JSON.stringify(hints(newcomer)), /RESTART-GENERATION/, 'newly eligible peer receives it after restart')
 
     // Ineligible role: blogger carries no cognitive tools, so no announcement.
     await fixture.withRuntime(async (runtime) => {
       await admit(runtime, 'restart-blogger', 'blogger')
     })
-    const blogger = await transform(hooks, 'restart-blogger', [user('restart-blogger')])
+    const blogger = await transform(hooks, fixture, 'restart-blogger', [user('restart-blogger')])
     assert.doesNotMatch(JSON.stringify(hints(blogger)), /RESTART-GENERATION|OWNER-RESTART-MESSAGE/, 'ineligible role receives nothing')
     await fixture.stop(hooks)
   })
 })
 
-test('WHAT[concern-routing-002] restart replays frozen hints and does not repeat announcements in new occurrences', async () => {
+test('WHAT[concern-routing-002] new physical ingress after plugin reopen replays frozen history without repeating announcements', async () => {
   const { withRestartablePlugin, configureManagedPlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
   await withRestartablePlugin(async (start, _directory, fixture) => {
     const boot = async () => {
@@ -120,7 +120,7 @@ test('WHAT[concern-routing-002] restart replays frozen hints and does not repeat
     })
     const deliveredHints = new Map()
     for (const [session] of eligible) {
-      const first = await transform(hooks, session, [user(session)])
+      const first = await transform(hooks, fixture, session, [user(session)])
       assert.match(JSON.stringify(hints(first)), /REPRO-GENERATION/, session + ' receives the announcement before restart')
       deliveredHints.set(session, hints(first))
     }
@@ -132,10 +132,18 @@ test('WHAT[concern-routing-002] restart replays frozen hints and does not repeat
 
     for (const [session] of eligible) {
       const frozen = deliveredHints.get(session)
-      const replay = await transform(hooks, session, [user(session)])
-      assert.deepEqual(hints(replay), frozen, session + ' replays the frozen hint byte-for-byte')
+      // A reopened plugin has no old provider lease. A new physical input
+      // starts the next execution while its history replays the frozen hint.
+      const replay = await transform(hooks, fixture, session, [
+        user(session), user(session, `physical-${session}-after-restart`),
+      ])
+      const historical = replay.filter(message => message.info?.id === `root-${session}`)
+      assert.deepEqual(hints(historical), frozen, session + ' replays the frozen hint byte-for-byte')
+      assert.ok(hints(replay).length > frozen.length, session + ' reaches a new occurrence on the new physical input')
+      assert.doesNotMatch(JSON.stringify(hints(replay).slice(frozen.length)), /REPRO-GENERATION/, session + ' does not repeat the announcement after restart')
+      assert.doesNotMatch(JSON.stringify(replay), /OWNER-REPRO-MESSAGE/, session + ' never receives the owner mailbox contents')
 
-      const next = await transform(hooks, session, [...replay, ...toolBatch(session, 'after-restart')])
+      const next = await transform(hooks, fixture, session, [...replay, ...toolBatch(session, 'after-restart')])
       const nextHints = hints(next)
       assert.deepEqual(nextHints.slice(0, frozen.length), frozen, session + ' keeps historical hints unchanged')
       assert.ok(nextHints.length > frozen.length, session + ' reaches a new Pair Hint occurrence')

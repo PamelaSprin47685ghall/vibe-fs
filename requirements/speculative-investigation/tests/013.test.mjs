@@ -475,7 +475,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
 
 // Drive the admitted provider request, then deliver its exact physical child
 // completion through the shared terminal port.
-test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session', async () => {
+async function captureRootDelegation(tailPlaceholder) {
   globalThis.__wanxiangshu_test_predictor_state = 'configured'
   try {
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -490,11 +490,20 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       const callB = 'call-positive-2'
       const seedUser = userMessage(physical, sessionId, [hostText('inspect the file')])
       const seedAssistant = assistantMessage(run, sessionId, physical, [budgetCall(callA, 1), budgetCall(callB, 1)])
+      const targetRun = tailPlaceholder ? 'run-positive-target' : run
+      const messages = [seedUser, seedAssistant]
+      if (tailPlaceholder) seedAssistant.info.time.completed = 2
       runtime.pushHostMessage(sessionId, seedUser)
       runtime.pushHostMessage(sessionId, seedAssistant)
+      if (tailPlaceholder) {
+        const target = assistantMessage(targetRun, sessionId, physical, [])
+        target.info.time.created = 3
+        runtime.pushHostMessage(sessionId, target)
+        messages.push(target)
+      }
 
       const promptsBefore = runtime.prompts.length
-      const pending = hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
+      const pending = hooks['experimental.chat.messages.transform']({}, { messages })
 
       let waited = 0
       let bootstrap
@@ -557,11 +566,19 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       const bound = durableEventsOfType(directory, 'DelegationBound')
       assert.equal(bound.length, 1, 'the start phase must bind exactly one replica for the decision')
       assert.equal(bound[0].payload.decision_id, payload.decision_id)
-      assert.equal(bound[0].payload.target_provider_run, run)
+      assert.equal(bound[0].payload.target_provider_run, targetRun)
     })
   } finally {
     globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
   }
+}
+
+test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session', async () => {
+  await captureRootDelegation(false)
+})
+
+test('WHAT[speculative-investigation-013] SPEC_INV_013_an_empty_target_placeholder_keeps_the_emitting_assistant_source_identity', async () => {
+  await captureRootDelegation(true)
 })
 
 test('WHAT[speculative-investigation-013] shared common-dir instances prepare one resident and unloading one preserves its lease and next decision', async () => {

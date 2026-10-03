@@ -14,6 +14,7 @@ import { NODE_TEST_INNER, superviseNodeTest } from './e2e/support/supervise-node
 const fixture = fileURLToPath(new URL('./support/fixtures/two-leaf.fixture.mjs', import.meta.url))
 const childEnv = { ...process.env }
 delete childEnv.NODE_TEST_CONTEXT
+delete childEnv.WXS_ACCEPT_TODO
 const verdict = (name, type = 'test:pass', extra = {}) => ({
   type,
   data: { name, file: '/test/a.mjs', details: { duration_ms: 1 }, ...extra },
@@ -303,9 +304,11 @@ process.send({type:'runner:file-drained',data:{entryFile:file}});
 process.send({type:'runner:summary',data:{passed:1,failed:0,todo:1,leafDurations:[]}});
 process.send({type:'inner:drained'});
 `)
-    await assert.rejects(superviseNodeTest({
-      files: [fixture], inner, env: childEnv, label: 'pending-proof', silenceMs: 10000, throwOnFailure: true,
-    }), /supervised suite failed/)
+    for (const env of [childEnv, { ...childEnv, WXS_ACCEPT_TODO: '1' }]) {
+      await assert.rejects(superviseNodeTest({
+        files: [fixture], inner, env, label: 'pending-proof', silenceMs: 10000, throwOnFailure: true,
+      }), /supervised suite failed/)
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

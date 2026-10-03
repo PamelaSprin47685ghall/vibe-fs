@@ -31,6 +31,7 @@
  * declares it cannot use it to smuggle a message rewrite past the barrier.
  */
 
+import { readFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
 
@@ -170,14 +171,21 @@ const withoutGuidanceMessage = (message) =>
 
 // The companion frame is the other retired auxiliary injection: the Host renders it as
 // a synthetic assistant ack row plus a user row carrying the memory preamble and the
-// prior work record.
-const COMPANION_PREAMBLE_MARKER = '# older prefix of this session. Continue from it.';
+// prior work record. Match the complete rendered resource, never a keyword in user prose.
+const COMPANION_PREAMBLES = ['en', 'zh-CN'].map((language) =>
+  readFileSync(new URL(`../../../../../resources/provider/lifecycle/companion/memory-preamble/${language}.md`, import.meta.url), 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => `# ${line}`)
+    .join('\n'),
+);
 
 const isCompanionFrameRow = (message) =>
   message?.role === 'user'
-  && (message.parts ?? []).some(
-    (part) => typeof part?.text === 'string' && part.text.includes(COMPANION_PREAMBLE_MARKER),
-  );
+  && message.parts?.length === 1
+  && message.parts[0]?.kind === 'text'
+  && typeof message.parts[0].text === 'string'
+  && COMPANION_PREAMBLES.some((preamble) => message.parts[0].text.startsWith(`${preamble}\n`));
 
 const withoutCompanionFrames = (messages) => {
   const kept = [];
@@ -188,8 +196,11 @@ const withoutCompanionFrames = (messages) => {
     }
     const ack = kept.at(-1);
     const isSyntheticAck = ack?.role === 'assistant'
-      && (ack.parts ?? []).every((part) => part?.kind === 'text' && (part.text ?? '').length <= 1);
+      && ack.parts?.length === 1
+      && ack.parts[0]?.kind === 'text'
+      && ack.parts[0].text === '.';
     if (isSyntheticAck) kept.pop();
+    else kept.push(message);
   }
   return kept;
 };

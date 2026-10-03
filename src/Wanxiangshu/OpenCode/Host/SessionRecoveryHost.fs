@@ -278,9 +278,7 @@ type SessionRecoveryHost
             | None -> ()
         }
 
-    /// Resume from an idle sweep: the manual-intervention fact is always
-    /// published; only a sweep also settles the unresolved accepted material.
-    let settleUnresumedFor (event: ChatExecutionRecoveryLifecycleEvent) (request: PreProviderResumeRequest) =
+    let handleUnresumedEvent (event: ChatExecutionRecoveryLifecycleEvent) (request: PreProviderResumeRequest) =
         task {
             publishNoAuthorizedDisposition request
 
@@ -293,7 +291,7 @@ type SessionRecoveryHost
             let! resumed = tryResumeAccepted request
 
             if not resumed then
-                do! settleUnresumedFor event request
+                do! handleUnresumedEvent event request
         }
         :> Task
 
