@@ -34,7 +34,7 @@ integrationTest('WHAT[action-affordance-014] assume commits without echoing the 
   })
 })
 
-integrationTest('WHAT[action-affordance-015] native todowrite keeps the host definition byte-identical', async () => {
+integrationTest('WHAT[action-affordance-014] native todowrite keeps the host definition byte-identical', async () => {
   await withPlugin(async (hooks) => {
     const output = {
       description: 'Native todo writer',
@@ -73,7 +73,7 @@ integrationTest('WHAT[action-affordance-015] native todowrite keeps the host def
   })
 })
 
-integrationTest('WHAT[action-affordance-015] native todowrite args reach the executor untouched and stay untouched after', async () => {
+integrationTest('WHAT[action-affordance-014] native todowrite args reach the executor untouched and stay untouched after', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'native-todo-checkpoint'
     const callID = 'todo-call-1'
