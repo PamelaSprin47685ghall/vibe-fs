@@ -107,7 +107,7 @@
 | GAP-097 | durable-events-019—025 | PARTIAL | 磁盘重开、Current 与损坏历史已有证据；019 反例已由隔离变异覆盖五注册（经 WorkspaceEventStore.programWithoutRegistration 观察口移除真实注册：Strength/Casebook/JsTransaction 为 Current 缺失形态，Structural/Journal 为构造 fail-closed 形态，如实分型；SphinxV2 注册必要性观察不在 019 范围；DevOps 真实跑绿 019/020/013 共 31 pass + 1 既有 todo）。完整 boot 激活、物理 fatal 和跨进程 cut 仍待证。IdentityCollision/StorageInvalid/普通 Rejected 都不自动等于 semantic cut 已结算。 |
 | GAP-098 | durable-events-022—025 | PARTIAL | 持久化 typed 结果与组合层 fatal owner 分工已保留；实际直接物理 fuse 和编译预算的政策归属仍需核对，100/185 不由测试便利改变。 |
 | GAP-099 | durable-events-022/023 | PARTIAL | 旧观察测试遗留 timer、局部工程缺依赖与顺序错误曾修复；保留局部编译和生命周期回归。本批依新 shard 迁移，旧全量成功不能关闭新局部依赖缺口。 |
-| GAP-100 | effect-accounting | PARTIAL | 有真实 durable 意图、未知回执、文件副作用与 Change Program 正反例；真实提交后重放/冲突、跨进程 effect 不重发、工作区提交故障仍缺证。局部投影拒绝不能直接判上层幂等失败。 |
+| GAP-100 | effect-accounting | PARTIAL | 有真实 durable 意图、未知回执、文件副作用与 Change Program 正反例；真实提交后重放/冲突、跨进程 effect 不重发、工作区提交故障仍缺证。局部投影拒绝不能直接判上层幂等失败。2026-10-04 结算：001 的 B4 负编译已在 change-fact 真实闭包落地（参照 durable-events 023 的 planOwnerCompile/isolate 模式：正例全绿排除语法/依赖错误 + Publish 家族 witness 互换两个负例，Fable 匿名 record 类型边界拒绝）；Worktree 家族 payload 同构、区分在 case 与 fold 穷尽匹配层，按 001 卡停止规则不另造 witness type；DevOps 真实跑绿（默认层 2/2 + integration 通道 3/3，真实 Fable 编译 199 源文件；诊断正则按 Fable 实际措辞校准，语义未弱化）。 |
 | GAP-101 | semantic-trace-005/007—012 | PARTIAL | 已撤下自排序 lane/自增游标模型，保留 capture、exact range 与磁盘重开；真实 Fission/Resume、终结前沿、多 invocation 消费及封装编译仍缺证。 |
 | GAP-102 | semantic-trace-010；SyncDelegate 首次 Opening | PARTIAL | 旧捕获只看“已有”而接受冲突；真实回归与纯裁决已迁入。SyncDelegate 仅初次 assignment 捕获 Opening，续接保留原文；待新基线回归确认。 |
 | GAP-103 | dispatch 物理接受生命周期 | PARTIAL | 旧成功路径未取消 Promise.race 的 timeout，断言后进程滞留；清理与回归属本批必要依赖。既有 ambient timer 不因修复就满足完整时间能力合同。 |
@@ -203,9 +203,9 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-123 | interaction-authority、managed-session-lifecycle | OPEN | 五类durable authority closure尚缺完整生产执行与归还证据；不得用描述字段代替已发生的关闭。 |
 | GAP-124 | interaction-authority历史身份 | PARTIAL | 历史Inspector材料与活跃准入必须分别验证；不靠放宽当前身份恢复旧测试。 |
 | GAP-125 | managed-chat-execution continuation | OPEN | 发送前对目标active run的真实核对仍缺完整证据；持久事实存在不等于当前可发送。 |
-| GAP-126 | managed-chat-execution | PARTIAL | 保留真实journal/准入；Host请求链、物理承接和失败后果仍缺。显式/continue已退役，恢复归加载阶段。 |
+| GAP-126 | managed-chat-execution | PARTIAL | 保留真实journal/准入；Host请求链、物理承接和失败后果仍缺。显式/continue已退役，恢复归加载阶段。2026-10-04 结算：006 经 SessionRecoveryHostSurface 受控 writer（bootControlledRecoveryHost）驱动真实 Signal→Finalize→append→release 链，磁盘 .ndjson 行数/sharedCapacitySnapshot exact owner 计数/task reject 为 oracle；先红复核确认当前实现本已正确（append Error 即 raise、release 仅在 Ok 后），故以基线绿 + 隔离变异红交付；DevOps 真实跑绿（12/12，回归 003/005/007/010/013/par023/hb003/hb033 共 15 条 0 fail；变异把 release 前置到 requirePersistence 之前时 held 场景红、还原后复绿）。 |
 | GAP-127 | managed-chat-execution恢复 | PARTIAL | 新接缝驱动实际admission序列，撤去只传restart标签的证明；受控调用仍不是OS进程死亡与重开。 |
-| GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | 本批upstream已有AdmittedWork及scoped事实，将稳定participant handle与单次工作分开；准入身份来自真实physical acceptance，不能由裸Root/link猜测。加载owner按实际Active work追加exact ChildWorkVoided，正式018/020覆盖journal重开、工作墓碑及显式新工作。仍需逐个核对真实producer/consumer、同event重放与迟到交付，以及旧无scope历史的拒绝/隔离和物理重启；不以局部fold或直接结算关闭全链缺口。 |
+| GAP-132 | managed-session-lifecycle-006/007/015 | PARTIAL | 本批upstream已有AdmittedWork及scoped事实，将稳定participant handle与单次工作分开；准入身份来自真实physical acceptance，不能由裸Root/link猜测。加载owner按实际Active work追加exact ChildWorkVoided，正式018/020覆盖journal重开、工作墓碑及显式新工作。仍需逐个核对真实producer/consumer、同event重放与迟到交付，以及旧无scope历史的拒绝/隔离和物理重启；不以局部fold或直接结算关闭全链缺口。2026-10-04 结算：006 三例反例（同 event_id 重放/same payload 新 event/已 Accepted 新 work）已经真实 resume/Journal 链路逐例核对可区分（event_id 去重+fold 幂等 / 新字节零状态变化 / 新 AuthorityRoot Active 条目），link 准入 owner 无需改动，角色循环弱断言已收紧为显式断言；DevOps 真实跑绿（run.mjs 通道 22/0，相邻 006/007/008/015 共 22/22）；007/015 关联项仍待各自卡核对。 |
 | GAP-134 | managed-session-lifecycle测试接缝 | PARTIAL | 首批关联源码已迁入真实端口观察；实际生命周期用例待新产物执行，自写时间整数不算Temporal。 |
 | GAP-135 | managed-session-lifecycle终止 | PARTIAL | Host abort明确拒绝的传播需本次产物复验；不能把端口调用完成当成退出成功。 |
 | GAP-148 | crash-reconciliation测试资源 | PARTIAL | 旧接缝主动结束自身请求的修正保留；本基线仍需验证文件完成，不扩大业务超时。 |

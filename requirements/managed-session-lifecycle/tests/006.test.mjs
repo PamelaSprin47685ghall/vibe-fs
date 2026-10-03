@@ -416,7 +416,11 @@ test('WHAT[managed-session-lifecycle-006] TPOL_outstanding_without_durable_work_
       const retired = handles.apply(complete.state, { op: 'retire', handle: link.handle })
       assert.equal(retired.ok, true)
       const replay = handles.apply(retired.state, link)
-      if (replay.ok) assert.equal(handles.read(replay.state, link.handle).lifecycle, 'Retired')
+      // C2: the same bare link replay must be idempotent, not refused —
+      // refusing it would be the old "just forbid Completed/Retired re-link"
+      // shape the ruling retires. Either way it must not revive the handle.
+      assert.equal(replay.ok, true, 'same binding replay is idempotent, not refused')
+      assert.equal(handles.read(replay.state, link.handle).lifecycle, 'Retired')
     })
   }
 }

@@ -8,6 +8,8 @@ module SessionRecoveryHostSurface =
           Scope: PluginRecoveryScope
           Host: SessionRecoveryHost
           PortOutcome: string
+          TerminalGate: TaskCompletionSource<unit>
+          TerminalArrival: TaskCompletionSource<unit>
           ResumeCalls: System.Collections.Generic.List<bool> }
 
     val bootRecoveryHost: directory: string -> portOutcome: string -> Task<RecoveryHostHandle>
@@ -45,3 +47,24 @@ module SessionRecoveryHostSurface =
     val signalSessionQuiesced: handle: RecoveryHostHandle -> sessionId: string -> Task<obj>
 
     val disposeRecoveryHost: handle: RecoveryHostHandle -> unit
+
+    /// managed-chat-execution-006：受控 terminal barrier boot。terminalMode 为
+    /// "committed"（纯透传）、"held"（Terminal append 停在门上直到放行）或
+    /// "commitUnknown"（Terminal append 回答 typed unknown 且不写盘）。
+    val bootControlledRecoveryHost:
+        directory: string -> portOutcome: string -> terminalMode: string -> Task<RecoveryHostHandle>
+
+    val awaitTerminalBarrier: handle: RecoveryHostHandle -> Task<unit>
+
+    val releaseTerminalBarrier: handle: RecoveryHostHandle -> unit
+
+    /// managed-chat-execution-006：经生产 recovery signal 路径投递 exact assistant
+    /// terminal 事件（Signal → 决策 → Finalize → terminal append → exact release），
+    /// 返回结算后的 lifecycle 视图；持久化失败时该 task reject。
+    val signalExactTerminal:
+        handle: RecoveryHostHandle ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        providerRun: string ->
+        disposition: string ->
+            Task<obj>

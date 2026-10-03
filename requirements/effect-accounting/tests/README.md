@@ -2,7 +2,7 @@
 
 WHAT 定义意图、确认与未知的边界，本目录只说明证据范围。
 
-- 001 驱动真实工作区投影与事实 codec，确认意图和结果不同；尚无类型混用的负向编译。
+- 001 驱动真实工作区投影与事实 codec，确认意图和结果不同；另以 B4 编译隔离在 change-fact 真实闭包上正负编译：Publish 家族请求 claim（六字段）与确认 Published（三字段）载荷结构不同，确认 witness 传入 `OrchestratorProjection.recordPublishClaimed` 准入、或请求载荷传入确认构造器，均因 Fable 类型边界失败（正例先证全部符号与值合法）。Worktree 家族两 payload 同构，请求/确认区分在 `OrchestratorFactCases` case 与 fold 穷尽匹配层（上方行为测试证明），按卡面停止规则不另造测试专属 witness type。真实 Fable 编译归 integration tier，诊断正则若与实际 FCS 输出不符，由 DevOps 按实际诊断校准（ok 断言不变）。
 - 002 驱动实际 Fork 生命周期，缺失有效报告时保留 pending，随后真实有效结果可完成同一 cell；不再等待 50 毫秒来猜它是否挂起。这是终态证据测试，不是所有 Requested-only 修复预算的证明。
 - 003 在真实 dispatcher 的 Host 入口重开磁盘日志，核对 exact PromptKey 的意图已可恢复；另验已关闭句柄阻止发送。原源码 token 先后顺序检查已撤下，工作区与待办的具体提交失败边界仍 TODO。
 - 004 保留实际工作区确认不回退与 Blogger 未确认请求幂等。周期投影会拒绝重复 receipt，并在 receipt 后重新 materialize 同 RequestId；但前者允许由上层幂等拦截，后者尚未经过命令准入，不能据此断言产品违约。两项改为真实入口的缺失证明 TODO；需分别验证同一完整材料重放、冲突材料与确认后重开。见 GAP-105 对初次判断的修正。

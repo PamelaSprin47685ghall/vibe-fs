@@ -15,7 +15,9 @@
 
 ## GAP-132 的 scoped work 回归
 
-006/007 已移除两处源码中的 todo 选项，保留原完整反例：006 的一处声明通过角色循环实例化为 Engineer、DevOps 两个测试；007 是一个完成 cell 重开反例。源码声明数与运行实例数不是同一统计。原来将裸 link 当成新工作的阳性断言改为重复 link 保留墓碑；真实新工作阳性通过 Manager fork/resume 的实际 accepted prompt 建立，不用 Root 字符串伪造准入。
+006/007 已移除两处源码中的 todo 选项，保留原完整反例：006 的一处声明通过角色循环实例化为 Engineer、DevOps 两个测试；007 是一个完成 cell 重开反例。源码声明数与运行实例数不是同一统计。原来将裸 link 当成新工作的阳性断言改为重复 link 保留墓碑；真实新工作阳性通过 Manager fork/resume 的实际 accepted prompt 建立，不用 Root 字符串伪造准入。角色循环断言已收紧为显式 `replay.ok === true`：C2 裁决要求相同裸 link 幂等接受而非拒绝，条件式 `if (replay.ok)` 会掩盖「拒绝重开」这一被裁决废弃的旧形态。
+
+2026-10-04 session006 核对：006 卡三例反例在当前实现下逐例可区分，均经真实 resume/Journal 驱动（scoped-work 链路，非 apply(op) 直调 fold）。同 event_id 重放 = journal 冷重开重放既有事件（assertCold 两处，含 B 准入后），EventStore 按 event_id 幂等去重、fold 幂等，Retired 墓碑不变；same payload 新 event = 经 HandleController.linkNamed 以相同 binding 重新执行 link（replayBinding），追加新 HandleLinked 字节但 replayExistingLink 幂等，投影与墓碑不变；已 Accepted 新 work = Manager resume 的实际 accepted prompt 经 PromptAuthority 准入（admit WORK-B），新 work 以新 AuthorityRoot 键入 Works，同 handle 同 child，旧 work 保持 Retired，B 仍可 settle（合法续做不被误杀）。生产链路无需改动：link 准入 owner（HandleController.linkNamed → HandleProjection.linkNamed）已按 C2 实现，未触碰 AdmittedWork 持久化契约。
 
 006/007/008/015 新增的正式断言调用已有 ForkToolSurface 及扩展的 exact work 观察/消费接口：A 完成、B 在 join 前接纳、消费 A、迟到 A、B 完成、两份 exact consume、每个关键点重新打开 canonical journal 比较投影。008 在消费 capability 边界注入确认前拒绝与真实追加后的回执未知，并验证不交付未确认 payload、不二次交付；它不是 OS crash 或半行写盘证明。015 保留无永久丢失证明时拒绝 DevOps 换 child 的反例，并拒绝没有 canonical admission 的 Root。
 

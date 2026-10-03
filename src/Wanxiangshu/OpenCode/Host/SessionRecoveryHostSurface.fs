@@ -5,12 +5,16 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 
 /// JS semantic boundary over the compiled session recovery host.
 ///
@@ -31,6 +35,8 @@ module SessionRecoveryHostSurface =
           Scope: PluginRecoveryScope
           Host: SessionRecoveryHost
           PortOutcome: string
+          TerminalGate: TaskCompletionSource<unit>
+          TerminalArrival: TaskCompletionSource<unit>
           ResumeCalls: System.Collections.Generic.List<bool> }
 
 
@@ -159,11 +165,22 @@ module SessionRecoveryHostSurface =
 
                 let host = SessionRecoveryHost(journalHandle.Journal, snapshot, scope, port)
 
+                let plainGate =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                let plainArrival =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                plainGate.SetResult()
+                plainArrival.SetResult()
+
                 return
                     { Journal = journalHandle
                       Scope = scope
                       Host = host
                       PortOutcome = portOutcome
+                      TerminalGate = plainGate
+                      TerminalArrival = plainArrival
                       ResumeCalls = calls }
         }
 
@@ -329,4 +346,165 @@ module SessionRecoveryHostSurface =
                         else
                             handle.ResumeCalls.Count
                        manuals = manualsOf handle.Scope |}
+        }
+
+    /// managed-chat-execution-006 B1 seam: a transparent pass-through writer that
+    /// holds or fails only ChatExecution Terminal appends. Every other fact,
+    /// read and lifecycle call forwards to the real writer unchanged; a held
+    /// append still executes on the real writer once the gate opens, and the
+    /// unknown answer never writes a line.
+    type private ControlledTerminalWriter
+        (inner: IJournalWriter, mode: string, gate: TaskCompletionSource<unit>, arrival: TaskCompletionSource<unit>) =
+
+        interface IJournalWriter with
+            member _.RuntimeId = inner.RuntimeId
+            member _.BlobWriter = inner.BlobWriter
+            member _.LocalSeq = inner.LocalSeq
+            member _.LastCommittedLocalSeq = inner.LastCommittedLocalSeq
+            member _.IsPoisoned = inner.IsPoisoned
+            member _.TryCurrent key = inner.TryCurrent key
+
+            member _.Append stream providerRun fact =
+                match fact with
+                | Fact.Agent(AgentFact.ChatExecution(ChatExecutionFactCases.Terminal _)) ->
+                    arrival.SetResult()
+
+                    match mode with
+                    | "held" ->
+                        task {
+                            do! gate.Task
+                            return! inner.Append stream providerRun fact
+                        }
+                    | "commitUnknown" ->
+                        let unknown: CommitResult<Envelope> =
+                            CommitUnknown(
+                                EventId.create "controlled-terminal-unknown",
+                                JournalFailure.WriteFailed "controlled terminal commit unknown"
+                            )
+
+                        Task.FromResult(unknown)
+                    | _ -> inner.Append stream providerRun fact
+                | _ -> inner.Append stream providerRun fact
+
+            member _.Release() = inner.Release()
+            member _.ReleaseAsync() = inner.ReleaseAsync()
+
+    /// managed-chat-execution-006: boot the same real recovery host over a real
+    /// on-disk journal whose writer passes Terminal appends through a controlled
+    /// barrier. `terminalMode` is "committed" (plain pass-through), "held" (the
+    /// Terminal append parks on the gate until `releaseTerminalBarrier`), or
+    /// "commitUnknown" (the Terminal append answers a typed unknown and never
+    /// writes a line).
+    let bootControlledRecoveryHost
+        (directory: string)
+        (portOutcome: string)
+        (terminalMode: string)
+        : Task<RecoveryHostHandle> =
+        task {
+            let calls = System.Collections.Generic.List<bool>()
+            // Fail fast on unknown answers before booting durability.
+            let port = portOf calls portOutcome
+
+            match terminalMode with
+            | "committed"
+            | "held"
+            | "commitUnknown" -> ()
+            | other -> invalidArg "terminalMode" $"unknown controlled terminal mode '{other}'"
+
+            let gate =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let arrival =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let integrator =
+                CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
+
+            let store =
+                EventStore.createLocal directory (Guid.NewGuid().ToString("N")) integrator
+
+            let! result =
+                EventStoreJournalWriter.resumeOrCreate (
+                    RuntimeId.create $"recovery-controlled-{terminalMode}",
+                    4242,
+                    DateTimeOffset.Parse "2026-10-04T00:00:00Z",
+                    store
+                )
+
+            match result with
+            | Error error -> return invalidOp $"recovery controlled journal boot failed: {error.Fact}: {error.Reason}"
+            | Ok(writer, _, projection) ->
+                let controlled = ControlledTerminalWriter(writer, terminalMode, gate, arrival)
+
+                match AgentJournal.createFromProjection controlled projection with
+                | Error error ->
+                    return invalidOp $"recovery controlled journal boot failed: {error.Fact}: {error.Reason}"
+                | Ok journal ->
+                    let scope = PluginRecoveryScope(None)
+
+                    let snapshot =
+                        { new ISessionSnapshotPort with
+                            member _.GetMessages _ = Task.FromResult(Ok []) }
+
+                    let host = SessionRecoveryHost(journal, snapshot, scope, port)
+
+                    return
+                        { Journal = JournalHandle.Create(journal)
+                          Scope = scope
+                          Host = host
+                          PortOutcome = portOutcome
+                          TerminalGate = gate
+                          TerminalArrival = arrival
+                          ResumeCalls = calls }
+        }
+
+    /// managed-chat-execution-006: wait until the controlled writer has parked a
+    /// Terminal append (the barrier is holding the terminal writer).
+    let awaitTerminalBarrier (handle: RecoveryHostHandle) : Task<unit> = handle.TerminalArrival.Task
+
+    /// managed-chat-execution-006: open the held Terminal barrier; the parked
+    /// append then executes on the real writer.
+    let releaseTerminalBarrier (handle: RecoveryHostHandle) : unit = handle.TerminalGate.SetResult()
+
+    /// managed-chat-execution-006: deliver the exact assistant terminal event
+    /// through the production recovery signal path (Signal -> decision ->
+    /// Finalize -> terminal append -> exact release) and report the settled
+    /// lifecycle view. A persistence failure rejects the returned task.
+    let signalExactTerminal
+        (handle: RecoveryHostHandle)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (providerRun: string)
+        (disposition: string)
+        : Task<obj> =
+        task {
+            let evidence = acceptedEvidence sessionId physicalUserMessageId
+            let key = keyOf evidence
+
+            let started =
+                { Accepted = evidence
+                  ProviderRun = ProviderRunIdentity.create providerRun
+                  RequestKind = ProviderRequestKind.WorkMain
+                  ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
+
+            let terminal =
+                match disposition with
+                | "Completed" -> ChatExecutionTerminalDisposition.Completed
+                | "Cancelled" -> ChatExecutionTerminalDisposition.Cancelled
+                | "Rejected" -> ChatExecutionTerminalDisposition.Rejected
+                | "Failed" -> ChatExecutionTerminalDisposition.Failed
+                | other -> invalidArg "disposition" $"unknown terminal disposition '{other}'"
+
+            do! handle.Host.Signal(ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(started, terminal))
+
+            let projection =
+                (AgentJournal.snapshot handle.Journal.Journal).AgentProjections.ChatExecutions
+
+            return
+                ChatExecutionProjection.byKey key projection
+                |> Option.map lifecycleView
+                |> Option.defaultWith (fun () ->
+                    box
+                        {| phase = "Missing"
+                           disposition = null |})
         }
