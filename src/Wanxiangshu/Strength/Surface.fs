@@ -237,6 +237,7 @@ module StrengthSurface =
         |> Array.toList
         |> List.map (fun batch ->
             { RequestOrdinal = int (textOf batch?requestOrdinal)
+              AssistantText = arrayOf batch?assistantText |> Array.toList |> List.map textOf
               Exchanges = exchangesOf batch?exchanges })
 
     let private bundleOf (value: obj) : StrengthFrameBundle =
@@ -251,9 +252,11 @@ module StrengthSurface =
                canonicalResult = exchange.CanonicalResult |}
 
     let private batchToJs (batch: StrengthRequestBatch) : obj =
-        box
-            {| requestOrdinal = batch.RequestOrdinal
-               exchanges = batch.Exchanges |> List.map exchangeToJs |> List.toArray |}
+        createObj
+            [ "requestOrdinal", box batch.RequestOrdinal
+              "exchanges", box (batch.Exchanges |> List.map exchangeToJs |> List.toArray)
+              if not (List.isEmpty batch.AssistantText) then
+                  "assistantText", box (List.toArray batch.AssistantText) ]
 
     let private bundleToJs (bundle: StrengthFrameBundle) : obj =
         box
@@ -1701,6 +1704,8 @@ module StrengthSurface =
                   RequestedRounds = requestedRounds
                   SemanticDigest = textOf value?semanticDigest
                   LocalizedMirrorMessages = messagesOf value?localizedMirrorMessages
+                  SynchronizedTextMessages =
+                    arrayOf value?synchronizedTextMessages |> Array.map unbox<int> |> Set.ofArray
                   ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor role requestKind }
         | Error error, _
         | _, Error error -> Error error
@@ -2074,6 +2079,7 @@ module StrengthSurface =
                     binding.RequestedRounds,
                     Roles.roleLabel binding.CanonicalRole,
                     binding.LocalizedMirrorMessages,
+                    binding.SynchronizedTextMessages,
                     binding.SemanticDigest
                 )
 
@@ -2245,8 +2251,8 @@ module StrengthSurface =
                   Role = None
                   Directory = None
                   Parts = parts
-                  Finish = None
-                  ErrorName = None
+                  Finish = optionalText value?finish
+                  ErrorName = optionalText value?errorName
                   Model = None
                   Outcome = outcome
                   Observation = None }
@@ -2630,8 +2636,12 @@ module StrengthSurface =
             )
             :> obj
 
-    let TwinBijectionSurface_restore (child: obj array) (owner: obj array) : obj array =
-        TwinBijectionSurface.restore child owner
+    let TwinBijectionSurface_restore
+        (child: obj array)
+        (owner: obj array)
+        (synchronizedTextMessages: obj array)
+        : obj array =
+        TwinBijectionSurface.restore child owner synchronizedTextMessages
 
     let TwinBijectionSurface_preservesOwnerOrder (child: obj array) (owner: obj array) : bool =
         TwinBijectionSurface.preservesOwnerOrder child owner

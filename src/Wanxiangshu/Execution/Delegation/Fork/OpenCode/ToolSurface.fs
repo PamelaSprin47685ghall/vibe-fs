@@ -7,7 +7,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -29,13 +31,16 @@ open Wanxiangshu.Foundation.Identity
 /// supplies a physical Host boundary for executable requirement proofs.
 module ForkToolSurface =
 
+    type private TerminalSubscription =
+        { Listener: TerminalCompletionListener }
+
     type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>) =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
         // DSL-MUTABLE: algorithm-scratch — pre-accepted prompt count in the harness
         let mutable preAcceptedPrompts = 0
-        let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
+        let listeners = Dictionary<string, ResizeArray<TerminalSubscription>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
 
         let promptWaiters =
@@ -53,6 +58,7 @@ module ForkToolSurface =
         let mutable abortCount = 0
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
+        let physicalNamespace = Guid.NewGuid().ToString("N")
 
         let historyOf (source: Dictionary<string, ResizeArray<string>>) key =
             match source.TryGetValue key with
@@ -133,18 +139,25 @@ module ForkToolSurface =
                 match listeners.TryGetValue key with
                 | true, values -> values
                 | false, _ ->
-                    let values = ResizeArray<TerminalCompletionListener>()
+                    let values = ResizeArray<TerminalSubscription>()
                     listeners[key] <- values
                     values
 
-            registrations.Add listener
+            let registration = { Listener = listener }
+            registrations.Add registration
 
             { new IDisposable with
-                member _.Dispose() = registrations.Remove listener |> ignore }
+                member _.Dispose() =
+                    let index =
+                        registrations.FindIndex(fun candidate -> obj.ReferenceEquals(candidate, registration))
+
+                    if index >= 0 then
+                        registrations.RemoveAt index }
 
         member _.LatestChild = latestChild ()
 
         member _.ChildCount = children.Count
+        member _.TerminalListenerCount = listeners.Values |> Seq.sumBy _.Count
 
         member _.PromptCount(sessionId: SessionId) =
             promptCountForKey (SessionId.value sessionId)
@@ -176,13 +189,18 @@ module ForkToolSurface =
                 emittedWaiters.Add(count, waiter)
                 waiter.Task :> Task
 
+        member _.AcceptNextPrompt() =
+            preAcceptedPrompts <- preAcceptedPrompts + 1
+
         member _.AcceptPrompt(sessionId: SessionId, index: int) =
             let key = SessionId.value sessionId
 
             match pendingAcceptances.TryGetValue key with
             | true, values when index >= 0 && index < values.Count ->
                 physicalSequence.Value <- physicalSequence.Value + 1
-                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                let physical =
+                    sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
 
                 if
                     AsyncSupport.trySetResult
@@ -196,7 +214,9 @@ module ForkToolSurface =
             | true, values when values.Count > 0 ->
                 let lastIndex = values.Count - 1
                 physicalSequence.Value <- physicalSequence.Value + 1
-                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                let physical =
+                    sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
 
                 if
                     AsyncSupport.trySetResult
@@ -227,8 +247,8 @@ module ForkToolSurface =
         member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
             match listeners.TryGetValue(SessionId.value sessionId) with
             | true, registrations ->
-                for listener in registrations |> Seq.toList do
-                    listener sessionId outcome
+                for registration in registrations |> Seq.toList do
+                    registration.Listener sessionId outcome
             | false, _ -> ()
 
         interface ISessionHostPort with
@@ -249,7 +269,10 @@ module ForkToolSurface =
                 | None when preAcceptedPrompts > 0 ->
                     preAcceptedPrompts <- preAcceptedPrompts - 1
                     physicalSequence.Value <- physicalSequence.Value + 1
-                    let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                    let physical =
+                        sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
+
                     historyOf physicalRoots key |> fun roots -> roots.Add physical
                     Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
                 | None ->
@@ -416,7 +439,7 @@ module ForkToolSurface =
                         )
         }
 
-    let private createRuntimeUsingAbort directory owners abortSession : Task<obj> =
+    let private createRuntimeUsingAbort directory owners abortSession cancelSignals : Task<obj> =
         emitJsExpr () "process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'" |> ignore
 
         task {
@@ -471,7 +494,7 @@ module ForkToolSurface =
                     None,
                     None,
                     None,
-                    None,
+                    cancelSignals,
                     childWorkRecordForRun = childWorkRecordForRun,
                     workRecordCapability = workRecordCapability
                 )
@@ -482,7 +505,18 @@ module ForkToolSurface =
         }
 
     let createRuntime (directory: string) (owners: obj) : Task<obj> =
-        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok()))
+        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok())) None
+
+    let createRuntimeWithCancelSignals
+        (directory: string)
+        (owners: obj)
+        (cancelSignals: string array -> unit)
+        : Task<obj> =
+        createRuntimeUsingAbort
+            directory
+            owners
+            (fun _ -> Task.FromResult(Ok()))
+            (Some(fun sessionIds -> sessionIds |> Seq.map SessionId.value |> Seq.toArray |> cancelSignals))
 
     let createRuntimeWithAbort (directory: string) (owners: obj) (abortSession: string -> Task<obj>) : Task<obj> =
         let abort sessionId =
@@ -496,7 +530,7 @@ module ForkToolSurface =
                         Error(string result?error)
             }
 
-        createRuntimeUsingAbort directory owners abort
+        createRuntimeUsingAbort directory owners abort None
 
     let private managerContext (harness: ForkHarness) owner =
         { SessionId = SessionId.value (harness.OwnerSession owner)
@@ -629,6 +663,12 @@ module ForkToolSurface =
         | Some childId -> harness.Sessions.AcceptPrompt(childId, index)
         | None -> harness.Sessions.AcceptPrompt(SessionId.create "", index)
 
+    let acceptNextPrompt (value: obj) =
+        (unbox<ForkHarness> value).Sessions.AcceptNextPrompt()
+
+    let terminalListenerCount (value: obj) =
+        (unbox<ForkHarness> value).Sessions.TerminalListenerCount
+
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value
 
@@ -733,6 +773,296 @@ module ForkToolSurface =
                             match! runtime.AwaitCurrentWorkRecord agent.AgentId with
                             | Ok _ -> return true
                             | Error _ -> return false
+        }
+
+    let prepareTerminalDelivery (value: obj) (owner: string) (answer: string) (providerRun: string) =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                let projection =
+                    AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+
+                match
+                    HandleProjection.tryFindByChildSession childId projection,
+                    harness.Sessions.LatestAuthorityRoot childId
+                with
+                | Some binding, Some root ->
+                    do! captureTraceText harness.Journal childId providerRun answer
+
+                    return
+                        fun () ->
+                            task {
+                                harness.Sessions.Notify(
+                                    childId,
+                                    TerminalOutcome.Completed
+                                        { SessionId = childId
+                                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                                          ProviderRun = ProviderRunIdentity.create providerRun
+                                          Role = binding.CanonicalRole
+                                          Directory = None
+                                          TerminalText = answer
+                                          TurnFormalText = answer }
+                                )
+
+                                do! runtime.AwaitObservedWork()
+                            }
+                            :> Task
+                | _ -> return invalidOp "no accepted child work for terminal delivery"
+            | _ -> return invalidOp "no owned runtime for terminal delivery"
+        }
+
+    let private workView (record: HandleRecord) : obj =
+        let root =
+            record.Work
+            |> Option.map (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot)
+
+        let lifecycle =
+            match record.Lifecycle with
+            | Active -> "Active"
+            | CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
+            | Abandoned _ -> "Abandoned"
+            | Retired -> "Retired"
+
+        box
+            {| root = root
+               handle = HandleId.describe record.Handle
+               child = SessionId.value record.ChildSessionId
+               targetAgent = record.TargetAgent
+               byname = record.Byname
+               role = Roles.roleLabel record.CanonicalRole
+               lifecycle = lifecycle
+               completionRef = record.LastCompletion |> Option.bind _.CompletionRef |> Option.map BlobRef.value
+               completionDigest =
+                record.LastCompletion
+                |> Option.bind _.CompletionDigest
+                |> Option.map BlobDigest.value |}
+
+    let workSnapshot (value: obj) (owner: string) : obj array =
+        let harness = unbox<ForkHarness> value
+
+        AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+        |> HandleProjection.workRecords
+        |> List.map workView
+        |> List.toArray
+
+    let coldWorkSnapshot (directory: string) (owner: string) : Task<obj array> =
+        task {
+            let! journal = createJournal directory
+
+            try
+                return
+                    AgentJournal.handleProjection journal (SessionId.create owner)
+                    |> HandleProjection.workRecords
+                    |> List.map workView
+                    |> List.toArray
+            finally
+                (journal :> IDisposable).Dispose()
+        }
+
+    let replayBinding (value: obj) (owner: string) (byname: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let projection = AgentJournal.handleProjection harness.Journal parent
+
+            match HandleProjection.tryFindByByname byname projection with
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "binding not found" |}
+            | Some record ->
+                match HandleId.tryAgent record.Handle with
+                | None ->
+                    return
+                        box
+                            {| ok = false
+                               error = "not an agent binding" |}
+                | Some id ->
+                    let! result =
+                        Wanxiangshu.Execution.Delegation.Handle.HandleController.linkNamed
+                            (Some(AgentJournalPortAdapter.fromAgentJournal harness.Journal))
+                            parent
+                            (AgentHandleId.value id)
+                            record.ChildSessionId
+                            record.TargetAgent
+                            record.Byname
+                            record.CanonicalRole
+                            record.Ownership
+
+                    let error =
+                        match result with
+                        | Ok() -> None
+                        | Error reason -> Some reason
+
+                    return
+                        box
+                            {| ok = Result.isOk result
+                               error = error |}
+        }
+
+    let emitTerminalForRoot (value: obj) (owner: string) (root: string) (answer: string) (providerRun: string) : Task =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                harness.Sessions.Notify(
+                    childId,
+                    TerminalOutcome.Completed
+                        { SessionId = childId
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                          ProviderRun = ProviderRunIdentity.create providerRun
+                          Role = Role.Engineer
+                          Directory = None
+                          TerminalText = answer
+                          TurnFormalText = answer }
+                )
+
+                do! runtime.AwaitObservedWork()
+            | _ -> invalidOp "no owned child work"
+        }
+        :> Task
+
+    let startUnprepared (value: obj) (owner: string) (charge: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = sprintf "%A" error |}
+            | Ok runtime ->
+                let! result = runtime.Fork("plain-child", Role.Engineer, "engineer", charge, None, byname = "Plain")
+                return box {| ok = Result.isOk result |}
+        }
+
+    let emitStopForRoot (value: obj) (owner: string) (root: string) (kind: string) : Task =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                let stop =
+                    TerminalStop.forAuthority (AuthorityRootUserMessageId.create root) "old work stop"
+
+                let outcome =
+                    match kind with
+                    | "Failed" -> TerminalOutcome.Failed stop
+                    | "Aborted" -> TerminalOutcome.Aborted stop
+                    | _ -> invalidArg "kind" "unknown stop"
+
+                harness.Sessions.Notify(childId, outcome)
+                do! runtime.AwaitObservedWork()
+            | _ -> invalidOp "no owned child work"
+        }
+        :> Task
+
+    let replayWorkCompletion (value: obj) (owner: string) (root: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let handles = AgentJournal.handleProjection harness.Journal parent
+
+            let candidate =
+                HandleProjection.workRecords handles
+                |> List.tryFind (fun record ->
+                    record.Work
+                    |> Option.exists (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot = root))
+
+            match
+                candidate
+                |> Option.bind (fun record -> record.LastCompletion |> Option.map (fun cell -> record, cell))
+            with
+            | None -> return box {| ok = false |}
+            | Some(record, cell) ->
+                let! result =
+                    (AgentJournalPortAdapter.fromAgentJournal harness.Journal).AppendExecutionFact
+                        parent
+                        (ExecutionFactCases.HandleWorkCompleted
+                            {| ParentSessionId = parent
+                               Work = record.Work |> Option.get
+                               Kind = HandleCompletionKind.SendFailure
+                               CompletionRef = cell.CompletionRef
+                               CompletionDigest = cell.CompletionDigest |})
+
+                return box {| ok = Result.isOk result |}
+        }
+
+    let consumeWorkWithOutcome (value: obj) (owner: string) (root: string) (commitment: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let parent = harness.OwnerSession owner
+            let journal = AgentJournalPortAdapter.fromAgentJournal harness.Journal
+
+            let capability =
+                match commitment with
+                | "confirmed" -> journal
+                | "before" ->
+                    { journal with
+                        AppendExecutionFact = fun _ _ -> Task.FromResult(Error "known-not-committed") }
+                | "after" ->
+                    { journal with
+                        AppendExecutionFact =
+                            fun session fact ->
+                                task {
+                                    let! outcome = journal.AppendExecutionFact session fact
+                                    return outcome |> Result.bind (fun () -> Error "commit-unknown-after-append")
+                                } }
+                | _ -> invalidArg "commitment" "unknown commitment scenario"
+
+            let candidate =
+                HandleProjection.workRecords (journal.HandleProjection parent)
+                |> List.tryFind (fun record ->
+                    record.Work
+                    |> Option.exists (fun work -> AuthorityRootUserMessageId.value work.AuthorityRoot = root))
+
+            match candidate with
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "WorkNotAdmitted" |}
+            | Some record ->
+                let! payload =
+                    Wanxiangshu.Execution.Delegation.Handle.HandleCompletionCodec.tryRead
+                        journal
+                        record
+                        (HandleId.tryAgent record.Handle
+                         |> Option.map AgentHandleId.value
+                         |> Option.defaultValue "")
+                        DateTimeOffset.MinValue
+
+                let consumption =
+                    match payload with
+                    | Error reason ->
+                        Task.FromResult(Error(Wanxiangshu.Execution.Delegation.Handle.AppendFailed reason))
+                    | Ok _ ->
+                        Wanxiangshu.Execution.Delegation.Handle.HandleController.consumeWork capability parent record
+
+                match! consumption with
+                | Error reason ->
+                    return
+                        box
+                            {| ok = false
+                               error = sprintf "%A" reason |}
+                | Ok consumed ->
+                    match payload with
+                    | Ok(Some { Outcome = AgentCompleted completion }) ->
+                        return
+                            box
+                                {| ok = true
+                                   root = root
+                                   workRecord = completion.WorkRecord |}
+                    | _ ->
+                        return
+                            box
+                                {| ok = false
+                                   error = "materialization failed" |}
         }
 
     let injectAcceptedAssessment (value: obj) (owner: string) : Task =

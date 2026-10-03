@@ -44,6 +44,43 @@ module HostForkRunLifecycle =
         | AcceptanceUncertain of string
         | Rejected of string
 
+    let private admittedWork durable parentId agentId childId authorityRoot =
+        HandleProjection.tryAdmittedWork
+            { Handle = HandleController.agentHandle agentId
+              ChildSessionId = childId
+              AuthorityRoot = authorityRoot }
+            (AgentJournal.handleProjection durable parentId)
+
+    let private acceptedWorkOutcome durable parentId childId root physical (binding: HandleRecord) =
+        match
+            HandleProjection.tryAdmittedWork
+                { Handle = binding.Handle
+                  ChildSessionId = childId
+                  AuthorityRoot = root }
+                (AgentJournal.handleProjection durable parentId)
+        with
+        | Ok _ -> AgentOwnerDispatchOutcome.Accepted(physical, root)
+        | Error _ ->
+            AgentOwnerDispatchOutcome.AcceptanceUncertain
+                "physical acceptance exists; exact work admission is not established"
+
+    let private acceptedBindingOutcome durable parentId childId root physical =
+        let projection = (AgentJournal.snapshot durable).AgentProjections
+
+        match Map.tryFind childId projection.HandleByChildSession with
+        | Some binding -> acceptedWorkOutcome durable parentId childId root physical binding
+        | None -> AgentOwnerDispatchOutcome.AcceptanceUncertain "physical acceptance exists; child binding is missing"
+
+    let private acceptedOutcome durable childId identitySeed onAccepted (evidence: PromptAuthority.AcceptedDispatch) =
+        onAccepted evidence.PhysicalUserMessageId
+
+        let root =
+            PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
+
+        match PromptAuthority.identitySeedOwner identitySeed with
+        | Some(parentId, _, _) -> acceptedBindingOutcome durable parentId childId root evidence.PhysicalUserMessageId
+        | None -> AgentOwnerDispatchOutcome.Rejected "child assignment has no exact owner identity"
+
     let issueCurrentOwnerIdentitySeed
         (journal: AgentJournal option)
         (ownerSessionId: SessionId)
@@ -128,13 +165,7 @@ module HostForkRunLifecycle =
         =
         let payloadDigest = HostDigest.sha256Hex prompt
 
-        let accepted (evidence: PromptAuthority.AcceptedDispatch) =
-            onAccepted evidence.PhysicalUserMessageId
-
-            AgentOwnerDispatchOutcome.Accepted(
-                evidence.PhysicalUserMessageId,
-                PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
-            )
+        let accepted = acceptedOutcome durable childId identitySeed onAccepted
 
         match durableDispatchObservation durable childId payloadDigest identitySeed with
         | DurableDispatchObservation.Accepted evidence -> accepted evidence
@@ -147,12 +178,7 @@ module HostForkRunLifecycle =
     let private classifySendSuccess durable childId identitySeed prompt onAccepted =
         match durableDispatchObservation durable childId (HostDigest.sha256Hex prompt) identitySeed with
         | DurableDispatchObservation.Accepted evidence ->
-            onAccepted evidence.PhysicalUserMessageId
-
-            AgentOwnerDispatchOutcome.Accepted(
-                evidence.PhysicalUserMessageId,
-                PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
-            )
+            acceptedOutcome durable childId identitySeed onAccepted evidence
         | DurableDispatchObservation.Pending _ ->
             AgentOwnerDispatchOutcome.AcceptanceUncertain "Prompt submitted but physical acceptance unconfirmed"
         | DurableDispatchObservation.IdentityMismatch ->
@@ -247,16 +273,12 @@ module HostForkRunLifecycle =
             sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
 
     let private completionBelongsToRun (run: PendingHostRun) (result: AgentRunResult) =
-        match run.Handoff with
-        | None -> true
-        | Some _ -> run.AuthorityRoot = result.AuthorityRootUserMessageId
+        run.ChildId = result.SessionId
+        && run.AuthorityRoot = result.AuthorityRootUserMessageId
 
     let private stopBelongsToRun (run: PendingHostRun) (stop: TerminalStop) =
-        match run.Handoff with
-        | None -> true
-        | Some _ ->
-            let root = run.AuthorityRoot
-            TerminalStop.belongsTo root stop
+        stop.AuthorityRootUserMessageId.IsNone
+        || TerminalStop.belongsTo run.AuthorityRoot stop
 
     /// delegation-031: the handoff port travels with the prepared handoff as one slot
     /// (`Some slot` proves the capability was present at PrepareHandoff time).
@@ -332,7 +354,6 @@ module HostForkRunLifecycle =
             match pendingRuns.TryGetValue run.AgentId with
             | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
                 run.Finished <- true
-                pendingRuns.Remove run.AgentId |> ignore
                 true, run.Subscription
             | _ -> false, None)
 
@@ -346,7 +367,12 @@ module HostForkRunLifecycle =
         task {
             let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
 
-            match! ChildRecoveryWorkflow.commitJoinable journalPort parentId proof with
+            let commitment =
+                match run.Work with
+                | Some admitted -> HandleController.recordWorkCompletion journalPort parentId admitted proof
+                | None -> Task.FromResult(Error "durable pending run has no admitted work proof")
+
+            match! commitment with
             | Ok() -> return agentOutcome
             | Error error ->
                 return
@@ -359,7 +385,16 @@ module HostForkRunLifecycle =
                         (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
         }
 
+    let private removeClaimedRun (gate: obj) (pendingRuns: Dictionary<string, PendingHostRun>) (run: PendingHostRun) =
+        lock gate (fun () ->
+            match pendingRuns.TryGetValue run.AgentId with
+            | true, current when obj.ReferenceEquals(current.Token, run.Token) ->
+                pendingRuns.Remove run.AgentId |> ignore
+            | _ -> ())
+
     let private startClaimDelivery
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
         (journal: AgentJournal option)
         (parentId: SessionId)
         (run: PendingHostRun)
@@ -371,6 +406,24 @@ module HostForkRunLifecycle =
                 match journal with
                 | None -> Task.FromResult agentOutcome
                 | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
+
+            // Do not release the road while the exact completion commit is unknown.
+            let committed =
+                journal
+                |> Option.exists (fun durable ->
+                    run.Work
+                    |> Option.exists (fun admitted ->
+                        HandleProjection.tryWork
+                            (AdmittedWork.id admitted)
+                            (AgentJournal.handleProjection durable parentId)
+                        |> Option.exists (fun work ->
+                            match work.Lifecycle with
+                            | CompletedAwaitingJoin _
+                            | Retired -> true
+                            | _ -> false)))
+
+            if journal.IsNone || committed then
+                removeClaimedRun gate pendingRuns run
 
             run.Source.SetResult finalOutcome
         }
@@ -391,7 +444,7 @@ module HostForkRunLifecycle =
             subscriptionToDispose
             |> Option.iter (fun subscription -> subscription.Dispose())
 
-            startClaimDelivery journal parentId run proof agentOutcome
+            startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
         else
             Task.FromResult(())
 
@@ -533,6 +586,13 @@ module HostForkRunLifecycle =
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
         =
+        let work =
+            match journal with
+            | None -> invalidOp "a pending agent work requires a canonical journal"
+            | Some durable ->
+                admittedWork durable parentId agentId childId authorityRoot
+                |> Result.defaultWith (fun reason -> invalidOp (sprintf "exact work admission missing: %A" reason))
+
         let run =
             { Token = obj ()
               AgentId = agentId
@@ -541,6 +601,7 @@ module HostForkRunLifecycle =
               StartCursor = xTraceHead childId
               Handoff = handoff
               AuthorityRoot = authorityRoot
+              Work = Some work
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }

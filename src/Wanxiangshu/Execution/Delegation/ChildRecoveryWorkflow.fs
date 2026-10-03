@@ -15,7 +15,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
-/// Sole production owner of HandleController.recordCompletion.
+/// Recovery consumes canonical admission and commits only exact scoped completions.
 /// GREEN-5: after durable commit, Pulse agent handle only (wake); Journal is fact source.
 module ChildRecoveryWorkflow =
 
@@ -63,11 +63,19 @@ module ChildRecoveryWorkflow =
 
     let private evidenceFromDecodedBody (ports: Ports) (body: string) : DurableHandleEvidence =
         match HandleCompletionCodec.decodeBody body with
-        | Current decoded ->
+        | Current decoded when
+            ports.Journal
+            |> Option.exists (fun journal ->
+                HandleProjection.tryFind ports.Handle (journal.HandleProjection ports.ParentId)
+                |> Option.exists (fun record ->
+                    record.Work
+                    |> Option.exists (fun work -> HandleCompletionCodec.belongsToWork work decoded)))
+            ->
             let proof =
                 JoinableCompletion.fromDecoded ports.AgentId ports.Handle ports.ChildSession decoded body
 
             DurableHandleEvidence.CompletedAwaitingJoin proof
+        | Current _ -> DurableHandleEvidence.Unknown
         | LegacyFalseAbort _ -> DurableHandleEvidence.Active
         | Invalid _ -> DurableHandleEvidence.Unknown
 
@@ -113,6 +121,8 @@ module ChildRecoveryWorkflow =
         : ChildSnapshotEvidence =
         match lastByRole messages "user" with
         | None -> ChildSnapshotEvidence.Unreadable "host restart: terminal child has no user message"
+        | Some user when assistant.ParentId <> Some user.Id ->
+            ChildSnapshotEvidence.Unreadable "terminal assistant does not answer the exact accepted physical message"
         | Some user ->
             let runId = "run-restored-" + ports.AgentId
             let workRecord = textOfParts assistant.Parts
@@ -123,7 +133,7 @@ module ChildRecoveryWorkflow =
                     ports.ChildSession
                     runId
                     ports.Role
-                    (AuthorityRootUserMessageId.create user.Id)
+                    (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
                     (ProviderRunIdentity.create assistant.Id)
                     workRecord
                     None
@@ -159,13 +169,38 @@ module ChildRecoveryWorkflow =
         | Some pulse -> pulse ()
         | None -> ()
 
-    /// P0-RECOVERY-JOIN-001 §十: sole production caller of HandleController.recordCompletion.
+    let private commitAdmittedTerminal journal parentId proof (durable: AgentJournalPort) (work: HandleWorkId) =
+        let projection = durable.HandleProjection parentId
+
+        match HandleProjection.tryAdmittedWork work projection, HandleProjection.tryWork work projection with
+        | Ok admitted, _ -> HandleController.recordWorkCompletion journal parentId admitted proof
+        | _, Some existing when
+            existing.Lifecycle <> Active
+            && not (Set.contains work.Handle projection.LegacyWorkHandles)
+            ->
+            Task.FromResult(Ok())
+        | _ -> Task.FromResult(Error "historical or unmatched terminal has no scoped admission")
+
+    let private commitDecodedTerminal journal parentId proof durable =
+        match JoinableCompletion.body proof |> Option.map HandleCompletionCodec.decodeBody with
+        | Some(Current(CompletedV2 payload)) ->
+            let work =
+                { Handle = JoinableCompletion.handle proof
+                  ChildSessionId = JoinableCompletion.childSession proof
+                  AuthorityRoot = AuthorityRootUserMessageId.create payload.AuthorityRoot }
+
+            commitAdmittedTerminal journal parentId proof durable work
+        | _ -> Task.FromResult(Error "recovery terminal requires its exact admitted Root; no legacy write fallback")
+
+    /// Snapshot recovery must match an existing canonical work; it cannot reopen history.
     let commitJoinable
         (journal: AgentJournalPort option)
         (parentId: SessionId)
         (proof: JoinableCompletion)
         : Task<Result<unit, string>> =
-        HandleController.recordCompletion journal parentId proof
+        match journal with
+        | None -> Task.FromResult(Error "completion requires an exact canonical admission")
+        | Some durable -> commitDecodedTerminal journal parentId proof durable
 
     let private commitAbandon
         (ports: Ports)

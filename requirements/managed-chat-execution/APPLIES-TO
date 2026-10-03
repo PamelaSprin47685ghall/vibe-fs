@@ -30,7 +30,6 @@
 /src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs
-/src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Facts.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Fold.fs
 /src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs

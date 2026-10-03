@@ -360,7 +360,8 @@ module StrengthSurface =
 
     val replicaReleased: handle: obj -> string array
 
-    val TwinBijectionSurface_restore: child: obj array -> owner: obj array -> obj array
+    val TwinBijectionSurface_restore:
+        child: obj array -> owner: obj array -> synchronizedTextMessages: obj array -> obj array
 
     val TwinBijectionSurface_preservesOwnerOrder: child: obj array -> owner: obj array -> bool
 

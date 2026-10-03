@@ -11,6 +11,60 @@ const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: r
 const exchange = (toolName, canonicalArguments, canonicalResult) => ({ toolName, canonicalArguments, canonicalResult })
 const batch = (requestOrdinal, exchanges) => ({ requestOrdinal, exchanges })
 
+test('WHAT[speculative-investigation-005] predictor text crosses as reasoning without its native reasoning', async () => {
+  const texts = [' 核对结果\n𠀀 ', '第二段', '结束正文']
+  const messages = [
+    { role: 'assistant', parts: [
+      { kind: 'reasoning', text: 'private thinking' },
+      { kind: 'text', text: texts[0] },
+      { kind: 'text', text: texts[1] },
+      call('p1', 'js-predictor', '{"program":"read"}'),
+    ] },
+    { role: 'tool', parts: [result('p1', 'actual evidence')] },
+    { role: 'assistant', parts: [
+      { kind: 'reasoning', text: 'private terminal thinking' },
+      { kind: 'text', text: texts[2] },
+    ] },
+  ]
+  const batches = Strength.collectCompleteBatches(messages)
+  assert.deepEqual(batches, [
+    { requestOrdinal: 1, assistantText: texts.slice(0, 2), exchanges: [
+      exchange('js-predictor', '{"program":"read"}', 'actual evidence'),
+    ] },
+    { requestOrdinal: 2, assistantText: texts.slice(2), exchanges: [] },
+  ])
+  const built = Strength.frameTryBuild(H, batches)
+  assert.equal(built.ok, true, built.error)
+  for (const intent of [
+    Strength.candidate(H, {
+      ownerSessionId: 'owner', ownerRole: 'engineer', decisionId: 'text-delivery',
+      targetProviderRun: 'target', currentProviderRun: 'target', bundle: built.value,
+    }),
+    Strength.promoted(H, {
+      ownerSessionId: 'owner', ownerRole: 'engineer', decisionId: 'text-delivery',
+      beforeIndex: 0, isReplicaRequest: false, bundle: built.value,
+    }),
+  ]) {
+    assert.equal(intent.ok, true, intent.error)
+    const Projection = await import('../../../dist/Participant/Provider/Projection/Surface.js')
+    const rendered = Projection.renderMessages(Projection.projectionSnapshot(Projection.semanticProjection([])), [], [intent.value])
+    assert.deepEqual(rendered.flatMap(message => message.parts).filter(part => part.kind === 'reasoning'),
+      texts.map(text => ({ kind: 'reasoning', text })))
+    assert.equal(rendered.flatMap(message => message.parts).some(part => part.kind === 'text'), false)
+    const encoded = Strength.tryApplyRenderedMessages('owner', H, {
+      messages: rendered, hostMessageIds: rendered.map(() => null), hostIsPhysical: rendered.map(() => false),
+    })
+    assert.equal(encoded.ok, true, encoded.error)
+    assert.deepEqual(encoded.value.flatMap(message => message.parts).filter(part => part.type === 'reasoning').map(part => part.text), texts)
+  }
+  assert.deepEqual(Strength.collectCompleteBatches([
+    { role: 'assistant', parts: [{ kind: 'reasoning', text: 'private only' }] },
+  ]), [])
+  assert.deepEqual(Strength.collectCompleteBatches([
+    { role: 'assistant', parts: [{ kind: 'text', text: 'unfinished' }, call('pending', 'read', '{}')] },
+  ]), [], 'incomplete tool batches do not publish their accompanying text')
+})
+
 test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', () => {
   const good = Strength.frameTryBuild(H, [
     batch(1, [exchange('read', '{"filePath":"a"}', 'alpha'), exchange('grep', '{"pattern":"x"}', 'a:1:x')]),
@@ -47,6 +101,7 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
     parts: [
       { type: 'step-start' },
       { type: 'reasoning', text: 'r' },
+      { type: 'text', text: 'read preface' },
       { type: 'tool', callID: 'call_1', tool: 'glob', state: { status: 'completed', input: { pattern: 'x' }, output: 'found 12' } },
       { type: 'step-finish' },
     ],
@@ -59,6 +114,11 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
   assert.equal(out.kind, 'Ready', `expected a built frame, got ${out.kind} ${out.reason ?? ''}`)
   assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['glob'])
   assert.equal(out.batches[0].exchanges[0].canonicalResult, 'found 12')
+  assert.deepEqual(out.batches[0].assistantText, ['read preface'])
+  assert.deepEqual(messages.flatMap(message => message.parts).filter(part => part.type === 'text').map(part => part.text),
+    ['read preface'], 'predictor keeps its own mixed tool text once, without demoting it')
+  assert.deepEqual(messages.flatMap(message => message.parts).filter(part => part.type === 'reasoning').map(part => part.text),
+    ['r'], 'native thinking remains in the predictor history, not in the returned material')
 
   // The mirror the adapter actually receives is the localized owner transcript,
   // and that transcript keeps the result-only assistant message verbatim
@@ -76,23 +136,25 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
         ? { kind: 'tool-result', callId: part.callId, result: part.result }
         : part.kind === 'Reasoning'
           ? { kind: 'reasoning', text: part.text }
+          : part.kind === 'Text'
+            ? { kind: 'text', text: part.text }
           : part),
   }))
   const localized = Transform.frameTryLocalizeMirror(sha256, 'dec', sha256('anchor'), wireMessages)
   assert.equal(localized.ok, true)
   assert.equal(localized.value.length, 1)
   assert.equal(localized.value[0].role, 'assistant')
-  assert.deepEqual(localized.value[0].parts.map((part) => part.kind), ['reasoning', 'tool-result'])
+  assert.deepEqual(localized.value[0].parts.map((part) => part.kind), ['reasoning', 'text', 'tool-result'])
   const rendered = { messages: localized.value, hostMessageIds: [null], hostIsPhysical: [false] }
   const applied = Transform.tryApplyRenderedMessages('replica', sha256, rendered)
   assert.equal(applied.ok, true, `host session-shaped message must be emitted, got ${applied.error}`)
   const appliedParts = applied.value[0].parts
-  assert.deepEqual(appliedParts.map((part) => part.type), ['reasoning', 'tool'])
+  assert.deepEqual(appliedParts.map((part) => part.type), ['reasoning', 'text', 'tool'])
   const completed = appliedParts.find((part) => part.type === 'tool')
   assert.equal(completed.tool, '')
   assert.equal(completed.state.status, 'completed')
   assert.equal(completed.state.output, 'found 12')
-  assert.equal(completed.callID, localized.value[0].parts[1].callId, 'the completed part keeps the relocated call identity')
+  assert.equal(completed.callID, localized.value[0].parts[2].callId, 'the completed part keeps the relocated call identity')
 
   // A genuinely orphaned result is still refused: a logical `tool` message carries
   // only the result half, so it must keep requiring its preceding call batch.

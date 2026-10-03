@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import fc from 'fast-check'
 import * as boundary from '../../../dist/Strength/Surface.js'
+import * as projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 // The class exposes a plain-object boundary; the pure F# functions are what it
 // wraps, and the properties below are stated against that boundary.
@@ -32,6 +33,76 @@ const childExchange = (ordinal) => [
 ]
 
 const speech = (text) => ({ role: 'assistant', parts: [{ kind: 'text', text }] })
+
+test('WHAT[speculative-investigation-020] synchronized text returns to predictor once while ordinary main content stays unchanged', () => {
+  const privateReasoning = { kind: 'reasoning', text: 'predictor private thinking' }
+  const childSpeech = { role: 'assistant', parts: [privateReasoning, { kind: 'text', text: 'finding' }] }
+  const mainText = speech('main response')
+  const mainReasoning = { role: 'assistant', parts: [{ kind: 'reasoning', text: 'finding' }] }
+  const owner = [
+    ...ownerExchange(0),
+    { role: 'assistant', parts: [{ kind: 'reasoning', text: 'finding' }] },
+    mainText, mainReasoning,
+  ]
+  const child = [...childExchange(0), childSpeech]
+  assert.deepEqual(restore(child, owner, [2]), [
+    ...ownerExchange(0), childSpeech, mainText, mainReasoning,
+  ])
+  const laterOwner = owner.concat(ownerExchange(1))
+  const laterChild = child.concat(childExchange(1))
+  const restored = restore(laterChild, laterOwner, [2])
+  assert.deepEqual(restored, [
+    ...ownerExchange(0), childSpeech, mainText, mainReasoning, ...ownerExchange(1),
+  ])
+  assert.deepEqual(restored.slice(0, 5), restore(child, owner, [2]))
+})
+
+test('WHAT[speculative-investigation-020] repeated synchronized text keeps occurrences and mixed tool text keeps its original kind', () => {
+  const child = [speech('same'), ...childExchange(0), speech('same')]
+  const owner = [
+    { role: 'assistant', parts: [{ kind: 'reasoning', text: 'same' }] },
+    ...ownerExchange(0),
+    { role: 'assistant', parts: [{ kind: 'reasoning', text: 'same' }] },
+  ]
+  assert.deepEqual(restore(child, owner, [0, 3]), [speech('same'), ...ownerExchange(0), speech('same')])
+  const mixed = ownerExchange(0)
+  mixed[0].parts.unshift({ kind: 'reasoning', text: 'tool preface' })
+  const restored = restore([
+    { role: 'assistant', parts: [{ kind: 'text', text: 'tool preface' }, ...childExchange(0)[0].parts] },
+    childExchange(0)[1],
+  ], mixed, [0])
+  assert.deepEqual(restored[0].parts, [{ kind: 'text', text: 'tool preface' }, ...ownerExchange(0)[0].parts])
+})
+
+test('WHAT[speculative-investigation-020] projected text roundtrips with private thinking and append-only prefix stability', () => {
+  fc.assert(fc.property(fc.array(fc.string(), { minLength: 2, maxLength: 6 }), texts => {
+    const child = texts.flatMap((text, index) => {
+      const exchange = childExchange(index)
+      exchange[0].parts.unshift({ kind: 'reasoning', text: `private-${index}` }, { kind: 'text', text })
+      return exchange
+    })
+    const owner = texts.flatMap((_text, index) => {
+      const batches = boundary.collectCompleteBatches(child.slice(index * 2, index * 2 + 2))
+      const bundle = boundary.frameTryBuild(value => `H(${value})`, batches)
+      assert.equal(bundle.ok, true, bundle.error)
+      const candidate = boundary.candidate(value => `H(${value})`, {
+        ownerSessionId: 'owner', ownerRole: 'engineer', decisionId: `decision-${index}`,
+        targetProviderRun: `target-${index}`, currentProviderRun: `target-${index}`, bundle: bundle.value,
+      })
+      assert.equal(candidate.ok, true, candidate.error)
+      return projection.renderMessages(projection.projectionSnapshot(projection.semanticProjection([])), [], [candidate.value])
+    })
+    const coordinates = owner.map((_message, index) => index).filter(index => index % 2 === 0)
+    const first = restore(child.slice(0, -2), owner.slice(0, -2), coordinates.slice(0, -1))
+    const full = restore(child, owner, coordinates)
+    assert.deepEqual(full.slice(0, first.length), first)
+    assert.deepEqual(full.flatMap(message => message.parts).filter(part => part.kind === 'text').map(part => part.text), texts)
+    assert.deepEqual(full.flatMap(message => message.parts).filter(part => part.kind === 'reasoning').map(part => part.text),
+      texts.map((_text, index) => `private-${index}`))
+    assert.deepEqual(owner.flatMap(message => message.parts).filter(part => part.kind === 'reasoning').map(part => part.text), texts,
+      'main contains demoted text, not native thinking')
+  }), { seed: 20261003 })
+})
 
 test('WHAT[speculative-investigation-020] owner_sequence_survives_restoration_unchanged', () => {
   fc.assert(

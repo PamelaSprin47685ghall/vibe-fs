@@ -10,4 +10,5 @@ test('WHAT[cognitive-workspace-007] no TodoSink compatibility bridge survives', 
   assert.equal(existsSync(resolve(root, 'src/Wanxiangshu/Participant/Cognition/TodoSink.fs')), false)
   const hooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
   assert.doesNotMatch(hooks, /TodoSink|MagicTodo/)
+  assert.doesNotMatch(hooks, /TodoWriteCompressionContract/)
 })

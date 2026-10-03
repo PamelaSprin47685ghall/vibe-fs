@@ -4,6 +4,8 @@
 
 产品语义只由 `requirements/<package>/WHAT.md` 定义；[规范导航](../requirements/README.md) 和 [GAP 台账](../requirements/GAP.md) 分别提供正式条款与当前证明缺口。计划、提案和历史结果不增加产品义务。
 
+最新上游同步与兼容修复见[e1e7dd3f1记录](archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。Sphinx由旧占位进入部分实现，GAP-219仍PARTIAL；后续施工按总计划和最新包测试说明，不照归档旧诊断重做decoder或store。
+
 ## 保留在入口目录的文档
 
 | 文档 | 状态与用途 |

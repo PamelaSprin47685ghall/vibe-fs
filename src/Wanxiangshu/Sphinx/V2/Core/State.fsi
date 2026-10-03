@@ -46,6 +46,11 @@ type PhysicalBinding =
       PhysicalRef: string option
       Receipt: string option }
 
+type CommandReceipt =
+    { Fingerprint: string
+      Revision: Revision
+      EventId: EventId }
+
 type InquiryState =
     {
         Id: InquiryId
@@ -73,14 +78,15 @@ type InquiryState =
         Rounds: Map<RoundId, RoundRecord>
         Decisions: Map<string, string>
         Answer: AnswerCommittedBody option
-        /// Command identity -> revision, for idempotent retry of a control command.
-        CommandReceipts: Map<string, Revision>
+        /// Command identity -> immutable content-bound receipt, rebuilt from transitions.
+        CommandReceipts: Map<string, CommandReceipt>
         PhysicalBindings: Map<string, PhysicalBinding>
         Status: InquiryStatus
     }
 
 module InquiryState =
     val commandRevision: InquiryState -> string -> Revision option
+    val commandReceipt: InquiryState -> string -> CommandReceipt option
 
     val certificateKey: string -> string -> string -> string -> string
 

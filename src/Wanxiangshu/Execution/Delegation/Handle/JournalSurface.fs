@@ -1,30 +1,14 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open System
 open System.Threading.Tasks
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Delegation.Handle
 
-type HandleJournalResource internal (journal: AgentJournal) =
-    member internal _.Journal = journal
-
-    interface IDisposable with
-        member _.Dispose() = (journal :> IDisposable).Dispose()
-
 module JournalSurface =
 
-    let private success () : obj = box {| ok = true |}
-
     let private failure error : obj = box {| ok = false; error = error |}
-
-    let private role value =
-        match Roles.tryParseRole value with
-        | Some canonicalRole -> Ok canonicalRole
-        | None -> Error $"unknown role '{value}'"
 
     let private abandonReason value =
         match value with
@@ -33,95 +17,74 @@ module JournalSurface =
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
         | other -> Error $"unknown abandon reason '{other}'"
 
-    let openJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
-        task {
-            let store =
-                EventStore.createLocal
-                    commonDir
-                    (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
-
-            match!
-                EventStoreJournalWriter.resumeOrCreate (
-                    RuntimeId.create runtimeId,
-                    processId,
-                    DateTimeOffset.Parse startedAt,
-                    store
-                )
-            with
-            | Error rejection -> return failure $"{rejection.Fact}: {rejection.Reason}"
-            | Ok(writer, _, projection) ->
-                match AgentJournal.createFromProjection writer projection with
-                | Error rejection ->
-                    writer.Release()
-                    return failure $"{rejection.Fact}: {rejection.Reason}"
-                | Ok journal ->
-                    return
-                        box
-                            {| ok = true
-                               journal = new HandleJournalResource(journal) |}
-        }
-
-    let dispose (resource: HandleJournalResource) : unit = (resource :> IDisposable).Dispose()
-
-    let link
-        (resource: HandleJournalResource)
-        (parentId: string)
-        (agentId: string)
-        (childId: string)
-        (targetAgent: string)
-        (roleName: string)
-        : Task<obj> =
-        task {
-            match role roleName with
-            | Error error -> return failure error
-            | Ok canonicalRole ->
-                let journalPort = AgentJournalPortAdapter.fromAgentJournal resource.Journal
-
-                match!
-                    HandleController.link
-                        (Some journalPort)
-                        (SessionId.create parentId)
-                        agentId
-                        (SessionId.create childId)
-                        targetAgent
-                        canonicalRole
-                        HandleOwnership.DurableParentHandle
-                with
-                | Ok() -> return success ()
-                | Error error -> return failure error
-        }
+    let private workId agent child root : HandleWorkId =
+        { Handle = HandleId.Agent(AgentHandleId.create agent)
+          ChildSessionId = SessionId.create child
+          AuthorityRoot = AuthorityRootUserMessageId.create root }
 
     let recordAbandon
-        (resource: HandleJournalResource)
-        (parentId: string)
-        (agentId: string)
+        (handle: JournalHandle)
+        (parent: string)
+        (agent: string)
+        (child: string)
+        (root: string)
         (reasonName: string)
-        (abandonedAt: string)
         : Task<obj> =
         task {
-            match abandonReason reasonName with
-            | Error error -> return failure error
-            | Ok reason ->
-                let journalPort = AgentJournalPortAdapter.fromAgentJournal resource.Journal
+            let parentId = SessionId.create parent
+            let work = workId agent child root
 
-                match!
-                    HandleController.recordAbandon
-                        (Some journalPort)
-                        (SessionId.create parentId)
-                        agentId
+            match
+                abandonReason reasonName,
+                HandleProjection.tryWork work (AgentJournal.handleProjection handle.Journal parentId)
+            with
+            | Error error, _ -> return failure error
+            | _, None -> return failure "WorkNotAdmitted"
+            | Ok reason, Some _ ->
+                let! result =
+                    HandleController.abandonWork
+                        (AgentJournalPortAdapter.fromAgentJournal handle.Journal)
+                        parentId
+                        work
                         reason
-                        (DateTimeOffset.Parse abandonedAt)
-                with
-                | Ok() -> return success ()
-                | Error error -> return failure error
+
+                return
+                    match result with
+                    | Ok() -> box {| ok = true |}
+                    | Error error -> failure error
         }
 
-    let snapshot (resource: HandleJournalResource) (parentId: string) (handle: obj) : obj =
-        let projection =
-            AgentJournal.handleProjection resource.Journal (SessionId.create parentId)
-            |> HandleSurface.HandleProjectionState
+    let private lifecycle =
+        function
+        | Active -> "Active"
+        | CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
+        | Retired -> "Retired"
+        | Abandoned _ -> "Abandoned"
+
+    let private recordView (record: HandleWorkRecord) : obj =
+        let reason =
+            match record.Lifecycle with
+            | Abandoned reason -> Some(string reason)
+            | _ -> None
 
         box
-            {| record = HandleSurface.read projection handle
-               views = HandleSurface.views projection |}
+            {| lifecycle = lifecycle record.Lifecycle
+               abandonReason = reason
+               child = SessionId.value record.Work.ChildSessionId |}
+
+    let snapshot (handle: JournalHandle) (parent: string) (agent: string) (child: string) (root: string) : obj =
+        let parentId = SessionId.create parent
+        let projection = AgentJournal.handleProjection handle.Journal parentId
+
+        box
+            {| record =
+                HandleProjection.tryWork (workId agent child root) projection
+                |> Option.map recordView
+                |> Option.defaultValue null
+               revision = JournalRevision.value (AgentJournal.revision handle.Journal) |> string
+               horizonVisible = HandleProjection.horizonVisible projection |> List.length
+               views =
+                {| joinable =
+                    HandleProjection.joinable projection
+                    |> List.map (fun record -> HandleId.describe record.Handle)
+                    |> List.toArray |} |}

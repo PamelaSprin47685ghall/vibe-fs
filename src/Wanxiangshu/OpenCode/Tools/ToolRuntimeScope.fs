@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
@@ -519,7 +520,6 @@ type ToolRuntimeScope
         match runtime.OwnsAgent agentId with
         | false ->
             runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
-            runtime.AdoptExisting(agentId, existingHandle.ChildSessionId, existingHandle.CanonicalRole, "devops")
             runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
             runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
             registerChild parentKey existingHandle.CanonicalRole existingHandle.ChildSessionId
@@ -653,7 +653,10 @@ type ToolRuntimeScope
                 |> Option.bind (fun s -> s.Handles)
 
             let devopsHandleOpt =
-                handlesOpt |> Option.bind (HandleProjection.tryFindByByname "devops")
+                handlesOpt
+                |> Option.bind (fun handles ->
+                    HandleProjection.tryFindByByname "devops" handles
+                    |> Option.bind (fun record -> HandleProjection.tryBinding record.Handle handles))
 
 
             let runtimeResult = getOrCreateRuntime key
@@ -1287,16 +1290,28 @@ type ToolRuntimeScope
 
         task {
             let! ownedFailure = stopOwnedWorkAndDrain ()
+            // DSL-MUTABLE: algorithm-scratch — failures from all owned runtime shutdowns.
+            let failures = ResizeArray<exn>()
+            ownedFailure |> Option.iter failures.Add
 
             for runtime in forkRuntimes do
-                do! runtime.DetachAndDrain()
+                let! failure = captureOwnedWorkFailure runtime.DetachAndDrain
+                failure |> Option.iter failures.Add
 
             for host in orchestrators do
-                do! host.DetachAndDrain()
+                let! failure = captureOwnedWorkFailure host.DetachAndDrain
+                failure |> Option.iter failures.Add
 
-            match ownedFailure with
-            | Some failure -> return raise failure
-            | None -> return ()
+            match Seq.toList failures with
+            | [] -> return ()
+            | [ failure ] -> return raise failure
+            | failures ->
+                return
+                    raise (
+                        emitJsExpr
+                            (List.toArray failures)
+                            "new AggregateError($0, 'tool runtime scope detach failed', { cause: $0[0] })"
+                    )
         }
         :> Task
 

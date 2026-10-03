@@ -5,6 +5,8 @@ open System.Text
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
@@ -63,7 +65,19 @@ module HostForkPtySurface =
                    owned = runtime.SnapshotOutstandingPtyRuns() |> List.isEmpty |> not
                    calls = calls |}
 
-    let scenario (action: string) (input: string) (failure: string) : Task<obj> =
+    let private devopsRoot (journal: AgentJournal) child =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind child
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+        |> Option.filter (fun profile ->
+            profile.SessionId = child
+            && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            && profile.CanonicalRole = Role.DevOps)
+        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+        |> Option.defaultWith (fun () -> invalidOp "DevOps work requires exact canonical child authority")
+
+    let scenario (action: string) (input: string) (failure: string) (journal: JournalHandle option) : Task<obj> =
         task {
             let calls = ResizeArray<obj>()
             // DSL-MUTABLE: resource — controlled backend read-completion port
@@ -160,8 +174,13 @@ module HostForkPtySurface =
                                byNameAfter = byNameAfter |> Option.map (fun (p: PtyId) -> p.Value)
                                calls = calls.ToArray() |}
             | "devops-return-drain" ->
+                let durable =
+                    journal
+                    |> Option.map (fun handle -> handle.Journal)
+                    |> Option.defaultWith (fun () -> invalidOp "DevOps settlement requires a canonical journal")
                 // Setup child runtime representing DevOps session
                 let devopsSessionId = SessionId.create "devops-session"
+                let authorityRoot = devopsRoot durable devopsSessionId
                 let devopsPort = PtyPort(handler = handler)
 
                 let devopsRuntime =
@@ -242,18 +261,12 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
-                        drainChildPtys = drainChildPtys
+                        drainChildPtys = drainChildPtys,
+                        journal = durable
                     )
 
                 let run =
-                    managerRuntime.InstallRun(
-                        "devops",
-                        devopsSessionId,
-                        Role.DevOps,
-                        Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot (
-                            Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create "auth-root"
-                        )
-                    )
+                    managerRuntime.InstallRun("devops", devopsSessionId, Role.DevOps, authorityRoot)
 
                 let devopsPtysBefore = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
 
@@ -266,10 +279,7 @@ module HostForkPtySurface =
                         { SessionId = devopsSessionId
                           Role = Role.DevOps
                           ProviderRun = ProviderRunIdentity.create "prov-run"
-                          AuthorityRootUserMessageId =
-                            Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot (
-                                Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create "auth-root"
-                            )
+                          AuthorityRootUserMessageId = authorityRoot
                           Directory = None
                           TerminalText = "devops finished"
                           TurnFormalText = "devops finished" }
@@ -280,6 +290,11 @@ module HostForkPtySurface =
 
                 let devopsPtysAfter = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
                 let engineerPtysAfter = engineerRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+                let observedCalls = calls.ToArray()
+                do! managerRuntime.DetachAndDrain()
+                do! devopsRuntime.DetachAndDrain()
+                do! engineerRuntime.DetachAndDrain()
+                do! runtime.DetachAndDrain()
 
                 return
                     box
@@ -290,7 +305,7 @@ module HostForkPtySurface =
                            devopsAfter = devopsPtysAfter
                            engineerBefore = engineerPtysBefore
                            engineerAfter = engineerPtysAfter
-                           calls = calls.ToArray() |}
+                           calls = observedCalls |}
             | "blank-fork"
             | "fork"
             | "fork-error" ->

@@ -100,7 +100,7 @@ type private StrengthReplicaDecisionState =
         Batches: StrengthRequestBatch list
         TerminalSubscription: IDisposable option
         PhysicalUserMessageId: PhysicalUserMessageId option
-        PendingTurns: (PhysicalUserMessageId * ReconcileProgram.TurnOutcome) list
+        PendingTurns: ReconciledTurn list
     }
 
 type private StrengthReplicaPreparationFlight =
@@ -582,20 +582,24 @@ module private StrengthReplicaRuntimeLogic =
     let completeFromTurnOutcome
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
         (state: StrengthReplicaDecisionState)
+        (turn: ReconciledTurn)
         (outcome: ReconcileProgram.TurnOutcome)
         =
         match outcome with
         | ReconcileProgram.TurnCompleted -> complete StrengthReplicaTerminal.TextCompleted state
+        | ReconcileProgram.TurnNeedsContinuation _ when turn.Finish = Some "stop" && turn.ErrorName.IsNone ->
+            complete StrengthReplicaTerminal.TextCompleted state
         | ReconcileProgram.TurnFailed reason
         | ReconcileProgram.TurnAborted reason -> complete (StrengthReplicaTerminal.Failed reason) state
         | ReconcileProgram.TurnNeedsContinuation _
         | ReconcileProgram.TurnInProgress -> ()
 
-    let isReplicaPhysicalTerminal =
-        function
+    let isReplicaPhysicalTerminal (turn: ReconciledTurn) =
+        match turn.Outcome with
         | ReconcileProgram.TurnCompleted
         | ReconcileProgram.TurnFailed _
         | ReconcileProgram.TurnAborted _ -> true
+        | ReconcileProgram.TurnNeedsContinuation _ when turn.Finish = Some "stop" && turn.ErrorName.IsNone -> true
         | ReconcileProgram.TurnNeedsContinuation _
         | ReconcileProgram.TurnInProgress -> false
 
@@ -863,37 +867,82 @@ type StrengthReplicaRuntime
         | Some resident -> releaseLease resident
         | None -> ()
 
-    let observeReplicaTurn state outcome =
-        StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state outcome
+    let observeReplicaTurn state (turn: ReconciledTurn) =
+        let texts =
+            turn.Parts
+            |> Array.choose (function
+                | MessagePart.Text text -> Some text
+                | _ -> None)
+            |> Array.toList
 
-        if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
+        let alreadyCollected =
+            state.Batches
+            |> List.tryLast
+            |> Option.exists (fun batch -> List.isEmpty batch.Exchanges && batch.AssistantText = texts)
+
+        match turn.Outcome, state.SemanticTerminal, texts with
+        | ReconcileProgram.TurnCompleted, None, _ :: _ when not alreadyCollected ->
+            replaceState
+                state
+                { state with
+                    Batches =
+                        state.Batches
+                        @ [ { RequestOrdinal = state.Batches.Length + 1
+                              AssistantText = texts
+                              Exchanges = [] } ] }
+            |> ignore
+        | _ -> ()
+
+        StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state turn turn.Outcome
+
+        if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal turn then
             removeState state
 
-    let bufferPendingTurn state physical outcome =
+    let bufferPendingTurn state (turn: ReconciledTurn) =
         lock gate (fun () ->
             match byReplica.TryGetValue(key state.Replica) with
             | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
                 byReplica.[key state.Replica] <-
                     { current with
-                        PendingTurns = (physical, outcome) :: current.PendingTurns }
+                        PendingTurns = turn :: current.PendingTurns }
             | _ -> ())
 
-    let observeDecisionPhysicalOutcome state physical outcome =
+    let observeDecisionPhysicalOutcome state (turn: ReconciledTurn) =
         match state.PhysicalUserMessageId with
-        | Some current when current = physical -> observeReplicaTurn state outcome
+        | Some current when current = turn.PhysicalUserMessageId -> observeReplicaTurn state turn
         | Some _ -> ()
-        | None -> bufferPendingTurn state physical outcome
+        | None -> bufferPendingTurn state turn
 
     let applyCompletedSnapshot (state: StrengthReplicaDecisionState) providerRun messages =
-        let physical =
+        let assistant =
             messages
             |> List.tryFind (fun (message: SessionMessage) -> message.Id = ProviderRunIdentity.value providerRun)
+
+        let physical =
+            assistant
             |> Option.bind (fun message -> message.ParentId)
             |> Option.map PhysicalUserMessageId.create
 
         match physical, tryState state.Replica with
         | Some observed, Some current when Object.ReferenceEquals(current.Completion, state.Completion) ->
-            observeDecisionPhysicalOutcome current observed ReconcileProgram.TurnCompleted
+            let syntheticTurn =
+                { SessionId = state.Replica
+                  PhysicalUserMessageId = observed
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (PhysicalUserMessageId.value observed)
+                  ProviderRun = providerRun
+                  Role = None
+                  Directory = None
+                  Parts =
+                    assistant
+                    |> Option.map (fun message -> message.Parts)
+                    |> Option.defaultValue [||]
+                  Finish = Some "stop"
+                  ErrorName = None
+                  Model = None
+                  Outcome = ReconcileProgram.TurnCompleted
+                  Observation = None }
+
+            observeDecisionPhysicalOutcome current syntheticTurn
         | _ -> ()
 
     let observeCompletedNotification (state: StrengthReplicaDecisionState) providerRun =
@@ -938,9 +987,9 @@ type StrengthReplicaRuntime
                 Some flight.Completion.Task
             | _ -> None)
 
-    let replayPendingTurn state physical (pendingPhysical, outcome) =
-        if pendingPhysical = physical then
-            observeReplicaTurn state outcome
+    let replayMatchingPendingTurn (state: StrengthReplicaDecisionState) physical (turn: ReconciledTurn) =
+        if turn.PhysicalUserMessageId = physical then
+            observeReplicaTurn state turn
 
     let bindDecisionPhysical state physical =
         let claimed =
@@ -961,11 +1010,11 @@ type StrengthReplicaRuntime
                 | _ -> None)
 
         match claimed with
-        | Some(pending, next) -> List.rev pending |> List.iter (replayPendingTurn next physical)
+        | Some(pending, next) -> List.rev pending |> List.iter (replayMatchingPendingTurn next physical)
         | _ -> ()
 
     let observeDecisionTurn state (turn: ReconciledTurn) =
-        observeDecisionPhysicalOutcome state turn.PhysicalUserMessageId turn.Outcome
+        observeDecisionPhysicalOutcome state turn
 
     let bindAcceptedBootstrap state promptKey =
         (dispatcher.ProjectionFor state.Replica).PhysicalLandings
@@ -1281,6 +1330,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string,
             flight: StrengthReplicaPreparationFlight
         ) : Task<Result<StrengthReplicaPreparation, string>> =
@@ -1337,6 +1387,7 @@ type StrengthReplicaRuntime
                   RequestedRounds = requestedRounds
                   SemanticDigest = mirrorSemanticDigest
                   LocalizedMirrorMessages = localizedMirror
+                  SynchronizedTextMessages = synchronizedTextMessages
                   ToolCapabilitySet = capabilities }
 
             do!
@@ -1385,6 +1436,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaPreparation, string>> =
         let claim =
@@ -1421,6 +1473,7 @@ type StrengthReplicaRuntime
                 requestedRounds,
                 replicaAgent,
                 localizedMirror,
+                synchronizedTextMessages,
                 mirrorSemanticDigest,
                 flight
             )
@@ -1446,6 +1499,7 @@ type StrengthReplicaRuntime
             requestedRounds: ReadonlyRoundBudget,
             replicaAgent: string,
             localizedMirror: WireMessage list,
+            synchronizedTextMessages: Set<int>,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaOutcome, string>> =
         let work =
@@ -1458,6 +1512,7 @@ type StrengthReplicaRuntime
                         requestedRounds,
                         replicaAgent,
                         localizedMirror,
+                        synchronizedTextMessages,
                         mirrorSemanticDigest
                     )
 

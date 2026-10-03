@@ -33,6 +33,7 @@ type HostForkRunLifecycleHandle
               StartCursor = XTraceCursor.create 0L
               Handoff = None
               AuthorityRoot = AuthorityRootUserMessageId.create "surface-authority-root"
+              Work = None
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }
@@ -68,7 +69,9 @@ module HostForkRunLifecycleSurface =
             TerminalOutcome.Completed
                 { SessionId = handle.Run.ChildId
                   AuthorityRootUserMessageId =
-                    AuthorityRootUserMessageId.create (SessionId.value handle.Run.ChildId + "-root")
+                    match property value "authorityRoot" with
+                    | null -> handle.Run.AuthorityRoot
+                    | root -> AuthorityRootUserMessageId.create (string root)
                   ProviderRun = ProviderRunIdentity.create ("run-" + handle.Run.AgentId)
                   Role = handle.Run.Role
                   Directory = None

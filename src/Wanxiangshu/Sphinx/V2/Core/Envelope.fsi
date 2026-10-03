@@ -17,6 +17,9 @@ type JsonEnvelope =
 
 type EnvelopeError = { Code: string; Message: string }
 
+module Envelope =
+    val tryCreate: id: string -> hash: string -> Result<SchemaRef, EnvelopeError>
+
 module JsonEnvelope =
     val tryOfCanonical: SchemaRef -> string -> Result<JsonEnvelope, EnvelopeError>
     val ofCanonical: SchemaRef -> string -> JsonEnvelope

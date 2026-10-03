@@ -154,5 +154,6 @@ type InquiryEvent =
 [<RequireQualifiedAccess>]
 module SphinxV2EventTypes =
     val transition: string
+    val strictTransition: string
     val all: string list
     val isKnown: string -> bool

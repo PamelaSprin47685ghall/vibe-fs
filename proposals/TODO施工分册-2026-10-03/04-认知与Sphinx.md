@@ -158,6 +158,8 @@
 
 **入口。** [WHAT](../../requirements/speculative-investigation/WHAT.md)、Strength 的真实 DryRun/Replica coordinator 及正式 Host fixture。GAP-015/183/184；W3/W7。
 
+上游`2c4ff4c36`同步增量：当前[005]/[009]/[012]/[020]要求真实assistant正文降为Main reasoning，原生reasoning不回传，返回Replica时恢复原text并合并自身reasoning一次；混合工具正文及终止正文也须保留，同样文本在不同批次真实发生两次不能全局去重。旧“只回传工具交换、纯文本一律NoMaterial”的断言不再有效。SharedCompletion仍须共享一个Prepared和一次bootstrap，不能因材料合同变化撤下并发资源断言；异模型切换的传输坐标仍要独立验证。
+
 | 文件 | 步骤 | 反例与验收 |
 |---|---|---|
 | 001 | 固定同一个可重放 Work 输入，依次运行优化 absent、Off、fused、K0；抓 owner provider 请求、权限、retry、finality 与持久事实 | 四种关闭状态的可观察业务行为一致，没有 Prepared/Promoted/额外 authority；真实 child 端口/调用计数为零。只比较开关枚举或纯分类器不算 |
@@ -169,7 +171,7 @@
 
 **入口与判断。** [WHAT](../../requirements/sphinx-v2/WHAT.md)、[SUPERSEDES](../../requirements/sphinx-v2/SUPERSEDES.md)、[README](../../requirements/sphinx-v2/tests/README.md)、[MCP Server](../../src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Server.fs)、[OpenCode Adapter](../../src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Adapter.fs)、[Runtime Driver](../../src/Wanxiangshu/Sphinx/V2/Runtime/Driver.fs)、[Wire Surface](../../src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs)。GAP-219/222；D01/D02；W5。
 
-当前 MCP 七个 handler 忽略参数查询空 inquiry；OpenCode ReadStatus/ReadResult/Reconcile 返回固定值；Wire 模板不能证明调用 Runtime。Driver 的纯计划也不能代替完成持久提交、派发、回收的外壳。这些都须从真实入口补齐。旧报告已经登记这些缺口，不是“未上报的偶然发现”，也不单是缺一个外部依赖。
+创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`的新实现替代：七工具独立解码/typed拒绝，cancel有canonical准入/落盘，Persistence有canonical batch、冷重开和原子拒绝入口。GAP-219现在PARTIAL。start/work_next/work_submit/goal_amend仍明确unsupported，export traceUnavailable，现存inquiry status的JSON正向出口仍待证。OpenCode可dispatch/request-cancel，但ReadStatus仍Unknown，ReadResult/Reconcile因port缺读取能力拒绝；不能称状态/结果已能观察。先保留本批真实SDK协议与持久化基础证明，不重复造第二份decoder/store；从真实driver、读取DTO/trace及物理能力owner开始，继续下面的完整dispatch、worker结果、accepted renderer、取消/恢复与外部结果交付。
 
 ### 实施顺序与每步产物
 
@@ -183,7 +185,9 @@
 8. **补数学保证与持久恢复。** 跨插件传递 certificate 地址、scope/model/guarantee 类别；与独立数值/组合例对照。冷重开、删非权威 cache、重放不联网/不随机/不再调 LLM。
 9. **全接入面对照。** 相同逻辑命令经 MCP 与 OpenCode 进入同一 runtime，允许物理 binding 不同，按 WHAT 分别比较 trace/state/semantic hash；status/export 为读，不创建 lease。Host 原生 `/sphinx` 不被迫启动或注入 MCP。
 
-### 12 项 TODO 的逐文件验收
+### 创建时12项TODO的逐文件验收与同步增量
+
+下表保留原义务边界；上游新增019/018/036等正式行为证明，已经覆盖的局部项不重做。实际剩余TODO按现行文件逐实例核对，历史表格不充当新运行统计。
 
 | 文件 | 具体场景 | 独立 oracle / 必须击红的违约 |
 |---|---|---|

@@ -35,7 +35,6 @@ module HostForkChildDispatch =
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>) ->
         sendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>) ->
         onRunStarted: (SessionId -> Role -> unit) ->
-        relink: (unit -> Task<Result<unit, string>>) ->
         preparedHandoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->
@@ -49,7 +48,7 @@ module HostForkChildDispatch =
 
     val cancelParent:
         cancelSignals: (SessionId seq -> unit) ->
-        awaitRecovery: (unit -> Task<unit>) ->
+        drainCancelledCallbacks: (string list -> string list -> Task<unit>) ->
         runtime: ForkRuntime ->
         ptyPort: PtyPort ->
         parentKey: string ->

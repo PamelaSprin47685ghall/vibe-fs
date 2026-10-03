@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -187,11 +188,12 @@ test('WHAT[durable-events-023] EXEC_one_commit_moves_every_related_view_together
       // already show one slice advanced.
       assert.equal(result.midMember, false, 'mid-commit member must not see the parked handle')
       assert.equal(result.midLinked, false, 'mid-commit view must not see the parked link')
-      assert.equal(result.midState, false, 'mid-commit state must stay absent')
+      assert.equal(result.midState, false, 'mid-commit canonical handle state must stay absent')
       assert.equal(result.midCompanion, false)
       assert.equal(result.postMember, true, 'after release both handle slices are visible')
       assert.equal(result.postLinked, true)
-      assert.equal(result.postState, true, 'ReadView must carry the session state the commit created')
+      assert.equal(result.postState, true, 'the canonical parent handle state must appear with both derived views')
+      assert.equal(result.advancedOnce, true, 'only the parked handle commit advances the accepted setup revision')
     }),
   ))
 test('WHAT[durable-events-023] EXEC_revision_waiter_wakes_on_next_commit', { timeout: 8000 }, () =>
@@ -202,6 +204,7 @@ test('WHAT[durable-events-023] EXEC_revision_waiter_wakes_on_next_commit', { tim
       assert.ok(result.changeRevision > 0, 'the woken waiter must carry the new revision')
       assert.equal(result.changeRevision, result.currentRevision, 'the wake revision is the live revision')
       assert.equal(result.observedHandle, true, 'the member reads the committed state after the wake')
+      assert.equal(result.advancedOnce, true, 'the waiter observes exactly the next commit after physical admission setup')
     }),
   ))
 test('WHAT[durable-events-023] EXEC_cancelled_waiter_releases_without_stealing_a_commit', () =>
@@ -221,7 +224,7 @@ test('WHAT[durable-events-023] EXEC_unknown_append_poisons_and_is_never_confirme
       assert.ok(result.afterOutcome.startsWith('Poisoned:'), `a poisoned writer must refuse later appends, got ${result.afterOutcome}`)
     }),
   ))
-test('WHAT[durable-events-023] isolated compilation rejects physical-store authority in the codec closure', async () => {
+integrationTest('WHAT[durable-events-023] isolated compilation rejects physical-store authority in the codec closure', async () => {
   const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')

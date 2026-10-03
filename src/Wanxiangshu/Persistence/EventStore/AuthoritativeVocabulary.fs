@@ -21,9 +21,9 @@ module AuthoritativeEventTypes =
               yield! JsTransactionEventTypes.all
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
-              // Sphinx clean-break: the only v2 Sphinx kind. The historical sphinx/*
-              // kinds left the production program with the old kernel; old events stay
-              // readable but are never accepted again.
-              "sphinx/v2-transition@1" ]
+              // Version 1 remains readable for the domain's explicit semantic cut.
+              // New transitions use the strict canonical version 2 payload.
+              "sphinx/v2-transition@1"
+              "sphinx/v2-transition@2" ]
 
     let isKnown eventType = Set.contains eventType builtins

@@ -72,7 +72,7 @@ Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前�
 
 进程重启后不存在任何显式续传命令（`/continue` 已移除）。系统在加载阶段自行完成归位，且只做持久记账，不重放任何命令：
 
-- 上一个 runtime 遗留的活跃子 run 被**作废**（`ExecutionFactCases.ChildRunVoided`）：只关闭该子会话的逻辑 run，不产生任何“待收交付”；该 run 什么都没产出，就不欠父会话一次 join——`horizon` 与 `join` 对它都为空，直接 `resume` 才是正确时序；
+- 上一个 runtime 遗留的活跃子 run 被**作废**：已有 scoped 工作须用其实际准入身份追加 `ExecutionFactCases.ChildWorkVoided`；合法的无 scope 历史才使用 `ChildRunVoided`，不得由裸 Root 补造工作准入。作废只关闭对应子会话的逻辑 run，不产生任何“待收交付”；该 run 什么都没产出，就不欠父会话一次 join——`horizon` 与 `join` 对它都为空，直接 `resume` 才是正确时序；
 - 父子会话的执行绑定与 fission lane 归属按 durable 投影**按需解析**（取 handle 的 `TargetAgent`，不取逻辑 `Byname`），进程本地表只是缓存，装载阶段不做任何预登记扫描；
 - 复用仍由 manager 显式发起；复用门禁、placement、await 一律以 durable handle 为存在性依据。
 

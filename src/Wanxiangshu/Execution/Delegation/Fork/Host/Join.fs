@@ -257,16 +257,15 @@ module HostForkJoin =
     let private journalHasActiveJoinHandles (runtime: HostForkRuntime) (durable: AgentJournal) =
         AgentJournal.handleProjection durable runtime.ParentId
         |> fun projection ->
-            projection.Handles
-            |> Map.exists (fun _ record -> handleIsActiveJoinTarget runtime record)
+            HandleProjection.linkedChildren projection
+            |> List.exists (handleIsActiveJoinTarget runtime)
 
     let private parentHasJoinWork (runtime: HostForkRuntime) =
         runtime.HasBufferedJoinItems
-        || runtime.Runtime.ActiveRunCount > 0
         || runtime.Runtime.PendingCompletionCount > 0
         || lock runtime.Gate (fun () -> runtime.PendingRuns.Count > 0 || runtime.PtyRuns.Count > 0)
         || match runtime.Journal with
-           | None -> false
+           | None -> runtime.Runtime.ActiveRunCount > 0
            | Some durable -> journalHasActiveJoinHandles runtime durable
 
     let private raceJournalArms

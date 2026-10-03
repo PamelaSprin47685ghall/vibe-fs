@@ -82,13 +82,13 @@ export class ProcessHost {
     const startTimeout = opts.startTimeoutMs || HOST_START_TIMEOUT_MS;
     const listenLine = await this._waitForListening(startTimeout, () => {
       if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-        console.log('[host.start] bootstrap observed');
+        console.error('[host.start] bootstrap observed');
       }
       opts.onProgress?.('bootstrapped');
     });
     const ht1 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
+      console.error(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
     }
     if (!listenLine) {
       try { this._child?.kill('SIGKILL'); } catch {}
@@ -105,13 +105,13 @@ export class ProcessHost {
     await this._waitForGlobalHealth(startTimeout);
     const ht2 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForGlobalHealth took ${ht2 - ht1}ms`);
+      console.error(`[host.start] _waitForGlobalHealth took ${ht2 - ht1}ms`);
     }
     opts.onProgress?.('global-healthy');
     const onProjectEvents = opts.pluginPaths?.length > 0
       ? () => {
           if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-            console.log('[host.start] project event source observed');
+            console.error('[host.start] project event source observed');
           }
           opts.onProgress?.('project-events');
         }
@@ -119,7 +119,7 @@ export class ProcessHost {
     await this._waitForHealth(startTimeout, onProjectEvents);
     const ht3 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForHealth took ${ht3 - ht2}ms`);
+      console.error(`[host.start] _waitForHealth took ${ht3 - ht2}ms`);
     }
     opts.onProgress?.('healthy');
   }
@@ -272,7 +272,7 @@ export class ProcessHost {
   }
 
   _onStdout(s) {
-    if (process.env.DEBUG) process.stdout.write(s);
+    if (process.env.DEBUG) process.stderr.write(s);
     ringPush(this._stdoutBuffer, s, STDOUT_RING_MAX);
   }
   _onStderr(s) {

@@ -12,6 +12,9 @@ test('WHAT[participant-horizon-010] actual Manager horizon includes the runtime-
     const roster = await forkTool.executeHorizon(runtime, owner)
     assert.match(roster, /devops/)
     assert.ok(!roster.includes(owner))
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), [], 'an idle visible binding is not admitted work')
+    assert.equal(forkTool.promptCount(runtime), 0)
   })
 })
 

@@ -240,13 +240,14 @@ module StrengthReplay =
                   batch.RequestOrdinal
                   "call"
                   plan.Bundle.Digest
-              StrengthFrame.hostMessageId
-                  HostDigest.sha256Hex
-                  plan.Prepared.OwnerSessionId
-                  plan.Prepared.DecisionId
-                  batch.RequestOrdinal
-                  "result"
-                  plan.Bundle.Digest ])
+              if not (List.isEmpty batch.Exchanges) then
+                  StrengthFrame.hostMessageId
+                      HostDigest.sha256Hex
+                      plan.Prepared.OwnerSessionId
+                      plan.Prepared.DecisionId
+                      batch.RequestOrdinal
+                      "result"
+                      plan.Bundle.Digest ])
 
     let private tryStableTraceRange
         (plan: StrengthReplayPlan)

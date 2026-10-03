@@ -25,8 +25,33 @@ type HandleAbandonReason =
 [<RequireQualifiedAccess>]
 type FalseCompletionReason = | LegacyAbortWasObservation
 
+type HandleWorkId =
+    { Handle: HandleId
+      ChildSessionId: SessionId
+      AuthorityRoot: AuthorityRootUserMessageId }
+
 /// Durable execution facts owned by the delegation boundary.
 type ExecutionFactCases =
+    | HandleWorkCompleted of
+        {| ParentSessionId: SessionId
+           Work: HandleWorkId
+           Kind: HandleCompletionKind
+           CompletionRef: BlobRef option
+           CompletionDigest: BlobDigest option |}
+    | HandleWorkConsumed of
+        {| ParentSessionId: SessionId
+           Work: HandleWorkId
+           ConsumptionId: string
+           Kind: HandleCompletionKind
+           CompletionRef: BlobRef option
+           CompletionDigest: BlobDigest option |}
+    | HandleWorkAbandoned of
+        {| ParentSessionId: SessionId
+           Work: HandleWorkId
+           Reason: HandleAbandonReason |}
+    | ChildWorkVoided of
+        {| ParentSessionId: SessionId
+           Work: HandleWorkId |}
     | HandleLinked of
         {| ParentSessionId: SessionId
            ChildSessionId: SessionId

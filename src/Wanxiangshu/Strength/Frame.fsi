@@ -10,6 +10,7 @@ type StrengthToolExchange =
 
 type StrengthRequestBatch =
     { RequestOrdinal: int
+      AssistantText: string list
       Exchanges: StrengthToolExchange list }
 
 type StrengthFrameBundle =

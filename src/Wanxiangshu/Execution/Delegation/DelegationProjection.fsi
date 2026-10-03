@@ -15,7 +15,8 @@ type DelegationProjectionChange =
     | ReplaceSessionState of sessionId: SessionId * state: DelegationSessionState
     | IndexChildHandle of childSessionId: SessionId * record: HandleRecord
     | MoveHandoffFrontier of key: string * parentEndExclusive: int64
-    | TerminatedChildHandle of childSessionId: SessionId
+    | TerminatedChildHandle of parentSessionId: SessionId * childSessionId: SessionId
+    | TerminatedChildWork of work: HandleWorkId * logicalRunId: LogicalRunId
 
 /// delegation-029 / durable-events-023: Closed rejections emitted by delegation-owned folds.
 /// Durable composition translates these into durable FoldRejection values.
@@ -23,6 +24,7 @@ type DelegationFoldRejection =
     | HandleBindingConflict of fact: string
     | HandleNeverLinked of fact: string
     | HandleCompletionMissing of fact: string
+    | WorkRejected of fact: string * reason: HandleTransitionRejection
     | HandoffFrontierCannotRetreat of previous: int64 * requested: int64
     | HandoffFrontierNegative of requested: int64
     | ToolEstimateNegative of expectedToolCalls: int

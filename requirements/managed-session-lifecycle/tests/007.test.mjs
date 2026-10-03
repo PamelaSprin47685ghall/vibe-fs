@@ -1,4 +1,52 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+
+test('WHAT[managed-session-lifecycle-007] canonical A and B retain separate cells across late A and cold replay', async () => {
+  const owner = 'scope-two-completions'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'WORK-A')
+    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-A', 'provider-a'), true)
+    const completedA = forkTool.workSnapshot(runtime, owner)[0]
+    assert.equal((await forkTool.replayBinding(runtime, owner, 'Ada')).ok, true)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner)[0], completedA)
+    const b = await admit(runtime, owner, 2, 'WORK-B-BEFORE-JOIN')
+    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root).lifecycle, 'CompletedAwaitingJoin')
+    await assertCold(runtime, directory, owner)
+    const first = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
+    assert.equal(first.ok, true)
+    assert.match(first.workRecord, /ANSWER-A/)
+    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === b.root).lifecycle, 'Active')
+    await forkTool.emitTerminalForRoot(runtime, owner, a.root, 'LATE-A', 'provider-a-late')
+    assert.equal((await forkTool.replayWorkCompletion(runtime, owner, a.root)).ok, true)
+    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === b.root).lifecycle, 'Active')
+    const retainedA = forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root)
+    assert.equal(retainedA.completionRef, completedA.completionRef)
+    assert.equal(retainedA.completionDigest, completedA.completionDigest)
+    assert.equal(retainedA.lifecycle, 'Retired')
+    await assertCold(runtime, directory, owner)
+    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-B', 'provider-b'), true)
+    const second = await forkTool.consumeWorkWithOutcome(runtime, owner, b.root, 'confirmed')
+    assert.equal(second.ok, true)
+    assert.match(second.workRecord, /ANSWER-B/)
+    assert.doesNotMatch(second.workRecord, /ANSWER-A|LATE-A/)
+    assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')).ok, false)
+    assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, b.root, 'confirmed')).ok, false)
+    await assertCold(runtime, directory, owner)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-007] completed work remains single-assignment before consumption', async () => {
+  const owner = 'scope-single-cell'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'FIRST')
+    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'first-provider'), true)
+    const original = forkTool.workSnapshot(runtime, owner)
+    assert.equal((await forkTool.replayWorkCompletion(runtime, owner, a.root)).ok, true)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
+    await assertCold(runtime, directory, owner)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -362,7 +410,7 @@ test('WHAT[managed-session-lifecycle-007] folding linked and completed facts exp
 {
   const { default: assert } = await import('node:assert/strict')
   const handles = await import('../../../dist/Execution/Delegation/Handle/Surface.js')
-  test('WHAT[managed-session-lifecycle-007] replayed link cannot reopen the completed cell for a different winner', { todo: 'GAP-132: completed link becomes Active again' }, () => {
+  test('WHAT[managed-session-lifecycle-007] replayed link cannot reopen the completed cell for a different winner', () => {
     const link = { op: 'link', handle: 'agent:completed', child: 'child', agent: 'engineer', role: 'Engineer' }
     const active = handles.apply(handles.empty(), link)
     assert.equal(active.ok, true)

@@ -21,31 +21,64 @@ open Wanxiangshu.Persistence.Journal
 ///
 /// The explicit reset happens here, once, at load: every child work run still
 /// active at startup is voided — the durable evidence that closes the child
-/// authority (the delegation fold derives `TerminatedChildHandle` from it) while
+/// authority through its exact admitted work while
 /// leaving the handle itself untouched, so nothing appears as an unreported
 /// delivery. The child's transcript is untouched, and restarting the work
 /// remains the manager's own explicit decision.
 module ChildWorkRecovery =
 
     type OrphanedChildRun =
-        { ParentSessionId: SessionId
-          Handle: HandleId
-          ChildSessionId: SessionId }
+        private
+        | Admitted of parentSessionId: SessionId * work: AdmittedWork
+        | Historical of parentSessionId: SessionId * childSessionId: SessionId
 
     let private isChildWorkRun (run: PromptAuthority.AuthorityExecutionProfile) : bool =
         run.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         && run.CanonicalRole <> Role.Manager
 
-    let private activeChildRuns (projections: AgentProjectionSet) : SessionId list =
+    let private activeChildRuns (projections: AgentProjectionSet) =
         projections.Sessions
         |> Map.toList
         |> List.choose (fun (sessionId, session) ->
             session.PromptAuthority
             |> Option.bind (fun authority -> authority.ActiveLogicalRun)
             |> Option.filter isChildWorkRun
-            |> Option.map (fun _ -> sessionId))
+            |> Option.map (fun run -> sessionId, run))
 
-    let private handleFor (projections: AgentProjectionSet) (childSessionId: SessionId) : OrphanedChildRun option =
+    let private scopedRun
+        parentSessionId
+        handle
+        (handles: AgentLinkageProjection)
+        (run: PromptAuthority.AuthorityExecutionProfile)
+        =
+        handles.Works
+        |> Map.toList
+        |> List.tryPick (fun (work, record) ->
+            HandleProjection.tryAdmittedWork work handles
+            |> Result.toOption
+            |> Option.filter (fun admitted ->
+                work.Handle = handle
+                && work.ChildSessionId = run.SessionId
+                && work.AuthorityRoot = run.AuthorityRootUserMessageId
+                && AdmittedWork.logicalRunId admitted = run.LogicalRunId
+                && record.LogicalRunId = run.LogicalRunId)
+            |> Option.map (fun admitted -> Admitted(parentSessionId, admitted)))
+
+    let private runForHandle
+        parentSessionId
+        handle
+        (handles: AgentLinkageProjection)
+        (run: PromptAuthority.AuthorityExecutionProfile)
+        =
+        let scopedChild =
+            handles.Works |> Map.exists (fun work _ -> work.ChildSessionId = run.SessionId)
+
+        if scopedChild then
+            scopedRun parentSessionId handle handles run
+        else
+            Some(Historical(parentSessionId, run.SessionId))
+
+    let private handleFor (projections: AgentProjectionSet) (childSessionId, run) : OrphanedChildRun option =
         projections.HandleByChildSession
         |> Map.tryFind childSessionId
         |> Option.filter (fun record ->
@@ -58,10 +91,7 @@ module ChildWorkRecovery =
             |> List.tryPick (fun (parentSessionId, session) ->
                 match session.Handles with
                 | Some handles when HandleProjection.tryFind record.Handle handles |> Option.isSome ->
-                    Some
-                        { ParentSessionId = parentSessionId
-                          Handle = record.Handle
-                          ChildSessionId = childSessionId }
+                    runForHandle parentSessionId record.Handle handles run
                 | _ -> None))
 
     /// The child work runs a fresh process can no longer execute, with the parent
@@ -75,9 +105,20 @@ module ChildWorkRecovery =
     /// asked to collect — the child stays reusable and both views stay empty,
     /// exactly as a fresh process should look.
     let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases =
-        ExecutionFactCases.ChildRunVoided
-            {| ParentSessionId = orphaned.ParentSessionId
-               ChildSessionId = orphaned.ChildSessionId |}
+        match orphaned with
+        | Admitted(parentSessionId, work) ->
+            ExecutionFactCases.ChildWorkVoided
+                {| ParentSessionId = parentSessionId
+                   Work = AdmittedWork.id work |}
+        | Historical(parentSessionId, childSessionId) ->
+            ExecutionFactCases.ChildRunVoided
+                {| ParentSessionId = parentSessionId
+                   ChildSessionId = childSessionId |}
+
+    let private parentOf =
+        function
+        | Admitted(parentSessionId, _)
+        | Historical(parentSessionId, _) -> parentSessionId
 
     let settleOrphanedChildRuns (journal: AgentJournal) : Task<unit> =
         task {
@@ -86,7 +127,7 @@ module ChildWorkRecovery =
             for orphaned in orphanedChildRuns projections do
                 match!
                     AgentJournal.appendAgent
-                        (StreamId.Session orphaned.ParentSessionId)
+                        (StreamId.Session(parentOf orphaned))
                         None
                         (AgentFact.Execution(settlementFact orphaned))
                         journal

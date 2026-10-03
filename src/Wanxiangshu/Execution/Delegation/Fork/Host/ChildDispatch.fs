@@ -82,8 +82,15 @@ module HostForkChildDispatch =
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (settleAbandoned: PendingHostRun -> unit)
+        (agentIds: string list)
         =
-        let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+        let owned = Set.ofList agentIds
+
+        let pending =
+            lock gate (fun () ->
+                pendingRuns.Values
+                |> Seq.filter (fun run -> Set.contains run.AgentId owned)
+                |> Seq.toList)
 
         for run in pending do
             settleAbandoned run
@@ -99,6 +106,17 @@ module HostForkChildDispatch =
         match handleRecordOpt with
         | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
         | None -> isFixedDevOps agentId
+
+    let private retainedFixedDevOps handles (agentId, childId) =
+        handles
+        |> Option.bind (HandleProjection.tryBinding (HandleController.agentHandle agentId))
+        |> Option.exists (fun binding ->
+            binding.ChildSessionId = childId
+            && binding.CanonicalRole = Role.DevOps
+            && binding.Byname = "devops"
+            && binding.TargetAgent = "devops"
+            && binding.Ownership = HandleOwnership.DurableParentHandle
+            && binding.Lifecycle = HandleLifecycle.Active)
 
     let private clearChildrenAndRuns
         (gate: obj)
@@ -120,7 +138,10 @@ module HostForkChildDispatch =
             | Some cid -> children.["devops"] <- cid
             | None -> ()
 
-            pendingRuns.Clear())
+            let cancelled = pendingRuns.Keys |> Seq.filter (isFixedDevOps >> not) |> Seq.toList
+
+            for agentId in cancelled do
+                pendingRuns.Remove agentId |> ignore)
 
     let private nudgeBusyChild
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -159,7 +180,6 @@ module HostForkChildDispatch =
         (childId: SessionId)
         (role: Role)
         (identitySeed: PromptAuthority.IdentitySeed)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (prompt: string)
         (agent: string)
@@ -174,8 +194,6 @@ module HostForkChildDispatch =
 
             match sent with
             | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-                let! _ = relink ()
-
                 let run =
                     HostForkRunLifecycle.installRun
                         gate
@@ -224,7 +242,6 @@ module HostForkChildDispatch =
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (onRunStarted: SessionId -> Role -> unit)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -257,7 +274,6 @@ module HostForkChildDispatch =
                         childId
                         role
                         identitySeed
-                        relink
                         preparedHandoff
                         prompt
                         agent
@@ -292,7 +308,6 @@ module HostForkChildDispatch =
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
-        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -330,7 +345,6 @@ module HostForkChildDispatch =
                         handoffPort
                         sendChildPrompt
                         onRunStarted
-                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -355,19 +369,11 @@ module HostForkChildDispatch =
 
         loop childIds None
 
-    /// Cancel parent: fail pending runs, abandon child handles, clear maps.
-    ///
-    /// `cancelSignals` is invoked with parentId :: childIds so the signal router
-    /// ignores further idle/retry events for the torn-down sessions. Unregistering
-    /// the routing is the whole cancellation: a torn-down session simply stops
-    /// producing turns to reconcile.
-    ///
-    /// Side effects that must be visible before the call returns (ForkRuntime
-    /// cancellation, signal unrouting, handle retirement) run synchronously before
-    /// the async block starts.
+    /// Cancel ordinary owned work after its observed callbacks drain. The fixed
+    /// road companion retains its physical runtime and completion subscription.
     let cancelParent
         (cancelSignals: SessionId seq -> unit)
-        (awaitRecovery: unit -> Task<unit>)
+        (drainCancelledCallbacks: string list -> string list -> Task<unit>)
         (runtime: ForkRuntime)
         (ptyPort: PtyPort)
         (parentKey: string)
@@ -382,10 +388,6 @@ module HostForkChildDispatch =
         (settleAbandoned: PendingHostRun -> unit)
         (abandonedAt: DateTimeOffset)
         : Task<unit> =
-        // Synchronous: make sure observers (runtime.Join, tests, parent abort
-        // callbacks) see cancellation immediately.
-        runtime.Cancel()
-
         // Teardown ownership is process-local. Durable Active handles from a
         // previous process are broken historical tools, not resources this
         // runtime may abandon/abort merely because the same parent runtime exists.
@@ -404,6 +406,11 @@ module HostForkChildDispatch =
             owned
             |> List.filter (fun (agentId, _) -> not (isFixedDevOpsHandle durableHandles agentId))
 
+        let retainedAgents =
+            processOwned |> List.filter (retainedFixedDevOps durableHandles) |> List.map fst
+
+        let cancelledAgents = ownedToCancel |> List.map fst
+
         let childIdsToCancel = ownedToCancel |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIdsToCancel)
 
@@ -411,17 +418,30 @@ module HostForkChildDispatch =
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
         task {
+            do! drainCancelledCallbacks cancelledAgents retainedAgents
+
+            if List.isEmpty retainedAgents then
+                runtime.Cancel()
+            else
+                cancelledAgents |> List.iter runtime.CancelAgent
+
             let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
 
+            let activeToAbandon =
+                match journal with
+                | None -> ownedToCancel
+                | Some durable ->
+                    let current = AgentJournal.handleProjection durable parentId
+                    ownedToCancel |> List.filter (isProcessOwnedActiveHandle current)
+
             let! cancelResult =
-                HandleController.cancelChildren journalPort parentId (ownedToCancel |> List.map fst) abandonedAt
+                HandleController.cancelChildren journalPort parentId (activeToAbandon |> List.map fst) abandonedAt
 
             requireOk "Parent handle abandon failed" cancelResult
 
             do! ptyPort.CloseAll()
             Pty.unregisterParentAbort parentKey parentAbortToken
-            settlePendingAbandoned gate pendingRuns settleAbandoned
-            do! awaitRecovery ()
+            settlePendingAbandoned gate pendingRuns settleAbandoned (activeToAbandon |> List.map fst)
 
             let! teardown = teardownChildren sessions (childIdsToCancel |> List.distinct)
             requireOk "Parent teardown failed" teardown

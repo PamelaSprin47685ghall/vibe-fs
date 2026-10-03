@@ -132,9 +132,10 @@ type HostForkRuntime
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
-    // One terminal runtime teardown owns either logical cancel or process-local detach.
-    // DSL-MUTABLE: single-flight — detach/cancel teardown owner under cancelGate
-    let mutable teardownTask: Task option = None
+    // DSL-MUTABLE: single-flight — current parent cancellation episode.
+    let mutable cancelTask: Task option = None
+    // DSL-MUTABLE: single-flight — process-local observer shutdown.
+    let mutable detachTask: Task option = None
     // DSL-MUTABLE: resource — terminal/failure callback admission latch.
     let mutable acceptingOwnedWork = true
     // DSL-MUTABLE: resource — in-flight runtime-owned callback count.
@@ -143,10 +144,28 @@ type HostForkRuntime
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first runtime-owned callback failure for shutdown propagation.
     let mutable ownedWorkFailure: exn option = None
+    // DSL-MUTABLE: resource — acknowledgement for observed callbacks without closing admission.
+    let mutable observedWorkWaiter: TaskCompletionSource<unit> option = None
+
+    let observedWorkTask () =
+        match observedWorkWaiter with
+        | Some waiter -> waiter.Task
+        | None ->
+            let waiter =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            observedWorkWaiter <- Some waiter
+            waiter.Task
 
     let finishOwnedWork () =
         lock ownedWorkGate (fun () ->
             ownedWorkCount <- ownedWorkCount - 1
+
+            if ownedWorkCount = 0 then
+                observedWorkWaiter
+                |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore)
+
+                observedWorkWaiter <- None
 
             if not acceptingOwnedWork && ownedWorkCount = 0 then
                 ownedWorkDrainWaiter
@@ -478,6 +497,28 @@ type HostForkRuntime
 
         subscriptions |> List.iter (fun subscription -> subscription.Dispose())
 
+    member private this.DrainCancelledCallbacks(agentIds: string list, retainedAgents: string list) : Task<unit> =
+        let cancelled = Set.ofList agentIds
+
+        let subscriptions =
+            lock gate (fun () ->
+                pendingRuns.Values
+                |> Seq.filter (fun run -> Set.contains run.AgentId cancelled)
+                |> Seq.choose (fun run ->
+                    let subscription = run.Subscription
+                    run.Subscription <- None
+                    subscription)
+                |> Seq.toList)
+
+        subscriptions |> List.iter (fun subscription -> subscription.Dispose())
+
+        task {
+            if List.isEmpty retainedAgents then
+                do! stopOwnedWorkAndDrain ()
+            else
+                do! this.AwaitObservedWork()
+        }
+
     /// EXEC-009: retired OR abandoned ids must never re-fork under the same handle.
     member _.IsRetiredHandle(agentId: string) =
         journal
@@ -566,42 +607,97 @@ type HostForkRuntime
             return! this.WorkRecordFromCompletion completion
         }
 
+    member private this.CancelParentEpisode(completion: TaskCompletionSource<unit>) : Task =
+        task {
+            let! failure =
+                captureOwnedWorkFailure (fun () ->
+                    HostForkChildDispatch.cancelParent
+                        cancelSignals
+                        (fun cancelled retained -> this.DrainCancelledCallbacks(cancelled, retained))
+                        runtime
+                        ptyPortInstance
+                        parentKey
+                        parentAbortToken
+                        gate
+                        pendingRuns
+                        children
+                        sessions
+                        journal
+                        (journal
+                         |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
+                        parentId
+                        (fun run -> HostForkRunLifecycle.settleParentCancelled gate pendingRuns run)
+                        (clockPort.UtcNow())
+                    :> Task)
+
+            lock cancelGate (fun () -> cancelTask <- None)
+
+            match failure with
+            | None -> completion.SetResult()
+            | Some failure -> completion.SetException failure
+        }
+        :> Task
+
     member this.CancelAndDrain() : Task =
         lock cancelGate (fun () ->
-            match teardownTask with
-            | Some drain -> drain
-            | None ->
-                let drain =
-                    task {
-                        // Close terminal/failure callback admission first and let
-                        // callbacks that already observed a terminal settle their
-                        // durable completion before parent-cancel claims leftovers.
-                        do! stopOwnedWorkAndDrain ()
+            match detachTask, cancelTask with
+            | Some drain, _
+            | _, Some drain -> drain
+            | None, None ->
+                let completion =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                        do!
-                            HostForkChildDispatch.cancelParent
-                                cancelSignals
-                                // GREEN-4: no second recovery ownership; cancel does not start restore.
-                                (fun () -> Task.FromResult(()))
-                                runtime
-                                ptyPortInstance
-                                parentKey
-                                parentAbortToken
-                                gate
-                                pendingRuns
-                                children
-                                sessions
-                                journal
-                                (journal
-                                 |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
-                                parentId
-                                (fun run -> HostForkRunLifecycle.settleParentCancelled gate pendingRuns run)
-                                (clockPort.UtcNow())
-                    }
-                    :> Task
-
-                teardownTask <- Some drain
+                let drain = completion.Task :> Task
+                cancelTask <- Some drain
+                this.CancelParentEpisode completion |> ignore
                 drain)
+
+    member private this.DetachObserversAfter(cancelling: Task option) : Task =
+        // DSL-MUTABLE: algorithm-scratch — actual failures from independent cleanup boundaries.
+        let failures = ResizeArray<exn>()
+
+        let release work =
+            task {
+                let! failure = captureOwnedWorkFailure work
+                failure |> Option.iter failures.Add
+            }
+
+        task {
+            match cancelling with
+            | Some cancellation -> do! release (fun () -> cancellation)
+            | None -> ()
+
+            do! release stopOwnedWorkAndDrain
+
+            do!
+                release (fun () ->
+                    runtime.Cancel()
+                    AsyncSupport.completedTask ())
+
+            do!
+                release (fun () ->
+                    this.DetachPendingObservers()
+                    AsyncSupport.completedTask ())
+
+            do! release (fun () -> ptyPortInstance.CloseAll() :> Task)
+
+            do!
+                release (fun () ->
+                    Pty.unregisterParentAbort parentKey parentAbortToken
+                    AsyncSupport.completedTask ())
+
+            match Seq.toList failures with
+            | [] -> return ()
+            | [ failure ] -> return raise failure
+            | failures ->
+                return
+                    raise (
+                        emitJsExpr
+                            (List.toArray failures)
+                            "new AggregateError($0, 'fork runtime detach failed', { cause: $0[0] })"
+                    )
+        }
+        :> Task
 
     /// managed-session-lifecycle-018: plugin/process lifetime ending is not a logical
     /// parent cancellation. Stop this process's observers and local runtime
@@ -609,28 +705,11 @@ type HostForkRuntime
     /// child sessions. Durable Active handles remain the restart authority.
     member this.DetachAndDrain() : Task =
         lock cancelGate (fun () ->
-            match teardownTask with
+            match detachTask with
             | Some drain -> drain
             | None ->
-                let drain =
-                    task {
-                        do! stopOwnedWorkAndDrain ()
-
-                        // Cancel only process-local ChildRun/mailbox waiters. This
-                        // does not call the Host AbortSession port and does not
-                        // write any durable handle terminal.
-                        runtime.Cancel()
-                        this.DetachPendingObservers()
-
-                        // PTYs are process-owned OS resources and are not durable
-                        // agent sessions; close them while preventing exit fan-out
-                        // from re-entering the detached runtime.
-                        do! ptyPortInstance.CloseAll()
-                        Pty.unregisterParentAbort parentKey parentAbortToken
-                    }
-                    :> Task
-
-                teardownTask <- Some drain
+                let drain = this.DetachObserversAfter cancelTask
+                detachTask <- Some drain
                 drain)
 
     member this.Cancel() : unit = this.CancelAndDrain() |> ignore
@@ -752,6 +831,7 @@ type HostForkRuntime
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
     member _.IsCancelled = runtime.IsCancelled
+    member internal _.IsCancelling = lock cancelGate (fun () -> cancelTask.IsSome)
 
     member this.TrackPtyRun(id: PtyId) =
         lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
@@ -780,6 +860,22 @@ type HostForkRuntime
 
     member this.OwnsPty(id: PtyId) =
         lock gate (fun () -> ptyRuns.Contains id.Value)
+
+    member this.AwaitObservedWork() : Task<unit> =
+        let waiting =
+            lock ownedWorkGate (fun () ->
+                if ownedWorkCount = 0 then
+                    Task.FromResult(())
+                else
+                    observedWorkTask ())
+
+        task {
+            do! waiting
+
+            match lock ownedWorkGate (fun () -> ownedWorkFailure) with
+            | Some failure -> return raise failure
+            | None -> return ()
+        }
 
     member this.DrainOwnedWork() : Task<unit> =
         task {

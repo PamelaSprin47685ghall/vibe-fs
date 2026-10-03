@@ -64,7 +64,7 @@ test('WHAT[managed-session-lifecycle-018] authorized owner cancellation durably 
       })
     const children = []
     for (const owner of owners) {
-      forkTool.nextPromptAdmittedWithReceipt(runtime, `accepted-child:${owner}`)
+      forkTool.acceptNextPrompt(runtime)
       assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'REVIEW-ONE-CHANGE'), /Ada/)
       children.push(forkTool.child(runtime))
       assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')

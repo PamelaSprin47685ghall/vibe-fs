@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 
 type HandleCompletion =
     { Kind: HandleCompletionKind
@@ -23,11 +24,27 @@ type HandleRecord =
       Ownership: HandleOwnership
       Lifecycle: HandleLifecycle
       CreationOrder: int
-      LastCompletion: HandleCompletion option }
+      LastCompletion: HandleCompletion option
+      Work: HandleWorkId option }
+
+type HandleWorkRecord =
+    { Work: HandleWorkId
+      LogicalRunId: LogicalRunId
+      Lifecycle: HandleLifecycle
+      LastCompletion: HandleCompletion option
+      ConsumptionId: string option }
+
+type AdmittedWork = private AdmittedWork of HandleWorkId * LogicalRunId
+
+module AdmittedWork =
+    val id: AdmittedWork -> HandleWorkId
+    val logicalRunId: AdmittedWork -> LogicalRunId
 
 type AgentLinkageProjection =
     { Handles: Map<HandleId, HandleRecord>
-      NextCreationOrder: int }
+      NextCreationOrder: int
+      Works: Map<HandleWorkId, HandleWorkRecord>
+      LegacyWorkHandles: Set<HandleId> }
 
 type HandleTransitionRejection =
     | UnknownHandle
@@ -36,9 +53,47 @@ type HandleTransitionRejection =
     | AlreadyCompleted
     | AlreadyAbandoned
     | NotCompleted
+    | WorkNotAdmitted
+    | WorkStillActive
+    | ConsumptionMismatch
+    | LegacyWorkAmbiguous
 
 module HandleProjection =
     val empty: AgentLinkageProjection
+
+    val admitWork:
+        SessionId ->
+        HandleId ->
+        PromptAuthority.PromptAuthorityProjection ->
+        AgentLinkageProjection ->
+            Result<AgentLinkageProjection, HandleTransitionRejection>
+
+    val tryWork: HandleWorkId -> AgentLinkageProjection -> HandleWorkRecord option
+    val tryAdmittedWork: HandleWorkId -> AgentLinkageProjection -> Result<AdmittedWork, HandleTransitionRejection>
+
+    val completeWork:
+        HandleWorkId ->
+        HandleCompletion ->
+        AgentLinkageProjection ->
+            Result<AgentLinkageProjection, HandleTransitionRejection>
+
+    val abandonWork:
+        HandleWorkId ->
+        HandleAbandonReason ->
+        AgentLinkageProjection ->
+            Result<AgentLinkageProjection, HandleTransitionRejection>
+
+    val voidWork: HandleWorkId -> AgentLinkageProjection -> Result<AgentLinkageProjection, HandleTransitionRejection>
+
+    val consumeWork:
+        HandleWorkId ->
+        string ->
+        HandleCompletion ->
+        AgentLinkageProjection ->
+            Result<AgentLinkageProjection, HandleTransitionRejection>
+
+    val workRecords: AgentLinkageProjection -> HandleRecord list
+    val tryBinding: HandleId -> AgentLinkageProjection -> HandleRecord option
 
     val linkNamed:
         handle: HandleId ->
@@ -85,6 +140,8 @@ module HandleProjection =
     val isRetired: handle: HandleId -> current: AgentLinkageProjection -> bool
     val isAbandoned: handle: HandleId -> current: AgentLinkageProjection -> bool
     val tryFindByByname: byname: string -> current: AgentLinkageProjection -> HandleRecord option
+    val auditListable: AgentLinkageProjection -> HandleRecord list
+    val auditActiveHandles: AgentLinkageProjection -> HandleRecord list
     val listable: current: AgentLinkageProjection -> HandleRecord list
     val horizonVisible: current: AgentLinkageProjection -> HandleRecord list
     val joinable: current: AgentLinkageProjection -> HandleRecord list

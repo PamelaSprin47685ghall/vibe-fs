@@ -77,7 +77,7 @@ module JoinDrain =
             match record.Lifecycle, HandleId.tryAgent record.Handle with
             | HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.Cancelled }, Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
-                let! outcome = HandleController.consume durable parentId record.Handle
+                let! outcome = HandleController.consumeWork durable parentId record
                 return afterConsumeCas "cancelled-" agentId record "Cancelled" completedAt outcome
             | _ -> return None
         }
@@ -94,7 +94,7 @@ module JoinDrain =
             match record.Lifecycle, HandleId.tryAgent record.Handle with
             | HandleLifecycle.Abandoned reason, Some agentHandleId ->
                 let agentId = AgentHandleId.value agentHandleId
-                let! outcome = HandleController.consume durable parentId record.Handle
+                let! outcome = HandleController.consumeWork durable parentId record
                 return afterConsumeCas "abandoned-" agentId record (abandonReasonText reason) completedAt outcome
             | _ -> return None
         }
@@ -188,7 +188,7 @@ module JoinDrain =
             match JoinableCompletion.finality proof with
             | ChildFinality.Succeeded _
             | ChildFinality.Failed _ ->
-                let! outcome = HandleController.consume durable parentId record.Handle
+                let! outcome = HandleController.consumeWork durable parentId record
                 return afterFinalityConsume completion outcome
             | ChildFinality.Abandoned _ -> return None
         }
@@ -204,7 +204,12 @@ module JoinDrain =
         (completedAt: DateTimeOffset)
         : Task<Result<RunCompletion, ForkError> option> =
         match HandleCompletionCodec.decodeBody body with
-        | Current decoded -> joinCurrentDecoded durable parentId record agentId decoded body completedAt
+        | Current decoded when
+            record.Work
+            |> Option.forall (fun work -> HandleCompletionCodec.belongsToWork work decoded)
+            ->
+            joinCurrentDecoded durable parentId record agentId decoded body completedAt
+        | Current _ -> Task.FromResult(Some(Error(ForkError.NotFound "completion work identity mismatch")))
         | LegacyFalseAbort _ -> rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
         | Invalid _ -> Task.FromResult None
 
@@ -265,21 +270,13 @@ module JoinDrain =
         | HandleLifecycle.CompletedAwaitingJoin _ -> tryConsumeOneDurable durable parentId record completedAt
         | _ -> Task.FromResult None
 
-    let private agentNotTaken (takenIds: Set<string>) (r: HandleRecord) =
-        match HandleId.tryAgent r.Handle with
-        | Some id -> not (Set.contains (AgentHandleId.value id) takenIds)
-        | None -> true
-
     let private refreshCandidates
         (acc: RunCompletion list)
         (refresh: unit -> AgentLinkageProjection)
         (records: HandleRecord list)
         =
-        let takenIds =
-            acc |> List.map (fun c -> AgentCompletion.agentId c.Outcome) |> Set.ofList
-
+        // Exact consumed work tombstones, not agent ids, remove delivered entries.
         orderedCandidates (refresh ())
-        |> List.filter (agentNotTaken takenIds)
         |> fun refreshed ->
             if List.isEmpty refreshed then Choice1Of3()
             elif refreshed = records then Choice2Of3()

@@ -228,6 +228,10 @@ module HandleSurface =
         | AlreadyCompleted -> "AlreadyCompleted"
         | AlreadyAbandoned -> "AlreadyAbandoned"
         | NotCompleted -> "NotCompleted"
+        | WorkNotAdmitted -> "WorkNotAdmitted"
+        | WorkStillActive -> "WorkStillActive"
+        | ConsumptionMismatch -> "ConsumptionMismatch"
+        | LegacyWorkAmbiguous -> "LegacyWorkAmbiguous"
 
     /// JS `undefined` for missing optional fields. Fable's `null` would fail
     /// `deepStrictEqual` against `undefined` in the test suite.
@@ -445,9 +449,21 @@ module HandleSurface =
             |> List.toArray
 
         box
-            {| listable = describeRecords (HandleProjection.listable projection)
+            {| listable =
+                describeRecords (
+                    if projection.Works.IsEmpty then
+                        HandleProjection.auditListable projection
+                    else
+                        HandleProjection.listable projection
+                )
                joinable = describeRecords (HandleProjection.joinable projection)
-               active = describeRecords (HandleProjection.activeHandles projection) |}
+               active =
+                describeRecords (
+                    if projection.Works.IsEmpty then
+                        HandleProjection.auditActiveHandles projection
+                    else
+                        HandleProjection.activeHandles projection
+                ) |}
 
     /// `linkedChildren(projection)` — every child session ever linked, as
     /// record snapshots sorted by creation order.

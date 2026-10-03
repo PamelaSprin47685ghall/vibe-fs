@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -61,8 +62,22 @@ type ToolRuntimeScopeSurface =
         else
             Some(unbox<'T> (target?(prop)))
 
+    static member private childAuthorityRoot(journal: JournalHandle, child: string, role: Role) =
+        let childId = SessionId.create child
+
+        (AgentJournal.snapshot journal.Journal).AgentProjections.Sessions
+        |> Map.tryFind childId
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+        |> Option.filter (fun profile ->
+            profile.SessionId = childId
+            && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            && profile.CanonicalRole = role)
+        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+        |> Option.defaultWith (fun () -> invalidOp "work requires exact canonical child authority")
+
     [<CompiledName("evaluateRetirementBlockers")>]
-    static member evaluateRetirementBlockers(scenario: obj) : string array =
+    static member evaluateRetirementBlockers(journal: JournalHandle, scenario: obj) : Task<string array> =
         let managerSessionId =
             ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "managerSessionId")
             |> Option.defaultValue "manager-road-1"
@@ -106,7 +121,7 @@ type ToolRuntimeScopeSurface =
                 dummyObserver,
                 { new IRootWorkspaceReader with
                     member _.TryRead() = None },
-                None,
+                Some journal.Journal,
                 None,
                 sessionParents,
                 (fun _ -> None),
@@ -136,7 +151,8 @@ type ToolRuntimeScopeSurface =
             mgrRuntime.AdoptChild("devops", SessionId.create devopsId)
 
             if managerHasDevopsAgent then
-                let authRoot = AuthorityRootUserMessageId.create "auth-root-devops"
+                let authRoot =
+                    ToolRuntimeScopeSurface.childAuthorityRoot (journal, devopsId, Role.DevOps)
 
                 mgrRuntime.InstallRun("devops", SessionId.create devopsId, Role.DevOps, authRoot)
                 |> ignore)
@@ -146,7 +162,8 @@ type ToolRuntimeScopeSurface =
             mgrRuntime.AdoptChild("engineer-1", SessionId.create engId)
 
             if managerHasEngineerAgent then
-                let authRoot = AuthorityRootUserMessageId.create "auth-root-eng"
+                let authRoot =
+                    ToolRuntimeScopeSurface.childAuthorityRoot (journal, engId, Role.Engineer)
 
                 mgrRuntime.InstallRun("engineer-1", SessionId.create engId, Role.Engineer, authRoot)
                 |> ignore)
@@ -171,10 +188,15 @@ type ToolRuntimeScopeSurface =
             for pty in engineerPtys do
                 engRuntime.TrackPtyRun(PtyId.Create pty))
 
-        scope.RetirementBlockersFor managerSessionId |> List.toArray
+        let blockers = scope.RetirementBlockersFor managerSessionId |> List.toArray
+
+        task {
+            do! scope.DisposeAsync()
+            return blockers
+        }
 
     [<CompiledName("verifyDevOpsReturnDrain")>]
-    static member verifyDevOpsReturnDrain(scenario: obj) : Task<obj> =
+    static member verifyDevOpsReturnDrain(journal: JournalHandle, scenario: obj) : Task<obj> =
         task {
             let managerSessionId =
                 ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "managerSessionId")
@@ -213,7 +235,7 @@ type ToolRuntimeScopeSurface =
                     dummyObserver,
                     { new IRootWorkspaceReader with
                         member _.TryRead() = None },
-                    None,
+                    Some journal.Journal,
                     None,
                     sessionParents,
                     (fun _ -> None),
@@ -260,12 +282,14 @@ type ToolRuntimeScopeSurface =
             mgrRuntime.AdoptChild("devops", SessionId.create devopsChildSessionId)
             mgrRuntime.AdoptChild("engineer-1", SessionId.create engineerChildSessionId)
 
-            let authRootDevops = AuthorityRootUserMessageId.create "auth-root-devops"
+            let authRootDevops =
+                ToolRuntimeScopeSurface.childAuthorityRoot (journal, devopsChildSessionId, Role.DevOps)
 
             let devopsRun =
                 mgrRuntime.InstallRun("devops", SessionId.create devopsChildSessionId, Role.DevOps, authRootDevops)
 
-            let authRootEng = AuthorityRootUserMessageId.create "auth-root-eng"
+            let authRootEng =
+                ToolRuntimeScopeSurface.childAuthorityRoot (journal, engineerChildSessionId, Role.Engineer)
 
             let engRun =
                 mgrRuntime.InstallRun("engineer-1", SessionId.create engineerChildSessionId, Role.Engineer, authRootEng)
@@ -299,6 +323,7 @@ type ToolRuntimeScopeSurface =
 
             let devopsAfter = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
             let engineerAfter = engRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+            do! scope.DisposeAsync()
 
             return
                 box

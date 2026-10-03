@@ -10,6 +10,9 @@ module ForkToolSurface =
     val createRuntime: directory: string -> owners: obj -> Task<obj>
     val createRuntimeWithAbort: directory: string -> owners: obj -> abortSession: (string -> Task<obj>) -> Task<obj>
 
+    val createRuntimeWithCancelSignals:
+        directory: string -> owners: obj -> cancelSignals: (string array -> unit) -> Task<obj>
+
     val executeManagerFork:
         value: obj ->
         toolModule: obj ->
@@ -36,6 +39,8 @@ module ForkToolSurface =
     val promptCount: value: obj -> int
     val awaitPromptCount: value: obj -> count: int -> Task
     val acceptPrompt: value: obj -> index: int -> bool
+    val acceptNextPrompt: value: obj -> unit
+    val terminalListenerCount: value: obj -> int
     val prompt: value: obj -> index: int -> obj
     val nextPromptAcceptanceUnknown: value: obj -> reason: string -> unit
     val nextPromptAdmittedWithReceipt: value: obj -> receipt: string -> unit
@@ -45,6 +50,19 @@ module ForkToolSurface =
     val executeJoin: value: obj -> owner: string -> Task<string>
     val executeHorizon: value: obj -> owner: string -> Task<string>
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
+
+    val prepareTerminalDelivery:
+        value: obj -> owner: string -> answer: string -> providerRun: string -> Task<(unit -> Task)>
+
     val injectAcceptedAssessment: value: obj -> owner: string -> Task
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
+    val startUnprepared: obj -> string -> string -> Task<obj>
+    val emitStopForRoot: obj -> string -> string -> string -> Task
+    val replayWorkCompletion: obj -> string -> string -> Task<obj>
+    val workSnapshot: obj -> string -> obj array
+    val coldWorkSnapshot: string -> string -> Task<obj array>
+    val replayBinding: obj -> string -> string -> Task<obj>
+    val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task
+    val consumeWorkWithOutcome: obj -> string -> string -> string -> Task<obj>
+
     val disposeRuntime: value: obj -> unit

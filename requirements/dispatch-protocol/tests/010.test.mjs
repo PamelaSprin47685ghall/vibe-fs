@@ -321,11 +321,14 @@ test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection
   await withJournal('dp010-producers', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
-    const root = await dispatch.sendAgentOwnerRoot(hostPort(async () => dispatch.admittedWithReceipt('receipt-root')), handle, 'ses_p_root', 'root send', seed)
-    assert.equal(root.ok, true, root.error)
-    const rootAccepted = await dispatch.acceptAgentOwnerRoot(handle, 'ses_p_root', root.key, 'msg-producers-root')
-    assert.equal(rootAccepted.ok, true, rootAccepted.error)
-    const profile = rootAccepted.profile
+    const profiles = new Map()
+    for (const session of ['ses_p_4', 'ses_p_5', 'ses_p_6']) {
+      const root = await dispatch.sendAgentOwnerRoot(hostPort(async () => dispatch.admittedWithReceipt('receipt-root')), handle, session, 'root send', seed)
+      assert.equal(root.ok, true, root.error)
+      const accepted = await dispatch.acceptAgentOwnerRoot(handle, session, root.key, `msg-producers-root-${session}`)
+      assert.equal(accepted.ok, true, accepted.error)
+      profiles.set(session, accepted.profile)
+    }
 
     const capturing = () => {
       const seen = []
@@ -340,9 +343,9 @@ test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection
       ['sendAgentOwnerRoot', capturing(), (p) => dispatch.sendAgentOwnerRoot(p, handle, 'ses_p_1', 'text', seed)],
       ['sendAgentOwnerRootAwait', capturing(), (p) => dispatch.sendAgentOwnerRootAwait(p, handle, 'ses_p_2', 'text', seed)],
       ['sendManagedAssignment', capturing(), (p) => dispatch.sendManagedAssignment(p, handle, 'ses_p_3', 'text', seed, ['read', 'grep'])],
-      ['sendContinuation', capturing(), (p) => dispatch.sendContinuation(p, handle, 'ses_p_4', 'text', 'ProviderRetryAttempt', profile, 'Await')],
-      ['sendGateNudgesConcurrently', capturing(), async (p) => (await dispatch.sendGateNudgesConcurrently(p, handle, 'ses_p_5', 'text', 'ProviderRetryAttempt', 'JoinGate', 'run-terminal', profile))[0]],
-      ['sendIdleContinuation', capturing(), (p) => dispatch.sendIdleContinuation(p, handle, 'ses_p_6', 'text', 'ProviderRetryAttempt', profile, true)],
+      ['sendContinuation', capturing(), (p) => dispatch.sendContinuation(p, handle, 'ses_p_4', 'text', 'ProviderRetryAttempt', profiles.get('ses_p_4'), 'Await')],
+      ['sendGateNudgesConcurrently', capturing(), async (p) => (await dispatch.sendGateNudgesConcurrently(p, handle, 'ses_p_5', 'text', 'ProviderRetryAttempt', 'JoinGate', 'run-terminal', profiles.get('ses_p_5')))[0]],
+      ['sendIdleContinuation', capturing(), (p) => dispatch.sendIdleContinuation(p, handle, 'ses_p_6', 'text', 'ProviderRetryAttempt', profiles.get('ses_p_6'), true)],
     ]
 
     for (const [name, capture, run] of cases) {

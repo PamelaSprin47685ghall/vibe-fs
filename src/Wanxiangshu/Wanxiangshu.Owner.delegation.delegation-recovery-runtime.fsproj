@@ -20,10 +20,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
-    <Compile Include="Execution/Delegation/Handle/Controller.fsi"/>
-    <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
     <Compile Include="Execution/Delegation/Handle/CompletionCodec.fsi"/>
     <Compile Include="Execution/Delegation/Handle/CompletionCodec.fs"/>
+    <Compile Include="Execution/Delegation/Handle/Controller.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
     <Compile Include="Execution/Delegation/Handle/JoinDrain.fsi"/>
     <Compile Include="Execution/Delegation/Handle/JoinDrain.fs"/>
     <Compile Include="Execution/Delegation/ChildRecoveryWorkflow.fsi"/>

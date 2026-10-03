@@ -315,6 +315,50 @@ module StrengthReplicaTransform =
             return! tryApplyRenderedMessages sessionId sha256 rendered
         }
 
+    let private modelOfMessage (raw: obj) =
+        let info = ProviderWireDecode.infoObject raw
+        let model = ProviderWireDecode.readField info "model"
+
+        let provider =
+            ProviderWireDecode.firstString info [ "providerID" ]
+            |> Option.orElseWith (fun () -> ProviderWireDecode.firstString model [ "providerID" ])
+
+        let modelId =
+            ProviderWireDecode.firstString info [ "modelID" ]
+            |> Option.orElseWith (fun () -> ProviderWireDecode.firstString model [ "modelID" ])
+
+        Option.map2 (fun provider modelId -> provider, modelId) provider modelId
+
+    let private withReasoningModel (source: obj list) (encoded: obj list) =
+        let model =
+            source
+            |> List.fold (fun current raw -> modelOfMessage raw |> Option.orElse current) None
+
+        let needsModel raw =
+            (ProviderWireDecode.rawPartsOf raw
+             |> List.exists (fun part -> ProviderWireDecode.firstString part [ "type" ] = Some "reasoning"))
+            && Option.isNone (modelOfMessage raw)
+
+        let attach raw =
+            let info = ProviderWireDecode.infoObject raw
+
+            match model, needsModel raw with
+            | Some(provider, modelId), true ->
+                // OpenCode downcasts reasoning to text when the assistant model
+                // differs from the request model, including missing model fields.
+                let clonedInfo = emitJsExpr info "Object.assign({}, $0)"
+                clonedInfo?providerID <- provider
+                clonedInfo?modelID <- modelId
+                let cloned = emitJsExpr raw "Object.assign({}, $0)"
+                cloned?info <- clonedInfo
+                cloned
+            | _ -> raw
+
+        match model with
+        | None -> encoded
+        | Some _ when not (List.exists needsModel encoded) -> encoded
+        | Some _ -> encoded |> List.map attach
+
     /// Keep logical call/result rows intact through XTrace and context projection.
     /// Only at the final Host boundary fold them into native completed tool parts.
     let tryEncodeOwnerMessages (sha256: string -> string) (rawMessages: obj list) : Result<obj list, string> =
@@ -328,9 +372,9 @@ module StrengthReplicaTransform =
             | raw :: tail -> encode tail (raw :: acc)
 
         if rawMessages |> List.exists isLogicalCallMessage then
-            encode rawMessages []
+            encode rawMessages [] |> Result.map (withReasoningModel rawMessages)
         else
-            Ok rawMessages
+            Ok(withReasoningModel rawMessages rawMessages)
 
     let private providerResultsByCallId (rawMessages: obj list) =
         ProviderWireCapture.decodeMessageView rawMessages
@@ -371,7 +415,14 @@ module StrengthReplicaTransform =
         let toolParts = message.ToolParts |> Array.toList
         let exchanges = toolParts |> List.choose (exchangeOfPart results)
 
-        if List.isEmpty toolParts then
+        let texts =
+            message.Parts
+            |> Array.choose (function
+                | MessagePart.Text text -> Some text
+                | _ -> None)
+            |> Array.toList
+
+        if List.isEmpty toolParts && List.isEmpty texts then
             HostBatchStep.Stop
         elif hasPendingTool toolParts then
             HostBatchStep.Stop
@@ -380,6 +431,7 @@ module StrengthReplicaTransform =
         else
             HostBatchStep.Take
                 { RequestOrdinal = requestOrdinal + 1
+                  AssistantText = texts
                   Exchanges = exchanges }
 
     let private classifyHostMessage
@@ -428,7 +480,7 @@ module StrengthReplicaTransform =
                 batch.Exchanges
                 |> List.filter (fun exchange -> StrengthFrame.isProjectionTool exchange.ToolName)
 
-            if List.isEmpty allowedExchanges then
+            if List.isEmpty allowedExchanges && List.isEmpty batch.AssistantText then
                 None
             else
                 Some
@@ -463,11 +515,13 @@ module StrengthReplicaTransform =
         let wireBatches =
             StrengthBatchCollector.collectCompleteBatches decisionWire.Messages
 
+        let hostBatches = collectHostCompleteBatches decisionMessages
+
         let candidateBatches =
-            if not (List.isEmpty wireBatches) then
-                wireBatches
+            if List.length hostBatches > List.length wireBatches then
+                hostBatches
             else
-                collectHostCompleteBatches decisionMessages
+                wireBatches
 
         filterReadonlyBatches candidateBatches
 
@@ -488,8 +542,8 @@ module StrengthReplicaTransform =
     ///
     /// sigma walks the two histories together: the owner's tool exchanges are
     /// re-emitted at their owner positions, and the replica's OWN speech is
-    /// restored in the gaps the child recorded. Speech is the material main never
-    /// receives (the projection emits calls and results only), and its position is
+    /// restored in the gaps the child recorded. Synchronized text returns to its
+    /// original kind, without duplicating the child's own speech. Its position is
     /// knowable solely from the child — which is exactly why it must come from
     /// there and not from main. Dropping it, or appending it at the end, would make
     /// the provider see a different sequence than the one it cached.
@@ -506,9 +560,30 @@ module StrengthReplicaTransform =
         (frame: StrengthFrameBundle option)
         : Result<ProjectionIntent list, StrengthProjectionIntentError> =
         result {
-            let owner = binding.LocalizedMirrorMessages
+            let! local =
+                match frame with
+                | None -> Ok []
+                | Some bundle ->
+                    StrengthProjectionIntent.replicaLocal sha256 binding.OwnerSessionId binding.DecisionId bundle
+                    |> Result.map List.singleton
 
-            let aligned = TwinBijection.restore childMessages owner
+            let localMessages =
+                ProjectionRenderer.renderMessagesWithHostIds
+                    (snapshotOf (ProviderWireCapture.decodeMessageView []))
+                    []
+                    local
+                |> fun rendered -> rendered.Messages
+
+            let owner = binding.LocalizedMirrorMessages @ localMessages
+
+            let synchronized =
+                localMessages
+                |> List.mapi (fun index message -> index + binding.LocalizedMirrorMessages.Length, message)
+                |> List.choose (fun (index, message) -> if TwinBijection.hasCall message then Some index else None)
+                |> Set.ofList
+                |> Set.union binding.SynchronizedTextMessages
+
+            let aligned = TwinBijection.restore childMessages owner synchronized
 
             let! mirror =
                 aligned
@@ -518,13 +593,7 @@ module StrengthReplicaTransform =
                       HostIsPhysical = false })
                 |> StrengthProjectionIntent.projectionMirror
 
-            match frame with
-            | None -> return [ mirror ]
-            | Some bundle ->
-                let! local =
-                    StrengthProjectionIntent.replicaLocal sha256 binding.OwnerSessionId binding.DecisionId bundle
-
-                return [ mirror; local ]
+            return [ mirror ]
         }
 
     let private retireWith
@@ -570,7 +639,8 @@ module StrengthReplicaTransform =
         | Error error -> retireWith runtime sessions replicaSessionId error batches
         | Ok replacement ->
             task {
-                HostMessageProjection.replaceMessagesInPlace output replacement
+                let source = ProviderWireDecode.messagesFromTransformOutput output
+                HostMessageProjection.replaceMessagesInPlace output (withReasoningModel source replacement)
                 return StrengthReplicaTransformOutcome.Ready batches
             }
 

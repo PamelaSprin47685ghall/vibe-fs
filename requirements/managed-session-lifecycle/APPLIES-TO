@@ -8,7 +8,6 @@
 /src/Wanxiangshu/Interaction/Authority/Surface.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
-/src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
 /src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs
 /src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs

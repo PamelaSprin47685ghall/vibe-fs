@@ -10,14 +10,15 @@ module TwinBijection =
     /// Does this message carry at least one tool call?
     val hasCall: message: ProviderProjection.WireMessage -> bool
 
-    /// Speech: text or reasoning with no tool call (replica-only material).
+    /// Speech: text or reasoning without a tool exchange.
     val isSpeechOnly: message: ProviderProjection.WireMessage -> bool
 
-    /// Restore the replica's speech into the child-recorded gaps. Never refuses,
-    /// never drops speech; the owner skeleton keeps its order and its count.
+    /// Restore speech into child-recorded gaps. Synchronized owner reasoning
+    /// returns to child text once; ordinary owner text and reasoning stay intact.
     val restore:
         child: ProviderProjection.WireMessage list ->
         owner: ProviderProjection.WireMessage list ->
+        synchronizedTextMessages: Set<int> ->
             ProviderProjection.WireMessage list
 
     /// The owner's own call sequence survives restoration unchanged.
@@ -43,7 +44,7 @@ module TwinBijection =
 [<RequireQualifiedAccess>]
 module TwinBijectionSurface =
 
-    val restore: child: obj array -> owner: obj array -> obj array
+    val restore: child: obj array -> owner: obj array -> synchronizedTextMessages: obj array -> obj array
     val preservesOwnerOrder: child: obj array -> owner: obj array -> bool
     val introducesNothing: child: obj array -> owner: obj array -> bool
     val dropsNoSpeech: child: obj array -> owner: obj array -> bool

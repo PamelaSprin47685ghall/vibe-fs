@@ -696,7 +696,18 @@ test('WHAT[participant-identity-008] root_dispatch_uses_the_external_participant
 
   await withExecutablePlugin(async (_hooks, _directory, _createdIds, runtime) => {
     const session = 'ses_pid008_root'
-    const profile = rootProfile(session, `root-${session}`, 'engineer')
+    // Establish the durable root through the production writer before sending:
+    // a continuation may only attach to the target's own active Logical Run
+    // (interaction-authority-017). No Host session cache and no process-local
+    // binding is created here, so the profile remains the only identity source.
+    const accepted = await dispatch.acceptHumanRootSelection(
+      runtime.journal,
+      session,
+      `root-${session}`,
+      rootProfile(session, `root-${session}`, 'engineer').identitySeed,
+    )
+    assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
+    const profile = accepted.profile
     const captured = []
     const port = {
       SubscribeTerminal: () => ({ Dispose: () => {} }),

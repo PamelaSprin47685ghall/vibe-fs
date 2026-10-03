@@ -1,16 +1,22 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// File-private representation: owner and scope are visible only to the
 /// issuing gate. Keeping them in the opaque handle lets the gate retire its
 /// live-resource entry without losing typed stale-handle diagnostics.
+[<AttachMembers>]
 type private QuiescencePermitToken(owner: obj, sessionId: SessionId, serial: int64) =
     member _.Owner = owner
     member _.SessionId = sessionId
     member _.Serial = serial
+
+    member _.toJSON() : obj =
+        invalidOp "QuiescencePermit is process-local and cannot be serialized"
+
     interface QuiescencePermit
 
 /// Per-session process-local activity state. Transport status is a wake, not a

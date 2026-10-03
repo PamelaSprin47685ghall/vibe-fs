@@ -36,6 +36,12 @@ module HandleController =
         ownership: HandleOwnership ->
             Task<Result<unit, string>>
 
+    val recordWorkCompletion:
+        AgentJournalPort option -> SessionId -> AdmittedWork -> JoinableCompletion -> Task<Result<unit, string>>
+
+    val consumeWork: AgentJournalPort -> SessionId -> HandleRecord -> Task<Result<HandleRecord, HandleConsumeRejection>>
+    val abandonWork: AgentJournalPort -> SessionId -> HandleWorkId -> HandleAbandonReason -> Task<Result<unit, string>>
+
     val recordCompletion:
         journal: AgentJournalPort option ->
         parentId: SessionId ->

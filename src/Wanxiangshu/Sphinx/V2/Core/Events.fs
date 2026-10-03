@@ -172,6 +172,9 @@ module SphinxV2EventTypes =
     /// vocabulary and the codec both derive from this constant.
     let transition = "sphinx/v2-transition@1"
 
-    let all = [ transition ]
+    /// Strict explicit DTO representation; @1 bytes and identity remain frozen.
+    let strictTransition = "sphinx/v2-transition@2"
+
+    let all = [ transition; strictTransition ]
 
     let isKnown eventType = List.contains eventType all

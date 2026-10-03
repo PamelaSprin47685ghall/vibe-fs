@@ -319,26 +319,7 @@ module Projection =
     /// Covers every materialized field, including the physical bindings recovery needs.
     /// Two hosts that dispatched through different sessions differ here, which is why
     /// this hash is never offered as Host-independent.
-    let stateHash (state: InquiryState) : string =
-        let bindings =
-            state.PhysicalBindings
-            |> Map.toList
-            |> List.sortBy fst
-            |> List.map (fun (key, binding) ->
-                {| key = key
-                   work = WorkId.value binding.WorkId
-                   attempt = Attempt.value binding.Attempt
-                   dispatchIntentId = binding.DispatchIntentId
-                   physicalRef = binding.PhysicalRef
-                   receipt = binding.Receipt |})
-
-        let full =
-            {| semantic = semanticProjection state
-               physicalBindings = bindings
-               eventHead = state.EventHead |> Option.map EventId.value
-               revision = Revision.value state.Revision |}
-
-        full |> digest
+    let stateHash (state: InquiryState) : string = state |> Representation.state |> digest
 
     /// Covers the accepted canonical envelopes in their exact order. Two hosts that ran
     /// different physical retries legitimately differ here; that is the point.

@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+
+for (const kind of ['Failed', 'Aborted']) {
+  test('WHAT[delegation-027] root affinity also rejects old ' + kind + ' without a prepared handoff', async () => {
+    const owner = 'unprepared-affinity-' + kind
+    await withForkRuntime(owner, async runtime => {
+      const started = forkTool.startUnprepared(runtime, owner, 'WORK-WITHOUT-HANDOFF')
+      await forkTool.awaitPromptCount(runtime, 1)
+      assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+      assert.equal((await started).ok, true)
+      const before = forkTool.workSnapshot(runtime, owner)
+      assert.equal(before.length, 1)
+      await forkTool.emitStopForRoot(runtime, owner, 'another-work-root', kind)
+      assert.deepEqual(forkTool.workSnapshot(runtime, owner), before)
+      assert.equal(await forkTool.settle(runtime, owner, 'CURRENT-WORK-ANSWER', 'current-provider'), true)
+      const result = await forkTool.executeJoin(runtime, owner)
+      assert.match(result, /CURRENT-WORK-ANSWER/)
+      assert.doesNotMatch(result, /old work stop/)
+    })
+  })
+}
 import { toolModule, withForkRuntime } from './support/fork-runtime.mjs'
 
 test('WHAT[delegation-027] an active road rejects a new charge and becomes reusable after completion before join consumption', async () => {

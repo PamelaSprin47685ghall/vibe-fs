@@ -28,6 +28,7 @@ type StrengthReplicaBinding =
       RequestedRounds: ReadonlyRoundBudget
       SemanticDigest: string
       LocalizedMirrorMessages: ProviderProjection.WireMessage list
+      SynchronizedTextMessages: Set<int>
       ToolCapabilitySet: Set<ToolPermission> }
 
 [<RequireQualifiedAccess>]

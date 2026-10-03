@@ -222,10 +222,11 @@ module StrengthStore =
         let encodeBatch (batch: StrengthRequestBatch) =
             Encode.object
                 [ "request_ordinal", Encode.int batch.RequestOrdinal
+                  "assistant_text", Encode.list (List.map Encode.string batch.AssistantText)
                   "exchanges", Encode.list (List.map encodeExchange batch.Exchanges) ]
 
         Encode.object
-            [ "version", Encode.int 1
+            [ "version", Encode.int 2
               "digest", Encode.string bundle.Digest
               "byte_length", Encode.int bundle.ByteLength
               "batches", Encode.list (List.map encodeBatch bundle.Batches) ]
@@ -245,22 +246,29 @@ module StrengthStore =
                   CanonicalArguments = get.Required.Field "arguments" Decode.string
                   CanonicalResult = get.Required.Field "result" Decode.string })
 
-        let batchDecoder =
+        let batchDecoder version =
             Decode.object (fun get ->
                 { RequestOrdinal = get.Required.Field "request_ordinal" Decode.int
+                  AssistantText =
+                    if version = 1 then
+                        []
+                    else
+                        get.Required.Field "assistant_text" (Decode.list Decode.string)
                   Exchanges = get.Required.Field "exchanges" (Decode.list exchangeDecoder) })
 
         let decoder =
             Decode.object (fun get ->
-                get.Required.Field "version" Decode.int,
+                let version = get.Required.Field "version" Decode.int
+
+                version,
                 get.Required.Field "digest" Decode.string,
                 get.Required.Field "byte_length" Decode.int,
-                get.Required.Field "batches" (Decode.list batchDecoder))
+                get.Required.Field "batches" (Decode.list (batchDecoder version)))
 
         Encoding.UTF8.GetString content
         |> Decode.fromString decoder
         |> Result.bind (fun (version, digest, byteLength, batches) ->
-            if version <> 1 then
+            if version <> 1 && version <> 2 then
                 Error(sprintf "unsupported Strength frame payload version: %d" version)
             else
                 StrengthFrame.tryBuild sha256 batches

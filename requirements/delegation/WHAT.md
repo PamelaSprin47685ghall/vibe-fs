@@ -108,6 +108,8 @@ run-scoped Completed/Failed/Aborted 均须保留因果身份；只有 session-wi
 
 acceptance unknown 或确认超时时，保留 durable Pending 与原 PromptKey，不伪造失败、不自动重发；返回明确的 `DispatchUncertain`，说明可能已接受、不要重复委托，且不得发布为 join 等待任务。已经发生的 effect 不得被后置失败否认为“未放置”。route 的 parent frontier 只由本次 interaction 已完成的 durable fact 推进。
 
+Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 经 journal 投影可见。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。
+
 ## [027] Busy nudge 不承载新 assignment
 
 同一 logical route 同时至多一个 active work unit，忙碌时明确拒绝新 charge。BusyAgentNudge 只作既有 LogicalRun 的内部 continuation。前一 work unit 完成后即可承接下一项，不依赖 join 消费或重建 participant。

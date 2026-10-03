@@ -69,7 +69,7 @@ module Decode =
         let value = field raw name
 
         match isSafeCount value with
-        | true -> Ok(unbox<int64> value)
+        | true -> Ok(int64 (unbox<float> value))
         | false -> error "INVALID_SCHEMA" name (sprintf "field %s must be a non-negative safe integer" name)
 
     let private revisionFault (message: string) : WireError =

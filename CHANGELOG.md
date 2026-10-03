@@ -1,5 +1,36 @@
 # Changelog — 版本历史
 
+## Unreleased — 合并 upstream e1e7dd3f1
+
+- 合入四个上游提交，包含空只读Replica终态、重启后空闲DevOps Join、Predictor正文降格与往复恢复，以及Sphinx canonical持久化和MCP合同。
+- 合并保留本地Guard替代、Host就绪与判决输送修复；补齐Sphinx严格事件版本登记、原生MCP协议与opaque permit的Fable JSON拒绝，以及exact scoped子工作的加载期void。
+- 固定DevOps的空闲道路可见性、父取消后在途工作与终态结算继续按实际所有者处理；受影响测试的准入前置改用真实physical acceptance，不由裸Root或稳定handle补造工作权限。
+- 更新施工总计划、生命周期/Sphinx分册与GAP台账。具体红绿、生成输入和未完成边界见[本批同步记录](proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)；Sphinx的业务driver、现存inquiry读取DTO/trace及完整发布验收仍待完成。
+
+## Unreleased — 原工作区迁移代码编译修复
+
+- 补齐 Sphinx Representation、BodyDto、Persistence Surface 的编译登记，调整 completion codec 的声明和实现顺序；修正直接阻塞编译的局部缩进、元组、保留字、缺失声明/引用，以及类型和参数名不一致。
+- 直接在原工作区通过 Fable 构建，并验证 predictor 正文降为 reasoning、原生 reasoning 不回传、重启及子 owner 往复；未回退现有迁移或扩展同步逻辑。
+
+## Unreleased — predictor 正文降格回传与往复恢复
+
+- predictor → Main 现在回传 assistant 正文并降为 reasoning，原生 reasoning 不回传；混合工具消息与无后续请求的终止正文都纳入 frame 的持久化、校验、重放和 XTrace 覆盖。
+- 最终 Host 编码补齐模型传输坐标，防止合成 reasoning 被 Host 再转为普通正文。Main → predictor 保持普通正文与思考的原语义；已同步正文恢复原类型，合并 predictor 自身 reasoning，且不重复插入。
+- 补充往复前缀性质、重复正文次数、EventStore 重开与终止正文回归；真实 Host 验证常驻 predictor、重启重放和子 owner 的 reasoning_content 外发。
+
+## Unreleased — 修复重启后空闲伴随句柄阻塞 Manager Join
+
+- 现场根因：进程重启后，Manager 经 `horizon` 重新收养持久化的空闲 `devops` 伴随句柄时，`syncAdoptDevOps → AdoptExisting → runtime.Restore` 会新建一个 completion cell 打开、CTS 未取消的 `ChildRun`，使 `ActiveRunCount ≥ 1`，即使该句柄当前没有任何在跑任务。`HostForkJoin.parentHasJoinWork` 以 `runtime.Runtime.ActiveRunCount > 0` 短路判为有工作，Manager 的无超时 `join` 于是永久等待一个永远不会完成的幽灵运行，整条主会话挂起。
+- 修复：`parentHasJoinWork` 只在**无 journal 的纯 PTY 模式**才以进程内 `ActiveRunCount` 作为 agent 工作信号；有 journal 时真实 Host agent 运行由 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 由 journal 投影可见，重启后重新收养的空闲伴随句柄只注册身份、不误判为有工作。真实在跑的 agent 仍会经 `PendingRuns` 正确阻塞 join。
+- 回归：新增 `RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_hang`，重开同一 durable journal 后收养空闲 devops 再 `join` 必须返回 `NothingToJoin`。修复前该测试 `JOIN_HANG_DETECTED` 失败，修复后通过；完整 delegation 套件 71 通过 / 0 失败 / 22 TODO。
+
+## Unreleased — 修复只读同伴在空正文提前停止时导致的决策挂起
+
+- 现场根因：子代理（如 gate-scout）在委托只读同伴（Strength Replica）调查时，若模型在最后回合直接以 `finish='stop'` 结束且输出正文为空（仅有 step-start/step-finish 等骨架），OpenCode 的分类器会将其判定为需要交互修复的 `TurnNeedsContinuation EmptyFormalText`。
+- 由于只读同伴属于内部叶子（InternalLeaf），不享有也不执行 InteractionRepair，此前 `StrengthReplicaRuntime` 忽略了该结果，导致 completion `Task` 永不结算，决策永久卡死在 `Bound`，进而使主模型会话永远阻塞在下一次变换与 `join` 等待。
+- 现将该物理停止信号在只读同伴所有权内正确确认为决策提前结束（`TextCompleted`），并安全清理物理会话与租约；不放宽普通 Work 会话的交互修复门禁。
+- 补齐空正文提前停止、前缀证据保留、常驻副本连续复用及真实 Host 下 6 次委托（含空终止闭环）的端到端可复现回归测试。
+
 ## Unreleased — predictor 回传到主会话的映射修复
 
 - 现场 `InvalidRequestOrdinal (1, 2)` 来自第二次常驻委托：首轮工具名误成 `<tool_call>js-predictor`，Host 记录错误，次轮正常只读调用完成。筛掉首轮后仍保留材料编号 2，导致 bundle 拒绝并返回 500。现在 surviving readonly batches 连续编号，provider 请求预算仍独立记账；不放宽帧校验、不压制熔断。

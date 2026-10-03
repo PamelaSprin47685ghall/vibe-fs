@@ -38,7 +38,7 @@ module PromptAuthorityProjectionBridge =
 
     let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match PromptFactFold.fold (authorityOf projection) projection.RuntimeStartCount fact with
-        | Ok changes -> Ok(List.fold applyChange projection changes)
+        | Ok changes -> DelegationProjectionBridge.admitAuthority (List.fold applyChange projection changes) fact
         | Error rejection ->
             FoldRejection.reject
                 (PromptAuthorityFoldRejection.fact rejection)

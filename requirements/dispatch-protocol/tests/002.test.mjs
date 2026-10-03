@@ -301,7 +301,7 @@ const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurfac
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
 
 for (const newPhysicalInput of [false, true]) {
-  test(`WHAT[dispatch-protocol-002] WHAT[crash-reconciliation-006] production Manager idle dispatch ${newPhysicalInput ? 'abandons a captured permit revoked by Human physical ingress before SDK send' : 'sends with the same road and fresh captured permit'}`, async () => {
+  test(`WHAT[dispatch-protocol-002] production Manager idle dispatch (crash-reconciliation-006 compatibility) ${newPhysicalInput ? 'abandons a captured permit revoked by Human physical ingress before SDK send' : 'sends with the same road and fresh captured permit'}`, async () => {
     const base = mkdtempSync(join(tmpdir(), 'wxs-manager-idle-send-'))
     const writer = 'writer-manager-idle-send'
     let opened

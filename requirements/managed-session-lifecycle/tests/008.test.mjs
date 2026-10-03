@@ -1,4 +1,41 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+
+for (const commitment of ['before', 'after']) {
+  test('WHAT[managed-session-lifecycle-008] exact consume with ' + commitment + ' commit failure never releases an unconfirmed payload', async () => {
+    const owner = 'scope-consume-' + commitment
+    await withForkRuntime(owner, async (runtime, directory) => {
+      const a = await admit(runtime, owner, 1, 'FIRST')
+      assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
+      const withheld = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, commitment)
+      assert.equal(withheld.ok, false)
+      assert.equal(Object.hasOwn(withheld, 'workRecord'), false)
+      const state = forkTool.workSnapshot(runtime, owner)[0]
+      assert.equal(state.lifecycle, commitment === 'before' ? 'CompletedAwaitingJoin' : 'Retired')
+      await assertCold(runtime, directory, owner)
+      const next = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
+      assert.equal(next.ok, commitment === 'before')
+      if (next.ok) assert.match(next.workRecord, /FIRST-ANSWER/)
+      assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')).ok, false)
+      await assertCold(runtime, directory, owner)
+    })
+  })
+}
+
+test('WHAT[managed-session-lifecycle-008] concurrent exact consumers deliver a work at most once', async () => {
+  const owner = 'scope-concurrent-consume'
+  await withForkRuntime(owner, async runtime => {
+    const a = await admit(runtime, owner, 1, 'FIRST')
+    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
+    const outcomes = await Promise.all([
+      forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed'),
+      forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed'),
+    ])
+    assert.equal(outcomes.filter(outcome => outcome.ok).length, 1)
+    assert.match(outcomes.find(outcome => outcome.ok).workRecord, /FIRST-ANSWER/)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

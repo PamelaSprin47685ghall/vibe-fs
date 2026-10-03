@@ -589,9 +589,13 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
         const target = assistantMessage('shared-target', owner, 'shared-user', [])
         target.info.time.created = 3
         family.pushHostMessage(owner, target)
+        const outputs = [
+          { messages: [seedUser, seedAssistant] },
+          { messages: [seedUser, seedAssistant] },
+        ]
         const pending = [
-          first['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
-          second['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
+          first['experimental.chat.messages.transform']({}, outputs[0]),
+          second['experimental.chat.messages.transform']({}, outputs[1]),
         ]
         const pendingSettled = Promise.allSettled(pending)
         const physicalResponses = new Map()
@@ -616,7 +620,10 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
             { message: admission, parts: admission.parts },
           )
           const run = `response-${physical.id}`
-          const response = assistantMessage(run, replica, physical.id, [hostText('finished')])
+          const response = assistantMessage(run, replica, physical.id, [
+            { type: 'reasoning', text: 'private predictor thinking' },
+            hostText('finished'),
+          ])
           family.pushHostMessage(replica, response)
           await hooks['experimental.chat.messages.transform']({}, { messages: [
             admission,
@@ -636,7 +643,19 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
         }
         assert.equal(durableRequestedEvents(directory).length, 1)
         assert.equal(durableEventsOfType(directory, 'DelegationBound').length, 1)
-        assert.deepEqual(durableEventsOfType(directory, 'DelegationClosed').map(row => row.payload.closed_reason), ['no-material'], 'shared completion closes its one bound decision once')
+        assert.deepEqual(durableEventsOfType(directory, 'DelegationClosed'), [], 'actual terminal text is material, so shared completion does not close the decision')
+        const prepared = durableEventsOfType(directory, 'StrengthCandidatePrepared')
+        assert.equal(prepared.length, 1, 'shared consumers publish one exact material fact')
+        assert.equal(prepared[0].payload_refs.length, 1)
+        const bundle = JSON.parse(readFileSync(join(directory, '.git', 'wanxiang', 'payloads', prepared[0].payload_refs[0]), 'utf8'))
+        assert.deepEqual(bundle.batches.map(batch => ({ text: batch.assistant_text, exchanges: batch.exchanges })), [{ text: ['finished'], exchanges: [] }])
+        assert.doesNotMatch(JSON.stringify(bundle), /private predictor thinking/)
+        for (const output of outputs) {
+          const parts = output.messages.flatMap(message => message.parts)
+          assert.deepEqual(parts.filter(part => part.type === 'reasoning' && part.text === 'finished').map(part => part.text), ['finished'])
+          assert.equal(parts.some(part => part.type === 'text' && part.text === 'finished'), false)
+          assert.doesNotMatch(JSON.stringify(output), /private predictor thinking/)
+        }
         assert.equal(family.prompts.filter(prompt => prompt.path?.id === replica).length, 1, 'duplicate consumers send one resident bootstrap')
         const credits = () => ModelRouting.sharedCapacitySnapshot().custodies.filter(custody => custody.owner.sessionId === replica)
         const before = credits()

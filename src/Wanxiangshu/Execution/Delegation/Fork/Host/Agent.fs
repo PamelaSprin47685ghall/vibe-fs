@@ -336,20 +336,6 @@ module HostForkAgent =
             | Some sendAgent ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
-                let relink () =
-                    let journalPort =
-                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
-
-                    HandleController.linkNamed
-                        journalPort
-                        runtime.ParentId
-                        agentId
-                        childId
-                        sendAgent
-                        sendAgent
-                        role
-                        runtime.HandleOwnership
-
                 return!
                     HostForkChildDispatch.sendToExistingChild
                         runtime.Gate
@@ -365,7 +351,6 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -392,9 +377,10 @@ module HostForkAgent =
         (requirements: string list)
         (enrichedPrompt: string)
         : Task<Result<ForkResult, string>> =
-        match retired, existing with
-        | Some true, _ -> Task.FromResult(Error(sprintf "RetiredHandle: %s" agentId))
-        | _, Some childId ->
+        match runtime.IsCancelling, retired, existing with
+        | true, _, _ -> Task.FromResult(Error "Parent cancellation is in progress")
+        | false, Some true, _ -> Task.FromResult(Error(sprintf "RetiredHandle: %s" agentId))
+        | false, _, Some childId ->
             forkExistingChild
                 runtime
                 agentId
@@ -405,7 +391,7 @@ module HostForkAgent =
                 isFirstPrompt
                 expectedToolCalls
                 preparedHandoff
-        | _, None ->
+        | false, _, None ->
             forkNewChild
                 runtime
                 agentId
@@ -462,20 +448,6 @@ module HostForkAgent =
             match providerBynameOpt with
             | None -> return Error(sprintf "Agent handle '%s' has no provider byname" agentId)
             | Some providerByname ->
-                let relink () =
-                    let journalPort =
-                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
-
-                    HandleController.linkNamed
-                        journalPort
-                        runtime.ParentId
-                        agentId
-                        childId
-                        agentName
-                        providerByname
-                        role
-                        runtime.HandleOwnership
-
                 runtime.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
                 let! enriched = resolveReuseEnrichedPrompt runtime prompt renderedPrompt
 
@@ -494,7 +466,6 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -755,11 +726,12 @@ module HostForkAgent =
                 let existing = this.ReusableChildOrAdopt agentId
                 let active = lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
 
-                match active, abandoned, existing with
-                | true, _, _ -> return Error(sprintf "Agent already has an active assignment: %s" agentId)
-                | _, Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
-                | _, _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                | _, _, Some(childId, wasDormant) ->
+                match this.IsCancelling, active, abandoned, existing with
+                | true, _, _, _ -> return Error "Parent cancellation is in progress"
+                | false, true, _, _ -> return Error(sprintf "Agent already has an active assignment: %s" agentId)
+                | false, _, Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
+                | false, _, _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
+                | false, _, _, Some(childId, wasDormant) ->
                     return!
                         reuseLiveChild
                             this

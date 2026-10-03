@@ -107,7 +107,11 @@ test('WHAT[execution-model-routing-012] admission lease is opaque and projects o
   const lease = await acquire(runtime)
 
   assert.deepEqual(routing.executionAdmissionTarget(runtime, lease), target())
-  assert.equal(JSON.stringify(lease), '{}', 'the process capability has no serializable identity or capacity fields')
+  assert.throws(
+    () => JSON.stringify(lease),
+    /ExecutionAdmissionToken is process-local and cannot be serialized/,
+    'the live process capability must refuse native JSON serialization',
+  )
   assert.deepEqual(routing.commitExecutionAdmission(runtime, {}, identity()), { kind: 'StaleFence' })
 })
 test('WHAT[execution-model-routing-012] admission lease permits one terminal transition and idempotent duplicate', async () => {

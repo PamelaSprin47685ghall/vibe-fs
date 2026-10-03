@@ -56,6 +56,17 @@ export const acceptRun = (state, { child = 'child', agent = 'engineer', parent =
     const issued = authority.issueInheritedIdentitySeed(agent, owner)
     assert.equal(issued.ok, true, issued.error)
     profile = createRoot(child, 'AgentOwnerRoot', issued.value)
+    const accepted = JSON.parse(codec.encode(rootFact(profile)))[1][1][1]
+    const promptKey = id('PromptKey', `load-${child}`)
+    fold(state, canonical('Prompt', 'PluginPromptClaimed', {
+      PromptKey: promptKey, SessionId: accepted.SessionId, ContinuationKind: 'AgentOwnerRoot',
+      LogicalRunId: null, AuthorityRootUserMessageId: null, IdentitySeed: accepted.IdentitySeed,
+      PayloadDigest: `load-payload-${child}`,
+    }))
+    fold(state, canonical('Prompt', 'PluginPromptPhysicalAccepted', {
+      PromptKey: promptKey, SessionId: accepted.SessionId,
+      PhysicalUserMessageId: id('PhysicalUserMessageId', profile.authorityRoot),
+    }))
   }
   fold(state, rootFact(profile))
   return profile

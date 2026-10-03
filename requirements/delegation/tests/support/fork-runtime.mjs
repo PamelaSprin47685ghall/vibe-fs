@@ -22,7 +22,7 @@ export async function withForkRuntime(owner, run) {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-delegation-fork-'))
   const runtime = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
   try {
-    return await run(runtime)
+    return await run(runtime, directory)
   } finally {
     forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })

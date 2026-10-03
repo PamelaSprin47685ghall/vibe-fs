@@ -4,6 +4,7 @@ import * as roles from '../../../dist/Foundation/RolesSurface.js'
 import * as recovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
 import { fold, link, acceptRun, terminal, canonical, materialized, abandoned } from './support/load-projection.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 
 test('WHAT[crash-reconciliation-020] current role vocabulary includes DevOps and Engineer but excludes legacy Coder', () => {
   assert.ok(roles.allRoleLabels.includes('devops'))
@@ -42,10 +43,10 @@ test('WHAT[crash-reconciliation-020] production load decision voids active child
     assert.equal(recovery.childView(state, 'parent', 'child').activeRun, child.logicalRun)
     const settlements = recovery.childSettlements(state)
     assert.equal(settlements.length, 1)
-    assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildRunVoided')
+    assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildWorkVoided')
     fold(state, settlements[0])
     assert.deepEqual(recovery.childView(state, 'parent', 'child'), {
-      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 1,
+      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 0,
     })
     assert.deepEqual(recovery.childSettlements(state), [])
     assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
@@ -111,6 +112,8 @@ const withDurableChildRuns = async (body) => {
     await reopen()
     const parent = await dispatch.acceptHumanRootSelection(handle, 'parent', 'root-parent', managerRootSelection)
     assert.equal(parent.ok, true, JSON.stringify(parent.error))
+    const profiles = new Map()
+    const port = hostPort(async () => dispatch.admittedWithReceipt('load-child-receipt'))
     for (const agent of ['engineer', 'devops']) {
       const linked = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: 'parent' }, null, {
         family: 'Execution', case: 'HandleLinked', payload: {
@@ -121,11 +124,14 @@ const withDurableChildRuns = async (body) => {
       assert.equal(linked.ok, true, JSON.stringify(linked.error))
       const seed = authority.issueInheritedIdentitySeed(agent, parent.profile)
       assert.equal(seed.ok, true, seed.error)
-      const accepted = await dispatch.appendAuthorityRoot(handle, agent, seed.value)
+      const sent = await dispatch.sendAgentOwnerRootAwait(port, handle, agent, `WORK-${agent}`, seed.value)
+      assert.equal(sent.ok, true, sent.error)
+      const accepted = await dispatch.acceptAgentOwnerRoot(handle, agent, sent.key, `physical-${agent}`)
       assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+      profiles.set(agent, accepted.profile)
     }
     // Reopen the actual writer before settlement; this does not simulate plugin activation or an OS crash.
-    await body({ handle: await reopen(), commonDir, reopen, dispatch })
+    await body({ handle: await reopen(), commonDir, reopen, dispatch, profiles })
   } finally {
     if (handle !== undefined) journal.JournalSurface_dispose(handle)
     rmSync(directory, { recursive: true, force: true })
@@ -149,10 +155,10 @@ const durableEvents = async (commonDir) => {
 }
 
 integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists voids across journal reopen without a completion', async () => {
-  await withDurableChildRuns(async ({ handle, commonDir, reopen, dispatch }) => {
+  await withDurableChildRuns(async ({ handle, commonDir, reopen, dispatch, profiles }) => {
     const before = new Set((await durableEvents(commonDir)).map(event => event.event_id))
     for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(handle, child).activeLogicalRun.logicalRun, `run-${child}`)
+      assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child))
     }
     await recovery.settleChildRuns(handle)
     for (const child of ['engineer', 'devops']) {
@@ -164,9 +170,13 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists
     const settlements = added.filter(fact => fact[0] === 'Agent')
     assert.equal(settlements.length, 2, 'settlement appends only the two void facts, never a completion')
     for (const child of ['engineer', 'devops']) {
-      assert.deepEqual(settlements.find(fact => fact[1]?.[1]?.[1]?.ChildSessionId?.[1] === child), [
-        'Agent', ['Execution', ['ChildRunVoided', {
-          ParentSessionId: ['SessionId', 'parent'], ChildSessionId: ['SessionId', child],
+      assert.deepEqual(settlements.find(fact => fact[1]?.[1]?.[1]?.Work?.ChildSessionId?.[1] === child), [
+        'Agent', ['Execution', ['ChildWorkVoided', {
+          ParentSessionId: ['SessionId', 'parent'], Work: {
+            Handle: ['Agent', ['AgentHandleId', `work-${child}`]],
+            ChildSessionId: ['SessionId', child],
+            AuthorityRoot: ['AuthorityRootUserMessageId', profiles.get(child).authorityRoot],
+          },
         }]],
       ])
     }

@@ -13,4 +13,3 @@
 /src/Wanxiangshu/Repository/Investigation/WarmStart/**
 /src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs
 /scripts/checks/provider-leak-gate.mjs
-/requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs

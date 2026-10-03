@@ -1,6 +1,66 @@
 import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as recovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
+import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import { withJournal, acceptOwner, hostPort } from '../../interaction-authority/tests/support/authority.mjs'
+
+test('WHAT[crash-reconciliation-018] canonical load settlement voids the exact admitted child work and preserves its stable road for explicit new work', async () => {
+  await withJournal('scoped-child-load', async (initial, reopen, directory) => {
+    const parent = 'load-parent'
+    const child = 'load-child'
+    const owner = await acceptOwner(initial, parent)
+    const linked = await journal.JournalSurface_appendAgent(initial, { kind: 'Session', session: parent }, null, {
+      family: 'Execution', case: 'HandleLinked', payload: {
+        ParentSessionId: parent, ChildSessionId: child, Handle: 'agent:load-engineer',
+        TargetAgent: 'engineer', Byname: 'Ada', CanonicalRole: 'engineer', Ownership: 'DurableParentHandle',
+      },
+    })
+    assert.equal(linked.ok, true, JSON.stringify(linked.error))
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner)
+    assert.equal(seed.ok, true, seed.error)
+    let sends = 0
+    const port = hostPort(async () => {
+      sends += 1
+      return dispatch.admittedWithReceipt(`load-receipt-${sends}`)
+    })
+    const first = await dispatch.sendAgentOwnerRootAwait(port, initial, child, 'WORK-A', seed.value)
+    assert.equal(first.ok, true, first.error)
+    const acceptedA = await dispatch.acceptAgentOwnerRoot(initial, child, first.key, 'physical-work-A')
+    assert.equal(acceptedA.ok, true, acceptedA.error)
+    const [workA] = await forkTool.coldWorkSnapshot(directory, parent)
+    assert.equal(workA.lifecycle, 'Active')
+    const current = await reopen()
+    await recovery.settleChildRuns(current)
+    assert.equal(dispatch.projectionObservation(current, child).activeLogicalRun, null)
+    const after = await forkTool.coldWorkSnapshot(directory, parent)
+    assert.equal(after.length, 1)
+    assert.deepEqual(after[0], { ...workA, lifecycle: 'Retired' })
+    assert.equal(after[0].completionRef, undefined)
+    assert.equal(after[0].completionDigest, undefined)
+    assert.equal(sends, 1, 'load settlement never replays the interrupted assignment')
+    await recovery.settleChildRuns(current)
+    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, parent), after)
+    const second = await dispatch.sendAgentOwnerRootAwait(port, current, child, 'WORK-B', seed.value)
+    assert.equal(second.ok, true, second.error)
+    const acceptedB = await dispatch.acceptAgentOwnerRoot(current, child, second.key, 'physical-work-B')
+    assert.equal(acceptedB.ok, true, acceptedB.error)
+    const works = await forkTool.coldWorkSnapshot(directory, parent)
+    assert.equal(works.length, 2)
+    assert.equal(works.find(work => work.root === workA.root).lifecycle, 'Retired')
+    const workB = works.find(work => work.root !== workA.root)
+    assert.equal(workB.lifecycle, 'Active')
+    assert.equal(workB.handle, workA.handle)
+    assert.equal(workB.child, workA.child)
+    assert.equal(workB.targetAgent, workA.targetAgent)
+    assert.equal(workB.byname, workA.byname)
+    assert.equal(sends, 2, 'only the explicit new assignment sends after load settlement')
+  })
+})
 
 {
 const { default: assert } = await import('node:assert/strict')

@@ -43,6 +43,7 @@
 |---|---|
 | [requirements 语义合并审查](2026-10-03/requirements-语义合并审查-2026-09-30.md) | 记录收紧条款及测试恢复的提交与验证 |
 | [resources 语义合并审查](2026-10-03/resources-语义合并审查-2026-09-30.md) | 只做调查，未修改资源；P1 修复建议和 P3 去留建议未在本次整理中核实或关闭 |
+| [Upstream e1e7dd3f1同步](2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md) | 从faae4a602合入四个提交，保留双方修复；记录Sphinx、Predictor及scoped delegation兼容红绿和有限证明范围 |
 
 ### 基线证据与缺档
 

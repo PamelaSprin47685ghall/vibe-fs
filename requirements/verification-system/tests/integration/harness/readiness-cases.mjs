@@ -21,10 +21,14 @@
  * failure here instead of a suite-wide hang whose cause is nowhere near its symptom.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
-import { assertEq, assertTrue } from './lib.mjs';
+import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { ReadinessLadder, READINESS_STAGES } from '../../e2e/support/readiness.js';
 import { CANARY_READY_MS, READINESS_STAGE_MS } from '../../e2e/support/time-budget.js';
 
@@ -81,7 +85,68 @@ const climb = (stageNames) => {
 
 const allStageNames = READINESS_STAGES.map((stage) => stage.name);
 
+const execFileAsync = promisify(execFile);
+
+async function processHostDiagnosticChannels(mode) {
+  const scenarioDir = tmpScenarioDir();
+  const executable = join(scenarioDir, 'fake-host.mjs');
+  writeFileSync(executable, `#!${process.execPath}
+import http from 'node:http';
+const server = http.createServer((request, response) => {
+  response.setHeader('content-type', 'application/json');
+  if (request.url === '/global/health') {
+    response.end(JSON.stringify({ healthy: true }));
+  } else if (request.url === '/path') {
+    response.end(JSON.stringify({ home: process.env.HOME, state: process.env.XDG_STATE_HOME,
+      config: process.env.XDG_CONFIG_HOME, worktree: process.cwd(), directory: process.cwd() }));
+  } else {
+    response.writeHead(404).end();
+  }
+});
+process.stdout.write('Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.\\n');
+server.listen(0, '127.0.0.1', () => {
+  process.stdout.write('opencode server listening on http://127.0.0.1:' + server.address().port + '\\n');
+});
+`, { mode: 0o755 });
+  const hostModule = new URL('../../e2e/support/process-host.js', import.meta.url).href;
+  const subject = `
+import { ProcessHost } from ${JSON.stringify(hostModule)};
+const host = new ProcessHost();
+const phases = [];
+try {
+  await host.start({ scenarioDir: ${JSON.stringify(scenarioDir)}, providerUrl: 'http://127.0.0.1:1/v1',
+    pluginPaths: [${JSON.stringify(executable)}], onProgress: phase => phases.push(phase) });
+} finally {
+  await host.stop();
+}
+process.stdout.write(JSON.stringify({ phases, hostOutputCaptured: host.stdoutLog.includes('opencode server listening'),
+  released: host.pid === null }) + '\\n');
+`;
+  try {
+    const { stdout, stderr } = await execFileAsync(process.execPath, ['--input-type=module', '-e', subject], {
+      env: { ...process.env, OPENCODE_BIN: executable, CANARY_VERBOSE: '', DEBUG: '', [mode]: '1' },
+    });
+    assert.doesNotMatch(stdout, /\[host\.start\]|opencode server listening|OPENCODE_SERVER_PASSWORD/,
+      `${mode} diagnostics must not enter the caller's protocol stdout`);
+    const result = JSON.parse(stdout);
+    assert.deepEqual(result.phases, ['bootstrapped', 'listening', 'global-healthy', 'project-events', 'healthy']);
+    assert.equal(result.hostOutputCaptured, true, 'the real Host stdout remains available in its diagnostic ring');
+    assert.equal(result.released, true, 'the actual child and socket have passed ProcessHost cleanup');
+    assert.match(stderr, /\[host\.start\] bootstrap observed/);
+    assert.match(stderr, /\[host\.start\] _waitForListening took \d+ms/);
+    assert.match(stderr, /\[host\.start\] _waitForGlobalHealth took \d+ms/);
+    assert.match(stderr, /\[host\.start\] project event source observed/);
+    assert.match(stderr, /\[host\.start\] _waitForHealth took \d+ms/);
+  } finally {
+    rmSync(scenarioDir, { recursive: true, force: true });
+  }
+}
+
 export const readinessCases = [
+  ...['CANARY_VERBOSE', 'DEBUG'].map(mode => ({
+    name: `WHAT[verification-system-005] ProcessHost ${mode} startup diagnostics preserve protocol stdout and report progress on stderr`,
+    fn: () => processHostDiagnosticChannels(mode),
+  })),
   {
     name: 'verification-system-004 the ladder stages are ordered the way production prints them',
     fn: () => {
