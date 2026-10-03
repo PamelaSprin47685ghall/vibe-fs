@@ -12,3 +12,7 @@ type IEventStore =
     abstract TryHeads: streamId: EventStreamId -> EventId list
     abstract TryHead: streamId: EventStreamId -> EventId option
     abstract AllHeads: unit -> EventId list
+    /// Fold durable facts committed by any writer since this instance's last
+    /// read into the canonical Current. Read-only refresh for arbitration
+    /// reads; append cost stays independent of history (durable-events-017).
+    abstract ReloadLocal: unit -> Result<unit, string>

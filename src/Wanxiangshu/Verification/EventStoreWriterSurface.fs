@@ -30,6 +30,7 @@ module EventStoreWriterSurface =
             member _.TryHeads _ = []
             member _.TryHead _ = None
             member _.AllHeads() = []
+            member _.ReloadLocal() = Ok()
 
     let private writerFact (sessionId: SessionId) =
         Fact.Agent(CompanionFact.CompanionBloggerClosed {| SessionId = sessionId |})

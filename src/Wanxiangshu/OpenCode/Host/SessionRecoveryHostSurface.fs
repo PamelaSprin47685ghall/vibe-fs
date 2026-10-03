@@ -388,6 +388,7 @@ module SessionRecoveryHostSurface =
 
             member _.Release() = inner.Release()
             member _.ReleaseAsync() = inner.ReleaseAsync()
+            member _.RefreshCurrent() = inner.RefreshCurrent()
 
     /// managed-chat-execution-006: boot the same real recovery host over a real
     /// on-disk journal whose writer passes Terminal appends through a controlled

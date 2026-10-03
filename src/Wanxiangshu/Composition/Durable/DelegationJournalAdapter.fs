@@ -18,6 +18,7 @@ module DelegationJournalAdapter =
                     | Ok _ -> return Ok()
                     | Error failure -> return Error(JournalAppendFailure.describe failure)
                 }
+          RefreshProjection = fun () -> AgentJournal.refreshCurrent journal
           HandleProjection = fun sessionId -> AgentJournal.handleProjection journal sessionId
           ReadBlob = fun blobRef -> journal.Writer.BlobWriter.Read blobRef
           WriteBlob =

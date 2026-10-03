@@ -459,3 +459,4 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         member this.Append stream providerRun fact = this.Append stream providerRun fact
         member this.Release() = this.Release()
         member this.ReleaseAsync() = this.ReleaseAsync()
+        member this.RefreshCurrent() = store.ReloadLocal()

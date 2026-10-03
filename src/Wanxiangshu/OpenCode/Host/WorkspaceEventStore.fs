@@ -59,7 +59,8 @@ module WorkspaceEventStore =
             member _.TryEvent(eventId) = active.Value.TryEvent eventId
             member _.TryHeads(streamId) = active.Value.TryHeads streamId
             member _.TryHead(streamId) = active.Value.TryHead streamId
-            member _.AllHeads() = active.Value.AllHeads() }
+            member _.AllHeads() = active.Value.AllHeads()
+            member _.ReloadLocal() = active.Value.ReloadLocal() }
 
     let acquire (commonDir: string) : IEventStore =
         if String.IsNullOrWhiteSpace commonDir then

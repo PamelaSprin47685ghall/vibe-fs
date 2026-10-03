@@ -75,12 +75,14 @@ const FOCUSED_RUNTIME_SHARDS = [
 // obligationsurface 305, durable-runtime-surface 352,
 // opencode-host-workspaceeventstore 529, opencode-host-
 // turnruntimepreparation 528) — recorded in the package README.
-// authority-runtime-surface is likewise held out of the set, but for a
-// different reason: its flat compile is red on five out-of-closure
-// namespace opens (Child.fs / CompletedTurn.fs), and mechanically
-// repairing those edges balloons the closure from 118 to 251 sources,
-// breaking the 185 focused-runtime ratchet (delegation WHAT-028). The
-// honest state is the explicit todo below, not a red positive.
+// authority-runtime-surface joined the set (2026-10-04,
+// shard-regrouping card) after its five out-of-closure namespace opens
+// were resolved as dead opens: Child.fs / CompletedTurn.fs reference no
+// symbol from Change, Context.Trace, Enforcer (incl. Enforcer.Guidance),
+// Execution.Fission, or Persistence.EventStore, so deleting those open
+// lines is a zero-behavior structural fix. The closure stays at 118
+// production sources — inside the 185 focused-runtime ratchet (delegation
+// WHAT-028) — with no ProjectReference edge added.
 const EXTENDED_CONTRACT_LOCALITIES = [
   'interaction-authority-fold',
   'execution-session-syncdelegaterole',
@@ -89,23 +91,11 @@ const EXTENDED_CONTRACT_LOCALITIES = [
 const EXTENDED_FOCUSED_RUNTIME_LOCALITIES = [
   'interaction-authority-fact',
   'interaction-authority-ledger',
+  'authority-runtime-surface',
   'dispatch-runtime',
   'context-companion-fold',
   'persistence-journal-agentjournal',
 ]
-
-// Manager ruling 2026-10-04: the authority-runtime-surface flat positive
-// moves from red to this explicit todo. Flat compile exposes five
-// out-of-closure namespace opens (Change, Context.Trace, Enforcer,
-// Execution.Fission, Persistence.EventStore — Child.fs /
-// CompletedTurn.fs), but mechanically repairing those edges grows the
-// closure 118 -> 251 production sources, breaking the delegation
-// WHAT-028 focused-runtime ratchet of 185 (enforcer-codec alone closes
-// at 198, the Enforcer.Guidance shard at 357). The real fix is shard
-// regrouping — splitting or sinking the heavy dependencies of
-// Interaction/Authority/Child.fs and Interaction/Repair/CompletedTurn.fs —
-// tracked as a backlog card for Manager scheduling.
-test.todo('WHAT[durable-events-022] authority-runtime-surface flat compile pending shard regrouping')
 
 const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'eventstore-model-contract',

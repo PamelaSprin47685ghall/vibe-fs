@@ -159,6 +159,7 @@ module LoadRecoverySurface =
                   HandleProjection = fun session -> handlesOf state (SessionId.value session)
                   ReadBlob = fun _ -> Task.FromResult(Error "fixture has no completion body")
                   WriteBlob = fun _ -> Task.FromResult(Error "fixture does not write blobs")
+                  RefreshProjection = fun () -> Ok()
                   Sha256 = fun _ -> invalidOp "fixture does not hash blobs" }
 
             match!

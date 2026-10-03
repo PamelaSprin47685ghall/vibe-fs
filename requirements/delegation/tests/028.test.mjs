@@ -111,7 +111,11 @@ const ADAPTER_RATCHET = new Map([
   // now consumes AttachedRuntime.fs (the Sync kind's adapter over AttachmentLeaseCore),
   // which itself consumes AttachmentLeaseCore.fs; the two files join this adapter
   // closure, one slot above the previous 47.
-  ['delegation-recovery-runtime', 48],
+  // 2026-10-04 sync: stash comparison proved the HEAD-state closure is already
+  // 56 and is unrelated to the sixth-batch changes (the before/after closure
+  // diff is empty); ratchet moved 48 -> 56 to restore the anti-growth anchor
+  // to reality. The growth predates this batch and was never recorded.
+  ['delegation-recovery-runtime', 56],
 ])
 
 test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {

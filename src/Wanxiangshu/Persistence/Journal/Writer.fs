@@ -33,3 +33,6 @@ type IJournalWriter =
     /// interface so Fable does not collide with System.IDisposable.Dispose.
     abstract Release: unit -> unit
     abstract ReleaseAsync: unit -> ValueTask
+    /// Re-fold durable writer files into this writer's store so projection
+    /// reads reflect facts other journal instances committed. Read-only.
+    abstract RefreshCurrent: unit -> Result<unit, string>

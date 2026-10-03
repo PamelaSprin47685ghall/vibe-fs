@@ -276,10 +276,18 @@ module HandleController =
         | _ -> None
 
     let private confirmConsumption (journal: AgentJournalPort) parentId work consumptionId record =
-        match HandleProjection.tryWork work (journal.HandleProjection parentId) with
-        | Some consumed when consumed.ConsumptionId = Some consumptionId -> Ok record
-        | Some { Lifecycle = Retired } -> Error AlreadyRetired
-        | _ -> Error(AppendFailed "exact consumption receipt was not confirmed")
+        // Durable arbitration (managed-session-lifecycle-013): the receipt is
+        // confirmed against the durable fold, never against this instance's
+        // possibly-stale in-memory projection. A second consumer whose append
+        // raced a first tombstone finds the first ConsumptionId in the fold and
+        // is refused instead of delivering a second payload.
+        match journal.RefreshProjection() with
+        | Error reason -> Error(AppendFailed reason)
+        | Ok() ->
+            match HandleProjection.tryWork work (journal.HandleProjection parentId) with
+            | Some consumed when consumed.ConsumptionId = Some consumptionId -> Ok record
+            | Some { Lifecycle = Retired } -> Error AlreadyRetired
+            | _ -> Error(AppendFailed "exact consumption receipt was not confirmed")
 
     let private appendConsumption (journal: AgentJournalPort) parentId work (cell: HandleCompletion) record =
         task {
@@ -302,11 +310,18 @@ module HandleController =
         }
 
     let private consumeAdmittedWork (journal: AgentJournalPort) parentId work record =
-        match HandleProjection.tryWork work (journal.HandleProjection parentId), consumptionCell record with
-        | Some { Lifecycle = Retired }, _ -> Task.FromResult(Error AlreadyRetired)
-        | None, _ -> Task.FromResult(Error(NotJoinable WorkNotAdmitted))
-        | _, None -> Task.FromResult(Error(NotJoinable NotCompleted))
-        | Some _, Some cell -> appendConsumption journal parentId work cell record
+        // Durable arbitration (managed-session-lifecycle-013): refresh the fold
+        // from disk before deciding, so a tombstone another journal instance
+        // committed (a cold consumer, a restarted process) is visible here and
+        // the consume is refused before a second append or delivery.
+        match journal.RefreshProjection() with
+        | Error reason -> Task.FromResult(Error(AppendFailed reason))
+        | Ok() ->
+            match HandleProjection.tryWork work (journal.HandleProjection parentId), consumptionCell record with
+            | Some { Lifecycle = Retired }, _ -> Task.FromResult(Error AlreadyRetired)
+            | None, _ -> Task.FromResult(Error(NotJoinable WorkNotAdmitted))
+            | _, None -> Task.FromResult(Error(NotJoinable NotCompleted))
+            | Some _, Some cell -> appendConsumption journal parentId work cell record
 
     let consumeWork
         (journal: AgentJournalPort)
