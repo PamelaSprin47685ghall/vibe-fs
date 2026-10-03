@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — 程序无返回值不再击穿沙箱
+
+- 现场：`js-predictor` 程序只 `console.log`、没有 `return`，沙箱报 `PROGRAM_FAILED: undefined is not an object (evaluating 'json.startsWith')`。根因：`JSON.stringify(undefined)`（及函数、Symbol）返回 `undefined` 而非字符串，`decodeRunResult` 对它调用 `StartsWith`。现在包装器在序列化结果不是字符串时与循环引用同样返回 `INVALID_RETURN_VALUE`，符合 repository-programming WHAT[011]。
+- 回归：`repository-programming/tests/011` 覆盖缺省返回、`return undefined`、函数与 Symbol。
+
 ## Unreleased — Replica 请求不得以 model turn 结尾
 
 - Gemini Cloud Code Assist 拒绝以 model turn 结尾的请求（400 `Requests ending with a model turn are not supported`）。Replica 的镜像加本决策已完成批次总以 assistant 行结尾；`StrengthReplicaTransform` 在写回 Host 前，若末行为 assistant，则追加一条 user 行，正文为与启动时相同的 `delegation/readonly-investigation` 提示。该行 id 由 session 与末行 id 派生，重复 transform 字节一致；末行已是 user 时不追加。
