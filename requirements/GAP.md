@@ -154,7 +154,7 @@
 | GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；006新增成功零setter仍推进maintenance基线、completion不变、重开不重复维护及下次精确差分，阻止推进的隔离生产变异被击红。终结自动归档、全部工具访问、真实仓库权限拒绝、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。权限调查只静态定位到共享JsSandbox注入宿主对象的边界，未运行实际越权探针；既不能据此宣称越权成立，也不能把prompt/schema当拒绝证据。删除假维护接口，不补空实现凑绿。 |
 | GAP-161 | knowledge-reuse-005/015/016 | CLOSED | 实际fetch读取不可变旧payload并验证完整UTF-8字节/hash，一次目标捕获同时形成真实多hunk diff与待提交基线；B→C捕获后物理文件变D，本次仍保存C、下次才比较C→D。先红反例覆盖旧hash冒充正文、二次读取、无关Git变化、不变中段泄漏、BOM丢失和旧payload损坏；225对独立小域oracle核对最小增删及重建。隔离Fable构建与关键正式回归通过。非法UTF-8拒绝，历史已丢BOM不自动恢复；本条不关闭GAP-160的归档、权限、并发副本和完整预算义务。 |
 | GAP-180 | institutional-learning | PARTIAL | 真插件收据、冻结消费和重开有证据；Enhancer次数、完整BIRTH、学习闭合前不消费、各故障零部分效果仍缺证。 |
-| GAP-181 | institutional-learning-002—006 | OPEN | 当前evaluator仅按规则名匹配ABSORB，否则DISCARD；通用机制提炼、BIRTH、准入和revision重评尚未实现，不能以保守舍弃当作完整学习能力。 |
+| GAP-181 | institutional-learning-002—006 | PARTIAL | b7768f478新增调用方candidate的机械准入、BIRTH事实/投影与纯revision重评分支。尚不满足WHAT003的限定输入与机制提炼，非空trigger/negative不证明长期价值/注意力成本。生产Append无expectedRevision门禁，Born与Committed分两次追加：第二次失败已产生规则且没有冻结收据，重试可转ABSORB/DISCARD，并非零半状态。Born只在学习工具私有liveRules合流，未进入统一Blogger prompt/chronicle索引。003/005原语义TODO与008故障/并发义务保留，不采用上游CLOSED自述。 |
 | GAP-182 | institutional-learning-008 | PARTIAL | 合同要求LearningDispositionCommitted与必要DeferredWorkResurfaced同批；实际单事实携带消费ID并原子投影。需裁决是否允许完整单事实承载，不为实现方便删义务。 |
 | GAP-183 | speculative-investigation | PARTIAL | Policy/Frame/coordinator/EventStore真实局部证据保留；Host K+1外发、Off/K0等价、模糊提交阻断、XTrace闭环与真实semantic cut→结算→fatal仍缺证。旧C01已无实际fatal subject，转入31历史；真实composition F17保留，不用006成功写入/重开充数。e1e7dd3f1新增正文降为reasoning、排除原生reasoning及往复恢复；013共享回归保留单次bootstrap与两消费者。真实Host结果见本批同步记录，模型切换传输坐标还需独立场景；旧DryRun签名错配仅属前次迁移基线。 |
 | GAP-184 | speculative-investigation-002 | PARTIAL | 旧白名单coder/inspector/devops/inquiry与现活跃身份冲突，实际策略允许Engineer；失败TODO保留，活跃Engineer/DevOps及历史解码范围须统一后改合同。 |
@@ -194,7 +194,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-074 | capability-enforcement-001/013/014/017/018 | PARTIAL | 一次性permit与消费→释放→再消费仍有合同分岔；manifest和全链authority证明未闭合。 |
 | GAP-075 | capability-enforcement | PARTIAL | 025观察点已前置：正常准入经before→execute→after读取文件，计数器观察到一次注册工具调用；assessment的已知提交验证revision会推进。拒绝分支只调用before，证明参数、注册工具调用次数及该journal已发布revision不变；revision只观察成功提交的发布，不能代替物理读写尝试计数。完整生产调用的零物理I/O与真实并发overlap均保留TODO；026零durable append及跨进程能力隔离仍待证。 |
 | GAP-076 | cognitive-environment | PARTIAL | 资源组装不证明认知纪律、职责和完整双语语义；关键词伪证明已撤，有限材料审阅及真实行为仍须补齐。 |
-| GAP-077 | cognitive-environment-015 | OPEN | Blogger临时提示仍内联，白名单、重复注入、历史不变和真实Host路径缺证；不以源码词形计入通过。 |
+| GAP-077 | cognitive-environment-015 | PARTIAL | b7768f478迁移双语Blogger提示资源并增加实际maybeInject Surface：真实canonical journal/committed model lease上的白名单命中与未命中、同一output重复注入、磁盘字节不变与英文绑定有有限证明。direct Surface不替代registered Host transform/provider路径，journal不写也不证明下一请求历史不污染；这些实际入口与跨请求义务仍未闭合，不能据五项局部行为与静态扫描记CLOSED。 |
 | GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |
 | GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
 | GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
@@ -236,3 +236,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
 | GAP-223 | Host自动Manager接续与新用户消息交错；host-boundary-033、execution-model-routing、managed-chat-execution、dispatch-protocol | CLOSED | 2026-10-03新H先持久Accepted并取得容量owner的exact Admitted/Queued准入，再持久结算旧G并排空物理attempt，之后才允许H的Host保存/provider effect；排队H可被J替代，QueueFull拒绝保全G，取消失败/未知提交只处理exact资源。实际ManagerWorkflow拒绝旧idle许可且零SDK发送；旧coarse abort/idle不撤新输入。OpenCode1.18.29六个独立Host场景覆盖暂停transform、实际provider及H接受后J交错，在默认/单槽容量均验证新回答身份、G/H持久终态和零错误ProviderRetry。最终integration35文件376 pass/0 fail/15 TODO，文件排空及清理accepted=true；入口因TODO退出1。证明与正式红例见[交付记录](../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。GAP-139的无assistant/boot sweep与T180不在关闭范围。 |
+
+## 2026-10-03：upstream b7768f478 增量
+
+上游提交自报全量unit为3706 pass、0 fail；这只说明其提交记录，不是本地合并后的证书。两次普通merge保留上游历史，按现行WHAT保全本地exact准入与墓碑：不接受raw link复活、无scope新abandon、child-only closure、pending claim放行或固定busy DevOps的伪终态。Sphinx保留严格Revision/native MCP，vocabulary改引用Core的@1/@2清单。新增BIRTH/Blogger部分分别记GAP-181/077 PARTIAL。原始结果、具体冲突裁决和本地重新验收见[增量记录](../proposals/archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。

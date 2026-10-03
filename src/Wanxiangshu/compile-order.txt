@@ -1466,6 +1466,8 @@ OpenCode/Plugin/PluginRecoveryWiring.fsi
 OpenCode/Plugin/PluginRecoveryWiring.fs
 OpenCode/Host/BloggerChronicleText.fsi
 OpenCode/Host/BloggerChronicleText.fs
+OpenCode/Host/BloggerChronicleSurface.fsi
+OpenCode/Host/BloggerChronicleSurface.fs
 OpenCode/Plugin/PluginTransforms.fsi
 OpenCode/Plugin/PluginTransforms.fs
 OpenCode/Host/PluginTransformSurface.fsi

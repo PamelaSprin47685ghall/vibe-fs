@@ -14,15 +14,80 @@ module InstitutionalEnhancer =
         |> String.concat "\u001e"
         |> HostDigest.sha256Hex
 
-    /// One bounded evaluation.  The conservative live implementation may
-    /// absorb an experience into an explicitly named existing rule; otherwise
-    /// it discards rather than inventing a permanent bilingual rule from
-    /// insufficient evidence.  BIRTH remains a typed disposition for a future
-    /// candidate that passes the behavior-diagnosis admission boundary.
-    let evaluate (experience: string) (rules: EnforcerRule list) : LearningDisposition =
-        let lower = experience.ToLowerInvariant()
+    let private nonEmpty (value: string) =
+        not (isNull value) && value.Trim().Length > 0
 
-        rules
-        |> List.tryFind (fun rule -> lower.Contains(rule.Name.ToLowerInvariant(), StringComparison.Ordinal))
-        |> Option.map (fun rule -> LearningDisposition.Absorb rule.Name)
-        |> Option.defaultValue (LearningDisposition.Discard "no-reusable-mechanism")
+    /// Mechanical admission boundary for a BIRTH candidate: unique TipName in
+    /// the live rule set and complete bilingual leaf text with trigger and
+    /// negative/distinction. Semantic abstraction (novelty, long-term value)
+    /// stays with the caller; this check only refuses mechanically
+    /// inadmissible candidates.
+    let candidateAdmissible (candidate: BirthCandidate) (rules: EnforcerRule list) =
+        nonEmpty candidate.TipName
+        && nonEmpty candidate.EnforcerTextEn
+        && nonEmpty candidate.EnforcerTextZh
+        && nonEmpty candidate.MainTextEn
+        && nonEmpty candidate.MainTextZh
+        && nonEmpty candidate.Trigger
+        && nonEmpty candidate.Negative
+        && not (rules |> List.exists (fun rule -> rule.Name = candidate.TipName.Trim()))
+
+    /// One bounded evaluation. An admissible candidate concludes BIRTH; a
+    /// missing or inadmissible candidate falls back to the existing
+    /// absorb-by-explicit-rule-name / discard logic. Pure: no IO, no provider.
+    let evaluate
+        (experience: string)
+        (rules: EnforcerRule list)
+        (candidate: BirthCandidate option)
+        : LearningDisposition =
+        match candidate with
+        | Some candidate when candidateAdmissible candidate rules -> LearningDisposition.Birth(candidate.TipName.Trim())
+        | _ ->
+            let lower = experience.ToLowerInvariant()
+
+            rules
+            |> List.tryFind (fun rule -> lower.Contains(rule.Name.ToLowerInvariant(), StringComparison.Ordinal))
+            |> Option.map (fun rule -> LearningDisposition.Absorb rule.Name)
+            |> Option.defaultValue (LearningDisposition.Discard "no-reusable-mechanism")
+
+    /// WHAT institutional-learning-002 revision contract around one
+    /// evaluation. Before committing a BIRTH the live revision is re-read; on
+    /// drift the evaluation runs once more against the latest live rulebook;
+    /// a second conflict fails explicitly with zero commits.
+    type LearnOutcome =
+        | LearnCommitted of disposition: LearningDisposition * revision: string * reevaluated: bool
+        | LearnRevisionConflict of revision: string
+
+    let private confirmReevaluatedBirth load revision tip =
+        let finalRevision = load () |> rulebookRevision
+
+        if finalRevision = revision then
+            LearnCommitted(LearningDisposition.Birth tip, finalRevision, true)
+        else
+            LearnRevisionConflict finalRevision
+
+    let private reevaluateBirth experience candidate load fresh revision =
+        match evaluate experience fresh candidate with
+        | LearningDisposition.Birth tip -> confirmReevaluatedBirth load revision tip
+        | other -> LearnCommitted(other, revision, true)
+
+    let private confirmBirth experience candidate load revision tip =
+        let fresh = load ()
+        let freshRevision = rulebookRevision fresh
+
+        if freshRevision = revision then
+            LearnCommitted(LearningDisposition.Birth tip, revision, false)
+        else
+            reevaluateBirth experience candidate load fresh freshRevision
+
+    let commitDecision
+        (experience: string)
+        (candidate: BirthCandidate option)
+        (load: unit -> EnforcerRule list)
+        : LearnOutcome =
+        let rules = load ()
+        let revision = rulebookRevision rules
+
+        match evaluate experience rules candidate with
+        | LearningDisposition.Birth tip -> confirmBirth experience candidate load revision tip
+        | other -> LearnCommitted(other, revision, false)

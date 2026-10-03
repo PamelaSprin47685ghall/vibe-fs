@@ -12,12 +12,11 @@ open Wanxiangshu.Persistence.Journal
 
 module BloggerChronicleText =
 
+    let private bloggerChronicleTextSemanticPath =
+        "cognitive-environment/blogger-chronicle-text"
+
     let private bloggerChronicleText (language: ProviderLanguage) =
-        match language with
-        | ProviderLanguage.SimplifiedChinese ->
-            "这是一轮记账，不需要额外展开长篇推理。直接把材料提炼成 charge、occurrence、settlement、consequence，并调用 chronicle。"
-        | ProviderLanguage.English ->
-            "This is a bookkeeping turn; no extra long-form reasoning is needed. Distill the material into charge, occurrence, settlement, and consequence, then call chronicle directly."
+        ProviderProse.render language bloggerChronicleTextSemanticPath Map.empty
 
     let private bloggerChronicleTextModelPrefixes: string list = [ "step-3.5-flash" ]
 

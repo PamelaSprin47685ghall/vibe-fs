@@ -540,6 +540,23 @@ module HandleProjection =
                 else
                     None)
 
+    /// Physical road lookup reads the stable binding, independently of its work.
+    let tryFindBindingByByname (byname: string) (current: AgentLinkageProjection) =
+        if System.String.IsNullOrWhiteSpace byname then
+            None
+        else
+            let wanted = byname.Trim()
+
+            current.Handles
+            |> Map.tryPick (fun _ binding ->
+                if
+                    parentVisible binding
+                    && System.String.Equals(binding.Byname, wanted, System.StringComparison.OrdinalIgnoreCase)
+                then
+                    Some binding
+                else
+                    None)
+
     /// Historical projection observations are not executable work admission.
     let auditListable (current: AgentLinkageProjection) =
         current.Handles

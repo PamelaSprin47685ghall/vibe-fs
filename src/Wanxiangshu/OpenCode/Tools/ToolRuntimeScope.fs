@@ -519,6 +519,11 @@ type ToolRuntimeScope
         =
         match runtime.OwnsAgent agentId with
         | false ->
+            // delegation-026: a reopened road's idle companion handle registers its
+            // identity only (AdoptChild). Restore would plant an active ChildRun with no
+            // work behind it, so the next dispatch's backend Fork answers Nudged, its
+            // runTask never starts, and settle's AwaitCurrentWorkRecord waits on the
+            // restored cell forever.
             runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
             runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
             runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
@@ -653,10 +658,7 @@ type ToolRuntimeScope
                 |> Option.bind (fun s -> s.Handles)
 
             let devopsHandleOpt =
-                handlesOpt
-                |> Option.bind (fun handles ->
-                    HandleProjection.tryFindByByname "devops" handles
-                    |> Option.bind (fun record -> HandleProjection.tryBinding record.Handle handles))
+                handlesOpt |> Option.bind (HandleProjection.tryFindBindingByByname "devops")
 
 
             let runtimeResult = getOrCreateRuntime key

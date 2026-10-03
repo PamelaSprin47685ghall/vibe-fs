@@ -140,6 +140,7 @@ module HandleProjection =
     val isRetired: handle: HandleId -> current: AgentLinkageProjection -> bool
     val isAbandoned: handle: HandleId -> current: AgentLinkageProjection -> bool
     val tryFindByByname: byname: string -> current: AgentLinkageProjection -> HandleRecord option
+    val tryFindBindingByByname: byname: string -> current: AgentLinkageProjection -> HandleRecord option
     val auditListable: AgentLinkageProjection -> HandleRecord list
     val auditActiveHandles: AgentLinkageProjection -> HandleRecord list
     val listable: current: AgentLinkageProjection -> HandleRecord list

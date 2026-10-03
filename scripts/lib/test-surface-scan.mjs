@@ -110,6 +110,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Host/BloggerChronicleSurface.js',
+    owner: 'cognitive-environment',
+    laws: ['COGNITIVE-ENVIRONMENT-015'],
+    source: 'src/Wanxiangshu/OpenCode/Host/BloggerChronicleSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Host/PluginTransformSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-019'],
@@ -538,7 +546,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Sphinx/V2/Persistence/Surface.js',
     owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-005', 'SPHINX-V2-006', 'SPHINX-V2-007', 'SPHINX-V2-019', 'SPHINX-V2-033'],
+    laws: ['SPHINX-V2-001', 'SPHINX-V2-005', 'SPHINX-V2-006', 'SPHINX-V2-007', 'SPHINX-V2-011', 'SPHINX-V2-019', 'SPHINX-V2-033'],
     source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
     representation: 'json',
     kind: 'resource',

@@ -93,11 +93,18 @@ module ProjectionUpdate =
                             payload.SessionId
                             payload.OccurrenceId
                             payload.ResurfacedDeferredWorkIds }
+        | InstitutionalLearningFactCases.InstitutionalRuleBorn _ ->
+            // Rule birth does not resurface deferred work.
+            Ok projection
 
     let applyInstitutionalLearning
         (projection: AgentProjectionSet)
         (fact: InstitutionalLearningFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
-        Ok
+        InstitutionalLearningProjection.apply fact projection.InstitutionalLearning
+        |> Result.map (fun updated ->
             { projection with
-                InstitutionalLearning = InstitutionalLearningProjection.apply fact projection.InstitutionalLearning }
+                InstitutionalLearning = updated })
+        |> Result.mapError (fun reason ->
+            { Fact = "InstitutionalLearning"
+              Reason = reason })

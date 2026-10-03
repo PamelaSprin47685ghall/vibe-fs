@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — upstream b7768f478 增量
+
+- 合并 Blogger 双语提示资源和真实 journal/lease 注入观察，以及制度学习 candidate 机械准入、Born 持久事实/投影和 revision 计算。GAP-077/181 仅进入 PARTIAL，保留真实 Host、语义提炼、生产并发及原子提交义务。
+- 按现行需求保留 exact AdmittedWork、墓碑、固定 DevOps 原终态回调和取消排空；Sphinx 保留严格 Revision 与 native MCP，词汇登记改引用 Core 清单。修正新增 Surface 的 opaque resource 登记，拆平新增控制分支，不增加基线。
+- ProcessHost 的 verbose/debug 诊断进入 stderr，避免破坏 canary JSON 协议；保持原预算和默认并发。正式结果及原始失败见 `proposals/archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md`。
+
 ## Unreleased — 合并 upstream e1e7dd3f1
 
 - 合入四个上游提交，包含空只读Replica终态、重启后空闲DevOps Join、Predictor正文降格与往复恢复，以及Sphinx canonical持久化和MCP合同。

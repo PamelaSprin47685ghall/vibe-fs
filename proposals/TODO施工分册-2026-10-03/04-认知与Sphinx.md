@@ -4,6 +4,10 @@
 
 共同开工条件：读现行 WHAT 与测试 README，按总计划区分 A—F 类；修改生产前立正式反例；用本包已有真实入口；共享 Rulebook、MarkerText、journal 或 Host run 契约先由一人定边界。表中“变异”是候选验证手段，只在隔离候选副本使用，不改共享 dist、不拿测试内自建状态机充当生产。
 
+`b7768f478`实施增量见[记录](../archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。Blogger inline文本已迁双语资源，015已有真实canonical journal/lease上的direct maybeInject五例；下一步接registered transform/provider并比较两个真实请求的历史，磁盘不写不能替代它。制度学习已有caller candidate的机械检查、Born facts和纯revision重评；003/005的语义TODO保留，不将非空字段当抽象能力。
+
+制度学习继续施工时依次做：按WHAT003只给Enhancer经验和canonical live rulebook，并立raw command/path/timestamp不得永久化的真实反例；按005证明trigger、negative/distinction、语义去重和长期注意力成本，拒绝不合格候选；在生产提交口引入真实expected revision判决，以两个并发调用和悬置Append证明冲突零部分效果；按008一次提交Born、Disposition及必要Deferred事实，在每个物理提交失败切点核对Current、磁盘、冻结收据和重试；最后把Born接入同一Blogger prompt/chronicle索引并重开核对。现在Born→Committed二追加会半落地，重试可能改为ABSORB/DISCARD，不能当作已解决前提。保留原表剩余义务，已完成机械基础不重复施工。
+
 ## action-affordance
 
 **入口与前提。** [WHAT](../../requirements/action-affordance/WHAT.md)、[证明范围](../../requirements/action-affordance/tests/README.md)、真实插件注册工具、provider 的 tool definition、各角色实际收到的调用描述。GAP-078；总计划 D14；W6，但材料清点可从 W0 开始。现有 014 的单 assumption、015 的 Host 原生 todowrite 已有独立证明，不恢复旧 canvas 或插件 todo 参数。
@@ -46,7 +50,7 @@
 | 010 | 首次、后续、重启、压缩后请求分别捕获 lifecycle 材料 | 该出现时出现、历史重放冻结、正常后续不重复教育；系统提示职责保持 |
 | 011 | 运行中更新 mission/运行材料后捕获下次真实请求 | 变化进入消息通道，不伪造用户授权或替换 Role Law；检查 authority 根及历史字节 |
 | 012 | Manager 接收可核对证据与相互矛盾评价，完成实际评审轨迹；检查真实 provider 输入是否泄露隐藏 Reviewer、双重确认或 barrier | 结论可追溯当前证据，缺证据不照搬隐藏过程；泄露本身也须拒绝，不能只查有没有扩权；与 relay-assessment 共用输入场景，独立记录有限语义判断 |
-| 015，补充 | 沿实际 Blogger 提示注入路径核对白名单、重复 transform、历史与后续请求；把内联材料归入现行资源 owner | 白名单内/外、相同 occurrence 两次、另一个 session 对照；直接读 provider 字节和 journal。GAP-077 不因没有运行时 TODO 而遗漏 |
+| 015，补充 | 资源化与真实 journal/lease 上的五项直接 maybeInject 观察已完成；接续补正式注册 Host、历史与后续请求 | 保留白名单内/外和重复 transform 断言；直接捕获实际 provider 字节，证明同一 occurrence、另一 session 和后续请求的历史边界。GAP-077 不因没有运行时 TODO 而遗漏 |
 
 **衔接。** 若所有接缝只覆盖纯 prompt 组装，先扩展已有正式 Host fixture 的请求捕获，再做语义审阅；不要在测试里组装一份“正确请求”后自证。013/016 等 README 人审余项随 GAP-076 补查，不虚增 TODO 统计。
 
@@ -139,7 +143,7 @@
 
 **入口。** [WHAT](../../requirements/institutional-learning/WHAT.md)、[Enhancer](../../src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs)、[InstitutionalLearningTools](../../src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs)、[JournalAdapter](../../src/Wanxiangshu/Composition/Durable/InstitutionalLearningJournalAdapter.fs)。GAP-180/181/182；D12；W5。
 
-当前 Enhancer 只按既有规则名作 ABSORB，否则 DISCARD；BIRTH 通路未实现。不能把这解释成“只差几条测试”。先定义窄 Enhancer 输入/输出与一次评估所有权，再接现有 behavior-diagnosis admission，最后做原子提交与 deferred 消费。语义模型输出可由受控 provider 返回候选以验证机械协议；真正机制提炼质量另用真实有限样例审阅，两层不得互相替代。
+当前已接入调用方提供 candidate 的机械 BIRTH 准入、Born 持久事实/投影及纯 revision 重评。接续先限定 Enhancer 输入并补实际机制提炼与语义准入，再将生产 revision CAS、Born/Disposition/Deferred 同批原子提交和重放冻结落实到真实 writer；最后接入统一 Blogger 规则索引。当前两次 Append 可能留下 Born 已写而收据未写的半状态，重试可改判 ABSORB/DISCARD。受控 provider 的机械协议证据不能替代真实有限样例的机制提炼审阅。
 
 | 文件 | 施工步骤 | 可红反例与验收 |
 |---|---|---|
@@ -152,7 +156,7 @@
 | 008-A | 实际 staging、writer、revision 三边界注入失败；非空旧 rulebook+deferred+receipt，关闭重开 | 没有局部 learning/rule/deferred 提交；exact replay 冻结结果、零重评/重复消费 |
 | 008-B | 按现行 WHAT008 记录 LearningDispositionCommitted、必要的 InstitutionalRuleBorn/DeferredWorkResurfaced；同步编码/fold/消费者与合法历史恢复 | 同批原子提交，任一非法事实使整批拒绝；若提议单事实字段替代才另走 D12 的规范变更，不先等待是否保留旧实现的裁决 |
 
-**跨包验收。** 本包 8 项 TODO 完成后仍联查 behavior001/002/005/018、attention004/005、guidance 的冻结交付。BIRTH 生效、活跃 life 不变、下个 life 看到新规则是一条可追溯的业务链。
+**跨包验收。** 本包剩余义务完成后仍联查 behavior001/002/005/018、attention004/005、guidance 的冻结交付。BIRTH 生效、活跃 life 不变、下个 life 看到新规则是一条可追溯的业务链。
 
 ## speculative-investigation
 

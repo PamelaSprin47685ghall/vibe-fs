@@ -17,6 +17,7 @@ type HostToolArguments =
     internal new: raw: obj -> HostToolArguments
     member Text: name: string -> string
     member OptionalText: name: string -> string option
+    member OptionalTextIn: objectName: string * propertyName: string -> string option
     member OptionalTexts: name: string -> string list option
     member Texts: name: string -> string list
     member OptionalNumber: name: string -> float option
@@ -76,6 +77,7 @@ module ToolHostCodec =
     val managedOrHandleSchema: values: string list -> factory: HostToolFactory -> HostSchema
     val optionalStringSchema: factory: HostToolFactory -> HostSchema
     val optionalStringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
+    val birthCandidateSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val optionalNumberSchema: factory: HostToolFactory -> HostSchema
     val optionalNonNegativeIntegerSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val optionalStringArraySchema: factory: HostToolFactory -> HostSchema
