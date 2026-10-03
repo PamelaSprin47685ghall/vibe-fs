@@ -371,12 +371,9 @@ module StrengthReplicaTransform =
     /// turn is a model turn. The mirror plus completed batches ends on the
     /// replica's own assistant rows, so the request is closed with the same
     /// read-only instruction the bootstrap used, as a user turn. The id derives
-    /// from the last row, so a repeated transform yields identical bytes.
-    let private withContinuationTurn
-        (sessionId: string)
-        (sha256: string -> string)
-        (messages: obj list)
-        : obj list =
+    /// from the last row. The same input and language yield identical bytes;
+    /// the instruction follows the live global language preference.
+    let private withContinuationTurn (sessionId: string) (sha256: string -> string) (messages: obj list) : obj list =
         if not (endsWithAssistantTurn messages) then
             messages
         else
@@ -387,9 +384,7 @@ module StrengthReplicaTransform =
                     Map.empty
 
             let lastId =
-                List.last messages
-                |> ProviderWireDecode.hostMessageId
-                |> Option.defaultValue ""
+                List.last messages |> ProviderWireDecode.hostMessageId |> Option.defaultValue ""
 
             let continuation =
                 ProjectionMessageEdit.HostWireEncoding.rawMessage
@@ -688,7 +683,8 @@ module StrengthReplicaTransform =
 
                 HostMessageProjection.replaceMessagesInPlace
                     output
-                    (withReasoningModel source replacement |> withContinuationTurn sessionIdText sha256)
+                    (withReasoningModel source replacement
+                     |> withContinuationTurn sessionIdText sha256)
 
                 return StrengthReplicaTransformOutcome.Ready batches
             }

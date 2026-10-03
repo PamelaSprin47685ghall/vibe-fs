@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 指定 Git tree 源码准备
+
+- 从明确指定的Git tree读取完整原始blob，保留路径、执行位和字节；在自有Git目录重新构造index/tree核对身份，避免工作区、attributes、replace refs和继承Git环境改变候选。缺对象、promisor仓、不支持的类型或无法忠实物化的路径均失败。
+- 普通合并upstream `46935e5bd` 的Replica请求收尾user行；新增真实注册hook回归，验证它不建立新的physical acceptance，原预算/终态仍绑定原bootstrap，语言变更只影响提示正文。
+- 源码准备尚未接入实际verify，依赖与只读执行未封闭，T418/T419保留。见[本批记录](proposals/archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。
+
 ## Unreleased — S03 输入枚举前置
 
 - 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。

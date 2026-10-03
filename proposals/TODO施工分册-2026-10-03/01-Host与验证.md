@@ -447,6 +447,8 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 ### VS-016 · P0 · 实际验收绑定同一个不可变候选（2 TODO）
 
+2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
+
 - **已有**：完整tracked输入集合及Git inventory失败传播已补；源码/资源/规范/脚本等输入和步骤边界变化能拒绝。本次补符号链接枚举前置：输入根、普通文件/目录及tracked corpus父目录的未知链接一律拒绝，不跟随外部可写目标；普通文件不会因名叫obj而被当作输出。见[S03记录](../archive/2026-10-03/S03输入链接边界-2026-10-03.md)。当前仍在可变工作区执行，“一步内改后恢复”是现存 executable TODO。
 - **前提**：明确输入闭包包括被generator实际消费的tracked corpus、工具链/锁文件、构建脚本、测试与规范；dist和日志是输出，必须放可写且不反向成为输入的区域。原工作区继续编辑与快照被篡改是两个不同命题。
 - **先红 A**：真实 verify入口的 build/unit/integration/package 分别记录所用候选身份与根，原工作区在运行中编辑不影响隔离候选；不能偷借原repo dist、node_modules解析路径、资源或git查询。让任一阶段错误cwd/import回原repo，验收必须失败。

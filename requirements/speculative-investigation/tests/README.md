@@ -12,7 +12,7 @@
 | [006] | 真 EventStore/payload closure、冲突拒绝、关闭重开读取；Prepared 不 replay | 模糊写入时实际 Owner 外发被阻止 |
 | [007] | 消费证据分类、exact target 裁决、失败轮次 Abandoned、Promoted 持久化 | 模糊 Promotion 时实际 continuation 被阻止 |
 | [008] | 真实 EventStore 关闭重开后的正文及工具 Promoted replay；包含 reasoning 的 trace-range 与 exact match；真实中间请求快照确认消费后，两个决策进入 Promoted → XTrace → Traced，进程重启继续回放 | 普通压缩覆盖后的完整因果闭环 |
-| [009] | ToolCallId 重定位、孤儿/媒体拒绝、普通 Main text/reasoning 镜像语义不变；mirror 替换及局部 batches；真实 Host wire 以 reasoning_content 接收 predictor 正文 | 更多连续决策与压缩交替组合 |
+| [009] | ToolCallId 重定位、孤儿/媒体拒绝、普通 Main text/reasoning 镜像语义不变；mirror 替换及局部 batches；真实 Host wire 以 reasoning_content 接收 predictor 正文；Replica末尾user提示的同语言完整输出稳定与语言切换，实际registered hook保持原physical准入/预算/终态且不派发新SDKprompt | 更多连续决策与压缩交替组合 |
 | [010] | 成本公式、预算门槛、控制分组、真实 scope 的 exact-run 计数、会话隔离与重放幂等 | rollout 样本充分性和生产训练流不接纳干预请求 |
 | [011] | scope 熔断 first-wins；真实 coordinator 的取消、删除、释放与不可复活终态；无后续请求时收集终止正文，晚到旧 physical 不污染新决策 | 更多无因果终态组合 |
 | [012] | Candidate/Promoted 插入准确工具交换与降格正文，保留普通正文中的“replica”等合法内容 | 更多 Owner/Replica 输入形态 |
