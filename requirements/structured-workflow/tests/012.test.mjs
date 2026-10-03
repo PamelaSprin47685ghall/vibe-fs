@@ -840,7 +840,13 @@ test('WHAT[structured-workflow-012] compile-impact CLI plan-only smoke matches t
   )
   assert.equal(result.status, 0, result.stderr || result.stdout)
   const cli = JSON.parse(result.stdout)
-  assert.ok(cli.mode === 'no-op' || cli.mode === 'full', 'manifest mode is valid')
+  // The plan reflects the live worktree: a clean tree reports no-op, a
+  // toolchain change reports full, and non-compiler inputs (e.g. shard-graph
+  // fsproj edits) legitimately report focused. All three are valid modes.
+  assert.ok(
+    cli.mode === 'no-op' || cli.mode === 'full' || cli.mode === 'focused',
+    'manifest mode is valid',
+  )
   const plan = planImpactCompile({
     changedPaths: [changed],
     projectDirectory: SOURCE_ROOT,
@@ -1037,11 +1043,13 @@ test('WHAT[structured-workflow-012] baseline writer binds one clean exact commit
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const { planImpactCompile, planImpactFromInventory, readImpactInventory } = await import("../../../scripts/lib/owner-compile.mjs");
+
+const SOURCE_ROOT = join(import.meta.dirname, '../../..', 'src/Wanxiangshu')
 
 const projectName = (node) => `Owner.${String(node).padStart(2, '0')}.fsproj`
 const writeProject = (root, node, { references = [], compileItems = [`Source/Node${node}.fsi`, `Source/Node${node}.fs`], rawReferences = null } = {}) => {
@@ -1069,6 +1077,31 @@ const writeChainFixture = () => {
   ]).join('\n')}\n  </ItemGroup>\n</Project>\n`)
   return { aggregate, root, sourceDirectory }
 }
+
+test('WHAT[structured-workflow-012] production focused closure carries upstream type-definition shards (CompanionHost regression)', () => {
+  const pluginSessionScopeFs = join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs')
+  const companionHostFsi = join(SOURCE_ROOT, 'Context/Companion/Host.fsi')
+  const companionHostFs = join(SOURCE_ROOT, 'Context/Companion/Host.fs')
+
+  assert.equal(existsSync(pluginSessionScopeFs), true, 'production PluginSessionScope.fs must exist')
+  assert.equal(existsSync(companionHostFs), true, 'production CompanionHost definition file must exist')
+
+  const plan = planImpactCompile({
+    changedPaths: [pluginSessionScopeFs],
+    projectDirectory: SOURCE_ROOT,
+    fullThreshold: 1,
+  })
+
+  assert.equal(plan.mode, 'focused', `a .fs-only implementation change must stay focused, got ${plan.mode} (${plan.reason})`)
+  assert.ok(
+    plan.compileItems.includes(companionHostFsi) && plan.compileItems.includes(companionHostFs),
+    'the focused closure of PluginSessionScope.fs must include the CompanionHost definition files: the owner shard graph has to declare every upstream definition dependency the one-pass flat compile resolves',
+  )
+  assert.ok(
+    plan.compileItems.indexOf(companionHostFs) < plan.compileItems.indexOf(pluginSessionScopeFs),
+    'canonical order must compile the CompanionHost definition before its consumer',
+  )
+})
 
 test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and rejects unmapped added sources fail-closed', () => {
   const fixture = writeChainFixture()
