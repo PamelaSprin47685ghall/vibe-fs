@@ -8,6 +8,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Replica
@@ -359,6 +360,50 @@ module StrengthReplicaTransform =
         | Some _ when not (List.exists needsModel encoded) -> encoded
         | Some _ -> encoded |> List.map attach
 
+    let private endsWithAssistantTurn (messages: obj list) =
+        match List.tryLast messages with
+        | Some last ->
+            ProviderWireDecode.firstString (ProviderWireDecode.infoObject last) [ "role" ]
+            |> Option.exists (fun role -> String.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase))
+        | None -> false
+
+    /// Some providers (Gemini Cloud Code Assist) reject a request whose last
+    /// turn is a model turn. The mirror plus completed batches ends on the
+    /// replica's own assistant rows, so the request is closed with the same
+    /// read-only instruction the bootstrap used, as a user turn. The id derives
+    /// from the last row, so a repeated transform yields identical bytes.
+    let private withContinuationTurn
+        (sessionId: string)
+        (sha256: string -> string)
+        (messages: obj list)
+        : obj list =
+        if not (endsWithAssistantTurn messages) then
+            messages
+        else
+            let prompt =
+                ProviderProse.render
+                    (ProviderProse.languageOf (SessionId.create sessionId))
+                    "delegation/readonly-investigation"
+                    Map.empty
+
+            let lastId =
+                List.last messages
+                |> ProviderWireDecode.hostMessageId
+                |> Option.defaultValue ""
+
+            let continuation =
+                ProjectionMessageEdit.HostWireEncoding.rawMessage
+                    sessionId
+                    sha256
+                    (List.length messages)
+                    { Role = "user"
+                      Parts = [ ProviderProjection.WireText prompt ] }
+                    (Some(sha256 ("strength-replica-continuation\u001f" + sessionId + "\u001f" + lastId)))
+                    "user"
+                    [ createObj [ "type", box "text"; "text", box prompt ] ]
+
+            messages @ [ continuation ]
+
     /// Keep logical call/result rows intact through XTrace and context projection.
     /// Only at the final Host boundary fold them into native completed tool parts.
     let tryEncodeOwnerMessages (sha256: string -> string) (rawMessages: obj list) : Result<obj list, string> =
@@ -640,7 +685,11 @@ module StrengthReplicaTransform =
         | Ok replacement ->
             task {
                 let source = ProviderWireDecode.messagesFromTransformOutput output
-                HostMessageProjection.replaceMessagesInPlace output (withReasoningModel source replacement)
+
+                HostMessageProjection.replaceMessagesInPlace
+                    output
+                    (withReasoningModel source replacement |> withContinuationTurn sessionIdText sha256)
+
                 return StrengthReplicaTransformOutcome.Ready batches
             }
 

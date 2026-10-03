@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — Replica 请求不得以 model turn 结尾
+
+- Gemini Cloud Code Assist 拒绝以 model turn 结尾的请求（400 `Requests ending with a model turn are not supported`）。Replica 的镜像加本决策已完成批次总以 assistant 行结尾；`StrengthReplicaTransform` 在写回 Host 前，若末行为 assistant，则追加一条 user 行，正文为与启动时相同的 `delegation/readonly-investigation` 提示。该行 id 由 session 与末行 id 派生，重复 transform 字节一致；末行已是 user 时不追加。
+- 回归：`speculative-investigation/tests/009`（末行恒为 user、重复 transform id 稳定、仅 user 的镜像不变）；005、009 旧断言改为含收尾 user 行的新形态。
+
 ## Unreleased — upstream fcfba389e 与 PR 合并冲突
 
 - 普通合并上游 `3f9aa1636` / `fcfba389e`，清理误提交的零字节工程临时文件，吸收 CI 镜像依赖和经过复核的工程接线。保留既有 exact work、Guard 交接和固定 DevOps 取消边界。

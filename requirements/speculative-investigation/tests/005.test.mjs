@@ -128,7 +128,7 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
   assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['glob'])
   assert.equal(out.batches[0].exchanges[0].canonicalResult, 'found 12')
   assert.deepEqual(out.batches[0].assistantText, ['read preface'])
-  assert.deepEqual(messages.flatMap(message => message.parts).filter(part => part.type === 'text').map(part => part.text),
+  assert.deepEqual(messages.filter(message => message.info.role === 'assistant').flatMap(message => message.parts).filter(part => part.type === 'text').map(part => part.text),
     ['read preface'], 'predictor keeps its own mixed tool text once, without demoting it')
   assert.deepEqual(messages.flatMap(message => message.parts).filter(part => part.type === 'reasoning').map(part => part.text),
     ['r'], 'native thinking remains in the predictor history, not in the returned material')
