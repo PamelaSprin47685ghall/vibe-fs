@@ -76,7 +76,7 @@
 | GAP-052 | requirement-system-001/002/005/007/008/010 | PARTIAL | 格式检查不能判定语义重复、隐性规则、组织权或历史编号复用；001、004—008、011、017、018 保留可识别形式的正反例，其余人工审阅。 |
 | GAP-053 | feature-ablation-002 | PARTIAL | registry、执行/schema/事实/角色 gate 的行为有反例；尚未证明每个业务包关闭后全链零副作用及借用面完整。新 registry 接口不改变此证明限制。 |
 | GAP-054 | verification-system-004/005/006/007/010/012/018/019 | PARTIAL | 保留真实监督与门禁反例；2026-10-03补正式同步工作/微任务反例并修复Node原生reporter输送饥饿：已完成叶afterEach单次让步，不自造进展、不改5000ms，挂起噪声及after异常仍失败，Node22/26先红后绿。尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
-| GAP-055 | verification-system-006/016 | PARTIAL | 已补真实corpus输入闭包：tracked proposals内容与Git跟踪集合身份参与验证digest，Git inventory失败阻止任何阶段启动；6项反例先红后绿。运行器仍只检查步骤边界，阶段中途修改再恢复仍可能通过。固定快照还缺准备一致性、真正不可写输入、外部依赖隔离、各阶段同源及结论绑定，两个TODO保留；copy、chmod或fs.watch均不当作完整隔离证明。 |
+| GAP-055 | verification-system-006/016 | PARTIAL | 已补真实corpus输入闭包：tracked proposals内容与Git跟踪集合身份参与验证digest，Git inventory失败阻止任何阶段启动；6项反例先红后绿。2026-10-04闭合固定输入快照：执行前物化只读快照（输入文件444/目录555，快照根可写承载合法构建输出），准备一致性逐字节校验捕获身份，每步组合inode/ctime/mtime/size/内容哈希与输入区新增扫描使步骤内改写后还原可发现；全部阶段同源于同一快照执行（cwd与阶段入口均指向快照），工作树偏离仍按既有反例拒绝；结果对象、run日志snapshot-manifest.json与输出摘要共同绑定快照digest，T418/T419先红后绿。仍留：node_modules以symlink、.git以gitfile按原树身份共享，非输入依赖的完全物理隔离未证明；release全链（Long Stroke/package）在快照上的真实运行证据待后续批次验证。copy、chmod或fs.watch均不单独当作完整隔离证明。 |
 | GAP-056 | verification-system-008/020 | PARTIAL | 用户已确认断言完整性按规范要求的结果和副作用判断；精确结构/文本仍完整比较。生成器设施的重放成功不等于全仓 oracle 独立、充分，继续人工审阅。 |
 | GAP-057 | verification-system-021 | PARTIAL | 计数、容器失败、结果流与文件完成已有回归；其它入口对未完成原因和范围的传播仍待证，TODO 应阻断完整验收。 |
 | GAP-058 | js-semantic-surface-001/006 | PARTIAL | `.mjs` 辅助文件义务与既有 `.js` 依赖、真实退出探针对内部物理入口的导入例外尚待裁决。保留可执行 TODO，不删除物理退出证据。 |
@@ -104,7 +104,7 @@
 | GAP-094 | causal-wait-001/002/007/009 | PARTIAL | 007已修同owner多等待分支与断开循环遗漏；正式先红反例覆盖外部/缺失/循环分支、注册顺序、菱形汇聚，并补多root共享producer仍保留完整链。registry、诊断非干扰及独立进程证据保留；Last progress因果关联、ProducerRunningWithoutWait所需活跃producer信息与真实生产注入仍缺证。 |
 | GAP-095 | causal-wait-008 | PARTIAL | 合同说不落持久介质，Bridge 却写可遗留 JSON；非权威不等于不落盘。需裁决可丢弃诊断快照例外及进程/新鲜度约束。 |
 | GAP-096 | causal-wait | PARTIAL | 异常等待的错误分类/未取消 deadline，以及逆序链误提取循环已有先红修复；新基线须复核同一正式回归，不把诊断算法用于业务裁决。 |
-| GAP-097 | durable-events-019—025 | PARTIAL | 磁盘重开、Current 与损坏历史已有证据；完整 boot 激活、物理 fatal 和跨进程 cut 仍待证。IdentityCollision/StorageInvalid/普通 Rejected 都不自动等于 semantic cut 已结算。 |
+| GAP-097 | durable-events-019—025 | PARTIAL | 磁盘重开、Current 与损坏历史已有证据；019 反例已由隔离变异覆盖五注册（经 WorkspaceEventStore.programWithoutRegistration 观察口移除真实注册：Strength/Casebook/JsTransaction 为 Current 缺失形态，Structural/Journal 为构造 fail-closed 形态，如实分型；SphinxV2 注册必要性观察不在 019 范围；DevOps 真实跑绿 019/020/013 共 31 pass + 1 既有 todo）。完整 boot 激活、物理 fatal 和跨进程 cut 仍待证。IdentityCollision/StorageInvalid/普通 Rejected 都不自动等于 semantic cut 已结算。 |
 | GAP-098 | durable-events-022—025 | PARTIAL | 持久化 typed 结果与组合层 fatal owner 分工已保留；实际直接物理 fuse 和编译预算的政策归属仍需核对，100/185 不由测试便利改变。 |
 | GAP-099 | durable-events-022/023 | PARTIAL | 旧观察测试遗留 timer、局部工程缺依赖与顺序错误曾修复；保留局部编译和生命周期回归。本批依新 shard 迁移，旧全量成功不能关闭新局部依赖缺口。 |
 | GAP-100 | effect-accounting | PARTIAL | 有真实 durable 意图、未知回执、文件副作用与 Change Program 正反例；真实提交后重放/冲突、跨进程 effect 不重发、工作区提交故障仍缺证。局部投影拒绝不能直接判上层幂等失败。 |
@@ -199,7 +199,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
 | GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
 | GAP-104 | context-compression | PARTIAL | 保留真实mailbox、flight、生产解码及XWire局部窗口证明；撤下布尔透传、手算floor、旧续传协议。027证明wire描述符经validating constructor、摘要重算、非法覆盖拒绝及canonical requestId；新增真实owner源码闭包的Fable正反编译，外部工厂调用/公开读取通过，Main与Squash私有record直接构造均在指定消费者位置被拒绝，3项通过。Opening恢复、持续追平、当前载体、紧急Probe前置失败、恢复旧epoch拒绝及端到端退休仍待证。 |
-| GAP-122 | interaction-authority | PARTIAL | 011部分证明：accepted root的session/logicalRun/authorityRoot/authorityKind/identitySeed/participantIdentity与同进程投影逐字段一致。per-physical target/lease原子携带与重启重放仍待证。身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
+| GAP-122 | interaction-authority | PARTIAL | 011部分证明：accepted root的session/logicalRun/authorityRoot/authorityKind/identitySeed/participantIdentity与同进程投影逐字段一致。017已补exact supplied profile与active run逐字段比对，wrong run/wrong root/never-active反例经真实journal闭合；closed target待Relay closure fact（归GAP-123/018）；DevOps真实跑绿（IA全套103条0 fail，连带适配dispatch-protocol/012与provider-attempt-recovery/021的profile传递合同，断言意图不变）。per-physical target/lease原子携带与重启重放仍待证。身份分类与准入有局部证明；真实外部消息、exact terminal解除抑制及越权零副作用需完整链路。缺身份允许durable查询，畸形身份不得借此恢复授权。 |
 | GAP-123 | interaction-authority、managed-session-lifecycle | OPEN | 五类durable authority closure尚缺完整生产执行与归还证据；不得用描述字段代替已发生的关闭。 |
 | GAP-124 | interaction-authority历史身份 | PARTIAL | 历史Inspector材料与活跃准入必须分别验证；不靠放宽当前身份恢复旧测试。 |
 | GAP-125 | managed-chat-execution continuation | OPEN | 发送前对目标active run的真实核对仍缺完整证据；持久事实存在不等于当前可发送。 |
@@ -220,7 +220,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-173 | 旧Sphinx Research export | RETIRED | 旧bundle要求不迁为新内核隐藏义务；历史材料仍可查。 |
 | GAP-174 | 旧Sphinx取消revision | RETIRED | 旧修复不恢复到新内核，不能声称v2取消已证。 |
 | GAP-175 | 旧Sphinx Agenda依赖选择 | RETIRED | 旧调度器已退役；v2调度与完成的因果关系需独立证据。 |
-| GAP-190 | obligation-ledger | PARTIAL | 新七条守住Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004已证companion/opening/parts/terminal/blog/prefix epoch在非空前态下逐值保留、同call重放幂等、跨session隔离及退役API拒绝；handles/enforcement/relay/guidelines等FoldSurface未暴露切片仍未证。005现有8项正式integration测试：before/after/running/异工具终态无checkpoint；exact completed追加且重复终态的durable事实仅一条；error不产生且不阻塞后续call；类型化身份配对隔离（含拼接与冒号碰撞反例），日志按Fact结构计数。并发失败用例原未注册，复核已移出helper不可达尾部。并发成功仅一条事实；并发WriteUnknown失败与同call重试均观察同一事件身份和错误；WriterUnavailable/NotAttempted释放call，重试以新事件身份进入writer准入后再次被poisoned writer拒绝，不宣称再次物理写入。隔离变异跳过joinPending或缓存NotAttempted失败均报红，恢复后通过。实际安装版Host TodoTable物理替换仍见GAP-220，包级其余TODO继续保留。 |
+| GAP-190 | obligation-ledger | PARTIAL | 新七条守住Host-native todowrite边界：provider定义与参数保持宿主原样、数组原样交给宿主，插件只在Host终态后追加压缩checkpoint（K固定=3，checkpoint只含ToolCallId）。004已证companion/opening/parts/terminal/blog/prefix epoch在非空前态下逐值保留、同call重放幂等、跨session隔离及退役API拒绝，并经DevOps真实跑绿（004/005+attention/002+effect-accounting/008在integration tier 24/24）；ProviderFailures/BloggerCycles/Guidelines/RequirementGrounding/TipDelivery/SessionStartedAt/DelegatedToolEstimate七slice无共享journal前态入口，空形状保留已断言，非空前态待Manager后续裁决。005现有8项正式integration测试：before/after/running/异工具终态无checkpoint；exact completed追加且重复终态的durable事实仅一条；error不产生且不阻塞后续call；类型化身份配对隔离（含拼接与冒号碰撞反例），日志按Fact结构计数。并发失败用例原未注册，复核已移出helper不可达尾部。并发成功仅一条事实；并发WriteUnknown失败与同call重试均观察同一事件身份和错误；WriterUnavailable/NotAttempted释放call，重试以新事件身份进入writer准入后再次被poisoned writer拒绝，不宣称再次物理写入。隔离变异跳过joinPending或缓存NotAttempted失败均报红，恢复后通过。实际安装版Host TodoTable物理替换仍见GAP-220，包级其余TODO继续保留。 |
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |

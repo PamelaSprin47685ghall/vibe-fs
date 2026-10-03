@@ -23,6 +23,15 @@ module WorkspaceEventStore =
         @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
         @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 
+    /// durable-events-019 registration-necessity seam: the production history
+    /// program with exactly one named registration removed. Every other
+    /// registration, including Sphinx v2, keeps production order. Removing
+    /// Structural or Journal is rejected by the canonical integrator's
+    /// fail-closed base-rule precondition; that construction refusal is the
+    /// observable form for those two spine registrations.
+    let programWithoutRegistration (ruleName: string) : IntegrationRule list =
+        hostProgram |> List.filter (fun rule -> rule.Name <> ruleName)
+
     /// DSL-state-combination: physical — shared local writer + canonical Current.
     type private SharedEntry =
         { Store: IEventStore

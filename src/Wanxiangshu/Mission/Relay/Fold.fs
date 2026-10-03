@@ -717,6 +717,14 @@ module Fold =
                 | Ok current -> Internal.applyEvent roadId current event)
             (Ok state)
 
+    /// obligation-ledger-004: enumerate every durable road id so a read-only
+    /// projection forwarder can observe each road through `view` without
+    /// touching the private state representation.
+    let roads (state: RelayState) : RoadId list =
+        let (RelayState roadMap) = state
+
+        roadMap |> Map.toList |> List.map (fst >> RoadId.create)
+
     let view state roadId =
         Internal.road roadId state
         |> Option.map (fun (road: RoadState) ->

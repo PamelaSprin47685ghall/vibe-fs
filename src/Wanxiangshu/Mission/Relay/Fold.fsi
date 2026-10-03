@@ -29,6 +29,10 @@ module Fold =
     val apply: state: RelayState -> roadId: RoadId -> transaction: RelayTransaction -> Result<RelayState, string>
     val view: state: RelayState -> roadId: RoadId -> RoadView option
 
+    /// obligation-ledger-004: enumerate every durable road id for read-only
+    /// projection forwarding (owner-provided accessor; no private state escapes).
+    val roads: state: RelayState -> RoadId list
+
 module Decision =
     val openIncumbency:
         state: RelayState ->

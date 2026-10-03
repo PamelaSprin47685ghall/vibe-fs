@@ -381,15 +381,40 @@ module DispatchSurface =
     /// (interaction-authority-017). This Surface always holds a JournalHandle, so
     /// the journal-less branch HostSessionNudge must handle cannot occur here;
     /// the two reachable rejections keep that path's wording verbatim.
-    let private activeProfileAt (handle: JournalHandle) (sessionId: SessionId) : Result<unit, string> =
+    let private activeProfileAt
+        (handle: JournalHandle)
+        (sessionId: SessionId)
+        : Result<PromptAuthority.AuthorityExecutionProfile, string> =
         let projections = (AgentJournal.snapshot handle.Journal).AgentProjections
 
         match Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner sessionId projections.Fission with
         | Some _ -> Error "Session is retired by Fission"
         | None ->
             match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
-            | Some _ -> Ok()
+            | Some active -> Ok active
             | None -> Error "No active authority profile"
+
+    /// interaction-authority-017: the caller's profile is a claim, not authority.
+    /// A continuation may only extend the target's own active Logical Run, so the
+    /// supplied profile must equal the durable active profile exactly; any
+    /// difference in session, logical run, authority root or identity seed is
+    /// rejected before a runtime is built, before a durable claim is written and
+    /// before the Host transport is reached.
+    let private requireExactActiveProfile
+        (handle: JournalHandle)
+        (session: string)
+        (authorityProfile: PromptAuthority.AuthorityExecutionProfile)
+        : Result<unit, string> =
+        match activeProfileAt handle (SessionId.create session) with
+        | Error error -> Error error
+        | Ok active when active = authorityProfile -> Ok()
+        | Ok active ->
+            Error(
+                sprintf
+                    "Continuation profile does not match the active logical run: active logical run %s, supplied logical run %s"
+                    (LogicalRunId.value active.LogicalRunId)
+                    (LogicalRunId.value authorityProfile.LogicalRunId)
+            )
 
     let sendContinuation
         (port: obj)
@@ -403,10 +428,13 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                // Active-run validation is read-only and happens before any runtime
-                // is built, so a rejected target never reaches PromptDispatcher and
-                // never records a durable claim.
-                match activeProfileAt handle (SessionId.create session) with
+                // interaction-authority-017: the durable active profile, not the
+                // caller-supplied one, is what a continuation may extend. Both the
+                // active-run and exact-match checks are read-only and happen before
+                // any runtime is built, so a rejected target never reaches
+                // PromptDispatcher, never records a durable claim and never calls
+                // the Host transport.
+                match requireExactActiveProfile handle session authorityProfile with
                 | Error error ->
                     return
                         box

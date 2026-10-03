@@ -11,3 +11,6 @@ module WorkspaceEventStore =
     val tryCurrent: commonDir: string -> IEventStore option
     val release: commonDir: string -> unit
     val bootPort: commonDir: string -> IJournalEventStoreBoot
+    /// durable-events-019 registration-necessity seam: the production program
+    /// with exactly one named registration removed, all others kept in order.
+    val programWithoutRegistration: ruleName: string -> IntegrationRule list

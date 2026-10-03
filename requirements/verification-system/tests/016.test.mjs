@@ -7,7 +7,6 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
-test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
 import { verify } from '../../../scripts/verify.mjs'
 
@@ -330,27 +329,92 @@ test('WHAT[verification-system-016] a detected step-boundary mutation prevents l
   }
 })
 
-test('WHAT[verification-system-016] a mutation restored within one step still invalidates the run', {
-  todo: 'D2: fixed isolated inputs selected; current runner still uses mutable inputs and step-boundary hashes miss this counterexample',
-}, async () => {
+test('WHAT[verification-system-016] a mutation restored within one step still invalidates the run', async () => {
   const fixture = setupFixtureRepo()
   try {
-    const target = path.join(fixture, 'src/Foo.fs')
-    const original = fs.readFileSync(target)
     const result = await verify({
       root: fixture,
       output: { write() {} },
-      runStep: async ({ label }) => {
+      runStep: async ({ label, cwd }) => {
         if (label === 'check') {
-          fs.writeFileSync(target, 'module Foo\nlet x = 999\n')
-          fs.writeFileSync(target, original)
+          // D2 裁决（fixed isolated inputs selected）后的反例对象：快照输入
+          // 本身。改写再还原必须使该次运行失败——普通用户平台写入被物理
+          // 只读阻止（EACCES 使该步骤失败）；权限模型失效的平台由每步快
+          // 照完整性校验发现元数据漂移。
+          const target = path.join(cwd, 'src/Foo.fs')
+          const original = fs.readFileSync(target)
+          try {
+            fs.writeFileSync(target, 'module Foo\nlet x = 999\n')
+            fs.writeFileSync(target, original)
+          } catch (err) {
+            return { label, ok: false, exitCode: 1, signal: null, durationMs: 1, error: err }
+          }
         }
         return { label, ok: true, exitCode: 0, signal: null, durationMs: 1 }
       },
     })
-    assert.equal(result.exitCode, 1, 'changing and restoring an input is not a stable verification run')
+    assert.equal(result.exitCode, 1, 'changing and restoring a snapshot input is not a stable verification run')
     assert.equal(result.outcome, 'fail')
+    assert.equal(fs.readFileSync(path.join(fixture, 'src/Foo.fs')).toString(), 'module Foo\nlet x = 1\n', 'worktree input must stay untouched by the counterexample')
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot', async () => {
+  const fixture = setupFixtureRepo()
+  const tmpLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-bind-logs-'))
+  let buf = ''
+  const sink = { write(chunk) { buf += chunk } }
+  const stepCwds = []
+
+  try {
+    const result = await verify({
+      root: fixture,
+      release: false,
+      output: sink,
+      logDirectory: tmpLogs,
+      runStep: async ({ label, cwd }) => {
+        stepCwds.push(cwd)
+        if (label === 'check') {
+          const mode = fs.statSync(path.join(cwd, 'src/Foo.fs')).mode
+          assert.equal(mode & 0o222, 0, 'snapshot input must be read-only while stages execute')
+        }
+        return { label, ok: true, exitCode: 0, signal: null, durationMs: 1 }
+      },
+    })
+
+    assert.equal(result.exitCode, 0)
+    assert.equal(result.outcome, 'pass')
+
+    // 快照身份存在且等于执行前捕获的输入闭包身份：验证的是同一份候选。
+    assert.ok(result.snapshot?.digest, 'result must carry the snapshot digest')
+    assert.match(result.snapshot.digest, /^[0-9a-f]{64}$/)
+    assert.equal(result.snapshot.digest, computeDigest(collectVerificationInputs(fixture)))
+
+    // 所有阶段在同一快照目录执行（同源），且不在原工作树（隔离）。
+    assert.equal(stepCwds.length, 5, 'daily run must execute five stages')
+    assert.ok(stepCwds.every((cwd) => cwd === stepCwds[0]), 'all stages must share one snapshot root')
+    assert.notEqual(stepCwds[0], fixture)
+
+    // 日志目录绑定：manifest 持久存在，digest 与结果对象一致，文件哈希与候选一致。
+    const manifestPath = result.snapshot.manifestPath
+    assert.ok(fs.existsSync(manifestPath), 'snapshot manifest must persist in the run log directory')
+    assert.equal(path.dirname(manifestPath), path.join(tmpLogs, path.basename(path.dirname(manifestPath))), 'manifest must live inside the run log directory')
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    assert.equal(manifest.digest, result.snapshot.digest)
+    const fooEntry = manifest.files.find((file) => file.path === 'src/Foo.fs')
+    const expectedFoo = collectVerificationInputs(fixture).find((entry) => entry.path === 'src/Foo.fs')
+    assert.ok(fooEntry, 'manifest must record snapshot input files')
+    assert.equal(fooEntry.sha256, expectedFoo.sha256)
+
+    // 输出摘要与结果对象绑定同一快照身份。
+    assert.ok(buf.includes(`snapshot=${result.snapshot.digest.slice(0, 16)}`), 'output summary must carry the snapshot digest')
+
+    // 快照本体在运行结束后回收；证据由持久 manifest 承载，不随回收丢失。
+    assert.equal(fs.existsSync(stepCwds[0]), false, 'snapshot directory must be released after the run')
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(tmpLogs, { recursive: true, force: true })
   }
 })

@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as xwire from '../../../dist/Context/Prefix/XWireSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as failureOwner from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
@@ -78,29 +77,6 @@ const firstFailureKeptTarget = async () => {
   }
 
   return { template, runtime, failedTarget }
-}
-
-const hash = (value) => `H(${value})`
-
-const rootSelection = (participant) => ({
-  kind: 'RootSelection',
-  ownerSession: null,
-  ownerLogicalRun: null,
-  ownerAuthorityRoot: null,
-  participantIdentity: {
-    participant,
-    role: participant,
-    selectedTier: 'deep',
-    persona: 'Engineer',
-    personaCatalogVersion: 1,
-    origin: 'ResolvedAtRoot',
-  },
-})
-
-const profileFor = (session, physical) => {
-  const built = authority.createAuthorityRoot(hash, 'rt-lwr-fact', session, 'HumanRoot', physical, rootSelection('engineer'))
-  assert.equal(built.ok, true, built.ok ? '' : built.error)
-  return built.value
 }
 
 const admittedWithPhysical = (physicalMessageId) => ({
@@ -205,8 +181,11 @@ test('WHAT[provider-attempt-recovery-021] the_settlement_fact_is_the_durable_pro
       handle,
       'ses_lwr_fact',
       'continue after the confirmed provider failure',
+      // IA-017 / dispatch-protocol [010]: the retry continuation carries the
+      // durable active profile itself; its acceptance fact is bound to the
+      // physical message and provider run, not to a re-derived profile.
       'ProviderRetryAttempt',
-      profileFor('ses_lwr_fact', 'msg_lwr_retry'),
+      dispatch.projectionObservation(handle, 'ses_lwr_fact').activeLogicalRun,
       'Await',
     )
     assert.equal(sent.ok, true, sent.ok ? '' : sent.error)

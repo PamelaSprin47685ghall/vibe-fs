@@ -24,8 +24,11 @@ function inputFixture(directory) {
   return root
 }
 
-function assertRealEntry(fixtureRoot, command) {
-  assert.ok(existsSync(resolve(ROOT, relative(fixtureRoot, command))), `real entry missing: ${command}`)
+// Stages execute on the materialized snapshot of the input closure; the
+// snapshot mirrors repository-relative paths, so entries are resolved against
+// the stage execution root (the snapshot cwd) and checked in the real ROOT.
+function assertRealEntry(stageRoot, command) {
+  assert.ok(existsSync(resolve(ROOT, relative(stageRoot, command))), `real entry missing: ${command}`)
 }
 
 test('WHAT[verification-system-017] repository and package entries own distinct real integration suites', () => {
@@ -57,15 +60,18 @@ test('WHAT[verification-system-017] release adds one Long Stroke and package pro
   const calls = []
   try {
     const result = await verify({ root, release: true, logDirectory: directory, output: createMemorySink(),
-      runStep: async ({ label, argv }) => {
-        calls.push({ label, argv })
+      runStep: async ({ label, argv, cwd }) => {
+        calls.push({ label, argv, cwd })
         return { label, ok: true, exitCode: 0, signal: null, durationMs: 0 }
       },
     })
     assert.equal(result.exitCode, 0)
     assert.deepEqual(calls.map(({ label }) => label), ['format:check', 'check', 'build', 'unit', 'integration', 'e2e', 'package'])
     assert.ok(calls.find(({ label }) => label === 'build').argv.includes('--clean'))
-    for (const label of ['e2e', 'package']) assertRealEntry(root, calls.find((call) => call.label === label).argv[0])
+    for (const label of ['e2e', 'package']) {
+      const call = calls.find((entry) => entry.label === label)
+      assertRealEntry(call.cwd, call.argv[0])
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -103,8 +109,8 @@ test('WHAT[verification-system-017] daily verification executes each stage in or
   const root = inputFixture(tmpLogDir)
   const sink = createMemorySink()
   const spawned = []
-  const fakeRunStep = async ({ label, argv }) => {
-    spawned.push({ label, argv: argv.map((arg) => String(arg)) })
+  const fakeRunStep = async ({ label, argv, cwd }) => {
+    spawned.push({ label, argv: argv.map((arg) => String(arg)), cwd })
     return { label, ok: true, exitCode: 0, signal: null, durationMs: 0 }
   }
 
@@ -132,15 +138,15 @@ test('WHAT[verification-system-017] daily verification executes each stage in or
     'integration',
   ])
 
-    const buildArgs = spawned.find((s) => s.label === 'build').argv
-    assert.ok(buildArgs.some((a) => a.includes('scripts/build.mjs')), 'build must dispatch to build.mjs')
-    assertRealEntry(root, buildArgs[0])
-  const unitArgs = spawned.find((s) => s.label === 'unit').argv
-  assert.ok(unitArgs.some((a) => a.includes('requirements/verification-system/tests/run.mjs')))
-    assertRealEntry(root, unitArgs[0])
-  const integrationArgs = spawned.find((s) => s.label === 'integration').argv
-  assert.ok(integrationArgs.some((a) => a.includes('tests/integration/run.mjs')))
-    assertRealEntry(root, integrationArgs[0])
+    const buildStep = spawned.find((s) => s.label === 'build')
+    assert.ok(buildStep.argv.some((a) => a.includes('scripts/build.mjs')), 'build must dispatch to build.mjs')
+    assertRealEntry(buildStep.cwd, buildStep.argv[0])
+  const unitStep = spawned.find((s) => s.label === 'unit')
+  assert.ok(unitStep.argv.some((a) => a.includes('requirements/verification-system/tests/run.mjs')))
+    assertRealEntry(unitStep.cwd, unitStep.argv[0])
+  const integrationStep = spawned.find((s) => s.label === 'integration')
+  assert.ok(integrationStep.argv.some((a) => a.includes('tests/integration/run.mjs')))
+    assertRealEntry(integrationStep.cwd, integrationStep.argv[0])
 
     assert.match(sink.output, /PASS  verify daily/)
     const afterLink = existsSync(defaultLatest) ? readlinkSync(defaultLatest) : null

@@ -5,6 +5,9 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const foldSurface = await import("../../../dist/Context/Companion/FoldSurface.js");
 const obligation = await import("../../../dist/Persistence/Journal/ObligationJournalSurface.js");
+const journalSurface = await import("../../../dist/Persistence/Journal/Surface.js");
+const { acceptAuthorityRoot, bindManagedChild, openIncumbency, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
 
 // All envelopes cross the registered FoldSurface. The checkpoint fact carries
 // only the call identity (context-compression-028: K is the fixed module
@@ -153,6 +156,8 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
     'the blog projection carries the entry coverage',
   )
   assert.ok(beforeSession.PrefixEpoch, 'the pre-state carries a prefix epoch')
+  assert.ok(beforeSession.Enforcement, 'the enforcement pre-state is non-empty after the blog entry fold')
+  assert.equal(beforeSession.Enforcement.cycleCount, 1, 'the enforcement projection carries one committed cycle')
   assert.equal(Number(beforeSession.PrefixEpoch.EpochId), 1, 'the prefix epoch advanced to 1')
   assert.equal(beforeSession.PrefixEpoch.Snapshot.CutoffExclusive, 1, 'the prefix snapshot carries the rebase cutoff')
 
@@ -174,6 +179,7 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
   assert.deepEqual(afterSession.XTrace.LatestTerminal, beforeSession.XTrace.LatestTerminal, 'the terminal capture survives the checkpoint untouched')
   assert.deepEqual(afterSession.Blog, beforeSession.Blog, 'the blog projection survives the checkpoint untouched')
   assert.deepEqual(afterSession.PrefixEpoch, beforeSession.PrefixEpoch, 'the prefix epoch survives the checkpoint untouched')
+  assert.deepEqual(afterSession.Enforcement, beforeSession.Enforcement, 'the enforcement projection survives the checkpoint untouched')
 
   // A checkpoint for another session writes only that session's window.
   const crossSession = foldSurface.fold([
@@ -211,5 +217,101 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
   assert.equal(obligation.snapshotMagicTodo({}), null)
 })
 
-test.todo('WHAT[obligation-ledger-004] the checkpoint fact leaves every remaining non-checkpoint projection slice untouched (GAP-190: handles, enforcement, relay, guidelines and other state are not exposed by the registered FoldSurface, so their preservation is not proven here)')
+const terminalEvent = (sessionID, callID, status) => ({
+  event: {
+    type: 'message.part.updated',
+    properties: {
+      sessionID,
+      part: { type: 'tool', tool: 'todowrite', callID, state: { status } },
+    },
+  },
+})
+
+const todoCall = (hooks, sessionID, callID) => {
+  const output = { args: { todos: [{ content: 'native todo work', status: 'in_progress', priority: 'high' }] } }
+  return hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, output).then(() => output)
+}
+
+// Real owner entry points build the non-empty pre-states (Manager ruling on
+// 004): PromptAuthority via the dispatch surface's authority-root acceptance,
+// Handles via the production HandleLinked journal append, Relay via the real
+// RelayTransaction append, Companion and the XTrace terminal via the journal
+// surface's Companion facts. The checkpoint itself crosses the same
+// completed-terminal path 005 proved. The observation port forwards every
+// session slice, so a deep comparison over all of them turns any non-checkpoint
+// mutation — e.g. the handles being cleared — into a red.
+integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint leaves every non-checkpoint projection slice untouched', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ol-004-slices'
+    const childID = 'ol-004-child'
+    const callID = 'ol-004-call'
+    const bloggerSession = 'ol-004-blogger'
+
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    await bindManagedChild(runtime, sessionID, childID, 'engineer')
+    await openIncumbency(runtime, sessionID)
+    await journalSurface.JournalSurface_appendAgent(
+      runtime.journal,
+      { kind: 'Session', session: sessionID },
+      null,
+      {
+        family: 'Companion',
+        case: 'CompanionBloggerLinked',
+        payload: { SessionId: sessionID, BloggerSessionId: bloggerSession, BloggerAgent: 'blogger' },
+      },
+    )
+    await journalSurface.JournalSurface_appendAgent(
+      runtime.journal,
+      { kind: 'Session', session: sessionID },
+      null,
+      {
+        family: 'Companion',
+        case: 'TerminalOutputCaptured',
+        payload: { SessionId: sessionID, TextRef: 'blob-ol-004-terminal', TextDigest: 'digest-ol-004-terminal', ProviderRun: 'run-ol-004' },
+      },
+    )
+
+    const before = journalSurface.JournalSurface_snapshot(runtime.journal)
+    const beforeSlices = before.sessionProjections[sessionID]
+
+    // The pre-states are real, not vacuous — an empty view would make the
+    // later preservation claims vacuous.
+    assert.ok(beforeSlices.promptAuthority?.activeLogicalRun, 'the pre-state carries an active logical run')
+    assert.equal(beforeSlices.handles?.handleCount, 1, 'the pre-state carries one linked handle')
+    assert.equal(beforeSlices.handles?.handles[0]?.childSessionId, childID, 'the handle is the linked child session')
+    assert.equal(beforeSlices.relay?.roadCount, 1, 'the pre-state carries one relay road')
+    assert.equal(beforeSlices.relay?.roads[0]?.iterationOrdinal, 1, 'the relay road has opened once')
+    assert.ok(beforeSlices.relay?.roads[0]?.activeIncumbencyPresent, 'the relay road carries an active incumbency')
+    assert.equal(beforeSlices.companion?.bloggerSessionId, bloggerSession, 'the pre-state carries a linked companion')
+    assert.ok(beforeSlices.xTrace?.latestTerminalPresent, 'the pre-state carries a captured terminal')
+
+    // The checkpoint: the same exact completed-terminal evidence 005 proved.
+    await todoCall(hooks, sessionID, callID)
+    await hooks.event(terminalEvent(sessionID, callID, 'completed'))
+
+    const after = journalSurface.JournalSurface_snapshot(runtime.journal)
+
+    // Only the checkpoint window changed for the session.
+    const beforeWindow = before.todoCheckpoints.find((entry) => entry.sessionId === sessionID)
+    const afterWindow = after.todoCheckpoints.find((entry) => entry.sessionId === sessionID)
+    assert.equal(beforeWindow, undefined, 'no checkpoint window existed before the completed terminal')
+    assert.deepEqual(afterWindow?.checkpoints, [{ callId: callID }], 'the completed terminal commits the checkpoint')
+
+    // Every forwarded non-checkpoint slice keeps its exact value; slices with
+    // no pre-state keep their empty shape too.
+    const afterSlices = after.sessionProjections[sessionID]
+    const sliceNames = Object.keys(beforeSlices)
+    assert.ok(sliceNames.length >= 15, 'the observation port forwards every session slice')
+    for (const slice of sliceNames) {
+      assert.deepEqual(afterSlices[slice], beforeSlices[slice], `slice ${slice} survives the checkpoint untouched`)
+    }
+
+    // Other sessions' projections are untouched as well.
+    for (const [sessionId, slices] of Object.entries(before.sessionProjections)) {
+      if (sessionId !== sessionID) {
+        assert.deepEqual(after.sessionProjections[sessionId], slices, `session ${sessionId} survives the checkpoint untouched`)
+      }
+    }
+  })
+})
 }

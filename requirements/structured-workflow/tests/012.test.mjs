@@ -1857,7 +1857,7 @@ test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm 
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawn, spawnSync } = await import("node:child_process");
-const { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } = await import("node:fs");
+const { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join, resolve } = await import("node:path");
 const { hasEmittedJsFiles, compileOwnerProject } = await import("../../../scripts/lib/owner-compile.mjs");
@@ -1894,6 +1894,15 @@ const findImpactProject = (root) => {
 const copyFixture = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-fixture-'))
   cpSync(FIXTURE_CLI, dir, { recursive: true })
+  // cpSync 保留源文件权限；快照输入树为 444 只读时副本同样只读，而本
+  // fixture 是用例会直接改写的工作副本（Directory.Build.props、Alpha.fs、
+  // Core.fs 等），故整树恢复可写。
+  const restoreWritable = (entry) => {
+    const stat = statSync(entry)
+    chmodSync(entry, stat.isDirectory() ? 0o755 : 0o644)
+    if (stat.isDirectory()) for (const name of readdirSync(entry)) restoreWritable(join(entry, name))
+  }
+  restoreWritable(dir)
   writeFileSync(
     join(dir, 'Directory.Build.props'),
     `<Project>
