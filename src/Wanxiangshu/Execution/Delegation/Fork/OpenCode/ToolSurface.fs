@@ -31,6 +31,10 @@ open Wanxiangshu.Foundation.Identity
 /// supplies a physical Host boundary for executable requirement proofs.
 module ForkToolSurface =
 
+    // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter, module-level
+    // so a reopened harness runtime never re-mints an id the journal already settled
+    let private physicalSequence = ref 0
+
     type private ForkSessionPort() =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
@@ -53,8 +57,6 @@ module ForkToolSurface =
         let mutable nextSendOutcome: SendOutcome option = None
         // DSL-MUTABLE: algorithm-scratch — Host AbortSession call count in the harness
         let mutable abortCount = 0
-        // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
-        let physicalSequence = ref 0
 
         let historyOf (source: Dictionary<string, ResizeArray<string>>) key =
             match source.TryGetValue key with
@@ -643,6 +645,26 @@ module ForkToolSurface =
 
         AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
         |> HandleProjection.tryFindByByname byname
+        |> Option.map (fun record ->
+            match record.Lifecycle with
+            | HandleLifecycle.Active -> "Active"
+            | HandleLifecycle.CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
+            | HandleLifecycle.Abandoned _ -> "Abandoned"
+            | HandleLifecycle.Retired -> "Retired")
+        |> Option.map box
+        |> Option.defaultValue null
+
+    /// The binding's own durable lifecycle — unlike `durableLifecycleByname`,
+    /// whose provider summary folds work-unit state into the view (an
+    /// abandoned work unit masquerades as an Abandoned handle there). The
+    /// fixed DevOps binding stays Active across work-unit terminals
+    /// (managed-session-lifecycle-024), so callers asserting the binding's
+    /// own lifecycle must read it here.
+    let durableBindingLifecycleByname (value: obj) (owner: string) (byname: string) : obj =
+        let harness = unbox<ForkHarness> value
+
+        AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+        |> HandleProjection.tryFindBindingByByname byname
         |> Option.map (fun record ->
             match record.Lifecycle with
             | HandleLifecycle.Active -> "Active"

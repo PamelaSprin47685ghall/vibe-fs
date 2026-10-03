@@ -16,6 +16,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
@@ -30,9 +31,11 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
@@ -253,6 +256,116 @@ module HostForkRunLifecycle =
     let childPromptSender sessions parentId journal (directoryOf: string -> string option) =
         fun (agentId: string) childId (_role: Role) identitySeed prompt onAccepted ->
             sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
+
+    /// Surface journal: a real canonical journal in a fresh temporary directory,
+    /// opened exactly the way production composition does (EventStore + journal
+    /// writer + projection). Surfaces use it to construct pending runs with
+    /// durable admitted work instead of journal-less fakes.
+    let openTemporaryJournal () : Task<AgentJournal> =
+        task {
+            let directory =
+                System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    "wanxiangshu-surface-journal-" + Guid.NewGuid().ToString("N")
+                )
+
+            System.IO.Directory.CreateDirectory directory |> ignore
+
+            let store =
+                EventStore.createLocal
+                    directory
+                    (Guid.NewGuid().ToString("N"))
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
+
+            match!
+                EventStoreJournalWriter.resumeOrCreate (
+                    RuntimeId.create (sprintf "fork-host-surface-%s" directory),
+                    1,
+                    DateTimeOffset.UtcNow,
+                    store
+                )
+            with
+            | Ok(writer, _, projection) ->
+                match AgentJournal.createFromProjection writer projection with
+                | Ok journal -> return journal
+                | Error rejection -> return failwithf "surface journal open failed: %s: %s" rejection.Fact rejection.Reason
+            | Error rejection ->
+                return failwithf "surface journal open failed: %s: %s" rejection.Fact rejection.Reason
+        }
+
+    /// Surface admission for a pending agent run (delegation-026 effect truth):
+    /// durably link the child handle, admit the owner human root, and dispatch
+    /// the child's first AgentOwnerRoot prompt through the real dispatcher, so
+    /// the following installRun finds the exact admitted work instead of the
+    /// fail-fast rejections. Returns the accepted authority root InstallRun
+    /// must reuse so the run's terminal keeps its causal identity.
+    let admitPendingAgentWork
+        (durable: AgentJournal)
+        (sessions: ISessionHostPort)
+        (parentId: SessionId)
+        (ownerAgent: string)
+        (agentId: string)
+        (childId: SessionId)
+        (role: Role)
+        : Task<Result<AuthorityRootUserMessageId, string>> =
+        task {
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+
+            let ownerSeed =
+                ParticipantIdentity.resolveAtRoot ownerAgent
+                |> Result.map PromptAuthority.IdentitySeed.RootSelection
+
+            match ownerSeed with
+            | Error reason -> return Error(sprintf "surface admission: owner identity unresolved: %A" reason)
+            | Ok seed ->
+                let ownerPhysical =
+                    PhysicalUserMessageId.create (
+                        sprintf "surface-owner-root:%s" (SessionId.value parentId)
+                    )
+
+                match! dispatcher.AcceptHumanRoot parentId ownerPhysical (Some seed) with
+                | Error failure ->
+                    return
+                        Error(
+                            sprintf
+                                "surface admission: owner root rejected: %s"
+                                (PromptDispatcher.describeHumanRootAcceptanceFailure failure)
+                        )
+                | Ok _ ->
+                    let journalPort = AgentJournalPortAdapter.fromAgentJournal durable
+
+                    let! linkage =
+                        HandleController.linkNamed
+                            (Some journalPort)
+                            parentId
+                            agentId
+                            childId
+                            agentId
+                            agentId
+                            role
+                            HandleOwnership.DurableParentHandle
+
+                    match linkage with
+                    | Error reason -> return Error(sprintf "surface admission: handle link failed: %s" reason)
+                    | Ok() ->
+                        match issueCurrentOwnerIdentitySeed (Some durable) parentId agentId with
+                        | Error reason -> return Error(sprintf "surface admission: child identity seed failed: %s" reason)
+                        | Ok identitySeed ->
+                            let! sent =
+                                sendAgentOwnerRootObserved
+                                    sessions
+                                    (Some durable)
+                                    childId
+                                    identitySeed
+                                    None
+                                    (sprintf "surface admission: first work unit for %s" agentId)
+                                    ignore
+
+                            match sent with
+                            | AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) -> return Ok authorityRoot
+                            | AgentOwnerDispatchOutcome.AcceptanceUncertain reason -> return Error reason
+                            | AgentOwnerDispatchOutcome.Rejected reason -> return Error reason
+        }
 
     let private completionBelongsToRun (run: PendingHostRun) (result: AgentRunResult) =
         run.ChildId = result.SessionId && run.AuthorityRoot = result.AuthorityRootUserMessageId

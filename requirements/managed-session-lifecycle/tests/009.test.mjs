@@ -91,9 +91,10 @@ test('WHAT[managed-session-lifecycle-009] EXEC_009_Abandoned_is_not_joinable_and
     HandleSurface.apply(abandoned, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' }).error,
     { kind: 'TransitionRejected', reason: 'AlreadyAbandoned' },
   )
-  // EXEC-009: Retired handles reopen on link for agent reuse. The tombstone is
-  // the prior LastCompletion, not a permanent ban on further Labor.
-  const reopened = HandleSurface.apply(retired.state, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
+  // EXEC-009: Retired handles reopen on an explicit link command for agent
+  // reuse. The tombstone is the prior LastCompletion, not a permanent ban on
+  // further Labor. A journal replay of the same link stays Retired (msl-006).
+  const reopened = HandleSurface.apply(retired.state, { op: 'link-command', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
   assert.equal(reopened.ok, true, `Retired handle must be reopenable, got ${JSON.stringify(reopened)}`)
   assert.equal(stateOf(reopened.state).lifecycle, 'Active')
 })

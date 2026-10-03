@@ -47,21 +47,39 @@ module Mcp =
     let private constructEmpty (constructor: obj) : obj = jsNative
 
     [<Emit("$0.string().describe($1)")>]
-    let private zString (description: string) : obj = jsNative
+    let private zString (z: obj) (description: string) : obj = jsNative
+
+    // MCP's SDK validates tool arguments against the input schema before the
+    // handler runs, and zod objects strip unknown keys by default. The decode
+    // layer must see forbidden fields (work_submit's certificatePatches,
+    // status's smuggled commands) to refuse them by name, so every input
+    // schema becomes a passthrough zod object instead of silently dropping
+    // unknown keys.
+    [<Emit("$0.object($1).passthrough()")>]
+    let private zObjectPassthrough (z: obj) (shape: obj) : obj = jsNative
+
+    [<Emit("$0.string().optional().describe($1)")>]
+    let private zOptionalString (z: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.number().int().min(1).describe($1)")>]
-    let private zCount (description: string) : obj = jsNative
+    let private zCount (z: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.array($1).describe($2)")>]
-    let private zList (item: obj) (description: string) : obj = jsNative
+    let private zList (z: obj) (item: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.object({ id: $1, hash: $2 })")>]
-    let private zSchemaRef (id: obj) (hash: obj) : obj = jsNative
+    let private zSchemaRef (z: obj) (id: obj) (hash: obj) : obj = jsNative
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
 
-    [<Emit("(args) => $0(args)")>]
+    // Wrap every tool result as a real MCP result. Thoth's Encode.record emits
+    // FSharpMap values, which the MCP SDK's zod validation rejects ("expected
+    // record, received FSharpMap"), so the wrapper first deep-converts Fable
+    // maps into plain JSON objects. content carries the readable JSON,
+    // structuredContent carries the business payload, and a refusal is an
+    // explicit isError=true.
+    [<Emit("(args) => $0(args).then((raw) => { const toPlain = (v) => { if (v === null || typeof v !== 'object') { return v } if (Array.isArray(v)) { return v.map(toPlain) } if (typeof v.entries === 'function' && typeof v.get === 'function') { const o = {}; for (const entry of v.entries()) { o[entry[0]] = toPlain(entry[1]) } return o } return v }; const payload = toPlain(raw); return { content: [{ type: 'text', text: JSON.stringify(payload) }], isError: payload.outcome === 'refused', structuredContent: payload } })")>]
     let private unaryHandler (handler: obj -> Task<obj>) : obj = jsNative
 
     [<Emit("$0.connect($1)")>]
@@ -243,7 +261,7 @@ module Mcp =
                 createObj
                     [ "name" ==> Contract.toolName tool
                       "description" ==> description
-                      "inputSchema" ==> inputSchema ]
+                      "inputSchema" ==> zObjectPassthrough zod inputSchema ]
 
             registerTool server (Contract.toolName tool) config (unaryHandler handler)
             |> ignore
@@ -263,60 +281,61 @@ module Mcp =
         let startSchema =
             createObj
                 [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "goalText" ==> zString "The user's goal text, stored byte-exact"
+                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
+                  "goalText" ==> zString zod "The user's goal text, stored byte-exact"
                   "constraints"
-                  ==> zList (zString "one user constraint") "Supplementary constraints the user supplied"
+                  ==> zList zod (zString zod "one user constraint") "Supplementary constraints the user supplied"
                   "materialRefs"
-                  ==> zList (zString "one material ref") "Content refs of material the user attached"
-                  "authorizationRef" ==> zString "Reference proving the user supplied this goal"
-                  "profileRef" ==> zString "The declared profile this inquiry runs under" ]
+                  ==> zList zod (zString zod "one material ref") "Content refs of material the user attached"
+                  "authorizationRef" ==> zString zod "Reference proving the user supplied this goal"
+                  "profileRef" ==> zString zod "The declared profile this inquiry runs under" ]
 
         let workNextSchema =
             createObj
                 [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry whose ready work is claimed"
-                  "limit" ==> zCount "Maximum number of work items to claim" ]
+                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString zod "The inquiry whose ready work is claimed"
+                  "limit" ==> zCount zod "Maximum number of work items to claim" ]
 
         let workSubmitSchema =
             createObj
                 [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry that owns the work"
-                  "workId" ==> zString "The work item this answer belongs to"
-                  "attempt" ==> zCount "The attempt this answer belongs to"
-                  "fence" ==> zString "The logical fence of that attempt"
+                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString zod "The inquiry that owns the work"
+                  "workId" ==> zString zod "The work item this answer belongs to"
+                  "attempt" ==> zCount zod "The attempt this answer belongs to"
+                  "fence" ==> zString zod "The logical fence of that attempt"
                   "canonicalResult"
-                  ==> zString "The worker's canonical answer bytes, kept exactly as returned"
+                  ==> zString zod "The worker's canonical answer bytes, kept exactly as returned"
                   "resultSchema"
-                  ==> zSchemaRef (zString "Schema identity") (zString "Schema content hash")
-                  "clusterId" ==> zString "Ballot cluster this answer belongs to" ]
+                  ==> zSchemaRef zod (zString zod "Schema identity") (zString zod "Schema content hash")
+                  "clusterId" ==> zString zod "Ballot cluster this answer belongs to" ]
 
-        let statusSchema = createObj [ "inquiryId" ==> zString "The inquiry to read" ]
+        let statusSchema = createObj [ "inquiryId" ==> zString zod "The inquiry to read" ]
 
         let cancelSchema =
             createObj
                 [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry to stop"
-                  "reason" ==> zString "Why the caller asked to stop" ]
+                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString zod "The inquiry to stop"
+                  "reason" ==> zString zod "Why the caller asked to stop" ]
 
         let exportSchema =
             createObj
-                [ "inquiryId" ==> zString "The inquiry to export"
+                [ "inquiryId" ==> zString zod "The inquiry to export"
                   "mode"
-                  ==> zString "summary redacts; full declares what the durable store makes replayable" ]
+                  ==> zString zod "summary redacts; full declares what the durable store makes replayable" ]
 
         let goalAmendSchema =
             createObj
                 [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry whose goal is amended"
-                  "authorizedBy" ==> zString "The user authorization reference for this amendment"
+                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString zod "The inquiry whose goal is amended"
+                  "authorizedBy" ==> zString zod "The user authorization reference for this amendment"
+                  "expectedRevision" ==> zString zod "The inquiry revision this amendment is preconditioned on"
                   "addedConstraints"
-                  ==> zList (zString "one added constraint") "Constraints the user added"
-                  "replacementText" ==> zString "Replacement goal text, when the user reworded it" ]
+                  ==> zList zod (zString zod "one added constraint") "Constraints the user added"
+                  "replacementText" ==> zOptionalString zod "Replacement goal text, when the user reworded it" ]
 
         register
             SphinxTool.InquiryStart

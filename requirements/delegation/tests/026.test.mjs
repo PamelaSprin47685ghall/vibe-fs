@@ -170,8 +170,8 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
 
     try {
       // 3. Horizon on the fresh runtime re-adopts the durable Active devops handle
-      //    (syncAdoptDevOps → AdoptExisting → Restore). devops stays idle: no prompt,
-      //    no pending host run, nothing joinable in the journal.
+      //    (syncAdoptDevOps → AdoptChild: identity registration only). devops stays
+      //    idle: no prompt, no pending host run, nothing joinable in the journal.
       const horizon2 = await forkTool.executeHorizon(restarted, owner)
       assert.match(horizon2, /devops/)
       assert.equal(forkTool.durableLifecycleByname(restarted, owner, 'devops'), 'Active')

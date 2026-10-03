@@ -17,4 +17,33 @@ test('WHAT[institutional-learning-006] actual celebrate and regret both accept i
   })
 })
 
-test.todo('WHAT[institutional-learning-006] GAP-181: a reusable positive mechanism has the same BIRTH opportunity as a negative one; two DISCARD receipts cannot prove this')
+test('WHAT[institutional-learning-006] GAP-181: celebrate and regret give a reusable mechanism the same BIRTH opportunity', async () => {
+  await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
+    const session = 'learning-birth-both-verbs'
+    await admit(runtime, session)
+    const ctx = (id) => context(session, id)
+    const experience = 'A reusable mechanism emerged from this work.'
+
+    const candidateOf = (tipName) => ({
+      tipName,
+      enforcerTextEn: 'Enforce the distilled mechanism.',
+      enforcerTextZh: '执行提炼出的机制。',
+      mainTextEn: 'Main handling text.',
+      mainTextZh: 'Main 处置正文。',
+      trigger: 'the same mechanism recurs',
+      negative: 'a one-off local path is not this rule',
+    })
+
+    for (const [verb, callId, tipName] of [
+      ['celebrate', 'c-birth', 'positive-tip'],
+      ['regret', 'r-birth', 'negative-tip'],
+    ]) {
+      const result = await hooks.tool[verb].execute({ experience, candidate: candidateOf(tipName) }, ctx(callId))
+      assert.match(result, /BIRTH/)
+      assert.match(result, new RegExp(tipName))
+    }
+
+    assert.deepEqual(created, [])
+    assert.deepEqual(runtime.prompts, [])
+  })
+})

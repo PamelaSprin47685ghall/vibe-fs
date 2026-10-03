@@ -1028,6 +1028,12 @@ Execution/Delegation/Handle/JoinDrain.fsi
 Execution/Delegation/Handle/JoinDrain.fs
 Execution/Delegation/ChildRecoveryWorkflow.fsi
 Execution/Delegation/ChildRecoveryWorkflow.fs
+Persistence/EventStore/IntegratorEngine.fsi
+Persistence/EventStore/IntegratorEngine.fs
+Composition/Durable/JournalIntegration.fsi
+Composition/Durable/JournalIntegration.fs
+Persistence/EventStore/CanonicalIntegrator.fsi
+Persistence/EventStore/CanonicalIntegrator.fs
 Execution/Delegation/Fork/Host/RunLifecycle.fsi
 Execution/Delegation/Fork/Host/RunLifecycle.fs
 Execution/Delegation/Fork/Host/ChildDispatch.fsi
@@ -1300,12 +1306,6 @@ Repository/Programming/Js/ToolsBindings.fsi
 Repository/Programming/Js/ToolsBindings.fs
 Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
-Persistence/EventStore/IntegratorEngine.fsi
-Persistence/EventStore/IntegratorEngine.fs
-Composition/Durable/JournalIntegration.fsi
-Composition/Durable/JournalIntegration.fs
-Persistence/EventStore/CanonicalIntegrator.fsi
-Persistence/EventStore/CanonicalIntegrator.fs
 Sphinx/V2/Persistence/BodyDto.fsi
 Sphinx/V2/Persistence/BodyDto.fs
 Sphinx/V2/Persistence/Codec.fsi
@@ -1466,6 +1466,8 @@ OpenCode/Plugin/PluginRecoveryWiring.fsi
 OpenCode/Plugin/PluginRecoveryWiring.fs
 OpenCode/Host/BloggerChronicleText.fsi
 OpenCode/Host/BloggerChronicleText.fs
+OpenCode/Host/BloggerChronicleSurface.fsi
+OpenCode/Host/BloggerChronicleSurface.fs
 OpenCode/Plugin/PluginTransforms.fsi
 OpenCode/Plugin/PluginTransforms.fs
 OpenCode/Host/PluginTransformSurface.fsi

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {Surface_isError as isError, Surface_errorValue as errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
+import {isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
   Tool_decodeWorkSubmit as decodeWorkSubmit,
   Tool_refusalCode as refusalCode,
   Tool_refusalPath as refusalPath,
   Tool_refusalMessage as refusalMessage,
 } from '../../../dist/Sphinx/V2/Hosts/Mcp/Tool.js'
-import {Surface_capabilities as capabilities} from '../../../dist/Sphinx/V2/Hosts/OpenCode/Surface.js'
+import {capabilities} from '../../../dist/Sphinx/V2/Hosts/OpenCode/Surface.js'
 
 const refusalOf = result => {
   assert.equal(isError(result), true, 'expected a refused decode')
@@ -28,7 +28,7 @@ const answer = extra => ({
   ...extra,
 })
 
-import {Surface_recoveryAction as recoveryAction, Surface_recoveryMaySpend as recoveryMaySpend} from '../../../dist/Sphinx/V2/Runtime/Surface.js'
+import {recoveryAction, recoveryMaySpend} from '../../../dist/Sphinx/V2/Runtime/Surface.js'
 
 test('WHAT[sphinx-v2-034] recovery classifies an unconfirmed cancellation as awaiting terminal', () => {
   assert.equal(recoveryAction('CancelPending'), 'await-terminal')

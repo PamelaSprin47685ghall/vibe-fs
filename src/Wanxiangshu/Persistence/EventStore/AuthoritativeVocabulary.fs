@@ -3,6 +3,7 @@ namespace Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Sphinx.V2.Core
 
 [<RequireQualifiedAccess>]
 module AuthoritativeEventTypes =
@@ -21,9 +22,10 @@ module AuthoritativeEventTypes =
               yield! JsTransactionEventTypes.all
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
-              // Sphinx clean-break: the only v2 Sphinx kind. The historical sphinx/*
-              // kinds left the production program with the old kernel; old events stay
-              // readable but are never accepted again.
-              "sphinx/v2-transition@1" ]
+              // Sphinx clean-break: the v2 kinds, joined from the owning Core
+              // vocabulary (@1 stays readable, strict @2 is what new writes use).
+              // The historical sphinx/* kinds left the production program with the
+              // old kernel; old events stay readable but are never accepted again.
+              yield! SphinxV2EventTypes.all ]
 
     let isKnown eventType = Set.contains eventType builtins

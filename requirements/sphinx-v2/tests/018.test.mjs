@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {Surface_isOk as isOk, Surface_isError as isError, Surface_errorValue as errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
+import {isOk, isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
   Tool_decodeWorkSubmit as decodeWorkSubmit,
   Tool_refusalCode as refusalCode,

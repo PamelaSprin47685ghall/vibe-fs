@@ -89,7 +89,7 @@ module ExecutionFactFold =
             let byname = canonicalByname payload.Byname payload.TargetAgent
             let priorState = sessionState payload.ParentSessionId
 
-            HandleProjection.linkNamed
+            HandleProjection.replayLink
                 payload.Handle
                 payload.ChildSessionId
                 payload.TargetAgent
@@ -155,7 +155,29 @@ module ExecutionFactFold =
 
         // Clean-break: false abort cell → Active only when ref/digest match.
 
-        | ExecutionFactCases.ChildRunVoided payload -> Ok [ TerminatedChildHandle(payload.ParentSessionId, payload.ChildSessionId) ]
+        | ExecutionFactCases.ChildRunVoided payload ->
+            // crash-reconciliation-018: voiding an orphaned run closes the
+            // child's logical run itself. A bare TerminatedChildHandle would
+            // keep the authority open whenever the parent holds an admitted
+            // work entry for this child (its scopedChild branch defers closure
+            // to work-level settlement), so the void routes through
+            // TerminatedChildWork when a work entry exists. The handle and the
+            // work entry both stay untouched — the interrupted run owes no
+            // delivery, so horizon keeps showing the reusable binding.
+            let priorState = sessionState payload.ParentSessionId
+
+            let handles =
+                priorState
+                |> Option.bind (fun s -> s.Handles)
+                |> Option.defaultValue HandleProjection.empty
+
+            let childWork =
+                handles.Works
+                |> Seq.tryFind (fun (KeyValue(key, _)) -> key.ChildSessionId = payload.ChildSessionId)
+
+            match childWork with
+            | Some(KeyValue(work, record)) -> Ok [ TerminatedChildWork(work, record.LogicalRunId) ]
+            | None -> Ok [ TerminatedChildHandle(payload.ParentSessionId, payload.ChildSessionId) ]
 
         | ExecutionFactCases.HandleFalseCompletionRejected payload ->
             let priorState = sessionState payload.ParentSessionId

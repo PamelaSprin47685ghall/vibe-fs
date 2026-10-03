@@ -316,7 +316,11 @@ module HandleSurface =
     /// Apply one lifecycle command to a projection state.
     ///
     /// Commands:
-    ///   { op: "link", handle, child, agent, role, ownership? }
+    ///   { op: "link", handle, child, agent, role, ownership? } — journal replay
+    ///     semantics: a Retired binding absorbs the replay and stays Retired.
+    ///   { op: "link-command", handle, child, agent, role, ownership? } —
+    ///     explicit command semantics: a Retired binding reopens Labor on the
+    ///     same child session, keeping the LastCompletion tombstone.
     ///   { op: "complete", handle, kind?, ref?, digest? }
     ///   { op: "abandon", handle, reason? }
     ///   { op: "retire", handle }
@@ -327,7 +331,7 @@ module HandleSurface =
         let op = string (command?op)
 
         match op with
-        | "link" ->
+        | "link" | "link-command" ->
             match parseHandleId (command?handle) with
             | Error e -> inputError e
             | Ok h ->
@@ -344,7 +348,11 @@ module HandleSurface =
                     | Ok ownership ->
                         let child = SessionId.create (string (command?child))
                         let agent = string (command?agent)
-                        HandleProjection.link h child agent role ownership projection |> resultOf
+                        (if op = "link" then
+                            HandleProjection.replayLink h child agent agent role ownership projection
+                         else
+                            HandleProjection.link h child agent role ownership projection)
+                        |> resultOf
 
         | "complete" ->
             match parseHandleId (command?handle) with

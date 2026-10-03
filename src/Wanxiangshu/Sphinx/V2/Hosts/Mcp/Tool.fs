@@ -64,6 +64,7 @@ type GoalAmendArgs =
     { CommandId: string
       InquiryId: string
       AuthorizedBy: string
+      ExpectedRevision: string
       AddedConstraints: string list
       ReplacementText: string option }
 
@@ -289,21 +290,25 @@ module Tool =
                 Decode.stringField raw "authorizedBy"
                 |> Result.mapError fromWire
                 |> Result.bind (fun authorizedBy ->
-                    Decode.uniqueStringListField raw "addedConstraints"
+                    Decode.stringField raw "expectedRevision"
                     |> Result.mapError fromWire
-                    |> Result.bind (fun addedConstraints ->
-                        let replacement =
-                            if hasField raw "replacementText" then
-                                Decode.stringField raw "replacementText"
-                                |> Result.mapError fromWire
-                                |> Result.map Some
-                            else
-                                Ok None
+                    |> Result.bind (fun expectedRevision ->
+                        Decode.uniqueStringListField raw "addedConstraints"
+                        |> Result.mapError fromWire
+                        |> Result.bind (fun addedConstraints ->
+                            let replacement =
+                                if hasField raw "replacementText" then
+                                    Decode.stringField raw "replacementText"
+                                    |> Result.mapError fromWire
+                                    |> Result.map Some
+                                else
+                                    Ok None
 
-                        replacement
-                        |> Result.map (fun replacementText ->
-                            { CommandId = commandId
-                              InquiryId = inquiryId
-                              AuthorizedBy = authorizedBy
-                              AddedConstraints = addedConstraints
-                              ReplacementText = replacementText })))))
+                            replacement
+                            |> Result.map (fun replacementText ->
+                                { CommandId = commandId
+                                  InquiryId = inquiryId
+                                  AuthorizedBy = authorizedBy
+                                  ExpectedRevision = expectedRevision
+                                  AddedConstraints = addedConstraints
+                                  ReplacementText = replacementText }))))))
