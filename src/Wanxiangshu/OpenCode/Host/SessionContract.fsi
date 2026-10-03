@@ -17,7 +17,8 @@ type ILoopSensor =
     abstract Observe: raw: obj -> unit
 
     abstract ConsumeAbortCause:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> AbortCause
+        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option ->
+            System.Threading.Tasks.Task<AbortCause>
 
     abstract DropSession: sessionId: SessionId -> unit
     abstract ResetDetector: sessionId: SessionId -> unit

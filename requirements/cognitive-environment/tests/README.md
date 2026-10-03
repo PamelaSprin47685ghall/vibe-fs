@@ -7,8 +7,8 @@
 - 012 检查 Manager 的完整 Role Law 与 Quality Ledger 资源确实进入生成提示；不能据此断言评审独立、诚实或双语语义一致。
 - 原 002 的异地工作目录加载测试迁到 provider-language 009，并比较完整加载结果。原 006 的成对资源扫描由 provider-language 006 的实际门禁承担；汉字比例不是翻译质量门槛。
 - 001/002/004/006—011/013/016 涉及权威归属、语义分工或实际 Agent 行为，当前没有可区分的执行证据。原单词禁令会误伤“不要越权”的合规表达，固定长句也会阻止合规改写，因此不再用它们宣称满足。
-- 015 已升级为行为级测试：经 `BloggerChronicleSurface` 的真实 `maybeInject` 执行注入，10 用例（5 静态 + 5 行为：白名单命中/未命中、去重、零持久化快照、英文绑定）全部通过；双语文案已从 Host 内联迁至 `resources/provider/cognitive-environment/blogger-chronicle-text/`。GAP-077 已关闭。
+- 015 新增五项直接 Surface 行为用例：真实 `maybeInject` 读取 committed exact lease 和 EventStore companion 投影，检查白名单命中/未命中、同一转换输出去重、journal 字节不变和英文绑定。双语文案已迁至 `resources/provider/cognitive-environment/blogger-chronicle-text/`。另五项静态检查只证明资源文字与源码形状，不能计作执行注入的证明。GAP-077 为 PARTIAL：这些用例没有经过注册 Host hook 或实际 Provider 请求，未证明 Host 历史与下一请求不受污染，也未覆盖非 companion、无 exact lease 或空模型身份。
 
-本文件不新增产品义务。分类依据与必要一致性以 WHAT 为准；没有把 README 中的 fixture、资源路径或检查手法设为唯一实现。待决与人工审阅线索见[迁移记录](../../../proposals/20模块迁移-环境与权限-2026-09-28.md)。
+本文件不新增产品义务。分类依据与必要一致性以 WHAT 为准；没有把 README 中的 fixture、资源路径或检查手法设为唯一实现。待决与人工审阅线索见[迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-环境与权限-2026-09-28.md)。
 
 通过正式验证入口选择本包编号测试及 requirement-system；联动选择 provider-language 009。先完成正式构建，再运行检查。TODO 会使正式入口返回非零；测试执行完毕不等于本包验收完成。

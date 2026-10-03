@@ -40,6 +40,8 @@ Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token led
 
 物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同一 PhysicalUserMessageId 的执行与重试严格复用已有 target 与 capacity fence，不重新触发调度器，亦严禁在同一 physical 内改变 Role、participant 或切换 agent；同一 SessionId 出现新 PhysicalUserMessageId（fresh physical execution）时原子替代旧租约，并将该 run 不可变的 canonical Role 重新经 MJS 调度器路由至 target（可选择新 target；仅当旧执行仍是当前活跃执行时才将其 target 作为 `previous` 传入供优先续用），但绝不改变 participant identity 或 Role。provider step 结束时必须把实际 lease target 与 exact `ProviderRunIdentity` 绑定；failure settlement 只可原子消费该 witness，禁止从 mutable session-last target 猜测失败 provider。每个 session 最多保留 latest run witness，新 run 自动废除旧 witness。租约不以 SessionId 为单位跨物理执行永久绑定；exact terminal 释放后不存在 session 级 previous 缓存。
 
+成功建立新物理执行的 `Admitted` lease 或 `Queued` demand 才构成原子替代。调度返回 `null` 且 pending queue 已满时，新输入必须以 `CapacityQueueFull` 拒绝，保留旧 exact lease、token 和 pending ownership；不得先退休旧执行后再发现无处排队。队列已满但 scheduler 能立即发放 target 时，仍允许直接入场，不得仅凭队列长度拒绝。
+
 ## [007] physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
 租约释放必须依赖确切的物理执行终结证据（无 error、completed assistant、`finish` 明确属于 `stop | length | content-filter`，且其 parentID 匹配 PhysicalUserMessageId）。

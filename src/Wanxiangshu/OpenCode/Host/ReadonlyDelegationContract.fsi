@@ -36,11 +36,22 @@ module ReadonlyDelegationContract =
     /// manager review contract's own saved record is never touched.
     val hide: args: obj -> unit
 
+    /// Bind a new stash only after hiding completes. Missing identity and
+    /// unfinished hides never become a same-call repeat witness.
+    val hideForCall: owner: ProtocolArgumentCall option -> args: obj -> unit
+
+    /// Classifies parameter cleanup ownership only; it grants no tool permission.
+    val classifyHiddenArguments: owner: ProtocolArgumentCall option -> args: obj -> HiddenProtocolArguments
+
     /// Restores both protocol fields from the private module Symbol on the
     /// args object. Idempotent (no-op when no record is present, e.g. when
     /// the after hook receives a different object than before). Throws
     /// TypeError if the object is frozen/non-extensible.
     val restore: args: obj -> unit
+
+    /// Normal after callbacks release only their own stash, including when
+    /// hidden fields were reintroduced. Missing identity cannot release a bound stash.
+    val restoreForCall: owner: ProtocolArgumentCall option -> args: obj -> unit
 
     /// Validates the estimated_readonly_rounds value at the JS boundary
     /// before constructing the F# budget type: only a native finite integer

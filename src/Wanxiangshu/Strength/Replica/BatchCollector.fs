@@ -47,6 +47,7 @@ module StrengthBatchCollector =
 
     let private isRequestBoundary (message: ProviderProjection.WireMessage) =
         String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+        || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
 
     let private addResult
         (callIds: Set<string>)

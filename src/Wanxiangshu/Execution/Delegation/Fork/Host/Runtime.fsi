@@ -138,6 +138,7 @@ type HostForkRuntime =
     member PendingRunCount: int
     member PendingCompletionCount: int
     member IsCancelled: bool
+    member internal IsCancelling: bool
 
     member TrackPtyRun: id: PtyId -> unit
     member RegisterPtySnapshot: id: PtyId -> command: string -> unit

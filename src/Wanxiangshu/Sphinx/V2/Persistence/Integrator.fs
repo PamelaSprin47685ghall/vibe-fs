@@ -46,7 +46,7 @@ module Integrator =
     let private streamOf inquiryId =
         "sphinx-v2/" + InquiryId.value inquiryId
 
-    let private lookupParentState (states: Current) inquiryId parent =
+    let private acceptedParentState (states: Current) inquiryId parent : Result<InquiryState option, string> =
         match parent with
         | None -> Ok None
         | Some eventId ->
@@ -63,7 +63,7 @@ module Integrator =
 
         match Map.tryFind (streamOf inquiryId) states.Unavailable with
         | Some reason -> Error reason
-        | None -> lookupParentState states inquiryId parent
+        | None -> acceptedParentState states inquiryId parent
 
     /// One registered business oracle; only the shared engine owns enumeration,
     /// canonical ordering, storage validation and the durable cut protocol.
@@ -129,7 +129,7 @@ module Integrator =
                         { states with
                             Unavailable = Map.add stream reason states.Unavailable }) }
 
-    let private historyState (states: Current) (inquiryId: InquiryId) =
+    let private publishedInquiryState (states: Current) inquiryId : Result<InquiryState option, CurrentError> =
         match Map.tryFind inquiryId states.Histories with
         | None -> Ok None
         | Some history when Set.count history.Heads = 1 -> Ok(Map.tryFind (Set.minElement history.Heads) history.States)
@@ -152,4 +152,4 @@ module Integrator =
 
         match Map.tryFind (streamOf inquiryId) states.Unavailable with
         | Some reason -> Error(CurrentError.SemanticRejected reason)
-        | None -> historyState states inquiryId
+        | None -> publishedInquiryState states inquiryId

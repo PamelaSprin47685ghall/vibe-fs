@@ -43,7 +43,7 @@ module ChangeSurface =
 
     val createGit: repo: string -> runner: obj -> obj
 
-    val gitIsDirty: git: obj -> path: string -> Task<bool>
+    val gitIsDirty: git: obj -> path: string -> Task<obj>
 
 
     val observeManagerLoopBurst: count: int -> Task<obj>

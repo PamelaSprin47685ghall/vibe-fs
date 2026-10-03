@@ -12,6 +12,7 @@ import { OPENCODE_BIN, initGitWorkspace } from '../../../verification-system/tes
 import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js';
 import { readRequestBody, startHttpServer, stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js';
 import { resolvePluginPath } from '../../../verification-system/tests/e2e/support/scenario-paths.js';
+import { isCanaryTurnSettled, managerReviewStage } from './manager-review-canary-turn.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../../..');
@@ -33,7 +34,7 @@ const pluginPackageJsonPath = path.join(repoRoot, 'node_modules/@opencode-ai/plu
 const pluginVersion = JSON.parse(fs.readFileSync(pluginPackageJsonPath, 'utf8')).version;
 const opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim().replace(/^v/, '');
 assert.equal(pluginVersion, fixture.targetVersion);
-assert.match(opencodeVersion, /^1\.18\./);
+assert.equal(opencodeVersion, fixture.targetVersion);
 assert.ok(productionPluginPath, 'production plugin must be available');
 
 const REVIEW_TOOLS = ['js-manager'];
@@ -42,7 +43,6 @@ const CONTRACT_TOKEN = 'do-not-use-except-for-review';
 const CANCEL_ARGUMENTS = {
   program: 'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
   contract: CONTRACT_TOKEN,
-  estimated_readonly_rounds: 0,
 };
 
 // ── Collector setup ──────────────────────────────────────────────────────────
@@ -63,18 +63,19 @@ const waitFor = (predicate, timeoutMs = 25000) => {
   const existing = observations.find(predicate);
   if (existing) return Promise.resolve(existing);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      const idx = waiters.findIndex((w) => w.resolve === resolve);
-      if (idx >= 0) waiters.splice(idx, 1);
-      reject(new Error(`Timed out waiting for ${predicate.toString()} after ${timeoutMs}ms`));
-    }, timeoutMs);
-    waiters.push({
+    const pending = {
       predicate,
       resolve: (value) => {
         clearTimeout(timer);
         resolve(value);
       },
-    });
+    };
+    const timer = setTimeout(() => {
+      const idx = waiters.indexOf(pending);
+      if (idx >= 0) waiters.splice(idx, 1);
+      reject(new Error(`Timed out waiting for ${predicate.toString()} after ${timeoutMs}ms`));
+    }, timeoutMs);
+    waiters.push(pending);
   });
 };
 
@@ -106,9 +107,9 @@ const wireInspection = {
   providerVisibleToolNames: [],
   providerVisibleProtocolAbsence: false,
 };
+let normalFollowupObserved = false;
 
 let sessionID = null;
-let managerStep = 0;
 
 const isTitleRequest = (body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
@@ -143,7 +144,7 @@ const isManagerRequest = (request, body) => {
   // Review tools are strictly exclusive to Role.Manager
   const hasManagerReviewTools = toolNames.includes('js-manager');
 
-  if (!hasManagerReviewTools) {
+  if (!hasManagerReviewTools || managerReviewStage(body) === null) {
     return false;
   }
 
@@ -151,11 +152,9 @@ const isManagerRequest = (request, body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   const hasBloggerPrompt = messages.some(
     (m) =>
-      (m?.role === 'system' || m?.role === 'user') &&
+      m?.role === 'system' &&
       typeof m?.content === 'string' &&
-      (m.content.includes('role/blogger') ||
-        m.content.includes('BloggerSystemPrompt') ||
-        m.content.includes('Call the chronicle tool exactly once now')),
+      (m.content.includes('role/blogger') || m.content.includes('BloggerSystemPrompt')),
   );
   if (hasBloggerPrompt) {
     return false;
@@ -174,14 +173,21 @@ const provider = await startHttpServer(async (request, response) => {
   if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
     const body = await readRequestBody(request);
     providerRequests.push(body);
+    publish({ kind: 'provider.request.observed', value: {
+      request: providerRequests.length,
+      route: isTitleRequest(body) ? 'title' : isManagerRequest(request, body) ? 'manager' : 'companion',
+      stage: managerReviewStage(body),
+      prompts: (body.messages ?? []).filter((message) => message.role === 'user')
+        .map((message) => typeof message.content === 'string' ? message.content.slice(0, 150) : '<structured>'),
+    } });
 
-    // 1. Isolate Title requests -> return harmless plain text, do not advance manager steps
+    // Title requests do not belong to a canary execution path.
     if (isTitleRequest(body)) {
       sendSSE(response, buildTextChunks(`title_${Date.now()}`, 'Manager Review Canary Title', 1));
       return;
     }
 
-    // 2. Isolate Blogger or other companion sidecars -> return harmless text, do not advance manager steps
+    // Companion sidecars do not belong to a canary execution path.
     if (!isManagerRequest(request, body)) {
       const chronicle = (body.tools ?? []).find((tool) => (tool?.function?.name ?? tool?.name) === 'chronicle');
       if (chronicle) {
@@ -200,12 +206,11 @@ const provider = await startHttpServer(async (request, response) => {
       return;
     }
 
-    // 3. Target Manager session requests: step exclusively for manager lane
-    managerStep += 1;
+    const stage = managerReviewStage(body);
 
-    // Manager Step 1: Initial prompt -> issue js-manager tool call (with contract)
-    if (managerStep === 1) {
-      if (Array.isArray(body.tools)) {
+    // Normal call.
+    if (stage === 1) {
+      if (Array.isArray(body.tools) && wireInspection.providerVisibleToolNames.length === 0) {
         wireInspection.providerVisibleToolNames = body.tools.map((tool) => tool?.function?.name ?? tool?.name).sort();
         wireInspection.providerVisibleProtocolAbsence = body.tools.every((tool) => {
           const properties = tool?.function?.parameters?.properties ?? tool?.parameters?.properties ?? {};
@@ -226,70 +231,47 @@ const provider = await startHttpServer(async (request, response) => {
         argsStr: JSON.stringify({
           program: "class Js extends JsProgram { async run() { const f = await this.file('fixture-sample.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
-          estimated_readonly_rounds: 0,
         }),
       };
       sendSSE(response, buildToolCallChunks('call_read_norm_1', call.name, call.argsStr, 10));
       return;
     }
 
-    // Manager Step 2: Follow-up after js-manager normal execution
-    if (managerStep === 2) {
-      const historical = (body.messages ?? []).flatMap((message) => message.tool_calls ?? [])
-        .find((call) => call.id === 'call_read_norm_1');
-      wireInspection.historicalToolCallPreservesContract =
-        historical !== undefined && JSON.parse(historical.function?.arguments ?? '{}').contract === CONTRACT_TOKEN;
+    // The same physical turn's follow-up proves history and schema stability.
+    if (stage === 2) {
+      if (!normalFollowupObserved) {
+        normalFollowupObserved = true;
+        const historical = (body.messages ?? []).flatMap((message) => message.tool_calls ?? [])
+          .find((call) => call.id === 'call_read_norm_1');
+        wireInspection.historicalToolCallPreservesContract =
+          historical !== undefined && JSON.parse(historical.function?.arguments ?? '{}').contract === CONTRACT_TOKEN;
+        const toolNames = (body.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
+        wireInspection.round2ToolsStable = JSON.stringify(toolNames.sort()) === JSON.stringify(wireInspection.providerVisibleToolNames);
+      }
       sendSSE(response, buildTextChunks('resp_read_norm_done', 'CANARY_READ_DONE', 15));
       return;
     }
 
-    // Manager Step 3: Stability verification prompt (inspect history and tools)
-    if (managerStep === 3) {
-      let foundContractInHistory = false;
-      for (const msg of body.messages ?? []) {
-        if (msg.role === 'assistant' && Array.isArray(msg.tool_calls)) {
-          for (const tc of msg.tool_calls) {
-            try {
-              const parsedArgs = JSON.parse(tc.function?.arguments ?? '{}');
-              if (parsedArgs.contract === CONTRACT_TOKEN) {
-                foundContractInHistory = true;
-              }
-            } catch {}
-          }
-        }
-      }
-      wireInspection.historicalToolCallPreservesContract ||= foundContractInHistory;
-
-      const toolNames = (body.tools ?? []).map((t) => t?.function?.name ?? t?.name);
-      wireInspection.round2ToolsStable = JSON.stringify(toolNames.sort()) === JSON.stringify(wireInspection.providerVisibleToolNames);
-
-      publish({ kind: 'manager.stability.done' });
-      sendSSE(response, buildTextChunks('resp_stability_done', 'CANARY_STABILITY_DONE', 20));
-      return;
-    }
-
-    // Manager Step 4: Error path prompt -> issue js-manager with nonexistent file
-    if (managerStep === 4) {
+    // Business error call.
+    if (stage === 4) {
       const call = {
         name: 'js-manager',
         argsStr: JSON.stringify({
           program: "class Js extends JsProgram { async run() { const f = await this.file('nonexistent-missing-file.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
-          estimated_readonly_rounds: 0,
         }),
       };
       sendSSE(response, buildToolCallChunks('call_read_err_1', call.name, call.argsStr, 25));
       return;
     }
 
-    // Manager Step 5: Follow-up after tool error
-    if (managerStep === 5) {
+    if (stage === 5) {
       sendSSE(response, buildTextChunks('resp_err_done', 'CANARY_ERROR_DONE', 30));
       return;
     }
 
-    // Manager Step 6: Cancellation path prompt -> issue long-running js-manager call
-    if (managerStep === 6) {
+    // Cancellation call.
+    if (stage === 6) {
       const call = {
         name: 'js-manager',
         argsStr: JSON.stringify(CANCEL_ARGUMENTS),
@@ -298,13 +280,12 @@ const provider = await startHttpServer(async (request, response) => {
       return;
     }
 
-    // Fallback if additional manager steps arrive
-    if (managerStep === 7) {
+    if (stage === 7) {
       const cancelled = (body.messages ?? []).flatMap((message) => message.tool_calls ?? [])
         .find((call) => call.id === 'call_js_cancel_1');
       publish({ kind: 'manager.cancellation.history', value: cancelled?.function?.arguments ?? null });
     }
-    sendSSE(response, buildTextChunks(`resp_step_${managerStep}`, 'CANARY_OK', 40));
+    sendSSE(response, buildTextChunks(`resp_stage_${stage}`, 'CANARY_OK', 40));
     return;
   }
 
@@ -313,35 +294,18 @@ const provider = await startHttpServer(async (request, response) => {
 
 // ── Host client helper ──────────────────────────────────────────────────────
 
-const isTransientHostError = (status, text) =>
-  status >= 500 && /Unexpected server error/i.test(text ?? '');
-
-const requestOnce = async (baseUrl, method, pathname, body) => {
+const request = async (baseUrl, method, pathname, body, expectedStatus) => {
   const response = await fetch(baseUrl + pathname, {
     method,
     headers: { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  return { status: response.status, text };
-};
-
-/** Up to 3 attempts on Host 5xx "Unexpected server error" — intermittent on
- * Linux CI with OpenCode 1.18.29 while Darwin 1.18.31 stays green. Harness-only. */
-const request = async (baseUrl, method, pathname, body, expectedStatus) => {
-  const backoffsMs = [0, 250, 750];
-  let status = 0;
-  let text = '';
-  for (const delayMs of backoffsMs) {
-    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    ({ status, text } = await requestOnce(baseUrl, method, pathname, body));
-    if (!isTransientHostError(status, text)) break;
-  }
   if (expectedStatus !== undefined) {
     const allowed = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
-    assert.ok(allowed.includes(status), `${method} ${pathname}: ${text}`);
+    assert.ok(allowed.includes(response.status), `${method} ${pathname}: ${text}`);
   }
-  return { status, data: text ? JSON.parse(text) : null };
+  return { status: response.status, data: text ? JSON.parse(text) : null };
 };
 
 const sessionIdOf = ({ data }) => data?.data?.data?.id ?? data?.data?.id ?? data?.id;
@@ -352,6 +316,24 @@ const prompt = (messageID, text) => ({
   model: { providerID: 'test', modelID: 'test-model' },
   parts: [{ type: 'text', text }],
 });
+
+const waitForTurnSettled = async (messageID) => {
+  const deadline = Date.now() + 25000;
+  let state;
+  while (Date.now() < deadline) {
+    const messages = await request(host.baseUrl, 'GET', `/session/${sessionID}/message`, undefined, 200);
+    const statuses = await request(host.baseUrl, 'GET', '/session/status', undefined, 200);
+    state = { sessionID, messageID, messages: messages.data, status: statuses.data?.[sessionID] };
+    if (isCanaryTurnSettled(state)) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Physical canary turn did not settle after 25000ms: ${JSON.stringify({
+    sessionID, messageID, status: state?.status, messages: state?.messages.map(({ info }) => ({
+      messageID: info.id, parentID: info.parentID, role: info.role,
+      finish: info.finish, completed: info.time?.completed, error: info.error,
+    })),
+  })}`);
+};
 
 // ── Run Canary Scenario ─────────────────────────────────────────────────────
 
@@ -368,6 +350,15 @@ fs.writeFileSync(
 await initGitWorkspace(workspace);
 
 const host = new ProcessHost();
+const sessionIDs = [];
+const createManagerSession = async () => {
+  const sessionRes = await request(host.baseUrl, 'POST', '/api/session', {
+    agent: 'manager', model: { providerID: 'test', id: 'test-model' },
+  }, 200);
+  sessionID = sessionIdOf(sessionRes);
+  assert.ok(sessionID, 'session creation failed to return sessionID');
+  sessionIDs.push(sessionID);
+};
 
 try {
   await host.start({
@@ -380,18 +371,7 @@ try {
     },
   });
 
-  const sessionRes = await request(
-    host.baseUrl,
-    'POST',
-    '/api/session',
-    {
-      agent: 'manager',
-      model: { providerID: 'test', id: 'test-model' },
-    },
-    200,
-  );
-  sessionID = sessionIdOf(sessionRes);
-  assert.ok(sessionID, 'session creation failed to return sessionID');
+  await createManagerSession();
 
   // 1. Normal js-manager prompt
   const msg1 = 'msg_canary_prompt_1';
@@ -401,43 +381,44 @@ try {
   const normBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_read_norm_1',
   );
+  assert.equal(normBeforeObs.value.sessionID, sessionID);
+  assert.equal(normBeforeObs.value.physicalUserMessageID, msg1);
   const normAfterObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_read_norm_1',
   );
   const normalTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_norm_1',
   );
-  await waitFor(({ kind, value, sequence }) =>
-    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > normalTerminal.sequence);
+  await waitForTurnSettled(msg1);
 
-  // 2. Round 2: stability prompt
-  const msg2 = 'msg_canary_prompt_2';
-  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg2, 'VERIFY_STABILITY'), 200);
-  const stability = await waitFor(({ kind }) => kind === 'manager.stability.done');
-  await waitFor(({ kind, value, sequence }) =>
-    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > stability.sequence);
-
-  // 3. Round 3: error path (read nonexistent file)
+  // Each execution path owns its physical prompt; automatic Manager continuations
+  // must not compete with the next canary case in the same session.
+  await createManagerSession();
+  // 2. Error path (read nonexistent file)
   const msg3 = 'msg_canary_prompt_3';
   await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg3, 'TRIGGER_ERROR'), 200);
   const errBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_read_err_1',
   );
+  assert.equal(errBeforeObs.value.sessionID, sessionID);
+  assert.equal(errBeforeObs.value.physicalUserMessageID, msg3);
   const errAfterObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_read_err_1',
   );
   const errorTerminal = await waitFor(
     ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_err_1',
   );
-  await waitFor(({ kind, value, sequence }) =>
-    kind === 'session.idle.observed' && value?.sessionID === sessionID && sequence > errorTerminal.sequence);
+  await waitForTurnSettled(msg3);
 
-  // 4. Round 4: cancellation path (long task + abort)
+  await createManagerSession();
+  // 3. Cancellation path (long task + abort)
   const msg4 = 'msg_canary_prompt_4';
   await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(msg4, 'TRIGGER_CANCEL'), 204);
   const cancelBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_js_cancel_1',
   );
+  assert.equal(cancelBeforeObs.value.sessionID, sessionID);
+  assert.equal(cancelBeforeObs.value.physicalUserMessageID, msg4);
   const cancelRunningObs = await waitFor(
     ({ kind, value }) => kind === 'tool.running.observed' && value?.callID === 'call_js_cancel_1',
   );
@@ -543,21 +524,25 @@ try {
 } catch (err) {
   console.error('[run-manager-review-tools-canary] Canary failed:', err);
   console.error(JSON.stringify({
-    observations: observations.slice(-20).map(({ sequence, kind, value }) => ({
-      sequence, kind, sessionID: value?.sessionID, callID: value?.callID, status: value?.status, toolName: value?.toolName,
-    })),
+    observations: observations.filter(({ kind }) => kind !== 'tool.definition.observed' && kind !== 'tool.terminal.observed')
+      .slice(-80),
     providerRequests: providerRequests.map((body) => (body.messages ?? [])
       .filter((message) => message.role === 'user')
       .map((message) => typeof message.content === 'string' ? message.content.slice(0, 150) : '<structured>')),
-    providerRequestsCount: providerRequests.length, managerStep,
+    providerRequestsCount: providerRequests.length,
   }));
   console.error(`Host stdout:\n${host.stdoutLog}\nHost stderr:\n${host.stderrLog}`);
+  const hostLogDir = path.join(scenarioDir, 'xdg', 'data', 'opencode', 'log');
+  if (fs.existsSync(hostLogDir)) {
+    for (const name of fs.readdirSync(hostLogDir).filter((name) => name.endsWith('.log'))) {
+      console.error(`Host server log ${name}:\n${fs.readFileSync(path.join(hostLogDir, name), 'utf8').split('\n').slice(-80).join('\n')}`);
+    }
+  }
   process.exitCode = 1;
 } finally {
-  if (sessionID && host.baseUrl) {
-    try {
-      await request(host.baseUrl, 'POST', `/session/${sessionID}/abort`, {}, 204);
-    } catch {}
+  for (const ownedSessionID of sessionIDs) {
+    if (!host.baseUrl) break;
+    try { await request(host.baseUrl, 'POST', `/session/${ownedSessionID}/abort`, {}, [200, 204]); } catch {}
   }
   try {
     await host.stop();

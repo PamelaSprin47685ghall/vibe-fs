@@ -169,18 +169,7 @@ module ChildRecoveryWorkflow =
         | Some pulse -> pulse ()
         | None -> ()
 
-    let private commitRecoveredWork
-        (journal: AgentJournalPort option)
-        (durable: AgentJournalPort)
-        (parentId: SessionId)
-        (proof: JoinableCompletion)
-        (payload: CompletedPayload)
-        : Task<Result<unit, string>> =
-        let work =
-            { Handle = JoinableCompletion.handle proof
-              ChildSessionId = JoinableCompletion.childSession proof
-              AuthorityRoot = AuthorityRootUserMessageId.create payload.AuthorityRoot }
-
+    let private commitAdmittedTerminal journal parentId proof (durable: AgentJournalPort) (work: HandleWorkId) =
         let projection = durable.HandleProjection parentId
 
         match HandleProjection.tryAdmittedWork work projection, HandleProjection.tryWork work projection with
@@ -192,14 +181,15 @@ module ChildRecoveryWorkflow =
             Task.FromResult(Ok())
         | _ -> Task.FromResult(Error "historical or unmatched terminal has no scoped admission")
 
-    let private commitDecodedJoinable
-        (journal: AgentJournalPort option)
-        (durable: AgentJournalPort)
-        (parentId: SessionId)
-        (proof: JoinableCompletion)
-        : Task<Result<unit, string>> =
+    let private commitDecodedTerminal journal parentId proof durable =
         match JoinableCompletion.body proof |> Option.map HandleCompletionCodec.decodeBody with
-        | Some(Current(CompletedV2 payload)) -> commitRecoveredWork journal durable parentId proof payload
+        | Some(Current(CompletedV2 payload)) ->
+            let work =
+                { Handle = JoinableCompletion.handle proof
+                  ChildSessionId = JoinableCompletion.childSession proof
+                  AuthorityRoot = AuthorityRootUserMessageId.create payload.AuthorityRoot }
+
+            commitAdmittedTerminal journal parentId proof durable work
         | _ -> Task.FromResult(Error "recovery terminal requires its exact admitted Root; no legacy write fallback")
 
     /// Snapshot recovery must match an existing canonical work; it cannot reopen history.
@@ -210,7 +200,7 @@ module ChildRecoveryWorkflow =
         : Task<Result<unit, string>> =
         match journal with
         | None -> Task.FromResult(Error "completion requires an exact canonical admission")
-        | Some durable -> commitDecodedJoinable journal durable parentId proof
+        | Some durable -> commitDecodedTerminal journal parentId proof durable
 
     let private commitAbandon
         (ports: Ports)

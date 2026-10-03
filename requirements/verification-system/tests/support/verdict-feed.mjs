@@ -24,6 +24,8 @@
 // are genuine progress reports from a lane that must be RECORDED and must NOT renew, which is
 // exactly the distinction `Watchdog.advance` already draws for canary sidecars.
 
+import { testEntryFile } from './test-run-state.mjs';
+
 /** Events that prove one test reached a verdict. */
 const BLOCKING = new Set(['test:pass', 'test:fail', 'test:complete']);
 
@@ -47,7 +49,7 @@ export function classifyVerdict(event) {
   if (typeof type !== 'string') return null;
 
   const name = typeof event?.data?.name === 'string' ? event.data.name : '(unnamed)';
-  const file = typeof event?.data?.file === 'string' ? event.data.file : '(no file)';
+  const file = testEntryFile(event) || '(no file)';
 
   if (BLOCKING.has(type)) return { blocking: true, reason: `${type}:${name}`, lane: file };
   if (BACKGROUND.has(type)) return { blocking: false, reason: type, lane: file };

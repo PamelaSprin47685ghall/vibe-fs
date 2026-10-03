@@ -1206,7 +1206,7 @@ module ChangeSurface =
                         Ok value
 
             let git: GitPort =
-                { IsDirty = fun _ -> Task.FromResult false
+                { IsDirty = fun _ -> Task.FromResult(Ok false)
                   CreateWorktree = fun _ _ -> Task.FromResult(Ok worktreeIdentity)
                   FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
                   Rebase =
@@ -1600,8 +1600,11 @@ module ChangeSurface =
         | Ok value -> box {| ok = true; value = valueOf value |}
         | Error error -> box {| ok = false; error = error |}
 
-    let gitIsDirty (git: obj) (path: string) : Task<bool> =
-        (git :?> GitHandle).Port.IsDirty(WorktreePath.create path)
+    let gitIsDirty (git: obj) (path: string) : Task<obj> =
+        task {
+            let! result = (git :?> GitHandle).Port.IsDirty(WorktreePath.create path)
+            return resultObject result box
+        }
 
     let gitFreezeTargetBranch (git: obj) : Task<obj> =
         task {

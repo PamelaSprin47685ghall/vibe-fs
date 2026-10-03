@@ -107,7 +107,8 @@ test('WHAT[provider-projection-009] CTX_013_tool_call_renders_as_new_work_table_
   )
 })
 test('WHAT[provider-projection-009] CTX_013_a_multiline_body_keeps_the_key_order_and_uses_a_literal_string', () => {
-  const rendered = bt.renderItem(item(part.toolCall('edit', '{\n  "a": 1\n}'), { role: 'assistant' }))
+  const argumentsText = '{\n  "a": 1\n}\n'
+  const rendered = bt.renderItem(item(part.toolCall('edit', argumentsText), { role: 'assistant' }))
 
   assert.equal(
     rendered,
@@ -122,7 +123,7 @@ test('WHAT[provider-projection-009] CTX_013_a_multiline_body_keeps_the_key_order
     ].join('\n') + '\n',
   )
 
-  assert.equal(parseToml(rendered).new_work_to_record[0].arguments, '{\n  "a": 1\n}\n')
+  assert.equal(parseToml(rendered).new_work_to_record[0].arguments, argumentsText)
 })
 test('WHAT[provider-projection-009] CTX_013_a_text_part_uses_role_as_field_name', () => {
   const rendered = bt.renderItem(item(part.text('Fix the race.'), { role: 'user' }))

@@ -28,6 +28,10 @@ type AccessTracker =
 /// CASE-003 / KR-003 / KR-014: typed observation capture and substantive access.
 module CasebookCapture =
 
+    type MaintenanceCapture =
+        { DiffSummary: string
+          TargetState: string }
+
     /// Stable content fingerprint.
     val contentHash: text: string -> string
 
@@ -45,7 +49,6 @@ module CasebookCapture =
 
     /// Create an access tracker.
     val createAccessTracker: unit -> AccessTracker
-    val baselineFromObservations: observations: Observation list -> relatedPaths: string list -> obj
 
     /// Record substantive access onto a tracker.
     val recordSubstantiveAccess: tracker: AccessTracker -> toolName: string -> args: obj -> committed: bool -> unit
@@ -63,7 +66,10 @@ module CasebookCapture =
     val freezeCompletionState:
         store: IEventStore -> workspaceRoot: string -> paths: string list -> Task<Result<string, string>>
 
-    val captureBaselineFileStateMap: workspaceRoot: string -> paths: string list -> obj
-
-    /// KR-004 / KR-005: Compute diff between baseline and current workspace.
-    val computeMaintenanceDiff: workspaceRoot: string -> baseline: obj -> Task<obj>
+    /// KR-005 / KR-015: one target capture supplies both the diff and its durable state.
+    val computeMaintenanceDiff:
+        store: IEventStore ->
+        workspaceRoot: string ->
+        paths: string list ->
+        baseline: string ->
+            Task<Result<MaintenanceCapture, string>>

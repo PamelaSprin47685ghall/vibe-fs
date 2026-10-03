@@ -27,7 +27,8 @@ module ChatAdmissionIntent =
           Text: string option }
 
     type DurableSnapshot =
-        { Authority: PromptAuthority.PromptAuthorityProjection option }
+        { Authority: PromptAuthority.PromptAuthorityProjection option
+          AcceptedExecutionEvidence: AcceptedChatExecutionEvidence option }
 
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
@@ -42,6 +43,7 @@ module ChatAdmissionIntent =
         | ManagedIntentMissingPhysicalUserMessageId
         | DurableAuthorityUnavailable
         | InvalidExplicitAgent of string
+        | AcceptedParticipantConflict of ChatExecutionKey * acceptedAgent: string * requestedAgent: string
         | PromptKeyNotClaimed of PromptKey
         | AgentOwnerRootPromptNotClaimed of PromptKey * PromptAuthority.IdentitySeed
         | PromptClaimSessionMismatch of expectedSessionId: SessionId * claimedSessionId: SessionId
@@ -264,10 +266,51 @@ module ChatAdmissionIntent =
         | Some sessionId, Some projection, Some physicalMessageId ->
             resolveWithProjection message projection sessionId physicalMessageId
 
+    let private acceptedHumanRootReplay (message: DecodedMessage) (snapshot: DurableSnapshot) =
+        match
+            snapshot.AcceptedExecutionEvidence, message.SessionId, message.PhysicalUserMessageId, message.PromptKey
+        with
+        | Some accepted, Some sessionId, Some physicalId, None when
+            accepted.SessionId = sessionId
+            && accepted.PhysicalUserMessageId = physicalId
+            && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
+            && not (isHostInternal message)
+            ->
+            let selectedAgent =
+                accepted.IdentitySeed
+                |> PromptAuthority.identitySeedParticipantIdentity
+                |> ParticipantIdentity.selectedAgent
+
+            match message.ExplicitAgent with
+            | Some explicitAgent when explicitAgent <> selectedAgent ->
+                Some(
+                    Decision.Reject(
+                        Rejection.AcceptedParticipantConflict(
+                            { SessionId = accepted.SessionId
+                              PhysicalUserMessageId = accepted.PhysicalUserMessageId },
+                            selectedAgent,
+                            explicitAgent
+                        )
+                    )
+                )
+            | _ ->
+                Some(
+                    Decision.ExternalRootIntent
+                        { Key =
+                            { SessionId = accepted.SessionId
+                              PhysicalUserMessageId = accepted.PhysicalUserMessageId }
+                          ExplicitAgent = selectedAgent
+                          Origin = accepted.Origin
+                          IdentitySeed = accepted.IdentitySeed }
+                )
+        | _ -> None
+
     let resolve (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
         match message.InvalidIdentityCarrier with
         | Some carrier -> Decision.Reject(Rejection.MalformedIdentityCarrier carrier)
-        | None -> resolveValid message snapshot
+        | None ->
+            acceptedHumanRootReplay message snapshot
+            |> Option.defaultWith (fun () -> resolveValid message snapshot)
 
     let private identityCarrierName =
         function
@@ -285,6 +328,13 @@ module ChatAdmissionIntent =
         | Rejection.DurableAuthorityUnavailable -> "Managed chat intent requires a durable authority snapshot"
         | Rejection.InvalidExplicitAgent agent ->
             sprintf "HumanRoot participant identity resolution failed for %s" agent
+        | Rejection.AcceptedParticipantConflict(key, acceptedAgent, requestedAgent) ->
+            sprintf
+                "accepted participant conflict for %s/%s: accepted %s, requested %s"
+                (SessionId.value key.SessionId)
+                (PhysicalUserMessageId.value key.PhysicalUserMessageId)
+                acceptedAgent
+                requestedAgent
         | Rejection.PromptKeyNotClaimed promptKey ->
             sprintf "PromptKey %s is not an exact pending claim" (PromptKey.value promptKey)
         | Rejection.AgentOwnerRootPromptNotClaimed(promptKey, _) ->

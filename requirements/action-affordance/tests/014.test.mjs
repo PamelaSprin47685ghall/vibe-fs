@@ -24,7 +24,7 @@ integrationTest('WHAT[action-affordance-014] assume commits without echoing the 
       { sessionID, agent: 'engineer', callID: 'assume-1', messageID: 'message-assume-1' },
     )
 
-    // The fixed prompt is rendered in the session's bound language; the alternation pins the
+    // The fixed prompt is rendered in the current global language; the alternation pins the
     // whole string instead of merely checking that some answer came back.
     assert.match(
       result,

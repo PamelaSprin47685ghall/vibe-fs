@@ -17,7 +17,7 @@ module internal BodyDto =
                 | Error reason -> Decode.fail reason)
             decoder
 
-    let private decodeExactFields (fields: string list) (decoder: Decoder<'value>) (raw: obj) =
+    let private exactFields (fields: string list) (decoder: Decoder<'value>) (raw: obj) : Decoder<'value> =
         let keys: string array = emitJsExpr raw "Object.keys($0)"
 
         if Set.ofArray keys <> Set.ofList fields then
@@ -36,7 +36,7 @@ module internal BodyDto =
                 if not plain then
                     Decode.fail "expected a plain DTO object"
                 else
-                    decodeExactFields fields decoder raw)
+                    exactFields fields decoder raw)
             Decode.value
 
     let nonBlank =

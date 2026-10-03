@@ -131,6 +131,13 @@ test('WHAT[verification-system-021] the real concurrent runner keeps shared help
     assert.equal(summary.files, 2)
     assert.equal(summary.filesCompleted, 2)
     assert.equal(summary.containerFailures, 0)
+    for (const file of entries) {
+      const owned = messages.filter(({ data }) => data?.entryFile === file)
+      assert.equal(owned[0].type, 'runner:file-start')
+      assert.equal(owned.at(-1).type, 'runner:file-drained')
+      assert.equal(owned.filter(({ type }) => type === 'runner:file-start').length, 1)
+      assert.equal(owned.filter(({ type }) => type === 'runner:file-drained').length, 1)
+    }
     assert.deepEqual(summary.byFile.map(({ file, passed }) => ({ file, passed })).sort((a, b) => a.file.localeCompare(b.file)),
       entries.map((file) => ({ file, passed: 1 })))
   } finally {
@@ -184,7 +191,13 @@ test('WHAT[verification-system-021] a real inner runner completes all leaves bef
   assert.deepEqual(completions.map(isFileCompletionEvent), [false, false, true])
   const summaryIndex = messages.findIndex(({ type }) => type === 'runner:summary')
   const drainedIndex = messages.findIndex(({ type }) => type === 'inner:drained')
-  assert.ok(summaryIndex > messages.indexOf(completions.at(-1)))
+  const fileStartIndex = messages.findIndex(({ type }) => type === 'runner:file-start')
+  const fileDrainIndex = messages.findIndex(({ type }) => type === 'runner:file-drained')
+  assert.equal(fileStartIndex, 0)
+  assert.equal(messages[fileStartIndex].data.entryFile, fixture)
+  assert.equal(messages[fileDrainIndex].data.entryFile, fixture)
+  assert.ok(fileDrainIndex > messages.indexOf(completions.at(-1)))
+  assert.ok(summaryIndex > fileDrainIndex)
   assert.ok(drainedIndex > summaryIndex)
   assert.deepEqual(counts(messages[summaryIndex].data), { passed: 2, failed: 0, skipped: 0, todo: 0, cancelled: 0 })
   assert.equal(messages[summaryIndex].data.filesCompleted, 1)
@@ -192,16 +205,45 @@ test('WHAT[verification-system-021] a real inner runner completes all leaves bef
 
 test('WHAT[verification-system-021] summary and clean exit cannot disguise missing file completion', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'incomplete-test-run-'))
+  const diagnostics = []
+  const originalError = console.error
+  console.error = (...args) => {
+    diagnostics.push(args.join(' '))
+    originalError(...args)
+  }
   try {
     const inner = join(dir, 'inner.mjs')
-    writeFileSync(inner, `process.send({type:'runner:summary',data:{passed:1,failed:0,leafDurations:[]}})
+    writeFileSync(inner, `const file = process.argv[2]
+process.send({type:'runner:file-start',data:{entryFile:file}})
+process.send({type:'runner:file-drained',data:{entryFile:file}})
+process.send({type:'runner:summary',data:{passed:1,failed:0,leafDurations:[]}})
 process.send({type:'inner:drained'})
 `)
     await assert.rejects(superviseNodeTest({
       files: [fixture], inner, env: childEnv, label: 'incomplete-fixture', silenceMs: 10000, throwOnFailure: true,
     }), /supervised suite failed/)
+    assert.match(diagnostics.join('\n'), /incomplete run; no completion for/)
   } finally {
+    console.error = originalError
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-021] aggregate drain cannot replace a planned file stream drain', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'missing-file-drain-'))
+  try {
+    const inner = join(directory, 'inner.mjs')
+    writeFileSync(inner, `const file = process.argv[2]
+process.send({ type: 'runner:file-start', data: { entryFile: file } })
+process.send({ type: 'test:complete', data: { name: file, file, entryFile: file } })
+process.send({ type: 'runner:summary', data: { passed: 1, failed: 0, leafDurations: [] } })
+process.send({ type: 'inner:drained' })
+`)
+    await assert.rejects(superviseNodeTest({
+      files: [fixture], inner, env: childEnv, label: 'missing-file-drain', silenceMs: 1000, throwOnFailure: true,
+    }), /supervised suite failed/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
@@ -256,13 +298,17 @@ test('WHAT[verification-system-021] a known TODO cannot authorize complete accep
   try {
     const inner = join(dir, 'inner.mjs')
     writeFileSync(inner, `const file = process.argv[2];
+process.send({type:'runner:file-start',data:{entryFile:file}});
 process.send({type:'test:complete',data:{name:file,file}});
+process.send({type:'runner:file-drained',data:{entryFile:file}});
 process.send({type:'runner:summary',data:{passed:1,failed:0,todo:1,leafDurations:[]}});
 process.send({type:'inner:drained'});
 `)
-    await assert.rejects(superviseNodeTest({
-      files: [fixture], inner, env: childEnv, label: 'pending-proof', silenceMs: 10000, throwOnFailure: true,
-    }), /supervised suite failed/)
+    for (const env of [childEnv, { ...childEnv, WXS_ACCEPT_TODO: '1' }]) {
+      await assert.rejects(superviseNodeTest({
+        files: [fixture], inner, env, label: 'pending-proof', silenceMs: 10000, throwOnFailure: true,
+      }), /supervised suite failed/)
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

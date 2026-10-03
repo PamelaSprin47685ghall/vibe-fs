@@ -2,6 +2,7 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
+const { execFileSync } = await import("node:child_process");
 const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join, resolve } = await import("node:path");
@@ -16,6 +17,7 @@ const { walk } = await import("../../../scripts/lib/walk.mjs");
 test('WHAT[verification-system-008] assertBuildFresh succeeds on current repository build', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-fresh-build-'))
   try {
+    execFileSync('git', ['init', '--quiet', root])
     const buildStateDir = join(root, '.fable-build')
     const distDir = join(root, 'dist')
     mkdirSync(buildStateDir, { recursive: true })
@@ -60,6 +62,7 @@ test('WHAT[verification-system-008] assertBuildFresh succeeds on current reposit
 test('WHAT[verification-system-008] no-op mode preserves manifest and generation', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-noop-build-'))
   try {
+    execFileSync('git', ['init', '--quiet', root])
     const buildStateDir = join(root, '.fable-build')
     const distDir = join(root, 'dist')
     mkdirSync(buildStateDir, { recursive: true })

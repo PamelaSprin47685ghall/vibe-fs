@@ -128,7 +128,7 @@ module GlobalProviderLanguage =
     /// HOST-026: the live global preference is the only language authority.
     /// Every Class A render reads it, so changing the setting changes the
     /// language of the next request even mid-session.
-    // DSL-MUTABLE: resource — live global provider language preference
+    // DSL-MUTABLE: resource — live global preference cache, replaced by host configuration refresh
     let mutable private currentLanguage = ProviderLanguage.English
 
     /// Re-resolve the live global preference (env → host config → locale →

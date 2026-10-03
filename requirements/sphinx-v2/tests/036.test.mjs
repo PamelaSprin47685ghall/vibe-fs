@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {createHash} from 'node:crypto'
-import {accessSync, mkdtempSync, rmSync} from 'node:fs'
+import {accessSync, mkdtempSync, realpathSync, rmSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -120,6 +120,15 @@ test('WHAT[sphinx-v2-036] a goal amendment requires its own user authorizer and 
   }
 })
 
+test('WHAT[sphinx-v2-036] goal amendment ingress requires its own checked revision precondition', () => {
+  const args = {commandId: 'c', inquiryId: 'i', expectedRevision: '0', authorizedBy: 'u', addedConstraints: []}
+  assert.equal(isOk(decodeGoalAmend(args)), true)
+  const {expectedRevision, ...withoutRevision} = args
+  for (const invalid of [withoutRevision, {...args, expectedRevision: null}, {...args, expectedRevision: 1}, {...args, expectedRevision: '-1'}, {...args, expectedRevision: 'not-a-revision'}]) {
+    assert.equal(refusalOf(decodeGoalAmend(invalid)).path, 'expectedRevision')
+  }
+})
+
 test('WHAT[sphinx-v2-036] an export mode outside summary and full, and a claim limit that could never admit work, are refused by field', () => {
   assert.equal(refusalOf(decodeExport({inquiryId: 'i', mode: 'everything'})).path, 'mode')
   assert.equal(refusalOf(decodeWorkNext({commandId: 'c', inquiryId: 'i', limit: 0})).path, 'limit')
@@ -199,10 +208,11 @@ async function withSphinxStdio(t, scenario) {
   try { accessSync(serveEntry) }
   catch (cause) { throw new Error('MCP_ENTRY_UNAVAILABLE: 需要最终集成产物 ' + serveEntry, {cause}) }
   const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-mcp-contract-'))
+  const entryPath = realpathSync(serveEntry)
   // SDK 默认安全环境加本次目录，不继承父测试的 fatal-disable 或 NODE_OPTIONS。
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [serveEntry],
+    args: [entryPath],
     cwd: commonDir,
     env: {SPHINX_COMMON_DIR: commonDir},
     stderr: 'pipe',
@@ -368,6 +378,9 @@ test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and p
       }
     }
     const amendment = {commandId: 'amend-1', inquiryId, expectedRevision: '0', authorizedBy: 'user-authorizer', addedConstraints: ['keep the original goal']}
+    await t.test('WHAT[sphinx-v2-036] public goal amendment refuses a negative revision before the unsupported driver', async () => {
+      await expectMcpRefusal(session, 'sphinx_goal_amend', {...amendment, expectedRevision: '-1'}, 'INVALID_REVISION', 'expectedRevision', 'negative amendment revision')
+    })
     for (const [label, args] of [
       ['omitted replacementText', amendment],
       ['nonblank replacementText', {...amendment, replacementText: 'user replacement'}],
@@ -413,4 +426,5 @@ test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and p
   })
 })
 
+test.todo('WHAT[sphinx-v2-036] registered writable MCP tools drive durable creation, work claim, result admission and authorized goal amendment through the single runtime')
 test.todo('WHAT[sphinx-v2-036] status/export over real stdio read an existing inquiry without creating leases, calling models or changing business state; receipts and dispatch observers need positive controls')

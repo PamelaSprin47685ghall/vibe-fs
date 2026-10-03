@@ -34,3 +34,6 @@ module SyntheticTomlSurface =
         SyntheticToml.document (List.ofArray instructions) (List.ofArray body)
 
     let byteCount (text: string) : int = SyntheticToml.byteCount text
+
+    let renderStringByteCountPrefix (text: string) (length: int) (suffix: string) : int =
+        SyntheticToml.renderStringByteCountPrefix text length suffix

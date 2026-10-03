@@ -18,16 +18,24 @@ export function startHttpServer(handler) {
   });
 }
 
-export function stopHttpServer(server) {
-  if (!server) return Promise.resolve();
-  return new Promise((resolve) => {
-    try {
-      if (typeof server.closeAllConnections === 'function') {
-        server.closeAllConnections();
-      }
-    } catch {}
-    server.close(() => resolve());
-  });
+export async function stopHttpServer(server) {
+  if (!server) return;
+  const failures = [];
+  const record = (error) => {
+    if (error?.code !== 'ERR_SERVER_NOT_RUNNING') failures.push(error);
+  };
+  try {
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+  } catch (error) { record(error); }
+  try {
+    await new Promise((resolve, reject) => {
+      server.close((error) => error == null ? resolve() : reject(error));
+    });
+  } catch (error) { record(error); }
+  if (failures.length > 1) {
+    throw new AggregateError(failures, 'HTTP server cleanup failed', { cause: failures[0] });
+  }
+  if (failures.length === 1) throw failures[0];
 }
 
 export function handleWebSearch(req, res) {

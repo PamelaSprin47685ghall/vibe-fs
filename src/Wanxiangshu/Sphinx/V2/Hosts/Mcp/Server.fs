@@ -47,39 +47,36 @@ module Mcp =
     let private constructEmpty (constructor: obj) : obj = jsNative
 
     [<Emit("$0.string().describe($1)")>]
-    let private zString (z: obj) (description: string) : obj = jsNative
+    let private zStringOf (z: obj) (description: string) : obj = jsNative
 
-    // MCP's SDK validates tool arguments against the input schema before the
-    // handler runs, and zod objects strip unknown keys by default. The decode
-    // layer must see forbidden fields (work_submit's certificatePatches,
-    // status's smuggled commands) to refuse them by name, so every input
-    // schema becomes a passthrough zod object instead of silently dropping
-    // unknown keys.
-    [<Emit("$0.object($1).passthrough()")>]
-    let private zObjectPassthrough (z: obj) (shape: obj) : obj = jsNative
-
-    [<Emit("$0.string().optional().describe($1)")>]
-    let private zOptionalString (z: obj) (description: string) : obj = jsNative
+    /// A zod string schema carrying a human description.
+    let private zString (description: string) : obj = zStringOf zod description
 
     [<Emit("$0.number().int().min(1).describe($1)")>]
-    let private zCount (z: obj) (description: string) : obj = jsNative
+    let private zCountOf (z: obj) (description: string) : obj = jsNative
+
+    let private zCount (description: string) : obj = zCountOf zod description
 
     [<Emit("$0.array($1).describe($2)")>]
-    let private zList (z: obj) (item: obj) (description: string) : obj = jsNative
+    let private zListOf (z: obj) (item: obj) (description: string) : obj = jsNative
+
+    let private zList (item: obj) (description: string) : obj = zListOf zod item description
 
     [<Emit("$0.object({ id: $1, hash: $2 })")>]
-    let private zSchemaRef (z: obj) (id: obj) (hash: obj) : obj = jsNative
+    let private zSchemaRefOf (z: obj) (id: obj) (hash: obj) : obj = jsNative
+
+    let private zSchemaRef (id: obj) (hash: obj) : obj = zSchemaRefOf zod id hash
+
+    [<Emit("$0.object($1).passthrough()")>]
+    let private zObjectOf (z: obj) (shape: obj) : obj = jsNative
+
+    [<Emit("$0.optional()")>]
+    let private zOptional (schema: obj) : obj = jsNative
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
 
-    // Wrap every tool result as a real MCP result. Thoth's Encode.record emits
-    // FSharpMap values, which the MCP SDK's zod validation rejects ("expected
-    // record, received FSharpMap"), so the wrapper first deep-converts Fable
-    // maps into plain JSON objects. content carries the readable JSON,
-    // structuredContent carries the business payload, and a refusal is an
-    // explicit isError=true.
-    [<Emit("(args) => $0(args).then((raw) => { const toPlain = (v) => { if (v === null || typeof v !== 'object') { return v } if (Array.isArray(v)) { return v.map(toPlain) } if (typeof v.entries === 'function' && typeof v.get === 'function') { const o = {}; for (const entry of v.entries()) { o[entry[0]] = toPlain(entry[1]) } return o } return v }; const payload = toPlain(raw); return { content: [{ type: 'text', text: JSON.stringify(payload) }], isError: payload.outcome === 'refused', structuredContent: payload } })")>]
+    [<Emit("(args) => $0(args)")>]
     let private unaryHandler (handler: obj -> Task<obj>) : obj = jsNative
 
     [<Emit("$0.connect($1)")>]
@@ -94,6 +91,15 @@ module Mcp =
     let private consoleError (line: string) : unit = jsNative
 
     let private classify = Wanxiangshu.Sphinx.V2.Runtime.Surface.classifyOutcome
+
+    let private record (fields: (string * obj) list) : obj = createObj fields
+
+    let private toolResult (isError: bool) (payload: obj) : obj =
+        createObj
+            [ "isError" ==> isError
+              "structuredContent" ==> payload
+              "content"
+              ==> [| createObj [ "type" ==> "text"; "text" ==> CanonicalJson.canonicalJson payload ] |] ]
 
     /// The published inquiry state, read through the one canonical key.
     let private currentState (store: IEventStore) (inquiryId: InquiryId) : Result<InquiryState option, CurrentError> =
@@ -114,14 +120,15 @@ module Mcp =
     let private refused (refusal: ToolRefusal) : Task<obj> =
         task {
             return
-                Encode.record
+                record
                     [ ("apiVersion", box Contract.apiVersion)
                       ("outcome", box "refused")
                       ("refusal",
-                       Encode.record
+                       record
                            [ ("code", box refusal.Code)
                              ("path", box refusal.Path)
                              ("message", box refusal.Message) ]) ]
+                |> toolResult true
         }
 
     /// None means the inquiry is not in the durable record. It never means an empty
@@ -167,7 +174,7 @@ module Mcp =
             | Ok None -> return! refused (unknownInquiry args.InquiryId)
             | Ok(Some found) ->
                 return
-                    Encode.record
+                    record
                         [ ("apiVersion", box Contract.apiVersion)
                           ("outcome", box "read")
                           ("inquiryId", box args.InquiryId)
@@ -175,6 +182,7 @@ module Mcp =
                           ("revision", Encode.revision found.Revision)
                           ("advance", classify found)
                           ("inquiry", Encode.semanticView found) ]
+                    |> toolResult false
         }
 
     /// A durable receipt and the readable Current are different facts. A fork formed
@@ -187,10 +195,10 @@ module Mcp =
               ("revision", Encode.revision revision) ]
 
         let refusedCurrent (refusal: ToolRefusal) =
-            Encode.record (
+            record (
                 receipt
                 @ [ ("currentRefusal",
-                     Encode.record
+                     record
                          [ ("code", box refusal.Code)
                            ("path", box refusal.Path)
                            ("message", box refusal.Message) ]) ]
@@ -199,109 +207,92 @@ module Mcp =
         match currentState store (InquiryId.create args.InquiryId) with
         | Error fault -> refusedCurrent (currentRefusal fault)
         | Ok None -> refusedCurrent (unknownInquiry args.InquiryId)
-        | Ok(Some current) -> Encode.record (receipt @ [ ("status", box (Encode.statusOf current)) ])
+        | Ok(Some current) -> record (receipt @ [ ("status", box (Encode.statusOf current)) ])
 
-    let private appendSealedCancellation
-        (store: IEventStore)
-        (encoded: EventEnvelope)
-        (args: CancelArgs)
-        (nextRevision: Revision)
-        : Task<obj> =
+    let private appendCancellation (store: IEventStore) (args: CancelArgs) (revision: Revision) encoded : Task<obj> =
         task {
             let! appended = store.Append [ encoded ]
 
             match appended with
             | Error fault -> return! refused (appendRefusal fault)
             | Ok receipt when not (List.isEmpty receipt.Cuts) -> return! refused (cutRefusal receipt)
-            | Ok _ -> return cancellationReceipt store args nextRevision
+            | Ok _ -> return cancellationReceipt store args revision |> toolResult false
         }
 
-    let private sealAndAppendCancellation
+    let private freshCancellation
         (store: IEventStore)
-        (state: InquiryState)
         (args: CancelArgs)
-        (nextRevision: Revision)
-        (batch: TransitionBatch)
-        : Task<obj> =
-        match Codec.seal HostDigest.sha256Hex (Some state) batch with
-        | Error fault ->
-            refused
-                { Code = fault.Code
-                  Path = "commandId"
-                  Message = fault.Message }
-        | Ok encoded -> appendSealedCancellation store encoded args nextRevision
-
-    let private cancelFreshAdmission
-        (store: IEventStore)
         (state: InquiryState)
-        (args: CancelArgs)
         (fingerprint: string)
         : Task<obj> =
-        let head = previousHead state
         let nextRevision = Revision.next state.Revision
 
         let batch =
             { SchemaVersion = "2"
               InquiryId = state.Id
               PreviousRevision = state.Revision
-              PreviousHead = head
+              PreviousHead = previousHead state
               Revision = nextRevision
               CommandId = args.CommandId
               CommandFingerprint = fingerprint
               PostStateFingerprint = None
               Events = [ InquiryEventBody.CancelRequested args.Reason ] }
 
-        sealAndAppendCancellation store state args nextRevision batch
-
-    let private cancelAfterAdmission
-        (store: IEventStore)
-        (state: InquiryState)
-        (args: CancelArgs)
-        (fingerprint: string)
-        (admitted: Result<IdempotencyOutcome<InquiryCommand>, CommandError>)
-        : Task<obj> =
-        match admitted with
-        | Error fault -> refused (commandRefusal fault)
-        | Ok(IdempotencyOutcome.Conflict message) ->
+        match Codec.seal HostDigest.sha256Hex (Some state) batch with
+        | Error fault ->
             refused
-                { Code = "COMMAND_CONFLICT"
+                { Code = fault.Code
                   Path = "commandId"
-                  Message = message }
-        | Ok(IdempotencyOutcome.Replay revision) ->
-            Task.FromResult(
-                Encode.record
-                    [ ("apiVersion", box Contract.apiVersion)
-                      ("outcome", box "replayed")
-                      ("inquiryId", box args.InquiryId)
-                      ("revision", Encode.revision revision)
-                      ("status", box (Encode.statusOf state)) ]
-            )
-        | Ok(IdempotencyOutcome.Fresh _) -> cancelFreshAdmission store state args fingerprint
+                  Message = fault.Message }
+        | Ok encoded -> appendCancellation store args nextRevision encoded
 
-    /// Requests cancellation. The request is appended through the same canonical fold
-    /// the reader uses, so a retried command id returns the original receipt instead
-    /// of appending twice. The reported status stays cancelling.
-    let private cancelResult (store: IEventStore) (args: CancelArgs) : Task<obj> =
+    let private admittedCancellation
+        (store: IEventStore)
+        (args: CancelArgs)
+        (state: InquiryState)
+        (fingerprint: string)
+        : Task<obj> =
         task {
-            match currentState store (InquiryId.create args.InquiryId) with
-            | Error fault -> return! refused (currentRefusal fault)
-            | Ok None -> return! refused (unknownInquiry args.InquiryId)
-            | Ok(Some state) ->
-                let fingerprint =
-                    HostDigest.sha256Hex (
-                        CanonicalJson.canonicalJson (
-                            box
-                                {| tool = Contract.toolName SphinxTool.InquiryCancel
-                                   inquiryId = args.InquiryId
-                                   reason = args.Reason |}
-                        )
-                    )
-
-                let admitted =
-                    Admission.admitCommand state args.CommandId fingerprint (InquiryCommand.CancelCommand args.Reason)
-
-                return! cancelAfterAdmission store state args fingerprint admitted
+            match
+                Admission.admitCommand state args.CommandId fingerprint (InquiryCommand.CancelCommand args.Reason)
+            with
+            | Error fault -> return! refused (commandRefusal fault)
+            | Ok(IdempotencyOutcome.Conflict message) ->
+                return!
+                    refused
+                        { Code = "COMMAND_CONFLICT"
+                          Path = "commandId"
+                          Message = message }
+            | Ok(IdempotencyOutcome.Replay revision) ->
+                return
+                    record
+                        [ ("apiVersion", box Contract.apiVersion)
+                          ("outcome", box "replayed")
+                          ("inquiryId", box args.InquiryId)
+                          ("revision", Encode.revision revision)
+                          ("status", box (Encode.statusOf state)) ]
+                    |> toolResult false
+            | Ok(IdempotencyOutcome.Fresh _) -> return! freshCancellation store args state fingerprint
         }
+
+    /// Requests cancellation through the canonical fold; a repeated command returns
+    /// the original receipt. An unconfirmed physical abort stays cancelling.
+    let private cancelResult (store: IEventStore) (args: CancelArgs) : Task<obj> =
+        match currentState store (InquiryId.create args.InquiryId) with
+        | Error fault -> refused (currentRefusal fault)
+        | Ok None -> refused (unknownInquiry args.InquiryId)
+        | Ok(Some state) ->
+            let fingerprint =
+                HostDigest.sha256Hex (
+                    CanonicalJson.canonicalJson (
+                        box
+                            {| tool = Contract.toolName SphinxTool.InquiryCancel
+                               inquiryId = args.InquiryId
+                               reason = args.Reason |}
+                    )
+                )
+
+            admittedCancellation store args state fingerprint
 
     /// Registers the seven public tools. Each one decodes its own arguments and then
     /// goes to the one Runtime; none of them decides what comes next.
@@ -311,7 +302,7 @@ module Mcp =
                 createObj
                     [ "name" ==> Contract.toolName tool
                       "description" ==> description
-                      "inputSchema" ==> zObjectPassthrough zod inputSchema ]
+                      "inputSchema" ==> zObjectOf zod inputSchema ]
 
             registerTool server (Contract.toolName tool) config (unaryHandler handler)
             |> ignore
@@ -331,65 +322,62 @@ module Mcp =
         let startSchema =
             createObj
                 [ "commandId"
-                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
-                  "goalText" ==> zString zod "The user's goal text, stored byte-exact"
+                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
+                  "goalText" ==> zString "The user's goal text, stored byte-exact"
                   "constraints"
-                  ==> zList zod (zString zod "one user constraint") "Supplementary constraints the user supplied"
+                  ==> zList (zString "one user constraint") "Supplementary constraints the user supplied"
                   "materialRefs"
-                  ==> zList zod (zString zod "one material ref") "Content refs of material the user attached"
-                  "authorizationRef"
-                  ==> zString zod "Reference proving the user supplied this goal"
-                  "profileRef" ==> zString zod "The declared profile this inquiry runs under" ]
+                  ==> zList (zString "one material ref") "Content refs of material the user attached"
+                  "authorizationRef" ==> zString "Reference proving the user supplied this goal"
+                  "profileRef" ==> zString "The declared profile this inquiry runs under" ]
 
         let workNextSchema =
             createObj
                 [ "commandId"
-                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString zod "The inquiry whose ready work is claimed"
-                  "limit" ==> zCount zod "Maximum number of work items to claim" ]
+                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString "The inquiry whose ready work is claimed"
+                  "limit" ==> zCount "Maximum number of work items to claim" ]
 
         let workSubmitSchema =
             createObj
                 [ "commandId"
-                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString zod "The inquiry that owns the work"
-                  "workId" ==> zString zod "The work item this answer belongs to"
-                  "attempt" ==> zCount zod "The attempt this answer belongs to"
-                  "fence" ==> zString zod "The logical fence of that attempt"
+                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString "The inquiry that owns the work"
+                  "workId" ==> zString "The work item this answer belongs to"
+                  "attempt" ==> zCount "The attempt this answer belongs to"
+                  "fence" ==> zString "The logical fence of that attempt"
                   "canonicalResult"
-                  ==> zString zod "The worker's canonical answer bytes, kept exactly as returned"
+                  ==> zString "The worker's canonical answer bytes, kept exactly as returned"
                   "resultSchema"
-                  ==> zSchemaRef zod (zString zod "Schema identity") (zString zod "Schema content hash")
-                  "clusterId" ==> zString zod "Ballot cluster this answer belongs to" ]
+                  ==> zSchemaRef (zString "Schema identity") (zString "Schema content hash")
+                  "clusterId" ==> zString "Ballot cluster this answer belongs to" ]
 
-        let statusSchema = createObj [ "inquiryId" ==> zString zod "The inquiry to read" ]
+        let statusSchema = createObj [ "inquiryId" ==> zString "The inquiry to read" ]
 
         let cancelSchema =
             createObj
                 [ "commandId"
-                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString zod "The inquiry to stop"
-                  "reason" ==> zString zod "Why the caller asked to stop" ]
+                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString "The inquiry to stop"
+                  "reason" ==> zString "Why the caller asked to stop" ]
 
         let exportSchema =
             createObj
-                [ "inquiryId" ==> zString zod "The inquiry to export"
+                [ "inquiryId" ==> zString "The inquiry to export"
                   "mode"
-                  ==> zString zod "summary redacts; full declares what the durable store makes replayable" ]
+                  ==> zString "summary redacts; full declares what the durable store makes replayable" ]
 
         let goalAmendSchema =
             createObj
                 [ "commandId"
-                  ==> zString zod "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString zod "The inquiry whose goal is amended"
-                  "authorizedBy"
-                  ==> zString zod "The user authorization reference for this amendment"
-                  "expectedRevision"
-                  ==> zString zod "The inquiry revision this amendment is preconditioned on"
+                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
+                  "inquiryId" ==> zString "The inquiry whose goal is amended"
+                  "expectedRevision" ==> zString "The inquiry revision this amendment expects"
+                  "authorizedBy" ==> zString "The user authorization reference for this amendment"
                   "addedConstraints"
-                  ==> zList zod (zString zod "one added constraint") "Constraints the user added"
+                  ==> zList (zString "one added constraint") "Constraints the user added"
                   "replacementText"
-                  ==> zOptionalString zod "Replacement goal text, when the user reworded it" ]
+                  ==> zOptional (zString "Replacement goal text, when the user reworded it") ]
 
         register
             SphinxTool.InquiryStart

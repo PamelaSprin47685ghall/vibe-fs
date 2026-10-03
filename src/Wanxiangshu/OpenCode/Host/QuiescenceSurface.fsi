@@ -12,6 +12,8 @@ module QuiescenceSurface =
         gate: ISessionQuiescenceGate -> sessionId: string -> physicalUserMessageId: string -> unit
 
     val observeIdle: gate: ISessionQuiescenceGate -> sessionId: string -> QuiescencePermit
+    val captureCurrentAttempt: gate: SessionQuiescenceGate -> sessionId: string -> QuiescencePermit
+    val observeIdleFor: gate: SessionQuiescenceGate -> observation: QuiescencePermit -> QuiescencePermit option
     val tryConsume: gate: ISessionQuiescenceGate -> permit: QuiescencePermit -> obj
     val tryRelease: gate: ISessionQuiescenceGate -> permit: QuiescencePermit -> obj
     val livePermitCount: gate: SessionQuiescenceGate -> int

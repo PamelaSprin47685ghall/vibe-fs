@@ -57,19 +57,14 @@ module ExecutionFactFold =
         | Error NotCompleted -> Error(HandleCompletionMissing factName)
         | Error reason -> Error(WorkRejected(factName, reason))
 
-    let private workProjectionChanges parentId prior (work: HandleWorkId) updated terminal =
+    let private workChanges parentId (work: HandleWorkId) (prior: DelegationSessionState) terminal updated =
         let record = HandleProjection.tryFind work.Handle updated |> Option.get
         let completed = HandleProjection.tryWork work updated |> Option.get
 
-        let terminalChanges =
-            if terminal then
-                [ TerminatedChildWork(work, completed.LogicalRunId) ]
-            else
-                []
-
         [ ReplaceSessionState(parentId, { prior with Handles = Some updated })
           IndexChildHandle(work.ChildSessionId, record)
-          yield! terminalChanges ]
+          if terminal then
+              TerminatedChildWork(work, completed.LogicalRunId) ]
 
     let private foldWork sessionState parentId (work: HandleWorkId) factName terminal transition =
         let prior =
@@ -82,16 +77,7 @@ module ExecutionFactFold =
         | Error AlreadyAbandoned
         | Error HandleIsRetired -> Ok []
         | Error reason -> Error(WorkRejected(factName, reason))
-        | Ok updated -> Ok(workProjectionChanges parentId prior work updated terminal)
-
-    let private foldChildRunVoided parentId childSessionId (handles: AgentLinkageProjection) =
-        let childWork =
-            handles.Works
-            |> Seq.tryFind (fun (KeyValue(key, _)) -> key.ChildSessionId = childSessionId)
-
-        match childWork with
-        | Some(KeyValue(work, record)) -> Ok [ TerminatedChildWork(work, record.LogicalRunId) ]
-        | None -> Ok [ TerminatedChildHandle(parentId, childSessionId) ]
+        | Ok updated -> Ok(workChanges parentId work prior terminal updated)
 
     let fold
         (sessionState: SessionId -> DelegationSessionState option)
@@ -138,7 +124,7 @@ module ExecutionFactFold =
             let byname = canonicalByname payload.Byname payload.TargetAgent
             let priorState = sessionState payload.ParentSessionId
 
-            HandleProjection.replayLink
+            HandleProjection.linkNamed
                 payload.Handle
                 payload.ChildSessionId
                 payload.TargetAgent
@@ -205,22 +191,7 @@ module ExecutionFactFold =
         // Clean-break: false abort cell → Active only when ref/digest match.
 
         | ExecutionFactCases.ChildRunVoided payload ->
-            // crash-reconciliation-018: voiding an orphaned run closes the
-            // child's logical run itself. A bare TerminatedChildHandle would
-            // keep the authority open whenever the parent holds an admitted
-            // work entry for this child (its scopedChild branch defers closure
-            // to work-level settlement), so the void routes through
-            // TerminatedChildWork when a work entry exists. The handle and the
-            // work entry both stay untouched — the interrupted run owes no
-            // delivery, so horizon keeps showing the reusable binding.
-            let priorState = sessionState payload.ParentSessionId
-
-            let handles =
-                priorState
-                |> Option.bind (fun s -> s.Handles)
-                |> Option.defaultValue HandleProjection.empty
-
-            foldChildRunVoided payload.ParentSessionId payload.ChildSessionId handles
+            Ok [ TerminatedChildHandle(payload.ParentSessionId, payload.ChildSessionId) ]
 
         | ExecutionFactCases.HandleFalseCompletionRejected payload ->
             let priorState = sessionState payload.ParentSessionId

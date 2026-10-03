@@ -89,17 +89,18 @@ module DelegationProjectionBridge =
                             PromptAuthority = updatedAuthority }
                         projection.Sessions }
 
-    let private admitActiveAuthority parentId handle childId projection state handles authority =
-        match HandleProjection.admitWork parentId handle authority handles with
-        // Exact landing/owner evidence is not yet durable — keep the fold and retry
-        // when a later fact supplies the missing PhysicalLanding / identity seed.
-        | Error WorkNotAdmitted -> Ok projection
-        | Error reason -> FoldRejection.reject "HandleWorkAdmission" (sprintf "%A" reason)
-        | Ok updated ->
-            let next =
-                applyChange projection (ReplaceSessionState(parentId, { state with Handles = Some updated }))
+    let private applyAdmittedWork projection parentId childId handle state updated =
+        let next =
+            applyChange projection (ReplaceSessionState(parentId, { state with Handles = Some updated }))
 
-            Ok(applyChange next (IndexChildHandle(childId, HandleProjection.tryFind handle updated |> Option.get)))
+        applyChange next (IndexChildHandle(childId, HandleProjection.tryFind handle updated |> Option.get))
+
+    let private admitActiveWork projection parentId childId handle state handles authority =
+        HandleProjection.admitWork parentId handle authority handles
+        |> Result.mapError (fun reason ->
+            { Fact = "HandleWorkAdmission"
+              Reason = sprintf "%A" reason })
+        |> Result.map (applyAdmittedWork projection parentId childId handle state)
 
     let private admitBinding parentId handle childId (projection: AgentProjectionSet) =
         let authority =
@@ -114,21 +115,24 @@ module DelegationProjectionBridge =
         match authority with
         | None -> Ok projection
         | Some authority when authority.ActiveLogicalRun.IsNone -> Ok projection
-        | Some authority -> admitActiveAuthority parentId handle childId projection state handles authority
+        | Some authority -> admitActiveWork projection parentId childId handle state handles authority
+
+    let private admitRoot projection (payload: AuthorityRootAcceptedPayload) =
+        match
+            PromptAuthority.identitySeedOwner payload.IdentitySeed,
+            Map.tryFind payload.SessionId projection.HandleByChildSession
+        with
+        | Some(parentId, _, _), Some binding -> admitBinding parentId binding.Handle payload.SessionId projection
+        | _, None -> Ok projection
+        | _ -> FoldRejection.reject "HandleWorkAdmission" "exact owner authority is missing"
 
     let admitAuthority (projection: AgentProjectionSet) (fact: PromptFactCases) =
         match fact with
         | PromptFactCases.AuthorityRootAccepted payload when payload.AuthorityKind = "AgentOwnerRoot" ->
-            match
-                PromptAuthority.identitySeedOwner payload.IdentitySeed,
-                Map.tryFind payload.SessionId projection.HandleByChildSession
-            with
-            | Some(parentId, _, _), Some binding -> admitBinding parentId binding.Handle payload.SessionId projection
-            | _, None -> Ok projection
-            | _ -> FoldRejection.reject "HandleWorkAdmission" "exact owner authority is missing"
+            admitRoot projection payload
         | _ -> Ok projection
 
-    let private admitAfterExecutionFold projection fact updated =
+    let private admitLinkedBinding fact updated =
         match fact with
         | ExecutionFactCases.HandleLinked payload ->
             admitBinding payload.ParentSessionId payload.Handle payload.ChildSessionId updated
@@ -139,9 +143,7 @@ module DelegationProjectionBridge =
         (fact: ExecutionFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
         match ExecutionFactFold.fold (sessionState projection) fact with
-        | Ok changes ->
-            let updated = List.fold applyChange projection changes
-            admitAfterExecutionFold projection fact updated
+        | Ok changes -> List.fold applyChange projection changes |> admitLinkedBinding fact
         | Error rejection ->
             FoldRejection.reject (DelegationFoldRejection.fact rejection) (DelegationFoldRejection.message rejection)
 

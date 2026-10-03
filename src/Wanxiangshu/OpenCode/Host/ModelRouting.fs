@@ -602,6 +602,7 @@ module ModelRouting =
             | None -> false
 
         let routeFreshOrPoison
+            retireOnUnavailable
             sessionId
             oldPhysicalUserMessageId
             physicalUserMessageId
@@ -616,7 +617,8 @@ module ModelRouting =
                     oldPhysicalUserMessageId,
                     physicalUserMessageId,
                     lenderSessionId,
-                    fun running -> scheduleOrPoison running role previous purpose
+                    (fun running -> scheduleOrPoison running role previous purpose),
+                    retireOnUnavailable = retireOnUnavailable
                 )
             with ex ->
                 poison ex
@@ -727,6 +729,7 @@ module ModelRouting =
 
         let schedulePendingDemand (demand: ExecutionAdmissionDemand) =
             routeFreshOrPoison
+                true
                 demand.SessionId
                 None
                 demand.PhysicalUserMessageId
@@ -941,6 +944,7 @@ module ModelRouting =
                 admissionQueue.SupersedeSession sessionId |> ignore
 
         let acquireFreshDemand
+            replacePrevious
             sessionId
             oldPhysicalUserMessageId
             physicalUserMessageId
@@ -952,6 +956,8 @@ module ModelRouting =
             =
             match
                 routeFreshOrPoison
+                    (admissionQueue.ContainsSession sessionId
+                     || admissionQueue.Count < ModelCapacityQueue.MaximumPendingDemands)
                     sessionId
                     oldPhysicalUserMessageId
                     physicalUserMessageId
@@ -961,6 +967,8 @@ module ModelRouting =
                     purpose
             with
             | Some target ->
+                replacePrevious ()
+
                 let lease: ExecutionLease =
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Participant = Some participant
@@ -974,21 +982,27 @@ module ModelRouting =
                 drainDemands ()
                 issueAdmission sessionId physicalUserMessageId role participant target
             | None ->
-                // RouteFresh may have retired the superseded execution, which frees capacity.
-                // The freed slot must trigger a queue recompute immediately.
-                let enqueued =
-                    admissionQueue.Enqueue(
-                        sessionId,
-                        physicalUserMessageId,
-                        role,
-                        participant,
-                        purpose,
-                        lenderSessionId,
-                        previous
-                    )
+                if
+                    not (admissionQueue.ContainsSession sessionId)
+                    && admissionQueue.Count >= ModelCapacityQueue.MaximumPendingDemands
+                then
+                    ExecutionAdmissionAcquisition.QueueFull
+                else
+                    replacePrevious ()
 
-                drainDemands ()
-                enqueued
+                    let enqueued =
+                        admissionQueue.Enqueue(
+                            sessionId,
+                            physicalUserMessageId,
+                            role,
+                            participant,
+                            purpose,
+                            lenderSessionId,
+                            previous
+                        )
+
+                    drainDemands ()
+                    enqueued
 
         let acquireFreshOrAdopt
             sessionId
@@ -1003,15 +1017,22 @@ module ModelRouting =
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
 
-                oldPhysicalUserMessageId
-                |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
-
                 let previous = previousForFreshPurpose purpose sessionId role
 
-                activeBySession.Remove sessionId |> ignore
-                supersedeCurrentDemand sessionId
+                let replacePrevious () =
+                    let previousPhysical =
+                        oldPhysicalUserMessageId
+                        |> Option.orElseWith (fun () ->
+                            admissionQueue.TryCurrent sessionId |> Option.map _.PhysicalUserMessageId)
+
+                    previousPhysical
+                    |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
+
+                    activeBySession.Remove sessionId |> ignore
+                    supersedeCurrentDemand sessionId
 
                 acquireFreshDemand
+                    replacePrevious
                     sessionId
                     oldPhysicalUserMessageId
                     physicalUserMessageId
@@ -1152,7 +1173,9 @@ module ModelRouting =
             lenderSessionId
             previous
             =
-            match routeFreshOrPoison sessionId None physicalUserMessageId role lenderSessionId previous purpose with
+            match
+                routeFreshOrPoison true sessionId None physicalUserMessageId role lenderSessionId previous purpose
+            with
             | Some target ->
                 let lease: ExecutionLease =
                     { PhysicalUserMessageId = Some physicalUserMessageId
@@ -1215,6 +1238,7 @@ module ModelRouting =
 
             let targetOpt =
                 routeFreshOrPoison
+                    true
                     sessionId
                     oldPhysicalUserMessageId
                     physicalUserMessageId
@@ -1324,6 +1348,13 @@ module ModelRouting =
                  | Some _ -> admissionQueue.CancelExecution(sessionId, physicalUserMessageId)
                  | None -> admissionOwner.ReleasePhysical(sessionId, physicalUserMessageId))
                 |> completePhysicalRelease sessionId physicalUserMessageId)
+
+        let cancelPendingPhysicalExecutionLocked (sessionId, physicalUserMessageId) =
+            match admissionQueue.TryCurrent sessionId with
+            | Some demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
+                admissionQueue.CancelSession sessionId
+            | Some _ -> CapacityTransitionOutcome.StaleFence
+            | None -> releasePhysicalExecutionLocked (sessionId, physicalUserMessageId)
 
         let capacitySnapshotLocked () =
             let physical: BorrowingCapacitySnapshot<ModelRoutingTarget> =
@@ -1555,6 +1586,23 @@ module ModelRouting =
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () -> this.ReadCommittedExecutionLocked(normSessionId, normPhysicalUserMessageId))
 
+        member _.WasExecutionSuperseded(sessionId: string, physicalUserMessageId: string) : bool =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> false
+            | Some exact -> lock gate (fun () -> supersededPhysical.Contains exact)
+
+        member _.OwnsExecutionAdmission(sessionId: string, physicalUserMessageId: string) : bool =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> false
+            | Some(exactSession, exactPhysical) ->
+                lock gate (fun () ->
+                    not (supersededPhysical.Contains(exactSession, exactPhysical))
+                    && ((match activeBySession.TryGetValue exactSession with
+                         | true, lease -> lease.PhysicalUserMessageId = Some exactPhysical
+                         | false, _ -> false)
+                        || (admissionQueue.TryCurrent exactSession
+                            |> Option.exists (fun demand -> demand.PhysicalUserMessageId = exactPhysical))))
+
         /// Record the exact provider-run → physical-message relation. Called only
         /// from the authoritative Host start observation, so the tool boundary
         /// can end this run's step without reading any session-current binding.
@@ -1662,6 +1710,11 @@ module ModelRouting =
         member _.CancelPendingExecution(sessionId: string) =
             normalizeSessionId sessionId
             |> Option.map (fun normSessionId -> lock gate (fun () -> admissionQueue.CancelSession normSessionId))
+            |> Option.defaultValue CapacityTransitionOutcome.Conflict
+
+        member _.CancelPendingPhysicalExecution(sessionId: string, physicalUserMessageId: string) =
+            normalizePhysicalExecutionKey sessionId physicalUserMessageId
+            |> Option.map (fun key -> lock gate (fun () -> cancelPendingPhysicalExecutionLocked key))
             |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
         member _.CapacitySnapshot() = lock gate capacitySnapshotLocked
@@ -1882,6 +1935,24 @@ module ModelRouting =
             )
         | None -> None
 
+    let internal wasExecutionSuperseded (key: ChatExecutionKey) : bool =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.WasExecutionSuperseded(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            )
+        | None -> false
+
+    let internal ownsExecutionAdmission (key: ChatExecutionKey) : bool =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.OwnsExecutionAdmission(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            )
+        | None -> false
+
     /// Exact provider-run → physical-message relation, written only from the
     /// authoritative Host start observation.
     let internal rememberProviderStepIdentity
@@ -1982,33 +2053,20 @@ module ModelRouting =
         | Some runtime -> runtime.CancelPendingExecution(SessionId.value sessionId)
         | None -> CapacityTransitionOutcome.AlreadyApplied
 
-    let internal capacitySnapshot () = current().CapacitySnapshot()
-
-    let private sharedRuntimePredictorConfiguration () : PredictorConfiguration =
+    let internal cancelPendingPhysicalExecution (key: ChatExecutionKey) =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.PredictorConfiguration
-        | None -> PredictorConfiguration.NotConfigured
+        | Some runtime ->
+            runtime.CancelPendingPhysicalExecution(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            )
+        | None -> CapacityTransitionOutcome.AlreadyApplied
+
+    let internal capacitySnapshot () = current().CapacitySnapshot()
 
     /// Same Predictor existence query on the process-shared scheduler, resolved
     /// from the one loaded model configuration.
-    let internal sharedPredictorConfiguration () : PredictorConfiguration =
-        let testState =
-            emitJsExpr<string option>
-                ()
-                "(typeof globalThis !== 'undefined' && globalThis.__wanxiangshu_test_predictor_state) || null"
-
-        match testState with
-        | Some "configured" -> PredictorConfiguration.Configured
-        | Some "invalid" ->
-            let reason =
-                emitJsExpr<string option>
-                    ()
-                    "(typeof globalThis !== 'undefined' && globalThis.__wanxiangshu_test_predictor_reason) || 'test Predictor configuration is invalid'"
-                |> Option.defaultValue "test Predictor configuration is invalid"
-
-            PredictorConfiguration.ConfigurationInvalid reason
-        | Some "unconfigured" -> PredictorConfiguration.NotConfigured
-        | _ -> sharedRuntimePredictorConfiguration ()
+    let internal sharedPredictorConfiguration () : PredictorConfiguration = current().PredictorConfiguration
 
     let enterProviderStep
         (sessionId: SessionId)

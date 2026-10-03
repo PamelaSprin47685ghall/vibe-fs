@@ -199,6 +199,20 @@ module Surface =
         | "residual-only" -> CertificateGuarantee.ResidualOnly(arg 0)
         | _ -> CertificateGuarantee.ResidualOnly "unspecified"
 
+    /// sphinx-v2-026: the guarantee's own class name, so a JS test can
+    /// distinguish PosteriorCredible from external-correctness classes
+    /// without reading Fable's union representation.
+    let guaranteeKind (guarantee: CertificateGuarantee) : string =
+        match guarantee with
+        | CertificateGuarantee.EmpiricalSummary _ -> "empirical-summary"
+        | CertificateGuarantee.OrdinalObservation _ -> "ordinal-observation"
+        | CertificateGuarantee.ModelEstimate _ -> "model-estimate"
+        | CertificateGuarantee.PosteriorCredible _ -> "posterior-credible"
+        | CertificateGuarantee.FrequentistCoverage _ -> "frequentist-coverage"
+        | CertificateGuarantee.DeterministicBound _ -> "deterministic-bound"
+        | CertificateGuarantee.ExactWithinModel _ -> "exact-within-model"
+        | CertificateGuarantee.ResidualOnly _ -> "residual-only"
+
     let eventBodyTag (body: InquiryEventBody) : string =
         match body with
         | InquiryEventBody.InquiryCreated _ -> "InquiryCreated"

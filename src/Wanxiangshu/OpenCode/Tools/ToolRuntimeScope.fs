@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
@@ -656,12 +657,6 @@ type ToolRuntimeScope
                 AgentProjection.tryFind parentSessionId snapshot.AgentProjections
                 |> Option.bind (fun s -> s.Handles)
 
-            // managed-session-lifecycle-024 / delegation-027: decide replacement on
-            // the binding's own lifecycle. The byname *summary* folds work-unit
-            // state into the view, so a Retired work unit would masquerade as a
-            // Retired handle here and push the reopen path into createAndLink,
-            // which then collides with the still-Active binding
-            // (HandleIdentityConflict) and leaves an orphan child session.
             let devopsHandleOpt =
                 handlesOpt |> Option.bind (HandleProjection.tryFindBindingByByname "devops")
 
@@ -1297,16 +1292,28 @@ type ToolRuntimeScope
 
         task {
             let! ownedFailure = stopOwnedWorkAndDrain ()
+            // DSL-MUTABLE: algorithm-scratch — failures from all owned runtime shutdowns.
+            let failures = ResizeArray<exn>()
+            ownedFailure |> Option.iter failures.Add
 
             for runtime in forkRuntimes do
-                do! runtime.DetachAndDrain()
+                let! failure = captureOwnedWorkFailure runtime.DetachAndDrain
+                failure |> Option.iter failures.Add
 
             for host in orchestrators do
-                do! host.DetachAndDrain()
+                let! failure = captureOwnedWorkFailure host.DetachAndDrain
+                failure |> Option.iter failures.Add
 
-            match ownedFailure with
-            | Some failure -> return raise failure
-            | None -> return ()
+            match Seq.toList failures with
+            | [] -> return ()
+            | [ failure ] -> return raise failure
+            | failures ->
+                return
+                    raise (
+                        emitJsExpr
+                            (List.toArray failures)
+                            "new AggregateError($0, 'tool runtime scope detach failed', { cause: $0[0] })"
+                    )
         }
         :> Task
 

@@ -13,6 +13,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
@@ -22,20 +25,20 @@ open Wanxiangshu.Persistence.Journal
 /// the same canonical projection the store publishes.
 module JournalPortObservationSurface =
 
-    /// Gates only the Append that commits the business envelope. The journal's
-    /// first physical Append is the lazy RuntimeStarted, so `gateAt` 2 parks
-    /// exactly the first business fact's commit inside the store; TryCurrent
-    /// and the canonical integrator pass through untouched.
+    /// Armed after real authority admission, this parks the next business append.
+    /// TryCurrent and the canonical integrator pass through untouched.
     type private GatedAppendStore
-        (inner: IEventStore, gateAt: int, entered: TaskCompletionSource<unit>, release: TaskCompletionSource<unit>) =
-        // DSL-MUTABLE: resource — parked-append counter for the single gate
-        let mutable appended = 0
+        (inner: IEventStore, entered: TaskCompletionSource<unit>, release: TaskCompletionSource<unit>) =
+        // DSL-MUTABLE: resource — one-shot ownership of the parked append
+        let mutable parkNext = false
+
+        member _.ParkNextAppend() = parkNext <- true
 
         interface IEventStore with
             member _.Append events =
-                appended <- appended + 1
+                if parkNext then
+                    parkNext <- false
 
-                if appended = gateAt then
                     task {
                         AsyncSupport.trySetResult entered () |> ignore
                         do! release.Task
@@ -91,11 +94,78 @@ module JournalPortObservationSurface =
                 {| ParentSessionId = parent
                    ChildSessionId = child
                    Handle = HandleId.Agent(AgentHandleId.create "hdl-port-obs")
-                   TargetAgent = "coder"
-                   Byname = "coder-port-obs"
-                   CanonicalRole = Role.Coder
+                   TargetAgent = "engineer"
+                   Byname = "engineer-port-obs"
+                   CanonicalRole = Role.Engineer
                    Ownership = HandleOwnership.DurableParentHandle |}
         )
+
+    let private acceptChildWork (journal: AgentJournal) (parent: SessionId) (child: SessionId) : Task<unit> =
+        task {
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)
+
+            let identity =
+                ParticipantIdentity.resolveAtRoot "manager"
+                |> Result.defaultWith (fun error -> failwithf "parent identity rejected: %A" error)
+
+            let! acceptedParent =
+                dispatcher.AcceptHumanRoot
+                    parent
+                    (PhysicalUserMessageId.create ("msg-" + SessionId.value parent))
+                    (Some(PromptIdentitySeed.RootSelection identity))
+
+            let owner =
+                acceptedParent
+                |> Result.defaultWith (fun error -> failwithf "parent admission rejected: %A" error)
+
+            let seed =
+                PromptAuthority.issueInheritedIdentitySeed "engineer" owner
+                |> Result.defaultWith (fun error -> failwithf "child identity rejected: %A" error)
+
+            let port =
+                { new IDispatchSessionPort with
+                    member _.SendPrompt(_, _, _) =
+                        Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt-port-obs"))
+
+                    member _.SubscribeFutureTerminal(_, _) =
+                        { new IDisposable with
+                            member _.Dispose() = () }
+
+                    member _.SubscribeTerminal(_, _) =
+                        { new IDisposable with
+                            member _.Dispose() = () } }
+
+            let! sent =
+                dispatcher.SendAgentOwnerRoot
+                    port
+                    child
+                    "port-observation work"
+                    seed
+                    None
+                    PromptDispatcher.AwaitMode.Await
+                    None
+
+            let key =
+                sent
+                |> Result.defaultWith (fun error -> failwithf "child dispatch rejected: %s" error)
+
+            let! acceptedChild =
+                dispatcher.AcceptAgentOwnerRoot
+                    key
+                    child
+                    (PhysicalUserMessageId.create ("msg-" + SessionId.value child))
+
+            acceptedChild
+            |> Result.defaultWith (fun error -> failwithf "child admission rejected: %s" error)
+            |> ignore
+        }
+
+    let private hasCommittedHandle (journal: AgentJournal) (parent: SessionId) : bool =
+        AgentProjection.tryFind parent (AgentJournal.snapshot journal).AgentProjections
+        |> Option.bind _.Handles
+        |> Option.exists (fun handles ->
+            HandleProjection.tryFind (HandleId.Agent(AgentHandleId.create "hdl-port-obs")) handles
+            |> Option.isSome)
 
     let private attentionFact (sessionId: SessionId) : AgentFact =
         AgentFact.Attention(
@@ -206,16 +276,20 @@ module JournalPortObservationSurface =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
             let inner = openStore commonDir writerTag
-            let store = GatedAppendStore(inner, 2, entered, release) :> IEventStore
-            use! journal = openJournal store writerTag
+            let store = GatedAppendStore(inner, entered, release)
+            use! journal = openJournal (store :> IEventStore) writerTag
 
             let _, terminal, wire = portsOf journal
             let parent = SessionId.create "ses-port-parent"
             let child = SessionId.create "ses-port-child"
+            do! acceptChildWork journal parent child
+            let fromRevision = journal.Revision
 
             let preMember = terminal.HasListableHandles parent
             let preLinked = terminal.IsLinkedChild child
-            let preState = Option.isSome (wire.ReadView parent).State
+            let preState = hasCommittedHandle journal parent
+
+            store.ParkNextAppend()
 
             let commitTask =
                 journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
@@ -225,7 +299,7 @@ module JournalPortObservationSurface =
             let midMember = terminal.HasListableHandles parent
             let midLinked = terminal.IsLinkedChild child
             let midView = wire.ReadView parent
-            let midState = Option.isSome midView.State
+            let midState = hasCommittedHandle journal parent
             let midCompanion = midView.IsCompanion
 
             AsyncSupport.trySetResult release () |> ignore
@@ -233,7 +307,10 @@ module JournalPortObservationSurface =
 
             let postMember = terminal.HasListableHandles parent
             let postLinked = terminal.IsLinkedChild child
-            let postState = Option.isSome (wire.ReadView parent).State
+            let postState = hasCommittedHandle journal parent
+
+            let advancedOnce =
+                JournalRevision.value journal.Revision = JournalRevision.value fromRevision + 1L
 
             return
                 box
@@ -247,7 +324,8 @@ module JournalPortObservationSurface =
                        midCompanion = midCompanion
                        postMember = postMember
                        postLinked = postLinked
-                       postState = postState |}
+                       postState = postState
+                       advancedOnce = advancedOnce |}
         }
 
     let revisionWaitScenario (commonDir: string) (writerTag: string) : Task<obj> =
@@ -257,6 +335,7 @@ module JournalPortObservationSurface =
             let _, terminal, _ = portsOf journal
             let parent = SessionId.create "ses-port-wait"
             let child = SessionId.create "ses-port-waited"
+            do! acceptChildWork journal parent child
 
             let fromRevision = journal.Revision
             let waiter = journal.AwaitChangeFrom fromRevision
@@ -275,7 +354,8 @@ module JournalPortObservationSurface =
                        resolved = resolved
                        changeRevision = changeRevision
                        currentRevision = int64 (JournalRevision.value journal.Revision)
-                       observedHandle = terminal.HasListableHandles parent |}
+                       observedHandle = terminal.HasListableHandles parent
+                       advancedOnce = JournalRevision.value outcome.Revision = JournalRevision.value fromRevision + 1L |}
         }
 
     let cancelWaiterScenario (commonDir: string) (writerTag: string) : Task<obj> =

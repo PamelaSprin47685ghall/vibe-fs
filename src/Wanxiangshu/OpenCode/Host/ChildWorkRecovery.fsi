@@ -15,15 +15,15 @@ module ChildWorkRecovery =
     /// A child work run the fresh process can no longer execute, and the parent
     /// handle that must carry its settlement.
     type OrphanedChildRun =
-        { ParentSessionId: SessionId
-          Handle: HandleId
-          ChildSessionId: SessionId }
+        private
+        | Admitted of parentSessionId: SessionId * work: AdmittedWork
+        | Historical of parentSessionId: SessionId * childSessionId: SessionId
 
     /// Child work runs still active at startup, resolved to their parent handle.
     val orphanedChildRuns: projections: AgentProjectionSet -> OrphanedChildRun list
 
-    /// ChildRunVoided closes the child authority without creating a completion;
-    /// the active handle remains reusable and owes no join delivery.
+    /// Exact ChildWorkVoided closes admitted work; ChildRunVoided only normalizes
+    /// history without scoped work. Neither creates a completion or join delivery.
     val settlementFact: orphaned: OrphanedChildRun -> ExecutionFactCases
 
     /// Append one settlement per orphaned child run. Load Phase; no dispatch, no

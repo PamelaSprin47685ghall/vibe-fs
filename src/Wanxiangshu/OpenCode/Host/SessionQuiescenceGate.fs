@@ -8,22 +8,14 @@ open Wanxiangshu.Foundation.Identity
 /// File-private representation: owner and scope are visible only to the
 /// issuing gate. Keeping them in the opaque handle lets the gate retire its
 /// live-resource entry without losing typed stale-handle diagnostics.
-/// capability-enforcement-019: the serialization guard must live on the
-/// value itself. Fable compiles class members to free module-level
-/// functions, so a `member _.toJSON()` never lands on the instance and
-/// JSON.stringify silently succeeds. Attach the guard as an own property,
-/// mirroring ModelRoutingSurface's ExecutionAdmissionToken pattern.
-module private QuiescencePermitSerializationGuard =
-
-    [<Emit("Object.defineProperty($0, 'toJSON', { value: function () { throw new Error('QuiescencePermit is process-local and cannot be serialized'); } })")>]
-    let attach (token: obj) : unit = jsNative
-
-type private QuiescencePermitToken(owner: obj, sessionId: SessionId, serial: int64) as this =
-    do QuiescencePermitSerializationGuard.attach (box this)
-
+[<AttachMembers>]
+type private QuiescencePermitToken(owner: obj, sessionId: SessionId, serial: int64) =
     member _.Owner = owner
     member _.SessionId = sessionId
     member _.Serial = serial
+
+    member _.toJSON() : obj =
+        invalidOp "QuiescencePermit is process-local and cannot be serialized"
 
     interface QuiescencePermit
 
@@ -201,6 +193,23 @@ type SessionQuiescenceGate() as this =
                 currentPermits.Add(key, permit)
                 permit
             | None, _ -> issuePermit sessionId serial)
+
+    member _.CaptureCurrentAttempt(sessionId: SessionId) : QuiescencePermit =
+        lock gate (fun () ->
+            let serial =
+                Map.tryFind (SessionId.value sessionId) serials |> Option.defaultValue 0L
+
+            issuePermit sessionId serial)
+
+    member _.ObserveIdleFor(observation: QuiescencePermit) : QuiescencePermit option =
+        lock gate (fun () ->
+            match observation with
+            | :? QuiescencePermitToken as opaque when
+                obj.ReferenceEquals(opaque.Owner, owner)
+                && opaque.Serial = (Map.tryFind (SessionId.value opaque.SessionId) serials |> Option.defaultValue 0L)
+                ->
+                Some(this.ObserveIdle opaque.SessionId)
+            | _ -> None)
 
     /// Atomically consume one fresh idle capability. Every rejection is typed
     /// and leaves gate state unchanged.

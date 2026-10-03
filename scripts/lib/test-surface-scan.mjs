@@ -114,8 +114,8 @@ export const SURFACE_MANIFEST = [
     owner: 'cognitive-environment',
     laws: ['COGNITIVE-ENVIRONMENT-015'],
     source: 'src/Wanxiangshu/OpenCode/Host/BloggerChronicleSurface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/Host/PluginTransformSurface.js',
@@ -544,6 +544,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Persistence/Surface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-001', 'SPHINX-V2-005', 'SPHINX-V2-006', 'SPHINX-V2-007', 'SPHINX-V2-011', 'SPHINX-V2-019', 'SPHINX-V2-033'],
+    source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Sphinx/V2/Hosts/Mcp/Tool.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-018', 'SPHINX-V2-036'],
@@ -624,14 +632,6 @@ export const SURFACE_MANIFEST = [
     source: 'src/Wanxiangshu/Sphinx/V2/Core/Surface.fs',
     representation: 'json',
     kind: 'pure',
-  },
-  {
-    module: 'Sphinx/V2/Persistence/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-001', 'SPHINX-V2-011', 'SPHINX-V2-019'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Persistence/Surface.fs',
-    representation: 'json',
-    kind: 'resource',
   },
   {
     module: 'Context/Prefix/Surface.js',
@@ -1607,6 +1607,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Mission/Manager/WorkflowSurface.js',
+    owner: 'relay-retirement',
+    laws: ['DISPATCH-PROTOCOL-002', 'CRASH-RECONCILIATION-006'],
+    lawOwners: { 'DISPATCH-PROTOCOL-002': 'dispatch-protocol', 'CRASH-RECONCILIATION-006': 'crash-reconciliation' },
+    source: 'src/Wanxiangshu/Mission/Manager/WorkflowSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Interaction/Dispatch/JoinGuardSurface.js',
     owner: 'dispatch-protocol',
     laws: ['DISPATCH-PROTOCOL-007'],
@@ -1634,7 +1643,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Change/Host/Surface.js',
     owner: 'change-integration',
-    laws: ['CHGINT-003'],
+    laws: ['CHGINT-002', 'CHGINT-003'],
     source: 'src/Wanxiangshu/Change/Host/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

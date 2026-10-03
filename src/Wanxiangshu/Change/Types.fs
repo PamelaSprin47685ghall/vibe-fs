@@ -30,7 +30,7 @@ type OrchestratorHandle =
 /// built for, and ORCH-008's frozen target branch belongs to exactly one repo.
 type GitPort =
     {
-        IsDirty: WorktreePath -> Task<bool>
+        IsDirty: WorktreePath -> Task<Result<bool, string>>
 
         /// Creates the worktree and returns its stable identity (ORCH-006).
         /// Recovery locates a worktree by identity; the path is diagnostic and may

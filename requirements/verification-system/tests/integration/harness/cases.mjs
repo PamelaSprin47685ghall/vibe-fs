@@ -5,7 +5,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
   assertEq,
   assertTrue,
@@ -14,6 +16,7 @@ import {
   postJson,
 } from './lib.mjs';
 import { StrictMockProvider } from '../../e2e/support/strict-mock-provider.js';
+import { startHttpServer, stopHttpServer } from '../../e2e/support/strict-mock-server.js';
 import { kindOf } from '../../e2e/support/runtime-key.js';
 import { EventProbe } from '../../e2e/support/event-probe.js';
 import { shapeFromParsed } from '../../e2e/support/event-shape.js';
@@ -125,6 +128,218 @@ async function runProcessHostStderrCapture() {
   host._onStdout('stdout-line\n');
   assertTrue(host.stderrLog.includes('stderr-warning'), 'stderr ring buffer captured');
   assertTrue(host.stdoutLog.includes('stdout-line'), 'stdout ring buffer captured');
+}
+
+async function runProcessHostInitializationRequest() {
+  let requests = 0;
+  let replyTimer;
+  const { server, url } = await startHttpServer((_request, response) => {
+    requests += 1;
+    replyTimer = setTimeout(() => response.end(JSON.stringify({
+      home: '/isolated/home', state: '/isolated/state', config: '/isolated/config',
+      worktree: '/isolated/workspace', directory: '/isolated/workspace',
+    })), 300);
+  });
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  host._workDir = '/isolated/workspace';
+  let progress = 0;
+  try {
+    await host._waitForHealth(1000, () => { progress += 1; });
+    assert.equal(requests, 1, 'an accepted initialization request must not be cancelled every polling slice');
+    assert.equal(progress, 1, 'successful project initialization is one causal observation');
+  } finally {
+    clearTimeout(replyTimer);
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostRejectsHttpError() {
+  const { server, url } = await startHttpServer((_request, response) => {
+    response.writeHead(500);
+    response.end('initialization failed');
+  });
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  let progress = 0;
+  try {
+    await assert.rejects(host._waitForHealth(1000, () => { progress += 1; }), /project.*\/path.*HTTP 500/s);
+    assert.equal(progress, 0, 'an error response must not report project readiness');
+    await assert.rejects(host._waitForGlobalHealth(1000), /global.*\/global\/health.*HTTP 500/s);
+  } finally {
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostRejectsMalformedHealth() {
+  const { server, url } = await startHttpServer((_request, response) => response.end('{broken'));
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  try {
+    await assert.rejects(host._waitForGlobalHealth(1000), /global.*\/global\/health.*JSON/s);
+    await assert.rejects(host._waitForHealth(1000), /project.*\/path.*JSON/s);
+  } finally {
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostRejectsForeignProject() {
+  const { server, url } = await startHttpServer((_request, response) => response.end(JSON.stringify({
+    home: '/isolated/home', state: '/isolated/state', config: '/isolated/config',
+    worktree: '/other/workspace', directory: '/other/workspace',
+  })));
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  host._workDir = '/isolated/workspace';
+  try {
+    await assert.rejects(host._waitForHealth(1000), /project.*\/path.*directory.*\/other\/workspace/s);
+  } finally {
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostExitDuringHealth() {
+  const child = new EventEmitter();
+  let exitTimer;
+  const { server, url } = await startHttpServer(() => {
+    exitTimer = setTimeout(() => {
+      host._onChildExit(17, null);
+      child.emit('exit', 17, null);
+    }, 20);
+  });
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  host._child = child;
+  let guardTimer;
+  try {
+    await assert.rejects(Promise.race([
+      host._waitForHealth(1000),
+      new Promise((_, reject) => {
+        guardTimer = setTimeout(() => reject(new Error('health wait ignored child exit')), 500);
+      }),
+    ]), /project.*\/path.*code=17/s);
+    assert.equal(child.listenerCount('exit'), 0, 'completed health wait must release its exit observer');
+  } finally {
+    clearTimeout(exitTimer);
+    clearTimeout(guardTimer);
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostUnreadyDoesNotRenew() {
+  const requests = [];
+  let started;
+  const { server, url } = await startHttpServer((_request, response) => {
+    requests.push(Date.now() - started);
+    response.setHeader('content-type', 'application/json');
+    response.end('{"healthy":false}');
+  });
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  let guardTimer;
+  try {
+    started = Date.now();
+    await assert.rejects(Promise.race([
+      host._waitForGlobalHealth(1000),
+      new Promise((_, reject) => {
+        guardTimer = setTimeout(() => reject(new Error('repeated unready response renewed the deadline')), 2000);
+      }),
+    ]), /global.*\/global\/health.*deadline.*healthy=false/s);
+    const elapsed = Date.now() - started;
+    assert.ok(requests.length > 1, `the repeated observation must actually occur: received at ${requests.join(',')}ms`);
+    assert.ok(elapsed >= 1000 && elapsed < 2000, `unready observations must preserve the original 1000ms deadline: elapsed=${elapsed}ms`);
+  } finally {
+    clearTimeout(guardTimer);
+    await stopHttpServer(server);
+  }
+}
+
+async function runProcessHostReleasesObservedChild() {
+  const child = new EventEmitter();
+  const { server, url } = await startHttpServer((_request, response) => {
+    host._child = null;
+    response.end('{"healthy":true}');
+  });
+  const host = new ProcessHost();
+  host._baseUrl = url;
+  host._child = child;
+  try {
+    await host._waitForGlobalHealth(1000);
+    assert.equal(child.listenerCount('exit'), 0, 'readiness must release the child it observed even after instance disposal');
+  } finally {
+    await stopHttpServer(server);
+  }
+}
+
+async function runHttpServerClose() {
+  const { server, url } = await startHttpServer((_request, response) => response.end('ready'));
+  try {
+    assert.equal(await (await fetch(url)).text(), 'ready');
+    await stopHttpServer(server);
+    assert.equal(server.listening, false);
+    await stopHttpServer(server);
+    assert.equal(server.listening, false);
+  } finally {
+    if (server.listening) await stopHttpServer(server);
+  }
+}
+
+async function runHttpServerConnectionCloseFailure() {
+  const failure = new Error('connection close failed');
+  const calls = [];
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {
+      calls.push('connections');
+      throw failure;
+    },
+    close(done) {
+      calls.push('server');
+      queueMicrotask(() => done());
+    },
+  }), (error) => error === failure);
+  assert.deepEqual(calls, ['connections', 'server']);
+}
+
+async function runHttpServerCloseCallbackFailure() {
+  const failure = new Error('server close callback failed');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {},
+    close(done) { queueMicrotask(() => done(failure)); },
+  }), (error) => error === failure);
+}
+
+async function runHttpServerCloseThrow() {
+  const failure = new Error('server close threw');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() {},
+    close() { throw failure; },
+  }), (error) => error === failure);
+}
+
+async function runHttpServerBothCloseFailures() {
+  const connections = new Error('connection close failed');
+  const listener = new Error('server close callback failed');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() { throw connections; },
+    close(done) { queueMicrotask(() => done(listener)); },
+  }), (error) => {
+    assert.ok(error instanceof AggregateError);
+    assert.equal(error.errors.length, 2);
+    assert.equal(error.errors[0], connections);
+    assert.equal(error.errors[1], listener);
+    assert.equal(error.cause, connections);
+    return true;
+  });
+}
+
+async function runHttpServerAlreadyClosed() {
+  const closed = Object.assign(new Error('already stopped'), { code: 'ERR_SERVER_NOT_RUNNING' });
+  await stopHttpServer({ close() { throw closed; } });
+  const failure = new Error('server is not running');
+  await assert.rejects(stopHttpServer({
+    closeAllConnections() { throw failure; },
+    close(done) { queueMicrotask(() => done(closed)); },
+  }), (error) => error === failure);
 }
 
 
@@ -378,7 +593,20 @@ export const cases = [
   { name: 'isolation hardening', fn: runIsolationHardening },
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
   { name: 'ProcessHost health request obeys its deadline', fn: runProcessHostHealthDeadline },
+  { name: 'WHAT[verification-system-006] ProcessHost preserves one initialization request until its stage deadline', fn: runProcessHostInitializationRequest },
+  { name: 'WHAT[verification-system-005] ProcessHost rejects failed HTTP readiness responses', fn: runProcessHostRejectsHttpError },
+  { name: 'WHAT[verification-system-005] ProcessHost rejects malformed health responses', fn: runProcessHostRejectsMalformedHealth },
+  { name: 'WHAT[verification-system-005] ProcessHost rejects readiness for a foreign project', fn: runProcessHostRejectsForeignProject },
+  { name: 'WHAT[verification-system-005] ProcessHost interrupts readiness on child exit', fn: runProcessHostExitDuringHealth },
+  { name: 'WHAT[verification-system-006] ProcessHost repeated unready responses do not renew the deadline', fn: runProcessHostUnreadyDoesNotRenew },
+  { name: 'WHAT[verification-system-005] ProcessHost releases the original child observer after disposal', fn: runProcessHostReleasesObservedChild },
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
+  { name: 'WHAT[verification-system-006] HTTP server closure releases the real listener and is repeatable', fn: runHttpServerClose },
+  { name: 'WHAT[verification-system-005] HTTP connection close failure still invokes listener closure and preserves the error', fn: runHttpServerConnectionCloseFailure },
+  { name: 'WHAT[verification-system-005] HTTP close callback failure rejects unchanged', fn: runHttpServerCloseCallbackFailure },
+  { name: 'WHAT[verification-system-005] HTTP close synchronous failure rejects unchanged', fn: runHttpServerCloseThrow },
+  { name: 'WHAT[verification-system-005] HTTP cleanup preserves both close failures', fn: runHttpServerBothCloseFailures },
+  { name: 'WHAT[verification-system-005] only the explicit already-closed error is idempotent', fn: runHttpServerAlreadyClosed },
   ...laneCases,
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },

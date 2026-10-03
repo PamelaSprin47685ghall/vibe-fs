@@ -10,8 +10,10 @@ WHAT 是验收依据；本目录说明当前证据，不额外规定实现。
 
 021 证明坏事实与 cut 一起落盘、同进程重开可重放重置，另保留历史错误作用域用例。产生坏事实的实际进程退出、下一代进程恢复仍为 TODO；低层 store 继续 append 不代表上层进程获准继续运行。
 
-022 读取真实工程声明的传递闭包与源码数，并实际隔离编译 Journal 观察 owner；未实际编译每个 locality。此真实编译使用已有 compiler 预算单独监督，不放进普通 5 秒静默组。023 的 codec 用例实际覆盖公开协议，日志 port 用例实际覆盖查询与提交；部分源码扫描只证明当前词形，没有证明编译器拒绝越界。真实负向编译为 TODO。
+022 读取真实工程声明的传递闭包与源码数，并实际隔离编译 Journal 观察 owner；未实际编译每个 locality。此真实编译使用已有 compiler 预算单独监督，不放进普通 5 秒静默组。023 的 codec 用例实际覆盖公开协议，日志 port 用例实际覆盖查询与提交；部分源码扫描只证明当前词形。023已有同一物理store probe在store闭包编译成功、在codec闭包被编译器具名拒绝的正式用例，domain fold缺少aggregate authority的编译证明仍TODO。
+
+2026-10-03合并增量：日志port的原子发布fixture先经真实dispatcher接纳父子Root，随后仅暂停目标HandleLinked的追加；三个canonical handle视图同时变化，revision精确增加一次。023的真实Fable编译误入default unit，使七文件诊断在只剩该编译lane时触发5006ms因果静默，原始失败不抹去；该case现归integrationTest，完整integration自动发现并执行，原positive/negative、具名诊断与源码未改断言全部保留，不扩大预算。结果与边界见[同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。
 
 024—025 不再用自建 fatal 模型或源码调用字样证明结算与退出。025 实测的是同一 Prepared 身份不同载荷导致 StorageInvalid，并检查事件文件完全未变；它没有产生 semantic cut。真实 cut 的 typed 传播、必需注入、事务副作用边界和一次终止仍待证。
 
-完成一个节点后先运行 `node scripts/build.mjs`，再通过 `requirements/verification-system/tests/run.mjs`，将本目录 NNN.test.mjs 交给 `TESTS_MJS_FILES` 并启用 `WXS_TIER_INTEGRATION=1`。TODO 不计为通过；发布 canonical-spine 节点保持 TODO。与跨进程、结算和架构相关的缺口见 GAP-097/098。
+完成一个节点后先运行 `node scripts/build.mjs`，再通过 `requirements/verification-system/tests/run.mjs` 将本目录 NNN.test.mjs 交给 `TESTS_MJS_FILES`运行默认层；真实编译走 `requirements/verification-system/tests/integration/run.mjs`的既有compiler预算，不在unit组强开tier。TODO不计为通过；发布canonical-spine节点保持TODO。与跨进程、结算和架构相关的缺口见GAP-097/098。

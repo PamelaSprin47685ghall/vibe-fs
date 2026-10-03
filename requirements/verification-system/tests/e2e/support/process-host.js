@@ -10,7 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import http from 'node:http';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createIsolatedEnv } from './isolated-env.js';
 import {
   SIGTERM_GRACE_MS,
@@ -21,7 +21,6 @@ import {
 } from './time-budget.js';
 import {
   READY_POLL_INTERVAL_MS,
-  READY_POLL_MAX_TRIES,
   parseListenPort,
   ringPush,
   terminateChild,
@@ -83,13 +82,13 @@ export class ProcessHost {
     const startTimeout = opts.startTimeoutMs || HOST_START_TIMEOUT_MS;
     const listenLine = await this._waitForListening(startTimeout, () => {
       if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-        console.log('[host.start] bootstrap observed');
+        console.error('[host.start] bootstrap observed');
       }
       opts.onProgress?.('bootstrapped');
     });
     const ht1 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
+      console.error(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
     }
     if (!listenLine) {
       try { this._child?.kill('SIGKILL'); } catch {}
@@ -106,13 +105,13 @@ export class ProcessHost {
     await this._waitForGlobalHealth(startTimeout);
     const ht2 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForGlobalHealth took ${ht2 - ht1}ms`);
+      console.error(`[host.start] _waitForGlobalHealth took ${ht2 - ht1}ms`);
     }
     opts.onProgress?.('global-healthy');
     const onProjectEvents = opts.pluginPaths?.length > 0
       ? () => {
           if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-            console.log('[host.start] project event source observed');
+            console.error('[host.start] project event source observed');
           }
           opts.onProgress?.('project-events');
         }
@@ -120,59 +119,80 @@ export class ProcessHost {
     await this._waitForHealth(startTimeout, onProjectEvents);
     const ht3 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForHealth took ${ht3 - ht2}ms`);
+      console.error(`[host.start] _waitForHealth took ${ht3 - ht2}ms`);
     }
     opts.onProgress?.('healthy');
   }
 
   async _waitForGlobalHealth(timeoutMs = HOST_START_TIMEOUT_MS) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      try {
-        const res = await fetch(`${this._baseUrl}/global/health`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now()))),
-        });
-        if (res.ok && (await res.json())?.healthy === true) return;
-      } catch {}
-      await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
-    }
-    throw new Error(
-      'Global health-check failed: server not responding\n' +
-      `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
-      `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
-    );
+    await this._waitForReadiness('global', '/global/health', timeoutMs, (body) => {
+      if (typeof body?.healthy !== 'boolean') throw new Error('invalid health response: healthy must be boolean');
+      return body.healthy;
+    });
   }
 
   async _waitForHealth(timeoutMs = HOST_START_TIMEOUT_MS, onProjectEvents) {
-    let deadline = Date.now() + timeoutMs;
-    let projectEventsObserved = false;
-    const observeProjectEvents = () => {
-      if (projectEventsObserved) return;
-      projectEventsObserved = true;
-      deadline = Date.now() + timeoutMs;
-      onProjectEvents?.();
-    };
+    await this._waitForReadiness('project', '/path', timeoutMs, (body) => {
+      for (const name of ['home', 'state', 'config', 'worktree', 'directory']) {
+        if (typeof body?.[name] !== 'string') throw new Error(`invalid path response: ${name} must be string`);
+      }
+      if (body.directory !== this._workDir) {
+        throw new Error(`path response directory ${JSON.stringify(body.directory)} differs from ${JSON.stringify(this._workDir)}`);
+      }
+      return true;
+    });
+    onProjectEvents?.();
+  }
 
-    while (Date.now() < deadline) {
-      try {
-        const res = await fetch(`${this._baseUrl}/path`, {
-          method: 'GET',
-          headers: { 'x-opencode-directory': encodeURIComponent(this._workDir) },
-          signal: AbortSignal.timeout(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now()))),
-        });
-        if (res && res.status > 0) {
-          observeProjectEvents();
-          return;
+  async _waitForReadiness(phase, pathname, timeoutMs, isReady) {
+    const started = Date.now();
+    const deadline = started + timeoutMs;
+    const url = `${this._baseUrl}${pathname}`;
+    const child = this._child;
+    const controller = new AbortController();
+    let attempts = 0;
+    let lastObservation = 'waiting for response headers; no request completed';
+    const onExit = (code, signal) => controller.abort(new Error(`Host exited: code=${code} signal=${signal}`));
+    const timer = setTimeout(() => controller.abort(new Error(`stage deadline expired; ${lastObservation}`)), timeoutMs);
+    child?.once('exit', onExit);
+    try {
+      if (this._exitInfo) onExit(this._exitInfo.code, this._exitInfo.signal);
+      while (true) {
+        controller.signal.throwIfAborted();
+        attempts += 1;
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: phase === 'project' ? { 'x-opencode-directory': encodeURIComponent(this._workDir) } : undefined,
+            signal: controller.signal,
+          });
+          lastObservation = `HTTP ${response.status}; waiting for response JSON`;
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const body = await response.json();
+          if (isReady(body)) return;
+          lastObservation = 'healthy=false';
+        } catch (error) {
+          if (controller.signal.aborted) throw controller.signal.reason;
+          if (error?.cause?.code !== 'ECONNREFUSED') throw error;
+          lastObservation = 'connection refused';
         }
-      } catch (err) {}
-      await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
+        await delay(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now())), undefined, { signal: controller.signal });
+      }
+    } catch (error) {
+      const cause = controller.signal.aborted ? controller.signal.reason : error;
+      throw new Error(
+        `${phase === 'global' ? 'Global health-check' : 'Health-check'} failed: ` +
+        `phase=${phase} url=${url} elapsed=${Date.now() - started}ms attempts=${attempts}; ${cause.message}` +
+        `${cause.cause?.code ? ` (${cause.cause.code}: ${cause.cause.message})` : ''}\n` +
+        `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
+        `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
+        { cause },
+      );
+    } finally {
+      clearTimeout(timer);
+      child?.removeListener('exit', onExit);
+      controller.abort();
     }
-    throw new Error(
-      'Health-check failed: server not responding\n' +
-      `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
-      `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
-    );
   }
 
 
@@ -252,7 +272,7 @@ export class ProcessHost {
   }
 
   _onStdout(s) {
-    if (process.env.DEBUG) process.stdout.write(s);
+    if (process.env.DEBUG) process.stderr.write(s);
     ringPush(this._stdoutBuffer, s, STDOUT_RING_MAX);
   }
   _onStderr(s) {
@@ -321,7 +341,7 @@ export class ProcessHost {
 function ensureWorkspace(scenarioDir) {
   const workDir = path.join(scenarioDir, 'workspace');
   fs.mkdirSync(workDir, { recursive: true });
-  return workDir;
+  return fs.realpathSync(workDir);
 }
 
 function buildEnv(opts) {

@@ -181,7 +181,7 @@ const withSession = (messages, sessionID = 'ses-auto-injected') =>
       sessionID,
     },
   }))
-const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
+const admitManagedRoot = async (hooks, runtime, sessionID = 'ses-auto-injected') => {
   const output = {
     message: {
       id: `root-${sessionID}`,
@@ -193,6 +193,13 @@ const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
     parts: [],
   }
   await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
+  runtime.pushHostMessage(sessionID, { info: output.message, parts: output.parts })
+  runtime.pushHostMessage(sessionID, {
+    info: { id: `provider-${sessionID}`, sessionID, parentID: output.message.id,
+      role: 'assistant', agent: 'engineer', providerID: 'provider', modelID: 'engineer-model',
+      time: { created: 2 } },
+    parts: [],
+  })
 }
 
 test('WHAT[capability-enforcement-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
@@ -207,8 +214,8 @@ test('WHAT[capability-enforcement-006] AUTOINJ_skill_wire_stays_host_owned_and_i
   })
 })
 test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_real_skill_names', async () => {
-  await withExecutablePlugin(async (hooks) => {
-    await admitManagedRoot(hooks)
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    await admitManagedRoot(hooks, runtime)
     const transformed = {
       messages: withSession([
         {
@@ -254,8 +261,8 @@ test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied
   })
 })
 test('WHAT[capability-enforcement-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {
-  await withExecutablePlugin(async (hooks) => {
-    await admitManagedRoot(hooks)
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    await admitManagedRoot(hooks, runtime)
     const transformed = {
       messages: withSession([
         {
@@ -390,6 +397,13 @@ integrationTest('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owne
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be in hooks.tool')
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned rather than plugin-registered')
 
+    runtime.pushHostMessage('engineer-auto-injected', {
+      info: { id: 'provider-engineer-auto-injected', sessionID: 'engineer-auto-injected',
+        parentID: 'root-engineer-auto-injected', role: 'assistant', agent: 'engineer',
+        providerID: 'provider', modelID: 'engineer-model', time: { created: 3 } },
+      parts: [],
+    })
+
     const transformed = {
       messages: withSession([
         { role: 'user', info: { id: 'root-engineer-auto-injected' }, parts: [{ type: 'text', text: 'start' }] },
@@ -474,6 +488,12 @@ integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cu
     })
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be plugin-registered')
+    runtime.pushHostMessage('ses-capability-manager', {
+      info: { id: 'provider-capability-manager', sessionID: 'ses-capability-manager',
+        parentID: 'root-ses-capability-manager', role: 'assistant', agent: 'manager',
+        providerID: 'provider', modelID: 'manager-model', time: { created: 3 } },
+      parts: [],
+    })
     const transformed = {
       messages: withSession([
         { role: 'user', info: { id: 'root-ses-capability-manager' }, parts: [{ type: 'text', text: 'start' }] },

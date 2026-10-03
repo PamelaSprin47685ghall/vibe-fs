@@ -240,6 +240,186 @@ test('WHAT[durable-events-019] feature history loops report exact path line and 
     { line: 5, token: 'manual merge' },
   )
 })
+test('WHAT[durable-events-019] diagnostic history fields do not turn unrelated graph collection into durable replay', () => {
+  const source = [
+    'type Snapshot = { History: Transition list; Active: Wait list }',
+    'let ownerKey owner = owner.Identity |> List.sortBy fst',
+    'let branches snapshot =',
+    '    snapshot.Active |> List.collect followProducer',
+    'let orderedBranches snapshot =',
+    '    branches snapshot |> List.sortBy ownerKey',
+  ].join('\n')
+  assert.deepEqual(
+    scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Diagnostics.fs'),
+    [],
+  )
+})
+test('WHAT[durable-events-019] history merge detection binds collection and ordering to the same function', () => {
+  const source = [
+    'let count history = List.length history',
+    'let orderedPaths directories =',
+    '    directories |> List.collect paths |> List.sortBy pathName',
+    'let merge streams =',
+    '    let events = streams |> List.collect snd',
+    '    events |> List.sortBy eventKey',
+  ].join('\n')
+  assert.deepEqual(
+    scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Collections.fs')
+      .map(({ line, token }) => ({ line, token })),
+    [{ line: 6, token: 'manual merge' }],
+  )
+})
+test('WHAT[durable-events-019] overrides default members and constructor effects cannot merge business history', () => {
+  for (const binding of ['override _.BuildCurrent() =', 'default _.BuildCurrent() =', 'do']) {
+    const source = [
+      'type FeatureProjection(history) =',
+      '    inherit BaseProjection()',
+      `    ${binding}`,
+      '        history |> List.collect snd |> List.sortBy eventKey |> consume',
+    ].join('\n')
+    assert.deepEqual(
+      scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Projection.fs')
+        .map(({ line, token }) => ({ line, token })),
+      [{ line: 4, token: 'manual merge' }],
+      binding,
+    )
+  }
+})
+test('WHAT[durable-events-019] a called local collection helper does not hide a history merge', () => {
+  const source = [
+    'let flatten streams = List.collect snd streams',
+    'let ordered streams = flatten streams |> List.sortBy eventKey',
+  ].join('\n')
+  assert.deepEqual(
+    scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Collections.fs')
+      .map(({ line, token }) => ({ line, token })),
+    [{ line: 2, token: 'manual merge' }],
+  )
+})
+test('WHAT[durable-events-019] history merge follows transitive and mutually recursive named helpers', () => {
+  const sources = [
+    [
+      'let flatten streams = List.collect snd streams',
+      'let forward values = flatten values',
+      'let ordered values = forward values |> List.sortBy eventKey',
+    ],
+    [
+      'let rec ordered streams = flatten streams |> List.sortBy eventKey',
+      'and flatten streams =',
+      '    if List.isEmpty streams then ordered streams else List.collect snd streams',
+    ],
+  ]
+  for (const [index, source] of sources.entries()) {
+    assert.deepEqual(
+      scanFeatureHistoryLoop(source.join('\n'), 'src/Wanxiangshu/Feature/Collections.fs')
+        .map(({ line, token }) => ({ line, token })),
+      [{ line: index === 0 ? 3 : 1, token: 'manual merge' }],
+    )
+  }
+})
+test('WHAT[durable-events-019] history merge follows explicitly called helpers in same-file modules', () => {
+  for (const called of ['Helpers.flatten', 'Feature.Helpers.flatten']) {
+    const source = [
+      'module Feature',
+      'module Helpers =',
+      '    let flatten values = List.collect id values',
+      `let ordered streams = ${called} streams |> List.sortBy eventKey`,
+    ].join('\n')
+    assert.deepEqual(
+      scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Collections.fs')
+        .map(({ line, token }) => ({ line, token })),
+      [{ line: 4, token: 'manual merge' }],
+      called,
+    )
+  }
+})
+test('WHAT[durable-events-019] lambda parameters shadow helpers only inside their own expression', () => {
+  const prefix = ['let flatten values = List.collect id values', 'let ordered streams =']
+  for (const body of [
+    ['    (fun flatten -> streams |> flatten |> List.sortBy eventKey) id'],
+    ['    (fun flatten ->', '        streams |> flatten |> List.sortBy eventKey) id'],
+  ]) {
+    assert.deepEqual(
+      scanFeatureHistoryLoop([...prefix, ...body].join('\n'), 'src/Wanxiangshu/Feature/Collections.fs'),
+      [],
+    )
+  }
+  const outside = [...prefix,
+    '    ignore ((fun flatten -> flatten streams) id)',
+    '    flatten streams |> List.sortBy eventKey',
+  ].join('\n')
+  assert.deepEqual(
+    scanFeatureHistoryLoop(outside, 'src/Wanxiangshu/Feature/Collections.fs')
+      .map(({ line, token }) => ({ line, token })),
+    [{ line: 4, token: 'manual merge' }],
+  )
+})
+test('WHAT[durable-events-019] a value parameter does not resolve to a same-named module helper', () => {
+  for (const body of [
+    'let ordered Helpers streams = Helpers.flatten streams |> List.sortBy eventKey',
+    'let ordered streams = (fun Helpers -> Helpers.flatten streams |> List.sortBy eventKey) source',
+  ]) {
+    const source = [
+      'module Helpers =',
+      '    let flatten values = List.collect id values',
+      body,
+    ].join('\n')
+    assert.deepEqual(scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Collections.fs'), [])
+  }
+})
+test('WHAT[durable-events-019] unreferenced and shadowed helpers do not supply history collection', () => {
+  const sources = [
+    [
+      'let flatten streams = List.collect snd streams',
+      'let ordered history = history |> List.sortBy eventKey',
+    ],
+    [
+      'let flatten streams = List.collect snd streams',
+      'let ordered flatten history = flatten history |> List.sortBy eventKey',
+    ],
+    [
+      'let flatten streams = List.collect snd streams',
+      'let ordered source history = source.flatten history |> List.sortBy eventKey',
+    ],
+    [
+      'let flatten streams = List.collect snd streams',
+      'let ordered history =',
+      '    log "flatten" // flatten history',
+      '    log (* flatten history *) "diagnostic"',
+      '    history |> List.sortBy eventKey',
+    ],
+    [
+      'let ordered history =',
+      '    let flatten streams = List.collect snd streams',
+      '    history |> List.sortBy eventKey',
+    ],
+    [
+      'module Collections =',
+      '    let flatten streams = List.collect snd streams',
+      'module Diagnostics =',
+      '    let flatten values = values',
+      '    let ordered history = flatten history |> List.sortBy eventKey',
+    ],
+  ]
+  for (const source of sources) {
+    assert.deepEqual(
+      scanFeatureHistoryLoop(source.join('\n'), 'src/Wanxiangshu/Feature/Collections.fs'),
+      [],
+      source.join('\n'),
+    )
+  }
+})
+test('WHAT[durable-events-019] history collection does not cross unrelated member boundaries', () => {
+  for (const binding of ['override _.Ordered(history) =', 'default _.Ordered(history) =', 'do']) {
+    const source = [
+      'type FeatureProjection(history) =',
+      '    member _.Flatten(streams) = List.collect snd streams',
+      `    ${binding}`,
+      '        history |> List.sortBy eventKey |> consume',
+    ].join('\n')
+    assert.deepEqual(scanFeatureHistoryLoop(source, 'src/Wanxiangshu/Feature/Projection.fs'), [], binding)
+  }
+})
 test('WHAT[durable-events-019] feature-local NDJSON SQLite and private stores are forbidden', () => {
   const file = 'src/Wanxiangshu/Repository/Feature/PrivateStore.fs'
   const source = [

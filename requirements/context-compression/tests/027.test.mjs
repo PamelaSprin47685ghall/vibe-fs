@@ -5,9 +5,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const sha256Hex = (input) => {
   const hash = createHash('sha256')
@@ -367,4 +368,152 @@ test('WHAT[context-compression-027] live request construction preserves its supp
 })
 
 test.todo('WHAT[context-compression-027] actual commit refuses a restored old-epoch request against a newer live projection; preserving the number alone does not prove authority; GAP-104')
-test.todo('WHAT[context-compression-027] independent consumer cannot construct private Main or Squash records; GAP-104')
+
+test('WHAT[context-compression-027] wire descriptors cannot bypass the validating constructor at runtime', () => {
+  const scope = runtime.createScope()
+  try {
+    // A wire descriptor is not a context: the only path to a live request is
+    // claimCurrentRequest, which routes through the validating constructor.
+    // A forged DeltaDigest on the wire never survives: the constructor
+    // recomputes it as SHA256(Toml) (WHAT 027: DeltaDigest = SHA256(Toml)).
+    const forged = runtime.main({
+      kind: 'Main',
+      mainSession: 'ses-main-forged',
+      bloggerSession: 'ses-blog-forged',
+      toml: 'raw work',
+      items: [],
+      previousIngested: 1,
+      nextIngested: 3,
+      previousCutoff: 1,
+      nextCutoff: 2,
+      nextDigest: 'nd-forged',
+      frameEpoch: 0,
+      observedEpoch: 0,
+      deltaDigest: 'FORGED-DIGEST',
+    })
+    runtime.claimCurrentRequest(scope, 'ses-blog-forged', forged)
+    const live = runtime.currentRequest(scope, 'ses-blog-forged')
+    assert.equal(live.deltaDigest, sha256Hex('raw work'))
+    assert.notEqual(live.deltaDigest, 'FORGED-DIGEST')
+
+    // nextIngested must strictly advance previousIngested; the constructor
+    // rejects the record and no partial state is claimed.
+    const noAdvance = runtime.main({
+      kind: 'Main',
+      mainSession: 'ses-main-no-advance',
+      bloggerSession: 'ses-blog-no-advance',
+      toml: 'raw work',
+      items: [],
+      previousIngested: 3,
+      nextIngested: 3,
+      previousCutoff: 1,
+      nextCutoff: 2,
+      nextDigest: 'nd-no-advance',
+      frameEpoch: 0,
+      observedEpoch: 0,
+    })
+    assert.throws(
+      () => runtime.claimCurrentRequest(scope, 'ses-blog-no-advance', noAdvance),
+      /main context rejected: CoverageDidNotAdvance/,
+    )
+    assert.equal(runtime.currentRequest(scope, 'ses-blog-no-advance'), null)
+
+    // Squash coverage must be non-empty and match the digest list length.
+    const emptySquash = runtime.squash({
+      kind: 'Squash',
+      mainSession: 'ses-main-empty-squash',
+      bloggerSession: 'ses-blog-empty-squash',
+      frameEpoch: 0,
+      observedEpoch: 0,
+      coveredFrameCount: 0,
+      digests: [],
+    })
+    assert.throws(
+      () => runtime.claimCurrentRequest(scope, 'ses-blog-empty-squash', emptySquash),
+      /squash context rejected/,
+    )
+    assert.equal(runtime.currentRequest(scope, 'ses-blog-empty-squash'), null)
+
+    // Without a wire requestId the owner identity is the canonical hash of
+    // the record contents, frozen and deterministic across claims.
+    const honest = runtime.main({
+      kind: 'Main',
+      mainSession: 'ses-main-honest',
+      bloggerSession: 'ses-blog-honest',
+      toml: 'raw work',
+      items: [],
+      previousIngested: 1,
+      nextIngested: 3,
+      previousCutoff: 1,
+      nextCutoff: 2,
+      nextDigest: 'nd-honest',
+      frameEpoch: 0,
+      observedEpoch: 0,
+    })
+    runtime.claimCurrentRequest(scope, 'ses-blog-honest', honest)
+    const first = runtime.currentRequest(scope, 'ses-blog-honest').requestId
+    assert.match(first, /^[0-9a-f]{64}$/)
+    const secondScope = runtime.createScope()
+    try {
+      runtime.claimCurrentRequest(secondScope, 'ses-blog-honest', honest)
+      assert.equal(runtime.currentRequest(secondScope, 'ses-blog-honest').requestId, first)
+    } finally {
+      runtime.dispose(secondScope)
+    }
+  } finally {
+    runtime.dispose(scope)
+  }
+})
+
+async function compileRequestConsumer(consumer) {
+  const { compileOwnerProject, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const root = resolve(import.meta.dirname, '../../..')
+  const sourceRoot = join(root, 'src/Wanxiangshu')
+  const projectPath = join(sourceRoot, 'Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj')
+  const scratch = mkdtempSync(join(tmpdir(), 'wxs-request-construction-'))
+  try {
+    const plan = planOwnerCompile({ projectPath })
+    const isolatedItems = plan.compileItems.map(source => {
+      const destination = join(scratch, 'src', relative(sourceRoot, source))
+      mkdirSync(dirname(destination), { recursive: true })
+      cpSync(source, destination)
+      return destination
+    })
+    const consumerPath = join(scratch, consumer)
+    cpSync(join(import.meta.dirname, 'fixtures/request-construction', consumer), consumerPath)
+    return await compileOwnerProject({
+      projectPath,
+      scratchRoot: join(scratch, 'build'),
+      rootPropsPath: join(root, 'Directory.Build.props'),
+      compilePlan: { ...plan, compileItems: [...isolatedItems, consumerPath] },
+      stdio: 'pipe',
+    })
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+integrationTest('WHAT[context-compression-027] Fable compiles an external consumer of both validating factories and readonly context members', async () => {
+  const result = await compileRequestConsumer('FactoryConsumer.fs')
+  assert.equal(result.ok, true, `the real declared request closure must compile with its public factories and readers\n${result.stdout}\n${result.stderr}`)
+  assert.equal(result.code, 0)
+  assert.equal(result.signal, null)
+})
+
+const assertPrivateConstructionRejected = async (consumer, typeName) => {
+  const result = await compileRequestConsumer(consumer)
+  const diagnostics = `${result.stdout}\n${result.stderr}`
+  assert.equal(result.ok, false, `${consumer} must not construct a private context`)
+  assert.notEqual(result.code, 0)
+  assert.equal(result.signal, null, 'a terminated compiler does not prove a private construction boundary')
+  assert.ok(
+    diagnostics.split('\n').some(line => line.includes(consumer) && line.includes(typeName) && /not accessible/i.test(line)),
+    `the compiler must reject access to ${typeName} at the external construction site\n${diagnostics}`,
+  )
+}
+
+integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Main record', () =>
+  assertPrivateConstructionRejected('DirectMainConsumer.fs', 'BloggerMainRequestContext'))
+
+integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Squash record', () =>
+  assertPrivateConstructionRejected('DirectSquashConsumer.fs', 'BloggerSquashRequestContext'))

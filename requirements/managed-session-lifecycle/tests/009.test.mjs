@@ -2,14 +2,16 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const FactCodecSurface = await import("../../../dist/Persistence/Journal/FactCodecSurface.js");
 const HandleFoldSurface = await import("../../../dist/Execution/Delegation/Handle/FoldSurface.js");
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 const HandleJournalSurface = await import("../../../dist/Execution/Delegation/Handle/JournalSurface.js");
+const { withAdmittedChildren } = await import('./support/admitted-child-work.mjs')
+const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
+const { withJournal, hostPort } = await import('../../interaction-authority/tests/support/authority.mjs')
+const { assertJsData } = await import('../../verification-system/tests/support/js-contract.mjs')
 
 const PARENT = 'ses_p'
 const CHILD = 'ses_c'
@@ -87,54 +89,69 @@ test('WHAT[managed-session-lifecycle-009] EXEC_009_Abandoned_is_not_joinable_and
   assert.equal(retired.ok, true)
   assert.equal(stateOf(retired.state).lifecycle, 'Retired')
   assert.equal(HandleSurface.reportableAbandonedCount(retired.state), 0)
-  assert.deepEqual(
-    HandleSurface.apply(abandoned, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' }).error,
-    { kind: 'TransitionRejected', reason: 'AlreadyAbandoned' },
-  )
-  // EXEC-009: Retired handles reopen on an explicit link command for agent
-  // reuse. The tombstone is the prior LastCompletion, not a permanent ban on
-  // further Labor. A journal replay of the same link stays Retired (msl-006).
-  const reopened = HandleSurface.apply(retired.state, { op: 'link-command', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
-  assert.equal(reopened.ok, true, `Retired handle must be reopenable, got ${JSON.stringify(reopened)}`)
-  assert.equal(stateOf(reopened.state).lifecycle, 'Active')
+  const replayed = HandleSurface.apply(abandoned, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
+  assert.equal(replayed.ok, true)
+  assert.deepEqual(stateOf(replayed.state), stateOf(abandoned), 'stable binding replay preserves the abandonment')
+  const reopened = HandleSurface.apply(retired.state, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
+  assert.equal(reopened.ok, true)
+  assert.deepEqual(stateOf(reopened.state), stateOf(retired.state), 'binding replay cannot revive a retired work')
 })
-test('WHAT[managed-session-lifecycle-009] EXEC_009_recordAbandon_CAS_first_wins', async (context) => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-direct-'))
-  const created = await HandleJournalSurface.JournalSurface_openJournal(
-    dir,
-    'managed-session-abandon-direct',
-    1,
-    '2026-03-01T12:00:00Z',
-  )
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
-  context.after(() => HandleJournalSurface.JournalSurface_dispose(created.journal))
-  const j = created.journal
-    const linked = await HandleJournalSurface.JournalSurface_link(j, PARENT, 'h1', CHILD, 'coder', 'Coder')
-    assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
-
-    const first = await HandleJournalSurface.JournalSurface_recordAbandon(
-      j,
-      PARENT,
-      'h1',
-      'ParentCancelled',
-      '2026-03-01T12:00:00Z',
-    )
+test('WHAT[managed-session-lifecycle-009] EXEC_009_recordAbandon_CAS_first_wins', async () => {
+  await withAdmittedChildren('abandon-direct', PARENT, [{ agentId: 'h1', sessionId: CHILD, role: 'engineer' }], async (j, profiles, directory, reopen) => {
+    const root = profiles.get('h1').authorityRoot
+    const first = await HandleJournalSurface.recordAbandon(j, PARENT, 'h1', CHILD, root, 'ParentCancelled')
     assert.equal(first.ok, true, first.ok ? '' : first.error)
-
-    const second = await HandleJournalSurface.JournalSurface_recordAbandon(
-      j,
-      PARENT,
-      'h1',
-      'DeadlineExceeded',
-      '2026-03-01T12:01:00Z',
-    )
-    // Journal accepts the line; fold absorbs AlreadyAbandoned (idempotent replay).
+    const before = HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, root)
+    const second = await HandleJournalSurface.recordAbandon(j, PARENT, 'h1', CHILD, root, 'DeadlineExceeded')
     assert.equal(second.ok, true, second.ok ? '' : second.error)
-
-    const projection = HandleJournalSurface.JournalSurface_snapshot(j, PARENT, HANDLE)
+    const projection = HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, root)
     assert.equal(projection.record.lifecycle, 'Abandoned')
     assert.equal(projection.record.abandonReason, 'ParentCancelled')
     assert.deepEqual(projection.views.joinable, [])
+    assert.equal(projection.revision, before.revision, 'same exact work retry must not append a second terminal fact')
+    const rejected = await HandleJournalSurface.recordAbandon(j, PARENT, 'h1', 'foreign-child', root, 'HostSessionGone')
+    assert.deepEqual(rejected, { ok: false, error: 'WorkNotAdmitted' })
+    assert.deepEqual(HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, root), projection)
+    const sent = await dispatch.sendAgentOwnerRootAwait(hostPort(async () => dispatch.admittedWithReceipt('new-child-work')), j, CHILD, 'SECOND-CHARGE', profiles.get('h1').identitySeed)
+    assert.equal(sent.ok, true, sent.error)
+    const accepted = await dispatch.acceptAgentOwnerRoot(j, CHILD, sent.key, 'physical-second-child-charge')
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+    const nextRoot = accepted.profile.authorityRoot
+    const nextBefore = HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, nextRoot)
+    assert.equal(nextBefore.record.lifecycle, 'Active')
+    assert.equal((await HandleJournalSurface.recordAbandon(j, PARENT, 'h1', CHILD, root, 'HostSessionGone')).ok, true)
+    assert.deepEqual(HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, nextRoot), nextBefore, 'old work retry cannot affect the next work or append another fact')
+    assert.deepEqual(HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, root).record, projection.record)
+    const reopened = await reopen()
+    assert.deepEqual(HandleJournalSurface.snapshot(reopened, PARENT, 'h1', CHILD, root).record, projection.record)
+    assert.equal(HandleJournalSurface.snapshot(reopened, PARENT, 'h1', CHILD, nextRoot).record.lifecycle, 'Active')
+  })
+})
+test('WHAT[managed-session-lifecycle-009] an unscoped historical binding cannot authorize a new abandonment', async () => {
+  await withJournal('historical-abandon-rejected', async j => {
+    const linked = await journalSurface.JournalSurface_appendAgent(j, { kind: 'Session', session: PARENT }, null, {
+      family: 'Execution', case: 'HandleLinked', payload: {
+        ParentSessionId: PARENT, ChildSessionId: CHILD, Handle: 'h1', TargetAgent: 'engineer',
+        Byname: 'h1', CanonicalRole: 'Engineer', Ownership: 'DurableParentHandle',
+      },
+    })
+    assert.equal(linked.ok, true)
+    const before = HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, 'untrusted-root-material')
+    assert.equal(before.record, null, 'a stable road is not a scoped admitted work')
+    assert.deepEqual(await HandleJournalSurface.recordAbandon(j, PARENT, 'h1', CHILD, 'untrusted-root-material', 'ParentCancelled'), { ok: false, error: 'WorkNotAdmitted' })
+    assert.deepEqual(HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, 'untrusted-root-material'), before, 'rejection writes nothing and grants no authority')
+  })
+})
+test('WHAT[managed-session-lifecycle-009] public scoped work snapshot is lossless JSON data', async () => {
+  await withAdmittedChildren('work-snapshot-json', PARENT, [{ agentId: 'h1', sessionId: CHILD, role: 'engineer' }], async (j, profiles) => {
+    const observed = HandleJournalSurface.snapshot(j, PARENT, 'h1', CHILD, profiles.get('h1').authorityRoot)
+    assertJsData(observed, 'scoped work snapshot')
+    assert.doesNotThrow(() => JSON.stringify(observed), 'public snapshot must serialize without compiler values or BigInt')
+    assert.match(observed.revision, /^(0|[1-9]\d*)$/, 'revision retains the exact canonical decimal value')
+    assert.deepEqual(JSON.parse(JSON.stringify(observed)), {
+      ...observed, record: { lifecycle: 'Active', child: CHILD },
+    })
+  })
 })
 test('WHAT[managed-session-lifecycle-009] EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
   const linked = fact('HandleLinked', {

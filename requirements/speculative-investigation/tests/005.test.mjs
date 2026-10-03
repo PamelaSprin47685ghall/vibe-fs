@@ -11,6 +11,19 @@ const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: r
 const exchange = (toolName, canonicalArguments, canonicalResult) => ({ toolName, canonicalArguments, canonicalResult })
 const batch = (requestOrdinal, exchanges) => ({ requestOrdinal, exchanges })
 
+test('WHAT[speculative-investigation-005] a later user input cannot complete the preceding predictor tool batch', () => {
+  const provider = { role: 'assistant', parts: [call('before-user', 'read', '{"filePath":"a"}')] }
+  const tool = { role: 'tool', parts: [result('before-user', 'actual result')] }
+  assert.deepEqual(Strength.collectCompleteBatches([provider, tool]), [
+    { requestOrdinal: 1, exchanges: [exchange('read', '{"filePath":"a"}', 'actual result')] },
+  ], 'the same provider batch with its result is accepted')
+  assert.deepEqual(Strength.collectCompleteBatches([
+    provider,
+    { role: 'user', parts: [{ kind: 'text', text: 'a new assignment' }] },
+    tool,
+  ]), [], 'the result cannot cross a real user boundary to complete the old request')
+})
+
 test('WHAT[speculative-investigation-005] predictor text crosses as reasoning without its native reasoning', async () => {
   const texts = [' 核对结果\n𠀀 ', '第二段', '结束正文']
   const messages = [

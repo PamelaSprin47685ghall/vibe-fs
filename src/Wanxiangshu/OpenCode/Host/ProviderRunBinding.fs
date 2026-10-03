@@ -53,6 +53,29 @@ module ProviderRunBinding =
         |> latestAssistant
         |> Result.bind (confirmLatestRun single)
 
+    let quiescedRun (messages: SessionMessage list) =
+        messages
+        |> List.filter (fun message -> message.Role = "assistant")
+        |> latestAssistant
+        |> Result.bind (fun message ->
+            let executionEnded =
+                message.ErrorName.IsSome
+                || (match message.Finish with
+                    | Some "stop"
+                    | Some "length"
+                    | Some "content-filter" -> true
+                    | _ -> false)
+
+            if
+                message.Completed
+                && executionEnded
+                && not message.IsCompaction
+                && message.ParentId.IsSome
+            then
+                Ok message
+            else
+                Error Rejection.NoBindableRun)
+
     let private decideCandidates messages candidates =
         match candidates with
         | [] -> Error Rejection.NoBindableRun

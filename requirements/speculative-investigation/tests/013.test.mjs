@@ -475,7 +475,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
 
 // Drive the admitted provider request, then deliver its exact physical child
 // completion through the shared terminal port.
-test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session', async () => {
+async function captureRootDelegation(tailPlaceholder) {
   globalThis.__wanxiangshu_test_predictor_state = 'configured'
   try {
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -490,11 +490,20 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       const callB = 'call-positive-2'
       const seedUser = userMessage(physical, sessionId, [hostText('inspect the file')])
       const seedAssistant = assistantMessage(run, sessionId, physical, [budgetCall(callA, 1), budgetCall(callB, 1)])
+      const targetRun = tailPlaceholder ? 'run-positive-target' : run
+      const messages = [seedUser, seedAssistant]
+      if (tailPlaceholder) seedAssistant.info.time.completed = 2
       runtime.pushHostMessage(sessionId, seedUser)
       runtime.pushHostMessage(sessionId, seedAssistant)
+      if (tailPlaceholder) {
+        const target = assistantMessage(targetRun, sessionId, physical, [])
+        target.info.time.created = 3
+        runtime.pushHostMessage(sessionId, target)
+        messages.push(target)
+      }
 
       const promptsBefore = runtime.prompts.length
-      const pending = hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
+      const pending = hooks['experimental.chat.messages.transform']({}, { messages })
 
       let waited = 0
       let bootstrap
@@ -514,14 +523,14 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       const childUser = runtime.messages.find(message => message.role === 'user' && message.id.startsWith(`msg-${replicaSessionId}-`))
       assert.ok(childUser, 'bootstrap dispatch records an actual Host physical user message')
       const childPhysical = childUser.id
-      await hooks['experimental.chat.messages.transform']({}, {
-        messages: [userMessage(childPhysical, replicaSessionId, childUser.parts)],
-      })
       const childRun = `${replicaSessionId}-completed`
       const childAssistant = assistantMessage(childRun, replicaSessionId, childPhysical, [
         hostText('readonly investigation finished'),
       ])
       runtime.pushHostMessage(replicaSessionId, childAssistant)
+      await hooks['experimental.chat.messages.transform']({}, {
+        messages: [userMessage(childPhysical, replicaSessionId, childUser.parts)],
+      })
 
       await notifyCompleted(runtime, replicaSessionId, 'readonly investigation finished', 'finished', 7)
       await withTimeout(pending, 'the exact replica physical completion never resolved')
@@ -557,11 +566,19 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_o
       const bound = durableEventsOfType(directory, 'DelegationBound')
       assert.equal(bound.length, 1, 'the start phase must bind exactly one replica for the decision')
       assert.equal(bound[0].payload.decision_id, payload.decision_id)
-      assert.equal(bound[0].payload.target_provider_run, run)
+      assert.equal(bound[0].payload.target_provider_run, targetRun)
     })
   } finally {
     globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
   }
+}
+
+test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_captures_one_delegation_request_for_a_root_work_session', async () => {
+  await captureRootDelegation(false)
+})
+
+test('WHAT[speculative-investigation-013] SPEC_INV_013_an_empty_target_placeholder_keeps_the_emitting_assistant_source_identity', async () => {
+  await captureRootDelegation(true)
 })
 
 test('WHAT[speculative-investigation-013] shared common-dir instances prepare one resident and unloading one preserves its lease and next decision', async () => {
@@ -589,10 +606,15 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
         const target = assistantMessage('shared-target', owner, 'shared-user', [])
         target.info.time.created = 3
         family.pushHostMessage(owner, target)
-        const pending = [
-          first['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
-          second['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] }),
+        const outputs = [
+          { messages: [seedUser, seedAssistant] },
+          { messages: [seedUser, seedAssistant] },
         ]
+        const pending = [
+          first['experimental.chat.messages.transform']({}, outputs[0]),
+          second['experimental.chat.messages.transform']({}, outputs[1]),
+        ]
+        const pendingSettled = Promise.allSettled(pending)
         const physicalResponses = new Map()
         const finishDecision = async (hooks, decisionIndex) => {
           let bootstrap
@@ -614,20 +636,44 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
             { sessionID: replica, messageID: physical.id, agent: 'engineer' },
             { message: admission, parts: admission.parts },
           )
+          const run = `response-${physical.id}`
+          const response = assistantMessage(run, replica, physical.id, [
+            { type: 'reasoning', text: 'private predictor thinking' },
+            hostText('finished'),
+          ])
+          family.pushHostMessage(replica, response)
           await hooks['experimental.chat.messages.transform']({}, { messages: [
             admission,
           ] })
-          const run = `response-${physical.id}`
-          const response = assistantMessage(run, replica, physical.id, [hostText('finished')])
-          family.pushHostMessage(replica, response)
           physicalResponses.set(replica, response)
           Events.notify(runtime.terminalPort, replica, 'Completed', run, 'finished')
           return replica
         }
-        const replica = await finishDecision(second, 0)
-        await withTimeout(Promise.all(pending), 'shared consumers did not receive the same decision completion')
+        let replica
+        try {
+          replica = await finishDecision(second, 0)
+        } finally {
+          const results = await withTimeout(pendingSettled, 'shared consumers did not receive the same decision completion')
+          for (const result of results) {
+            if (result.status === 'rejected') throw result.reason
+          }
+        }
         assert.equal(durableRequestedEvents(directory).length, 1)
         assert.equal(durableEventsOfType(directory, 'DelegationBound').length, 1)
+        assert.deepEqual(durableEventsOfType(directory, 'DelegationClosed'), [], 'actual terminal text is material, so shared completion does not close the decision')
+        const prepared = durableEventsOfType(directory, 'StrengthCandidatePrepared')
+        assert.equal(prepared.length, 1, 'shared consumers publish one exact material fact')
+        assert.equal(prepared[0].payload_refs.length, 1)
+        const bundle = JSON.parse(readFileSync(join(directory, '.git', 'wanxiang', 'payloads', prepared[0].payload_refs[0]), 'utf8'))
+        assert.deepEqual(bundle.batches.map(batch => ({ text: batch.assistant_text, exchanges: batch.exchanges })), [{ text: ['finished'], exchanges: [] }])
+        assert.doesNotMatch(JSON.stringify(bundle), /private predictor thinking/)
+        for (const output of outputs) {
+          const parts = output.messages.flatMap(message => message.parts)
+          assert.deepEqual(parts.filter(part => part.type === 'reasoning' && part.text === 'finished').map(part => part.text), ['finished'])
+          assert.equal(parts.some(part => part.type === 'text' && part.text === 'finished'), false)
+          assert.doesNotMatch(JSON.stringify(output), /private predictor thinking/)
+        }
+        assert.equal(family.prompts.filter(prompt => prompt.path?.id === replica).length, 1, 'duplicate consumers send one resident bootstrap')
         const credits = () => ModelRouting.sharedCapacitySnapshot().custodies.filter(custody => custody.owner.sessionId === replica)
         const before = credits()
         assert.deepEqual(before.map(token => token.owner.sessionId), [replica], 'resident owns one actual capacity credit')
@@ -647,8 +693,13 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
         nextTarget.info.time.created = 5
         family.pushHostMessage(owner, nextTarget)
         const next = second['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant, target] })
-        assert.equal(await finishDecision(second, 1), replica)
-        await withTimeout(next, 'remaining instance could not reuse the resident')
+        const nextSettled = Promise.allSettled([next])
+        try {
+          assert.equal(await finishDecision(second, 1), replica)
+        } finally {
+          const [result] = await withTimeout(nextSettled, 'remaining instance could not reuse the resident')
+          if (result.status === 'rejected') throw result.reason
+        }
         assert.deepEqual(durableEventsOfType(directory, 'DelegationBound').map(row => row.payload.replica_session_id), [replica, replica])
         await family.stop(second)
         assert.deepEqual(credits(), [], 'last release returns the resident credit')
@@ -765,12 +816,14 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_refuses_to
       const call1 = 'call-complete-1'
       const seedUser1 = userMessage(physical, sessionId, [hostText('inspect the file')])
       const seedAssistant1 = assistantMessage(run1, sessionId, physical, [pendingCall(call1, 1)])
+      seedAssistant1.info.time.completed = 2
       const seedTool1 = toolMessage('tool-complete-1', sessionId, [{ type: 'tool-result', callID: call1, result: 'alpha' }])
 
       // Later incomplete batch with identical tool name and arguments, but different call ID and pending result
       const run2 = 'run-inflight-2'
       const call2 = 'call-inflight-2'
       const seedAssistant2 = assistantMessage(run2, sessionId, physical, [pendingCall(call2, 1)])
+      seedAssistant2.info.time.created = 3
 
       runtime.pushHostMessage(sessionId, seedUser1)
       runtime.pushHostMessage(sessionId, seedAssistant1)

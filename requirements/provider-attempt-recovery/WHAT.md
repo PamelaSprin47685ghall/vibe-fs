@@ -108,4 +108,6 @@ Host 停止自动重试的唯一证据是确切 `(SessionId, ProviderRunIdentity
 
 已 Accepted 且没有 ProviderStarted 的执行不得静默悬挂。session.idle 只检查该 session 中恰好处于此形状的执行；boot recovery sweep 检查重启后同样的义务。
 
+session-only idle 是唤醒，不能证明同 session 所有已接受输入都已被 Host 停止。在线 sweep 必须由公开 Host snapshot 的最新已完成 assistant 的 exact `parentID` 确认停止的物理执行，只定夺它自己的未启动义务。已被 owner 明确取代的旧 assistant idle 不定夺新输入，不铸造新输入的 idle permit；尚未保存到 Host 或仍在容量排队的已接受 successor 由其准入 owner 和独立 recovery sweep 负责。
+
 定夺必须终局：有 typed resume capability 时，用确切已接受 material 恢复执行；否则将该执行结为终态并报告该 turn 失败。本义务不发送新文本、不生成替换 PromptClaim，也不放宽 [003] 的单次物理发送约束。

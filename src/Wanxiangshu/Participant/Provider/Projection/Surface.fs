@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Host
 
 /// Plain-JavaScript boundary for the generic provider projection algebra.
 module ProjectionSurface =
@@ -329,6 +330,12 @@ module ProjectionSurface =
 
     let cutoffDigest (sha256: string -> string) (snapshot: obj) (cutoff: int) : string =
         ProjectionRenderer.cutoffDigest sha256 (snapshotOfJs snapshot) cutoff
+
+    /// provider-projection-011: the production Host crypto adapter, exposed so
+    /// a JS test can prove the injected-hash boundary tests used the same
+    /// digest function the composition root injects.
+    let hostSha256Hex (input: string) : string =
+        Wanxiangshu.Host.HostDigest.sha256Hex input
 
     let sealDigest (sha256: string -> string) (projection: obj) : string =
         wireProjectionOf projection |> ProviderProjection.renderWire |> sha256

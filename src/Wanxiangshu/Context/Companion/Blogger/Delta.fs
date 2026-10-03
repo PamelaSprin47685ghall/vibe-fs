@@ -140,6 +140,16 @@ module BloggerDelta =
 
         bestLength
 
+    let private alignPrefixToCodePoint (text: string) (length: int) =
+        if
+            length > 0
+            && length < text.Length
+            && System.Char.IsSurrogatePair(text, length - 1)
+        then
+            length - 1
+        else
+            length
+
     /// CTX-013 third level: cut one part's body so the rendered CHUNK fits.
     ///
     /// The budget applies to the rendered document, not to the item in isolation.
@@ -147,9 +157,8 @@ module BloggerDelta =
     /// one-item document then exceeds by exactly that byte — a limit violation small
     /// enough to pass every eyeball review and still be a limit violation.
     ///
-    /// Truncation happens on CHARACTERS of the already-normalised text. Cutting
-    /// the rendered UTF-8 bytes directly would split a multi-byte sequence and
-    /// produce invalid TOML — the failure CTX-013 names explicitly.
+    /// The retained prefix preserves the source's line endings and ends at a
+    /// complete Unicode code point, never between a UTF-16 surrogate pair.
     ///
     /// The cut is measured against the rendered document, not the source. Escaping
     /// and string-form choice make that size non-linear, so each candidate is
@@ -167,11 +176,11 @@ module BloggerDelta =
         // invalid item.
         | None -> item
         | Some text ->
-            let normalized = LlmFacing.normalizeNewlines text
+            let text = if isNull text then "" else text
             let suffix = "\n" + BloggerToml.TruncationMarker
 
             let rendered length =
-                let kept = normalized.Substring(0, length)
+                let kept = text.Substring(0, length)
 
                 { item with
                     Part = replacePartBody item.Part (kept + suffix)
@@ -183,15 +192,17 @@ module BloggerDelta =
                 LlmFacing.byteCount dummyDoc - LlmFacing.stringValueByteCount suffix
 
             let documentBytes prefixLength =
-                overhead + LlmFacing.stringValuePrefixByteCount normalized prefixLength suffix
+                overhead + LlmFacing.stringValuePrefixByteCount text prefixLength suffix
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
             // change the rendered size non-linearly, so only the same arithmetic
             // `renderString` uses can measure it. The scaffolding is rendered once;
-            // each step counts a prefix of `normalized` without allocating a
+            // each step counts a prefix of the source without allocating a
             // near-budget candidate document.
-            rendered (longestFittingPrefix budget documentBytes normalized.Length)
+            longestFittingPrefix budget documentBytes text.Length
+            |> alignPrefixToCodePoint text
+            |> rendered
 
     type private PendingEntry =
         {| Turn: int

@@ -63,6 +63,7 @@ module Surface =
     val statusCreate: string -> string -> InquiryStatus
     val resourceKindCreate: string -> string -> ResourceKind
     val guaranteeCreate: string -> string list -> CertificateGuarantee
+    val guaranteeKind: CertificateGuarantee -> string
     val eventBodyTag: InquiryEventBody -> string
 
     val goalCreate: GoalSpec -> GoalSpec

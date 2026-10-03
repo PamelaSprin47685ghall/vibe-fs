@@ -4,8 +4,13 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Execution.Session.ChatExecution
 
 type SessionPromptOptions = OpenCodePromptOptions
+
+type IExternalInputSupersessionPort =
+    abstract InterruptSupersededAttempt:
+        prior: ChatExecutionKey * replacement: ManagedChatAcceptanceWitness -> Task<Result<unit, string>>
 
 type ISessionHostPort =
     abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable

@@ -31,6 +31,12 @@ module QuiescenceSurface =
     let observeIdle (gate: ISessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
         gate.ObserveIdle(SessionId.create sessionId)
 
+    let captureCurrentAttempt (gate: SessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
+        gate.CaptureCurrentAttempt(SessionId.create sessionId)
+
+    let observeIdleFor (gate: SessionQuiescenceGate) (observation: QuiescencePermit) : QuiescencePermit option =
+        gate.ObserveIdleFor observation
+
     let private failureName =
         function
         | QuiescencePermitFailure.WrongOwner -> "WrongOwner"

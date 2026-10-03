@@ -107,6 +107,55 @@ const compiledAt = (kind, entryId = 'round2') => ({ kind, lane: 'coder', entryId
 const entry = (id) => ({ id, lane: 'coder' });
 
 export const coldBoundaryCases = [
+  {
+    name: 'MANAGER-LOOP keeps ordinary user prose that mentions Chronicle records',
+    fn: () => {
+      const previous = body('test-model', [
+        SYSTEM,
+        user('Round 1'),
+        assistant('.'),
+        user('Inspect the Chronicle records before deciding what to do.'),
+        assistant('assessment evidence'),
+        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+      ]);
+      assertEq(decide(previous, MANAGER_NEXT, at('manager-loop')).broken, 'manager-loop-rewrote-fixed');
+    },
+  },
+  {
+    name: 'MANAGER-LOOP keeps extra text and media beside a companion preamble',
+    fn: () => {
+      for (const extraPart of [
+        { type: 'text', text: 'ordinary retained content' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } },
+      ]) {
+        const previous = body('test-model', [
+          SYSTEM,
+          user('Round 1'),
+          assistant('.'),
+          user([{ type: 'text', text: `${COMPANION_PREAMBLE}\n# prior work record` }, extraPart]),
+          assistant('assessment evidence'),
+          { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+        ]);
+        assertEq(decide(previous, MANAGER_NEXT, at('manager-loop')).broken, 'manager-loop-rewrote-fixed', extraPart.type);
+      }
+    },
+  },
+  {
+    name: 'MANAGER-LOOP keeps companion-like rows without the exact synthetic ack',
+    fn: () => {
+      for (const ackContent of ['?', [], [{ type: 'text', text: '.' }, { type: 'text', text: '.' }]]) {
+        const previous = body('test-model', [
+          SYSTEM,
+          user('Round 1'),
+          assistant(ackContent),
+          user(`${COMPANION_PREAMBLE}\n# prior work record`),
+          assistant('assessment evidence'),
+          { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+        ]);
+        assertEq(decide(previous, MANAGER_NEXT, at('manager-loop')).broken, 'manager-loop-rewrote-fixed', JSON.stringify(ackContent));
+      }
+    },
+  },
   // ── the ordinary case ─────────────────────────────────────────────────────
 
   {

@@ -58,8 +58,8 @@ type ExportArgs = { InquiryId: string; Mode: ExportMode }
 type GoalAmendArgs =
     { CommandId: string
       InquiryId: string
+      ExpectedRevision: Revision
       AuthorizedBy: string
-      ExpectedRevision: string
       AddedConstraints: string list
       ReplacementText: string option }
 

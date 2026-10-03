@@ -28,3 +28,5 @@ test('WHAT[institutional-learning-003] GAP-181: candidate admission is mechanica
   // when the experience also mentions an existing rule name.
   assert.deepEqual(learning.evaluate('known-rule covered it', ['known-rule'], candidate), { disposition: 'BIRTH' })
 })
+
+test.todo('WHAT[institutional-learning-003] GAP-181: semantic mechanism extraction and actual input-capability isolation; substring matching is not an abstraction oracle')

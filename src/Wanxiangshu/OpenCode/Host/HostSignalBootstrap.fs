@@ -48,6 +48,16 @@ module HostSignalBootstrap =
         member _.Failure = failure
         member _.ExecutionKey = executionKey
 
+    [<RequireQualifiedAccess>]
+    type private ChatAdmissionFlightPhase =
+        | Running
+        | Finished
+
+    type private ChatAdmissionFlight =
+        { Work: Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
+          Outputs: ResizeArray<obj>
+          Phase: ChatAdmissionFlightPhase ref }
+
     /// What the composition root needs back from `wire`.
     ///
     /// Exactly the members `SpikePlugin` calls. Six more used to hang here —
@@ -61,12 +71,14 @@ module HostSignalBootstrap =
           CancelSignals: SessionId seq -> unit
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
+          ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit> }
 
     let wire
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
+        (externalInput: IExternalInputSupersessionPort)
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
@@ -157,14 +169,6 @@ module HostSignalBootstrap =
 
             do scope.TrackReconcileShutdown(fun () -> reconciler.StopAndDrain())
 
-            let handleOrdinaryAbort sessionId signal =
-                scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
-
-                strengthPorts.CancelStrengthOwner
-                |> Option.iter (fun cancel -> cancel sessionId)
-
-                reconciler.Signal signal
-
             /// provider-attempt-recovery-003: no Host signal may name the failed ProviderRun.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
@@ -174,44 +178,52 @@ module HostSignalBootstrap =
             /// performs the admission. ProviderFailure contributes only failure finality;
             /// Scheduler freezes the current physical identity at signal admission and
             /// reconciliation must match it to the snapshot assistant before publishing.
+            let tryObserveCurrentIdle key attempt =
+                if ModelRouting.wasExecutionSuperseded key then
+                    None
+                else
+                    scope.Sessions.Quiescence.ObserveIdleFor attempt
+
+            let observeQuiescedAssistant sessionId attempt (assistant: SessionMessage) =
+                let key: ChatExecutionKey =
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = PhysicalUserMessageId.create assistant.ParentId.Value }
+
+                task {
+                    match tryObserveCurrentIdle key attempt with
+                    | None -> ()
+                    | Some permit ->
+                        scope.LoopSensor.ResetDetector sessionId
+                        reconciler.SignalIdle(sessionId, permit)
+                        do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PhysicalExecutionQuiesced key)
+                }
+
+            let observeIdleSnapshot sessionId attempt =
+                task {
+                    match! snapshot.GetMessages sessionId with
+                    | Error _ -> ()
+                    | Ok messages ->
+                        let observed =
+                            ProviderRunBinding.quiescedRun messages
+                            |> Result.toOption
+                            |> Option.map (observeQuiescedAssistant sessionId attempt)
+                            |> Option.defaultWith (fun () -> Task.FromResult())
+
+                        do! observed
+                }
+
             let onSignal (signal: HostSignal) =
                 match signal with
                 | SessionIdle sessionId ->
-                    // LOOP-005: idle ends the attempt → fresh detector for the next stream.
-                    // Armed anomaly must survive until TurnAborted reconciliation consumes
-                    // guard ownership (ResetDetector deliberately does not clear it; degeneration-guard-008).
-                    scope.LoopSensor.ResetDetector sessionId
+                    reconciler.Signal signal
+                    let attempt = scope.Sessions.Quiescence.CaptureCurrentAttempt sessionId
 
-                    // provider-attempt-recovery-023: the Host published idle, so this
-                    // session's `Accepted ∧ ¬ProviderStarted` executions are exact
-                    // obligations that must be decided now — resume or terminalize —
-                    // never silently dangle. The recovery host owns the decision.
-                    scope.RunBackground(fun () ->
-                        scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId))
-
-                    // HOST-004: the idle observation mints the quiescence permit that
-                    // idle-derived continuations must hold at send time. The permit is
-                    // process-local — never journalled.
-                    let permit = scope.Sessions.Quiescence.ObserveIdle sessionId
-                    reconciler.SignalIdle(sessionId, permit)
+                    scope.RunBackground(fun () -> observeIdleSnapshot sessionId attempt)
                 | ProviderRetry _
                 | ProviderFailure _ -> reconciler.Signal signal
-                // HOST-002/004: operator abort immediately revokes the current
-                // attempt's idle permits, then routes to the
-                // reconciler. Never ProviderFailure — it does not advance fallback.
-                | AttemptAborted failure ->
-                    // Fission retires only the replaced physical present. It is not
-                    // an owner cancellation: do not revoke owner resources or cancel
-                    // speculation/children here. Revoke the physical attempt's idle
-                    // continuation capability so the retired conversation never continues.
-                    ProviderAttemptStopFence.shared.Revoke failure.SessionId
-
-                    FissionHost.routeAttemptAborted
-                        failure.SessionId
-                        (fun () ->
-                            scope.Sessions.Quiescence.RevokeCurrentAttempt failure.SessionId
-                            reconciler.Signal signal)
-                        (fun () -> handleOrdinaryAbort failure.SessionId signal)
+                // Session-only abort is a wake. Only an exact current cancelled
+                // assistant below may revoke resources.
+                | AttemptAborted _ -> reconciler.Signal signal
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
                     let deletion = HostSessionDeletion.prepare scope sessionId parentSessionIdOpt
 
@@ -321,6 +333,20 @@ module HostSignalBootstrap =
                 exactStarted key
 
             let settleExactTerminal (observation: ExactProviderTerminalObservation) =
+                let key: ChatExecutionKey =
+                    { SessionId = observation.SessionId
+                      PhysicalUserMessageId = observation.PhysicalUserMessageId }
+
+                match observation.Outcome, ModelRouting.tryReadExecution key with
+                | HostProviderTerminalOutcome.Cancelled _, Some _ ->
+                    ProviderAttemptStopFence.shared.Observe(observation.SessionId, observation.ProviderRun)
+                    scope.Sessions.Quiescence.RevokeCurrentAttempt observation.SessionId
+
+                    FissionHost.routeAttemptAborted observation.SessionId ignore (fun () ->
+                        strengthPorts.CancelStrengthOwner
+                        |> Option.iter (fun cancel -> cancel observation.SessionId))
+                | _ -> ()
+
                 match observation.Outcome, observation.Disposition, startedEvidenceForTerminal observation with
                 | HostProviderTerminalOutcome.ProviderFailure failure, None, _ ->
                     // provider-attempt-recovery-022: the exact terminal projection IS the Host's
@@ -341,6 +367,8 @@ module HostSignalBootstrap =
 
                     Task.FromResult()
                 | _, Some disposition, Some evidence -> applyObservedTerminal observation evidence disposition
+                | HostProviderTerminalOutcome.Cancelled _, Some ChatExecutionTerminalDisposition.Cancelled, None ->
+                    task { do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionCancelled key) }
                 | _ ->
                     rejectProviderTerminal observation
                     Task.FromResult()
@@ -390,6 +418,22 @@ module HostSignalBootstrap =
                     signalProviderStarted started
                 else
                     Task.FromResult() :> Task
+
+            let confirmProviderStarted (started: ExactProviderStartObservation) =
+                let key: ChatExecutionKey =
+                    { SessionId = started.SessionId
+                      PhysicalUserMessageId = started.PhysicalUserMessageId }
+
+                if ModelRouting.wasExecutionSuperseded key then
+                    Task.FromResult() :> Task
+                else
+                    ModelRouting.rememberProviderStepIdentity
+                        started.SessionId
+                        started.PhysicalUserMessageId
+                        started.ProviderRun
+
+                    reconciler.BindPhysicalUserMaterial(started.SessionId, started.PhysicalUserMessageId)
+                    signalProviderStarted started
 
             let continueProviderStart
                 (started: ExactProviderStartObservation)
@@ -674,26 +718,14 @@ module HostSignalBootstrap =
             // still uses. It holds no identity, persists nothing, never keeps a
             // lock across capacity waiting, and no same-key serial work waits on
             // it.
-            let admissionInFlight =
-                Dictionary<
-                    ChatExecutionKey,
-                    Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
-                 >()
+            let admissionInFlight = Dictionary<ChatExecutionKey, ChatAdmissionFlight>()
 
-            let admissionFlight createTransaction managed key output =
-                lock admissionInFlight (fun () ->
-                    match admissionInFlight.TryGetValue key with
-                    | true, existing -> existing
-                    | false, _ ->
-                        let ports = createTransaction (ModelRouting.projectHostModel output)
-                        let started = ChatAdmissionTransaction.execute ports managed
-                        admissionInFlight.[key] <- started
-                        started)
+            let admissionSequence = Dictionary<SessionId, Task>()
 
             let removeAdmissionFlight key flight =
                 lock admissionInFlight (fun () ->
                     match admissionInFlight.TryGetValue key with
-                    | true, registered when obj.ReferenceEquals(registered, flight) ->
+                    | true, registered when obj.ReferenceEquals(registered.Work, flight) ->
                         admissionInFlight.Remove(key) |> ignore
                     | _ -> ())
 
@@ -719,6 +751,218 @@ module HostSignalBootstrap =
                 | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
                 | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
 
+            let priorExecutions durable (key: ChatExecutionKey) =
+                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.current
+                |> List.filter (fun state -> state.key.SessionId = key.SessionId && state.key <> key)
+
+            let settleSupersededAdmissions durable key =
+                let superseded =
+                    priorExecutions durable key
+                    |> List.filter (fun state ->
+                        state.terminalDisposition.IsNone
+                        && ModelRouting.wasExecutionSuperseded state.key)
+
+                task {
+                    for state in superseded do
+                        do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionSuperseded state.key)
+                }
+
+            let drainExactAttempt previous witness =
+                task {
+                    match! externalInput.InterruptSupersededAttempt(previous, witness) with
+                    | Ok() -> ()
+                    | Error error ->
+                        invalidOp ("external input supersession failed to drain the old Host attempt: " + error)
+                }
+
+            let drainSupersededAttempt managed witness prior =
+                match managed, prior with
+                | (ChatAdmissionIntent.ManagedIntent.ExternalRoot _ | ChatAdmissionIntent.ManagedIntent.ActiveHumanContinuation _),
+                  Some previous when ModelRouting.wasExecutionSuperseded previous -> drainExactAttempt previous witness
+                | _ -> Task.FromResult()
+
+            let beginAdmissionTurn sessionId =
+                lock admissionInFlight (fun () ->
+                    let preceding =
+                        match admissionSequence.TryGetValue sessionId with
+                        | true, previous -> previous
+                        | _ -> Task.FromResult() :> Task
+
+                    let completion =
+                        TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                    admissionSequence.[sessionId] <- completion.Task
+                    preceding, completion)
+
+            let releaseAdmissionTurn sessionId (completion: TaskCompletionSource<unit>) =
+                AsyncSupport.trySetResult completion () |> ignore
+
+                lock admissionInFlight (fun () ->
+                    match admissionSequence.TryGetValue sessionId with
+                    | true, current when obj.ReferenceEquals(current, completion.Task) ->
+                        admissionSequence.Remove sessionId |> ignore
+                    | _ -> ())
+
+            let runProjectionTurn sessionId (operation: unit -> Task<'value>) =
+                let preceding, completion = beginAdmissionTurn sessionId
+
+                task {
+                    try
+                        do! preceding
+                        return! operation ()
+                    finally
+                        releaseAdmissionTurn sessionId completion
+                }
+
+            let finishProjection
+                (phase: ChatAdmissionFlightPhase ref)
+                intent
+                output
+                key
+                (outputs: ResizeArray<obj>)
+                result
+                =
+                try
+                    completeAdmission intent output result
+
+                    outputs
+                    |> Seq.filter (fun requestOutput -> not (obj.ReferenceEquals(requestOutput, output)))
+                    |> Seq.iter (projectCommittedAdmission key)
+                finally
+                    phase.Value <- ChatAdmissionFlightPhase.Finished
+
+            let projectCurrentAdmission durable key witness finish operation =
+                task {
+                    if ModelRouting.wasExecutionSuperseded key then
+                        let! settled = ManagedChatSupersession.settle durable key
+
+                        return
+                            settled
+                            |> Result.map (fun () -> ChatAdmissionTransactionOutcome.Superseded witness)
+                            |> Result.mapError ChatAdmissionTransactionError.SupersessionSettlementFailed
+                    else
+                        let! result = operation ()
+                        finish result
+                        return result
+                }
+
+            let handoffAcquisition durable key managed prior witness admission =
+                task {
+                    try
+                        do! settleSupersededAdmissions durable key
+                        do! drainSupersededAttempt managed witness prior
+                    with error ->
+                        raise (ChatAdmissionLeaseHandoffException(error, admission))
+                }
+
+            let observeQueuedAcquisition onQueued =
+                function
+                | ExecutionAdmissionAcquisition.Queued _ -> onQueued ()
+                | _ -> ()
+
+            let acquireAndHandoff durable key managed prior (ports: ChatAdmissionTransactionPorts) onQueued witness =
+                task {
+                    let! acquired = ports.Acquire witness
+
+                    match acquired with
+                    | Ok(ExecutionAdmissionAcquisition.Admitted _ as admission)
+                    | Ok(ExecutionAdmissionAcquisition.Queued _ as admission) ->
+                        do! handoffAcquisition durable key managed prior witness admission
+                        observeQueuedAcquisition onQueued admission
+                    | _ -> ()
+
+                    return acquired
+                }
+
+            let finishUnsettledAdmission intent output =
+                function
+                | Ok(ChatAdmissionTransactionOutcome.Settled _) -> ()
+                | result -> completeAdmission intent output result
+
+            let startAdmissionFlight
+                durable
+                createTransaction
+                intent
+                managed
+                (key: ChatExecutionKey)
+                output
+                (outputs: ResizeArray<obj>)
+                (phase: ChatAdmissionFlightPhase ref)
+                =
+                let preceding, completion = beginAdmissionTurn key.SessionId
+                // DSL-MUTABLE: resource — this admission released ingress while awaiting its capacity grant.
+                let mutable waitingForCapacity = false
+
+                let onQueued () =
+                    waitingForCapacity <- true
+                    releaseAdmissionTurn key.SessionId completion
+
+                let operation () =
+                    task {
+                        do! preceding
+
+                        let prior =
+                            priorExecutions durable key
+                            |> List.tryFind (fun state -> ModelRouting.ownsExecutionAdmission state.key)
+                            |> Option.map _.key
+
+                        let ports: ChatAdmissionTransactionPorts =
+                            createTransaction (ModelRouting.projectHostModel output)
+
+                        let finish = finishProjection phase intent output key outputs
+
+                        let withLeaseOwner witness projection =
+                            let project () =
+                                projectCurrentAdmission durable key witness finish projection
+
+                            if waitingForCapacity then
+                                runProjectionTurn key.SessionId project
+                            else
+                                project ()
+
+                        let! result =
+                            ChatAdmissionTransaction.executeWithLeaseOwner
+                                ignore
+                                withLeaseOwner
+                                { ports with
+                                    Acquire = acquireAndHandoff durable key managed prior ports onQueued }
+                                managed
+
+                        finishUnsettledAdmission intent output result
+                        return result
+                    }
+
+                task {
+                    try
+                        return! operation ()
+                    finally
+                        phase.Value <- ChatAdmissionFlightPhase.Finished
+                        releaseAdmissionTurn key.SessionId completion
+                }
+
+            let admissionFlight durable createTransaction intent managed (key: ChatExecutionKey) output =
+                lock admissionInFlight (fun () ->
+                    match admissionInFlight.TryGetValue key with
+                    | true, existing when existing.Phase.Value = ChatAdmissionFlightPhase.Running ->
+                        existing.Outputs.Add output
+                        existing.Work
+                    | _ ->
+                        let outputs = ResizeArray<obj>()
+                        outputs.Add output
+                        // DSL-MUTABLE: resource — registration remains open until this flight finishes Host projection.
+                        let phase = ref ChatAdmissionFlightPhase.Running
+
+                        let started =
+                            startAdmissionFlight durable createTransaction intent managed key output outputs phase
+
+                        admissionInFlight.[key] <-
+                            { Work = started
+                              Outputs = outputs
+                              Phase = phase }
+
+                        started)
+
             let admitManagedChatMessage durable createTransaction intent output =
                 let managed =
                     ChatAdmissionIntent.tryManaged intent
@@ -726,12 +970,12 @@ module HostSignalBootstrap =
                         invalidArg "intent" "managed chat transaction requires a managed intent")
 
                 let key = ChatAdmissionIntent.managedKey managed
-                let flight = admissionFlight createTransaction managed key output
+                let flight = admissionFlight durable createTransaction intent managed key output
 
                 task {
                     try
-                        let! result = flight
-                        completeAdmission intent output result
+                        let! _ = flight
+                        ()
                     finally
                         removeAdmissionFlight key flight
                 }
@@ -822,6 +1066,7 @@ module HostSignalBootstrap =
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                         |> Option.map PhysicalUserMessageId.value)
                   ChatMessageHook = chatMessageHook
+                  ConfirmProviderStarted = confirmProviderStarted
                   ObserveEvent =
                     (fun raw ->
                         task {

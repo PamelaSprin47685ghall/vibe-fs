@@ -95,6 +95,35 @@ module PluginTransforms =
 
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
+    [<RequireQualifiedAccess>]
+    type private ProviderStartBoundaryFailure =
+        | SnapshotUnavailable of ChatExecutionKey * string
+        | HostRunUnavailable of ChatExecutionKey * ProviderRunBinding.Rejection
+        | CommittedAdmissionUnavailable of ChatExecutionKey
+        | LifecycleRejected of ProviderLifecycle.ProviderStartObservationError<unit>
+
+    let private providerStartBoundaryErrorCode =
+        function
+        | ProviderStartBoundaryFailure.SnapshotUnavailable _ -> "host-snapshot-unavailable"
+        | ProviderStartBoundaryFailure.HostRunUnavailable _ -> "host-run-unavailable"
+        | ProviderStartBoundaryFailure.CommittedAdmissionUnavailable _ -> "committed-admission-unavailable"
+        | ProviderStartBoundaryFailure.LifecycleRejected error ->
+            ProviderLifecycle.providerStartObservationErrorCode error
+
+    type private ProviderStartBoundaryException(failure: ProviderStartBoundaryFailure) =
+        inherit
+            Exception(
+                sprintf
+                    "MANAGED-CHAT-005: provider start boundary rejected (%s): %A"
+                    (providerStartBoundaryErrorCode failure)
+                    failure
+            )
+
+        member _.Failure = failure
+
+    let private rejectProviderStartBoundary failure =
+        raise (ProviderStartBoundaryException failure)
+
     type TraceTransformCapture =
         { RawMessages: obj list
           Current: XTraceProjectionState option }
@@ -112,7 +141,6 @@ module PluginTransforms =
           ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          CaptureReadonlyDelegation: string option -> obj -> Task<unit>
           ApplyReadonlyDelegation: string option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
@@ -181,6 +209,71 @@ module PluginTransforms =
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
         let strengthFailFuse = boot.StrengthFailClosed
+
+        let requireProviderAdmission key =
+            if ModelRouting.readExecutionAdmission key |> Option.isNone then
+                rejectProviderStartBoundary (ProviderStartBoundaryFailure.CommittedAdmissionUnavailable key)
+
+        let observeProviderRun (key: ChatExecutionKey) =
+            task {
+                let snapshot =
+                    snapshotOpt
+                    |> Option.defaultWith (fun () ->
+                        rejectProviderStartBoundary (
+                            ProviderStartBoundaryFailure.SnapshotUnavailable(key, "snapshot port unavailable")
+                        ))
+
+                let! messages = snapshot.GetMessages key.SessionId
+
+                let observed =
+                    messages
+                    |> Result.mapError (fun reason -> ProviderStartBoundaryFailure.SnapshotUnavailable(key, reason))
+                    |> Result.bind (fun messages ->
+                        ProviderRunBinding.bindableRun (PhysicalUserMessageId.value key.PhysicalUserMessageId) messages
+                        |> Result.mapError (fun rejection ->
+                            ProviderStartBoundaryFailure.HostRunUnavailable(key, rejection)))
+
+                match observed with
+                | Error failure -> return rejectProviderStartBoundary failure
+                | Ok assistant ->
+                    return
+                        { SessionId = key.SessionId
+                          PhysicalUserMessageId = key.PhysicalUserMessageId
+                          ProviderRun = ProviderRunIdentity.create assistant.Id }
+            }
+
+        let persistProviderRun key observed =
+            task {
+                let! persisted =
+                    ProviderLifecycle.persistProviderStartedFromObservation journal scope.TryBindAttemptPlan observed
+
+                match persisted with
+                | Error error ->
+                    return rejectProviderStartBoundary (ProviderStartBoundaryFailure.LifecycleRejected error)
+                | Ok _ ->
+                    requireProviderAdmission key
+                    do! wired.ConfirmProviderStarted observed
+                    requireProviderAdmission key
+            }
+
+        let confirmProviderStarted projectionSessionIdOpt outObj =
+            task {
+                let physical =
+                    outObj
+                    |> ProviderWireDecode.messagesFromTransformOutput
+                    |> ProviderWireCapture.lastUserMessageId
+
+                match projectionSessionIdOpt, physical with
+                | Some sessionText, Some physical ->
+                    let key =
+                        { SessionId = SessionId.create sessionText
+                          PhysicalUserMessageId = physical }
+
+                    requireProviderAdmission key
+                    let! observed = observeProviderRun key
+                    do! persistProviderRun key observed
+                | _ -> return ()
+            }
 
         let drainTermination sessionId =
             function
@@ -263,7 +356,7 @@ module PluginTransforms =
                         projectionSessionIdOpt
                         outObj
                 with
-                | Ok _ -> return ()
+                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt outObj
                 | Error error ->
                     return
                         invalidOp (
@@ -422,40 +515,6 @@ module PluginTransforms =
                         boot.ProtocolArgumentVault
                         outObj
                         (ProviderWireDecode.projectionSessionIdFromMessages outObj)
-            }
-
-        let captureReadonlyDelegation projectionSessionIdOpt outObj =
-            task {
-                let! outcome =
-                    StrengthDelegate.tryCapture
-                        snapshotOpt
-                        journal
-                        strengthDurability
-                        boot.StrengthScope
-                        scope.TryAttemptPlan
-                        scope.SyncDelegateRuntime
-                        (predictorConfigured ())
-                        projectionSessionIdOpt
-                        (Some boot.Timer)
-                        outObj
-
-                match outcome with
-                | StrengthDelegate.CaptureOutcome.Captured request ->
-                    Diagnostic.emit
-                        "strength-delegation-requested"
-                        [ "session_id", SessionId.value request.OwnerSessionId
-                          "result", "capture-phase:" + string (ReadonlyRoundBudget.value request.RequestedRounds) ]
-                | StrengthDelegate.CaptureOutcome.Skipped reason ->
-                    let sessionId =
-                        projectionSessionIdOpt
-                        |> Option.orElseWith (fun () -> ProviderWireDecode.projectionSessionIdFromMessages outObj)
-                        |> Option.defaultValue ""
-
-                    Diagnostic.emit
-                        "strength-delegation-skip"
-                        [ "session_id", sessionId; "result", "capture-phase:" + reason ]
-
-                return ()
             }
 
         let applyReadonlyDelegation projectionSessionIdOpt outObj =
@@ -670,7 +729,6 @@ module PluginTransforms =
                             outObj
                 }
 
-          CaptureReadonlyDelegation = captureReadonlyDelegation
           ApplyReadonlyDelegation = applyReadonlyDelegation
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
@@ -778,12 +836,6 @@ module PluginTransforms =
             // this the capture never sees the budget the model signed.
             do! caps.RestoreProtocolArguments outObj
 
-            // 4.5 StrengthDelegate.tryCapture — freeze the explicit authorization
-            // from the real completed owner batch and persist DelegationRequested
-            // here, before any compaction or message replacement downstream can
-            // lose batch metadata.
-            do! caps.CaptureReadonlyDelegation projectionSessionIdOpt outObj
-
             // 5. XTraceCapture.captureObservedMessagesWithReceipt
             let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
 
@@ -802,9 +854,8 @@ module PluginTransforms =
             let! prefixHorizon = caps.ApplyXWire relayProjection outObj
 
             // 10. ProviderLifecycle.freezeProviderAttemptPlanForTransform
-            // The transform sees the accepted user message only. Freeze the
-            // exact request plan; a later public assistant observation owns
-            // ProviderRunIdentity binding and ProviderStarted persistence.
+            // Freeze the exact plan, then confirm the Host's real assistant
+            // identity and durable ProviderStarted before returning its body.
             do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
 
             // 11. EnforcerContinuation.applyContinuation
@@ -817,9 +868,8 @@ module PluginTransforms =
                 // 13. RequirementGroundingTransform.projectOrTerminate
                 do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
-                // 14. StrengthDelegate.tryCaptureAndStart — only on the live
-                // Current horizon so manager-loop / prefix-probe sealed views
-                // are not rewritten by a no-op start path's surface apply.
+                // Capture and start on the final outgoing request so the
+                // preparation owns the same mirror and provider attempt plan.
                 do! caps.ApplyReadonlyDelegation projectionSessionIdOpt outObj
 
             // 15. BloggerChronicleText.maybeInject

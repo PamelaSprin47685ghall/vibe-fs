@@ -387,24 +387,8 @@ module DispatchSurface =
         match Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner sessionId projections.Fission with
         | Some _ -> Error "Session is retired by Fission"
         | None ->
-            // dispatch-protocol-009/011: a detached AgentOwnerRoot dispatch
-            // returns right after its durable claim, so a continuation on the
-            // same claim path may attach before the physical message lands.
-            // interaction-authority-001 keeps the root itself gated on
-            // physical acceptance, so here a pending AgentOwnerRoot claim
-            // counts as the session's in-flight run — it is neither an
-            // archived nor a closed profile (interaction-authority-017).
-            let pendingRootClaim =
-                PromptAuthorityProjectionQueries.projectionFor sessionId projections
-                |> Option.exists (fun authority ->
-                    authority.PendingClaims
-                    |> Map.exists (fun _ (claim: PromptAuthority.PromptClaim) ->
-                        claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot))
-
             match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
             | Some _ -> Ok()
-            | None when pendingRootClaim -> Ok()
             | None -> Error "No active authority profile"
 
     let sendContinuation

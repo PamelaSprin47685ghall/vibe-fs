@@ -1,18 +1,23 @@
 # Changelog — 版本历史
 
-## Unreleased — GAP 缺口与意外红修复：全量 unit 归零
+## Unreleased — upstream fcfba389e 与 PR 合并冲突
 
-- 全量 unit 从 39 个意外红修复至 3706 绿 / 0 红（generation 240，818/818 文件完成）；runner exit 1 仅来自 428 条 TODO 的 pending-proof 诚实报告，不是失败。
-- **关键修复（按包）**：
-  - sphinx-v2：AuthoritativeVocabulary 补注册 strict @2 事件类型；测试导入名与 dist 导出对齐；MCP Server 的 result 包装 FSharpMap→plain JSON + isError/structuredContent；zod passthrough；goal amendment expectedRevision 契约；Decode 的 int64 边界。
-  - capability-enforcement-019：QuiescencePermitToken 的 toJSON 守卫经 Emit/defineProperty 落到实例。
-  - managed-session-lifecycle：horizonVisible 移除 work 过滤；recordAbandon 区分 work 级 / handle 级；linkNamed 对 Abandoned 拒绝；fold 重放经 replayLink 幂等吸收 Retired，并与显式 link-command reopen 的路径区分。
-  - delegation-003/026：cancelParent 对 fixed devops 写 work 级终态；needsReplacementDevOps 按原始 binding 判定；ForkHarness physical id 模块级全局唯一；adoptDevOpsIfUnowned 回到 AdoptChild 身份登记。
-  - crash-reconciliation-020：load-projection 补生产链 fact 与 wire 形状；ChildRunVoided 关闭 child authority。
-  - durable-events-023：HasListableHandles 改读 auditListable。
-  - dispatch-protocol-009：activeProfileAt 的 pending root claim 回退。
-- **GAP 台账**：GAP-064/181/077 以实测证据关闭。GAP-181 的 BIRTH 链路：evaluate 三值、InstitutionalRuleBorn 入 durable substrate、revision 合同、002—006 测试升级；GAP-077：BloggerChronicleSurface 行为级测试与双语文案资源化。
-- **顺手**：action-affordance-015 测试文件归位；SURFACE_MANIFEST / compile-order / fsproj 相应登记。另记一笔工具链观察：增量构建对 Integrator 变更存在缓存传播缺陷（--clean 可绕过），建议工具链侧关注。
+- 普通合并上游 `3f9aa1636` / `fcfba389e`，清理误提交的零字节工程临时文件，吸收 CI 镜像依赖和经过复核的工程接线。保留既有 exact work、Guard 交接和固定 DevOps 取消边界。
+- 正式回归阻止 `WXS_ACCEPT_TODO` 将欠证判成完整通过；保持单次真实 canary、精确版本围栏及完整 Long Stroke。cold-boundary 改匹配完整双语资源及合成 ack，不以 Chronicle 关键词删普通用户历史。
+- 更新同步和施工入口；本批验证范围、吸收/拒绝依据与原始证据见[同步记录](proposals/archive/2026-10-03/Upstream增量-fcfba389e-2026-10-03.md)。既有 GAP 状态不因上游 CI 绿或统计自述而关闭。
+
+## Unreleased — upstream b7768f478 增量
+
+- 合并 Blogger 双语提示资源和真实 journal/lease 注入观察，以及制度学习 candidate 机械准入、Born 持久事实/投影和 revision 计算。GAP-077/181 仅进入 PARTIAL，保留真实 Host、语义提炼、生产并发及原子提交义务。
+- 按现行需求保留 exact AdmittedWork、墓碑、固定 DevOps 原终态回调和取消排空；Sphinx 保留严格 Revision 与 native MCP，词汇登记改引用 Core 清单。修正新增 Surface 的 opaque resource 登记，拆平新增控制分支，不增加基线。
+- ProcessHost 的 verbose/debug 诊断进入 stderr，避免破坏 canary JSON 协议；保持原预算和默认并发。正式结果及原始失败见 `proposals/archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md`。
+
+## Unreleased — 合并 upstream e1e7dd3f1
+
+- 合入四个上游提交，包含空只读Replica终态、重启后空闲DevOps Join、Predictor正文降格与往复恢复，以及Sphinx canonical持久化和MCP合同。
+- 合并保留本地Guard替代、Host就绪与判决输送修复；补齐Sphinx严格事件版本登记、原生MCP协议与opaque permit的Fable JSON拒绝，以及exact scoped子工作的加载期void。
+- 固定DevOps的空闲道路可见性、父取消后在途工作与终态结算继续按实际所有者处理；受影响测试的准入前置改用真实physical acceptance，不由裸Root或稳定handle补造工作权限。
+- 更新施工总计划、生命周期/Sphinx分册与GAP台账。具体红绿、生成输入和未完成边界见[本批同步记录](proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)；Sphinx的业务driver、现存inquiry读取DTO/trace及完整发布验收仍待完成。
 
 ## Unreleased — 原工作区迁移代码编译修复
 

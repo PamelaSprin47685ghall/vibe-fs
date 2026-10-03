@@ -16,3 +16,5 @@ WHAT 定义权威。配置路径、公开 ABI、exact identity 与次序属于�
 | 019 | 本地绑定可用时拒绝冲突；策略变化的可执行失败 TODO | 尚未证明道路持久化/换物理 session/真实恢复；现代码可覆盖绑定，见 GAP-129 |
 
 GAP-128—131 记录缺证和待裁决，不能把 TODO 算作通过。004 的局部 reservation adoption 用例仅保存当前机制的可观察行为；旁边的反例明确指出该机制尚不满足当前前置准入约束。019 不再把自动换模型当成满足“永不换模型”的正例。
+
+014 新增满队列回归：旧 Guard 已 committed 且 provider step 在途，32 个真实 pending demand 占满队列；新 Human 因无 target 被拒绝时，旧 exact lease 与完整容量快照保持不变。另证相同满队列前态下可立即取得 target 的新输入仍成功替代，原 3840-operation soak 保留。该文件修复后 8/8；真实 Manager 单槽 G/H 交接由 Host 033 的 installed canary 证明，辅助角色使用独立模型池。两层范围见[本批记录](../../../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。

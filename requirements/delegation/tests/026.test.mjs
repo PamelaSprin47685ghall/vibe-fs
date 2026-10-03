@@ -141,6 +141,8 @@ test('WHAT[delegation-026] IDLE_ROAD_DEVOPS_COMPANION_does_not_block_join_with_h
     const horizonResult = await forkTool.executeHorizon(runtime, owner)
     assert.match(horizonResult, /devops/)
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), [])
+    assert.equal(forkTool.promptCount(runtime), 0)
 
     // 2. devops is idle (never received any prompt or active run)
     // Join must NOT hang waiting on the idle devops handle; it must report NothingToJoin immediately
@@ -175,6 +177,8 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
       const horizon2 = await forkTool.executeHorizon(restarted, owner)
       assert.match(horizon2, /devops/)
       assert.equal(forkTool.durableLifecycleByname(restarted, owner, 'devops'), 'Active')
+      assert.deepEqual(forkTool.workSnapshot(restarted, owner), [])
+      assert.equal(forkTool.promptCount(restarted), 0)
 
       // 4. Join must NOT hang on the restored-but-idle devops handle.
       const joinPromise = forkTool.executeJoin(restarted, owner)

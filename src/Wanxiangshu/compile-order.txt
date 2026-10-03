@@ -1028,12 +1028,6 @@ Execution/Delegation/Handle/JoinDrain.fsi
 Execution/Delegation/Handle/JoinDrain.fs
 Execution/Delegation/ChildRecoveryWorkflow.fsi
 Execution/Delegation/ChildRecoveryWorkflow.fs
-Persistence/EventStore/IntegratorEngine.fsi
-Persistence/EventStore/IntegratorEngine.fs
-Composition/Durable/JournalIntegration.fsi
-Composition/Durable/JournalIntegration.fs
-Persistence/EventStore/CanonicalIntegrator.fsi
-Persistence/EventStore/CanonicalIntegrator.fs
 Execution/Delegation/Fork/Host/RunLifecycle.fsi
 Execution/Delegation/Fork/Host/RunLifecycle.fs
 Execution/Delegation/Fork/Host/ChildDispatch.fsi
@@ -1052,8 +1046,6 @@ Execution/Delegation/Fork/Host/Agent.fsi
 Execution/Delegation/Fork/Host/Agent.fs
 Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
-Execution/Delegation/Fork/Host/HostForkPtySurface.fsi
-Execution/Delegation/Fork/Host/HostForkPtySurface.fs
 Interaction/Repair/Port.fsi
 Interaction/Repair/Port.fs
 Context/Companion/Blogger/Runtime/ParkedTransform.fsi
@@ -1220,8 +1212,6 @@ OpenCode/JoinResultRendererSurface.fsi
 OpenCode/JoinResultRendererSurface.fs
 OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
-OpenCode/Tools/ToolRuntimeScopeSurface.fsi
-OpenCode/Tools/ToolRuntimeScopeSurface.fs
 Mission/Relay/OpenCode/ReviewTool.fsi
 Mission/Relay/OpenCode/ReviewTool.fs
 Mission/Relay/OpenCode/SuicideTool.fsi
@@ -1306,6 +1296,18 @@ Repository/Programming/Js/ToolsBindings.fsi
 Repository/Programming/Js/ToolsBindings.fs
 Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
+Persistence/EventStore/IntegratorEngine.fsi
+Persistence/EventStore/IntegratorEngine.fs
+Composition/Durable/JournalIntegration.fsi
+Composition/Durable/JournalIntegration.fs
+Persistence/EventStore/CanonicalIntegrator.fsi
+Persistence/EventStore/CanonicalIntegrator.fs
+Persistence/Journal/Surface.fsi
+Persistence/Journal/Surface.fs
+Execution/Delegation/Fork/Host/HostForkPtySurface.fsi
+Execution/Delegation/Fork/Host/HostForkPtySurface.fs
+OpenCode/Tools/ToolRuntimeScopeSurface.fsi
+OpenCode/Tools/ToolRuntimeScopeSurface.fs
 Sphinx/V2/Persistence/BodyDto.fsi
 Sphinx/V2/Persistence/BodyDto.fs
 Sphinx/V2/Persistence/Codec.fsi
@@ -1358,8 +1360,6 @@ OpenCode/Host/WorkspaceEventStore.fsi
 OpenCode/Host/WorkspaceEventStore.fs
 OpenCode/Host/WorkspaceEventStoreSurface.fsi
 OpenCode/Host/WorkspaceEventStoreSurface.fs
-Persistence/Journal/Surface.fsi
-Persistence/Journal/Surface.fs
 Mission/Relay/ProjectionSurface.fsi
 Mission/Relay/ProjectionSurface.fs
 OpenCode/Host/WorkspaceSharedJournal.fsi
@@ -1496,6 +1496,8 @@ Foundation/OutcomeSurface.fsi
 Foundation/OutcomeSurface.fs
 Interaction/Dispatch/DispatchSurface.fsi
 Interaction/Dispatch/DispatchSurface.fs
+Mission/Manager/WorkflowSurface.fsi
+Mission/Manager/WorkflowSurface.fs
 Interaction/Dispatch/JoinGuardSurface.fsi
 Interaction/Dispatch/JoinGuardSurface.fs
 OpenCode/Host/PluginHooksSurface.fsi

@@ -24,4 +24,32 @@ test('WHAT[sphinx-v2-026] malformed likelihoods cannot produce an exact posterio
   }
 })
 
-test.todo('WHAT[sphinx-v2-026] runtime certificate propagation never upgrades model posterior or adaptive samples into external correctness or deterministic bounds')
+test('WHAT[sphinx-v2-026] certificate wire decoding keeps posterior guarantees distinct from external correctness classes', async () => {
+  const surface = await import('../../../dist/Sphinx/V2/Core/Surface.js')
+
+  // A posterior-credible wire payload decodes to exactly the PosteriorCredible
+  // guarantee class: the decoder does not label it as FrequentistCoverage
+  // or DeterministicBound (WHAT 026: Bayes 模型后验不等于"概率=实际正确率").
+  const posterior = surface.guaranteeCreate('posterior-credible', surface.listOfItems(['model-id', '0.9', 'approx']))
+  assert.equal(surface.guaranteeKind(posterior), 'posterior-credible', 'posterior-credible decodes to its own class')
+
+  // A deterministic bound has its own class and validation entry.
+  const bound = surface.guaranteeCreate('deterministic-bound', surface.listOfItems(['bound-id']))
+  assert.equal(surface.guaranteeKind(bound), 'deterministic-bound')
+  assert.ok(surface.isOk(surface.certificateValidateGuarantee(bound)), 'the bound validates without any posterior material')
+
+  // FrequentistCoverage stays its own guarantee class, not a posterior upgrade.
+  const coverage = surface.guaranteeCreate('frequentist-coverage', surface.listOfItems(['coverage-ref', '0.05', 'scope']))
+  assert.equal(surface.guaranteeKind(coverage), 'frequentist-coverage')
+  assert.notEqual(surface.guaranteeKind(coverage), surface.guaranteeKind(posterior))
+
+  // Validation keeps the classes apart: an invalid posterior mass is rejected
+  // as a posterior problem, never silently accepted as a bound.
+  const invalidMass = surface.guaranteeCreate('posterior-credible', surface.listOfItems(['model', '0.0', 'approx']))
+  assert.ok(surface.isError(surface.certificateValidateGuarantee(invalidMass)), 'an invalid posterior mass is rejected')
+  const validPosterior = surface.guaranteeCreate('posterior-credible', surface.listOfItems(['model', '0.9', 'approx']))
+  assert.ok(surface.isOk(surface.certificateValidateGuarantee(validPosterior)), 'a valid posterior mass is accepted')
+})
+
+
+test.todo('WHAT[sphinx-v2-026] runtime certificate propagation never upgrades model posterior or adaptive samples into external correctness or deterministic bounds (GAP-219: runtime wiring pending — the wire-decoding distinctness test above does not prove cross-operator propagation)')

@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-open System
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
@@ -21,26 +19,6 @@ module CasebookBookkeeper =
                 | _ -> None)
             |> List.distinct
             |> List.sort
-
-    let private presentHashIn (targetState: obj) (p: string) : string option =
-        let entry = emitJsExpr (targetState, p) "$0.get($1)"
-
-        if isNull entry || unbox<string> (entry?kind) <> "Present" then
-            None
-        else
-            Some(unbox<string> (entry?contentHash))
-
-    /// A read observation keeps its path but adopts the maintained content hash.
-    let private rehashReadObservation (targetState: obj) (obs: Observation) : Observation option =
-        match obs with
-        | Observation.FileRead(p, _) -> presentHashIn targetState p |> Option.map (fun h -> Observation.FileRead(p, h))
-        | other -> Some other
-
-    let private storedStateRef (case: Case) (diffSummary: string) : string =
-        if String.IsNullOrWhiteSpace diffSummary then
-            case.MaintenanceFileState
-        else
-            sprintf "state-%s" (CasebookCapture.contentHash diffSummary)
 
     /// Run the Bookkeeper transaction with the real diff and publish the result.
     let private applyRefresh
@@ -61,15 +39,7 @@ module CasebookBookkeeper =
                     case.Observations
                     (Some diffSummary)
 
-            let updatedObservations = case.Observations
-
-            let newMaintenanceState =
-                if not (String.IsNullOrWhiteSpace targetState) then
-                    targetState
-                else
-                    storedStateRef case diffSummary
-
-            do! CasebookWorkflow.refreshCase store case.Identity q' a' newMaintenanceState paths updatedObservations
+            do! CasebookWorkflow.refreshCase store case.Identity q' a' targetState paths case.Observations
 
             CasebookIndex.invalidate ()
             let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
@@ -85,27 +55,10 @@ module CasebookBookkeeper =
         taskResult {
             let paths = extractPaths case
 
-            let baseline =
-                if
-                    not (String.IsNullOrWhiteSpace case.MaintenanceFileState)
-                    && case.MaintenanceFileState <> "state-initial"
-                then
-                    box case.MaintenanceFileState
-                elif
-                    not (String.IsNullOrWhiteSpace case.CompletionFileState)
-                    && case.CompletionFileState <> "state-initial"
-                then
-                    box case.CompletionFileState
-                else
-                    CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
+            let! captured = CasebookCapture.computeMaintenanceDiff store root paths case.MaintenanceFileState
 
-            let! diffObj = CasebookCapture.computeMaintenanceDiff root baseline |> TaskResultCE.ofTask
-            let! targetState = CasebookCapture.freezeCompletionState store root paths
-            let hasDiff = unbox<bool> (diffObj?hasDiff)
-            let diffSummary = unbox<string> (diffObj?diffSummary)
-
-            if hasDiff then
-                return! applyRefresh store sessionId paths targetState diffSummary case
+            if captured.DiffSummary <> "" then
+                return! applyRefresh store sessionId paths captured.TargetState captured.DiffSummary case
             else
                 return false
         }

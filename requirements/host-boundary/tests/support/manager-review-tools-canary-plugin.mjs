@@ -91,6 +91,7 @@ const locateToolPart = (messages, sessionID, callID) => {
       return {
         found: true,
         callID: part.callID,
+        physicalUserMessageID: info.parentID,
         tool: part.tool,
         status: part.state?.status ?? null,
         input: part.state?.input ?? null,
@@ -118,13 +119,26 @@ export default {
     const productionDefinition = hooks['tool.definition'];
     const productionBefore = hooks['tool.execute.before'];
     const productionAfter = hooks['tool.execute.after'];
+    const productionMessage = hooks['chat.message'];
     const productionEvent = hooks.event;
-    for (const hook of [productionDefinition, productionBefore, productionAfter]) {
+    for (const hook of [productionDefinition, productionBefore, productionAfter, productionMessage]) {
       if (typeof hook !== 'function') throw new Error('A required production tool hook is unavailable');
     }
 
     return {
       ...hooks,
+
+      'chat.message': async (hookInput, hookOutput) => {
+        const value = { sessionID: hookInput?.sessionID, messageID: hookInput?.messageID ?? hookOutput?.message?.id };
+        await emit('chat.message.received', value);
+        try {
+          await productionMessage(hookInput, hookOutput);
+          await emit('chat.message.completed', value);
+        } catch (error) {
+          await emit('chat.message.rejected', { ...value, error: String(error) });
+          throw error;
+        }
+      },
 
       event: async (input) => {
         if (typeof productionEvent === 'function') await productionEvent(input);
@@ -133,6 +147,16 @@ export default {
         const properties = event.properties ?? {};
         const sessionID = properties.sessionID ?? properties.info?.sessionID ?? properties.part?.sessionID;
         if (!sessionID) return;
+        if (event.type === 'message.updated' && properties.info?.time?.completed !== undefined) {
+          const info = properties.info;
+          await emit('message.updated.observed', {
+            sessionID, messageID: info?.id, parentID: info?.parentID,
+            role: info?.role, finish: info?.finish, completed: info?.time?.completed, error: info?.error,
+          });
+        }
+        if (event.type === 'session.error') {
+          await emit('session.error.observed', { sessionID, error: properties.error });
+        }
         if (event.type === 'session.idle') await emit('session.idle.observed', { sessionID });
         const messages = await fetchMessages(client, sessionID);
         for (const stored of inflightCalls.values()) {
@@ -268,6 +292,7 @@ export default {
               ? ('contract' in durableToolPart.input)
               : null,
             durableToolPartStatus: durableToolPart?.status ?? null,
+            physicalUserMessageID: durableToolPart?.physicalUserMessageID ?? null,
           };
 
           await emit('tool.execute.before.observed', record);

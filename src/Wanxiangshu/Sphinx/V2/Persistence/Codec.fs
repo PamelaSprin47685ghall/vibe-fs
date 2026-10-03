@@ -191,7 +191,7 @@ module Codec =
                   // ArtifactRef is not PayloadRef. No external blob DTO is defined here.
                   PayloadRefs = [] }
 
-    let private validateDecodedBatch
+    let private validateEnvelopeBinding
         (digest: string -> string)
         (envelope: EventEnvelope)
         (batch: TransitionBatch)
@@ -225,7 +225,7 @@ module Codec =
                 "@2 has inline canonical payloads only; no artifact string is interpreted as an external blob hash"
         else
             decodeInput (box envelope.Payload)
-            |> Result.bind (validateDecodedBatch digest envelope)
+            |> Result.bind (validateEnvelopeBinding digest envelope)
 
     /// Pure preparation, not publication. The same Core operation later validates the
     /// sealed bytes under the shared engine. No Current is changed before append.

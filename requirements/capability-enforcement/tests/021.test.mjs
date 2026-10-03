@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
 import fc from 'fast-check'
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,6 +11,9 @@ import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as turns from '../../../dist/Interaction/Repair/CompletedTurnSurface.js'
 import * as resources from '../../../dist/Resources/PromptSurface.js'
 import * as ownership from '../../verification-system/tests/support/blogger-ownership.mjs'
+
+// Deliver completed verdicts between the synchronous journal operations.
+afterEach(() => new Promise(resolve => setImmediate(resolve)))
 
 // Match plugin initialization: the continuation decodes chronicle calls
 // against the installed enforcer catalog.
@@ -367,34 +370,40 @@ test('WHAT[capability-enforcement-021] late observers after settlement failure g
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[capability-enforcement-021] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+test('WHAT[capability-enforcement-021] generated duplicate and interleaved repair observations preserve bounded effects', async (t) => {
+  let traceNumber = 0
   await fc.assert(fc.asyncProperty(
     fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
     async (trace) => {
-      const cleanups = []
-      const owner = await setupOwner({ after: fn => cleanups.push(fn) })
-      const { durable, scope, request, ids, ports, calls } = owner
-      try {
-        const { records } = await captureFatal(async () => {
-          let run = 0
-          for (const observation of trace) {
-            if (!observation.duplicate) run += 1
-            const providerRun = `generated-run-${run}`
-            if (observation.idle) {
-              await blog.observeIdleRepair(scope, durable, request,
-                idleObservation(ports, ids, providerRun, observation))
-            } else {
-              await blog.continueTransform(scope, durable, ids.blogger, ownedTerminal(ids, providerRun))
+      const proof = (async () => {
+        const cleanups = []
+        const owner = await setupOwner({ after: fn => cleanups.push(fn) })
+        const { durable, scope, request, ids, ports, calls } = owner
+        try {
+          const { records } = await captureFatal(async () => {
+            let run = 0
+            for (const observation of trace) {
+              if (!observation.duplicate) run += 1
+              const providerRun = `generated-run-${run}`
+              if (observation.idle) {
+                await blog.observeIdleRepair(scope, durable, request,
+                  idleObservation(ports, ids, providerRun, observation))
+              } else {
+                await blog.continueTransform(scope, durable, ids.blogger, ownedTerminal(ids, providerRun))
+              }
+              assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
+              assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
+              if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
             }
-            assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
-            assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
-            if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
-          }
-        })
-        assert.deepEqual(records, [])
-      } finally {
-        for (const cleanup of cleanups.reverse()) await cleanup()
-      }
+          })
+          assert.deepEqual(records, [])
+        } finally {
+          for (const cleanup of cleanups.reverse()) await cleanup()
+        }
+      })()
+      await t.test(`WHAT[capability-enforcement-021] generated repair trace ${++traceNumber}`, () => proof)
+      // A failed subtest does not reject t.test; preserve FastCheck's shrink input.
+      await proof
     },
   ), { seed: 20260914, numRuns: 60 })
 })

@@ -35,6 +35,7 @@ module HostSignalBootstrap =
           CancelSignals: SessionId seq -> unit
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
+          ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit> }
 
@@ -52,6 +53,7 @@ module HostSignalBootstrap =
     val wire:
         observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
+        externalInput: IExternalInputSupersessionPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
         journal: AgentJournal option ->

@@ -76,7 +76,7 @@ Worker 只交结果。`sphinx_work_submit` 接受的输入不含证书 patch、�
 
 ## [019] 一个 canonical envelope 承载一个原子 TransitionBatch
 
-一个 inquiry 逻辑迁移的多个事件封装在一个 canonical EventEnvelope 中；Integrator 对 batch 先完整验证并 fold 到临时值，再整体接受。batch 内任一项非法，整个 batch 不成为 accepted current。事件类型 `sphinx/v2-transition@1`。测试：C-16、R-01。
+一个 inquiry 逻辑迁移的多个事件封装在一个 canonical EventEnvelope 中；Integrator 对 batch 先完整验证并 fold 到临时值，再整体接受。batch 内任一项非法，整个 batch 不成为 accepted current。当前严格canonical载体的事件类型为 `sphinx/v2-transition@2`；历史 `sphinx/v2-transition@1` 只读入以明确报告不受支持并形成语义cut，不自动补齐缺失的body字段或恢复为新current。测试：C-16、R-01。
 
 ## [020] traceHash / stateHash / semanticHash 不可混称
 

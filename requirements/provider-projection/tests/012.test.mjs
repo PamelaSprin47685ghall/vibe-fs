@@ -95,13 +95,17 @@ const syntaxLines = (document) => {
   return lines
 }
 
-test('WHAT[provider-projection-012] ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
-  // Without this, identical logical content renders as different bytes depending on which platform
-  // produced it, and 「同一 semantic input 必须产生相同 bytes」 fails for a reason nobody can see.
+test('WHAT[provider-projection-012] ARCH_010_layout_uses_LF_without_normalizing_data_values', () => {
   assert.equal(toml.normalizeNewlines('a\r\nb\rc\nd'), 'a\nb\nc\nd')
   assert.equal(toml.normalizeNewlines(''), '')
 
-  assert.equal(toml.renderString('line one\r\nline two'), toml.renderString('line one\nline two'))
+  for (const raw of ['line one\r\nline two', 'line one\rline two', 'line one\nline two\n']) {
+    const rendered = toml.renderDocument(['first\r\nsecond\rthird'], [toml.field('data', toml.renderString(raw))])
+    assert.equal(rendered.includes('\r'), false, 'physical layout must contain only LF line endings')
+    assert.ok(rendered.startsWith('# first\n# second\n# third\n\n'))
+    assert.equal(parseToml(rendered).data, raw)
+    assert.equal(Buffer.byteLength(rendered, 'utf8'), toml.byteCount(rendered))
+  }
 })
 test('WHAT[provider-projection-012] ARCH_010_identical_input_renders_byte_identical_output', () => {
   const build = () =>
@@ -150,6 +154,23 @@ test('WHAT[provider-projection-012] ARCH_010_byteCount_agrees_with_the_platform_
       encoder.encode(text).length,
       `byteCount disagrees with TextEncoder for ${JSON.stringify(text)}`,
     )
+  }
+})
+test('WHAT[provider-projection-012] prefix byte counts equal the actual rendered UTF8 bytes across string form boundaries', () => {
+  const samples = ['', 'a\nb\n', 'a\r\nb\r', "a\n''b'", '中😀\n', '\u0000\t\n', '\uD83D', 'x\\"\n']
+  const suffixes = ['', '\n', '\n\n', '\r\n', "'\n", "''\n", '\n[truncated]', '\uDE00', '\uDE00\n']
+  for (const text of samples) {
+    for (const suffix of suffixes) {
+      for (let length = -1; length <= text.length + 1; length += 1) {
+        const prefix = text.slice(0, Math.max(0, Math.min(length, text.length)))
+        const rendered = toml.renderString(prefix + suffix)
+        assert.equal(
+          toml.renderStringByteCountPrefix(text, length, suffix),
+          Buffer.byteLength(rendered, 'utf8'),
+          `byte count differs for ${JSON.stringify({ text, length, suffix, rendered })}`,
+        )
+      }
+    }
   }
 })
 }

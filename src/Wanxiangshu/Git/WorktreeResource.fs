@@ -119,8 +119,12 @@ module WorktreeCommands =
 
     let isDirty (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
         task {
-            let! code, stdout, _ = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
-            return code = 0 && not (String.IsNullOrWhiteSpace stdout)
+            let! code, stdout, stderr = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
+
+            if code <> 0 then
+                return Error(failure stdout stderr)
+            else
+                return Ok(not (String.IsNullOrWhiteSpace stdout))
         }
 
     let create (runner: Command -> Task<int * string * string>) repo (jobId: ManagerJobId) (path: WorktreePath) =

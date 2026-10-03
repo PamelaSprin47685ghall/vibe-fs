@@ -22,7 +22,7 @@ Provider 上下文由完整物理历史与显式资源构成；工作区由 Mana
 
 ## [006] 确定性映设
 
-相同事实产生相同可见集合。Projection 不生成合成消息、列表或历史摘要，不改写、概括或拼接前任消息，也不另行注入 hidden reasoning、token 或 credential。
+相同事实产生相同可见集合。Projection 不生成合成消息、列表或历史摘要，不改写、概括或拼接前任消息，不得包含 hidden reasoning、token 或 credential。
 
 ## [007] 退休事实不回退
 

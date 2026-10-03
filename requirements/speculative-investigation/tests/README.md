@@ -38,7 +38,13 @@ WXS_TIER_INTEGRATION=1 node --test requirements/speculative-investigation/tests/
 
 这只是局部验证。正式交付须通过 verification-system 的 runner，选择本包全部编号测试及受影响的 `capability-enforcement/005`、身份相关测试；TODO 不计为完成。Host Canary 指纹相符只证明配置匹配，不证明安装版 Host 已满足协议。
 
-## 2026-09-28 上游迁移说明
+## 2026-10-03 upstream e1e7dd3f1 增量
+
+本批承接正文降为Main reasoning、排除原生reasoning及往复恢复的现行WHAT。013的双插件实例回归改为共同生成一次Prepared，两消费者各接收一次降格正文；仍核对真实并发transform、单次Requested/Bound/bootstrap及卸载后资源，不沿用旧“纯正文无材料”的Closed预期。真实Host canary的重启、子owner、终止正文和外发字节由本批integration重新验证，结果见[同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。同模型场景不证明模型切换时的当前请求传输坐标，完整GAP-183仍保留。
+
+## 2026-09-28 上游迁移说明（历史基线）
+
+2026-10-03增量：004增加实际active preparation的同Decision重入、不同Decision拒绝与已退休语义结果复用；013保留两个插件实例真正并行transform，核对一次Replica bootstrap、Requested/Bound/Prepared/Closed事实及卸载一个实例后另一实例的资源和后续决定。生产以`BootstrapRequired / SharedCompletion`区分首启动与共享完成，避免prepare flight结束后误关闭已Bound决定。该修复包含在255文件定向验收（0 fail）及35文件完整integration（376 pass、0 fail、15 TODO）中；不关闭GAP-183其余全链义务。详细红例与物理证据见[本批记录](../../../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。
 
 基于 upstream `1450f49d` 重新核对 [013]/[014]。该版本的 WHAT [013]、StrengthSettings、Replica runtime 和公开签名仍保留 DryRun；`runtimeBinding` 仍接收九个参数。上游新加的 [013] 测试却断言 DryRun 已删除，并调用七参数 binding 和尚不存在的 DelegationRequested 协议，二者不一致。本次保留实际 DryRun coordinator 的 exact owner/target 正反例和启动全链 TODO，不导入这些错误签名或源码词形断言；也没有恢复旧 Sphinx runtime。
 

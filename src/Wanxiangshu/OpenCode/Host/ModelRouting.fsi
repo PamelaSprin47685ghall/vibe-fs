@@ -81,6 +81,10 @@ module ModelRouting =
 
         member TryReadExecution: sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
 
+        member WasExecutionSuperseded: sessionId: string * physicalUserMessageId: string -> bool
+
+        member OwnsExecutionAdmission: sessionId: string * physicalUserMessageId: string -> bool
+
         member BindDevopsTarget: sessionId: string * target: ModelRoutingTarget -> unit
         member SeedBoundDevOpsModel: sessionId: string * value: string -> unit
 
@@ -102,6 +106,10 @@ module ModelRouting =
             sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome
 
         member CancelPendingExecution: sessionId: string -> CapacityTransitionOutcome
+
+        member CancelPendingPhysicalExecution:
+            sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome
+
         member CapacitySnapshot: unit -> CapacityInvariantEvidence
 
         member EnterProviderStep:
@@ -171,6 +179,10 @@ module ModelRouting =
 
     val internal tryReadExecution: key: ChatExecutionKey -> ExecutionAdmissionLease option
 
+    val internal wasExecutionSuperseded: key: ChatExecutionKey -> bool
+
+    val internal ownsExecutionAdmission: key: ChatExecutionKey -> bool
+
     val internal sharedPredictorConfiguration: unit -> PredictorConfiguration
 
 
@@ -188,6 +200,8 @@ module ModelRouting =
 
     val internal observePhysicalResource: key: ChatExecutionKey -> PhysicalResourceObservation
     val internal cancelUnacquiredExecution: sessionId: SessionId -> CapacityTransitionOutcome
+
+    val internal cancelPendingPhysicalExecution: key: ChatExecutionKey -> CapacityTransitionOutcome
     val internal capacitySnapshot: unit -> CapacityInvariantEvidence
 
     val enterProviderStep:

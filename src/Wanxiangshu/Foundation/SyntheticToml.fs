@@ -19,9 +19,7 @@ open System.Text
 [<RequireQualifiedAccess>]
 module SyntheticToml =
 
-    /// ARCH-010: CRLF and lone CR normalise to LF before anything else looks at the text. Without
-    /// this the same logical content renders as different bytes depending on which platform produced
-    /// it, and 「同一 semantic input 必须产生相同 bytes」 fails for a reason nobody can see.
+    /// Normalize instruction layout; data values retain their original line endings.
     let normalizeNewlines (text: string) =
         if isNull text then
             ""
@@ -86,54 +84,13 @@ module SyntheticToml =
 
     let private literalSafe (text: string) = literalSafeRange text 0 text.Length
 
-    /// ARCH-010 string selection. Deterministic, and genuinely parseable:
-    ///
-    ///   no newline                  → basic `"…"` with canonical escapes
-    ///   newline and literal-safe    → `'''` + verbatim body + closing delimiter on its own line
-    ///   anything else               → basic `"…"` with everything escaped
-    ///
-    /// The first test is only "does it contain a newline". Every other character a body can hold —
-    /// tab, NUL, DEL — has a basic-string escape, so a newline is the one thing that forces the
-    /// multi-line form.
-    ///
-    /// ── why `'''` and not `"""` ─────────────────────────────────────────────
-    ///
-    /// A multi-line BASIC string still processes escape sequences, and this notation has to carry
-    /// tool output, file contents, diffs and compiler logs into the value unchanged. A body holding
-    /// a backslash — every regex, every Windows path, every non-trivial tool-call argument — then
-    /// has only two outcomes, and both break something the clause requires:
-    ///
-    ///   backslash left alone   `\d` is not a valid TOML escape, so the document does not parse
-    ///   backslash escaped      the model reads `\\d+` where the tool emitted `\d+`, which is a
-    ///                          distortion of the very data the payload exists to report
-    ///
-    /// A literal multi-line string processes nothing, so the dilemma disappears. Which is also why
-    /// no format indentation is injected: TOML does not de-indent a literal string, so indenting the
-    /// body would put those spaces IN the value — the renderer corrupting data it promised to pass
-    /// through.
-    ///
-    /// ── the fallback is not a delimiter choice ──────────────────────────────
-    ///
-    /// ARCH-010 forbids picking between multi-line delimiters by content. The `else` branch is not
-    /// that: a body containing `'''` or a raw control character has NO legal multi-line
-    /// representation, so it goes to the single-line form. The rule is decidable and the same input
-    /// always lands the same way.
-    ///
-    /// The single-line form still escapes everything, and that asymmetry is required rather than
-    /// accidental: a single-line basic string has no raw variant, since TOML would read `"a\b"` as a
-    /// backspace. Only the multi-line form can be verbatim, which is what it is for.
-    ///
-    /// Being genuinely parseable is a hard requirement, not decoration. One-way means no business
-    /// logic may parse this back; it does not license emitting invalid TOML. Parseability is the only
-    /// mechanically checkable property this notation has, and every gate, golden test and
-    /// containment assertion rests on it.
+    /// A literal's closing delimiter stays on its own line only when the value
+    /// already ends in LF. Other values use basic escapes without changing data.
     let renderString (raw: string) : string =
-        let text = normalizeNewlines raw
+        let text = if isNull raw then "" else raw
 
-        if not (text.Contains "\n") then
-            "\"" + escapeBasic text + "\""
-        elif literalSafe text then
-            "'''\n" + text + "\n'''"
+        if text.EndsWith "\n" && literalSafe text then
+            "'''\n" + text + "'''"
         else
             "\"" + escapeBasic text + "\""
 
@@ -192,7 +149,7 @@ module SyntheticToml =
         if isBareKey name then
             name
         else
-            "\"" + escapeBasic (normalizeNewlines name) + "\""
+            "\"" + escapeBasic name + "\""
 
     let private formatPath (segments: string list) =
         segments |> List.map renderKey |> String.concat "."
@@ -258,6 +215,8 @@ module SyntheticToml =
         | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n" ordered + "\n"
 
     let private isUtf16LowSurrogate (code: int) = code >= 0xDC00 && code <= 0xDFFF
+
+    let private isUtf16HighSurrogate (code: int) = code >= 0xD800 && code <= 0xDBFF
 
     let private utf8Step (text: string) (index: int) (stop: int) =
         let code = int text.[index]
@@ -333,15 +292,6 @@ module SyntheticToml =
 
         total
 
-    let private rangeContainsNewline (text: string) (origin: int) (stop: int) =
-        // DSL-MUTABLE: algorithm-scratch — newline-scan index
-        let mutable index = origin
-
-        while index < stop && text.[index] <> '\n' do
-            index <- index + 1
-
-        index < stop
-
     let private tripleQuoteJoins (head: string) (headLen: int) (tail: string) =
         let total = headLen + tail.Length
 
@@ -356,12 +306,19 @@ module SyntheticToml =
         (headLen >= 2 && startsAt (headLen - 2))
         || (headLen >= 1 && startsAt (headLen - 1))
 
+    let private joinedUtf8Adjustment (head: string) (headLen: int) (tail: string) =
+        if
+            headLen > 0
+            && tail.Length > 0
+            && isUtf16HighSurrogate (int head.[headLen - 1])
+            && isUtf16LowSurrogate (int tail.[0])
+        then
+            -2
+        else
+            0
+
     /// UTF-8 byte length of `renderString (text.Substring(0, length) + suffix)`
     /// without allocating the concatenation or the rendered form.
-    ///
-    /// `text` and `suffix` must already be newline-normalised. `renderString` would
-    /// normalise first; doing it here would desynchronise `length` from the source
-    /// the caller is searching.
     let renderStringByteCountPrefix (text: string) (length: int) (suffix: string) : int =
         let text = if isNull text then "" else text
         let suffix = if isNull suffix then "" else suffix
@@ -371,23 +328,29 @@ module SyntheticToml =
             elif length > text.Length then text.Length
             else length
 
-        let hasNewline = suffix.Contains "\n" || rangeContainsNewline text 0 headLen
+        let endsWithNewline =
+            if suffix.Length > 0 then
+                suffix.EndsWith "\n"
+            else
+                headLen > 0 && text.[headLen - 1] = '\n'
 
         let safe =
             literalSafeRange text 0 headLen
             && literalSafeRange suffix 0 suffix.Length
             && not (tripleQuoteJoins text headLen suffix)
 
-        if not hasNewline then
-            2
-            + escapeBasicByteCountRange text 0 headLen
-            + escapeBasicByteCountRange suffix 0 suffix.Length
-        elif safe then
-            8 + byteCountRange text 0 headLen + byteCountRange suffix 0 suffix.Length
+        let joinAdjustment = joinedUtf8Adjustment text headLen suffix
+
+        if endsWithNewline && safe then
+            7
+            + byteCountRange text 0 headLen
+            + byteCountRange suffix 0 suffix.Length
+            + joinAdjustment
         else
             2
             + escapeBasicByteCountRange text 0 headLen
             + escapeBasicByteCountRange suffix 0 suffix.Length
+            + joinAdjustment
 
     /// UTF-8 byte count of rendered text.
     ///

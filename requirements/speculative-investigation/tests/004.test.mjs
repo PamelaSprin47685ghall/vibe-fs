@@ -77,6 +77,35 @@ import test from 'node:test'
     fixture.dispose()
   })
 
+  test('WHAT[speculative-investigation-004] repeated preparation after the flight settles retains its exact decision until publication', async () => {
+    const fixture = replicaFixture()
+    try {
+      const first = await fixture.prepare('same-decision')
+      assert.equal(first.ok, true)
+      const replica = first.value.replicaSessionId
+      await new Promise(resolve => setImmediate(resolve))
+      const repeated = await fixture.prepare('same-decision')
+      assert.equal(repeated.ok, true)
+      assert.equal(repeated.value.replicaSessionId, replica)
+      assert.equal(repeated.value.completion, first.value.completion)
+      assert.equal((await fixture.prepare('foreign-decision')).ok, false)
+      assert.equal(fixture.children.length, 1)
+      await fixture.admit(replica, 'same-physical')
+      fixture.terminal(replica)
+      await first.value.completion
+      const retired = await fixture.prepare('same-decision')
+      assert.equal(retired.ok, true)
+      assert.equal(retired.value.replicaSessionId, replica)
+      assert.equal(retired.value.completion, first.value.completion)
+      assert.equal(fixture.children.length, 1, 'physical cleanup cannot restart an unpublished decision')
+      assert.equal((await fixture.sendPrepared(replica)).ok, false, 'retained completion is no bootstrap authority')
+      assert.equal(fixture.isReplica(replica), false)
+      fixture.releaseOutcome('same-decision')
+    } finally {
+      fixture.dispose()
+    }
+  })
+
   test('WHAT[speculative-investigation-004] owner cancellation drains an in-flight creation before any decision can run', async () => {
     let finishCreate
     const pendingCreate = new Promise(resolve => { finishCreate = resolve })

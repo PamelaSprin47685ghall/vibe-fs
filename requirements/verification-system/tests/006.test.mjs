@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createWatchdogHarness } from './support/watchdog-harness.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
+import * as testSupervisor from './e2e/support/supervise-node-test.mjs'
 import { observeCausalProgress } from './e2e/support/causal-observation.js'
 import { gatherDiagnostics } from './e2e/support/diagnostics-collect.js'
 import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
@@ -111,9 +114,19 @@ test('WHAT[verification-system-006] missing and corrupt wait snapshots disclose 
   }
 })
 
+async function assertSingleTermination(h, timeoutMs) {
+  assert.equal(h.terminateCount, 1)
+  h.watchdog.advance({ reason: 'late verdict', lane: 'worker', blocking: true })
+  await h.advance(Math.max(DIAGNOSTIC_RACE_MS, timeoutMs))
+  assert.equal(h.terminateCount, 1, 'late progress must not restart a terminated watchdog')
+  h.watchdog.setWindow(timeoutMs)
+  await h.advance(timeoutMs)
+  assert.equal(h.terminateCount, 1, 'window changes must not restart a terminated watchdog')
+}
+
 test('WHAT[verification-system-006] the initial silence window covers execution before its first progress', async () => {
-  const h = createWatchdogHarness()
-  await h.advance(499)
+  const h = createWatchdogHarness({ timeoutMs: WATCHDOG_TIMEOUT_MS })
+  await h.advance(WATCHDOG_TIMEOUT_MS - 1)
   assert.equal(h.terminated, false)
   assert.deepEqual(h.diagnostics, [])
   await h.advance(1)
@@ -122,6 +135,7 @@ test('WHAT[verification-system-006] the initial silence window covers execution 
   assert.match(h.diagnostics.join('\n'), /last progress/)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable/i)
   assert.equal(h.trace.at(-1), 'terminate')
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] continuing progress outlives a window and silence is measured from its last advance', async () => {
@@ -163,12 +177,129 @@ test('WHAT[verification-system-006] completed verdicts renew the window while re
 test('WHAT[verification-system-006] scheduling events do not renew the silence window', async () => {
   const h = createWatchdogHarness()
   await h.advance(400)
-  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan', 'inner:drained', 'runner:error']) {
+  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan',
+    'runner:file-start', 'runner:file-drained', 'inner:drained', 'runner:error']) {
     const progress = classifyVerdict({ type, data: { file: 'x.mjs' } })
     if (progress) h.watchdog.advance(progress)
   }
   await h.advance(100)
   assert.equal(h.terminated, true)
+})
+
+test('WHAT[verification-system-006] file waits distinguish queued, active and verdicts awaiting stream drain', () => {
+  const files = ['drained.mjs', 'verdict.mjs', 'active.mjs', 'queued.mjs'].map((file) => path.resolve(file))
+  const waits = testSupervisor.createFileWaitTracker(files)
+  const event = (type, file, name) => ({ type, data: { entryFile: file, name } })
+  waits.observe(event('runner:file-start', files[0]))
+  waits.observe(event('test:pass', files[0], 'finished leaf'))
+  waits.observe(event('runner:file-drained', files[0]))
+  waits.observe(event('runner:file-start', files[1]))
+  waits.observe(event('test:pass', files[1], 'passed but still alive'))
+  waits.observe(event('runner:file-start', files[2]))
+  assert.deepEqual(waits.snapshot(), {
+    queued: [files[3]],
+    active: [
+      { file: files[1], lastVerdict: 'test:pass:passed but still alive' },
+      { file: files[2], lastVerdict: null },
+    ],
+    drained: [files[0]],
+  })
+  waits.observe(event('runner:file-drained', files[1]))
+  assert.deepEqual(waits.snapshot().active, [{ file: files[2], lastVerdict: null }])
+})
+
+test('WHAT[verification-system-006] file lifecycle facts reject unknown entries and impossible transitions', () => {
+  const file = path.resolve('planned.mjs')
+  const waits = testSupervisor.createFileWaitTracker([file])
+  const event = (type, entryFile = file) => ({ type, data: { entryFile } })
+  assert.throws(() => waits.observe(event('runner:file-start', path.resolve('unknown.mjs'))), /unplanned/)
+  assert.throws(() => waits.observe(event('runner:file-drained')), /queued/)
+  assert.throws(() => waits.observe({ type: 'runner:file-start', data: {} }), /entryFile/)
+  waits.observe(event('runner:file-start'))
+  assert.throws(() => waits.observe(event('runner:file-start')), /active/)
+  waits.observe(event('runner:file-drained'))
+  assert.throws(() => waits.observe(event('test:pass')), /drained/)
+  assert.deepEqual(waits.snapshot(), { queued: [], active: [], drained: [file] })
+})
+
+test('WHAT[verification-system-006] real silence diagnostics identify active waits separately from queued files', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'file-wait-diagnostics-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: process.argv.slice(2), label: 'file-wait-fixture', silenceMs: 1000 })
+`)
+    const files = ['all-pass.fixture.mjs', 'leaks-handle-after-pass.fixture.mjs', 'two-leaf.fixture.mjs']
+      .map((file) => fileURLToPath(new URL(`./support/fixtures/${file}`, import.meta.url)))
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, ...files], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let diagnostics = ''
+    child.stdout.resume()
+    child.stderr.on('data', (chunk) => { diagnostics += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 1, diagnostics)
+    assert.match(diagnostics, /file streams: 1 drained, 1 active, 1 queued/)
+    const activeWaits = diagnostics.split('\n').filter((line) => line.includes('active file '))
+    assert.equal(activeWaits.length, 1, diagnostics)
+    assert.match(activeWaits[0], /leaks-handle-after-pass\.fixture\.mjs.*waiting for stream drain.*passes and leaks/)
+    assert.match(diagnostics, /1 queued file\(s\) have not started/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+async function superviseSynchronousVerdicts(probe) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'synchronous-verdicts-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: process.argv.slice(2), label: 'synchronous-verdicts', silenceMs: 1000 })
+`)
+    const fixture = fileURLToPath(new URL('./support/fixtures/synchronous-verdicts.fixture.mjs', import.meta.url))
+    const env = { ...process.env, VERDICT_TRANSPORT_PROBE: probe, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, fixture], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', (chunk) => { output += chunk })
+    child.stderr.on('data', (chunk) => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    return { code, output }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+test('WHAT[verification-system-006] synchronous work and microtasks deliver completed verdicts before the file ends', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('healthy')
+  assert.equal(code, 0, output)
+  assert.match(output, /8 passed, 0 failed; 1\/1 planned file\(s\) completed/)
+  assert.doesNotMatch(output, /WATCHDOG/)
+})
+
+test('WHAT[verification-system-006] transport scheduling cannot renew unfinished work or background noise', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('hang')
+  assert.equal(code, 1, output)
+  assert.match(output, /WATCHDOG.*silent for/)
+  assert.match(output, /last progress: test:(?:pass|complete):synchronous work 7/)
+  assert.match(output, /background progress.*none of them renewals/)
+  assert.match(output, /verdict counts unavailable; no authoritative summary/)
+})
+
+test('WHAT[verification-system-006] transport scheduling preserves after-hook failure verdicts', async () => {
+  const { code, output } = await superviseSynchronousVerdicts('after-failure')
+  assert.equal(code, 1, output)
+  assert.match(output, /7 passed, 1 failed; 1\/1 planned file\(s\) completed/)
+  assert.match(output, /after hook failure remains visible/)
+  assert.doesNotMatch(output, /WATCHDOG/)
 })
 
 test('WHAT[verification-system-006] repeat observations of one causal state do not renew twice', async () => {
@@ -221,36 +352,61 @@ test('WHAT[verification-system-006] restoring the default window retains the ori
 })
 
 test('WHAT[verification-system-006] failed diagnostic collection discloses its cause before exit', async () => {
-  const h = createWatchdogHarness({ onTimeout: async () => { throw new Error('host unavailable') } })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { throw new Error('host unavailable') },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.equal(h.terminateCount, 1)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable.*host unavailable/i)
   assert.equal(h.trace.at(-1), 'terminate')
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] hung diagnostic collection discloses missing information and cannot prevent exit', async () => {
-  const h = createWatchdogHarness({ onTimeout: () => new Promise(() => {}) })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: () => new Promise(() => {}),
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.equal(h.terminated, false)
   await h.advance(DIAGNOSTIC_RACE_MS - 1)
   assert.equal(h.terminated, false)
   await h.advance(1)
   assert.equal(h.terminateCount, 1)
   assert.match(h.diagnostics.join('\n'), /current waits unavailable.*deadline/i)
-  await h.advance(DIAGNOSTIC_RACE_MS)
-  assert.equal(h.terminateCount, 1)
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] successful diagnostic collection completes before a single exit', async () => {
   const calls = []
-  const h = createWatchdogHarness({ onTimeout: async () => { calls.push('waits collected') } })
-  await h.advance(500)
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { calls.push('waits collected') },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS)
   assert.deepEqual(calls, ['waits collected'])
   assert.equal(h.terminateCount, 1)
   assert.equal(h.trace.at(-1), 'terminate')
   assert.doesNotMatch(h.diagnostics.join('\n'), /unavailable/)
-  await h.advance(DIAGNOSTIC_RACE_MS)
-  assert.equal(h.terminateCount, 1)
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
+})
+
+test('WHAT[verification-system-006] a diagnostic output failure still terminates once and cannot restart monitoring', async () => {
+  let collectionCount = 0
+  const h = createWatchdogHarness({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    onTimeout: async () => { collectionCount++ },
+    deps: { diagnostic: { write() { throw new Error('diagnostic sink unavailable') } } },
+  })
+  await h.advance(WATCHDOG_TIMEOUT_MS - 1)
+  assert.equal(h.terminateCount, 0)
+  await h.advance(1)
+  assert.equal(collectionCount, 0, 'diagnostic output failed before collection could start')
+  assert.equal(h.diagnostics.length, 1)
+  assert.match(h.diagnostics[0], /WATCHDOG: 'test-target'/)
+  assert.deepEqual(h.trace, ['diagnostic', 'terminate'])
+  await assertSingleTermination(h, WATCHDOG_TIMEOUT_MS)
 })
 
 test('WHAT[verification-system-006] consumed expectation observations preserve the matched physical attempt', () => {

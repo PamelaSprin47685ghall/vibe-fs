@@ -16,7 +16,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
@@ -31,11 +30,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
@@ -54,23 +51,34 @@ module HostForkRunLifecycle =
               AuthorityRoot = authorityRoot }
             (AgentJournal.handleProjection durable parentId)
 
-    let private acceptedOutcome
-        (_durable: AgentJournal)
-        (_childId: SessionId)
-        (identitySeed: PromptAuthority.IdentitySeed)
-        (onAccepted: PhysicalUserMessageId -> unit)
-        (evidence: PromptAuthority.AcceptedDispatch)
-        =
+    let private acceptedWorkOutcome durable parentId childId root physical (binding: HandleRecord) =
+        match
+            HandleProjection.tryAdmittedWork
+                { Handle = binding.Handle
+                  ChildSessionId = childId
+                  AuthorityRoot = root }
+                (AgentJournal.handleProjection durable parentId)
+        with
+        | Ok _ -> AgentOwnerDispatchOutcome.Accepted(physical, root)
+        | Error _ ->
+            AgentOwnerDispatchOutcome.AcceptanceUncertain
+                "physical acceptance exists; exact work admission is not established"
+
+    let private acceptedBindingOutcome durable parentId childId root physical =
+        let projection = (AgentJournal.snapshot durable).AgentProjections
+
+        match Map.tryFind childId projection.HandleByChildSession with
+        | Some binding -> acceptedWorkOutcome durable parentId childId root physical binding
+        | None -> AgentOwnerDispatchOutcome.AcceptanceUncertain "physical acceptance exists; child binding is missing"
+
+    let private acceptedOutcome durable childId identitySeed onAccepted (evidence: PromptAuthority.AcceptedDispatch) =
         onAccepted evidence.PhysicalUserMessageId
 
         let root =
             PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
 
-        // Physical acceptance is the durable dispatch fact. Work admission may lag
-        // until landing evidence arrives; do not downgrade a confirmed Host receipt
-        // to AcceptanceUncertain solely for a missing Works entry.
         match PromptAuthority.identitySeedOwner identitySeed with
-        | Some _ -> AgentOwnerDispatchOutcome.Accepted(evidence.PhysicalUserMessageId, root)
+        | Some(parentId, _, _) -> acceptedBindingOutcome durable parentId childId root evidence.PhysicalUserMessageId
         | None -> AgentOwnerDispatchOutcome.Rejected "child assignment has no exact owner identity"
 
     let issueCurrentOwnerIdentitySeed
@@ -264,170 +272,6 @@ module HostForkRunLifecycle =
         fun (agentId: string) childId (_role: Role) identitySeed prompt onAccepted ->
             sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
 
-    /// Surface journal: a real canonical journal in a fresh temporary directory,
-    /// opened exactly the way production composition does (EventStore + journal
-    /// writer + projection). Surfaces use it to construct pending runs with
-    /// durable admitted work instead of journal-less fakes.
-    let openTemporaryJournal () : Task<AgentJournal> =
-        task {
-            let directory =
-                System.IO.Path.Combine(
-                    System.IO.Path.GetTempPath(),
-                    "wanxiangshu-surface-journal-" + Guid.NewGuid().ToString("N")
-                )
-
-            System.IO.Directory.CreateDirectory directory |> ignore
-
-            let store =
-                EventStore.createLocal
-                    directory
-                    (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
-
-            match!
-                EventStoreJournalWriter.resumeOrCreate (
-                    RuntimeId.create (sprintf "fork-host-surface-%s" directory),
-                    1,
-                    DateTimeOffset.UtcNow,
-                    store
-                )
-            with
-            | Ok(writer, _, projection) ->
-                match AgentJournal.createFromProjection writer projection with
-                | Ok journal -> return journal
-                | Error rejection ->
-                    return failwithf "surface journal open failed: %s: %s" rejection.Fact rejection.Reason
-            | Error rejection -> return failwithf "surface journal open failed: %s: %s" rejection.Fact rejection.Reason
-        }
-
-    let private dispatchSurfaceOwnerRoot
-        (sessions: ISessionHostPort)
-        (durable: AgentJournal)
-        (childId: SessionId)
-        (identitySeed: PromptAuthority.IdentitySeed)
-        (agentId: string)
-        : Task<Result<AuthorityRootUserMessageId, string>> =
-        task {
-            let! sent =
-                sendAgentOwnerRootObserved
-                    sessions
-                    (Some durable)
-                    childId
-                    identitySeed
-                    None
-                    (sprintf "surface admission: first work unit for %s" agentId)
-                    ignore
-
-            match sent with
-            | AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) -> return Ok authorityRoot
-            | AgentOwnerDispatchOutcome.AcceptanceUncertain reason -> return Error reason
-            | AgentOwnerDispatchOutcome.Rejected reason -> return Error reason
-        }
-
-    let private admitAfterLinkage
-        (durable: AgentJournal)
-        (sessions: ISessionHostPort)
-        (parentId: SessionId)
-        (agentId: string)
-        (childId: SessionId)
-        : Task<Result<AuthorityRootUserMessageId, string>> =
-        task {
-            match issueCurrentOwnerIdentitySeed (Some durable) parentId agentId with
-            | Error reason -> return Error(sprintf "surface admission: child identity seed failed: %s" reason)
-            | Ok identitySeed -> return! dispatchSurfaceOwnerRoot sessions durable childId identitySeed agentId
-        }
-
-    let private admitAfterOwnerRoot
-        (durable: AgentJournal)
-        (sessions: ISessionHostPort)
-        (parentId: SessionId)
-        (agentId: string)
-        (childId: SessionId)
-        (role: Role)
-        : Task<Result<AuthorityRootUserMessageId, string>> =
-        task {
-            let journalPort = AgentJournalPortAdapter.fromAgentJournal durable
-
-            let! linkage =
-                HandleController.linkNamed
-                    (Some journalPort)
-                    parentId
-                    agentId
-                    childId
-                    agentId
-                    agentId
-                    role
-                    HandleOwnership.DurableParentHandle
-
-            match linkage with
-            | Error reason -> return Error(sprintf "surface admission: handle link failed: %s" reason)
-            | Ok() -> return! admitAfterLinkage durable sessions parentId agentId childId
-        }
-
-    let private acceptOwnerRootThenAdmit
-        (dispatcher: PromptDispatcher.Runtime)
-        (durable: AgentJournal)
-        (sessions: ISessionHostPort)
-        (parentId: SessionId)
-        (ownerPhysical: PhysicalUserMessageId)
-        (seed: PromptAuthority.IdentitySeed)
-        (agentId: string)
-        (childId: SessionId)
-        (role: Role)
-        : Task<Result<AuthorityRootUserMessageId, string>> =
-        task {
-            match! dispatcher.AcceptHumanRoot parentId ownerPhysical (Some seed) with
-            | Error failure ->
-                return
-                    Error(
-                        sprintf
-                            "surface admission: owner root rejected: %s"
-                            (PromptDispatcher.describeHumanRootAcceptanceFailure failure)
-                    )
-            | Ok _ -> return! admitAfterOwnerRoot durable sessions parentId agentId childId role
-        }
-
-    /// Surface admission for a pending agent run (delegation-026 effect truth):
-    /// durably link the child handle, admit the owner human root, and dispatch
-    /// the child's first AgentOwnerRoot prompt through the real dispatcher, so
-    /// the following installRun finds the exact admitted work instead of the
-    /// fail-fast rejections. Returns the accepted authority root InstallRun
-    /// must reuse so the run's terminal keeps its causal identity.
-    let admitPendingAgentWork
-        (durable: AgentJournal)
-        (sessions: ISessionHostPort)
-        (parentId: SessionId)
-        (ownerAgent: string)
-        (agentId: string)
-        (childId: SessionId)
-        (role: Role)
-        : Task<Result<AuthorityRootUserMessageId, string>> =
-        task {
-            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
-
-            let ownerSeed =
-                ParticipantIdentity.resolveAtRoot ownerAgent
-                |> Result.map PromptAuthority.IdentitySeed.RootSelection
-
-            match ownerSeed with
-            | Error reason -> return Error(sprintf "surface admission: owner identity unresolved: %A" reason)
-            | Ok seed ->
-                let ownerPhysical =
-                    PhysicalUserMessageId.create (sprintf "surface-owner-root:%s" (SessionId.value parentId))
-
-                return!
-                    acceptOwnerRootThenAdmit
-                        dispatcher
-                        durable
-                        sessions
-                        parentId
-                        ownerPhysical
-                        seed
-                        agentId
-                        childId
-                        role
-        }
-
     let private completionBelongsToRun (run: PendingHostRun) (result: AgentRunResult) =
         run.ChildId = result.SessionId
         && run.AuthorityRoot = result.AuthorityRootUserMessageId
@@ -513,24 +357,6 @@ module HostForkRunLifecycle =
                 true, run.Subscription
             | _ -> false, None)
 
-    let private lateAdmittedWorkFromJournal (journal: AgentJournal option) (parentId: SessionId) (run: PendingHostRun) =
-        // Admission may land after installRun snapped Work = None; re-read
-        // Current before failing closed so deferred fold can still settle.
-        match journal with
-        | None -> Error "durable pending run has no admitted work proof"
-        | Some durable ->
-            admittedWork durable parentId run.AgentId run.ChildId run.AuthorityRoot
-            |> Result.mapError (fun _ -> "durable pending run has no admitted work proof")
-
-    let private resolveAdmittedWorkForCommit
-        (journal: AgentJournal option)
-        (parentId: SessionId)
-        (run: PendingHostRun)
-        =
-        match run.Work with
-        | Some admitted -> Ok admitted
-        | None -> lateAdmittedWorkFromJournal journal parentId run
-
     let private committedOutcome
         (journal: AgentJournal option)
         (parentId: SessionId)
@@ -542,9 +368,9 @@ module HostForkRunLifecycle =
             let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
 
             let commitment =
-                match resolveAdmittedWorkForCommit journal parentId run with
-                | Ok admitted -> HandleController.recordWorkCompletion journalPort parentId admitted proof
-                | Error error -> Task.FromResult(Error error)
+                match run.Work with
+                | Some admitted -> HandleController.recordWorkCompletion journalPort parentId admitted proof
+                | None -> Task.FromResult(Error "durable pending run has no admitted work proof")
 
             match! commitment with
             | Ok() -> return agentOutcome
@@ -559,11 +385,7 @@ module HostForkRunLifecycle =
                         (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
         }
 
-    let private releaseMatchingPendingRun
-        (pendingRuns: Dictionary<string, PendingHostRun>)
-        (gate: obj)
-        (run: PendingHostRun)
-        =
+    let private removeClaimedRun (gate: obj) (pendingRuns: Dictionary<string, PendingHostRun>) (run: PendingHostRun) =
         lock gate (fun () ->
             match pendingRuns.TryGetValue run.AgentId with
             | true, current when obj.ReferenceEquals(current.Token, run.Token) ->
@@ -586,21 +408,22 @@ module HostForkRunLifecycle =
                 | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
 
             // Do not release the road while the exact completion commit is unknown.
-            let workIsSettled durable admitted =
-                HandleProjection.tryWork (AdmittedWork.id admitted) (AgentJournal.handleProjection durable parentId)
-                |> Option.exists (fun work ->
-                    match work.Lifecycle with
-                    | CompletedAwaitingJoin _
-                    | Retired -> true
-                    | _ -> false)
-
             let committed =
-                match resolveAdmittedWorkForCommit journal parentId run, journal with
-                | Ok admitted, Some durable -> workIsSettled durable admitted
-                | _ -> false
+                journal
+                |> Option.exists (fun durable ->
+                    run.Work
+                    |> Option.exists (fun admitted ->
+                        HandleProjection.tryWork
+                            (AdmittedWork.id admitted)
+                            (AgentJournal.handleProjection durable parentId)
+                        |> Option.exists (fun work ->
+                            match work.Lifecycle with
+                            | CompletedAwaitingJoin _
+                            | Retired -> true
+                            | _ -> false)))
 
             if journal.IsNone || committed then
-                releaseMatchingPendingRun pendingRuns gate run
+                removeClaimedRun gate pendingRuns run
 
             run.Source.SetResult finalOutcome
         }
@@ -763,17 +586,12 @@ module HostForkRunLifecycle =
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
         =
-        let tryInstalledWork durable =
-            // Missing or retired work must not block installing a pending run after
-            // physical acceptance; completion paths tolerate Work = None.
-            match admittedWork durable parentId agentId childId authorityRoot with
-            | Ok admitted -> Some admitted
-            | Error _ -> None
-
         let work =
             match journal with
-            | None -> None
-            | Some durable -> tryInstalledWork durable
+            | None -> invalidOp "a pending agent work requires a canonical journal"
+            | Some durable ->
+                admittedWork durable parentId agentId childId authorityRoot
+                |> Result.defaultWith (fun reason -> invalidOp (sprintf "exact work admission missing: %A" reason))
 
         let run =
             { Token = obj ()
@@ -783,7 +601,7 @@ module HostForkRunLifecycle =
               StartCursor = xTraceHead childId
               Handoff = handoff
               AuthorityRoot = authorityRoot
-              Work = work
+              Work = Some work
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }

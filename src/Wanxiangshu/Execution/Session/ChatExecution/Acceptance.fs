@@ -12,7 +12,8 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 
 /// Proof that the exact execution acceptance is present in the durable projection.
-type ManagedChatAcceptanceWitness = ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
+type ManagedChatAcceptanceWitness =
+    private | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptanceWitness =

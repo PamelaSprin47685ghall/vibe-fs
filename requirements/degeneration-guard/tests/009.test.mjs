@@ -7,10 +7,9 @@ import { decode, encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_bas
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import * as loopSensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
 import * as providerLanguage from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { deferred } from './support/stream.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-
-const wait = (ms = 15) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const repetitiveText = () => ' retry'.repeat(2000)
 
@@ -76,9 +75,9 @@ test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continu
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_next', repetitiveText(), 'msg_next_1'))
-  await wait()
+  await loopSensor.activeTask(sensor, 'ses_next', 'msg_next_1')
   assert.deepEqual(aborts, ['ses_next'])
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_1'), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
@@ -88,23 +87,21 @@ test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continu
   assert.notEqual(ownedContinuation, null)
   assert.equal(loopSensor.activeTask(sensor, 'ses_next', 'msg_next_2'), null)
   loopSensor.observe(sensor, loopSensor.textDelta('ses_next', repetitiveText(), 'msg_next_2'))
-  await wait()
   assert.deepEqual(aborts, ['ses_next'], 'active continuation blocks a same-session re-arm')
 
   // Drain the exact owned task through the production implementation, then retry.
   releaseContinue()
   await ownedContinuation
-  await wait()
   assert.equal(loopSensor.activeTask(sensor, 'ses_next', 'msg_next_1'), null)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_next', repetitiveText(), 'msg_next_2'))
-  await wait()
+  await loopSensor.activeTask(sensor, 'ses_next', 'msg_next_2')
   assert.deepEqual(aborts, ['ses_next', 'ses_next'])
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_2'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_2'), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
-  await wait()
+  await loopSensor.activeTask(sensor, 'ses_next', 'msg_next_2')
   assert.deepEqual(continuations, [
     ['ses_next', 'TooRepetitive'],
     ['ses_next', 'TooRepetitive'],
@@ -113,6 +110,7 @@ test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continu
 
 test('WHAT[degeneration-guard-009] LOOP_014_active_interrupt_tracked_in_owned_work_lifecycle', async () => {
   let workExecuted = 0
+  const continuation = deferred()
   const sensor = loopSensor.create({
     owned: ['ses_work'],
     abort: () => {
@@ -121,27 +119,26 @@ test('WHAT[degeneration-guard-009] LOOP_014_active_interrupt_tracked_in_owned_wo
     },
     continue: () => {
       workExecuted += 1
-      return { ok: true }
+      return continuation.promise
     },
     diagnostic: () => {},
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_work', repetitiveText(), 'msg_work_1'))
-  await wait()
   assert.equal(workExecuted, 1, 'abortSession was dispatched within owned-work lifecycle')
 
   const ownedInterrupt = loopSensor.activeTask(sensor, 'ses_work', 'msg_work_1')
   assert.notEqual(ownedInterrupt, null)
   await ownedInterrupt
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_work', 'msg_work_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_work', 'msg_work_1'), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
 
   const ownedContinue = loopSensor.activeTask(sensor, 'ses_work', 'msg_work_1')
   assert.notEqual(ownedContinue, null)
+  continuation.resolve({ ok: true })
   await ownedContinue
-  await wait()
   assert.equal(workExecuted, 2, 'continueSession was dispatched within owned-work lifecycle')
   assert.equal(loopSensor.activeTask(sensor, 'ses_work', 'msg_work_1'), null)
 })
@@ -156,9 +153,9 @@ test('WHAT[degeneration-guard-009] LOOP_018_diagnostics_name_kind_not_side', asy
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_diag', repetitiveText(), 'msg_diag_1'))
-  await wait()
-  loopSensor.consumeAbortCause(sensor, 'ses_diag', 'msg_diag_1')
-  await wait()
+  await loopSensor.activeTask(sensor, 'ses_diag', 'msg_diag_1')
+  await loopSensor.consumeAbortCause(sensor, 'ses_diag', 'msg_diag_1')
+  await loopSensor.activeTask(sensor, 'ses_diag', 'msg_diag_1')
 
   assert.ok(diagnostics.length > 0, 'guard reports its effects as diagnostics')
   for (const [, fields] of diagnostics) {
@@ -203,6 +200,7 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
   // wedged on an anomaly nobody owns any more.
   const diagnostics = []
   const attempts = []
+  const refusedContinuation = deferred()
   let attempt = 0
 
   const sensor = createSensor({
@@ -212,13 +210,12 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
       attempt += 1
       attempts.push(attempt)
 
-      return attempt === 1 ? { ok: false, error: 'no active authority profile' } : { ok: true }
+      return attempt === 1 ? refusedContinuation.promise : { ok: true }
     },
     diagnostic: (operation, fields) => diagnostics.push({ operation, fields, fields_json: JSON.stringify(fields ?? '') }),
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_retry', repetitiveText(), 'msg_retry_1'))
-  await wait()
 
   const interrupted = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_1')
   assert.notEqual(interrupted, null, 'the interrupt is owned work that can be awaited')
@@ -226,15 +223,15 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
 
   // The reconciled TurnAborted consumes the armed anomaly, which is what starts
   // the guard's own continuation (degeneration-guard-009).
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_1'), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
 
   const continued = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_1')
   assert.notEqual(continued, null, 'the guard continuation is owned work that can be awaited')
+  refusedContinuation.resolve({ ok: false, error: 'no active authority profile' })
   await continued
-  await wait()
 
   assert.deepEqual(attempts, [1], 'the guard tried to continue exactly once')
 
@@ -253,16 +250,16 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
   // The consumed anomaly must not wedge the session: a second repetition still
   // gets a fresh interrupt instead of waiting on an anomaly from the first one.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_retry', repetitiveText(), 'msg_retry_2'))
-  await wait()
 
   const secondInterrupt = loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_2')
   assert.notEqual(secondInterrupt, null, 'the sensor must still interrupt after a failed continuation')
   await secondInterrupt
   assert.deepEqual(
-    loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_2'),
+    await loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_2'),
     { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' },
     'the second repetition carries its own cause instead of reusing the stale one',
   )
+  await loopSensor.activeTask(sensor, 'ses_retry', 'msg_retry_2')
 })
 
 test.todo('WHAT[degeneration-guard-009] actual dispatch preserves accepted unknown and definitely refused continuation outcomes and owned-work cancellation (GAP-145)')

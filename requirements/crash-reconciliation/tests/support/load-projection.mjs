@@ -56,45 +56,15 @@ export const acceptRun = (state, { child = 'child', agent = 'engineer', parent =
     const issued = authority.issueInheritedIdentitySeed(agent, owner)
     assert.equal(issued.ok, true, issued.error)
     profile = createRoot(child, 'AgentOwnerRoot', issued.value)
-    // The production AgentOwnerRoot chain is Claimed → PhysicalAccepted →
-    // AuthorityRootAccepted (dispatch-protocol-002 four-state claim lifecycle;
-    // interaction-authority-001 promotes a root only after its physical
-    // message's landing is durable). admitWork's exactLanding check reads that
-    // landing by the root's physical message id, so the fixture must fold the
-    // same two dispatch facts the real writer emits before the root fact.
-    // FactCodecSurface's encode table does not cover these dispatch facts, so
-    // the canonical line is assembled by hand and the identity seed must carry
-    // its durable wire shape (PromptFactCodec identitySeedEncoder):
-    // ["InheritedFromOwner", { OwnerSessionId, OwnerLogicalRunId,
-    //   OwnerAuthorityRootUserMessageId, ParticipantIdentity }] — not the
-    // camelCase JS projection shape.
-    const wireSeed = seed =>
-      ['InheritedFromOwner', {
-        OwnerSessionId: id('SessionId', seed.ownerSession),
-        OwnerLogicalRunId: id('LogicalRunId', seed.ownerLogicalRun),
-        OwnerAuthorityRootUserMessageId: id('AuthorityRootUserMessageId', seed.ownerAuthorityRoot),
-        ParticipantIdentity: {
-          InitialTier: 'deep',
-          Origin: 'InheritedFromOwner',
-          Persona: seed.participantIdentity.persona,
-          PersonaCatalogVersion: seed.participantIdentity.personaCatalogVersion,
-          Role: seed.participantIdentity.role,
-          SelectedAgent: seed.participantIdentity.participant,
-        },
-      }]
-    const promptKey = id('PromptKey', `key-${child}`)
+    const accepted = JSON.parse(codec.encode(rootFact(profile)))[1][1][1]
+    const promptKey = id('PromptKey', `load-${child}`)
     fold(state, canonical('Prompt', 'PluginPromptClaimed', {
-      PromptKey: promptKey,
-      SessionId: id('SessionId', child),
-      ContinuationKind: 'AgentOwnerRoot',
-      LogicalRunId: null,
-      AuthorityRootUserMessageId: null,
-      IdentitySeed: wireSeed(profile.identitySeed),
-      PayloadDigest: `digest-${child}`,
+      PromptKey: promptKey, SessionId: accepted.SessionId, ContinuationKind: 'AgentOwnerRoot',
+      LogicalRunId: null, AuthorityRootUserMessageId: null, IdentitySeed: accepted.IdentitySeed,
+      PayloadDigest: `load-payload-${child}`,
     }))
     fold(state, canonical('Prompt', 'PluginPromptPhysicalAccepted', {
-      PromptKey: promptKey,
-      SessionId: id('SessionId', child),
+      PromptKey: promptKey, SessionId: accepted.SessionId,
       PhysicalUserMessageId: id('PhysicalUserMessageId', profile.authorityRoot),
     }))
   }

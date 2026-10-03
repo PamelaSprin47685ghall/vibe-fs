@@ -20,9 +20,9 @@ const execute = async (diagnosticThrows, continuationFails) => {
   })
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   await awaitOwned(handle, 'session', 'run')
-  trace.push(['cause', sensor.consumeAbortCause(handle, 'session', 'run')])
-  await awaitOwned(handle, 'session', 'run')
-  trace.push(['duplicate', sensor.consumeAbortCause(handle, 'session', 'run')])
+  trace.push(['cause', await sensor.consumeAbortCause(handle, 'session', 'run')])
+  await sensor.activeTask(handle, 'session', 'run')
+  trace.push(['duplicate', await sensor.consumeAbortCause(handle, 'session', 'run')])
   trace.push(['remaining', sensor.activeTask(handle, 'session', 'run')])
   assert.ok(diagnostics.length > 0)
   return { trace, diagnostics }

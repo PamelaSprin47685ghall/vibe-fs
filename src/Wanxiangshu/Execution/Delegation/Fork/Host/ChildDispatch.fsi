@@ -48,7 +48,7 @@ module HostForkChildDispatch =
 
     val cancelParent:
         cancelSignals: (SessionId seq -> unit) ->
-        awaitRecovery: (unit -> Task<unit>) ->
+        drainCancelledCallbacks: (string list -> string list -> Task<unit>) ->
         runtime: ForkRuntime ->
         ptyPort: PtyPort ->
         parentKey: string ->

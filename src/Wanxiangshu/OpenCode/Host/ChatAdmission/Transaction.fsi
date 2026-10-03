@@ -35,6 +35,18 @@ type internal ChatAdmissionReleaseOutcome =
     | BoundaryFailed of exn
 
 [<RequireQualifiedAccess>]
+type internal ChatAdmissionHandoffSettlement =
+    | TerminalCommitted of ChatAdmissionReleaseOutcome
+    | SettlementIncomplete of PreProviderSettlementError
+    | SettlementBoundaryFailed of exn
+
+type internal ChatAdmissionLeaseHandoffException =
+    inherit System.Exception
+    new: cause: exn * acquisition: ExecutionAdmissionAcquisition -> ChatAdmissionLeaseHandoffException
+    member Cause: exn
+    member Acquisition: ExecutionAdmissionAcquisition
+
+[<RequireQualifiedAccess>]
 /// DSL-class: Evidence
 type internal ChatAdmissionTransactionError =
     | AdmissionRejected of ChatAdmissionError
@@ -43,12 +55,19 @@ type internal ChatAdmissionTransactionError =
     | PreProviderSettlementFailed of PreProviderSettlementError
     | PreProviderSettlementBoundaryFailed of exn
     | LeaseAcquisitionFailed of exn
+    | LeaseHandoffFailed of cause: exn * settlement: ChatAdmissionHandoffSettlement
+    | SupersessionSettlementFailed of Wanxiangshu.Composition.Durable.ManagedChatSupersessionError
     | LeaseTargetFailed of ExecutionAdmissionRejection * release: ChatAdmissionReleaseOutcome
     | LeaseTargetBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseTargetProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | HostProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseCommitFailed of commit: CapacityTransitionOutcome * release: ChatAdmissionReleaseOutcome
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
+
+type internal ChatAdmissionLeaseOwner =
+    ManagedChatAcceptanceWitness
+        -> (unit -> Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>)
+        -> Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
 
 type internal ChatAdmissionTransactionPorts =
     { Accept:
@@ -67,6 +86,13 @@ type internal ChatAdmissionTransactionPorts =
 
 [<RequireQualifiedAccess>]
 module internal ChatAdmissionTransaction =
+    val executeWithLeaseOwner:
+        observe: (ChatAdmissionTransactionStep -> unit) ->
+        withLeaseOwner: ChatAdmissionLeaseOwner ->
+        ports: ChatAdmissionTransactionPorts ->
+        managed: ChatAdmissionIntent.ManagedIntent ->
+            Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
+
     val executeWith:
         observe: (ChatAdmissionTransactionStep -> unit) ->
         ports: ChatAdmissionTransactionPorts ->

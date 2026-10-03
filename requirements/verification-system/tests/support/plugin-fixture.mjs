@@ -16,8 +16,10 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
 
 process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
-const { default: plugin } = await import('wanxiangshu')
-const initSpikePlugin = plugin.server
+const initSpikePlugin = async (input) => {
+  const { default: plugin } = await import('wanxiangshu')
+  return plugin.server(input)
+}
 const { requiredNames: managedAgentNames } = await import('../../../../dist/Participant/Persona/Surface.js')
 const journalSurface = await import('../../../../dist/Persistence/Journal/Surface.js')
 const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceSharedJournal.js')
@@ -61,6 +63,9 @@ export default function route(role, running, previous, purpose) {
   if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
     globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
+  }
+  if (typeof globalThis.__wanxiangshu_test_routing_decision === 'function') {
+    return globalThis.__wanxiangshu_test_routing_decision(role, running, previous, purpose)
   }
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }
@@ -260,6 +265,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
         journal: journalResult.journal,
         runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
         terminalPort,
+        client,
         prompts,
         messages,
         abortedIds,

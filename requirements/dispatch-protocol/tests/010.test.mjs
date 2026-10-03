@@ -279,8 +279,6 @@ test('WHAT[dispatch-protocol-010] DP_010_send_without_session_agent_cache_succee
 })
 }
 
-test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root and all actual synthetic send producers leave model selection to admission (GAP-136)')
-
 {
 const assert = (await import('node:assert/strict')).default
 const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
@@ -319,4 +317,46 @@ for (const [participant, tools] of [
     })
   })
 }
+test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection to admission at the wire', async () => {
+  await withJournal('dp010-producers', async (handle) => {
+    const owner = await acceptOwner(handle)
+    const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
+    const profiles = new Map()
+    for (const session of ['ses_p_4', 'ses_p_5', 'ses_p_6']) {
+      const root = await dispatch.sendAgentOwnerRoot(hostPort(async () => dispatch.admittedWithReceipt('receipt-root')), handle, session, 'root send', seed)
+      assert.equal(root.ok, true, root.error)
+      const accepted = await dispatch.acceptAgentOwnerRoot(handle, session, root.key, `msg-producers-root-${session}`)
+      assert.equal(accepted.ok, true, accepted.error)
+      profiles.set(session, accepted.profile)
+    }
+
+    const capturing = () => {
+      const seen = []
+      const port = hostPort(async (session, text, options) => {
+        seen.push({ session, text, agent: options?.agent ?? null, model: options?.model ?? null })
+        return dispatch.admittedWithReceipt('receipt-producers')
+      })
+      return { port, seen }
+    }
+
+    const cases = [
+      ['sendAgentOwnerRoot', capturing(), (p) => dispatch.sendAgentOwnerRoot(p, handle, 'ses_p_1', 'text', seed)],
+      ['sendAgentOwnerRootAwait', capturing(), (p) => dispatch.sendAgentOwnerRootAwait(p, handle, 'ses_p_2', 'text', seed)],
+      ['sendManagedAssignment', capturing(), (p) => dispatch.sendManagedAssignment(p, handle, 'ses_p_3', 'text', seed, ['read', 'grep'])],
+      ['sendContinuation', capturing(), (p) => dispatch.sendContinuation(p, handle, 'ses_p_4', 'text', 'ProviderRetryAttempt', profiles.get('ses_p_4'), 'Await')],
+      ['sendGateNudgesConcurrently', capturing(), async (p) => (await dispatch.sendGateNudgesConcurrently(p, handle, 'ses_p_5', 'text', 'ProviderRetryAttempt', 'JoinGate', 'run-terminal', profiles.get('ses_p_5')))[0]],
+      ['sendIdleContinuation', capturing(), (p) => dispatch.sendIdleContinuation(p, handle, 'ses_p_6', 'text', 'ProviderRetryAttempt', profiles.get('ses_p_6'), true)],
+    ]
+
+    for (const [name, capture, run] of cases) {
+      const result = await run(capture.port)
+      const failed = result.ok === false || result.outcome === 'Failed'
+      assert.equal(failed, false, name + ': ' + (result.error ?? result.outcome))
+      assert.equal(capture.seen.length, 1, name + ' sent one prompt')
+      assert.equal(capture.seen[0].model, null, name + ' must leave model selection to admission')
+    }
+  })
+})
+
+test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root (GAP-136: F# type-level proof pending — the wire model-free test above is retained but does not prove compile-time rejection)')
 }

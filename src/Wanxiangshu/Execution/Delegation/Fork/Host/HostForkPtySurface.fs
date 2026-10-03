@@ -5,6 +5,8 @@ open System.Text
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
@@ -63,7 +65,19 @@ module HostForkPtySurface =
                    owned = runtime.SnapshotOutstandingPtyRuns() |> List.isEmpty |> not
                    calls = calls |}
 
-    let scenario (action: string) (input: string) (failure: string) : Task<obj> =
+    let private devopsRoot (journal: AgentJournal) child =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind child
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+        |> Option.filter (fun profile ->
+            profile.SessionId = child
+            && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            && profile.CanonicalRole = Role.DevOps)
+        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+        |> Option.defaultWith (fun () -> invalidOp "DevOps work requires exact canonical child authority")
+
+    let scenario (action: string) (input: string) (failure: string) (journal: JournalHandle option) : Task<obj> =
         task {
             let calls = ResizeArray<obj>()
             // DSL-MUTABLE: resource — controlled backend read-completion port
@@ -160,8 +174,13 @@ module HostForkPtySurface =
                                byNameAfter = byNameAfter |> Option.map (fun (p: PtyId) -> p.Value)
                                calls = calls.ToArray() |}
             | "devops-return-drain" ->
+                let durable =
+                    journal
+                    |> Option.map (fun handle -> handle.Journal)
+                    |> Option.defaultWith (fun () -> invalidOp "DevOps settlement requires a canonical journal")
                 // Setup child runtime representing DevOps session
                 let devopsSessionId = SessionId.create "devops-session"
+                let authorityRoot = devopsRoot durable devopsSessionId
                 let devopsPort = PtyPort(handler = handler)
 
                 let devopsRuntime =
@@ -204,11 +223,6 @@ module HostForkPtySurface =
                     | Ok id -> id
                     | Error e -> failwith e
 
-                let! journal = HostForkRunLifecycle.openTemporaryJournal ()
-
-                // DSL-MUTABLE: resource — surface-only physical message counter
-                let physicalSequence = ref 0
-
                 // Manager runtime configured with drainChildPtys capability
                 let drainChildPtys (sid: SessionId) =
                     task {
@@ -227,13 +241,7 @@ module HostForkPtySurface =
                                 member _.Dispose() = () }
 
                         member _.SendPrompt(_, _, _) =
-                            physicalSequence.Value <- physicalSequence.Value + 1
-
-                            let physicalId = sprintf "pty-surface-physical:%d" physicalSequence.Value
-
-                            Task.FromResult(
-                                Outcome.SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physicalId)
-                            )
+                            Task.FromResult(Outcome.SendOutcome.AcceptanceUnknown "dummy")
 
                         member _.AbortSession _ = Task.FromResult(Ok())
                         member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -253,24 +261,9 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
-                        journal = journal,
-                        drainChildPtys = drainChildPtys
+                        drainChildPtys = drainChildPtys,
+                        journal = durable
                     )
-
-                let! devopsAdmitted =
-                    HostForkRunLifecycle.admitPendingAgentWork
-                        journal
-                        dummySessions
-                        (SessionId.create "manager-session")
-                        "manager"
-                        "devops"
-                        devopsSessionId
-                        Role.DevOps
-
-                let authorityRoot =
-                    match devopsAdmitted with
-                    | Ok root -> root
-                    | Error reason -> failwith reason
 
                 let run =
                     managerRuntime.InstallRun("devops", devopsSessionId, Role.DevOps, authorityRoot)
@@ -297,6 +290,11 @@ module HostForkPtySurface =
 
                 let devopsPtysAfter = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
                 let engineerPtysAfter = engineerRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+                let observedCalls = calls.ToArray()
+                do! managerRuntime.DetachAndDrain()
+                do! devopsRuntime.DetachAndDrain()
+                do! engineerRuntime.DetachAndDrain()
+                do! runtime.DetachAndDrain()
 
                 return
                     box
@@ -307,7 +305,7 @@ module HostForkPtySurface =
                            devopsAfter = devopsPtysAfter
                            engineerBefore = engineerPtysBefore
                            engineerAfter = engineerPtysAfter
-                           calls = calls.ToArray() |}
+                           calls = observedCalls |}
             | "blank-fork"
             | "fork"
             | "fork-error" ->

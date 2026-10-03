@@ -4,14 +4,23 @@ import test from 'node:test'
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
+const HandleJournalSurface = await import("../../../dist/Execution/Delegation/Handle/JournalSurface.js");
+const { withAdmittedChildren } = await import('./support/admitted-child-work.mjs')
 
 const observed = (action) => HandleSurface.scenario(action)
 
-test('WHAT[managed-session-lifecycle-013] abandonment projection remains parent-visible until consumption', () => {
-  const result = observed('abandon')
-  assert.equal(result.ok, true)
-  assert.equal(result.record.lifecycle, 'Abandoned')
-  assert.equal(result.horizonVisible, 1, 'unconsumed abandonment remains visible to the parent horizon')
+test('WHAT[managed-session-lifecycle-013] abandonment projection remains parent-visible until consumption', async () => {
+  await withAdmittedChildren('abandon-horizon', 'ses_parent', [{ agentId: 'h1', sessionId: 'ses_child', role: 'engineer' }], async (journal, profiles, directory, reopen) => {
+    const root = profiles.get('h1').authorityRoot
+    const settled = await HandleJournalSurface.recordAbandon(journal, 'ses_parent', 'h1', 'ses_child', root, 'ParentCancelled')
+    assert.equal(settled.ok, true)
+    const result = HandleJournalSurface.snapshot(journal, 'ses_parent', 'h1', 'ses_child', root)
+    assert.equal(result.record.lifecycle, 'Abandoned')
+    assert.equal(result.record.child, 'ses_child')
+    assert.equal(result.horizonVisible, 1, 'unconsumed scoped abandonment remains visible to the parent horizon')
+    const reopened = await reopen()
+    assert.deepEqual(HandleJournalSurface.snapshot(reopened, 'ses_parent', 'h1', 'ses_child', root).record, result.record)
+  })
 })
 test('WHAT[managed-session-lifecycle-013] retirement projection removes the handle from parent horizon', () => {
   const result = observed('retire')

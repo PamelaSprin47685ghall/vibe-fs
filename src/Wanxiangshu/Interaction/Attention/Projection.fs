@@ -55,3 +55,10 @@ module AttentionProjection =
 
         { state with
             BySession = Map.add sessionId updated state.BySession }
+
+    /// ATTENTION-004: a life that ends before resurfacing takes its remaining
+    /// entries with it — a reused SessionId starts a fresh life and must not
+    /// inherit the closed life's pending work.
+    let closeLife sessionId state =
+        { state with
+            BySession = Map.remove sessionId state.BySession }

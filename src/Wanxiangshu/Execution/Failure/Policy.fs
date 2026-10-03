@@ -146,6 +146,12 @@ module ExecutionFailurePolicy =
               CapacitySettlement = capacity
               Fatality = fatality }
 
+    let decideSupersession key lifecycle capacity : ExecutionFailureDecision =
+        { Resolution = terminalResolution key ChatExecutionTerminalDisposition.Cancelled lifecycle
+          Breaker = BreakerDecision.NoBreakerTransition
+          CapacitySettlement = releaseCapacity lifecycle capacity
+          Fatality = FatalityDecision.NoFatality }
+
     let decide (input: ExecutionFailureInput) : ExecutionFailureDecision =
         let breaker = deriveBreaker input.Failure
         let capacity = deriveCapacitySettlement input.Failure input.Lifecycle input.Capacity
@@ -163,7 +169,9 @@ module ExecutionFailurePolicy =
             | ExecutionFailure.UserCancelled ->
                 return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Cancelled input.Lifecycle
             | ExecutionFailure.Superseded ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Cancelled input.Lifecycle
+                return
+                    (decideSupersession input.ExecutionKey input.Lifecycle input.Capacity)
+                        .Resolution
             | ExecutionFailure.CapacityQueueFull ->
                 return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
             | ExecutionFailure.ProviderTransient ->

@@ -9,8 +9,6 @@ import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js
 import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
-const hash = (value) => `H(${value})`
-
 const capturingPort = (captured, outcome = () => dispatch.admittedWithReceipt('accepted-007')) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
   SendPrompt: async (session, text, options) => {
@@ -41,23 +39,6 @@ const rootSelection = (participant) => {
       origin: 'ResolvedAtRoot',
     },
   }
-}
-
-const profileFor = (session, runtime = 'rt-007c') => {
-  const owner = authority.createAuthorityRoot(
-    hash,
-    runtime,
-    `${session}_owner`,
-    'HumanRoot',
-    `msg-${session}-owner`,
-    rootSelection('manager'),
-  )
-  assert.equal(owner.ok, true, owner.error)
-  const seed = authority.issueInheritedIdentitySeed('engineer', owner.value)
-  assert.equal(seed.ok, true, seed.error)
-  const built = authority.createAuthorityRoot(hash, runtime, session, 'AgentOwnerRoot', `msg-root-${session}`, seed.value)
-  assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built.error))
-  return built.value
 }
 
 const acceptOwner = async (handle, session = 'ses_owner') => {
@@ -237,13 +218,16 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_continuation_same_claim_pa
       )
       assert.equal(root.ok, true, root.ok ? '' : root.error)
 
+      const accepted = await dispatch.acceptAgentOwnerRoot(opened.journal, 'ses_007c', root.key, 'msg-root-ses_007c')
+      assert.equal(accepted.ok, true, accepted.error)
+
       const cont = await dispatch.sendContinuation(
         port,
         opened.journal,
         'ses_007c',
         'busy nudge text',
         'BusyAgentNudge',
-        profileFor('ses_007c'),
+        accepted.profile,
         'Detached',
       )
       assert.equal(cont.ok, true, cont.ok ? '' : cont.error)

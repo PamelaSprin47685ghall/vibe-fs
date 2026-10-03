@@ -8,6 +8,10 @@ open System.Threading.Tasks
 module ForkToolSurface =
 
     val createRuntime: directory: string -> owners: obj -> Task<obj>
+    val createRuntimeWithAbort: directory: string -> owners: obj -> abortSession: (string -> Task<obj>) -> Task<obj>
+
+    val createRuntimeWithCancelSignals:
+        directory: string -> owners: obj -> cancelSignals: (string array -> unit) -> Task<obj>
 
     val executeManagerFork:
         value: obj ->
@@ -35,16 +39,21 @@ module ForkToolSurface =
     val promptCount: value: obj -> int
     val awaitPromptCount: value: obj -> count: int -> Task
     val acceptPrompt: value: obj -> index: int -> bool
+    val acceptNextPrompt: value: obj -> unit
+    val terminalListenerCount: value: obj -> int
     val prompt: value: obj -> index: int -> obj
     val nextPromptAcceptanceUnknown: value: obj -> reason: string -> unit
     val nextPromptAdmittedWithReceipt: value: obj -> receipt: string -> unit
     val cancelOwnerChildren: value: obj -> owner: string -> Task
     val detachToolRuntime: value: obj -> Task
     val durableLifecycleByname: value: obj -> owner: string -> byname: string -> obj
-    val durableBindingLifecycleByname: value: obj -> owner: string -> byname: string -> obj
     val executeJoin: value: obj -> owner: string -> Task<string>
     val executeHorizon: value: obj -> owner: string -> Task<string>
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
+
+    val prepareTerminalDelivery:
+        value: obj -> owner: string -> answer: string -> providerRun: string -> Task<(unit -> Task)>
+
     val injectAcceptedAssessment: value: obj -> owner: string -> Task
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
     val startUnprepared: obj -> string -> string -> Task<obj>

@@ -126,7 +126,12 @@ type Orchestrator
         (worktreePath: WorktreePath option)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         taskResult {
-            let! dirty = git.IsDirty(WorktreePath.create repoPath) |> TaskResultCE.ofTask
+            let integration failurePrefix error =
+                OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
+
+            let! dirty =
+                git.IsDirty(WorktreePath.create repoPath)
+                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to inspect target cleanliness")
 
             do!
                 if dirty then
@@ -143,9 +148,6 @@ type Orchestrator
                     {| ManagerJobId = jobId
                        WorktreeIdentity = identity
                        WorktreePath = path |}
-
-            let integration failurePrefix error =
-                OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
 
             let durableEffect =
                 (snapshot ()).AgentProjections.Orchestrator

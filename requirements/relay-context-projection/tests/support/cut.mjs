@@ -12,7 +12,11 @@ export const messageId = message => message.id ?? message.info?.id
 export const withSuccessor = async body => withReview(async context => {
   const {execute, hooks, runtime, session} = context
   assert.match(await execute(scores('REVISE')), /recorded = true/)
-  runtime.pushHostMessage(session, toolMessage())
+  const retirement = toolMessage()
+  retirement.info.sessionID = session
+  retirement.info.parentID = 'user-root'
+  retirement.info.time = {created: 3}
+  runtime.pushHostMessage(session, retirement)
   assert.match(await hooks.tool.suicide.execute({}, {
     sessionID: session, callID: 'suicide-call', messageID: 'retirement-run', agent: 'manager',
   }), /finished = true/)
@@ -27,6 +31,13 @@ export const withSuccessor = async body => withReview(async context => {
   const gate = structuredClone(runtime.messages.at(-1))
   assert.ok(gate.metadata?.wanxiangshu_prompt_key, 'successor must be the real owner-dispatched prompt')
   assert.ok(messageId(gate))
+  runtime.pushHostMessage(session, {
+    info: {
+      id: 'successor-provider-run', role: 'assistant', sessionID: session,
+      parentID: messageId(gate), time: {created: 4},
+    },
+    parts: [],
+  })
   const apply = (messages, acceptedHuman = false) => projection.apply(runtime.journal, session, acceptedHuman, messages)
   await body({...context, history, gate, apply})
 })

@@ -87,9 +87,86 @@ test('WHAT[causal-wait-007] a cycle explanation excludes the noncyclic prefix', 
   assert.deepEqual(frontier.cycle.map(causal.ownerKey), ['flow:id=B', 'flow:id=C', 'flow:id=B'])
 })
 
-test('WHAT[causal-wait-007] all unsatisfied branches of one active owner appear in the frontier', { todo: 'GAP-094: the current walk chooses only the first wait for each owner' }, () => {
+test('WHAT[causal-wait-007] all unsatisfied branches of one active owner appear in the frontier', () => {
   const frontiers = causal.frontiers([waitExternal('A', 'B'), waitExternal('A', 'C')])
   assert.deepEqual(frontiers.map(frontier => causal.producerKey(frontier.producer)).sort(), ['external:ext:id=B', 'external:ext:id=C'])
+})
+
+const explanation = frontier => ({
+  kind: frontier.kind,
+  chain: frontier.chain.map(node => causal.ownerKey(node.owner)),
+  producer: frontier.producer ? causal.producerKey(frontier.producer) : null,
+  cycle: frontier.cycle.map(causal.ownerKey),
+})
+
+test('WHAT[causal-wait-007] nested branches retain each exact dependency path', () => {
+  const waits = [
+    waitWorkflow('root', 'A'),
+    waitExternal('A', 'first'),
+    waitWorkflow('A', 'B'),
+    waitExternal('B', 'second'),
+  ]
+  const expected = [
+    { kind: 'ExternalProducerFrontier', chain: ['flow:id=root', 'flow:id=A'], producer: 'external:ext:id=first', cycle: [] },
+    { kind: 'ExternalProducerFrontier', chain: ['flow:id=root', 'flow:id=A', 'flow:id=B'], producer: 'external:ext:id=second', cycle: [] },
+  ]
+  const sorted = frontiers => frontiers.map(explanation).sort((a, b) => a.producer.localeCompare(b.producer))
+  assert.deepEqual(sorted(causal.frontiers(waits)), expected)
+  assert.deepEqual(sorted(causal.frontiers(waits.toReversed())), expected)
+})
+
+test('WHAT[causal-wait-007] a cyclic branch cannot hide an external branch of the same owner', () => {
+  const frontiers = causal.frontiers([
+    waitWorkflow('root', 'A'), waitWorkflow('A', 'B'),
+    waitWorkflow('B', 'A'), waitExternal('B', 'physical'),
+  ])
+  assert.deepEqual(frontiers.map(explanation), [
+    { kind: 'CausalWaitCycle', chain: ['flow:id=root', 'flow:id=A', 'flow:id=B'], producer: null, cycle: ['flow:id=A', 'flow:id=B', 'flow:id=A'] },
+    { kind: 'ExternalProducerFrontier', chain: ['flow:id=root', 'flow:id=A', 'flow:id=B'], producer: 'external:ext:id=physical', cycle: [] },
+  ])
+})
+
+test('WHAT[causal-wait-007] a broken branch cannot hide a live external producer', () => {
+  const frontiers = causal.frontiers([waitWorkflow('root', 'missing'), waitExternal('root', 'physical')])
+  assert.deepEqual(frontiers.map(explanation), [
+    { kind: 'BrokenCausalEdge', chain: ['flow:id=root', 'flow:id=missing'], producer: 'workflow:flow:id=missing', cycle: [] },
+    { kind: 'ExternalProducerFrontier', chain: ['flow:id=root'], producer: 'external:ext:id=physical', cycle: [] },
+  ])
+})
+
+test('WHAT[causal-wait-007] converging branches do not become a false cycle', () => {
+  const frontiers = causal.frontiers([
+    waitWorkflow('root', 'A'), waitWorkflow('root', 'B'),
+    waitWorkflow('A', 'shared'), waitWorkflow('B', 'shared'), waitExternal('shared', 'physical'),
+  ])
+  assert.deepEqual(frontiers.map(explanation), ['A', 'B'].map(owner => ({
+    kind: 'ExternalProducerFrontier',
+    chain: ['flow:id=root', `flow:id=${owner}`, 'flow:id=shared'],
+    producer: 'external:ext:id=physical',
+    cycle: [],
+  })))
+})
+
+test('WHAT[causal-wait-007] a disconnected cycle stays visible beside a rooted workflow', () => {
+  const frontiers = causal.frontiers([
+    waitExternal('root', 'physical'), waitWorkflow('A', 'B'), waitWorkflow('B', 'A'),
+  ])
+  assert.deepEqual(frontiers.map(explanation), [
+    { kind: 'ExternalProducerFrontier', chain: ['flow:id=root'], producer: 'external:ext:id=physical', cycle: [] },
+    { kind: 'CausalWaitCycle', chain: ['flow:id=A', 'flow:id=B'], producer: null, cycle: ['flow:id=A', 'flow:id=B', 'flow:id=A'] },
+  ])
+})
+
+test('WHAT[causal-wait-007] independent roots retain their complete explanations through one shared producer', () => {
+  const frontiers = causal.frontiers([
+    waitWorkflow('A', 'shared'), waitWorkflow('B', 'shared'), waitExternal('shared', 'physical'),
+  ])
+  assert.deepEqual(frontiers.map(explanation), ['A', 'B'].map(owner => ({
+    kind: 'ExternalProducerFrontier',
+    chain: [`flow:id=${owner}`, 'flow:id=shared'],
+    producer: 'external:ext:id=physical',
+    cycle: [],
+  })))
 })
 
 test('WHAT[causal-wait-007] empty_snapshot_yields_empty_frontier', () => {

@@ -230,7 +230,7 @@ module OrchestratorHostSurface =
             fun path ->
                 task {
                     let! value = invokeRawTask raw "IsDirty" [| box (WorktreePath.value path) |]
-                    return boolOf value
+                    return plainResult value boolOf
                 }
           CreateWorktree =
             fun job path ->
@@ -374,6 +374,18 @@ module OrchestratorHostSurface =
 
     let hasChild (handle: obj) (agentId: string) : bool =
         (handle :?> HostHandle).Host.HasChild agentId
+
+    let forkManagerJob (handle: obj) (jobId: string) (managerAgent: string) (prompt: string) : Task<obj> =
+        task {
+            let! result =
+                (handle :?> HostHandle)
+                    .Host.ForkManagerJob(ManagerJobId.create jobId, managerAgent, prompt)
+
+            return
+                match result with
+                | Ok path -> box {| ok = true; value = path |}
+                | Error error -> box {| ok = false; error = error |}
+        }
 
     /// Exercise the production candidate-finalization sequence through a plain
     /// JavaScript command port without exposing Command or Result internals.

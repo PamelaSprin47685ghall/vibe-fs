@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { verify, verificationSteps } from '../../../scripts/verify.mjs'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -19,6 +20,7 @@ function inputFixture(directory) {
     mkdirSync(join(root, name), { recursive: true })
   }
   writeFileSync(join(root, 'src/Input.fs'), 'module Input\nlet value = 1\n')
+  execFileSync('git', ['init', '--quiet', root])
   return root
 }
 
@@ -151,6 +153,7 @@ test('WHAT[verification-system-017] daily verification executes each stage in or
 test('WHAT[verification-system-017] formal verification cannot inherit a narrowed test selection', () => {
   const hostEnvWithOverride = {
     ...process.env,
+    NODE_TEST_VERBOSE: '1',
     TESTS_MJS_FILES: 'requirements/verification-system/tests/fake.test.mjs',
   }
 

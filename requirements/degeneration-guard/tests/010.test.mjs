@@ -9,7 +9,7 @@ test('WHAT[degeneration-guard-010] supplied eligibility rejects one session and 
   sensor.observe(handle, sensor.textDelta('stranger', repetitiveText(), 'run'))
   assert.deepEqual(aborts, [])
   assert.equal(sensor.activeTask(handle, 'stranger', 'run'), null)
-  assert.deepEqual(sensor.consumeAbortCause(handle, 'stranger', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, 'stranger', 'run'), { cause: 'External' })
   sensor.observe(handle, sensor.textDelta('owned', repetitiveText(), 'run'))
   await awaitOwned(handle, 'owned', 'run')
   assert.deepEqual(aborts, ['owned'])

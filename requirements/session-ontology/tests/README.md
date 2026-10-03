@@ -18,4 +18,4 @@ WHAT 规定容器分类、关联和复用边界。这里说明设施和证据范
 TESTS_MJS_FILES="$(rg --files requirements/session-ontology/tests | rg '/[0-9]{3}\.test\.mjs$' | sort | paste -sd, -)" node requirements/verification-system/tests/run.mjs
 ```
 
-TODO 阻断完整验收，局部断言通过不代表现场巡检通过。新基线验证范围见[本批记录](../../../proposals/35模块PR施工记录-2026-09-28.md)。
+TODO 阻断完整验收，局部断言通过不代表现场巡检通过。新基线验证范围见[本批记录](../../../proposals/archive/2026-10-03/35模块PR施工记录-2026-09-28.md)。

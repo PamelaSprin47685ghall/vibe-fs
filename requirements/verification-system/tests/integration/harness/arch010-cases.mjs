@@ -340,7 +340,7 @@ export const arch010Cases = [
       // and syntax (the item's own header), so "must not be classified as syntax" was false about the
       // document rather than about the classifier. A token that appears only inside the value is what
       // actually tests the split.
-      const body = ['# not an instruction', 'status = "not a field"', '[[injected_table]]'].join('\n');
+      const body = ['# not an instruction', 'status = "not a field"', '[[injected_table]]', ''].join('\n');
       const document = bloggerDocument([toolItem('tool', body)]);
 
       assertTrue(document.includes("tool_result = '''"), 'the fixture must actually take the literal form');
@@ -350,7 +350,7 @@ export const arch010Cases = [
       assertTrue(!unterminated, 'a rendered payload must never leave a literal open');
       assertEq(misplaced.length, 0, 'the closing delimiter must be alone');
 
-      for (const line of body.split('\n')) {
+      for (const line of body.slice(0, -1).split('\n')) {
         assertTrue(
           content.some((entry) => entry.text === line),
           `body line must be classified as content: ${JSON.stringify(line)}`,
@@ -424,6 +424,10 @@ export const arch010Cases = [
         'plain single line',
         'say "hi" and \\ backslash',
         'first\nsecond',
+        'first\nsecond\n',
+        'first\nsecond\n\n',
+        'first\r\nsecond\r\n',
+        'first\rsecond\r',
         '    leading indent preserved\nplain',
         '# looks like a comment\nbut is data',
         '[[item]]\nlooks like a table header',
@@ -437,6 +441,14 @@ export const arch010Cases = [
         const failure = roundTripValue(renderString(raw), raw);
         assertEq(failure, null, `${JSON.stringify(raw)}: ${failure}`);
       }
+      assertTrue(
+        roundTripValue("'''\nfirst\nsecond\n'''", 'first\nsecond') !== null,
+        'the audit must reject a writer-added LF even when the document parses',
+      );
+      assertTrue(
+        roundTripValue('"first\\nsecond"', 'first\r\nsecond') !== null,
+        'the audit must reject normalized data line endings',
+      );
     },
   },
 ];

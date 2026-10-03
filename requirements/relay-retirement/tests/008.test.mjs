@@ -51,6 +51,10 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
       { message: root, parts: root.parts },
     )
     const user = { info: { id: rootID, role: 'user', sessionID }, parts: root.parts }
+    runtime.pushHostMessage(sessionID, {
+      info: { id: 'run-root', role: 'assistant', sessionID, parentID: rootID, time: { created: 1 } },
+      parts: [],
+    })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
     // Step 1: Submit PERFECT review
@@ -59,7 +63,7 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
       'tests_evidence', 'logic_reliability_boundaries', 'caller_ergonomics', 'completeness',
     ].map((name) => [name, 'PERFECT']))
     const review = {
-      id: 'run-review', role: 'assistant', parentID: rootID,
+      id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
         { type: 'text', text: 'All criteria perfect.' },
         { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: scores } },
@@ -72,7 +76,7 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
 
     // Step 2: Suicide commits Accepted retirement
     const retiredRun = {
-      id: 'run-suicide', role: 'assistant', parentID: rootID,
+      id: 'run-suicide', role: 'assistant', parentID: rootID, time: { created: 3 },
       parts: [{ type: 'tool', tool: 'suicide', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
@@ -103,6 +107,10 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
         { info: { id: humanNext.id, role: 'user', sessionID }, parts: humanNext.parts },
       ],
     }
+    runtime.pushHostMessage(sessionID, {
+      info: { id: 'run-human-successor', role: 'assistant', sessionID, parentID: humanNext.id, time: { created: 4 } },
+      parts: [],
+    })
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
 
     // Step 4: After human input, fork must NOT be denied

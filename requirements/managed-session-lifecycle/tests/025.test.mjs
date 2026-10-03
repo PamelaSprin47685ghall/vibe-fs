@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostForkPtySurface.js'
+import { withAdmittedChildren } from './support/admitted-child-work.mjs'
+
+const devopsReturnDrain = label => withAdmittedChildren(label, 'manager-session', [
+  { agentId: 'devops', sessionId: 'devops-session', role: 'devops' },
+], journal => PtySurface.scenario('devops-return-drain', '', '', journal))
 
 test('WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping', async () => {
   // Scenario 1: fork a PTY, bind terminal name, assert outstanding before exit,
@@ -26,7 +31,7 @@ test('WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes 
   // terminate effect and be gone from its runtime; the engineer session keeps its
   // own PTY alive. Asserting the effect and the resulting counts — not which
   // helper issued it — keeps this test honest under internal refactors.
-  const res = await PtySurface.scenario('devops-return-drain', '', '')
+  const res = await devopsReturnDrain('devops-terminal-drain')
   assert.equal(res.ok, true, 'devops-return-drain scenario must succeed')
 
   assert.ok(res.devopsBefore.includes(res.devopsPtyId), 'DevOps must own a PTY before the run returns')
@@ -50,7 +55,7 @@ test('WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PT
   // Scenario 2: DevOps session holds an active PTY, another session (engineer) holds an active PTY.
   // When the DevOps run completes its terminal settlement on return, its PTYs are drained and cleared.
   // The engineer session PTY remains active and unaffected.
-  const res = await PtySurface.scenario('devops-return-drain', '', '')
+  const res = await devopsReturnDrain('devops-fixed-drain')
   assert.equal(res.ok, true, 'devops-return-drain scenario must succeed')
 
   // Before settlement: both DevOps and Engineer have outstanding PTYs
@@ -70,14 +75,17 @@ test('WHAT[managed-session-lifecycle-025] ToolRuntimeScope production wiring dra
   const verify = scopeMod.verifyDevOpsReturnDrain || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyDevOpsReturnDrain)
   assert.equal(typeof verify, 'function', 'verifyDevOpsReturnDrain must be exported on ToolRuntimeScope surface')
 
-  const res = await verify({
+  const res = await withAdmittedChildren('scope-devops-drain', 'manager-road-1', [
+    { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
+    { agentId: 'engineer-1', sessionId: 'engineer-session-1', role: 'engineer' },
+  ], journal => verify(journal, {
     managerSessionId: 'manager-road-1',
     devopsChildSessionId: 'devops-session-1',
     engineerChildSessionId: 'engineer-session-1',
     devopsPtys: ['devops-pty-1'],
     engineerPtys: ['eng-pty-1'],
     completeRole: 'devops',
-  })
+  }))
 
   assert.ok(res.devopsBefore.includes('devops-pty-1'), 'DevOps child must have outstanding PTY before return')
   assert.ok(res.engineerBefore.includes('eng-pty-1'), 'Engineer child must have outstanding PTY')

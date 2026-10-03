@@ -63,8 +63,8 @@ type ExportArgs = { InquiryId: string; Mode: ExportMode }
 type GoalAmendArgs =
     { CommandId: string
       InquiryId: string
+      ExpectedRevision: Revision
       AuthorizedBy: string
-      ExpectedRevision: string
       AddedConstraints: string list
       ReplacementText: string option }
 
@@ -298,12 +298,14 @@ module Tool =
             Decode.stringField raw "inquiryId"
             |> Result.mapError fromWire
             |> Result.bind (fun inquiryId ->
-                Decode.stringField raw "authorizedBy"
-                |> Result.mapError fromWire
-                |> Result.bind (fun authorizedBy ->
-                    Decode.stringField raw "expectedRevision"
+                Decode.revisionField raw "expectedRevision"
+                |> Result.mapError (fun fault ->
+                    { fromWire fault with
+                        Path = "expectedRevision" })
+                |> Result.bind (fun expectedRevision ->
+                    Decode.stringField raw "authorizedBy"
                     |> Result.mapError fromWire
-                    |> Result.bind (fun expectedRevision ->
+                    |> Result.bind (fun authorizedBy ->
                         Decode.uniqueStringListField raw "addedConstraints"
                         |> Result.mapError fromWire
                         |> Result.bind (fun addedConstraints ->
@@ -319,7 +321,7 @@ module Tool =
                             |> Result.map (fun replacementText ->
                                 { CommandId = commandId
                                   InquiryId = inquiryId
-                                  AuthorizedBy = authorizedBy
                                   ExpectedRevision = expectedRevision
+                                  AuthorizedBy = authorizedBy
                                   AddedConstraints = addedConstraints
                                   ReplacementText = replacementText }))))))

@@ -2,6 +2,8 @@
 
 WHAT 定义可见、可执行及权威消费的边界；Office 的职责上限由 office-capability 定义。
 
+2026-10-03同步增量：以下上游实施说明中的“未运行”属于合入前截面。本批已在gen69取得019的原生JSON/codec/独立进程三项失败，原因是Fable把toJSON发射为静态函数；给私有QuiescencePermitToken补AttachMembers后，gen71官方446文件运行中019的六项active断言及两个受监督独立进程均通过，PhysicalHandle TODO保留。017的exact permit归还合同不改，execution-model-routing/012已按原生拒绝更新并保留合法准入与StaleFence正反例。完整合并验收与原始日志见[同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)，本包局部绿色不能覆盖该次其他包的18项实际失败。
+
 001/003/004 通过生产请求规划器观察能力集。003 实际比较请求投影不超出 Office，并验证 Strength 的只读收窄；004 只证明旧 tier 输入被忽略，不代替真实模型路由切换。005 验证副本工具策略，未实际执行每一种拒绝动作。
 
 002/006/007/009/010/011/023 中保留的配置、工具注册与静态门禁用例有各自范围。部分 Host 权限结果由测试自己的 wildcard evaluator 解释，不能替代真实 Host 授权；注册/rolePredicate 也不等于完整运行期准入。006/010 中的 integration 用例需按设施规定另行启用，默认跳过不算通过。既有跨包和重复 fixture 尚未全面迁移。
@@ -11,6 +13,8 @@ WHAT 定义可见、可执行及权威消费的边界；Office 的职责上限�
 015/016 保留生产 admission 的 exact subject、版本冲突、终态后的旧准入拒绝及追加次数证明。018 覆盖现有 permit 的 typed failure 和拒绝零效果。017 保留消费→释放→再次消费的带断言 TODO。全文核对发现 10-D1 不只是实现遗漏：capability-enforcement-017 要求关闭 one-shot identity，而 crash-reconciliation-006 与 dispatch-protocol-007 明确允许确定未接受后归还同一个 exact permit；018 与 crash-006 的正式测试也要求重消费成功。当前 TryRelease 没有 rejection witness 或独立 retry-grant identity，不能只改 gate 将合法重试禁掉。新增三项已启用护栏覆盖同 session 新 attempt、重复 idle、旧 release callback、物理消息重放、tool completion 与 DropSession 后新准入；只通过公开 QuiescenceSurface 比较完整 typed result，不清墓碑、不读取私有表示，尚未执行。它们不关闭 10-D1。
 
 019 保留两个 gate 的当前 owner 隔离证明，另新增原生 JSON、真实 Fact/Journal/Event codec、execution lease 及两个受监督独立 Node 进程的正式回归；源码已落盘但未运行。QuiescencePermitToken 和既有 execution/queue token 发行点已补原生 JSON 拒绝，其他 PhysicalHandle 仍有具名 TODO。020 是现有 fatal 依赖边界检查，不能代替真实配置失败后的物理退出。024 包含实际插件对 fork DevOps 的拒绝和零子会话创建，固定 DevOps 忙碌准入的全链还需其生命周期所有者的证据。
+
+021 的生成轨迹保留 seed 20260914、60 次运行和全部副作用断言，每条完整轨迹作为子测试交付判决；测试之间归还事件循环，让 Node 发送已经完成的结果。子测试失败仍传回 fast-check 以保留反例收缩。这里没有增加静默预算，也不把轨迹内的循环或日志当成进展。
 
 前轮权限测试工作没有修改产品权限实现或用户的 OpenCode 配置。此次 019 只改变现有 opaque token 的 JSON 序列化拒绝，不改变权限矩阵、gate 消费/归还或容量准入/结算规则，也不修改用户配置。正式节点先构建，再通过 verification-system/tests/run.mjs 选取本包和 requirement-system。结果、跳过、进程不退出及待决分别记录；完整门禁仍未验收，见 GAP-074/075，不以旧发布清单的 DONE 或局部投影绿色宣称完成。
 
@@ -42,7 +46,7 @@ OrdinaryTurnWorkflow.applyJoinGuardNudge 与 FissionHost.observeOpenLaneCompleti
 
 此前 017 只补三项护栏并保留 one-shot 反例；此次未改 017、WHAT 或 013/014/025 的实现与测试。各轮源码都不能代替执行证据。
 
-## 019 本轮交付与运行边界
+## 019 上游实施时的交付与运行边界（历史截面）
 
 本轮生产改动只在 OpenCode/Host/SessionQuiescenceGate.fs 的 file-private QuiescencePermitToken，以及 OpenCode/Host/ModelRoutingSurface.fs 的既有 opaqueLeaseToken 发行点。两处阻止原生 JSON 编码，不更换 owner 引用、WeakMap 关联、attempt serial、retry 归还或 capacity custody；.fsi 全部不变。旧的 execution token 是冻结空对象，JSON 可编码成 {}；新断言要求明确的 process-local 拒绝，因此旧策略不可能靠恢复对象没有字段来假绿。Quiescence 的断言也要求由该 owner 报出明确拒绝，不能拿 incidental BigInt 编码错误当合同证明。异常文案只用于这道原生序列化拒绝的诊断断言，不用于生产准入、恢复或重试分支。
 

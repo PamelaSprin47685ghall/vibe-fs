@@ -18,8 +18,8 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
 /// Provider-start lifecycle. The transform freezes the exact attempt plan from
-/// its real trailing user message; the Host assistant observation later binds
-/// ProviderRunIdentity and persists ProviderStarted. Both operations address the
+/// its real trailing user message; the Host assistant event or the pre-provider
+/// public snapshot binds ProviderRunIdentity and persists ProviderStarted. Both operations address the
 /// exact (SessionId, PhysicalUserMessageId) key and read only durable facts.
 module ProviderLifecycle =
 

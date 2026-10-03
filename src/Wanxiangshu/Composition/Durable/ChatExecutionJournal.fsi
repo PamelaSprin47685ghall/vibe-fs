@@ -11,6 +11,12 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
+[<RequireQualifiedAccess>]
+type ManagedChatSupersessionError =
+    | MissingAccepted of ChatExecutionKey
+    | PreProviderSettlementFailed of PreProviderSettlementError
+    | ProviderSettlementFailed of ManagedChatProviderLifecycleError
+
 module ManagedChatAcceptance =
     val accept:
         journal: AgentJournal ->
@@ -20,6 +26,8 @@ module ManagedChatAcceptance =
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderLifecycle =
+    val internal forJournal: journal: AgentJournal -> ManagedChatProviderLifecyclePersistence
+
     val providerStarted:
         journal: AgentJournal ->
         key: ChatExecutionKey ->
@@ -38,9 +46,15 @@ module ManagedChatProviderLifecycle =
 
 [<RequireQualifiedAccess>]
 module PreProviderSettlement =
+    val internal forJournal: journal: AgentJournal -> PreProviderSettlementPersistence
+
     val settle:
         journal: AgentJournal ->
         key: ChatExecutionKey ->
         evidence: AcceptedChatExecutionEvidence ->
         disposition: ChatExecutionTerminalDisposition ->
             Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>>
+
+[<RequireQualifiedAccess>]
+module ManagedChatSupersession =
+    val settle: journal: AgentJournal -> key: ChatExecutionKey -> Task<Result<unit, ManagedChatSupersessionError>>

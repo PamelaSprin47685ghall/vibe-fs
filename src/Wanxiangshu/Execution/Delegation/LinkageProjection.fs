@@ -131,55 +131,20 @@ module HandleProjection =
         && existing.CanonicalRole = role
         && existing.Ownership = ownership
 
-    let private lifecycleAfterSameBinding
-        (handle: HandleId)
-        (existing: HandleRecord)
-        (current: AgentLinkageProjection)
-        : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match existing.Lifecycle with
-        | Retired ->
-            Ok
-                { current with
-                    Handles = Map.add handle { existing with Lifecycle = Active } current.Handles }
-        | Active
-        | CompletedAwaitingJoin _ -> Ok current
-        | Abandoned _ -> Error AlreadyAbandoned
-
-    let private reopenOrKeepExisting
+    let private replayExistingLink
         (childSessionId: SessionId)
         (targetAgent: string)
         (byname: string)
         (role: Role)
         (ownership: HandleOwnership)
-        (existing: HandleRecord)
         (current: AgentLinkageProjection)
-        (handle: HandleId)
-        : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        if not (sameBinding childSessionId targetAgent byname role ownership existing) then
-            Error HandleIdentityConflict
-        else
-            lifecycleAfterSameBinding handle existing current
-
-    let private absorbRetiredReplay
-        (childSessionId: SessionId)
-        (targetAgent: string)
-        (byname: string)
-        (role: Role)
-        (ownership: HandleOwnership)
         (existing: HandleRecord)
-        (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        if not (sameBinding childSessionId targetAgent byname role ownership existing) then
-            Error HandleIdentityConflict
-        else
+        if sameBinding childSessionId targetAgent byname role ownership existing then
             Ok current
+        else
+            Error HandleIdentityConflict
 
-    /// Abandoned is a durable terminal: the child never returns along this
-    /// handle, so a re-link is refused (msl-006/018). Retired is the
-    /// consumed-completion tombstone: reuse of the same agent id reopens Labor
-    /// on the same child session (msl-015; the tombstone is the retained
-    /// LastCompletion, not a permanent ban on further Labor). Active and
-    /// CompletedAwaitingJoin replay idempotently.
     let linkNamed
         (handle: HandleId)
         (childSessionId: SessionId)
@@ -211,27 +176,7 @@ module HandleProjection =
                   NextCreationOrder = order + 1
                   Works = current.Works
                   LegacyWorkHandles = current.LegacyWorkHandles }
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some existing -> reopenOrKeepExisting childSessionId targetAgent byname role ownership existing current handle
-
-    /// Journal replay path (ExecutionFactFold): replaying a historical
-    /// HandleLinked fact must not change already-folded state — a Retired
-    /// binding absorbs the replay idempotently and stays Retired (msl-006:
-    /// replay cannot revive). The explicit surface link command keeps the
-    /// msl-009 reopen semantics in linkNamed.
-    let replayLink
-        (handle: HandleId)
-        (childSessionId: SessionId)
-        (targetAgent: string)
-        (byname: string)
-        (role: Role)
-        (ownership: HandleOwnership)
-        (current: AgentLinkageProjection)
-        : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match Map.tryFind handle current.Handles with
-        | Some({ Lifecycle = Retired } as existing) ->
-            absorbRetiredReplay childSessionId targetAgent byname role ownership existing current
-        | _ -> linkNamed handle childSessionId targetAgent byname role ownership current
+        | Some existing -> replayExistingLink childSessionId targetAgent byname role ownership current existing
 
     /// Compatibility for internal callers that do not need a separate
     /// presentation identity. Provider-facing fork/commission use linkNamed.
@@ -371,7 +316,7 @@ module HandleProjection =
                 { current with
                     Works = Map.add work admitted current.Works }
 
-    let private decideAdmitWork
+    let private admitLandedWork
         parentId
         handle
         (authority: PromptAuthority.PromptAuthorityProjection)
@@ -418,7 +363,7 @@ module HandleProjection =
         match Map.tryFind handle current.Handles, authority.ActiveLogicalRun with
         | None, _ -> Error UnknownHandle
         | _, None -> Error WorkNotAdmitted
-        | Some binding, Some profile -> decideAdmitWork parentId handle authority binding profile current
+        | Some binding, Some profile -> admitLandedWork parentId handle authority binding profile current
 
     let tryWork work (current: AgentLinkageProjection) = Map.tryFind work current.Works
 
@@ -595,11 +540,7 @@ module HandleProjection =
                 else
                     None)
 
-    /// The raw binding record for a byname — no summary projection. The
-    /// summary folds work-unit state into the view, so a Retired work unit
-    /// masquerades as a Retired handle there; callers that must decide on the
-    /// binding's own lifecycle (managed-session-lifecycle-024: the fixed DevOps
-    /// binding stays Active across work-unit terminals) read the binding here.
+    /// Physical road lookup reads the stable binding, independently of its work.
     let tryFindBindingByByname (byname: string) (current: AgentLinkageProjection) =
         if System.String.IsNullOrWhiteSpace byname then
             None
@@ -647,15 +588,32 @@ module HandleProjection =
                 | Active
                 | CompletedAwaitingJoin _ -> true))
 
-    /// participant-horizon-011: a durably linked visible child stays on the
-    /// roster until Join consumes its final consequence and writes Retired —
-    /// Abandoned included. Visibility follows the HandleLinked binding, not
-    /// work admission: a handle without admitted work is still a durable child
-    /// whose consequence the parent has not yet received.
+    let private isIdleFixedDevOpsBinding (record: HandleRecord) =
+        record.Work.IsNone
+        && record.CanonicalRole = Role.DevOps
+        && record.Byname = "devops"
+        && record.TargetAgent = "devops"
+        && record.Lifecycle = Active
+
+    let private horizonRecord current binding =
+        let record = summary current binding
+
+        if isIdleFixedDevOpsBinding binding && record.Lifecycle = Retired then
+            binding
+        else
+            record
+
+    /// participant-horizon-011: parent-visible roster is not the same question
+    /// as "does this handle still block finality?". An Abandoned child still has
+    /// one undelivered consequence for its parent, so it remains visible until
+    /// Join consumes that consequence and writes Retired.
     let horizonVisible (current: AgentLinkageProjection) =
-        current
-        |> recordsWhere (fun record ->
-            parentVisible record
+        current.Handles
+        |> Map.toList
+        |> List.map (snd >> horizonRecord current)
+        |> List.filter (fun record ->
+            (record.Work.IsSome || isIdleFixedDevOpsBinding record)
+            && parentVisible record
             && (match record.Lifecycle with
                 | Retired -> false
                 | Active

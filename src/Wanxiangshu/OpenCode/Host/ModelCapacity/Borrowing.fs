@@ -520,13 +520,18 @@ type internal BorrowingCapacity<'target>
 
             completion.Task :> Task
 
+    let retireUnavailableExecution oldKey retireOnUnavailable =
+        if defaultArg retireOnUnavailable true then
+            oldKey |> Option.iter retireExecution
+
     member _.RouteFresh
         (
             sessionId: string,
             oldPhysicalUserMessageId: string option,
             newPhysicalUserMessageId: string,
             lenderSessionId: string option,
-            route: 'target array -> 'target option
+            route: 'target array -> 'target option,
+            ?retireOnUnavailable: bool
         ) =
         lock gate (fun () ->
             let oldKey =
@@ -537,7 +542,7 @@ type internal BorrowingCapacity<'target>
 
             match routeDecision lenderSessionId route with
             | None ->
-                oldKey |> Option.iter retireExecution
+                retireUnavailableExecution oldKey retireOnUnavailable
                 None
             | Some(target, credit) ->
                 commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target lenderSessionId credit

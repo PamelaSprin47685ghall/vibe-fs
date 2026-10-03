@@ -15,4 +15,4 @@
 
 通过正式构建后，选择本包、requirement-system、迁移来源 capability-enforcement 010 和受影响的 provider-language 检查运行。需启用 integration 才执行真实插件用例；未启用属于跳过。TODO 使正式入口返回非零，不宣称整包已验收。
 
-待决见[迁移记录](../../../proposals/20模块迁移-环境与权限-2026-09-28.md)，覆盖缺口见 GAP-078。README 不新增动作权限、命名规则或固定描述格式。
+待决见[迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-环境与权限-2026-09-28.md)，覆盖缺口见 GAP-078。README 不新增动作权限、命名规则或固定描述格式。

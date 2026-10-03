@@ -2,9 +2,174 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import assert from 'node:assert/strict'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+import * as recovery from '../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
+
+test('WHAT[host-boundary-033] superseded accepted execution settles before late provider observations and preserves the new execution', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sessionID = 'ses-superseded-observation'
+    const admit = async (messageID, metadata = undefined) => {
+      const carrier = metadata === undefined ? {} : { metadata }
+      const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: {}, ...carrier }
+      const parts = [{ type: 'text', text: 'controlled input', ...carrier }]
+      await hooks['chat.message']({ sessionID, messageID, agent: 'engineer' }, { message, parts })
+      return message
+    }
+    await admit('msg-root')
+    const profile = dispatch.projectionObservation(runtime.journal, sessionID).activeLogicalRun
+    const guard = await dispatch.sendContinuation({
+      SubscribeTerminal: () => ({ Dispose() {} }),
+      SendPrompt: async () => dispatch.admittedWithReceipt('guard-receipt'),
+    }, runtime.journal, sessionID, 'controlled input', 'ManagerGuard', profile, 'Await')
+    assert.equal(guard.ok, true, guard.error)
+    const oldMessage = await admit('msg-old', guard.observation.metadata)
+    const newMessage = await admit('msg-new')
+    const before = routing.sharedCapacitySnapshot()
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, oldMessage.id), {
+      phase: 'Terminal', disposition: 'Cancelled',
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, newMessage.id), {
+      phase: 'Accepted', disposition: null,
+    })
+    assert.deepEqual(runtime.abortedIds, [sessionID], 'only the replaced Guard attempt is physically interrupted')
+    const output = { temperature: 0.123 }
+    assert.throws(() => hooks['chat.params']({
+      sessionID, message: oldMessage, agent: 'engineer',
+      model: { providerID: 'provider', id: 'engineer-model', capabilities: {} },
+    }, output))
+    assert.deepEqual(output, { temperature: 0.123 })
+    assert.deepEqual(routing.sharedCapacitySnapshot(), before)
+    await hooks.event({ event: { type: 'session.error', properties: {
+      sessionID, error: { name: 'MessageAbortedError', data: { message: 'old Guard interrupted' } },
+    } } })
+    await hooks.event({ event: { type: 'message.updated', properties: { info: {
+      id: 'assistant-old', sessionID, parentID: oldMessage.id, role: 'assistant',
+      agent: 'engineer', modelID: 'engineer-model', providerID: 'provider',
+      time: { created: 1, completed: 2 },
+      error: { name: 'MessageAbortedError', data: { message: 'old Guard interrupted' } },
+    } } } })
+    assert.deepEqual(routing.sharedCapacitySnapshot(), before)
+    await hooks['chat.params']({
+      sessionID, message: newMessage, agent: 'engineer',
+      model: { providerID: 'provider', id: 'engineer-model', capabilities: {} },
+    }, {})
+    assert.equal(runtime.prompts.length, 0, 'late observation must not dispatch a provider retry')
+  })
+})
+
+test('WHAT[host-boundary-033] rejected Host abort fails and releases the exact accepted human successor without a retry', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sessionID = 'ses-supersession-abort-rejected'
+    const admit = async (messageID, metadata) => {
+      const carrier = metadata === undefined ? {} : { metadata }
+      const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: {}, ...carrier }
+      await hooks['chat.message']({ sessionID, messageID, agent: 'engineer' }, {
+        message, parts: [{ type: 'text', text: 'controlled input', ...carrier }],
+      })
+      return message
+    }
+    await admit('msg-root')
+    const profile = dispatch.projectionObservation(runtime.journal, sessionID).activeLogicalRun
+    const guard = await dispatch.sendContinuation({
+      SubscribeTerminal: () => ({ Dispose() {} }),
+      SendPrompt: async () => dispatch.admittedWithReceipt('guard-rejected-receipt'),
+    }, runtime.journal, sessionID, 'controlled input', 'ManagerGuard', profile, 'Await')
+    assert.equal(guard.ok, true, guard.error)
+    await admit('msg-guard', guard.observation.metadata)
+    runtime.client.session.abort = async () => {
+      runtime.abortedIds.push(sessionID)
+      return { error: { message: 'controlled SDK abort rejection' } }
+    }
+    await assert.rejects(admit('msg-human'), /supersession|hook|admission/i)
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, 'msg-guard'), {
+      phase: 'Terminal', disposition: 'Cancelled',
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, 'msg-human'), {
+      phase: 'Terminal', disposition: 'Failed',
+    })
+    const snapshot = routing.sharedCapacitySnapshot()
+    assert.equal(snapshot.executions.some((owner) => owner.sessionId === sessionID), false)
+    assert.equal(runtime.prompts.length, 0)
+    assert.deepEqual(runtime.abortedIds, [sessionID])
+  })
+})
+
+test('WHAT[host-boundary-033] a queued successor granted during the old attempt drain yields to the later human input before projection', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sessionID = 'ses-queued-supersession'
+    const admit = async (messageID, metadata, targetSession = sessionID) => {
+      const carrier = metadata === undefined ? {} : { metadata }
+      const message = { id: messageID, sessionID: targetSession, role: 'user', agent: 'engineer', model: {}, ...carrier }
+      await hooks['chat.message']({ sessionID: targetSession, messageID, agent: 'engineer' }, {
+        message, parts: [{ type: 'text', text: 'controlled input', ...carrier }],
+      })
+      return message
+    }
+    await admit('msg-root')
+    const profile = dispatch.projectionObservation(runtime.journal, sessionID).activeLogicalRun
+    const guard = await dispatch.sendContinuation({
+      SubscribeTerminal: () => ({ Dispose() {} }),
+      SendPrompt: async () => dispatch.admittedWithReceipt('queued-guard-receipt'),
+    }, runtime.journal, sessionID, 'controlled input', 'ManagerGuard', profile, 'Await')
+    assert.equal(guard.ok, true, guard.error)
+    await admit('msg-guard', guard.observation.metadata)
+    const abortEntered = Promise.withResolvers()
+    const releaseOldAbort = Promise.withResolvers()
+    let firstAbort = true
+    runtime.client.session.abort = async () => {
+      runtime.abortedIds.push(sessionID)
+      if (firstAbort) {
+        firstAbort = false
+        abortEntered.resolve()
+        await releaseOldAbort.promise
+      }
+      return {}
+    }
+    globalThis.__wanxiangshu_test_routing_decision = () => null
+    const human = admit('msg-human').then(
+      () => ({ accepted: true }),
+      error => ({ accepted: false, error }),
+    )
+    try {
+      await abortEntered.promise
+      assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, 'msg-human'), {
+        phase: 'Accepted', disposition: null,
+      })
+      assert.equal(routing.sharedCapacitySnapshot().waiters.filter(value => value.kind === 'Admission').length, 1)
+      globalThis.__wanxiangshu_test_routing_decision = () => ({ model: 'provider/engineer-model', reasoning: 'none' })
+      await admit('msg-trigger', undefined, 'ses-independent-queue-trigger')
+      assert.equal(routing.sharedCapacitySnapshot().waiters.filter(value => value.kind === 'Admission').length, 0, 'H grant occurred while old G drain still held ingress')
+      const latest = admit('msg-latest')
+      // The queued old abort is the only outstanding effect. An event-loop turn
+      // drains J's finite ingress microtasks before the controlled abort is released.
+      await new Promise(setImmediate)
+      releaseOldAbort.resolve()
+      const current = await latest
+      const old = await human
+      assert.equal(old.accepted, false)
+      assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, 'msg-human'), {
+        phase: 'Terminal', disposition: 'Cancelled',
+      })
+      assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, current.id), {
+        phase: 'Accepted', disposition: null,
+      })
+      await hooks['chat.params']({ sessionID, message: current, agent: 'engineer', model: {
+        providerID: 'provider', id: 'engineer-model', capabilities: {},
+      } }, {})
+      assert.equal(runtime.prompts.length, 0)
+      assert.equal(runtime.abortedIds.length, 2)
+    } finally {
+      releaseOldAbort.resolve()
+      delete globalThis.__wanxiangshu_test_routing_decision
+    }
+  })
+})
 
 {
   const { default: assert } = await import('node:assert/strict')
@@ -96,4 +261,31 @@ const read = (path) => readFileSync(join(root, path), 'utf8')
     assert.doesNotMatch(lifecycle, /admitUnestablishedKey|admitExternalRoot|admitContinuation/)
     assert.match(lifecycle, /AcceptedExecutionMissing/)
   })
+}
+
+{
+  const { spawnSync } = await import('node:child_process')
+  const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
+  const runInstalledCanary = (capacityOne) => {
+    const arguments_ = [join(root, 'requirements/host-boundary/tests/support/run-guard-supersession-canary.mjs')]
+    if (capacityOne) arguments_.push('--capacity-one')
+    const launched = spawnSync(process.execPath, arguments_, {
+      cwd: root, encoding: 'utf8', timeout: 120000,
+    })
+    assert.equal(launched.status, 0, `${launched.error ?? ''}\n${launched.stdout}\n${launched.stderr}`)
+    const result = JSON.parse(launched.stdout.trim())
+    assert.equal(result.opencode, '1.18.29')
+    assert.equal(result.capacityOne, capacityOne)
+    assert.equal(result.physicalCleanup, true)
+    assert.deepEqual(result.results.map(value => value.phase), capacityOne ? ['STARTED', 'PAUSED', 'INTERLEAVED'] : ['PAUSED', 'STARTED', 'INTERLEAVED'])
+    for (const execution of result.results) {
+      assert.equal(execution.answerParent, execution.human)
+      assert.equal(execution.old.disposition, 'Cancelled')
+      assert.equal(execution.current.disposition, 'Completed')
+      assert.equal(execution.providerRetries, 0)
+    }
+    assert.equal(result.results[2].intermediate.disposition, 'Cancelled')
+  }
+  integrationTest('WHAT[host-boundary-033] installed Host drains a superseded Guard and answers the exact fresh human input', () => runInstalledCanary(false))
+  integrationTest('WHAT[host-boundary-033] installed Host drains a held Guard before waiting for its only capacity slot', () => runInstalledCanary(true))
 }

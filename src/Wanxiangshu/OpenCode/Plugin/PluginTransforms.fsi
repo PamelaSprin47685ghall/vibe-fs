@@ -30,7 +30,6 @@ module PluginTransforms =
             ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
             FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
             ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-            CaptureReadonlyDelegation: string option -> obj -> Task<unit>
             ApplyReadonlyDelegation: string option -> obj -> Task<unit>
             InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
             ProjectRequirementGrounding: string option -> obj -> Task<unit>
@@ -60,7 +59,7 @@ module PluginTransforms =
         caps: NormalTransformCapabilities -> branches: TransformBranchCapabilities -> (obj -> obj -> Task<unit>)
 
     /// Provider-facing transform composition: order only.
-    /// Relay cut → Strength replay/trace → delegation capture → Companion/XWire
-    /// → delegation start → pair/grounding; retired raw history is removed
+    /// Relay cut → Strength replay/trace → Companion/XWire → pair/grounding
+    /// → delegation capture and start; retired raw history is removed
     /// before any downstream context owner.
     val create: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> (obj -> obj -> Task<unit>)

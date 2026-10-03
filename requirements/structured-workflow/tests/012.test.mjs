@@ -2215,6 +2215,7 @@ integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce 
 const { default: assert } = await import("node:assert/strict");
 const { createHash } = await import("node:crypto");
 const { EventEmitter } = await import("node:events");
+const { execFileSync } = await import("node:child_process");
 const { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { dirname, isAbsolute, join, relative, resolve } = await import("node:path");
@@ -2583,6 +2584,7 @@ test('WHAT[structured-workflow-012] compileIncremental staging rebaseEmittedImpo
 test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan focused, non-fs inputs plan full, and plan matches run mode', async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-mode-fixture-'));
   try {
+    execFileSync('git', ['init', '--quiet', fixtureRoot]);
     const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
     const distDir = join(fixtureRoot, 'dist');
     const buildStateDir = join(fixtureRoot, '.fable-build');
@@ -2755,6 +2757,7 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
 test('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (unit: pre-compile failure)', async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-unit-'));
   try {
+    execFileSync('git', ['init', '--quiet', fixtureRoot]);
     const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
     const distDir = join(fixtureRoot, 'dist');
     const buildStateDir = join(fixtureRoot, '.fable-build');
@@ -2838,6 +2841,7 @@ test('WHAT[structured-workflow-012] build failure preserves prior valid manifest
 integrationTest('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (integration: compiler failure)', { timeout: 120_000 }, async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-integration-'));
   try {
+    execFileSync('git', ['init', '--quiet', fixtureRoot]);
     const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
     const distDir = join(fixtureRoot, 'dist');
     const buildStateDir = join(fixtureRoot, '.fable-build');

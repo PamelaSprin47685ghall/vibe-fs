@@ -129,6 +129,30 @@ module TransactionSurface =
         | ChatAdmissionTransactionError.PreProviderSettlementBoundaryFailed _ ->
             box {| kind = "PreProviderSettlementBoundaryFailed" |}
         | ChatAdmissionTransactionError.LeaseAcquisitionFailed _ -> box {| kind = "LeaseAcquisitionFailed" |}
+        | ChatAdmissionTransactionError.SupersessionSettlementFailed error ->
+            box
+                {| kind = "SupersessionSettlementFailed"
+                   error = string error |}
+        | ChatAdmissionTransactionError.LeaseHandoffFailed(cause, settlement) ->
+            match settlement with
+            | ChatAdmissionHandoffSettlement.TerminalCommitted release ->
+                box
+                    {| kind = "LeaseHandoffFailed"
+                       cause = cause.Message
+                       settlement = "TerminalCommitted"
+                       release = releaseLabel release |}
+            | ChatAdmissionHandoffSettlement.SettlementIncomplete error ->
+                box
+                    {| kind = "LeaseHandoffFailed"
+                       cause = cause.Message
+                       settlement = "SettlementIncomplete"
+                       error = string error |}
+            | ChatAdmissionHandoffSettlement.SettlementBoundaryFailed error ->
+                box
+                    {| kind = "LeaseHandoffFailed"
+                       cause = cause.Message
+                       settlement = "SettlementBoundaryFailed"
+                       error = error.Message |}
         | ChatAdmissionTransactionError.LeaseTargetFailed(_, release) ->
             box
                 {| kind = "LeaseTargetFailed"
@@ -274,7 +298,17 @@ module TransactionSurface =
                                 return Ok ExecutionAdmissionAcquisition.Cancelled
                             else
                                 activeCapacity <- 1
-                                return Ok(ExecutionAdmissionAcquisition.Admitted lease)
+
+                                if failurePoint.StartsWith("Handoff", StringComparison.Ordinal) then
+                                    return
+                                        raise (
+                                            ChatAdmissionLeaseHandoffException(
+                                                InvalidOperationException "SDK abort rejected",
+                                                ExecutionAdmissionAcquisition.Admitted lease
+                                            )
+                                        )
+                                else
+                                    return Ok(ExecutionAdmissionAcquisition.Admitted lease)
                         }
                   LeaseTarget =
                     fun _ ->
@@ -320,34 +354,51 @@ module TransactionSurface =
                               AppendTerminal =
                                 fun _ _ _ ->
                                     task {
-                                        match
-                                            state
-                                            |> Option.map (fun current ->
-                                                ChatExecutionFactFold.applyTerminal
-                                                    key
-                                                    (ChatExecutionTerminalEvidence.PreProvider acceptedEvidence)
-                                                    disposition
-                                                    { ByKey = Map.ofList [ key, current ] })
-                                        with
-                                        | Some(Ok updated) ->
-                                            state <- ChatExecutionProjection.byKey key updated
-                                            return Ok()
-                                        | Some(Error rejection) ->
+                                        if failurePoint = "HandoffTerminalUnknown" then
                                             return
                                                 Error(
-                                                    JournalAppendFailure.FactRejected(
-                                                        EventId.create "transaction-terminal-rejected",
-                                                        rejection
+                                                    JournalAppendFailure.WriteUnknown(
+                                                        EventId.create "handoff-terminal-unknown",
+                                                        JournalFailure.FlushFailed "terminal flush failed"
                                                     )
                                                 )
-                                        | None ->
+                                        elif failurePoint = "HandoffTerminalUnavailable" then
                                             return
                                                 Error(
                                                     JournalAppendFailure.WriterUnavailable(
-                                                        EventId.create "transaction-terminal-missing",
-                                                        JournalUnavailable.WriterDisposed
+                                                        EventId.create "handoff-terminal-unavailable",
+                                                        JournalUnavailable.WriterClosing
                                                     )
                                                 )
+                                        else
+                                            match
+                                                state
+                                                |> Option.map (fun current ->
+                                                    ChatExecutionFactFold.applyTerminal
+                                                        key
+                                                        (ChatExecutionTerminalEvidence.PreProvider acceptedEvidence)
+                                                        disposition
+                                                        { ByKey = Map.ofList [ key, current ] })
+                                            with
+                                            | Some(Ok updated) ->
+                                                state <- ChatExecutionProjection.byKey key updated
+                                                return Ok()
+                                            | Some(Error rejection) ->
+                                                return
+                                                    Error(
+                                                        JournalAppendFailure.FactRejected(
+                                                            EventId.create "transaction-terminal-rejected",
+                                                            rejection
+                                                        )
+                                                    )
+                                            | None ->
+                                                return
+                                                    Error(
+                                                        JournalAppendFailure.WriterUnavailable(
+                                                            EventId.create "transaction-terminal-missing",
+                                                            JournalUnavailable.WriterDisposed
+                                                        )
+                                                    )
                                     } }
 
                         PreProviderSettlement.settleWith settlementPersistence key acceptedEvidence disposition
@@ -413,6 +464,8 @@ module TransactionSurface =
                        providerCount = 0
                        crashed = crashed
                        durableLifecycle = state |> Option.map _.lifecycleName |> Option.defaultValue "None"
+                       terminalDisposition =
+                        state |> Option.bind _.terminalDisposition |> Option.map string |> Option.toObj
                        admission =
                         {| activeCapacity = activeCapacity
 

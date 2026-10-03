@@ -521,43 +521,28 @@ module CasebookSurface =
     let isSubstantiveTool (toolName: string) : bool =
         CasebookCapture.isSubstantiveTool toolName
 
-    let freezeCompletionState (workspaceRootOrStore: obj) (pathsOrWorkspaceRoot: obj) : Task<obj> =
+    let freezeCompletionState (store: obj) (workspaceRoot: string) (pathsRaw: obj) : Task<obj> =
         task {
-            let argCount = emitJsExpr () "arguments.length" |> unbox<int>
+            let paths = stringsOf pathsRaw |> Array.toList
 
-            if argCount >= 3 then
-                let store = emitJsExpr () "arguments[0]" |> storeOf
-                let workspaceRoot = emitJsExpr () "arguments[1]" |> string
-                let pathsRaw = emitJsExpr () "arguments[2]"
-
-                let pathList =
-                    if isNull pathsRaw then
-                        []
-                    elif emitJsExpr pathsRaw "Array.isArray($0)" then
-                        stringsOf pathsRaw |> Array.toList
-                    else
-                        []
-
-                match! CasebookCapture.freezeCompletionState store workspaceRoot pathList with
-                | Ok json -> return box json
-                | Error err -> return box {| ok = false; error = err |}
-            else
-                let workspaceRoot = string workspaceRootOrStore
-                let pathsRaw = pathsOrWorkspaceRoot
-
-                let pathList =
-                    if isNull pathsRaw then
-                        []
-                    elif emitJsExpr pathsRaw "Array.isArray($0)" then
-                        stringsOf pathsRaw |> Array.toList
-                    else
-                        []
-
-                return CasebookCapture.captureBaselineFileStateMap workspaceRoot pathList
+            match! CasebookCapture.freezeCompletionState (storeOf store) workspaceRoot paths with
+            | Ok json -> return box json
+            | Error err -> return box {| ok = false; error = err |}
         }
 
-    let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
-        CasebookCapture.computeMaintenanceDiff workspaceRoot baseline
+    let computeMaintenanceDiff (store: obj) (workspaceRoot: string) (pathsRaw: obj) (baseline: string) : Task<obj> =
+        task {
+            let paths = stringsOf pathsRaw |> Array.toList
+
+            match! CasebookCapture.computeMaintenanceDiff (storeOf store) workspaceRoot paths baseline with
+            | Ok captured ->
+                return
+                    box
+                        {| hasDiff = captured.DiffSummary <> ""
+                           diffSummary = captured.DiffSummary
+                           targetState = captured.TargetState |}
+            | Error err -> return box {| ok = false; error = err |}
+        }
 
     let caseIdentityForInvocation (sessionId: string) (invocationId: string) : string =
         CasebookCapture.caseIdentityForInvocation sessionId invocationId

@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
@@ -94,6 +95,8 @@ module ManagerWorkflow =
         view |> Option.bind resourceForCurrentAction
 
     let private sendNudge
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal)
@@ -106,7 +109,9 @@ module ManagerWorkflow =
             else
                 Map.empty
 
-        HostSessionNudge.trySendGateContinuation
+        HostSessionNudge.trySendIdleGateContinuation
+            quiescence
+            permit
             sessionPort
             rootWorkspace
             turn.SessionId
@@ -116,8 +121,11 @@ module ManagerWorkflow =
             (Some journal)
             (resourcePath + ":" + ProviderRunIdentity.value turn.ProviderRun)
             turn.ProviderRun
+            PromptDispatcher.AwaitMode.Detached
 
     let private scheduleNudge
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal)
@@ -130,7 +138,7 @@ module ManagerWorkflow =
             | Some resourcePath ->
                 // Durable PromptAuthority gate is the sole dedupe/source of truth:
                 // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
-                let! _ = sendNudge sessionPort rootWorkspace journal turn resourcePath
+                let! _ = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
                 return ()
             | None -> return ()
         }
@@ -172,26 +180,10 @@ module ManagerWorkflow =
             RelayTransaction.create (invalidationEvents @ RelayTransaction.events opening.Transaction)
             |> Result.defaultValue opening.Transaction
 
-    /// ContinuousSessionAdvancesRoad is publication handoff (decideLoopOpening).
-    /// AuthorityRevisionAdvanced / RetirementBindingChanged race Host canary
-    /// authority clearance (032). Conflict / publish / workspace invalidations
-    /// must re-enter assess like Continue.
-    let private invalidationRequiresAssessLoop (reason: string option) =
-        match reason with
-        | Some "ContinuousSessionAdvancesRoad"
-        | Some "RetirementBindingChanged" -> false
-        | Some text when text.StartsWith("AuthorityRevisionAdvanced") -> false
-        | _ -> true
-
-    let private invalidatedAcceptedContinues (road: RoadView) (certId: QualityCertificateId) =
-        match road.Certificate with
-        | Some cert when cert.Id = certId && not cert.Valid -> invalidationRequiresAssessLoop cert.InvalidationReason
-        | _ -> false
-
     let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
         match retirement.Outcome with
         | RetirementOutcome.Continue -> true
-        | RetirementOutcome.Accepted certId -> invalidatedAcceptedContinues road certId
+        | RetirementOutcome.Accepted _ -> false
 
     let private isAcceptedWithValidCertificate (road: RoadView) (retirement: RetirementSummary) =
         match retirement.Outcome, road.Certificate with
@@ -272,14 +264,6 @@ module ManagerWorkflow =
             Some(durable, sessionId, opening.RoadId, fullTransaction)
         | RetirementOutcome.Continue -> None
 
-    /// Orchestrator-owned ManagerJob sessions publish through CandidateReady /
-    /// ContinueLoop. ContinuousSessionAdvancesRoad must not invalidate their
-    /// Accepted certificate before Orchestrator admits the candidate.
-    let private sessionOwnsOrchestratorJob (durable: AgentJournal) (sessionId: SessionId) =
-        (AgentJournal.snapshot durable).AgentProjections
-        |> AgentProjection.activeOrchestratorJobPairs
-        |> List.exists (fun (_, managerSessionId) -> managerSessionId = sessionId)
-
     let private decideLoopOpening journal (workspaceDirectory: string option) sessionIdTextOpt =
         sessionIdTextOpt
         |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
@@ -287,9 +271,7 @@ module ManagerWorkflow =
             journal
             |> Option.bind (fun durable ->
                 match tryAcceptedRoadContext durable sessionIdText with
-                | Some(_, sessionId, roadId, authorityRevision, retirement, true) when
-                    not (sessionOwnsOrchestratorJob durable sessionId)
-                    ->
+                | Some(_, sessionId, roadId, authorityRevision, retirement, true) ->
                     tryBuildAcceptedOpening durable workspaceDirectory sessionId roadId authorityRevision retirement
                 | _ -> None))
 
@@ -460,17 +442,19 @@ module ManagerWorkflow =
         }
 
     let observeIdle
+        (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (context: ReconciledTurnContext)
         : Task =
-        match journal, context.Failure, context.Turn.Outcome with
-        | Some durable, None, ReconcileProgram.TurnCompleted ->
-            scheduleNudge sessionPort rootWorkspace durable context.Turn
+        match journal, context.Failure, context.Turn.Outcome, context.Quiescence with
+        | Some durable, None, ReconcileProgram.TurnCompleted, Some permit ->
+            scheduleNudge quiescence permit sessionPort rootWorkspace durable context.Turn
         | _ -> Task.FromResult()
 
     let observe
+        (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
@@ -489,5 +473,6 @@ module ManagerWorkflow =
         // reason to stop. It earns the same bounded Interaction Repair as every
         // other repairable role instead of being silently dropped.
         | false, None, ReconcileProgram.TurnNeedsContinuation _ -> observeOrdinary context
-        | false, None, ReconcileProgram.TurnCompleted -> observeIdle sessionPort rootWorkspace journal context
+        | false, None, ReconcileProgram.TurnCompleted ->
+            observeIdle quiescence sessionPort rootWorkspace journal context
         | false, None, _ -> observeOrdinary context

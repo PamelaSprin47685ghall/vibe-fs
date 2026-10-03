@@ -12,6 +12,6 @@
 - 010 区分新建身份与历史解码。新反例覆盖 owner 派生旧名字被自动赋成 Engineer，以及伪造继承证据进入 authority；历史 Inspector 仍可按原角色解码且无写权。
 - 011 检查当前和历史角色的持久标签，不依赖会话关联等无关前置条件。
 
-当前待决与证据缺口见 GAP-067/068，新基线验证范围见[本批记录](../../../proposals/35模块PR施工记录-2026-09-28.md)。特别是共享解码入口是否允许历史身份进入全部活跃路径，不能由 010 的两个回归反例推断为已经全面关闭。
+当前待决与证据缺口见 GAP-067/068，新基线验证范围见[本批记录](../../../proposals/archive/2026-10-03/35模块PR施工记录-2026-09-28.md)。特别是共享解码入口是否允许历史身份进入全部活跃路径，不能由 010 的两个回归反例推断为已经全面关闭。
 
 节点验证先运行仓库构建，再将本包及受影响的 interaction-authority、dispatch-protocol、session-ontology、managed-session-lifecycle 和 requirement-system 编号测试交给 verification-system 的正式入口。以施工记录中的实际范围和结果为准。

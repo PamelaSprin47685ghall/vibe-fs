@@ -114,18 +114,6 @@ module HandleProjection =
         current: AgentLinkageProjection ->
             Result<AgentLinkageProjection, HandleTransitionRejection>
 
-    val replayLink:
-        handle: HandleId ->
-        childSessionId: SessionId ->
-        targetAgent: string ->
-        byname: string ->
-        role: Role ->
-        ownership: HandleOwnership ->
-        current: AgentLinkageProjection ->
-            Result<AgentLinkageProjection, HandleTransitionRejection>
-
-    val tryFindBindingByByname: byname: string -> AgentLinkageProjection -> HandleRecord option
-
     val complete:
         handle: HandleId ->
         completion: HandleCompletion ->
@@ -152,6 +140,7 @@ module HandleProjection =
     val isRetired: handle: HandleId -> current: AgentLinkageProjection -> bool
     val isAbandoned: handle: HandleId -> current: AgentLinkageProjection -> bool
     val tryFindByByname: byname: string -> current: AgentLinkageProjection -> HandleRecord option
+    val tryFindBindingByByname: byname: string -> current: AgentLinkageProjection -> HandleRecord option
     val auditListable: AgentLinkageProjection -> HandleRecord list
     val auditActiveHandles: AgentLinkageProjection -> HandleRecord list
     val listable: current: AgentLinkageProjection -> HandleRecord list

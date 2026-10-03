@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Strength
@@ -50,6 +51,9 @@ module ReadonlyDelegationContract =
 
     [<Emit("Object.getOwnPropertyDescriptor($0, $1)")>]
     let private getOwnPropertyDescriptor (target: obj) (key: obj) : obj = jsNative
+
+    [<Emit("Object.getOwnPropertyNames($0)")>]
+    let private ownPropertyNames (target: obj) : string array = jsNative
 
     [<Emit("Object.defineProperty($0, $1, $2)")>]
     let private defineProperty (target: obj) (key: obj) (descriptor: obj) : unit = jsNative
@@ -141,6 +145,14 @@ module ReadonlyDelegationContract =
             let conf = descriptor?configurable
             not (isNull conf) && unbox<bool> conf
 
+    let private requireRestorableKeyOrder (args: obj) (keys: string array) =
+        let canRestore =
+            keys
+            |> Array.forall (fun key -> descriptorConfigurableOrAbsent (getOwnPropertyDescriptor args key))
+
+        if not canRestore then
+            throwTypeError "Tool arguments cannot restore the readonly delegation fields' original key order"
+
     let private ensureFieldDeleted (args: obj) (field: string) =
         let deleted = deleteProperty args field
 
@@ -152,12 +164,8 @@ module ReadonlyDelegationContract =
             ensureFieldDeleted args field
 
     let private deleteProtocolFields (args: obj) : unit =
-        try
-            deleteProtocolField args roundsField
-            deleteProtocolField args noteField
-        with ex ->
-            deleteProperty args savedArgsKey |> ignore
-            raise ex
+        deleteProtocolField args roundsField
+        deleteProtocolField args noteField
 
     let private hideProtocolFields (args: obj) : unit =
         let roundsDescriptor = getOwnPropertyDescriptor args roundsField
@@ -170,7 +178,14 @@ module ReadonlyDelegationContract =
         then
             throwTypeError "Tool arguments cannot hold or modify the readonly delegation fields"
 
-        let saved = createObj [ "rounds", roundsDescriptor; "note", noteDescriptor ]
+        let keyOrder =
+            ownPropertyNames args
+            |> Array.skipWhile (fun key -> key <> roundsField && key <> noteField)
+
+        requireRestorableKeyOrder args keyOrder
+
+        let saved =
+            createObj [ "rounds", roundsDescriptor; "note", noteDescriptor; "keyOrder", box keyOrder ]
 
         let symbolDescriptor =
             createObj [ "value", saved; "enumerable", box false; "configurable", box true ]
@@ -188,20 +203,73 @@ module ReadonlyDelegationContract =
         if not (hasOwn args savedArgsKey) then
             hideProtocolFields args
 
-    let private restoreField (args: obj) (field: string) (descriptor: obj) : unit =
-        let restored =
-            if isNull descriptor then
-                deleteProperty args field
-            else
-                defineProperty args field descriptor
-                true
+    let private hasSavedArgs (args: obj) =
+        not (isNull args) && isPlainObject args && hasOwn args savedArgsKey
 
-        if not restored then
-            throwTypeError (sprintf "Failed to restore the readonly delegation field %s" field)
+    let private hasExactCallIdentity (owner: ProtocolArgumentCall) =
+        not (String.IsNullOrWhiteSpace(SessionId.value owner.SessionId))
+        && not (String.IsNullOrWhiteSpace(ToolCallId.value owner.ToolCallId))
+        && not (String.IsNullOrWhiteSpace owner.Tool)
+
+    let private bindCallOwner (owner: ProtocolArgumentCall option) (args: obj) =
+        match owner with
+        | Some call when hasExactCallIdentity call ->
+            let saved = args?(savedArgsKey)
+            saved?owner <- box call
+        | _ -> ()
+
+    let hideForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
+        let alreadyHidden = hasSavedArgs args
+        hide args
+
+        if not alreadyHidden then
+            bindCallOwner owner args
+
+    let private classifySavedCall (owner: ProtocolArgumentCall option) (saved: obj) =
+        match owner with
+        | Some call when
+            hasExactCallIdentity call
+            && hasOwn saved "owner"
+            && call = unbox<ProtocolArgumentCall> saved?owner
+            ->
+            HiddenProtocolArguments.SameCall
+        | _ -> HiddenProtocolArguments.DifferentCallOrChangedArguments
+
+    let classifyHiddenArguments (owner: ProtocolArgumentCall option) (args: obj) : HiddenProtocolArguments =
+        if not (hasSavedArgs args) then
+            HiddenProtocolArguments.NotHidden
+        elif
+            hasOwn args roundsField
+            || hasOwn args noteField
+            || hasOwn args "delegate_readonly_rounds"
+        then
+            HiddenProtocolArguments.DifferentCallOrChangedArguments
+        else
+            classifySavedCall owner args?(savedArgsKey)
+
+    let private restoredDescriptor (args: obj) (saved: obj) (field: string) =
+        if field = roundsField then saved?rounds
+        elif field = noteField then saved?note
+        else getOwnPropertyDescriptor args field
 
     let private restoreSavedFields (args: obj) (saved: obj) : unit =
-        restoreField args roundsField saved?rounds
-        restoreField args noteField saved?note
+        let keyOrder: string array = saved?keyOrder
+
+        let affectedKeys =
+            Array.append keyOrder [| roundsField; noteField |] |> Array.distinct
+
+        requireRestorableKeyOrder args affectedKeys
+
+        let descriptors =
+            keyOrder
+            |> Array.map (fun key -> key, restoredDescriptor args saved key)
+            |> Array.filter (fun (_, descriptor) -> not (isNull descriptor))
+
+        for key in affectedKeys do
+            deleteProtocolField args key
+
+        for key, descriptor in descriptors do
+            defineProperty args key descriptor
 
     let private restoreSavedArgs (args: obj) : unit =
         let saved = args?(savedArgsKey)
@@ -218,6 +286,14 @@ module ReadonlyDelegationContract =
 
     let restore (args: obj) : unit =
         if not (isNull args) && isPlainObject args && hasOwn args savedArgsKey then
+            restoreSavedArgs args
+
+    let private ownsSavedCall (owner: ProtocolArgumentCall option) (saved: obj) =
+        (owner.IsNone && not (hasOwn saved "owner"))
+        || classifySavedCall owner saved = HiddenProtocolArguments.SameCall
+
+    let restoreForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
+        if hasSavedArgs args && ownsSavedCall owner args?(savedArgsKey) then
             restoreSavedArgs args
 
     let private currentLanguage () =

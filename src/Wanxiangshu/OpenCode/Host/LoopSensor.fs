@@ -34,8 +34,18 @@ type LoopSensor
     /// DSL-cross-callback-proof: physical cancellation-token — active interruption/continuation tasks
     // DSL-MUTABLE: single-flight — active interrupt/continuation task tracking by exact run
     let activeInterrupts = Dictionary<string, ProviderRunIdentity * Task * Task>()
+    // DSL-MUTABLE: single-flight — attempted run identities survive effect failure and reconciliation.
+    let interruptAttempts = Dictionary<string, HashSet<ProviderRunIdentity>>()
 
     let keyOf (sessionId: SessionId) = SessionId.value sessionId
+
+    let interruptAttemptsFor sessionKey =
+        match interruptAttempts.TryGetValue sessionKey with
+        | true, runs -> runs
+        | _ ->
+            let runs = HashSet<ProviderRunIdentity>()
+            interruptAttempts.[sessionKey] <- runs
+            runs
 
     let executeWork (work: unit -> Task) : Task =
         match runOwnedWork with
@@ -64,12 +74,16 @@ type LoopSensor
         | Error reason ->
             observeDiagnostic "degeneration-guard" (baseFields @ [ "result", "failed"; "provider_error", reason ])
 
-    member private this.RemoveArmedIfRun(sessionId: SessionId, providerRun: ProviderRunIdentity) =
+    member private this.RemoveInterruptIfProxy(sessionId: SessionId, providerRun: ProviderRunIdentity, proxy: Task) =
         lock gate (fun () ->
             let key = keyOf sessionId
 
-            match armed.TryGetValue key with
-            | true, (_, storedRun) when storedRun = providerRun -> armed.Remove key |> ignore
+            match activeInterrupts.TryGetValue key with
+            | true, (storedRun, storedTask, _) when
+                storedRun = providerRun && Object.ReferenceEquals(storedTask, proxy)
+                ->
+                armed.Remove key |> ignore
+                activeInterrupts.Remove key |> ignore
             | _ -> ())
 
     member private this.RemoveActiveIfProxy(sessionId: SessionId, providerRun: ProviderRunIdentity, proxy: Task) =
@@ -105,8 +119,7 @@ type LoopSensor
             proxy: TaskCompletionSource<unit>
         ) =
         reportPhysicalOutcome "interrupt" sessionId kind (Error reason)
-        this.RemoveArmedIfRun(sessionId, providerRun)
-        this.RemoveActiveIfProxy(sessionId, providerRun, proxy.Task :> Task)
+        this.RemoveInterruptIfProxy(sessionId, providerRun, proxy.Task :> Task)
         proxy.SetResult(())
 
     member private this.ClassifyDegeneration state =
@@ -120,10 +133,16 @@ type LoopSensor
         : bool =
         lock gate (fun () ->
             let key = keyOf sessionId
+            let runs = interruptAttemptsFor key
 
-            if armed.ContainsKey key || activeInterrupts.ContainsKey key then
+            if
+                runs.Contains providerRun
+                || armed.ContainsKey key
+                || activeInterrupts.ContainsKey key
+            then
                 false
             else
+                runs.Add providerRun |> ignore
                 armed.[key] <- (kind, providerRun)
                 activeInterrupts.[key] <- (providerRun, publicTask, publicTask)
                 true)
@@ -399,7 +418,7 @@ type LoopSensor
     /// decide whether the reconciled run may take ownership. Tuple match keeps
     /// the whole state space in one flat decision.
     member private this.TryTakeArmedForContinue
-        (sessionId: SessionId, expectedRun: ProviderRunIdentity)
+        (sessionId: SessionId, expectedRun: ProviderRunIdentity, interrupt: Task)
         : (DegenerationKind * TaskCompletionSource<unit> * Task) option =
         lock gate (fun () ->
             let key = keyOf sessionId
@@ -407,18 +426,13 @@ type LoopSensor
             let activeFound, activeEntry = activeInterrupts.TryGetValue key
 
             match armedFound, armedEntry, activeFound, activeEntry with
-            | true, (kind, armedRun), true, (storedRun, _, _) when armedRun = expectedRun && storedRun = expectedRun ->
+            | true, (kind, armedRun), true, (storedRun, storedTask, _) when
+                armedRun = expectedRun
+                && storedRun = expectedRun
+                && Object.ReferenceEquals(storedTask, interrupt)
+                ->
                 armed.Remove key |> ignore
                 activeInterrupts.Remove key |> ignore
-
-                let proxy =
-                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                let publicTask = proxy.Task :> Task
-                activeInterrupts.[key] <- (expectedRun, publicTask, publicTask)
-                Some(kind, proxy, publicTask)
-            | true, (kind, armedRun), _, _ when armedRun = expectedRun ->
-                armed.Remove key |> ignore
 
                 let proxy =
                     TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -434,20 +448,31 @@ type LoopSensor
     /// never consumes the armed anomaly and never clears newer owned work.
     member this.ConsumeAbortCause
         (sessionId: SessionId, expectedRun: ProviderRunIdentity, directory: string option)
-        : AbortCause =
-        let consumed = this.TryTakeArmedForContinue(sessionId, expectedRun)
+        : Task<AbortCause> =
+        task {
+            let interrupted = this.ActiveInterruptTask(sessionId, expectedRun)
 
-        match consumed with
-        | None -> AbortCause.External
-        | Some(kind, proxy, publicTask) ->
-            this.StartContinueWork(sessionId, expectedRun, kind, directory, proxy, publicTask)
-            AbortCause.DegenerationGuard kind
+            match interrupted with
+            | Some interrupt -> do! interrupt
+            | None -> ()
+
+            let consumed =
+                interrupted
+                |> Option.bind (fun interrupt -> this.TryTakeArmedForContinue(sessionId, expectedRun, interrupt))
+
+            match consumed with
+            | None -> return AbortCause.External
+            | Some(kind, proxy, publicTask) ->
+                this.StartContinueWork(sessionId, expectedRun, kind, directory, proxy, publicTask)
+                return AbortCause.DegenerationGuard kind
+        }
 
     member _.DropSession(sessionId: SessionId) =
         lock gate (fun () ->
             let key = keyOf sessionId
             detectors.Remove key |> ignore
             armed.Remove key |> ignore
+            interruptAttempts.Remove key |> ignore
             activeInterrupts.Remove key |> ignore)
 
     /// Owned interrupt/continuation task for the exact requested run. A run

@@ -626,6 +626,14 @@ test('WHAT[context-compression-018] fresh binding without suppression history ad
       userOutput,
     )
 
+    runtime.pushHostMessage(sessionID, { info: userOutput.message, parts: userOutput.parts })
+    runtime.pushHostMessage(sessionID, {
+      info: { id: 'assistant-fresh-ordinary', sessionID, parentID: userMessageID,
+        role: 'assistant', agent: 'manager', providerID: 'provider', modelID: 'manager-model',
+        time: { created: 2 } },
+      parts: [],
+    })
+
     const providerOutput = {
       messages: [
         {

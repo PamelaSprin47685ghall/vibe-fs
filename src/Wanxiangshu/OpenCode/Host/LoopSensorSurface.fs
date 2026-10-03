@@ -123,16 +123,20 @@ module LoopSensorSurface =
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
-    let consumeAbortCause (sensor: obj) (session: string) (run: string) : obj =
-        match
-            (sensor :?> SensorHandle)
-                .Sensor.ConsumeAbortCause(SessionId.create session, ProviderRunIdentity.create run, None)
-        with
-        | AbortCause.External -> box {| cause = "External" |}
-        | AbortCause.DegenerationGuard kind ->
-            box
-                {| cause = "DegenerationGuard"
-                   anomaly = LoopSensor.kindName kind |}
+    let consumeAbortCause (sensor: obj) (session: string) (run: string) : Task<obj> =
+        task {
+            let! cause =
+                (sensor :?> SensorHandle)
+                    .Sensor.ConsumeAbortCause(SessionId.create session, ProviderRunIdentity.create run, None)
+
+            return
+                match cause with
+                | AbortCause.External -> box {| cause = "External" |}
+                | AbortCause.DegenerationGuard kind ->
+                    box
+                        {| cause = "DegenerationGuard"
+                           anomaly = LoopSensor.kindName kind |}
+        }
 
     /// Owned interrupt/continuation task for the exact requested run, exposed
     /// as an awaitable. Null when no task is owned for that run; a mismatched

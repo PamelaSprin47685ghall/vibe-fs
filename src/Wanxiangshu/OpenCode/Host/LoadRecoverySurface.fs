@@ -44,6 +44,9 @@ module LoadRecoverySurface =
         )
         |> List.toArray
 
+    let settleChildRuns (handle: JournalHandle) : Task<unit> =
+        ChildWorkRecovery.settleOrphanedChildRuns handle.Journal
+
     let private handlesOf state parent =
         (stateOf state).Projection.AgentProjections.Sessions
         |> Map.tryFind (SessionId.create parent)

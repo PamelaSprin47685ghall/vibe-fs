@@ -31,17 +31,16 @@ open Wanxiangshu.Foundation.Identity
 /// supplies a physical Host boundary for executable requirement proofs.
 module ForkToolSurface =
 
-    // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter, module-level
-    // so a reopened harness runtime never re-mints an id the journal already settled
-    let private physicalSequence = ref 0
+    type private TerminalSubscription =
+        { Listener: TerminalCompletionListener }
 
-    type private ForkSessionPort() =
+    type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>) =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
         // DSL-MUTABLE: algorithm-scratch — pre-accepted prompt count in the harness
         let mutable preAcceptedPrompts = 0
-        let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
+        let listeners = Dictionary<string, ResizeArray<TerminalSubscription>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
 
         let promptWaiters =
@@ -57,6 +56,9 @@ module ForkToolSurface =
         let mutable nextSendOutcome: SendOutcome option = None
         // DSL-MUTABLE: algorithm-scratch — Host AbortSession call count in the harness
         let mutable abortCount = 0
+        // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
+        let physicalSequence = ref 0
+        let physicalNamespace = Guid.NewGuid().ToString("N")
 
         let historyOf (source: Dictionary<string, ResizeArray<string>>) key =
             match source.TryGetValue key with
@@ -137,18 +139,25 @@ module ForkToolSurface =
                 match listeners.TryGetValue key with
                 | true, values -> values
                 | false, _ ->
-                    let values = ResizeArray<TerminalCompletionListener>()
+                    let values = ResizeArray<TerminalSubscription>()
                     listeners[key] <- values
                     values
 
-            registrations.Add listener
+            let registration = { Listener = listener }
+            registrations.Add registration
 
             { new IDisposable with
-                member _.Dispose() = registrations.Remove listener |> ignore }
+                member _.Dispose() =
+                    let index =
+                        registrations.FindIndex(fun candidate -> obj.ReferenceEquals(candidate, registration))
+
+                    if index >= 0 then
+                        registrations.RemoveAt index }
 
         member _.LatestChild = latestChild ()
 
         member _.ChildCount = children.Count
+        member _.TerminalListenerCount = listeners.Values |> Seq.sumBy _.Count
 
         member _.PromptCount(sessionId: SessionId) =
             promptCountForKey (SessionId.value sessionId)
@@ -180,13 +189,18 @@ module ForkToolSurface =
                 emittedWaiters.Add(count, waiter)
                 waiter.Task :> Task
 
+        member _.AcceptNextPrompt() =
+            preAcceptedPrompts <- preAcceptedPrompts + 1
+
         member _.AcceptPrompt(sessionId: SessionId, index: int) =
             let key = SessionId.value sessionId
 
             match pendingAcceptances.TryGetValue key with
             | true, values when index >= 0 && index < values.Count ->
                 physicalSequence.Value <- physicalSequence.Value + 1
-                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                let physical =
+                    sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
 
                 if
                     AsyncSupport.trySetResult
@@ -200,7 +214,9 @@ module ForkToolSurface =
             | true, values when values.Count > 0 ->
                 let lastIndex = values.Count - 1
                 physicalSequence.Value <- physicalSequence.Value + 1
-                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                let physical =
+                    sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
 
                 if
                     AsyncSupport.trySetResult
@@ -231,8 +247,8 @@ module ForkToolSurface =
         member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
             match listeners.TryGetValue(SessionId.value sessionId) with
             | true, registrations ->
-                for listener in registrations |> Seq.toList do
-                    listener sessionId outcome
+                for registration in registrations |> Seq.toList do
+                    registration.Listener sessionId outcome
             | false, _ -> ()
 
         interface ISessionHostPort with
@@ -253,7 +269,10 @@ module ForkToolSurface =
                 | None when preAcceptedPrompts > 0 ->
                     preAcceptedPrompts <- preAcceptedPrompts - 1
                     physicalSequence.Value <- physicalSequence.Value + 1
-                    let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                    let physical =
+                        sprintf "fork-physical-%s-%d" physicalNamespace physicalSequence.Value
+
                     historyOf physicalRoots key |> fun roots -> roots.Add physical
                     Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
                 | None ->
@@ -263,9 +282,9 @@ module ForkToolSurface =
                     acceptancesOf key |> fun values -> values.Add acceptance
                     acceptance.Task
 
-            member _.AbortSession _ =
+            member _.AbortSession sessionId =
                 abortCount <- abortCount + 1
-                Task.FromResult(Ok())
+                abortSession sessionId
 
             member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.IsManagedChild _ = true
@@ -420,7 +439,7 @@ module ForkToolSurface =
                         )
         }
 
-    let createRuntime (directory: string) (owners: obj) : Task<obj> =
+    let private createRuntimeUsingAbort directory owners abortSession cancelSignals : Task<obj> =
         emitJsExpr () "process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'" |> ignore
 
         task {
@@ -443,7 +462,7 @@ module ForkToolSurface =
             for (sessionId, _, _, agent) in admissions do
                 ownerAgents.Add(SessionId.value sessionId, agent)
 
-            let sessionPort = ForkSessionPort()
+            let sessionPort = ForkSessionPort(abortSession)
             let sessions = sessionPort :> ISessionHostPort
 
             let childWorkRecordForRun sessionId range providerRun =
@@ -475,7 +494,7 @@ module ForkToolSurface =
                     None,
                     None,
                     None,
-                    None,
+                    cancelSignals,
                     childWorkRecordForRun = childWorkRecordForRun,
                     workRecordCapability = workRecordCapability
                 )
@@ -484,6 +503,34 @@ module ForkToolSurface =
 
             return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
         }
+
+    let createRuntime (directory: string) (owners: obj) : Task<obj> =
+        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok())) None
+
+    let createRuntimeWithCancelSignals
+        (directory: string)
+        (owners: obj)
+        (cancelSignals: string array -> unit)
+        : Task<obj> =
+        createRuntimeUsingAbort
+            directory
+            owners
+            (fun _ -> Task.FromResult(Ok()))
+            (Some(fun sessionIds -> sessionIds |> Seq.map SessionId.value |> Seq.toArray |> cancelSignals))
+
+    let createRuntimeWithAbort (directory: string) (owners: obj) (abortSession: string -> Task<obj>) : Task<obj> =
+        let abort sessionId =
+            task {
+                let! result = abortSession (SessionId.value sessionId)
+
+                return
+                    if unbox<bool> result?ok then
+                        Ok()
+                    else
+                        Error(string result?error)
+            }
+
+        createRuntimeUsingAbort directory owners abort None
 
     let private managerContext (harness: ForkHarness) owner =
         { SessionId = SessionId.value (harness.OwnerSession owner)
@@ -616,6 +663,12 @@ module ForkToolSurface =
         | Some childId -> harness.Sessions.AcceptPrompt(childId, index)
         | None -> harness.Sessions.AcceptPrompt(SessionId.create "", index)
 
+    let acceptNextPrompt (value: obj) =
+        (unbox<ForkHarness> value).Sessions.AcceptNextPrompt()
+
+    let terminalListenerCount (value: obj) =
+        (unbox<ForkHarness> value).Sessions.TerminalListenerCount
+
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value
 
@@ -645,26 +698,6 @@ module ForkToolSurface =
 
         AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
         |> HandleProjection.tryFindByByname byname
-        |> Option.map (fun record ->
-            match record.Lifecycle with
-            | HandleLifecycle.Active -> "Active"
-            | HandleLifecycle.CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
-            | HandleLifecycle.Abandoned _ -> "Abandoned"
-            | HandleLifecycle.Retired -> "Retired")
-        |> Option.map box
-        |> Option.defaultValue null
-
-    /// The binding's own durable lifecycle — unlike `durableLifecycleByname`,
-    /// whose provider summary folds work-unit state into the view (an
-    /// abandoned work unit masquerades as an Abandoned handle there). The
-    /// fixed DevOps binding stays Active across work-unit terminals
-    /// (managed-session-lifecycle-024), so callers asserting the binding's
-    /// own lifecycle must read it here.
-    let durableBindingLifecycleByname (value: obj) (owner: string) (byname: string) : obj =
-        let harness = unbox<ForkHarness> value
-
-        AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
-        |> HandleProjection.tryFindBindingByByname byname
         |> Option.map (fun record ->
             match record.Lifecycle with
             | HandleLifecycle.Active -> "Active"
@@ -740,6 +773,44 @@ module ForkToolSurface =
                             match! runtime.AwaitCurrentWorkRecord agent.AgentId with
                             | Ok _ -> return true
                             | Error _ -> return false
+        }
+
+    let prepareTerminalDelivery (value: obj) (owner: string) (answer: string) (providerRun: string) =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                let projection =
+                    AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+
+                match
+                    HandleProjection.tryFindByChildSession childId projection,
+                    harness.Sessions.LatestAuthorityRoot childId
+                with
+                | Some binding, Some root ->
+                    do! captureTraceText harness.Journal childId providerRun answer
+
+                    return
+                        fun () ->
+                            task {
+                                harness.Sessions.Notify(
+                                    childId,
+                                    TerminalOutcome.Completed
+                                        { SessionId = childId
+                                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                                          ProviderRun = ProviderRunIdentity.create providerRun
+                                          Role = binding.CanonicalRole
+                                          Directory = None
+                                          TerminalText = answer
+                                          TurnFormalText = answer }
+                                )
+
+                                do! runtime.AwaitObservedWork()
+                            }
+                            :> Task
+                | _ -> return invalidOp "no accepted child work for terminal delivery"
+            | _ -> return invalidOp "no owned runtime for terminal delivery"
         }
 
     let private workView (record: HandleRecord) : obj =

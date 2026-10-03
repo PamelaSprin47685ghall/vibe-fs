@@ -21,3 +21,5 @@ test('WHAT[institutional-learning-005] GAP-181: BIRTH requires a future-recogniz
   assert.equal(learning.evaluate('a mechanism', ['known-rule'], { ...candidate, trigger: '' }).disposition, 'DISCARD')
   assert.equal(learning.evaluate('a mechanism', ['known-rule'], { ...candidate, negative: ' ' }).disposition, 'DISCARD')
 })
+
+test.todo('WHAT[institutional-learning-005] GAP-181: review and exercise meaningful BIRTH candidates against trigger, distinction, novelty and attention-cost boundaries')

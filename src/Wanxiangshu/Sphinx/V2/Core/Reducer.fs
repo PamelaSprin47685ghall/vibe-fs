@@ -693,7 +693,7 @@ module Reducer =
                     Status = InquiryStatus.InputRequired reason }
         | _ -> Error(coreError "unknown-status" (sprintf "unknown inquiry status: %s" status))
 
-    let private cancellingUnlessTerminal status =
+    let private statusAfterCancelRequest status =
         if InquiryState.isTerminal status then
             status
         else
@@ -731,7 +731,7 @@ module Reducer =
             // A late request may be booked, but never resurrects a terminal inquiry.
             Ok
                 { state with
-                    Status = cancellingUnlessTerminal state.Status }
+                    Status = statusAfterCancelRequest state.Status }
         | InquiryEventBody.InquiryCancelled reason ->
             Ok
                 { state with
@@ -770,6 +770,36 @@ module Reducer =
         | false, InquiryEventBody.InquiryCreated created -> emptyState event created
         | false, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
 
+    let private validateTransitionParent
+        (prior: InquiryState option)
+        (batch: TransitionBatch)
+        : Result<unit, CoreError> =
+        match prior with
+        | None when
+            batch.PreviousHead.IsSome
+            || batch.PreviousRevision <> Revision.origin
+            || batch.Revision <> Revision.origin
+            ->
+            Error(coreError "invalid-origin" "creation has no parent and uses revision zero")
+        | None -> Ok()
+        | Some state when state.Id <> batch.InquiryId ->
+            Error(coreError "inquiry-mismatch" "transition belongs to another inquiry")
+        | Some state when state.EventHead <> batch.PreviousHead ->
+            Error(coreError "parent-conflict" "transition parent does not name its base state")
+        | Some state when
+            state.Revision <> batch.PreviousRevision
+            || Revision.value state.Revision = Int64.MaxValue
+            || batch.Revision <> Revision.next state.Revision
+            ->
+            Error(coreError "revision-conflict" "one atomic transition must advance its parent's revision exactly once")
+        | Some state when Map.containsKey batch.CommandId state.CommandReceipts ->
+            Error(
+                coreError
+                    "command-already-applied"
+                    "a committed command must be replayed through admission, not applied again"
+            )
+        | Some _ -> Ok()
+
     let private transitionBase (prior: InquiryState option) (batch: TransitionBatch) : Result<unit, CoreError> =
         if batch.SchemaVersion <> "2" then
             Error(coreError "unsupported-transition" "strict transitions require Sphinx API version 2")
@@ -781,35 +811,7 @@ module Reducer =
         elif List.isEmpty batch.Events then
             Error(coreError "empty-batch" "transition must carry at least one body")
         else
-            match prior with
-            | None when
-                batch.PreviousHead.IsSome
-                || batch.PreviousRevision <> Revision.origin
-                || batch.Revision <> Revision.origin
-                ->
-                Error(coreError "invalid-origin" "creation has no parent and uses revision zero")
-            | None -> Ok()
-            | Some state when state.Id <> batch.InquiryId ->
-                Error(coreError "inquiry-mismatch" "transition belongs to another inquiry")
-            | Some state when state.EventHead <> batch.PreviousHead ->
-                Error(coreError "parent-conflict" "transition parent does not name its base state")
-            | Some state when
-                state.Revision <> batch.PreviousRevision
-                || Revision.value state.Revision = Int64.MaxValue
-                || batch.Revision <> Revision.next state.Revision
-                ->
-                Error(
-                    coreError
-                        "revision-conflict"
-                        "one atomic transition must advance its parent's revision exactly once"
-                )
-            | Some state when Map.containsKey batch.CommandId state.CommandReceipts ->
-                Error(
-                    coreError
-                        "command-already-applied"
-                        "a committed command must be replayed through admission, not applied again"
-                )
-            | Some _ -> Ok()
+            validateTransitionParent prior batch
 
     /// All bodies share the envelope identity and one revision. Intermediate values
     /// are private; the receipt and head are published only after every body succeeds.

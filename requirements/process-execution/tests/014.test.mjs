@@ -34,12 +34,29 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
   assert.equal(parsed.exit_code, control.exit_code, 'log content cannot alter the trusted field or its representation')
   assert.equal(String(parsed.exit_code), '7', 'the actual exit code must survive the forged log field')
   assert.equal(parsed.policy, undefined, 'quoted output must not create policy fields')
-  assert.ok(parsed.output.startsWith(raw), 'hostile data is carried inside the output field')
+  assert.equal(parsed.output, raw, 'hostile data survives unchanged inside the output field')
 })
 
-test('WHAT[process-execution-014] multiline raw output round-trips without changing its value', { todo: 'GAP-081: the common TOML writer adds LF to multiline strings' }, () => {
-  const raw = 'first\r\nsecond\n'
-  assert.equal(parseDocument(formatSpooledOutcome(7, raw)).output, raw)
+test('WHAT[process-execution-014] actual spooled output round-trips every raw text value', async (context) => {
+  const samples = [
+    ['empty', ''],
+    ['no trailing LF', 'first\nsecond'],
+    ['trailing LF', 'first\nsecond\n'],
+    ['multiple trailing LF', 'first\nsecond\n\n'],
+    ['CRLF', 'first\r\nsecond\r\n'],
+    ['lone CR', 'first\rsecond\r'],
+    ['quotes and backslashes', '"double" \'single\' \'\'\' C:\\repo\\file\n'],
+    ['literal quotes and Unicode', "中文 😀 '' C:\\repo\\file\n"],
+    ['control characters', 'first\n\u0000\u0007\u007f\t\n'],
+  ]
+  for (const [name, raw] of samples) {
+    await context.test(name, () => {
+      const parsed = parseDocument(formatSpooledOutcome(7, raw))
+      assert.equal(parsed.output, raw)
+      assert.equal(parsed.exit_code, 7)
+      assert.equal(parsed.policy, undefined)
+    })
+  }
 })
 
 test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and_keeps_raw_output_as_data', async () => {
