@@ -214,7 +214,18 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
     }
 
     try {
+      const root = join(tmpLogDir, 'repository')
+      for (const directory of ['src', 'scripts', 'requirements', 'resources']) {
+        mkdirSync(join(root, directory), { recursive: true })
+        writeFileSync(join(root, directory, 'input.txt'), `${directory}\n`)
+      }
+      for (const args of [['init', '--quiet', root], ['-C', root, 'add', '.']]) {
+        const git = spawnSync('git', args, { encoding: 'utf8' })
+        assert.ifError(git.error)
+        assert.equal(git.status, 0, git.stderr)
+      }
       const result = await verify({
+        root,
         release: false,
         runStep: fakeRunStep,
         output: sink,
@@ -222,10 +233,15 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
       assert.equal(result.exitCode, 1)
       assert.equal(result.outcome, 'fail')
+      assert.equal(result.failureReason, `step-failed:${failingLabel}`)
       assert.equal(spawned.at(-1), failingLabel, `execution must stop after ${failingLabel}`)
 
       const failedIdx = result.steps.findIndex((s) => s.label === failingLabel)
       assert.ok(failedIdx >= 0)
+      assert.deepEqual(spawned, verificationSteps({ root }).slice(0, failedIdx + 1).map(step => step.label))
+      for (const step of result.steps.slice(0, failedIdx)) {
+        assert.equal(step.status, 'ok')
+      }
       assert.equal(result.steps[failedIdx].status, 'failed')
       for (let i = failedIdx + 1; i < result.steps.length; i++) {
         assert.equal(result.steps[i].status, 'not-run', `step ${result.steps[i].label} must be marked not-run`)

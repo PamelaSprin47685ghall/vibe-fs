@@ -293,8 +293,139 @@ test('WHAT[speculative-investigation-009] replica request never ends on an assis
     assert.match(outcome.output.at(-1).parts[0].text, /read-only investigation|只读查证/)
   }
   assert.equal(first.output.at(-1).info.id, second.output.at(-1).info.id)
+  assert.deepEqual(first.output, second.output, 'the entire projection is stable for the same input and language')
   // A mirror already ending on a user turn is left alone.
   const fresh = await Strength.transformApply(H, runtime, { messages: [user('u9', 'replica-tail', [hostText('Continue.')])] }, false)
   assert.deepEqual(fresh.output.map((message) => message.info.role), ['user'])
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+const Events = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+const Status = await import('../../../dist/Execution/Session/ChatExecution/StatusSurface.js')
+const { refreshGlobalLanguage } = await import('../../../dist/Participant/Provider/LanguageSurface.js')
+const { withPreference } = await import('../../provider-language/tests/support/language-fixtures.mjs')
+const { readdirSync, readFileSync } = await import('node:fs')
+const { join } = await import('node:path')
+
+const facts = directory => readdirSync(join(directory, '.git', 'wanxiang', 'events'))
+  .filter(name => name.endsWith('.ndjson'))
+  .flatMap(name => readFileSync(join(directory, '.git', 'wanxiang', 'events', name), 'utf8').trim().split('\n'))
+  .filter(Boolean)
+  .map(line => JSON.parse(line))
+const user = (sessionID, id, parts) => ({ info: { sessionID, id, role: 'user' }, parts })
+const assistant = (sessionID, parentID, id, created, parts = []) => ({
+  info: { sessionID, parentID, id, role: 'assistant', time: { created } }, parts,
+})
+const tool = callID => ({
+  type: 'tool', tool: 'read', callID,
+  state: { status: 'completed', input: { filePath: 'a', estimated_readonly_rounds: 2 }, output: 'alpha' },
+})
+
+test('WHAT[speculative-investigation-009] registered Replica hook closes the provider projection without admitting a synthetic physical input', async () => {
+  const previousPredictor = globalThis.__wanxiangshu_test_predictor_state
+  globalThis.__wanxiangshu_test_predictor_state = 'configured'
+  try {
+    await withPreference('en', async () => {
+      refreshGlobalLanguage()
+      await withExecutablePlugin(async (hooks, directory, _created, runtime) => {
+        const owner = 'owner-closing-turn'
+        const physical = 'owner-closing-physical'
+        await acceptAuthorityRoot(runtime, owner, 'engineer', physical)
+        const ownerUser = user(owner, physical, [{ type: 'text', text: 'inspect the file' }])
+        await hooks['chat.message']({ sessionID: owner, messageID: physical, agent: 'engineer' }, { message: ownerUser, parts: ownerUser.parts })
+        const source = assistant(owner, physical, 'owner-closing-source', 1, [tool('owner-call')])
+        source.info.time.completed = 2
+        const target = assistant(owner, physical, 'owner-closing-target', 3)
+        for (const message of [ownerUser, source, target]) runtime.pushHostMessage(owner, message)
+
+        let observeBootstrap
+        const bootstrapSeen = new Promise(resolve => { observeBootstrap = resolve })
+        const recordPrompt = runtime.prompts.push.bind(runtime.prompts)
+        runtime.prompts.push = (...prompts) => {
+          const count = recordPrompt(...prompts)
+          for (const prompt of prompts) {
+            if (prompt.body?.agent?.toLowerCase() === 'engineer' && prompt.path?.id !== owner) observeBootstrap(prompt)
+          }
+          return count
+        }
+        const pending = hooks['experimental.chat.messages.transform']({}, { messages: [ownerUser, source, target] })
+        const pendingSettled = Promise.allSettled([pending])
+        let replica, response
+        try {
+          const bootstrap = await Promise.race([bootstrapSeen, pending.then(() => { throw new Error('delegation returned without a Replica bootstrap') })])
+          replica = bootstrap.path.id
+          const landing = runtime.messages.find(message => message.role === 'user' && message.id.startsWith(`msg-${replica}-`))
+          assert.ok(landing, 'the actual managed bootstrap has physical Host evidence')
+          const admission = user(replica, landing.id, landing.parts)
+          await hooks['chat.message']({ sessionID: replica, messageID: landing.id, agent: 'engineer' }, { message: admission, parts: admission.parts })
+          response = assistant(replica, landing.id, 'replica-closing-response', 4)
+          runtime.pushHostMessage(replica, response)
+          const before = facts(directory)
+          const promptsBefore = runtime.prompts.length
+          const input = () => ({ messages: [structuredClone(admission)] })
+          const first = input()
+          await hooks['experimental.chat.messages.transform']({}, first)
+          const tail = first.messages.at(-1)
+          assert.equal(tail.info.role, 'user')
+          assert.notEqual(tail.info.id, landing.id)
+          assert.match(tail.parts[0].text, /read-only investigation/)
+          const repeat = input()
+          await hooks['experimental.chat.messages.transform']({}, repeat)
+          assert.deepEqual(repeat, first)
+          await withPreference('zh-CN', async () => {
+            refreshGlobalLanguage()
+            const changed = input()
+            await hooks['experimental.chat.messages.transform']({}, changed)
+            assert.deepEqual(changed.messages.slice(0, -1), first.messages.slice(0, -1))
+            assert.equal(changed.messages.at(-1).info.id, tail.info.id)
+            assert.match(changed.messages.at(-1).parts[0].text, /只读查证/)
+            assert.notEqual(changed.messages.at(-1).parts[0].text, tail.parts[0].text)
+          })
+          refreshGlobalLanguage()
+          assert.equal(runtime.prompts.length, promptsBefore, 'provider projection never dispatches a new physical prompt')
+          assert.equal(Status.query(runtime.journal, replica, tail.info.id).accepted, false)
+          assert.deepEqual(Status.query(runtime.journal, replica, landing.id), { accepted: true, providerStarted: true, terminal: false, disposition: null })
+          const priorFacts = new Set(before.map(row => JSON.stringify(row)))
+          const newFacts = facts(directory).filter(row => !priorFacts.has(JSON.stringify(row)))
+          assert.equal(newFacts.some(row => JSON.stringify(row.payload).includes(tail.info.id)), false,
+            'the provider-only user row is not durable acceptance or dispatch evidence')
+
+          response.parts.push({
+            type: 'tool', tool: 'js-predictor', callID: 'replica-call',
+            state: { status: 'completed', input: { code: 'read("a")', estimated_readonly_rounds: 0 }, output: 'alpha' },
+          })
+          response.info.time.completed = 5
+          const completed = response
+          response = assistant(replica, landing.id, 'replica-closing-followup', 6)
+          runtime.pushHostMessage(replica, response)
+          await hooks['experimental.chat.messages.transform']({}, { messages: [structuredClone(admission), structuredClone(completed)] })
+          assert.equal(runtime.abortedIds.filter(id => id === replica).length, 0,
+            'repeated projections and language changes leave the second authorized request available')
+          assert.equal(runtime.prompts.length, promptsBefore)
+          response.parts.push({ type: 'text', text: 'finished under the original physical input' })
+          response.info.time.completed = 7
+          Events.notify(runtime.terminalPort, replica, 'Completed', response.info.id, 'finished')
+          const results = await pendingSettled
+          assert.equal(results[0].status, 'fulfilled', results[0].reason?.message)
+          const prepared = facts(directory).filter(row => row.event_type === 'StrengthCandidatePrepared')
+          assert.equal(prepared.length, 1, 'the original physical completion resolves exactly one owner decision')
+          assert.equal(Status.query(runtime.journal, replica, tail.info.id).accepted, false)
+        } finally {
+          if (replica && response) {
+            response.parts.push({ type: 'text', text: 'finished' })
+            response.info.time.completed = 8
+            Events.notify(runtime.terminalPort, replica, 'Completed', response.info.id, 'finished')
+          }
+          await pendingSettled
+        }
+      })
+    })
+  } finally {
+    globalThis.__wanxiangshu_test_predictor_state = previousPredictor
+    refreshGlobalLanguage()
+  }
 })
 }

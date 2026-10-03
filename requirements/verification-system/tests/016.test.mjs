@@ -2,16 +2,19 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { Header } from 'tar'
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
 import { verify } from '../../../scripts/verify.mjs'
 
-function setupFixtureRepo() {
+function setupFixtureRepo(objectFormat = 'sha1') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-inputs-fixture-'))
 
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true })
@@ -28,9 +31,410 @@ function setupFixtureRepo() {
   fs.writeFileSync(path.join(dir, '.github/workflows/ci.yml'), 'name: CI\n')
   fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"fixture"}\n')
   fs.writeFileSync(path.join(dir, 'package-lock.json'), '{"lockfileVersion":3}\n')
-  execFileSync('git', ['init', '--quiet', dir])
+  execFileSync('git', ['init', '--quiet', `--object-format=${objectFormat}`, dir])
 
   return dir
+}
+
+const prepareSource = async options => (await import('../../../scripts/lib/verification-source-candidate.mjs')).prepareGitSourceCandidate(options)
+const fixtureGit = (root, ...args) => execFileSync('git', ['-C', root, ...args]).toString().trim()
+
+function dependencyArchive(root, members) {
+  const blocks = []
+  for (const member of members) {
+    const bytes = Buffer.from(member.bytes ?? '')
+    const header = new Header({ path: member.path, type: member.type ?? 'File', mode: member.mode ?? 0o644, size: bytes.length, linkpath: member.target })
+    header.encode()
+    blocks.push(header.block, bytes, Buffer.alloc((512 - bytes.length % 512) % 512))
+  }
+  blocks.push(Buffer.alloc(1024))
+  const archivePath = path.join(root, 'dependencies.tar')
+  fs.writeFileSync(archivePath, Buffer.concat(blocks))
+  return { archivePath, archiveSha256: computeFileDigest(fs.readFileSync(archivePath)) }
+}
+
+function computeFileDigest(bytes) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
+
+const prepareDependencies = async options => (await import('../../../scripts/lib/verification-dependency-candidate.mjs')).prepareVerificationDependencies(options)
+const dependencyMembers = () => [
+  { path: 'node_modules/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/.package-lock.json', bytes: '{"hidden":true}\n' },
+  { path: 'node_modules/demo/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/demo/package.json', bytes: '{"type":"module","exports":"./index.js"}' },
+  { path: 'node_modules/demo/index.js', bytes: 'export default 42\n' },
+  { path: 'node_modules/demo/cli.js', bytes: '#!/usr/bin/env node\n', mode: 0o755 },
+  { path: 'node_modules/.bin/', type: 'Directory', mode: 0o755 },
+  { path: 'node_modules/.bin/demo', type: 'SymbolicLink', target: '../demo/cli.js' },
+]
+
+test('WHAT[verification-system-016] explicit dependency archive identity preserves complete bytes modes and internal links independently of its origin', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-candidate-parent-'))
+  const candidates = []
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    for (let i = 0; i < 2; i++) candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    assert.equal(candidates[0].dependencyDigest, candidates[1].dependencyDigest)
+    assert.notEqual(candidates[0].dependencyRoot, candidates[1].dependencyRoot)
+    fs.unlinkSync(archive.archivePath)
+    fs.writeFileSync(path.join(fixture, 'package-lock.json'), 'changed after selection')
+    const candidate = candidates[0]
+    assert.equal(candidate.lockfileSha256, computeFileDigest(Buffer.from('{"lockfileVersion":3}\n')))
+    assert.equal(candidate.archiveSha256, archive.archiveSha256)
+    assert.equal(candidate.entries.length, 8)
+    assert.equal(fs.readFileSync(path.join(candidate.dependencyRoot, 'node_modules/.package-lock.json'), 'utf8'), '{"hidden":true}\n')
+    assert.deepEqual(fs.readFileSync(path.join(candidate.dependencyRoot, 'node_modules/demo/index.js')), Buffer.from('export default 42\n'))
+    assert.equal(fs.statSync(path.join(candidate.dependencyRoot, 'node_modules/demo/cli.js')).mode & 0o777, 0o755)
+    assert.equal(fs.readlinkSync(path.join(candidate.dependencyRoot, 'node_modules/.bin/demo')), '../demo/cli.js')
+    assert.equal(fs.realpathSync(path.join(candidate.dependencyRoot, 'node_modules/.bin/demo')), path.join(candidate.dependencyRoot, 'node_modules/demo/cli.js'))
+    const result = execFileSync(process.execPath, ['--input-type=module', '-e', 'console.log((await import("demo")).default)'], { cwd: candidate.dependencyRoot, env: { ...process.env, NODE_PATH: '' } }).toString()
+    assert.equal(result, '42\n')
+    candidate.dispose()
+    candidate.dispose()
+    assert.equal(fs.existsSync(candidate.dependencyRoot), false)
+  } finally {
+    for (const candidate of candidates) candidate.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency preparation rejects an unselected archive and binds lockfile and executable bytes to identity', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-identity-parent-'))
+  const candidates = []
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive, archiveSha256: '0'.repeat(64) }), { code: 'dependency-candidate-integrity-invalid' })
+    assert.deepEqual(fs.readdirSync(parent), [])
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    fs.writeFileSync(path.join(fixture, 'package-lock.json'), '{"lockfileVersion":3,"changed":true}\n')
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }))
+    assert.notEqual(candidates[0].dependencyDigest, candidates[1].dependencyDigest)
+    const changed = dependencyMembers()
+    changed.find(member => member.path === 'node_modules/demo/index.js').bytes = 'export default 43\n'
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, changed) }))
+    assert.notEqual(candidates[1].dependencyDigest, candidates[2].dependencyDigest)
+    const modeChanged = dependencyMembers()
+    modeChanged.find(member => member.path === 'node_modules/demo/index.js').mode = 0o755
+    candidates.push(await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, modeChanged) }))
+    assert.notEqual(candidates[1].dependencyDigest, candidates[3].dependencyDigest)
+  } finally {
+    for (const candidate of candidates) candidate.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency archives reject external dangling cyclic aliasing and special entries without publishing or escaping their owned root', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-invalid-parent-'))
+  try {
+    const cases = [
+      { path: 'node_modules/escape', type: 'SymbolicLink', target: '../../outside' },
+      { path: 'node_modules/absolute', type: 'SymbolicLink', target: path.join(fixture, 'resources/r.txt') },
+      { path: 'node_modules/missing', type: 'SymbolicLink', target: 'absent' },
+      { path: 'node_modules/cycle', type: 'SymbolicLink', target: 'cycle' },
+      { path: 'node_modules/demo/index.js', bytes: 'duplicate' },
+      { path: 'node_modules/../outside', bytes: 'escaped' },
+      { path: 'node_modules/demo/hard', type: 'Link', target: 'node_modules/demo/index.js' },
+      { path: 'node_modules/pipe', type: 'FIFO' },
+      { path: 'node_modules/device', type: 'CharacterDevice' },
+      { path: 'node_modules/ambiguous', type: 'SymbolicLink', target: 'demo/../demo/index.js' },
+      { path: 'node_modules/suid', mode: 0o4644, bytes: 'special permissions' },
+      { path: 'node_modules/.bin/demo/nested', bytes: 'symlink parent' },
+    ]
+    for (const invalid of cases) {
+      await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...dependencyArchive(fixture, [...dependencyMembers(), invalid]) }), { code: 'dependency-candidate-entry-invalid' }, JSON.stringify(invalid))
+      assert.deepEqual(fs.readdirSync(parent), [])
+      assert.equal(fs.readFileSync(path.join(fixture, 'resources/r.txt'), 'utf8'), 'resource\n')
+    }
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] dependency preparation fully consumes compressed archives and refuses malformed or truncated input and linked lockfiles', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-parser-parent-'))
+  let candidate
+  try {
+    const archive = dependencyArchive(fixture, dependencyMembers())
+    const tarBytes = fs.readFileSync(archive.archivePath)
+    const compressed = gzipSync(tarBytes)
+    fs.writeFileSync(archive.archivePath, compressed)
+    candidate = await prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, archivePath: archive.archivePath, archiveSha256: computeFileDigest(compressed) })
+    assert.equal(candidate.archiveSha256, computeFileDigest(compressed))
+    candidate.dispose()
+    for (const invalid of [Buffer.from('not tar'), compressed.subarray(0, compressed.length - 12), tarBytes.subarray(0, 1900), tarBytes.subarray(0, tarBytes.length - 1024), Buffer.concat([tarBytes, Buffer.alloc(512, 1)]), Buffer.concat([tarBytes, tarBytes])]) {
+      fs.writeFileSync(archive.archivePath, invalid)
+      await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, archivePath: archive.archivePath, archiveSha256: computeFileDigest(invalid) }))
+      assert.deepEqual(fs.readdirSync(parent), [])
+    }
+    fs.writeFileSync(archive.archivePath, tarBytes)
+    fs.unlinkSync(path.join(fixture, 'package-lock.json'))
+    fs.symlinkSync('resources/r.txt', path.join(fixture, 'package-lock.json'))
+    await assert.rejects(prepareDependencies({ sourceRoot: fixture, parentDirectory: parent, ...archive }), { code: 'verification-inputs-symbolic-link' })
+    assert.deepEqual(fs.readdirSync(parent), [])
+  } finally {
+    candidate?.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] a selected Git tree preserves complete raw source bytes and its own corpus inventory despite later workspace and index edits', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-candidate-parent-'))
+  let candidate
+  try {
+    fs.mkdirSync(path.join(fixture, 'proposals'))
+    const specialPath = 'proposals/中文 space\tline\n.md'
+    const binary = Buffer.from([0, 10, 255, 128, 0])
+    fs.writeFileSync(path.join(fixture, specialPath), binary)
+    fs.writeFileSync(path.join(fixture, '.gitattributes'), 'proposals/** export-ignore\nresources/r.txt filter=broken\n')
+    fixtureGit(fixture, 'add', '.')
+    fixtureGit(fixture, 'update-index', '--chmod=+x', 'scripts/x.mjs')
+    const treeId = fixtureGit(fixture, 'write-tree')
+    const originalSource = fs.readFileSync(path.join(fixture, 'src/Foo.fs'))
+    fixtureGit(fixture, 'config', 'filter.broken.smudge', 'false')
+    fs.writeFileSync(path.join(fixture, 'src/Foo.fs'), 'module Changed\n')
+    fixtureGit(fixture, 'rm', '--cached', 'resources/r.txt')
+    fs.writeFileSync(path.join(fixture, 'untracked.md'), '# Not selected\n')
+    fs.unlinkSync(path.join(fixture, specialPath))
+
+    candidate = await prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent })
+    assert.equal(candidate.treeId, treeId)
+    assert.deepEqual(fs.readFileSync(path.join(candidate.sourceRoot, 'src/Foo.fs')), originalSource)
+    assert.deepEqual(fs.readFileSync(path.join(candidate.sourceRoot, specialPath)), binary)
+    assert.equal(fs.readFileSync(path.join(candidate.sourceRoot, 'resources/r.txt'), 'utf8'), 'resource\n')
+    assert.equal(fs.existsSync(path.join(candidate.sourceRoot, 'untracked.md')), false)
+    assert.equal(fs.statSync(path.join(candidate.sourceRoot, 'scripts/x.mjs')).mode & 0o111, 0o111)
+    assert.equal(fixtureGit(candidate.sourceRoot, 'write-tree'), treeId)
+    assert.ok(collectGeneratedInputs(candidate.sourceRoot).some(entry => entry.path === specialPath))
+    assert.equal(fs.existsSync(path.join(candidate.sourceRoot, '.git/objects/info/alternates')), false)
+    assert.ok(candidate.entries.some(entry => entry.path === specialPath && entry.size === binary.length))
+    assert.match(candidate.sourceDigest, /^[0-9a-f]{64}$/)
+  } finally {
+    candidate?.dispose()
+    assert.deepEqual(fs.readdirSync(parent), [])
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+for (const objectFormat of ['sha1', 'sha256']) {
+test(`WHAT[verification-system-016] ${objectFormat} source candidate identity is independent of location and binds executable mode`, async () => {
+  const fixture = setupFixtureRepo(objectFormat)
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-identity-parent-'))
+  const candidates = []
+  try {
+    fixtureGit(fixture, 'add', '.')
+    const treeId = fixtureGit(fixture, 'write-tree')
+    for (let i = 0; i < 2; i++) candidates.push(await prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent }))
+    assert.notEqual(candidates[0].sourceRoot, candidates[1].sourceRoot)
+    assert.equal(candidates[0].objectFormat, objectFormat)
+    assert.equal(candidates[0].sourceDigest, candidates[1].sourceDigest)
+    fixtureGit(fixture, 'update-index', '--chmod=+x', 'scripts/x.mjs')
+    candidates.push(await prepareSource({ repositoryRoot: fixture, treeId: fixtureGit(fixture, 'write-tree'), parentDirectory: parent }))
+    assert.notEqual(candidates[0].sourceDigest, candidates[2].sourceDigest)
+    candidates[0].dispose()
+    candidates[0].dispose()
+    assert.equal(fs.existsSync(candidates[0].sourceRoot), false)
+  } finally {
+    for (const candidate of candidates) candidate.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+}
+
+test('WHAT[verification-system-016] source preparation ignores replacement refs and inherited Git repository redirection', async () => {
+  const fixture = setupFixtureRepo()
+  const hostile = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-environment-parent-'))
+  const names = ['GIT_DIR', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']
+  const previous = names.map(name => process.env[name])
+  let candidate
+  try {
+    fixtureGit(fixture, 'add', '.')
+    fixtureGit(hostile, 'add', '.')
+    const treeId = fixtureGit(fixture, 'write-tree')
+    const original = fs.readFileSync(path.join(fixture, 'src/Foo.fs'))
+    const originalIndex = fs.readFileSync(path.join(hostile, '.git/index'))
+    const replacement = execFileSync('git', ['-C', fixture, 'hash-object', '-w', '--stdin'], { input: 'replacement bytes\n' }).toString().trim()
+    fixtureGit(fixture, 'replace', fixtureGit(fixture, 'rev-parse', ':src/Foo.fs'), replacement)
+    process.env.GIT_DIR = path.join(hostile, '.git')
+    process.env.GIT_INDEX_FILE = path.join(hostile, '.git/index')
+    process.env.GIT_OBJECT_DIRECTORY = path.join(hostile, '.git/objects')
+    process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = path.join(hostile, '.git/objects')
+    candidate = await prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent })
+    assert.deepEqual(fs.readFileSync(path.join(candidate.sourceRoot, 'src/Foo.fs')), original)
+    assert.deepEqual(fs.readFileSync(path.join(hostile, '.git/index')), originalIndex)
+  } finally {
+    names.forEach((name, index) => {
+      if (previous[index] === undefined) delete process.env[name]
+      else process.env[name] = previous[index]
+    })
+    candidate?.dispose()
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(hostile, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] a tree topology that cannot be faithfully materialized fails and reclaims its partial source root', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-topology-parent-'))
+  try {
+    const emptyTree = execFileSync('git', ['-C', fixture, 'mktree'], { input: '' }).toString().trim()
+    const treeId = execFileSync('git', ['-C', fixture, 'mktree'], {
+      input: `040000 tree ${emptyTree}\tempty\n`,
+    }).toString().trim()
+    await assert.rejects(() => prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent }),
+      error => error.code === 'source-candidate-tree-invalid')
+    assert.deepEqual(fs.readdirSync(parent), [])
+    assert.equal(fs.readFileSync(path.join(fixture, 'src/Foo.fs'), 'utf8'), 'module Foo\nlet x = 1\n')
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+for (const mode of ['120000', '160000']) {
+  test(`WHAT[verification-system-016] source preparation rejects unsupported Git entry ${mode} without publishing a candidate`, async () => {
+    const fixture = setupFixtureRepo()
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-rejection-parent-'))
+    try {
+      fixtureGit(fixture, 'add', '.')
+      const objectId = mode === '120000'
+        ? fixtureGit(fixture, 'rev-parse', ':src/Foo.fs')
+        : fixtureGit(fixture, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit-tree', fixtureGit(fixture, 'write-tree'), '-m', 'fixture')
+      fixtureGit(fixture, 'update-index', '--add', '--cacheinfo', `${mode},${objectId},linked`)
+      await assert.rejects(() => prepareSource({ repositoryRoot: fixture, treeId: fixtureGit(fixture, 'write-tree'), parentDirectory: parent }),
+        error => error.code === 'source-candidate-entry-unsupported')
+      assert.deepEqual(fs.readdirSync(parent), [])
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+      fs.rmSync(parent, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[verification-system-016] missing selected blobs fail source preparation without falling back to working files', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-missing-parent-'))
+  try {
+    fixtureGit(fixture, 'add', '.')
+    const treeId = fixtureGit(fixture, 'write-tree')
+    const blobId = fixtureGit(fixture, 'rev-parse', ':src/Foo.fs')
+    fs.unlinkSync(path.join(fixture, '.git/objects', blobId.slice(0, 2), blobId.slice(2)))
+    await assert.rejects(() => prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent }),
+      error => error.code === 'source-candidate-blob-invalid')
+    assert.deepEqual(fs.readdirSync(parent), [])
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] source preparation rejects repositories that may implicitly fetch promised objects', async () => {
+  const fixture = setupFixtureRepo()
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-promisor-parent-'))
+  try {
+    fixtureGit(fixture, 'add', '.')
+    const treeId = fixtureGit(fixture, 'write-tree')
+    fixtureGit(fixture, 'config', 'remote.origin.promisor', 'true')
+    await assert.rejects(() => prepareSource({ repositoryRoot: fixture, treeId, parentDirectory: parent }),
+      error => error.code === 'source-candidate-promisor-unsupported')
+    assert.deepEqual(fs.readdirSync(parent), [])
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+for (const relativePath of ['src', '.github', 'package.json', 'resources/linked.txt', 'requirements/p/linked', 'resources/obj']) {
+  test(`WHAT[verification-system-016] verification rejects an unsealed symbolic input at ${relativePath} before running stages`, async () => {
+    const fixture = setupFixtureRepo()
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-input-'))
+    const stages = []
+    try {
+      const target = path.join(fixture, relativePath)
+      const isDirectory = ['src', '.github', 'requirements/p/linked'].includes(relativePath)
+      const source = path.join(external, isDirectory ? 'directory' : 'file')
+      if (isDirectory) {
+        fs.mkdirSync(source)
+        fs.writeFileSync(path.join(source, 'input.fs'), 'module External\n')
+      } else {
+        fs.writeFileSync(source, 'external input\n')
+      }
+      fs.rmSync(target, { recursive: true, force: true })
+      fs.symlinkSync(source, target, isDirectory ? 'dir' : 'file')
+
+      const result = await verify({
+        root: fixture,
+        logDirectory: path.join(external, 'logs'),
+        output: { write() {} },
+        runStep: async ({ label }) => {
+          stages.push(label)
+          return { label, ok: true, exitCode: 0 }
+        },
+      })
+      assert.equal(result.exitCode, 1)
+      assert.match(result.failureReason, /symbolic verification input/)
+      assert.deepEqual(stages, [])
+      assert.ok(result.steps.every(step => step.status === 'not-run'))
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+      fs.rmSync(external, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[verification-system-016] output directory names do not exclude ordinary input files, while root output links stay outside the closure', () => {
+  const fixture = setupFixtureRepo()
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-output-link-'))
+  try {
+    fs.writeFileSync(path.join(fixture, 'scripts/obj'), 'ordinary input\n')
+    for (const name of ['dist', 'node_modules', '.fable-build']) {
+      fs.symlinkSync(external, path.join(fixture, name), 'dir')
+    }
+    const inputs = collectVerificationInputs(fixture)
+    assert.ok(inputs.some(entry => entry.path === 'scripts/obj'))
+    assert.ok(inputs.every(entry => !['dist', 'node_modules', '.fable-build'].includes(entry.path.split('/')[0])))
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(external, { recursive: true, force: true })
+  }
+})
+
+for (const [linkDirectory, dangling] of [[false, false], [true, false], [false, true], [true, true]]) {
+  test(`WHAT[verification-system-016] tracked corpus rejects a ${dangling ? 'dangling ' : ''}symbolic ${linkDirectory ? 'ancestor' : 'file'} outside ordinary input roots`, () => {
+    const fixture = setupFixtureRepo()
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-corpus-'))
+    try {
+      fs.writeFileSync(path.join(external, 'decision.md'), '# External\n')
+      if (linkDirectory) {
+        fs.symlinkSync(dangling ? path.join(external, 'missing') : external, path.join(fixture, 'proposals'), 'dir')
+        execFileSync('git', ['-C', fixture, 'update-index', '--add', '--cacheinfo',
+          `100644,${execFileSync('git', ['-C', fixture, 'hash-object', '-w', path.join(external, 'decision.md')]).toString().trim()},proposals/decision.md`])
+      } else {
+        fs.mkdirSync(path.join(fixture, 'proposals'))
+        fs.symlinkSync(path.join(external, dangling ? 'missing.md' : 'decision.md'), path.join(fixture, 'proposals/decision.md'))
+        execFileSync('git', ['-C', fixture, 'add', 'proposals/decision.md'])
+      }
+      for (const collect of [collectGeneratedInputs, collectVerificationInputs]) {
+        assert.throws(() => collect(fixture), error => error.code === 'verification-inputs-symbolic-link')
+      }
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true })
+      fs.rmSync(external, { recursive: true, force: true })
+    }
+  })
 }
 
 test('WHAT[verification-system-016] tracked corpus proposals contribute their actual content to verification inputs', () => {

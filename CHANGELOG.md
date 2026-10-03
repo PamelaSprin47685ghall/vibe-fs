@@ -1,5 +1,21 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 明确身份的依赖归档准备
+
+- 新增依赖准备owner：完整读取调用者指定SHA-256的安装归档，解析后独立物化node_modules，复核全部目录、字节、权限和闭合内部链接，摘要绑定归档与源码锁文件字节。拒绝外部/悬空/循环链接、重复路径、链接祖先、特殊文件及截断归档。
+- 本批不执行npm安装，不证明归档符合锁文件来源，也未接入实际verify或只读执行。T418/T419保留；见[依赖准备记录](proposals/archive/2026-10-04/S03依赖归档准备-2026-10-04.md)。
+
+## Unreleased — S03 指定 Git tree 源码准备
+
+- 从明确指定的Git tree读取完整原始blob，保留路径、执行位和字节；在自有Git目录重新构造index/tree核对身份，避免工作区、attributes、replace refs和继承Git环境改变候选。缺对象、promisor仓、不支持的类型或无法忠实物化的路径均失败。
+- 普通合并upstream `46935e5bd` 的Replica请求收尾user行；新增真实注册hook回归，验证它不建立新的physical acceptance，原预算/终态仍绑定原bootstrap，语言变更只影响提示正文。
+- 源码准备尚未接入实际verify，依赖与只读执行未封闭，T418/T419保留。见[本批记录](proposals/archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。
+
+## Unreleased — S03 输入枚举前置
+
+- 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。
+- 新增正式WHAT016反例；不可变候选、同阶段改后恢复及依赖隔离仍待完成，两项TODO保留。见[S03记录](proposals/archive/2026-10-03/S03输入链接边界-2026-10-03.md)。
+
 ## Unreleased — Replica 请求不得以 model turn 结尾
 
 - Gemini Cloud Code Assist 拒绝以 model turn 结尾的请求（400 `Requests ending with a model turn are not supported`）。Replica 的镜像加本决策已完成批次总以 assistant 行结尾；`StrengthReplicaTransform` 在写回 Host 前，若末行为 assistant，则追加一条 user 行，正文为与启动时相同的 `delegation/readonly-investigation` 提示。该行 id 由 session 与末行 id 派生，重复 transform 字节一致；末行已是 user 时不追加。
