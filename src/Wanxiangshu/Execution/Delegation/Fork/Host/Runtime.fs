@@ -149,26 +149,13 @@ type HostForkRuntime
     let finishOwnedWork () =
         lock ownedWorkGate (fun () ->
             ownedWorkCount <- ownedWorkCount - 1
-
             if ownedWorkCount = 0 then
-                observedWorkWaiter
-                |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore)
-
+                observedWorkWaiter |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore)
                 observedWorkWaiter <- None
 
             if not acceptingOwnedWork && ownedWorkCount = 0 then
                 ownedWorkDrainWaiter
                 |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
-
-    let ensureObservedWorkWaiter () =
-        match observedWorkWaiter with
-        | Some waiter -> waiter.Task
-        | None ->
-            let waiter =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            observedWorkWaiter <- Some waiter
-            waiter.Task
 
     let recordOwnedWorkFailure (failure: exn) =
         lock ownedWorkGate (fun () -> ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
@@ -800,16 +787,17 @@ type HostForkRuntime
         lock gate (fun () -> ptyRuns.Contains id.Value)
 
     member this.AwaitObservedWork() : Task<unit> =
-        let waiting =
-            lock ownedWorkGate (fun () ->
-                if ownedWorkCount = 0 then
-                    Task.FromResult(())
-                else
-                    ensureObservedWorkWaiter ())
-
+        let waiting = lock ownedWorkGate (fun () ->
+            if ownedWorkCount = 0 then Task.FromResult(())
+            else
+                match observedWorkWaiter with
+                | Some waiter -> waiter.Task
+                | None ->
+                    let waiter = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+                    observedWorkWaiter <- Some waiter
+                    waiter.Task)
         task {
             do! waiting
-
             match lock ownedWorkGate (fun () -> ownedWorkFailure) with
             | Some failure -> return raise failure
             | None -> return ()

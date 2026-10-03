@@ -15,13 +15,14 @@ const runner = path.join(here, 'support/run-opencode-chat-admission-canary.mjs')
 
 const assertPassingVersionEvidence = (versions) => {
   const supported = fixture.supportedVersionRange !== null
-    && (versions.opencode === fixture.supportedVersionRange || versions.opencode.startsWith('1.18.'))
-    && (versions.plugin === fixture.supportedVersionRange || versions.plugin.startsWith('1.18.'))
+    && versions.opencode === fixture.supportedVersionRange
+    && versions.plugin === fixture.supportedVersionRange
   if (!supported) {
     throw new Error(
       `OpenCode ${versions.opencode}/plugin ${versions.plugin} is outside the passing observed range: ${fixture.missingCapability ?? fixture.supportedVersionRange}`,
     )
   }
+  assert.deepEqual(versions, fixture.observedVersions)
 }
 
 const runInstalledCanary = () => {
@@ -34,10 +35,7 @@ const first = (evidence, kind) => evidence.observations.find((observation) => ob
 
 test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', () => {
   const evidence = runInstalledCanary()
-  // 在真实测试或 CI 容器中，若运行的 opencode 与 recorded fixture 版本存在补丁漂移，
-  // 保持主版本与协议契约兼容校验，确保 Canary 契约与公共 Hook 集合一致。
-  assert.equal(typeof evidence.versions.opencode, 'string')
-  assert.equal(typeof evidence.versions.plugin, 'string')
+  assert.deepEqual(evidence.versions, fixture.observedVersions)
   assert.deepEqual(evidence.publicApis.hooks, fixture.publicHooks)
 
   const message = first(evidence, 'chat.message')

@@ -11,8 +11,18 @@ type LearningRecord =
       FrozenResult: string
       ResurfacedDeferredWorkIds: string list }
 
+type BornRule =
+    { TipName: string
+      EnforcerTextEn: string
+      EnforcerTextZh: string
+      MainTextEn: string
+      MainTextZh: string
+      Trigger: string
+      Negative: string }
+
 type InstitutionalLearningProjectionState =
-    { BySession: Map<SessionId, Map<string, LearningRecord>> }
+    { BySession: Map<SessionId, Map<string, LearningRecord>>
+      BornRules: BornRule list }
 
 [<RequireQualifiedAccess>]
 module InstitutionalLearningProjection =
@@ -27,4 +37,4 @@ module InstitutionalLearningProjection =
     val apply:
         fact: InstitutionalLearningFactCases ->
         state: InstitutionalLearningProjectionState ->
-            InstitutionalLearningProjectionState
+            Result<InstitutionalLearningProjectionState, string>

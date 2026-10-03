@@ -69,7 +69,6 @@ module Decode =
         let value = field raw name
 
         match isSafeCount value with
-        // JS numbers are IEEE floats; Fable int64 is BigInt — convert, do not unbox.
         | true -> Ok(int64 (unbox<float> value))
         | false -> error "INVALID_SCHEMA" name (sprintf "field %s must be a non-negative safe integer" name)
 

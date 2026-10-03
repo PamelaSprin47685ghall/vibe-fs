@@ -381,69 +381,32 @@ module DispatchSurface =
     /// (interaction-authority-017). This Surface always holds a JournalHandle, so
     /// the journal-less branch HostSessionNudge must handle cannot occur here;
     /// the two reachable rejections keep that path's wording verbatim.
-    let private hasPendingDispatchClaim projections (sessionId: SessionId) =
-        Map.tryFind sessionId projections.Sessions
-        |> Option.bind (fun session -> session.PromptAuthority)
-        |> Option.exists (fun authority -> not (Map.isEmpty authority.PendingClaims))
-
-    let private activeProfileDecision projections (sessionId: SessionId) : Result<unit, string> =
-        // Detached AgentOwnerRoot (dispatch-protocol-009) may leave only a pending
-        // claim before physical acceptance; BusyAgentNudge still attaches there.
-        // A never-active target has neither ActiveLogicalRun nor pending claims
-        // (interaction-authority-017).
-        match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
-        | Some _ -> Ok()
-        | None when hasPendingDispatchClaim projections sessionId -> Ok()
-        | None -> Error "No active authority profile"
-
     let private activeProfileAt (handle: JournalHandle) (sessionId: SessionId) : Result<unit, string> =
         let projections = (AgentJournal.snapshot handle.Journal).AgentProjections
 
         match Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner sessionId projections.Fission with
         | Some _ -> Error "Session is retired by Fission"
-        | None -> activeProfileDecision projections sessionId
+        | None ->
+            // dispatch-protocol-009/011: a detached AgentOwnerRoot dispatch
+            // returns right after its durable claim, so a continuation on the
+            // same claim path may attach before the physical message lands.
+            // interaction-authority-001 keeps the root itself gated on
+            // physical acceptance, so here a pending AgentOwnerRoot claim
+            // counts as the session's in-flight run — it is neither an
+            // archived nor a closed profile (interaction-authority-017).
+            let pendingRootClaim =
+                PromptAuthorityProjectionQueries.projectionFor sessionId projections
+                |> Option.exists (fun authority ->
+                    authority.PendingClaims
+                    |> Map.exists (fun _ (claim: PromptAuthority.PromptClaim) ->
+                        claim.Origin =
+                            PromptAuthority.PromptOrigin.AuthorityRoot
+                                PromptAuthority.RootAuthorityKind.AgentOwnerRoot))
 
-    let private continuationDispatchOutcome
-        (port: obj)
-        (handle: JournalHandle)
-        (session: string)
-        (text: string)
-        (kind: PromptAuthority.ContinuationKind)
-        (authorityProfile: PromptAuthority.AuthorityExecutionProfile)
-        (awaitMode: string)
-        : Task<obj> =
-        task {
-            let runtime =
-                PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
-
-            let adapter = PlainSessionPort(port)
-
-            let! result =
-                runtime.SendContinuation
-                    adapter.DispatchPort
-                    (SessionId.create session)
-                    text
-                    kind
-                    authorityProfile
-                    None
-                    (awaitModeOf awaitMode)
-                    None
-
-            return
-                match result with
-                | Ok key ->
-                    box
-                        {| ok = true
-                           key = PromptKey.value key
-                           error = null
-                           observation = adapter.LastObservation |}
-                | Error error ->
-                    box
-                        {| ok = false
-                           key = null
-                           error = error
-                           observation = adapter.LastObservation |}
-        }
+            match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
+            | Some _ -> Ok()
+            | None when pendingRootClaim -> Ok()
+            | None -> Error "No active authority profile"
 
     let sendContinuation
         (port: obj)
@@ -468,7 +431,37 @@ module DispatchSurface =
                                key = null
                                error = error
                                observation = null |}
-                | Ok() -> return! continuationDispatchOutcome port handle session text kind authorityProfile awaitMode
+                | Ok _ ->
+                    let runtime =
+                        PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
+                    let adapter = PlainSessionPort(port)
+
+                    let! result =
+                        runtime.SendContinuation
+                            adapter.DispatchPort
+                            (SessionId.create session)
+                            text
+                            kind
+                            authorityProfile
+                            None
+                            (awaitModeOf awaitMode)
+                            None
+
+                    return
+                        match result with
+                        | Ok key ->
+                            box
+                                {| ok = true
+                                   key = PromptKey.value key
+                                   error = null
+                                   observation = adapter.LastObservation |}
+                        | Error error ->
+                            box
+                                {| ok = false
+                                   key = null
+                                   error = error
+                                   observation = adapter.LastObservation |}
             | None, _ ->
                 return
                     box

@@ -16,6 +16,10 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Process
 
 type private DummySessionHostPort() =
+    // DSL-MUTABLE: resource — surface-only physical message counter; every
+    // SendPrompt lands a distinct physical id so dispatch admission is real.
+    let mutable physicalSequence = 0
+
     interface ISessionHostPort with
         member _.SubscribeTerminal(_, _) =
             { new IDisposable with
@@ -25,8 +29,13 @@ type private DummySessionHostPort() =
             { new IDisposable with
                 member _.Dispose() = () }
 
-        member _.SendPrompt(_, _, _) =
-            Task.FromResult(SendOutcome.Fatal "dummy")
+        member _.SendPrompt(sessionId, _, _) =
+            physicalSequence <- physicalSequence + 1
+
+            let physicalId =
+                sprintf "tool-runtime-scope-physical:%s:%d" (SessionId.value sessionId) physicalSequence
+
+            Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physicalId))
 
         member _.AbortSession _ = Task.FromResult(Ok())
         member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -62,116 +71,144 @@ type ToolRuntimeScopeSurface =
             Some(unbox<'T> (target?(prop)))
 
     [<CompiledName("evaluateRetirementBlockers")>]
-    static member evaluateRetirementBlockers(scenario: obj) : string array =
-        let managerSessionId =
-            ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "managerSessionId")
-            |> Option.defaultValue "manager-road-1"
+    static member evaluateRetirementBlockers(scenario: obj) : Task<string array> =
+        task {
+            let managerSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "managerSessionId")
+                |> Option.defaultValue "manager-road-1"
 
-        let devopsChildSessionId =
-            ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "devopsChildSessionId")
+            let devopsChildSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "devopsChildSessionId")
 
-        let engineerChildSessionId =
-            ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "engineerChildSessionId")
+            let engineerChildSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "engineerChildSessionId")
 
-        let devopsPtys =
-            ToolRuntimeScopeSurface.tryGetProperty<string array> (scenario, "devopsPtys")
-            |> Option.defaultValue [||]
+            let devopsPtys =
+                ToolRuntimeScopeSurface.tryGetProperty<string array> (scenario, "devopsPtys")
+                |> Option.defaultValue [||]
 
-        let engineerPtys =
-            ToolRuntimeScopeSurface.tryGetProperty<string array> (scenario, "engineerPtys")
-            |> Option.defaultValue [||]
+            let engineerPtys =
+                ToolRuntimeScopeSurface.tryGetProperty<string array> (scenario, "engineerPtys")
+                |> Option.defaultValue [||]
 
-        let managerHasDevopsAgent =
-            ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "managerHasDevopsAgent")
-            |> Option.defaultValue false
+            let managerHasDevopsAgent =
+                ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "managerHasDevopsAgent")
+                |> Option.defaultValue false
 
-        let managerHasEngineerAgent =
-            ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "managerHasEngineerAgent")
-            |> Option.defaultValue false
+            let managerHasEngineerAgent =
+                ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "managerHasEngineerAgent")
+                |> Option.defaultValue false
 
-        let sessionParents = Dictionary<string, string>()
+            let sessionParents = Dictionary<string, string>()
 
-        devopsChildSessionId
-        |> Option.iter (fun devopsId -> sessionParents.[devopsId] <- managerSessionId)
+            devopsChildSessionId
+            |> Option.iter (fun devopsId -> sessionParents.[devopsId] <- managerSessionId)
 
-        engineerChildSessionId
-        |> Option.iter (fun engId -> sessionParents.[engId] <- managerSessionId)
+            engineerChildSessionId
+            |> Option.iter (fun engId -> sessionParents.[engId] <- managerSessionId)
 
-        let dummySessions = DummySessionHostPort() :> ISessionHostPort
-        let dummyObserver = DummyObserver() :> IWaitObserver
+            let dummySessions = DummySessionHostPort() :> ISessionHostPort
+            let dummyObserver = DummyObserver() :> IWaitObserver
 
-        let scope =
-            new ToolRuntimeScope(
-                dummySessions,
-                dummyObserver,
-                { new IRootWorkspaceReader with
-                    member _.TryRead() = None },
-                None,
-                None,
-                sessionParents,
-                (fun _ -> None),
-                Dictionary<string, string>(),
-                None,
-                None,
-                None,
-                None,
-                None
-            )
+            let! journal = HostForkRunLifecycle.openTemporaryJournal ()
 
-        let emptyContext sid =
-            { SessionId = sid
-              Agent = None
-              ToolCallId = None
-              ProviderRunId = None
-              PromptText = None
-              AttachAbort = fun _ -> fun () -> () }
+            let scope =
+                new ToolRuntimeScope(
+                    dummySessions,
+                    dummyObserver,
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    Some journal,
+                    None,
+                    sessionParents,
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
 
-        let mgrRuntime =
-            match scope.RuntimeFor(emptyContext managerSessionId) with
-            | Ok r -> r
-            | Error err -> failwith err
+            let emptyContext sid =
+                { SessionId = sid
+                  Agent = None
+                  ToolCallId = None
+                  ProviderRunId = None
+                  PromptText = None
+                  AttachAbort = fun _ -> fun () -> () }
 
-        devopsChildSessionId
-        |> Option.iter (fun devopsId ->
-            mgrRuntime.AdoptChild("devops", SessionId.create devopsId)
-
-            if managerHasDevopsAgent then
-                let authRoot = AuthorityRootUserMessageId.create "auth-root-devops"
-
-                mgrRuntime.InstallRun("devops", SessionId.create devopsId, Role.DevOps, authRoot)
-                |> ignore)
-
-        engineerChildSessionId
-        |> Option.iter (fun engId ->
-            mgrRuntime.AdoptChild("engineer-1", SessionId.create engId)
-
-            if managerHasEngineerAgent then
-                let authRoot = AuthorityRootUserMessageId.create "auth-root-eng"
-
-                mgrRuntime.InstallRun("engineer-1", SessionId.create engId, Role.Engineer, authRoot)
-                |> ignore)
-
-        devopsChildSessionId
-        |> Option.iter (fun devopsId ->
-            let devopsRuntime =
-                match scope.RuntimeFor(emptyContext devopsId) with
+            let mgrRuntime =
+                match scope.RuntimeFor(emptyContext managerSessionId) with
                 | Ok r -> r
                 | Error err -> failwith err
 
-            for pty in devopsPtys do
-                devopsRuntime.TrackPtyRun(PtyId.Create pty))
+            match devopsChildSessionId with
+            | Some devopsId when managerHasDevopsAgent ->
+                mgrRuntime.AdoptChild("devops", SessionId.create devopsId)
 
-        engineerChildSessionId
-        |> Option.iter (fun engId ->
-            let engRuntime =
-                match scope.RuntimeFor(emptyContext engId) with
-                | Ok r -> r
-                | Error err -> failwith err
+                let! admitted =
+                    HostForkRunLifecycle.admitPendingAgentWork
+                        journal
+                        dummySessions
+                        (SessionId.create managerSessionId)
+                        "manager"
+                        "devops"
+                        (SessionId.create devopsId)
+                        Role.DevOps
 
-            for pty in engineerPtys do
-                engRuntime.TrackPtyRun(PtyId.Create pty))
+                match admitted with
+                | Ok authorityRoot ->
+                    mgrRuntime.InstallRun("devops", SessionId.create devopsId, Role.DevOps, authorityRoot)
+                    |> ignore
+                | Error reason -> failwith reason
+            | _ -> ()
 
-        scope.RetirementBlockersFor managerSessionId |> List.toArray
+            match engineerChildSessionId with
+            | Some engId when managerHasEngineerAgent ->
+                mgrRuntime.AdoptChild("engineer", SessionId.create engId)
+
+                let! admitted =
+                    HostForkRunLifecycle.admitPendingAgentWork
+                        journal
+                        dummySessions
+                        (SessionId.create managerSessionId)
+                        "manager"
+                        "engineer"
+                        (SessionId.create engId)
+                        Role.Engineer
+
+                match admitted with
+                | Ok authorityRoot ->
+                    mgrRuntime.InstallRun("engineer", SessionId.create engId, Role.Engineer, authorityRoot)
+                    |> ignore
+                | Error reason -> failwith reason
+            | _ -> ()
+
+            match devopsChildSessionId with
+            | Some devopsId ->
+                let devopsRuntime =
+                    match scope.RuntimeFor(emptyContext devopsId) with
+                    | Ok r -> r
+                    | Error err -> failwith err
+
+                for pty in devopsPtys do
+                    devopsRuntime.TrackPtyRun(PtyId.Create pty)
+            | None -> ()
+
+            match engineerChildSessionId with
+            | Some engId ->
+                let engRuntime =
+                    match scope.RuntimeFor(emptyContext engId) with
+                    | Ok r -> r
+                    | Error err -> failwith err
+
+                for pty in engineerPtys do
+                    engRuntime.TrackPtyRun(PtyId.Create pty)
+            | None -> ()
+
+            return scope.RetirementBlockersFor managerSessionId |> List.toArray
+        }
 
     [<CompiledName("verifyDevOpsReturnDrain")>]
     static member verifyDevOpsReturnDrain(scenario: obj) : Task<obj> =
@@ -207,13 +244,15 @@ type ToolRuntimeScopeSurface =
             let dummySessions = DummySessionHostPort() :> ISessionHostPort
             let dummyObserver = DummyObserver() :> IWaitObserver
 
+            let! journal = HostForkRunLifecycle.openTemporaryJournal ()
+
             let scope =
                 new ToolRuntimeScope(
                     dummySessions,
                     dummyObserver,
                     { new IRootWorkspaceReader with
                         member _.TryRead() = None },
-                    None,
+                    Some journal,
                     None,
                     sessionParents,
                     (fun _ -> None),
@@ -258,17 +297,43 @@ type ToolRuntimeScopeSurface =
             let engineerBefore = engRuntime.SnapshotOutstandingPtyRuns()
 
             mgrRuntime.AdoptChild("devops", SessionId.create devopsChildSessionId)
-            mgrRuntime.AdoptChild("engineer-1", SessionId.create engineerChildSessionId)
+            mgrRuntime.AdoptChild("engineer", SessionId.create engineerChildSessionId)
 
-            let authRootDevops = AuthorityRootUserMessageId.create "auth-root-devops"
+            let! devopsAdmitted =
+                HostForkRunLifecycle.admitPendingAgentWork
+                    journal
+                    dummySessions
+                    (SessionId.create managerSessionId)
+                    "manager"
+                    "devops"
+                    (SessionId.create devopsChildSessionId)
+                    Role.DevOps
+
+            let authRootDevops =
+                match devopsAdmitted with
+                | Ok root -> root
+                | Error reason -> failwith reason
+
+            let! engAdmitted =
+                HostForkRunLifecycle.admitPendingAgentWork
+                    journal
+                    dummySessions
+                    (SessionId.create managerSessionId)
+                    "manager"
+                    "engineer"
+                    (SessionId.create engineerChildSessionId)
+                    Role.Engineer
+
+            let authRootEng =
+                match engAdmitted with
+                | Ok root -> root
+                | Error reason -> failwith reason
 
             let devopsRun =
                 mgrRuntime.InstallRun("devops", SessionId.create devopsChildSessionId, Role.DevOps, authRootDevops)
 
-            let authRootEng = AuthorityRootUserMessageId.create "auth-root-eng"
-
             let engRun =
-                mgrRuntime.InstallRun("engineer-1", SessionId.create engineerChildSessionId, Role.Engineer, authRootEng)
+                mgrRuntime.InstallRun("engineer", SessionId.create engineerChildSessionId, Role.Engineer, authRootEng)
 
             let outcome =
                 TerminalOutcome.Completed

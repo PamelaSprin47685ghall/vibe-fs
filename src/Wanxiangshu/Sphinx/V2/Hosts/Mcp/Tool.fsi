@@ -59,6 +59,7 @@ type GoalAmendArgs =
     { CommandId: string
       InquiryId: string
       AuthorizedBy: string
+      ExpectedRevision: string
       AddedConstraints: string list
       ReplacementText: string option }
 

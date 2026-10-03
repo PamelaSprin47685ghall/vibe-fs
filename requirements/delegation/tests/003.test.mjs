@@ -180,8 +180,11 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
     // Trigger cancelOwnerChildren
     await forkTool.cancelOwnerChildren(runtime, owner)
 
-    // DevOps handle must remain Active (not Abandoned)
-    const lifecycle = forkTool.durableLifecycleByname(runtime, owner, 'devops')
+    // DevOps handle must remain Active (not Abandoned). Read the binding's own
+    // lifecycle: the provider summary view folds work-unit state into the
+    // handle view, but the work-level terminal settleExemptedWork writes is
+    // exactly what lets the next resume admit fresh work.
+    const lifecycle = forkTool.durableBindingLifecycleByname(runtime, owner, 'devops')
     assert.notEqual(lifecycle, 'Abandoned', 'Companion devops must not be abandoned on parent cancel')
 
     // Verify DevOps is still intact and ready to accept new assignments

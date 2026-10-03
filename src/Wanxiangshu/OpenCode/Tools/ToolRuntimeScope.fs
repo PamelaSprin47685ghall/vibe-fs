@@ -518,8 +518,12 @@ type ToolRuntimeScope
         =
         match runtime.OwnsAgent agentId with
         | false ->
+            // delegation-026: a reopened road's idle companion handle registers its
+            // identity only (AdoptChild). Restore would plant an active ChildRun with no
+            // work behind it, so the next dispatch's backend Fork answers Nudged, its
+            // runTask never starts, and settle's AwaitCurrentWorkRecord waits on the
+            // restored cell forever.
             runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
-            runtime.AdoptExisting(agentId, existingHandle.ChildSessionId, existingHandle.CanonicalRole, "devops")
             runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
             runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
             registerChild parentKey existingHandle.CanonicalRole existingHandle.ChildSessionId
@@ -652,8 +656,14 @@ type ToolRuntimeScope
                 AgentProjection.tryFind parentSessionId snapshot.AgentProjections
                 |> Option.bind (fun s -> s.Handles)
 
+            // managed-session-lifecycle-024 / delegation-027: decide replacement on
+            // the binding's own lifecycle. The byname *summary* folds work-unit
+            // state into the view, so a Retired work unit would masquerade as a
+            // Retired handle here and push the reopen path into createAndLink,
+            // which then collides with the still-Active binding
+            // (HandleIdentityConflict) and leaves an orphan child session.
             let devopsHandleOpt =
-                handlesOpt |> Option.bind (HandleProjection.tryFindByByname "devops")
+                handlesOpt |> Option.bind (HandleProjection.tryFindBindingByByname "devops")
 
 
             let runtimeResult = getOrCreateRuntime key

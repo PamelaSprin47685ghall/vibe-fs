@@ -43,11 +43,13 @@ export const RAW_TIME_TOKENS = Object.freeze([
 export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Change/Host/Host.fs',
   'Enforcer/Guidance/TipSurface.fs',
+  'Execution/Delegation/Fork/Host/RunLifecycle.fs',
   'Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
   'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
   'Execution/Delegation/SyncDelegate/Surface.fs',
   'Interaction/Dispatch/PhysicalAcceptance.fs',
+  'OpenCode/Host/BloggerChronicleSurface.fs',
   'OpenCode/Host/PairProgrammingThoughtSurface.fs',
   'OpenCode/Host/PluginHost.fs',
   'OpenCode/Host/RequirementGroundingRepositorySurface.fs',

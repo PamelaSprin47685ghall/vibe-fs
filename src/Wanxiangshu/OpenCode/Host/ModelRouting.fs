@@ -415,6 +415,16 @@ module ModelRouting =
         | Some _ when String.IsNullOrWhiteSpace physicalUserMessageId -> None
         | Some normSessionId -> Some(normSessionId, physicalUserMessageId.Trim())
 
+    /// A provider run this process never observed has no step to record; a blank
+    /// run id is such a run, and normalizing the physical key decides the rest.
+    let private normalizeProviderStepRecording sessionId physicalUserMessageId providerRun =
+        if String.IsNullOrWhiteSpace providerRun then
+            None
+        else
+            normalizePhysicalExecutionKey sessionId physicalUserMessageId
+            |> Option.map (fun (normSessionId, normPhysicalUserMessageId) ->
+                normSessionId, normPhysicalUserMessageId, providerRun.Trim())
+
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
 
@@ -1559,15 +1569,10 @@ module ModelRouting =
         /// from the authoritative Host start observation, so the tool boundary
         /// can end this run's step without reading any session-current binding.
         member _.RememberProviderStepIdentity(sessionId: string, physicalUserMessageId: string, providerRun: string) =
-            let trimmedRun = if isNull providerRun then "" else providerRun.Trim()
-
-            if not (String.IsNullOrEmpty trimmedRun) then
-                let keyOpt = normalizePhysicalExecutionKey sessionId physicalUserMessageId
-
-                keyOpt
-                |> Option.iter (fun (normSessionId, normPhysicalUserMessageId) ->
-                    lock gate (fun () ->
-                        rememberProviderStepIdentity normSessionId normPhysicalUserMessageId trimmedRun))
+            normalizeProviderStepRecording sessionId physicalUserMessageId providerRun
+            |> Option.iter (fun (normSessionId, normPhysicalUserMessageId, normProviderRun) ->
+                lock gate (fun () ->
+                    rememberProviderStepIdentity normSessionId normPhysicalUserMessageId normProviderRun))
 
         /// Read-only exact lookup: no run, or a run this process never observed,
         /// yields None. The query allocates nothing and never falls back to the
@@ -1984,31 +1989,9 @@ module ModelRouting =
 
     let internal capacitySnapshot () = current().CapacitySnapshot()
 
-    let private sharedRuntimePredictorConfiguration () : PredictorConfiguration =
-        match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.PredictorConfiguration
-        | None -> PredictorConfiguration.NotConfigured
-
     /// Same Predictor existence query on the process-shared scheduler, resolved
     /// from the one loaded model configuration.
-    let internal sharedPredictorConfiguration () : PredictorConfiguration =
-        let testState =
-            emitJsExpr<string option>
-                ()
-                "(typeof globalThis !== 'undefined' && globalThis.__wanxiangshu_test_predictor_state) || null"
-
-        match testState with
-        | Some "configured" -> PredictorConfiguration.Configured
-        | Some "invalid" ->
-            let reason =
-                emitJsExpr<string option>
-                    ()
-                    "(typeof globalThis !== 'undefined' && globalThis.__wanxiangshu_test_predictor_reason) || 'test Predictor configuration is invalid'"
-                |> Option.defaultValue "test Predictor configuration is invalid"
-
-            PredictorConfiguration.ConfigurationInvalid reason
-        | Some "unconfigured" -> PredictorConfiguration.NotConfigured
-        | _ -> sharedRuntimePredictorConfiguration ()
+    let internal sharedPredictorConfiguration () : PredictorConfiguration = current().PredictorConfiguration
 
     let enterProviderStep
         (sessionId: SessionId)

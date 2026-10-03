@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Strength.OpenCode
 
-open Fable.Core
 open System.Collections.Generic
 open Fable.Core
 open Wanxiangshu.Foundation

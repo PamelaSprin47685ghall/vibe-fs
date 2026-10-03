@@ -204,6 +204,11 @@ module HostForkPtySurface =
                     | Ok id -> id
                     | Error e -> failwith e
 
+                let! journal = HostForkRunLifecycle.openTemporaryJournal ()
+
+                // DSL-MUTABLE: resource — surface-only physical message counter
+                let physicalSequence = ref 0
+
                 // Manager runtime configured with drainChildPtys capability
                 let drainChildPtys (sid: SessionId) =
                     task {
@@ -222,7 +227,12 @@ module HostForkPtySurface =
                                 member _.Dispose() = () }
 
                         member _.SendPrompt(_, _, _) =
-                            Task.FromResult(Outcome.SendOutcome.AcceptanceUnknown "dummy")
+                            physicalSequence.Value <- physicalSequence.Value + 1
+
+                            let physicalId =
+                                sprintf "pty-surface-physical:%d" physicalSequence.Value
+
+                            Task.FromResult(Outcome.SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physicalId))
 
                         member _.AbortSession _ = Task.FromResult(Ok())
                         member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -242,18 +252,27 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
+                        journal = journal,
                         drainChildPtys = drainChildPtys
                     )
 
+                let! devopsAdmitted =
+                    HostForkRunLifecycle.admitPendingAgentWork
+                        journal
+                        dummySessions
+                        (SessionId.create "manager-session")
+                        "manager"
+                        "devops"
+                        devopsSessionId
+                        Role.DevOps
+
+                let authorityRoot =
+                    match devopsAdmitted with
+                    | Ok root -> root
+                    | Error reason -> failwith reason
+
                 let run =
-                    managerRuntime.InstallRun(
-                        "devops",
-                        devopsSessionId,
-                        Role.DevOps,
-                        Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot (
-                            Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create "auth-root"
-                        )
-                    )
+                    managerRuntime.InstallRun("devops", devopsSessionId, Role.DevOps, authorityRoot)
 
                 let devopsPtysBefore = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
 
@@ -266,10 +285,7 @@ module HostForkPtySurface =
                         { SessionId = devopsSessionId
                           Role = Role.DevOps
                           ProviderRun = ProviderRunIdentity.create "prov-run"
-                          AuthorityRootUserMessageId =
-                            Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot (
-                                Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create "auth-root"
-                            )
+                          AuthorityRootUserMessageId = authorityRoot
                           Directory = None
                           TerminalText = "devops finished"
                           TurnFormalText = "devops finished" }

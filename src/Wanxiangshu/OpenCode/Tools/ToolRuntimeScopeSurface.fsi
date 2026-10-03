@@ -5,5 +5,5 @@ open Fable.Core
 
 [<AbstractClass; Sealed; AttachMembers>]
 type ToolRuntimeScopeSurface =
-    static member evaluateRetirementBlockers: scenario: obj -> string array
+    static member evaluateRetirementBlockers: scenario: obj -> Task<string array>
     static member verifyDevOpsReturnDrain: scenario: obj -> Task<obj>

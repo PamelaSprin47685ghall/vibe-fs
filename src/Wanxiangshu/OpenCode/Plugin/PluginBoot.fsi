@@ -20,7 +20,6 @@ module PluginBoot =
             Scope: PluginRuntimeScope
             StrengthScope: PluginStrengthScope
             Clock: IClockPort
-            Timer: ITimerPort
             StrengthFailClosed: string -> unit
             WorkspaceDirectory: string option
             FamilyParent: SessionId -> SessionId option

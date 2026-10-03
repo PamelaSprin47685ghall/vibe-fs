@@ -1,5 +1,19 @@
 # Changelog — 版本历史
 
+## Unreleased — GAP 缺口与意外红修复：全量 unit 归零
+
+- 全量 unit 从 39 个意外红修复至 3706 绿 / 0 红（generation 240，818/818 文件完成）；runner exit 1 仅来自 428 条 TODO 的 pending-proof 诚实报告，不是失败。
+- **关键修复（按包）**：
+  - sphinx-v2：AuthoritativeVocabulary 补注册 strict @2 事件类型；测试导入名与 dist 导出对齐；MCP Server 的 result 包装 FSharpMap→plain JSON + isError/structuredContent；zod passthrough；goal amendment expectedRevision 契约；Decode 的 int64 边界。
+  - capability-enforcement-019：QuiescencePermitToken 的 toJSON 守卫经 Emit/defineProperty 落到实例。
+  - managed-session-lifecycle：horizonVisible 移除 work 过滤；recordAbandon 区分 work 级 / handle 级；linkNamed 对 Abandoned 拒绝；fold 重放经 replayLink 幂等吸收 Retired，并与显式 link-command reopen 的路径区分。
+  - delegation-003/026：cancelParent 对 fixed devops 写 work 级终态；needsReplacementDevOps 按原始 binding 判定；ForkHarness physical id 模块级全局唯一；adoptDevOpsIfUnowned 回到 AdoptChild 身份登记。
+  - crash-reconciliation-020：load-projection 补生产链 fact 与 wire 形状；ChildRunVoided 关闭 child authority。
+  - durable-events-023：HasListableHandles 改读 auditListable。
+  - dispatch-protocol-009：activeProfileAt 的 pending root claim 回退。
+- **GAP 台账**：GAP-064/181/077 以实测证据关闭。GAP-181 的 BIRTH 链路：evaluate 三值、InstitutionalRuleBorn 入 durable substrate、revision 合同、002—006 测试升级；GAP-077：BloggerChronicleSurface 行为级测试与双语文案资源化。
+- **顺手**：action-affordance-015 测试文件归位；SURFACE_MANIFEST / compile-order / fsproj 相应登记。另记一笔工具链观察：增量构建对 Integrator 变更存在缓存传播缺陷（--clean 可绕过），建议工具链侧关注。
+
 ## Unreleased — 原工作区迁移代码编译修复
 
 - 补齐 Sphinx Representation、BodyDto、Persistence Surface 的编译登记，调整 completion codec 的声明和实现顺序；修正直接阻塞编译的局部缩进、元组、保留字、缺失声明/引用，以及类型和参数名不一致。

@@ -413,6 +413,26 @@ module HostForkChildDispatch =
 
             do! ptyPort.CloseAll()
             Pty.unregisterParentAbort parentKey parentAbortToken
+
+            // managed-session-lifecycle-024 / delegation-027: the fixed DevOps
+            // handle is exempt from the handle-level abandon above, but its
+            // in-flight work unit still settles durably here — otherwise the
+            // next resume's admitWork is refused with WorkStillActive and a
+            // physically accepted dispatch degrades to DispatchUncertain.
+            // Durable terminal first, then the in-memory waiter settle.
+            let devopsPending =
+                lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+                |> List.filter (fun run -> isFixedDevOpsHandle durableHandles run.AgentId)
+
+            for run in devopsPending do
+                match run.Work with
+                | Some admitted ->
+                    let! devopsSettled =
+                        HandleController.settleExemptedWork journalPort parentId admitted HandleAbandonReason.ParentCancelled
+
+                    requireOk "DevOps exempted work settlement failed" devopsSettled
+                | None -> ()
+
             settlePendingAbandoned gate pendingRuns settleAbandoned
             do! awaitRecovery ()
 

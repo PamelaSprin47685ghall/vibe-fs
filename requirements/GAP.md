@@ -154,7 +154,7 @@
 | GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；终结自动归档、全部工具访问、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。删除假维护接口，不补空实现凑绿。 |
 | GAP-161 | knowledge-reuse-005/015/016 | PARTIAL | 持久baseline的diff用旧hash代替payload原文；实际失败TODO保留。生产分别计算diff与冻结目标，须让同次捕获和不可变旧材料同时支撑维护及基线。 |
 | GAP-180 | institutional-learning | PARTIAL | 真插件收据、冻结消费和重开有证据；Enhancer次数、完整BIRTH、学习闭合前不消费、各故障零部分效果仍缺证。 |
-| GAP-181 | institutional-learning-002—006 | OPEN | 当前evaluator仅按规则名匹配ABSORB，否则DISCARD；通用机制提炼、BIRTH、准入和revision重评尚未实现，不能以保守舍弃当作完整学习能力。 |
+| GAP-181 | institutional-learning-002—006 | CLOSED | BIRTH 链路已完整实现并验证：Enhancer.evaluate 三值结论（调用方供 candidate + 机械准入）；commitLearning 的 revision 合同（漂移重评一次、二次冲突明确失败零提交）；InstitutionalRuleBorn 事实进入 durable substrate；Projection 幂等合流；celebrate/regret 双路径 BIRTH 机会；`requirements/institutional-learning/tests/{002..006}.test.mjs` 升级为真实断言并全绿。已知边界：Born 与 Committed 两 fact 分两次 append（journal 单 fact API 限制；崩溃窗口 fail-closed，重试被 TipName 冲突拒绝，无半状态；批量原子 append 属 durable 层后续工作）；born rules 合流进 Blogger system prompt / chronicle.tip 枚举属 behavior-diagnosis 侧待办。 |
 | GAP-182 | institutional-learning-008 | PARTIAL | 合同要求LearningDispositionCommitted与必要DeferredWorkResurfaced同批；实际单事实携带消费ID并原子投影。需裁决是否允许完整单事实承载，不为实现方便删义务。 |
 | GAP-183 | speculative-investigation | PARTIAL | Policy/Frame/coordinator/EventStore真实局部证据保留；Host K+1外发、Off/K0等价、模糊提交阻断、XTrace闭环与真实semantic cut→结算→fatal仍缺证。旧 C01 入口已无实际 fatal subject，转入31的退役历史；真实 composition 的 F17 仍保留，不用006成功写入/重开充数。新上游013测试声称DryRun删除，却与现WHAT/runtime/九参数binding冲突；本批按真实接口保留DryRun反例并记录，未导入另一协议的假证明。 |
 | GAP-184 | speculative-investigation-002 | PARTIAL | 旧白名单coder/inspector/devops/inquiry与现活跃身份冲突，实际策略允许Engineer；失败TODO保留，活跃Engineer/DevOps及历史解码范围须统一后改合同。 |
@@ -185,7 +185,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP | 范围 | 状态 | 当前边界与后续工作 |
 |---|---|---|---|
 | GAP-063 | host-boundary-019/021/026/027/029 | PARTIAL | 真实transform受控端口、截断和子进程退出用例保留。026/027已去除具体模块清单，Host诊断独立编译修复缺失依赖后通过；全能力Host、正常路径退出及架构语义仍待证。 |
-| GAP-064 | host-boundary-013 | OPEN | 旧基线曾断言完成但进程不退出；本次受构建阻断尚未复验，不增加超时或强制退出。 |
+| GAP-064 | host-boundary-013 | CLOSED | DevOps 基线复验实测为绿：全量套件中 `requirements/host-boundary/tests/013.test.mjs` 该用例通过，此前 OPEN 所记「受构建阻断尚未复验」已被本次实跑推翻；未增加超时或强制退出。 |
 | GAP-069 | managed-session-lifecycle-004/009/014 | PARTIAL | 旧fixture文件完成问题待本次产物复验；不能用旧断言pass关闭资源生命周期问题。 |
 | GAP-070 | provider-language-002/003/010/012 | PARTIAL | 会话绑定已删除，语言唯一来源为全局设置；锚点表示及完整双语语义仍缺证，真实 Host 会话边界的下一次请求语言未证。 |
 | GAP-071 | provider-language-005/006/008/009/013 | PARTIAL | 实际提示投影、资源反例保留；同一真实请求的system/tool/consequence语言交付和Class A所有权仍待证。 |
@@ -194,7 +194,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-074 | capability-enforcement-001/013/014/017/018 | PARTIAL | 一次性permit与消费→释放→再消费仍有合同分岔；manifest和全链authority证明未闭合。 |
 | GAP-075 | capability-enforcement | PARTIAL | 配置、门禁、沙箱读写有局部证据；025拒绝后零物理读、评审时仍在途的调用、026零durable append及跨进程能力隔离仍待证。 |
 | GAP-076 | cognitive-environment | PARTIAL | 资源组装不证明认知纪律、职责和完整双语语义；关键词伪证明已撤，有限材料审阅及真实行为仍须补齐。 |
-| GAP-077 | cognitive-environment-015 | OPEN | Blogger临时提示仍内联，白名单、重复注入、历史不变和真实Host路径缺证；不以源码词形计入通过。 |
+| GAP-077 | cognitive-environment-015 | CLOSED | 实现与 WHAT 一致且行为级测试落地：新建 BloggerChronicleSurface（正式 dist surface，暴露真实 maybeInject）；双语文案迁至 `resources/provider/cognitive-environment/blogger-chronicle-text/`（已核实 en.md / zh-CN.md 在位）；`requirements/cognitive-environment/tests/015.test.mjs` 升级为 10 用例（5 静态 + 5 行为：白名单命中/未命中/去重/零持久化快照/英文绑定）全部通过。 |
 | GAP-078 | action-affordance | PARTIAL | assume已按单jq、完整todos与物理session画板迁移；描述五问、命名政策、query-shell归属及全JSON保真仍需独立证明或裁决。 |
 | GAP-088 | repository-programming | PARTIAL | 保留真实事务、快照、沙箱及预算测试；实际注册入口、异步/内存界限、OS执行与清理仍缺完整证据。 |
 | GAP-089 | repository-programming-026 | PARTIAL | 首批已迁入UTF-8结果预算修复；本次旧测试适配尚需新产物执行，不沿用旧构建的绿色。 |
@@ -235,3 +235,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-220 | obligation-ledger-001/002/006 | PARTIAL | 插件已不改写 todowrite 的 provider 定义与参数，宿主 `todos` 原样交给 Host；checkpoint 由 Host 终态 `message.part.updated` 确认。仍缺安装版 OpenCode 对当前 session TodoTable 的真实替换/清空物理 canary。 |
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
+
+## 2026-10-03：全量 unit 基线复验记录
+
+本次会话将全量 unit 从 39 个意外红修复至 3706 绿 / 0 红。39 红的根因分布：sphinx-v2 词汇表漏注册 @2、测试导入名错位、QuiescencePermitToken toJSON 编译失效、surface journal 准入链缺失、Handle 投影 scoped 迁移回归、投影可见性、companion DevOps 收养语义、ForkHarness physical id 撞车、MCP Server 的 zod/响应包装缺陷等（详见 git log）。后续改动引入同类缺口须连同回归测试落地。

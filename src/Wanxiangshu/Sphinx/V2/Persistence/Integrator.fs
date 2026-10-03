@@ -39,31 +39,23 @@ module Integrator =
         { Histories: Map<InquiryId, InquiryHistory>
           Unavailable: Map<string, string> }
 
-    let private empty =
-        { Histories = Map.empty
-          Unavailable = Map.empty }
-
-    let private streamOf inquiryId =
-        "sphinx-v2/" + InquiryId.value inquiryId
-
-    let private lookupParentState (states: Current) inquiryId parent =
-        match parent with
-        | None -> Ok None
-        | Some eventId ->
-            states.Histories
-            |> Map.tryFind inquiryId
-            |> Option.bind (fun history -> Map.tryFind eventId history.States)
-            |> Option.map (Some >> Ok)
-            |> Option.defaultValue (Error "parent has no accepted state for this inquiry")
+    let private empty = { Histories = Map.empty; Unavailable = Map.empty }
+    let private streamOf inquiryId = "sphinx-v2/" + InquiryId.value inquiryId
 
     /// A valid ancestor remains a base even after another child advances a head.
     /// These snapshots are derived from accepted facts, never independent history.
     let parentState (current: obj) inquiryId parent : Result<InquiryState option, string> =
         let states = if isNull current then empty else unbox<Current> current
-
         match Map.tryFind (streamOf inquiryId) states.Unavailable with
         | Some reason -> Error reason
-        | None -> lookupParentState states inquiryId parent
+        | None ->
+            match parent with
+            | None -> Ok None
+            | Some eventId ->
+                states.Histories |> Map.tryFind inquiryId
+                |> Option.bind (fun history -> Map.tryFind eventId history.States)
+                |> Option.map (Some >> Ok)
+                |> Option.defaultValue (Error "parent has no accepted state for this inquiry")
 
     /// One registered business oracle; only the shared engine owns enumeration,
     /// canonical ordering, storage validation and the durable cut protocol.
@@ -73,31 +65,21 @@ module Integrator =
         |> Result.bind (fun batch ->
             parentState (box current) batch.InquiryId batch.PreviousHead
             |> Result.bind (fun prior ->
-                let eventId =
-                    Identity.EventId.value envelope.EventId
-                    |> Wanxiangshu.Sphinx.V2.Core.EventId.create
-
+                let eventId = Identity.EventId.value envelope.EventId |> Wanxiangshu.Sphinx.V2.Core.EventId.create
                 Reducer.applyTransition digest eventId prior batch
                 |> Result.mapError (fun fault -> fault.Code + ": " + fault.Message)
                 |> Result.map (fun next ->
                     let history =
-                        current.Histories
-                        |> Map.tryFind batch.InquiryId
-                        |> Option.defaultValue
-                            { States = Map.empty
-                              Heads = Set.empty }
-
+                        current.Histories |> Map.tryFind batch.InquiryId
+                        |> Option.defaultValue { States = Map.empty; Heads = Set.empty }
                     let heads =
                         batch.PreviousHead
                         |> Option.map (fun parent -> Set.remove parent history.Heads)
                         |> Option.defaultValue history.Heads
-
                     { current with
                         Histories =
-                            Map.add
-                                batch.InquiryId
-                                { States = Map.add eventId next history.States
-                                  Heads = Set.add eventId heads }
+                            Map.add batch.InquiryId
+                                { States = Map.add eventId next history.States; Heads = Set.add eventId heads }
                                 current.Histories })))
 
     let rule (digest: string -> string) : IntegrationRule =
@@ -106,50 +88,27 @@ module Integrator =
           FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
           Accepts = fun envelope -> SphinxV2EventTypes.isKnown envelope.EventType
           Integrate = fun current envelope -> integrateOne digest (unbox<Current> current) envelope |> Result.map box
-          PlanCut =
-            fun _ envelope reason _ ->
-                Ok
-                    { ResetJson =
-                        CanonicalJson.canonicalJson (
-                            createObj [ "stream" ==> EventStreamId.value envelope.StreamId; "reason" ==> reason ]
-                        ) }
-          ApplyCut =
-            fun current reset ->
-                let decoder =
-                    BodyDto.exact
-                        [ "stream"; "reason" ]
-                        (Decode.object (fun get ->
-                            get.Required.Field "stream" Decode.string, get.Required.Field "reason" Decode.string))
-
-                Decode.fromString decoder reset
-                |> Result.map (fun (stream, reason) ->
-                    let states = unbox<Current> current
-
-                    box
-                        { states with
-                            Unavailable = Map.add stream reason states.Unavailable }) }
-
-    let private historyState (states: Current) (inquiryId: InquiryId) =
-        match Map.tryFind inquiryId states.Histories with
-        | None -> Ok None
-        | Some history when Set.count history.Heads = 1 -> Ok(Map.tryFind (Set.minElement history.Heads) history.States)
-        | Some history ->
-            let heads =
-                history.Heads
-                |> Set.toList
-                |> List.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> Identity.EventId.create)
-
-            Error(
-                CurrentError.DomainConflict(
-                    DomainConflict.ConcurrentHeads(EventStreamId.create (streamOf inquiryId), heads)
-                )
-            )
+          PlanCut = fun _ envelope reason _ ->
+              Ok { ResetJson = CanonicalJson.canonicalJson (createObj [
+                  "stream" ==> EventStreamId.value envelope.StreamId; "reason" ==> reason ]) }
+          ApplyCut = fun current reset ->
+              let decoder = BodyDto.exact [ "stream"; "reason" ] (Decode.object (fun get ->
+                  get.Required.Field "stream" Decode.string, get.Required.Field "reason" Decode.string))
+              Decode.fromString decoder reset |> Result.map (fun (stream, reason) ->
+                  let states = unbox<Current> current
+                  box { states with Unavailable = Map.add stream reason states.Unavailable }) }
 
     /// Missing is distinct from invalid/cut and from multiple legitimate heads.
     /// There is no resolution command: a fork remains observable, not a chosen winner.
     let tryState (current: obj) (inquiryId: InquiryId) : Result<InquiryState option, CurrentError> =
         let states = if isNull current then empty else unbox<Current> current
-
         match Map.tryFind (streamOf inquiryId) states.Unavailable with
         | Some reason -> Error(CurrentError.SemanticRejected reason)
-        | None -> historyState states inquiryId
+        | None ->
+            match Map.tryFind inquiryId states.Histories with
+            | None -> Ok None
+            | Some history when Set.count history.Heads = 1 ->
+                Ok(Map.tryFind (Set.minElement history.Heads) history.States)
+            | Some history ->
+                let heads = history.Heads |> Set.toList |> List.map (Wanxiangshu.Sphinx.V2.Core.EventId.value >> Identity.EventId.create)
+                Error(CurrentError.DomainConflict(DomainConflict.ConcurrentHeads(EventStreamId.create (streamOf inquiryId), heads)))

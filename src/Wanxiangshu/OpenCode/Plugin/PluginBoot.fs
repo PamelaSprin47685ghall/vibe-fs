@@ -23,7 +23,6 @@ module PluginBoot =
           Scope: PluginRuntimeScope
           StrengthScope: PluginStrengthScope
           Clock: IClockPort
-          Timer: ITimerPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
           FamilyParent: SessionId -> SessionId option
@@ -83,7 +82,6 @@ module PluginBoot =
             scope.AttachScopeDispose(fun () -> ProtocolArgumentVault.clear protocolArgumentVault)
 
             let clock = NodeTiming.nodeClockPort ()
-            let timer = NodeTiming.nodeTimerPort ()
 
             let strengthFailClosed (reason: string) : unit =
                 strengthScope.TripStrengthFuse reason
@@ -101,7 +99,6 @@ module PluginBoot =
                   Scope = scope
                   StrengthScope = strengthScope
                   Clock = clock
-                  Timer = timer
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory
                   FamilyParent = familyParent

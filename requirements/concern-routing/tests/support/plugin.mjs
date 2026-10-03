@@ -1,17 +1,9 @@
 import assert from 'node:assert/strict'
 import { acceptAuthorityRoot, activateLife } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
-export const admit = async (runtime, session, role = 'engineer', hooks = null) => {
+export const admit = async (runtime, session, role = 'engineer') => {
   await acceptAuthorityRoot(runtime, session, role, `root-${session}`)
   await activateLife(runtime, session, `root-${session}`)
-  const u = user(session)
-  runtime.pushHostMessage(session, { id: `root-${session}`, role: 'user', parts: u.parts })
-  if (hooks && hooks['chat.message']) {
-    await hooks['chat.message'](
-      { sessionID: session, messageID: `root-${session}`, agent: role },
-      { message: { id: `root-${session}`, role: 'user', sessionID: session }, parts: u.parts },
-    )
-  }
 }
 export const context = (sessionID, callID, agent = 'engineer') => ({ sessionID, callID, agent, messageID: `run-${sessionID}` })
 export const user = sessionID => ({ info: { id: `root-${sessionID}`, sessionID, role: 'user', model: { providerID: 'anthropic', modelID: 'fixture' } }, parts: [{ type: 'text', text: 'Investigate current facts.' }] })

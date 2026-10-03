@@ -108,7 +108,14 @@ module AgentJournalPortAdapter =
                 AgentProjection.tryFind sessionId (projections ())
                 |> Option.bind (fun session -> session.Handles)
                 |> Option.defaultValue HandleProjection.empty
-                |> HandleProjection.listable
+                // durable-events-013 / crash-reconciliation-021: one commit
+                // must move every related view together, and the durable
+                // HandleLinked fact is the binding's existence truth. This
+                // finality member answers binding visibility, not work
+                // admission — `listable`'s Work.IsSome filter would hide a
+                // freshly linked handle until its root lands, so the gate
+                // reads `auditListable` (parent-visible, non-terminal).
+                |> HandleProjection.auditListable
                 |> List.isEmpty
                 |> not
           HasActiveOrchestratorJobs = fun () -> AgentProjection.hasActiveOrchestratorJobs (projections ())
@@ -133,7 +140,7 @@ module AgentJournalPortAdapter =
                     authority.PendingClaims
                     |> Map.exists (fun _ claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                            PromptAuthority.ContinuationKind.JoinGuard
+                                           PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
 
