@@ -1,5 +1,9 @@
 import test from 'node:test'
 
+// 语言锚定：断言比较英文指令资源（resources/provider/runtime/<name>/en.md 的渲染结果）；
+// WANXIANGSHU_PROVIDER_LANGUAGE 是语言阶梯最高优先级，显式设为英文，使断言不随宿主环境语言漂移。
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

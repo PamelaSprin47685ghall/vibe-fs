@@ -31,7 +31,12 @@ module EnforcerCycleDecode =
         step: AssistantStep ->
             (int * ToolCallId * Wanxiangshu.Enforcer.EnforcerCodec.CanonicalBlogCall) list
 
+    /// ENFORCER-042 / behavior-diagnosis-009: raw chronicle call count of one
+    /// step, by tool identity alone — before completion or decode filtering.
+    val chronicleCallCount: AssistantStep -> int
+
     val validateCycle:
         string ->
+        int ->
         (int * ToolCallId * Wanxiangshu.Enforcer.EnforcerCodec.CanonicalBlogCall) list ->
             Result<(Wanxiangshu.Enforcer.Cycle.EnforcerCycle.CanonicalCycle * ToolCallId list), string>

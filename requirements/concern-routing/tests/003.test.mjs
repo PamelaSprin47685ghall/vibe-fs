@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
+// 语言锚定：断言依赖英文投递回执文案（/Message accepted/）；
+// WANXIANGSHU_PROVIDER_LANGUAGE 是语言阶梯最高优先级，显式设为英文，使断言不随宿主环境语言漂移。
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 test('WHAT[concern-routing-003] publish fails closed for unknown and stale generations instead of retargeting', () => {
   assert.equal(concern.publish('sender', 'msg-0', 'missing', 'x', concern.empty()).ok, false)
 

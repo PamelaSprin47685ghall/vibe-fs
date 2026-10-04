@@ -220,6 +220,18 @@ module EnforcerCycleDecode =
         |> List.mapi (fun ordinal part -> ordinal, part)
         |> List.choose (tryCanonicalCall emitDiagnostic rules)
 
+    /// ENFORCER-042 / behavior-diagnosis-009: raw chronicle call cardinality
+    /// of one provider step, counted by tool identity alone — before any
+    /// completion or decode filtering. A second undecodable call still makes
+    /// the cardinality two.
+    let chronicleCallCount (step: AssistantStep) : int =
+        step.Parts
+        |> List.filter (fun part ->
+            not (isNull part)
+            && stringOrEmpty part?``type`` = "tool"
+            && toolNameOf part = "chronicle")
+        |> List.length
+
     let private validateBounds
         (cycle: EnforcerCycle.CanonicalCycle)
         (callId: ToolCallId)
@@ -239,13 +251,19 @@ module EnforcerCycleDecode =
         | [] -> Error "blog cycle has no completed chronicle call (ENFORCER-043)"
         | _ -> Error "blog cycle must contain exactly one chronicle call (ENFORCER-042)"
 
-    /// ENFORCER-043: after the raw exact-one gate, the provider run and one
-    /// canonical chronicle call must both be provable; canonical text is non-empty.
+    /// ENFORCER-043 / behavior-diagnosis-009: the raw exact-one gate runs
+    /// BEFORE decode filtering — a step whose raw chronicle call count is not
+    /// exactly one is a protocol breach however many of those calls decode.
+    /// After that gate the provider run and one canonical chronicle call must
+    /// both be provable; canonical text is non-empty.
     let validateCycle
         (messageId: string)
+        (rawCallCount: int)
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
         : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
-        if String.IsNullOrWhiteSpace messageId then
+        if rawCallCount <> 1 then
+            Error(sprintf "blog cycle chronicle call count = %d; expected exactly one (ENFORCER-042)" rawCallCount)
+        elif String.IsNullOrWhiteSpace messageId then
             Error "blog cycle has no provable provider run (ENFORCER-043)"
         else
             validateSingleCall calls
