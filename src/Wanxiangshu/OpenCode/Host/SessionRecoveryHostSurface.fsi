@@ -6,6 +6,7 @@ module SessionRecoveryHostSurface =
     type RecoveryHostHandle =
         { Journal: Wanxiangshu.Persistence.Journal.JournalHandle
           Scope: PluginRecoveryScope
+          Sessions: PluginSessionScope
           Host: SessionRecoveryHost
           PortOutcome: string
           TerminalGate: TaskCompletionSource<unit>
@@ -68,3 +69,13 @@ module SessionRecoveryHostSurface =
         providerRun: string ->
         disposition: string ->
             Task<obj>
+
+    /// managed-session-lifecycle-019：驱动 session 删除的 drain owner——
+    /// runtime 的 DisposeSession 所 await 的同一 PluginSessionScope.ClearSession，
+    /// 返回的 task 即该删除排空的公开生命周期完成 Promise。
+    val clearSession: handle: RecoveryHostHandle -> sessionId: string -> Task
+
+    /// managed-session-lifecycle-019：驱动 logical cancel 的 drain owner——
+    /// runtime 的 SignalChatRecoverySession 所转发的同一
+    /// SessionRecoveryHost.SignalSession，逐 key 结算该会话的全部执行。
+    val signalSessionCancelled: handle: RecoveryHostHandle -> sessionId: string -> Task

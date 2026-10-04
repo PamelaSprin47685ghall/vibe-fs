@@ -33,6 +33,7 @@ module SessionRecoveryHostSurface =
     type RecoveryHostHandle =
         { Journal: JournalHandle
           Scope: PluginRecoveryScope
+          Sessions: PluginSessionScope
           Host: SessionRecoveryHost
           PortOutcome: string
           TerminalGate: TaskCompletionSource<unit>
@@ -177,6 +178,7 @@ module SessionRecoveryHostSurface =
                 return
                     { Journal = journalHandle
                       Scope = scope
+                      Sessions = PluginSessionScope(Some journalHandle.Journal, (fun _ -> false))
                       Host = host
                       PortOutcome = portOutcome
                       TerminalGate = plainGate
@@ -452,6 +454,7 @@ module SessionRecoveryHostSurface =
                     return
                         { Journal = JournalHandle.Create(journal)
                           Scope = scope
+                          Sessions = PluginSessionScope(Some journal, (fun _ -> false))
                           Host = host
                           PortOutcome = portOutcome
                           TerminalGate = gate
@@ -509,3 +512,15 @@ module SessionRecoveryHostSurface =
                         {| phase = "Missing"
                            disposition = null |})
         }
+
+    /// managed-session-lifecycle-019: drive the session-deletion drain owner —
+    /// the same PluginSessionScope.ClearSession the runtime's DisposeSession
+    /// awaits — so the returned task is the public lifecycle completion
+    /// promise of the delete drain.
+    let clearSession (handle: RecoveryHostHandle) (sessionId: string) : Task = handle.Sessions.ClearSession sessionId
+
+    /// managed-session-lifecycle-019: drive the logical-cancel drain owner —
+    /// the same SessionRecoveryHost.SignalSession the runtime routes
+    /// SignalChatRecoverySession through — settling every key of the session.
+    let signalSessionCancelled (handle: RecoveryHostHandle) (sessionId: string) : Task =
+        handle.Host.SignalSession(SessionId.create sessionId, ChatExecutionRecoveryLifecycleEvent.SessionCancelled)
