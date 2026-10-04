@@ -12,6 +12,7 @@ const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surfa
 const transaction = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 const strength = await import("../../../dist/Strength/Surface.js");
 const { strengthDelegationChainEvents } = await import("../../verification-system/tests/support/strength-delegation-chain.mjs");
+const workspace = await import("../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js");
 
 const id = (n) => n.toString(16).padStart(40, '0')
 const hash = (text) => `proof-hash(${text})`
@@ -186,7 +187,162 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
   }
 })
 
-test.todo('WHAT[durable-events-019] removing each actual domain registration prevents its live fact from producing the expected Current')
+test('WHAT[durable-events-019] removing one real hostProgram registration blocks its domain result', async () => {
+  // Structural 与 Journal 是 spine 注册：移除时 CanonicalIntegrator 的
+  // base-rule 前置检查直接拒绝构造。如实断言「构造被整体拒绝」这一
+  // fail-closed 形态，不把它伪称为「观察到缺失 Current」。
+  for (const ruleName of ['Structural', 'Journal']) {
+    const root = mkdtempSync(join(tmpdir(), `wxs-integrator-without-${ruleName.toLowerCase()}-`))
+    const commonDir = join(root, '.git')
+    mkdirSync(commonDir, { recursive: true })
+    try {
+      assert.throws(
+        () => workspace.createIsolatedWithoutRegistration(commonDir, `without-${ruleName.toLowerCase()}`, ruleName),
+        (error) => {
+          const text = String((error && error.message) || error)
+          assert.ok(
+            text.includes(`missing required rule '${ruleName}'`),
+            `expected a fail-closed construction refusal naming ${ruleName}, got: ${text}`,
+          )
+          return true
+        },
+        `removing ${ruleName} must fail closed at construction`,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  // 三个域注册的隔离变异：变体程序来自真实 hostProgram 移除恰好一项、
+  // 其余注册（含 Sphinx）保持生产顺序；每个变体落在自己的临时目录，
+  // 不碰共享工作区。live fact 仍按已知词汇落盘，对应业务 Current 被阻止，
+  // 保留注册的 Structural 结果不受牵连。
+  const isolatedStore = (ruleName, writerId, root) => {
+    const commonDir = join(root, '.git')
+    mkdirSync(commonDir, { recursive: true })
+    return workspace.createIsolatedWithoutRegistration(commonDir, writerId, ruleName)
+  }
+
+  {
+    const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-without-strength-'))
+    try {
+      const store = isolatedStore('Strength', 'without-strength', root)
+      try {
+        mustOk(await eventStore.append(store, [structuralEvent]), 'append Structural fact with Strength removed')
+        const payload = mustOk(
+          await strength.storeWritePayload(store, new TextEncoder().encode('isolated strength material')),
+          'write Strength payload with Strength removed',
+        )
+        const delegationChain = strengthDelegationChainEvents(strength, {
+          ownerSessionId: 'isolated-owner',
+          decisionId: 'isolated-decision',
+          targetProviderRun: 'isolated-target-run',
+          replicaSessionId: 'isolated-replica',
+          anchorDigest: 'isolated-anchor',
+        })
+        mustOk(await strength.storeAppend(store, hash, delegationChain.requested), 'append Strength Requested fact with rule removed')
+        mustOk(await strength.storeAppend(store, hash, delegationChain.bound), 'append Strength Bound fact with rule removed')
+        mustOk(
+          await strength.storeAppend(
+            store,
+            hash,
+            strength.eventPrepared(
+              'isolated-owner',
+              'isolated-decision',
+              'isolated-target-run',
+              'isolated-replica',
+              'isolated-anchor',
+              'isolated-frame',
+              27,
+              [payload.value],
+            ),
+          ),
+          'append Strength fact with rule removed',
+        )
+        assert.equal(
+          strength.projectionDecisionForTarget('isolated-target-run', strength.storeCurrent(store)),
+          null,
+          'the Strength Current no longer produces the delegation decision',
+        )
+        assert.equal(
+          eventStore.head(store, structuralEvent.stream),
+          structuralEvent.id,
+          'the kept Structural registration still folds its live fact',
+        )
+      } finally {
+        eventStore.dispose(store)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  {
+    const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-without-casebook-'))
+    try {
+      const store = isolatedStore('Casebook', 'without-casebook', root)
+      try {
+        mustOk(await eventStore.append(store, [structuralEvent]), 'append Structural fact with Casebook removed')
+        mustOk(
+          await casebook.archive(store, {
+            sessionId: 'isolated-case',
+            q: 'Q',
+            a: 'A',
+            observations: [],
+            lastAccessOrder: 0,
+          }),
+          'append Casebook fact with rule removed',
+        )
+        const fetched = mustOk(
+          await casebook.fetchCase(store, 10, 'isolated-case'),
+          'read Casebook Current with rule removed',
+        )
+        assert.equal(fetched.value, null, 'the Casebook Current no longer produces the case')
+        assert.equal(
+          eventStore.head(store, structuralEvent.stream),
+          structuralEvent.id,
+          'the kept Structural registration still folds its live fact',
+        )
+      } finally {
+        eventStore.dispose(store)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  {
+    const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-without-jstransaction-'))
+    try {
+      const store = isolatedStore('JsTransaction', 'without-jstransaction', root)
+      try {
+        mustOk(await eventStore.append(store, [structuralEvent]), 'append Structural fact with JsTransaction removed')
+        mustOk(
+          await transaction.appendPrepared(store, {
+            transactionId: 'isolated-transaction',
+            workspaceRoot: '/isolated-workspace',
+            mutations: [{ path: 'a.txt', originalText: 'before', newText: 'after' }],
+          }),
+          'append JsTransaction fact with rule removed',
+        )
+        assert.deepEqual(
+          transaction.pending(store).map(({ transactionId }) => transactionId),
+          [],
+          'the JsTransaction Current no longer lists the pending transaction',
+        )
+        assert.equal(
+          eventStore.head(store, structuralEvent.stream),
+          structuralEvent.id,
+          'the kept Structural registration still folds its live fact',
+        )
+      } finally {
+        eventStore.dispose(store)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+})
 }
 
 {

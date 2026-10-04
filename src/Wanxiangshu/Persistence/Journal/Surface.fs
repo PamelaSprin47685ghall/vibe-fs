@@ -16,6 +16,18 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Enforcer
+open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
@@ -147,6 +159,200 @@ module JournalSurface =
         | "Session" -> StreamId.Session(sessionIdOf (value?session))
         | other -> failwith $"JournalSurface: unknown stream kind '{other}'"
 
+    // ── obligation-ledger-004: read-only per-slice forwarders ─────────────
+    // Each slice crosses as plain JS built only from public fields and
+    // owner-provided accessors (Relay.Fold.view/roads, SessionStartedAtProjection
+    // .startedAt); no private representation is destructured outside its owner.
+
+    let private companionSliceToJs (state: CompanionProjection) : obj =
+        box {| bloggerSessionId = state.BloggerSessionId |> Option.map SessionId.value |> Option.toObj |}
+
+    let private xTraceSliceToJs (state: XTraceProjectionState) : obj =
+        box
+            {| openingPresent = XTraceProjection.openingEvidence state |> Option.isSome
+               partCount = XTraceProjection.orderedSemanticParts state |> List.length
+               latestTerminalPresent = XTraceProjection.latestTerminalEvidence state |> Option.isSome |}
+
+    let private blogSliceToJs (state: BlogProjectionState) : obj =
+        box
+            {| frameEpochId = FrameEpochId.value state.FrameEpochId
+               frameCount = BlogProjection.frameCount state
+               ingestedThroughSequence = state.Coverage.IngestedThroughSequence |}
+
+    let private prefixEpochSliceToJs (epoch: ActivePrefixEpoch) : obj =
+        box
+            {| epochId = PrefixEpochId.value epoch.EpochId
+               snapshotPresent = epoch.Snapshot |> Option.isSome |}
+
+    let private handleIdText (handleId: HandleId) =
+        match handleId with
+        | HandleId.Agent id -> "agent:" + AgentHandleId.value id
+        | HandleId.Pty id -> "pty:" + PtyHandleId.value id
+        | HandleId.ManagerJob id -> "manager-job:" + ManagerJobId.value id
+
+    let private handlesToJs (state: AgentLinkageProjection) : obj =
+        box
+            {| handleCount = Map.count state.Handles
+               nextCreationOrder = state.NextCreationOrder
+               workCount = Map.count state.Works
+               legacyWorkHandleCount = Set.count state.LegacyWorkHandles
+               handles =
+                state.Handles
+                |> Map.toList
+                |> List.map (fun (handleId, record) ->
+                    box
+                        {| handle = handleIdText handleId
+                           childSessionId = SessionId.value record.ChildSessionId
+                           targetAgent = record.TargetAgent
+                           byname = record.Byname
+                           creationOrder = record.CreationOrder |})
+                |> List.toArray |}
+
+    let private providerFailuresToJs (state: ProviderFailureProjection) : obj =
+        box
+            {| logicalRun = LogicalRunId.value state.LogicalRunId
+               authorityRoot = AuthorityRootUserMessageId.value state.AuthorityRootUserMessageId
+               consecutiveFailureCount = state.Budget.ConsecutiveFailureCount
+               recentFailureKeyCount = state.RecentFailureKeys.Length
+               exhausted = state.Exhausted |}
+
+    let private authorityProfileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
+        box
+            {| session = SessionId.value profile.SessionId
+               logicalRun = LogicalRunId.value profile.LogicalRunId
+               authorityRoot = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+               authorityKind =
+                match profile.AuthorityKind with
+                | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+                | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot" |}
+
+    let private promptAuthorityToJs (state: PromptAuthority.PromptAuthorityProjection) : obj =
+        box
+            {| activeLogicalRun = state.ActiveLogicalRun |> Option.map authorityProfileToJs |> Option.toObj
+               lastAuthorityProfile = state.LastAuthorityProfile |> Option.map authorityProfileToJs |> Option.toObj
+               pendingClaimCount = Map.count state.PendingClaims
+               acceptedDispatchCount = Map.count state.AcceptedDispatches
+               physicalLandingCount = Map.count state.PhysicalLandings
+               acceptedContinuationCount = Map.count state.AcceptedContinuationIds
+               claimSequenceKeys = state.ClaimSequences |> Map.toList |> List.map fst |> List.toArray |}
+
+    let private enforcementToJs (state: EnforcementProjectionState) : obj =
+        box
+            {| cycleCount = Map.count state.ByProviderRun
+               cycles =
+                state.ByProviderRun
+                |> Map.toList
+                |> List.map (fun (providerRun, record) ->
+                    box
+                        {| providerRun = ProviderRunIdentity.value providerRun
+                           mainSessionId = SessionId.value record.MainSessionId
+                           bloggerSessionId = SessionId.value record.BloggerSessionId
+                           tipRuleId = record.TipRuleId
+                           toolCallCount = List.length record.ToolCallIds |})
+                |> List.toArray
+               recentTips =
+                state.RecentTips
+                |> List.map (fun tip ->
+                    box
+                        {| ruleId = tip.RuleId
+                           fieldName = tip.FieldName
+                           cycleId = tip.CycleId |})
+                |> List.toArray |}
+
+    let private bloggerCyclesToJs (state: BloggerCycleProjectionState) : obj =
+        box
+            {| receiptCount = Map.count state.ByProviderRun
+               receiptRuns =
+                state.ByProviderRun
+                |> Map.toList
+                |> List.map (fst >> ProviderRunIdentity.value)
+                |> List.toArray
+               openRequestCount = Map.count state.OpenByRequestId
+               openByBloggerCount = Map.count state.OpenByBlogger
+               providerRunByRequestIdCount = Map.count state.ProviderRunByRequestId |}
+
+    let private relayToJs (state: RelayState) : obj =
+        let roadViewToJs roadId (road: RoadView) =
+            box
+                {| roadId = RoadId.value roadId
+                   iterationOrdinal = road.IterationOrdinal
+                   authorityRevisionCount = List.length road.AuthorityRevisions
+                   authorityMessageIdCount = List.length road.AuthorityMessageIds
+                   activeIncumbencyPresent = road.ActiveIncumbency |> Option.isSome
+                   retiredIncumbencyCount = List.length road.RetiredIncumbencies
+                   certificatePresent = road.Certificate |> Option.isSome
+                   latestRetirementPresent = road.LatestRetirement |> Option.isSome
+                   boundDevOps = road.BoundDevOps |> Option.toObj |}
+
+        let roadIds = Wanxiangshu.Mission.Relay.Fold.roads state
+
+        box
+            {| roadCount = List.length roadIds
+               roads =
+                roadIds
+                |> List.map (fun roadId ->
+                    Wanxiangshu.Mission.Relay.Fold.view state roadId
+                    |> Option.map (roadViewToJs roadId)
+                    |> Option.toObj)
+                |> List.toArray |}
+
+    let private guidelinesToJs (state: GuidelineProjectionState) : obj =
+        box
+            {| pairCount = List.length state.Pairs
+               callIds = state.CallIds |> Set.toList |> List.toArray
+               placementCount = Set.count state.Placements
+               visibleFromOrdinal = state.VisibleFromOrdinal
+               pairs =
+                state.Pairs
+                |> List.map (fun pair ->
+                    box
+                        {| ordinal = pair.Ordinal
+                           callId = ToolCallId.value pair.CallId
+                           markerText = pair.MarkerText |})
+                |> List.toArray |}
+
+    let private requirementGroundingToJs (state: RequirementGroundingProjectionState) : obj =
+        box
+            {| pendingCount = Map.count state.Pending
+               occurrenceCount = List.length state.OccurrencesRev
+               visibleMaterialCount = Set.count state.VisibleMaterials
+               visibleFromOrdinal = state.VisibleFromOrdinal |}
+
+    let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =
+        box {| fullDeliveredTips = state.FullDeliveredTips |> Set.toList |> List.toArray |}
+
+    let private sessionStartedAtToJs (state: SessionStartedAtProjectionState) : obj =
+        box {| startedAt = (SessionStartedAtProjection.startedAt state).ToString("o") |}
+
+    let private delegatedToolEstimateToJs (state: DelegatedToolEstimateProjectionState) : obj =
+        box
+            {| remaining = state.Remaining
+               countedToolCallCount = Set.count state.CountedToolCalls |}
+
+    let private sessionSlicesToJs (session: SessionAgentProjection) : obj =
+        box
+            {| companion = session.Companion |> Option.map companionSliceToJs |> Option.toObj
+               xTrace = session.XTrace |> Option.map xTraceSliceToJs |> Option.toObj
+               blog = session.Blog |> Option.map blogSliceToJs |> Option.toObj
+               prefixEpoch = session.PrefixEpoch |> Option.map prefixEpochSliceToJs |> Option.toObj
+               handles = session.Handles |> Option.map handlesToJs |> Option.toObj
+               providerFailures = session.ProviderFailures |> Option.map providerFailuresToJs |> Option.toObj
+               promptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj
+               enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
+               bloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
+               relay = session.Relay |> Option.map relayToJs |> Option.toObj
+               guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
+               requirementGrounding =
+                session.RequirementGrounding
+                |> Option.map requirementGroundingToJs
+                |> Option.toObj
+               tipDelivery = session.TipDelivery |> Option.map tipDeliveryToJs |> Option.toObj
+               sessionStartedAt = session.SessionStartedAt |> Option.map sessionStartedAtToJs |> Option.toObj
+               delegatedToolEstimate =
+                session.DelegatedToolEstimate
+                |> Option.map delegatedToolEstimateToJs
+                |> Option.toObj |}
+
     let private projectionToJs (projection: ProjectionSet) : obj =
         let sessions =
             projection.AgentProjections.Sessions
@@ -166,9 +372,16 @@ module JournalSurface =
                         |> List.toArray |})
             |> List.toArray
 
+        let sessionProjections =
+            projection.AgentProjections.Sessions
+            |> Map.toList
+            |> List.map (fun (sessionId, session) -> SessionId.value sessionId, sessionSlicesToJs session)
+            |> createObj
+
         box
             {| sessions = sessions
-               todoCheckpoints = todoCheckpoints |}
+               todoCheckpoints = todoCheckpoints
+               sessionProjections = sessionProjections |}
 
     let private journalOrError (writer: IJournalWriter) (init: Envelope) (projection: ProjectionSet) : obj =
         match AgentJournal.createFromProjection writer projection with

@@ -111,7 +111,18 @@ const ADAPTER_RATCHET = new Map([
   // now consumes AttachedRuntime.fs (the Sync kind's adapter over AttachmentLeaseCore),
   // which itself consumes AttachmentLeaseCore.fs; the two files join this adapter
   // closure, one slot above the previous 47.
-  ['delegation-recovery-runtime', 48],
+  // 2026-10-04: declaring linkage-projection's real authority-model dependency
+  // adds eight production sources to this recovery closure (48 -> 56).
+  // Keep the measured bound explicit; the added files remain pure contracts.
+  // The real SessionHostPort contract also consumes ChatExecutionKey and
+  // ManagedChatAcceptanceWitness. Declaring that missing edge adds ten .fs
+  // sources (56 -> 66): Context/Prefix/Candidate; Foundation/Parallel,
+  // ParallelSurface, AsyncSupport; Execution/Session/ChatExecution/Facts,
+  // Projection, Acceptance, Settlement; Execution/Failure/Model; and
+  // Interaction/Authority/Run. These are the existing typed contracts and
+  // supporting modules, not concrete Host or I/O adapters. No runtime
+  // capability is introduced by recording the actual compile closure.
+  ['delegation-recovery-runtime', 66],
 ])
 
 test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {

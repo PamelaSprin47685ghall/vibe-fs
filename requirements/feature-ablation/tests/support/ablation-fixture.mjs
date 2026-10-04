@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -28,7 +28,10 @@ export async function withAblationFixture(mutate, run) {
     cpSync(join(root, 'dist'), join(dir, 'dist'), { recursive: true })
     cpSync(join(root, 'resources/ablation'), join(dir, 'resources/ablation'), { recursive: true })
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}\n')
+    // cpSync 保留源文件权限；快照输入树为 444 只读时副本同样只读，而本
+    // fixture 需要 mutate 后写回 nodes.json，故显式保证副本可写。
     const nodesPath = join(dir, 'resources/ablation/nodes.json')
+    chmodSync(nodesPath, 0o644)
     const nodes = JSON.parse(readFileSync(nodesPath, 'utf8'))
     mutate(nodes)
     writeFileSync(nodesPath, JSON.stringify(nodes))

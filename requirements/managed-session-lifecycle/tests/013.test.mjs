@@ -39,6 +39,45 @@ test.todo('WHAT[managed-session-lifecycle-013] actual restart re-enlists durable
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
+const { admit, forkTool, withForkRuntime } = await import("../../delegation/tests/support/scoped-work.mjs");
+
+test('WHAT[managed-session-lifecycle-013] a stale-projection consumer is arbitrated by the durable consumption tombstone, not its own fold', async () => {
+  const owner = 'scope-cross-instance-consume'
+  await withForkRuntime(owner, async (runtime, directory) => {
+    const a = await admit(runtime, owner, 1, 'RACE-FIRST')
+    assert.equal(await forkTool.settle(runtime, owner, 'RACE-ANSWER', 'provider-a'), true)
+    let deliveries = 0
+
+    // A fresh writer with replay consumes before the old runtime reads again.
+    const first = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
+    assert.equal(first.ok, true)
+    assert.match(first.workRecord, /RACE-ANSWER/)
+    deliveries += 1
+
+    // The old runtime still holds the in-memory projection it folded before
+    // the cold instance's append. WHAT-013 durable re-enlist: its consume
+    // must be arbitrated by the durable tombstone, not by its own stale
+    // fold — no second delivery, and no second consumption append written
+    // from a projection that never saw the first tombstone.
+    const stale = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
+    assert.equal(stale.ok, false)
+    assert.match(stale.error, /AlreadyRetired/)
+    assert.equal(Object.hasOwn(stale, 'workRecord'), false)
+
+    // Durable replay keeps a single terminal: a fresh cold reader sees the
+    // work Retired and every later consumer meets the same tombstone.
+    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'Retired')
+    const late = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
+    assert.equal(late.ok, false)
+    assert.match(late.error, /AlreadyRetired/)
+    assert.equal(deliveries, 1, 'sequential cold and stale consumers deliver only once')
+  })
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
 const RecoverySurface = await import("../../../dist/Execution/Session/Recovery/Surface.js");
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 

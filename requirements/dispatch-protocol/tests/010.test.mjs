@@ -358,5 +358,292 @@ test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection
   })
 })
 
-test.todo('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root (GAP-136: F# type-level proof pending — the wire model-free test above is retained but does not prove compile-time rejection)')
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
+
+// B4 compile isolation for dispatch-protocol-010 (GAP-136: the F# type-level
+// proof that the root opaque signature carries no model authority). The
+// probes compile against the real dispatch-runtime shard closure: Send.fsi
+// declares the root send public constructors, IdentitySeed.fsi declares the
+// root identity witness record and the identity seed union.
+//
+// WHAT-010 keeps model selection at Host admission: neither the root send
+// public signature nor the root identity witness may offer a position where
+// physical model authority could enter. The wire-level Model=null tests above
+// prove the runtime behaviour; these probes prove the same boundary at
+// compile time. The positive probe first proves every referenced symbol,
+// reference and value is legal, so the only remaining cause of each negative
+// failure is the type boundary refusing the model-authority injection:
+//   A. a ModelTarget field added to the root identity witness record;
+//   B. a model argument appended to the root send public constructor;
+//   C. a transport receipt offered where the root identity seed is required
+//      (WHAT-003: a receipt is transport acceptance, never authority).
+integrationTest('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root', async () => {
+  const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { compileOwnerProject, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+
+  const ROOT = resolveRoot(import.meta.dirname, '../../..')
+  const SOURCE_ROOT = joinPath(ROOT, 'src/Wanxiangshu')
+  const DISPATCH_RUNTIME_SHARD = joinPath(
+    SOURCE_ROOT,
+    'Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj',
+  )
+
+  const POSITIVE_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Foundation.Outcome',
+    'open Wanxiangshu.Interaction.Authority',
+    'open Wanxiangshu.Interaction.Dispatch',
+    'open Wanxiangshu.Participant.Persona',
+    '',
+    'module LegalRootSendAndWitness =',
+    '    /// The root identity witness record: exactly the four owner-declared',
+    '    /// fields; no model authority anywhere.',
+    '    let ownerWitness',
+    '        (session: SessionId)',
+    '        (run: LogicalRunId)',
+    '        (rootMessage: AuthorityRootUserMessageId)',
+    '        (participant: ParticipantIdentityInput)',
+    '        : OwnerIdentityWitnessInput =',
+    '        { OwnerSessionId = session',
+    '          OwnerLogicalRunId = run',
+    '          OwnerAuthorityRootUserMessageId = rootMessage',
+    '          ParticipantIdentity = participant }',
+    '',
+    '    /// The root identity seed union: both cases carry identity evidence only.',
+    '    let rootSeed (evidence: ParticipantIdentityEvidence) : PromptIdentitySeed =',
+    '        PromptIdentitySeed.RootSelection evidence',
+    '',
+    '    let rehydratedSeed (seedInput: PromptIdentitySeedInput) =',
+    '        PromptIdentitySeed.rehydrate seedInput',
+    '',
+    '    /// A transport receipt is a legal value in its own right (WHAT-003: it',
+    '    /// is transport-layer acceptance, never message identity or authority).',
+    '    let transportReceipt (outcome: SendOutcome) = outcome',
+    '',
+    '    /// The real root send public constructor (Send.fsi): port, session,',
+    '    /// text, identity seed, directory, await mode, accepted callback —',
+    '    /// seven parameters and no model parameter; the implementation fixes',
+    '    /// Model = None.',
+    '    let sendRoot',
+    '        (runtime: PromptDispatcher.Runtime)',
+    '        (port: IDispatchSessionPort)',
+    '        (session: SessionId)',
+    '        (seed: PromptAuthority.IdentitySeed) =',
+    '        runtime.SendAgentOwnerRoot',
+    '            port session "probe-root-send" seed None',
+    '            PromptDispatcher.AwaitMode.Await None',
+    '        |> ignore',
+    '',
+  ].join('\n')
+
+  // Negative probe A: a ModelTarget field is added to the root identity
+  // witness record. The record type has exactly four owner-declared fields,
+  // so the extra field must be rejected at the record type boundary.
+  const WITNESS_MODEL_FIELD_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Interaction.Authority',
+    'open Wanxiangshu.Participant.Persona',
+    '',
+    'module ModelTargetFieldOnRootWitness =',
+    '    let witnessWithModelTarget',
+    '        (session: SessionId)',
+    '        (run: LogicalRunId)',
+    '        (rootMessage: AuthorityRootUserMessageId)',
+    '        (participant: ParticipantIdentityInput)',
+    '        : OwnerIdentityWitnessInput =',
+    '        { OwnerSessionId = session',
+    '          OwnerLogicalRunId = run',
+    '          OwnerAuthorityRootUserMessageId = rootMessage',
+    '          ParticipantIdentity = participant',
+    '          ModelTarget = "glm-5.3" }',
+    '',
+  ].join('\n')
+
+  // Negative probe B: a model argument is appended to the root send public
+  // constructor. The signature has seven parameters and no model parameter,
+  // so the eighth application must be rejected by the type boundary.
+  const ROOT_SEND_MODEL_ARGUMENT_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Interaction.Authority',
+    'open Wanxiangshu.Interaction.Dispatch',
+    '',
+    'module ModelTargetArgumentOnRootSend =',
+    '    let sendRootWithModelTarget',
+    '        (runtime: PromptDispatcher.Runtime)',
+    '        (port: IDispatchSessionPort)',
+    '        (session: SessionId)',
+    '        (seed: PromptAuthority.IdentitySeed) =',
+    '        runtime.SendAgentOwnerRoot',
+    '            port session "probe-root-send" seed None',
+    '            PromptDispatcher.AwaitMode.Await None',
+    '            (Some "glm-5.3")',
+    '        |> ignore',
+    '',
+  ].join('\n')
+
+  // Negative probe C: a transport receipt is offered where the root identity
+  // seed is required. A receipt is transport acceptance, not authority, so
+  // the seed parameter must reject it by type.
+  const RECEIPT_AS_SEED_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Foundation.Outcome',
+    'open Wanxiangshu.Interaction.Authority',
+    'open Wanxiangshu.Interaction.Dispatch',
+    '',
+    'module TransportReceiptAsRootSeed =',
+    '    let sendRootWithReceiptAsSeed',
+    '        (runtime: PromptDispatcher.Runtime)',
+    '        (port: IDispatchSessionPort)',
+    '        (session: SessionId)',
+    '        (receipt: SendOutcome) =',
+    '        runtime.SendAgentOwnerRoot',
+    '            port session "probe-root-send" receipt None',
+    '            PromptDispatcher.AwaitMode.Await None',
+    '        |> ignore',
+    '',
+  ].join('\n')
+
+  // Source isolation: every compile input resolves to a copy under a temp
+  // root, so the real workspace is never written and a crash mid-test cannot
+  // leave the tree mutated. compileOwnerProject's scratchRoot only isolates
+  // outputs; the compile items themselves are remapped here.
+  const isolate = (plan, probeSource) => {
+    const iso = mkdtempSync(joinPath(tmpdir(), 'wxs-dp010-iso-'))
+    const items = plan.compileItems.map((item) => {
+      const dest = joinPath(iso, 'src', relativeOf(SOURCE_ROOT, item))
+      mkdirSync(dirnameOf(dest), { recursive: true })
+      cpSync(item, dest)
+      return dest
+    })
+    const probe = joinPath(iso, 'probe-dispatch-root-model.fs')
+    writeFileSync(probe, probeSource)
+    return { plan: { ...plan, compileItems: [...items, probe] }, iso }
+  }
+
+  const digestOf = (file) => ({
+    hash: createHash('sha256').update(readFileSync(file)).digest('hex'),
+    mtime: statSync(file).mtimeMs,
+  })
+
+  // Isolation evidence: the real owner sources keep their bytes and mtime.
+  const realSend = joinPath(SOURCE_ROOT, 'Interaction/Dispatch/Send.fs')
+  const realSendSignature = joinPath(SOURCE_ROOT, 'Interaction/Dispatch/Send.fsi')
+  const realDispatcher = joinPath(SOURCE_ROOT, 'Interaction/Dispatch/Dispatcher.fs')
+  const before = [digestOf(realSend), digestOf(realSendSignature), digestOf(realDispatcher)]
+
+  const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-dp010-compile-'))
+  const positiveIso = isolate(planOwnerCompile({ projectPath: DISPATCH_RUNTIME_SHARD }), POSITIVE_PROBE)
+  const witnessModelFieldIso = isolate(
+    planOwnerCompile({ projectPath: DISPATCH_RUNTIME_SHARD }),
+    WITNESS_MODEL_FIELD_PROBE,
+  )
+  const rootSendModelArgumentIso = isolate(
+    planOwnerCompile({ projectPath: DISPATCH_RUNTIME_SHARD }),
+    ROOT_SEND_MODEL_ARGUMENT_PROBE,
+  )
+  const receiptAsSeedIso = isolate(
+    planOwnerCompile({ projectPath: DISPATCH_RUNTIME_SHARD }),
+    RECEIPT_AS_SEED_PROBE,
+  )
+  try {
+    // Positive: the root witness record, the seed union, a receipt value, and
+    // the real root send public constructor all constructed legally. This
+    // proves every referenced symbol, every dependency and every value in the
+    // negative probes is legal.
+    const positive = await compileOwnerProject({
+      projectPath: DISPATCH_RUNTIME_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: positiveIso.plan,
+    })
+    assert.equal(
+      positive.ok,
+      true,
+      'legal root witness/seed/send construction must compile: ' +
+        String(positive.stdout ?? '').slice(-400),
+    )
+
+    // The positive probe already ruled out syntax, missing references and
+    // missing dependencies, so each remaining failure below is the type
+    // boundary refusing the model-authority injection.
+    const TYPE_BOUNDARY =
+      /expected to have type|but here has|should have fields|does not exactly match|type mismatch|incompatible|is not a function|cannot be applied|too many arguments|should not be given this argument|does not contain a field|does not contain a label|field '[^']+' is not defined|FS0001/i
+
+    const witnessModelField = await compileOwnerProject({
+      projectPath: DISPATCH_RUNTIME_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: witnessModelFieldIso.plan,
+    })
+    assert.equal(
+      witnessModelField.ok,
+      false,
+      'a ModelTarget field must not be expressible on the root identity witness',
+    )
+    assert.match(
+      String(witnessModelField.stdout ?? '') + String(witnessModelField.stderr ?? ''),
+      TYPE_BOUNDARY,
+      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+    )
+
+    const rootSendModelArgument = await compileOwnerProject({
+      projectPath: DISPATCH_RUNTIME_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: rootSendModelArgumentIso.plan,
+    })
+    assert.equal(
+      rootSendModelArgument.ok,
+      false,
+      'a model argument must not be admissible on the root send public constructor',
+    )
+    assert.match(
+      String(rootSendModelArgument.stdout ?? '') + String(rootSendModelArgument.stderr ?? ''),
+      TYPE_BOUNDARY,
+      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+    )
+
+    const receiptAsSeed = await compileOwnerProject({
+      projectPath: DISPATCH_RUNTIME_SHARD,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: receiptAsSeedIso.plan,
+    })
+    assert.equal(
+      receiptAsSeed.ok,
+      false,
+      'a transport receipt must not be admissible where the root identity seed is required',
+    )
+    assert.match(
+      String(receiptAsSeed.stdout ?? '') + String(receiptAsSeed.stderr ?? ''),
+      TYPE_BOUNDARY,
+      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+    )
+
+    // Isolation evidence: the real owner sources were never touched.
+    const after = [digestOf(realSend), digestOf(realSendSignature), digestOf(realDispatcher)]
+    assert.deepEqual(after, before, 'the real Dispatch sources are untouched (bytes and mtime)')
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+    rmSync(positiveIso.iso, { recursive: true, force: true })
+    rmSync(witnessModelFieldIso.iso, { recursive: true, force: true })
+    rmSync(rootSendModelArgumentIso.iso, { recursive: true, force: true })
+    rmSync(receiptAsSeedIso.iso, { recursive: true, force: true })
+  }
+})
 }

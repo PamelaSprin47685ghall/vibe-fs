@@ -7,9 +7,10 @@ test('WHAT[managed-session-lifecycle-007] canonical A and B retain separate cell
   await withForkRuntime(owner, async (runtime, directory) => {
     const a = await admit(runtime, owner, 1, 'WORK-A')
     assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-A', 'provider-a'), true)
-    const completedA = forkTool.workSnapshot(runtime, owner)[0]
+    const completedWorks = forkTool.workSnapshot(runtime, owner)
+    const completedA = completedWorks[0]
     assert.equal((await forkTool.replayBinding(runtime, owner, 'Ada')).ok, true)
-    assert.deepEqual(forkTool.workSnapshot(runtime, owner)[0], completedA)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), completedWorks)
     const b = await admit(runtime, owner, 2, 'WORK-B-BEFORE-JOIN')
     assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root).lifecycle, 'CompletedAwaitingJoin')
     await assertCold(runtime, directory, owner)
@@ -417,10 +418,16 @@ test('WHAT[managed-session-lifecycle-007] folding linked and completed facts exp
     const completed = handles.apply(active.state, { op: 'complete', handle: link.handle, kind: 'Terminal' })
     assert.equal(completed.ok, true)
     const replay = handles.apply(completed.state, link)
-    if (replay.ok) {
-      const late = handles.apply(replay.state, { op: 'complete', handle: link.handle, kind: 'Cancelled' })
-      assert.equal(late.ok, false)
-      assert.equal(handles.read(replay.state, link.handle).completion, 'Terminal')
-    }
+    assert.equal(replay.ok, true, `same binding replay is idempotent: ${JSON.stringify(replay)}`)
+    assert.equal(handles.read(replay.state, link.handle).lifecycle, 'CompletedAwaitingJoin')
+    assert.equal(handles.read(replay.state, link.handle).completion, 'Terminal')
+
+    const late = handles.apply(replay.state, { op: 'complete', handle: link.handle, kind: 'Cancelled' })
+    assert.deepEqual(late, { ok: false, error: { kind: 'TransitionRejected', reason: 'AlreadyCompleted' } })
+    assert.equal(handles.read(replay.state, link.handle).completion, 'Terminal')
+
+    const conflicting = handles.apply(completed.state, { op: 'link', handle: link.handle, child: 'other-child', agent: 'engineer', role: 'Engineer' })
+    assert.deepEqual(conflicting, { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIdentityConflict' } })
+    assert.equal(handles.read(completed.state, link.handle).completion, 'Terminal')
   })
 }

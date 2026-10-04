@@ -276,10 +276,17 @@ module HandleController =
         | _ -> None
 
     let private confirmConsumption (journal: AgentJournalPort) parentId work consumptionId record =
-        match HandleProjection.tryWork work (journal.HandleProjection parentId) with
-        | Some consumed when consumed.ConsumptionId = Some consumptionId -> Ok record
-        | Some { Lifecycle = Retired } -> Error AlreadyRetired
-        | _ -> Error(AppendFailed "exact consumption receipt was not confirmed")
+        // Confirm the receipt against refreshed durable facts rather than a stale projection.
+        let current =
+            journal.RefreshProjection()
+            |> Result.mapError AppendFailed
+            |> Result.map (fun () -> HandleProjection.tryWork work (journal.HandleProjection parentId))
+
+        match current with
+        | Error reason -> Error reason
+        | Ok(Some consumed) when consumed.ConsumptionId = Some consumptionId -> Ok record
+        | Ok(Some { Lifecycle = Retired }) -> Error AlreadyRetired
+        | Ok _ -> Error(AppendFailed "exact consumption receipt was not confirmed")
 
     let private appendConsumption (journal: AgentJournalPort) parentId work (cell: HandleCompletion) record =
         task {
@@ -302,11 +309,19 @@ module HandleController =
         }
 
     let private consumeAdmittedWork (journal: AgentJournalPort) parentId work record =
-        match HandleProjection.tryWork work (journal.HandleProjection parentId), consumptionCell record with
-        | Some { Lifecycle = Retired }, _ -> Task.FromResult(Error AlreadyRetired)
-        | None, _ -> Task.FromResult(Error(NotJoinable WorkNotAdmitted))
-        | _, None -> Task.FromResult(Error(NotJoinable NotCompleted))
-        | Some _, Some cell -> appendConsumption journal parentId work cell record
+        // Observe tombstones committed by another journal instance before deciding.
+        let current =
+            journal.RefreshProjection()
+            |> Result.mapError AppendFailed
+            |> Result.map (fun () ->
+                HandleProjection.tryWork work (journal.HandleProjection parentId), consumptionCell record)
+
+        match current with
+        | Error reason -> Task.FromResult(Error reason)
+        | Ok(Some { Lifecycle = Retired }, _) -> Task.FromResult(Error AlreadyRetired)
+        | Ok(None, _) -> Task.FromResult(Error(NotJoinable WorkNotAdmitted))
+        | Ok(_, None) -> Task.FromResult(Error(NotJoinable NotCompleted))
+        | Ok(Some _, Some cell) -> appendConsumption journal parentId work cell record
 
     let consumeWork
         (journal: AgentJournalPort)

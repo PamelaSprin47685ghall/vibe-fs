@@ -274,7 +274,6 @@ const terminal = ({
   },
 })
 
-test.todo('WHAT[managed-chat-execution-006] public Host terminal event waits for durable commit before exact capacity release under held and uncertain append (GAP-126)')
 test('WHAT[managed-chat-execution-006] exact successful Host terminals retain typed finish outcomes', () => {
   for (const [finish, outcome] of [
     ['stop', 'Stop'],
@@ -323,5 +322,176 @@ test('WHAT[managed-chat-execution-006] exact provider failure remains typed but 
 test('WHAT[managed-chat-execution-006] ambiguous and deleted evidence fail closed', () => {
   assert.equal(hostSignals.tryDecodeExactProviderTerminal(terminal({ providerRun: '' })), null)
   assert.equal(hostSignals.tryDecodeExactProviderTerminal({ type: 'session.deleted', properties: { sessionID: 'ses-terminal' } }), null)
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdtempSync, readdirSync, readFileSync, rmSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const recoveryHost = await import("../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const { startPluginIncarnation } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+
+const sessionId = 'ses-terminal-release'
+const physicalUserMessageId = 'msg-terminal-release'
+const providerRun = 'provider-terminal-release'
+// The decoy is a neighbouring execution in its own session: routing keeps one
+// active execution per session, so a second physical under the same session
+// would atomically supersede the first lease instead of coexisting.
+const decoySessionId = 'ses-terminal-decoy'
+const decoyPhysicalUserMessageId = 'msg-terminal-decoy'
+const decoyProviderRun = 'provider-terminal-decoy'
+
+const ndjsonFiles = (directory) => {
+  const found = []
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) found.push(...ndjsonFiles(path))
+    else if (entry.name.endsWith('.ndjson')) found.push(path)
+  }
+  return found
+}
+
+// Oracle: count durable Terminal lines on the real disk, not an observer.
+const terminalLineCount = (directory) =>
+  ndjsonFiles(directory)
+    .flatMap((path) => readFileSync(path, 'utf8').split('\n'))
+    .filter((line) => line.includes('["ChatExecution",["Terminal"')).length
+
+// Oracle: the real shared capacity snapshot, exact owner only.
+const executionCount = (session, physical) =>
+  routing.sharedCapacitySnapshot().executions.filter(
+    (execution) => execution.sessionId === session && execution.physicalUserMessageId === physical,
+  ).length
+
+const acquireLease = (session, physical) =>
+  routing.acquireSharedExecutionAdmission(session, physical, 'engineer', 'engineer', null, 'normal')
+
+const withPlugin = async (action) => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wxs-terminal-release-'))
+  const incarnation = await startPluginIncarnation(workspace)
+  try {
+    await action()
+  } finally {
+    await incarnation.hooks.dispose()
+    rmSync(workspace, { recursive: true, force: true })
+  }
+}
+
+const withHost = async (mode, action) => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-terminal-journal-'))
+  const host = await recoveryHost.bootControlledRecoveryHost(directory, 'absent', mode)
+  const pendingDrains = []
+  let barrierReleased = false
+  let actionFailure
+  const terminalWriter = {
+    trackDrain: (drain) => {
+      pendingDrains.push(drain)
+      return drain
+    },
+    releaseBarrier: () => {
+      if (!barrierReleased) {
+        recoveryHost.releaseTerminalBarrier(host)
+        barrierReleased = true
+      }
+    },
+  }
+  try {
+    await action(host, directory, terminalWriter)
+  } catch (error) {
+    actionFailure = { error }
+    throw error
+  } finally {
+    try {
+      if (mode === 'held') terminalWriter.releaseBarrier()
+      const settled = await Promise.allSettled(pendingDrains)
+      const failures = settled.filter((drain) => drain.status === 'rejected').map((drain) => drain.reason)
+      if (!actionFailure && failures.length) throw new AggregateError(failures, 'Held terminal drain failed', { cause: failures[0] })
+    } finally {
+      recoveryHost.disposeRecoveryHost(host)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+}
+
+test('WHAT[managed-chat-execution-006] public Host terminal event waits for durable commit before exact capacity release under held and uncertain append (GAP-126)', async () => {
+  await withPlugin(async () => {
+    await withHost('held', async (host, directory, terminalWriter) => {
+      await recoveryHost.seedProviderStarted(host, sessionId, physicalUserMessageId, providerRun)
+      await recoveryHost.seedProviderStarted(host, decoySessionId, decoyPhysicalUserMessageId, decoyProviderRun)
+      await acquireLease(sessionId, physicalUserMessageId)
+      await acquireLease(decoySessionId, decoyPhysicalUserMessageId)
+
+      const settle = terminalWriter.trackDrain(recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed'))
+      await recoveryHost.awaitTerminalBarrier(host)
+
+      // The barrier holds the terminal writer: the append is not confirmed, so
+      // the exact lease is retained, the disk carries no terminal line, and the
+      // projection does not fabricate a terminal.
+      assert.equal(executionCount(sessionId, physicalUserMessageId), 1)
+      assert.equal(executionCount(decoySessionId, decoyPhysicalUserMessageId), 1)
+      assert.equal(terminalLineCount(directory), 0)
+      assert.equal(recoveryHost.executionStatus(host, sessionId, physicalUserMessageId).phase, 'ProviderStarted')
+
+      terminalWriter.releaseBarrier()
+      const settled = await settle
+      assert.equal(settled.phase, 'Terminal')
+      assert.equal(settled.disposition, 'Completed')
+
+      // Once the commit confirms, only the exact execution releases; the
+      // neighbouring physical execution keeps its lease and its facts.
+      assert.equal(terminalLineCount(directory), 1)
+      assert.equal(executionCount(sessionId, physicalUserMessageId), 0)
+      assert.equal(executionCount(decoySessionId, decoyPhysicalUserMessageId), 1)
+    })
+
+    await withHost('commitUnknown', async (host, directory) => {
+      await recoveryHost.seedProviderStarted(host, sessionId, physicalUserMessageId, providerRun)
+      await recoveryHost.seedProviderStarted(host, decoySessionId, decoyPhysicalUserMessageId, decoyProviderRun)
+      await acquireLease(sessionId, physicalUserMessageId)
+      await acquireLease(decoySessionId, decoyPhysicalUserMessageId)
+
+      await assert.rejects(
+        recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed'),
+      )
+
+      // Unknown stays unknown: no release, no terminal line, no fabricated
+      // terminal disposition in the durable projection.
+      assert.equal(executionCount(sessionId, physicalUserMessageId), 1)
+      assert.equal(executionCount(decoySessionId, decoyPhysicalUserMessageId), 1)
+      assert.equal(terminalLineCount(directory), 0)
+      assert.equal(recoveryHost.executionStatus(host, sessionId, physicalUserMessageId).phase, 'ProviderStarted')
+    })
+
+    await withHost('held', async (host, directory, terminalWriter) => {
+      await recoveryHost.seedProviderStarted(host, sessionId, physicalUserMessageId, providerRun)
+      await acquireLease(sessionId, physicalUserMessageId)
+
+      // A competing terminal parks behind the held first writer.
+      const first = terminalWriter.trackDrain(recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed'))
+      await recoveryHost.awaitTerminalBarrier(host)
+      const competing = recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Failed')
+      const competingRejected = terminalWriter.trackDrain(assert.rejects(competing))
+
+      terminalWriter.releaseBarrier()
+      const settled = await first
+      assert.equal(settled.phase, 'Terminal')
+      assert.equal(settled.disposition, 'Completed')
+
+      // The first terminal fact wins; the competing disposition fails closed
+      // without a second write or a second release effect.
+      await competingRejected
+      assert.equal(terminalLineCount(directory), 1)
+      assert.equal(executionCount(sessionId, physicalUserMessageId), 0)
+
+      // An equal terminal replay after settlement is an idempotent no-op.
+      const replayed = await recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed')
+      assert.deepEqual(replayed, settled)
+      assert.equal(terminalLineCount(directory), 1)
+    })
+  })
 })
 }

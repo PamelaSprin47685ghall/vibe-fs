@@ -54,6 +54,7 @@ module JournalPortObservationSurface =
             member _.TryHeads streamId = inner.TryHeads streamId
             member _.TryHead streamId = inner.TryHead streamId
             member _.AllHeads() = inner.AllHeads()
+            member _.ReloadLocal() = inner.ReloadLocal()
 
     let private openStore (commonDir: string) (writerTag: string) : IEventStore =
         EventStore.createLocal

@@ -6,11 +6,9 @@ const { mkdtempSync, rmSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
-const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
-const hash = (value) => `H(${value})`
 const managerSelection = {
   kind: 'RootSelection',
   ownerSession: null,
@@ -84,15 +82,15 @@ test('WHAT[dispatch-protocol-012] recovered turn binding restores durable partic
 
       // A continuation on the durable profile preserves the participant: the
       // Host send carries agent = participant and the claim keeps participant+role.
-      const profile = authority.createAuthorityRoot(hash, 'rt-binding', session, 'HumanRoot', 'msg-binding-root', managerSelection)
-      assert.equal(profile.ok, true, profile.ok ? '' : profile.error)
+      // IA-017 / dispatch-protocol [010]: the continuation must carry the durable
+      // active profile itself; a re-derived profile would not match its logical run.
       const sent = await dispatch.sendContinuation(
         capturingPort(),
         opened.journal,
         session,
         'manager continuation',
         'ManagerGuard',
-        profile.value,
+        accepted.profile,
         'Await',
       )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)

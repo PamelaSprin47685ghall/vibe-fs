@@ -725,10 +725,14 @@ type HostForkRuntime
     /// crash-reconciliation-018: explicit /continue may discover a physically surviving child.
     /// It stays dormant: addressable by a later explicit reuse, but excluded from
     /// this process's cancellation/teardown ownership until that reuse begins.
-    member _.AdoptExisting(agentId: string, childId: SessionId, role: Role, agent: string) : unit =
+    ///
+    /// delegation-026: adoption registers identity only. Restoring here would
+    /// plant an active ChildRun with no work behind it, so the next dispatch's
+    /// backend Fork answers Nudged, its runTask never starts, and settle's
+    /// AwaitCurrentWorkRecord waits on the restored cell forever. The dispatch
+    /// itself installs the run that owns the completion cell.
+    member _.AdoptExisting(agentId: string, childId: SessionId) : unit =
         lock gate (fun () -> dormantChildren.[agentId] <- childId)
-        runtime.Restore(agentId, role, agent)
-        runtime.BindChildSession(agentId, childId)
 
     /// crash-reconciliation-020: the durable handle projection is the single
     /// source of truth for which children this parent still owns. A restarted
@@ -743,8 +747,8 @@ type HostForkRuntime
     member private this.AdoptDurableChild(agentId: string) : (SessionId * bool) option =
         match this.TryChildFromDurable agentId with
         | None -> None
-        | Some(childId, role, agent) ->
-            this.AdoptExisting(agentId, childId, role, agent)
+        | Some(childId, _, _) ->
+            this.AdoptExisting(agentId, childId)
             Some(childId, true)
 
     /// Resolve a child for reuse: process-local registration first, then the
@@ -763,7 +767,7 @@ type HostForkRuntime
         | Some _, None -> None
         | None, None -> None
         | None, Some(childId, role, agent) ->
-            this.AdoptExisting(agentId, childId, role, agent)
+            this.AdoptExisting(agentId, childId)
             Some(childId, role, agent)
 
     /// A parent-visible child exists when this process drives it or when the

@@ -320,5 +320,215 @@ integrationTest('WHAT[durable-events-023] isolated compilation rejects physical-
   assert.deepEqual(forbidden, [], 'codec shard declares no physical-store reference')
 })
 
-test.todo('WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds (GAP-149: domain-fold compile proof pending — the codec closure proof above does not cover domain folds)')
+// B4 domain-fold dimension (GAP-149): the codec closure proof above does not
+// cover domain folds, so this probe targets the real Delegation fact fold
+// (the card names it explicitly). Positive: the fold's declared closure
+// flattens into one zero-ProjectReference project and compiles green — a
+// domain fold owns its facts without the aggregate. Negative: the same fold
+// closure must reject the aggregate outer union (Fact.AgentFact), the
+// composition journal append entry (AgentJournalPortAdapter.fromAgentJournal,
+// delegation-029's composition-only wrapping point) and the physical
+// ProcessEventLog with not-defined diagnostics. Each probe first compiles
+// green in the closure that legitimately owns the symbol, so the only
+// remaining cause of each negative failure is the domain-fold boundary —
+// not probe syntax, not a missing reference, not toolchain drift.
+integrationTest('WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds', async () => {
+  const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { compileOwnerProject, materializeOwnerCompile, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const ROOT = resolveRoot(import.meta.dirname, '../../..')
+  const SOURCE_ROOT = joinPath(ROOT, 'src/Wanxiangshu')
+
+  // The domain fold under probe: the real Delegation fact fold. Its shard
+  // compiles DelegationFactFold (DelegationFactCases ->
+  // DelegationProjectionChange list / DelegationFoldRejection) and
+  // ExecutionFactFold — owner-owned fact cases, fold state and closed
+  // rejection only.
+  const FOLD_SHARD = joinPath(
+    SOURCE_ROOT, 'Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj')
+
+  // Positive-control closures, one per probe symbol.
+  const AGGREGATE_OWNER_SHARD = joinPath(
+    SOURCE_ROOT, 'Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj')
+  const JOURNAL_APPEND_OWNER_SHARD = joinPath(
+    SOURCE_ROOT, 'Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj')
+  const STORE_SHARD = joinPath(
+    SOURCE_ROOT, 'Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj')
+
+  const AGGREGATE_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Composition.Durable',
+    '',
+    'module ProbeAggregateUsage =',
+    '    let kindOf (fact: Fact.AgentFact) = "agent-fact"',
+    '',
+  ].join('\n')
+
+  const JOURNAL_APPEND_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Composition.Durable',
+    '',
+    'module ProbeJournalAppendUsage =',
+    '    let appendPort = AgentJournalPortAdapter.fromAgentJournal',
+    '',
+  ].join('\n')
+
+  const PROCESS_EVENT_LOG_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    '',
+    'open Wanxiangshu.Persistence.EventStore',
+    '',
+    'module ProbeProcessEventLogUsage =',
+    '    let describe (log: ProcessEventLog) = "process-event-log"',
+    '',
+  ].join('\n')
+
+  // Source isolation: every compile input resolves to a copy under a temp
+  // root, so the real workspace is never written and a crash mid-test cannot
+  // leave the tree mutated (same pattern as the codec closure proof above).
+  const isolate = (projectPath, probeSource) => {
+    const plan = planOwnerCompile({ projectPath, aggregatePath: null })
+    const iso = mkdtempSync(joinPath(tmpdir(), 'wxs-de023-fold-iso-'))
+    const items = plan.compileItems.map((item) => {
+      const dest = joinPath(iso, 'src', relativeOf(SOURCE_ROOT, item))
+      mkdirSync(dirnameOf(dest), { recursive: true })
+      cpSync(item, dest)
+      return dest
+    })
+    const probe = joinPath(iso, 'probe-domain-fold-boundary.fs')
+    writeFileSync(probe, probeSource)
+    return { projectPath, plan: { ...plan, compileItems: [...items, probe] }, iso }
+  }
+
+  // Isolation evidence: the real fold, aggregate, adapter and store sources
+  // keep their bytes and mtime across the whole probe matrix.
+  const realFold = joinPath(SOURCE_ROOT, 'Execution/Delegation/DelegationFactFold.fs')
+  const realAggregate = joinPath(SOURCE_ROOT, 'Composition/Durable/Fact.fs')
+  const realAdapter = joinPath(SOURCE_ROOT, 'Composition/Durable/AgentJournalPortAdapter.fs')
+  const realStore = joinPath(SOURCE_ROOT, 'Persistence/EventStore/ProcessEventLog.fs')
+  const digestOf = (file) => ({
+    hash: createHash('sha256').update(readFileSync(file)).digest('hex'),
+    mtime: statSync(file).mtimeMs,
+  })
+  const before = [digestOf(realFold), digestOf(realAggregate), digestOf(realAdapter), digestOf(realStore)]
+
+  const PROBES = [
+    {
+      name: 'the aggregate outer union',
+      ownerPath: AGGREGATE_OWNER_SHARD,
+      source: AGGREGATE_PROBE,
+      symbol: /AgentFact|Composition|Durable/,
+    },
+    {
+      name: 'the composition journal append entry',
+      ownerPath: JOURNAL_APPEND_OWNER_SHARD,
+      source: JOURNAL_APPEND_PROBE,
+      symbol: /AgentJournalPortAdapter|Composition|Durable/,
+    },
+    {
+      name: 'the physical process event log',
+      ownerPath: STORE_SHARD,
+      source: PROCESS_EVENT_LOG_PROBE,
+      symbol: /ProcessEventLog|Persistence|EventStore/,
+    },
+  ]
+
+  const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-de023-fold-compile-'))
+  const isolated = PROBES.map((probe) => ({
+    ...probe,
+    ownerIso: isolate(probe.ownerPath, probe.source),
+    foldIso: isolate(FOLD_SHARD, probe.source),
+  }))
+  try {
+    // Positive: the real domain fold compiles as one flat project over its
+    // own declared closure — fold own fact needs no aggregate, no journal
+    // append, no physical store.
+    const foldPlan = planOwnerCompile({ projectPath: FOLD_SHARD, aggregatePath: null })
+    const materialized = materializeOwnerCompile(foldPlan, { scratchRoot: scratch })
+    const flatXml = readFileSync(materialized.projectPath, 'utf8')
+    assert.ok(
+      !flatXml.includes('<ProjectReference'),
+      'the delegation fold flat project must carry zero ProjectReference',
+    )
+    assert.equal(
+      (flatXml.match(/<Compile Include=/g) ?? []).length,
+      foldPlan.compileItems.length,
+      'the delegation fold flat project must carry the full closure compile list',
+    )
+    const foldCompile = await compileOwnerProject({
+      projectPath: FOLD_SHARD,
+      aggregatePath: null,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: foldPlan,
+    })
+    assert.equal(
+      foldCompile.ok,
+      true,
+      'the real delegation fold closure compiles green (fold own fact): '
+        + String(foldCompile.stdout ?? '').slice(-400),
+    )
+
+    // Negative: every probe compiles green in its owner closure and fails
+    // inside the domain fold closure with a not-defined diagnostic naming
+    // the target symbol.
+    for (const { name, symbol, ownerIso, foldIso } of isolated) {
+      const ownerCompile = await compileOwnerProject({
+        projectPath: ownerIso.projectPath,
+        aggregatePath: null,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: ownerIso.plan,
+      })
+      assert.equal(
+        ownerCompile.ok,
+        true,
+        `${name}: the probe compiles in the owner closure (symbol and usage are valid): `
+          + String(ownerCompile.stdout ?? '').slice(-400),
+      )
+
+      const foldCompileProbe = await compileOwnerProject({
+        projectPath: foldIso.projectPath,
+        aggregatePath: null,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: foldIso.plan,
+      })
+      assert.equal(
+        foldCompileProbe.ok,
+        false,
+        `${name}: the same probe must fail in the domain fold closure`,
+      )
+      const output = String(foldCompileProbe.stdout ?? '') + String(foldCompileProbe.stderr ?? '')
+      assert.match(
+        output,
+        symbol,
+        `${name}: the diagnostic names the target symbol`,
+      )
+      assert.match(
+        output,
+        /is not defined/,
+        `${name}: the diagnostic is a not-defined rejection, not a syntax or toolchain error`,
+      )
+    }
+
+    // Isolation evidence: the real sources were never touched.
+    const after = [digestOf(realFold), digestOf(realAggregate), digestOf(realAdapter), digestOf(realStore)]
+    assert.deepEqual(
+      after,
+      before,
+      'the real fold, aggregate, adapter and store sources are untouched (bytes and mtime)',
+    )
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+    for (const { ownerIso, foldIso } of isolated) {
+      rmSync(ownerIso.iso, { recursive: true, force: true })
+      rmSync(foldIso.iso, { recursive: true, force: true })
+    }
+  }
+})
 }

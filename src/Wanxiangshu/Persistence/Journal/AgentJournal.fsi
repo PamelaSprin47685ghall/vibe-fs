@@ -46,6 +46,7 @@ type AgentJournal =
     member Snapshot: ProjectionSet
     member SnapshotWithRevision: ProjectionSet * JournalRevision
     member Writer: IJournalWriter
+    member RefreshCurrent: unit -> Result<unit, string>
 
 module AgentJournal =
     val createFromProjection: writer: IJournalWriter -> projection: ProjectionSet -> Result<AgentJournal, FoldRejection>
@@ -58,6 +59,7 @@ module AgentJournal =
             Task<Result<ProjectionSet, JournalAppendFailure>>
 
 
+    val refreshCurrent: journal: AgentJournal -> Result<unit, string>
     val snapshot: journal: AgentJournal -> ProjectionSet
     val revision: journal: AgentJournal -> JournalRevision
     val snapshotWithRevision: journal: AgentJournal -> ProjectionSet * JournalRevision

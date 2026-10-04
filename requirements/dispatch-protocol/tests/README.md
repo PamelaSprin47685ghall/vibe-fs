@@ -5,9 +5,11 @@
 - 001 实际 owner-root/continuation 在 Host 端观察注册好的 claim；全体合成消息来源仍需逐一验证。
 - 002/005/006 有真实生产 projection、sequence、hash 输入与兼容解码。005 单独改变六个组成要素；它以注入 hash 观察确定性输入，未声称穷尽哈希碰撞或跨进程故障。
 - 002 新增实际 `ManagerWorkflow.observeIdle` 发送链：有效许可只发送一次并被消费；旧 idle 调度暂停后，新 Human 入场撤销许可，恢复旧调度只追加 exact claim 的 `Abandoned(SupersededBeforePhysicalSend)`，SDK 发送为零。隔离副本恢复旧发送函数时，两条行为断言均失败。此接缝调用生产 owner 与受控 Host port，不是安装版 Host 或 OS 重启证明。
+- 002 另新增两条 claim-append 边界证明（与 effect-accounting/003 共证同一生产边界）：journal 写者关闭、claim 无法持久化时，SendPrompt 零调用、发送在 journal 边界失败，且重开冷读无 pending claim、无已消费 sequence；transport 已入栈未完成的窗口内，第二个 writer 冷读已能恢复 exact pending claim（receipt 为 null、sequence 已消费、恰一次 send）。claim append 的物理悬置（held）未注入生产 barrier 接缝，由 fail 与时序两侧断言共同覆盖；跨进程 crash-cut（B3）未做，冷读为同进程第二 writer，不宣称 OS 重启证明。
 - 003 实际 receipt 发送、关闭并重开 journal，确认两种外观的 receipt 均不授予权限。004/007/008 的历史用例多为同进程额外 journal writer，不是 OS crash。保留实际拒绝、未知、查不到证据、不可读及并发 flight 的行为断言。
 - 009 把 Host Promise 保持未决，直接观察 Detached 是否返回，再释放端口；不再用 120ms 竞争当完成事实。晚到 verdict 的用例注入于 dispatcher 端口，不证明 SDK/HTTP 适配器自身正确分类。构造器字面名单已删除。
-- 010/011 使用实际接受的 root profile 续行，验证发送参数、完整 PromptKey、Origin 与 LogicalRun 元数据。profile 没有 model 字段是投影证据，不代替编译边界或全部调用者证明。
+- 010/011 使用实际接受的 root profile 续行，验证发送参数、完整 PromptKey、Origin 与 LogicalRun 元数据。profile 没有 model 字段是投影证据，不代替全部调用者证明。
+- 010 的 B4 负编译（GAP-136 的 F# 类型级证明）按 durable-events/023 与 effect-accounting/001 的仓库成熟模式落地：正例 probe 先证明 root witness record（`OwnerIdentityWitnessInput` 四字段）、identity seed union 两个 case、`SendOutcome` 回执值与真实 `SendAgentOwnerRoot` 七参数公开构造在 dispatch-runtime shard 真实闭包内全部合法；随后三个 probe 分别尝试注入 witness record 的 `ModelTarget` 字段、root send 的第八个 model 参数、把 `SendOutcome` 回执塞进 identity seed 参数位置，各自必须以类型边界诊断失败。真实 `Send.fs`/`Send.fsi`/`Dispatcher.fs` 以 bytes/mtime 快照证明未被触碰。诊断正则含 Fable 实际措辞变体；若 Fable 措辞校准需要增补变体，属于措辞校准而非断言弱化。
 - 010 的 managed assignment 回归在 journal 重开后继续 Manager 与 Blogger 子会话，确认 run/root/participant 不变，副本的精确工具权限不丢失，且 continuation 不重新取得 root identity seed。
 - 012 实际 claim acceptance 与独立 turn reconciliation，完整 handoff/容量所有权仍有 TODO。013 是 journal 重开与显式恢复，不能证明真实插件构造无副作用。014 的自造 fatal descriptor 已撤，真实 invariant incident 仍需证明。
 - 015 的载体属性测试、诱饵/getter/冲突输入继续保留；新增实际插件的非法 PromptKey 和非法 agent 反例，防止错误被折叠成 Missing 后获得新 authority。

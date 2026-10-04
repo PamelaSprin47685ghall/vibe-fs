@@ -29,6 +29,19 @@ test('WHAT[repository-programming-011] JS010_circular_return_is_invalid_return_v
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'INVALID_RETURN_VALUE')
 })
+
+for (const [label, body] of [
+  ['missing_return', ''],
+  ['explicit_undefined', 'return undefined'],
+  ['function', 'return () => 1'],
+  ['symbol', 'return Symbol("x")'],
+]) {
+  test(`WHAT[repository-programming-011] JS010_${label}_is_invalid_return_value`, async () => {
+    const result = await runWrapped(`class Js extends JsProgram {\n  async run() { ${body} }\n}`, { js: {} })
+    assert.equal(result.ok, false)
+    assert.equal(failureCode(result), 'INVALID_RETURN_VALUE')
+  })
+}
 }
 
 {

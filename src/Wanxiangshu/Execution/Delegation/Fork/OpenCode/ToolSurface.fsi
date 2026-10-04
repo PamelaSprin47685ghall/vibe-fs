@@ -58,11 +58,18 @@ module ForkToolSurface =
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
     val startUnprepared: obj -> string -> string -> Task<obj>
     val emitStopForRoot: obj -> string -> string -> string -> Task
+
+    /// managed-session-lifecycle-018: deliver a stop with a free-form reason
+    /// through the same physical Notify boundary as emitStopForRoot. An empty
+    /// root addresses the session-level stop; a non-empty root binds the exact
+    /// authority root.
+    val emitStopWithReason: obj -> string -> string -> string -> string -> Task
     val replayWorkCompletion: obj -> string -> string -> Task<obj>
     val workSnapshot: obj -> string -> obj array
     val coldWorkSnapshot: string -> string -> Task<obj array>
     val replayBinding: obj -> string -> string -> Task<obj>
     val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task
     val consumeWorkWithOutcome: obj -> string -> string -> string -> Task<obj>
+    val coldConsumeWorkWithOutcome: string -> string -> string -> string -> Task<obj>
 
     val disposeRuntime: value: obj -> unit

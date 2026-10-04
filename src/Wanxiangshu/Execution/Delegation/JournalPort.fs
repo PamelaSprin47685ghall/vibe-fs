@@ -16,6 +16,11 @@ type AgentJournalPort =
         ReadBlob: BlobRef -> Task<Result<string, string>>
         /// Write a completion blob body; PERSIST-007 ordering (blob before fact) is preserved by the caller.
         WriteBlob: string -> Task<Result<BlobRef * BlobDigest, string>>
+        /// Durable arbitration refresh (managed-session-lifecycle-013): re-fold
+        /// the durable writer files so a consume decision reflects facts other
+        /// journal instances committed. Read-only; callers use it before
+        /// arbitrating single-delivery decisions, not on hot read paths.
+        RefreshProjection: unit -> Result<unit, string>
         /// Content digest of a blob body as the durable store computes it on write:
         /// lowercase hex sha256 of the UTF-8 body. Composition must supply the same
         /// adapter that produced the stored BlobDigest — a second implementation

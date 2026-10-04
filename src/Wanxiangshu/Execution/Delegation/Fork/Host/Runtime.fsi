@@ -116,7 +116,7 @@ type HostForkRuntime =
     member List: unit -> AgentRecord list * PtyRecord list
     member TryFindAgent: agentId: string -> AgentRecord option
     member internal OwnsAgent: agentId: string -> bool
-    member AdoptExisting: agentId: string * childId: SessionId * role: Role * agent: string -> unit
+    member AdoptExisting: agentId: string * childId: SessionId -> unit
     member internal TryReusableChild: agentId: string -> (SessionId * bool) option
 
     /// crash-reconciliation-020: durable child resolution for reuse/await.

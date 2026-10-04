@@ -2,7 +2,9 @@
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
-本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。下一批为VS-016的T418/T419；本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
+本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。VS-016的T418/T419与GAP-055仍PARTIAL，源码/依赖/工具准备不等于实际同候选verify或只读执行；DIST-001/005/007不能假定同候选快照已可用。最新上游取舍见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
+
+本地focused编译新证据：Controller使用SessionHostPort的ChatExecutionKey/ManagedChatAcceptanceWitness时，`host-session-contract`缺`execution-session-chatexecution-facts`真实边；SW012 production-plan正式红0通过/1失败，单边修正后定向2项通过。独立Controller闭包112→132个fs/fsi，fs计数由56→66（此前48→56另有8个source增长），facts shard分组带入10个typed ChatExecution合同及既有支持模块fs，不含具体Host/文件/网络适配器，单边不新授capability；028 recovery反增长ratchet据实66，其余预算未超，WHAT185及禁止实现source断言不变。统一正式构建/受影响套件仍待验收；SDK只调查未实施，S03其余边界保持PARTIAL，详情见590同步记录。
 
 ## 使用这份分册
 
@@ -453,11 +455,13 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 npm声明的必需生产依赖图须在所选npm包内闭合；direct `graceful-fs`及transitive `@gar/promise-retry`缺失、父目录实际补包的正式反例拒绝。optional缺失允许，存在则递归校验，不宣称任意loaded module、绝对文件读取或OS闭包已封闭。完整npm11.12.1工具包另取得15项定向通过，仍不是实际仓库依赖安装。Homebrew Node26的58项定向只有45通过、13失败，真实缺`libnode`被拒绝；后续平台证据统一见本批记录，旧失败保留。
 
-本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。
+早期45项默认夹具实际npm为11.18.0，当时尚未安装仓库依赖；接续实际application安装证据见下文，不扩大旧夹具范围。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。
 
 第二批见[工具归档安装与输出根](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)：新增`installVerificationDependenciesFromToolArchive`，真实定向10项通过、0失败（含父组）；安装器自己准备完整工具，直接使用原bundle角色路径，最终发布前完整复核工具，固定`toolDigest`进入installation/dependencyDigest，返回独立依赖前回收工具与安装root。两锁定包、held tarball后非CLI库/成员改动、actual Node/npm版本拒绝、Error/null取消及启动前取消都有正式证据。新入口未升级旧raw bootstrap的证明范围，也未接实际verify或提供只读能力。
 
-Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输入及owned挂载回收；受控编译spawn证明发布清理，不证明实际Fable只读执行。upstream `590a3f69e` copy/chmod实际父目录替换反例仍报告PASS、exitCode0，文件inode/ctime恢复不能闭合运行期输入。下一步用新入口准备仓库锁定依赖，闭合SDK、Git及dotnet/Fable/NuGet，执行真正只读候选并绑定实际verify。Windows子树回收未证；GAP-055仍PARTIAL，T418/T419保持。
+Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输入及owned挂载回收；受控编译spawn证明发布清理，不证明实际Fable只读执行。upstream `590a3f69e` copy/chmod实际父目录替换反例仍报告PASS、exitCode0，文件inode/ctime恢复不能闭合运行期输入。下一步闭合SDK、Git及dotnet/Fable/NuGet，执行真正只读候选并绑定实际verify。Windows子树回收未证；GAP-055仍PARTIAL，T418/T419保持。
+
+实际application依赖现有原生Node定向4项通过、0失败、0skip/TODO（1父3叶）：选定`174c2a2533`的Git tree/sourceDigest，以完整Node22.23.3/npm11.12.1归档真实安装236个仓库锁定包；toolDigest与11693成员完整inventory绑定，平台optional有7项存在、16项缺失，实际Fable List/Acorn/Tar消费者通过且全部ownedroot回收。证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。该结果仅属于明确选定tree及darwin-arm64依赖，不证明当前dirty合并输入、native Host/lifecycle/SDK、实际Fable编译、RO或actualverify，不关闭T418/T419。
 
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 
@@ -467,6 +471,7 @@ Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输�
 - **先红 B**：在同一步内尝试write→restore、rename、delete/add、符号链接替换快照输入；写被阻止或整个候选立即失效，绝不能最终hash相同就通过。准备期间并发改变输入也不能形成混合世代。
 - **步骤**：先设计可证明的固定输入准备与可写输出分界，再让所有阶段从同一封闭根执行，外部依赖按锁定身份解析；记录candidate/closure/toolchain/结果绑定。对准备失败、取消、子进程失败做资源回收。copy/chmod/fs.watch各有绕过边界，不单独当完整设计。
 - **验收/停止**：两正式反例在实际入口成立，输入准备一致、所有阶段同源、输出证据绑定唯一候选，原工作区不被锁死。受当前平台权限模型限制无法保障不变性时清楚列出边界，不能先删TODO承诺未来补齐。
+- **590合并取舍（未结算）**：上游copy/chmod物化与inode/ctime/mtime/size/hash边界检查不能证明输入不可变。真实父目录替换→阶段读新字节→恢复原目录仍报告PASS exitCode0；本次保留本地verify/build-state/016/017及原TODO，不把上游快照运行或manifest称为本地交付。T418/T419与GAP-055保持PARTIAL，实际verify同候选、完整依赖、真正只读执行及结果绑定按以上步骤继续，证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。
 
 ### VS-审阅债 · P1/P2 · 不增加虚假占位测试
 

@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — upstream 590a3f69e 增量
+
+- 合入会话 dormant 身份登记、冷读取持久消费投影刷新、取消与删除的公开 Surface，以及沙箱顶层无 JSON 返回值的类型化拒绝。吸收实际工程缺边及持久化、effect、生命周期回归。
+- 保留本地 S03 准备 owner 与两个 TODO，拒绝已被真实父目录替换反例证伪的 copy/chmod 快照接线；不将顺序冷读取证明写成跨实例同时消费已闭合。编译闭包 48→56 按本批新增依赖的八个源如实记录。
+- 本地受影响验收与合并裁决见[同步记录](proposals/archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。
+- S03 另补本仓精确 Git 输入与完整 npm11.12.1 工具归档的真实依赖安装，独立产物的 Fable、Acorn、Tar 消费者及回收已定向通过；native Host、SDK/NuGet 和不可变执行仍未证明。
+
 ## Unreleased — S03 工具归档安装与挂载输出清理
 
 - 新增从完整选定 Node/npm 归档执行真实 npm ci 的入口，沿原工具目录运行，安装 receipt 绑定工具摘要；安装前后及返回前复核完整工具成员，失败和取消回收自有目录。
@@ -27,6 +34,10 @@
 
 - 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。
 - 新增正式WHAT016反例；不可变候选、同阶段改后恢复及依赖隔离仍待完成，两项TODO保留。见[S03记录](proposals/archive/2026-10-03/S03输入链接边界-2026-10-03.md)。
+## Unreleased — 程序无返回值不再击穿沙箱
+
+- 现场：`js-predictor` 程序只 `console.log`、没有 `return`，沙箱报 `PROGRAM_FAILED: undefined is not an object (evaluating 'json.startsWith')`。根因：`JSON.stringify(undefined)`（及函数、Symbol）返回 `undefined` 而非字符串，`decodeRunResult` 对它调用 `StartsWith`。现在包装器在序列化结果不是字符串时与循环引用同样返回 `INVALID_RETURN_VALUE`，符合 repository-programming WHAT[011]。
+- 回归：`repository-programming/tests/011` 覆盖缺省返回、`return undefined`、函数与 Symbol。
 
 ## Unreleased — Replica 请求不得以 model turn 结尾
 

@@ -71,7 +71,10 @@ module JsSandbox =
         + "  }\n"
         + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
         + "}\n"
-        + "try { return JSON.stringify(__result); }\n"
+        + "try {\n"
+        + "  const __json = JSON.stringify(__result);\n"
+        + "  return typeof __json === 'string' ? __json : JSON.stringify({ __jsInvalidReturn: true });\n"
+        + "}\n"
         + "catch (__e2) { return JSON.stringify({ __jsInvalidReturn: true }); }\n"
         + "})()"
 

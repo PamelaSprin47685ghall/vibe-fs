@@ -112,6 +112,13 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member _.RuntimeId = writer.RuntimeId
     member _.WriteBlob(content: string) : Task<Result<BlobWriteReceipt, string>> = writer.BlobWriter.Write content
 
+    /// Durable arbitration refresh (managed-session-lifecycle-013): re-fold
+    /// the durable writer files so a consume decision reflects facts another
+    /// journal instance committed after this one booted. Read-only; the
+    /// process-local revision and waiters are untouched because no local
+    /// append happened.
+    member _.RefreshCurrent() : Result<unit, string> = writer.RefreshCurrent()
+
     /// Physical write uncertainty may poison the writer. A semantic cut does not
     /// poison persisted bytes, but it separately trips FatalProcess for this process.
     member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned)
@@ -307,6 +314,8 @@ module AgentJournal =
         (journal: AgentJournal)
         : Task<JournalChange option> =
         journal.AwaitChangeFromOrCancel(fromRevision, cancellation)
+
+    let refreshCurrent (journal: AgentJournal) : Result<unit, string> = journal.RefreshCurrent()
 
     let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
         AgentProjection.tryFind sessionId (snapshot journal).AgentProjections

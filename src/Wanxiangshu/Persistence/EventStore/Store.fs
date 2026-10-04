@@ -262,4 +262,5 @@ module EventStore =
             member _.TryEvent(eventId) = integrator.TryEvent eventId
             member _.TryHeads(streamId) = integrator.TryHeads streamId
             member _.TryHead(streamId) = integrator.TryHead streamId
-            member _.AllHeads() = integrator.AllHeads() }
+            member _.AllHeads() = integrator.AllHeads()
+            member _.ReloadLocal() = reloadFromDisk () }

@@ -13,9 +13,12 @@ import { createNpmInstallFixture } from './support/npm-install-fixture.mjs'
 import { registerNodeToolCandidateTests } from './support/node-tool-candidate-tests.mjs'
 import { registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
 import { assertParentReplacementInvalidatesVerification } from './support/parent-replacement.mjs'
+import { repositoryNpmInstallTest } from './support/repository-npm-install-tests.mjs'
+import { integrationTest } from './support/tier-gate.mjs'
 
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
+integrationTest('WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers', repositoryNpmInstallTest)
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'

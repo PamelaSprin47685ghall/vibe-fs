@@ -290,7 +290,130 @@ test('WHAT[dispatch-protocol-002] HOST_004_stale_idle_repair_is_abandoned_at_the
 })
 }
 
-test.todo('WHAT[dispatch-protocol-002] held and failed actual claim append prevents Host send, including crash between durable registration and transport invocation (GAP-136)')
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, rmSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const { default: test } = await import('node:test')
+const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+
+const openJournal = (base, writer, runtime, processId) =>
+  journal.JournalSurface_bootWithWriterId(base, writer, runtime, processId, '2026-01-01T00:00:00Z')
+
+const ownerSeedFor = async (handle) => {
+  const owner = await dispatch.acceptHumanRoot(handle, 'ses_owner_dp002', 'msg-owner-dp002', 'manager')
+  assert.equal(owner.ok, true, owner.error)
+  const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
+  assert.equal(inherited.ok, true, inherited.error)
+  return inherited.value
+}
+
+test('WHAT[dispatch-protocol-002] a journal that cannot persist the claim prevents the Host send and leaves no durable trace', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp002-unwritable-'))
+  try {
+    const opened = await openJournal(base, 'writer-dp002-unwritable', 'rt-dp002-unwritable', 4242)
+    assert.equal(opened.ok, true, JSON.stringify(opened.error))
+    try {
+      const seed = await ownerSeedFor(opened.journal)
+
+      let sends = 0
+      const port = {
+        SubscribeTerminal: () => ({ Dispose() {} }),
+        SubscribeFutureTerminal: () => ({ Dispose() {} }),
+        SendPrompt: async () => {
+          sends += 1
+          return dispatch.admittedWithReceipt('must-not-send')
+        },
+      }
+
+      journal.JournalSurface_dispose(opened.journal)
+
+      await assert.rejects(
+        () => dispatch.sendAgentOwnerRootAwait(port, opened.journal, 'ses_child_dp002', 'intent must precede the effect', seed),
+        /Journal handle is disposed/,
+        'a send whose claim cannot even be persisted must fail at the journal boundary',
+      )
+      assert.equal(sends, 0, 'the Host SendPrompt must not be entered when the claim append cannot succeed')
+    } finally {
+      // The handle was disposed inside the scenario; dispose is idempotent here.
+      journal.JournalSurface_dispose(opened.journal)
+    }
+
+    const reopened = await openJournal(base, 'observer-dp002-unwritable', 'rt-dp002-observe', 4243)
+    try {
+      const projection = dispatch.projectionObservation(reopened.journal, 'ses_child_dp002')
+      assert.equal(projection.pendingClaims.length, 0, 'no claim may survive a send that never persisted one')
+      assert.equal(projection.claimSequences.length, 0, 'a failed claim admission must not consume a claim sequence')
+    } finally {
+      journal.JournalSurface_dispose(reopened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[dispatch-protocol-002] the exact claim is already durable while the transport invocation is still in flight', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dp002-inflight-'))
+  try {
+    const opened = await openJournal(base, 'writer-dp002-inflight', 'rt-dp002-inflight', 4242)
+    try {
+      const seed = await ownerSeedFor(opened.journal)
+
+      let sends = 0
+      const coldReads = []
+      const port = {
+        SubscribeTerminal: () => ({ Dispose() {} }),
+        SubscribeFutureTerminal: () => ({ Dispose() {} }),
+        SendPrompt: async (_session, _text, options) => {
+          sends += 1
+
+          // The transport has been entered but not completed: this is the
+          // crash window between durable claim registration and the physical
+          // send. A second writer cold-boots and reads the projection.
+          const reopened = await openJournal(base, 'observer-dp002-inflight', 'rt-dp002-observe', 4243)
+          try {
+            const key = options.Metadata.wanxiangshu_prompt_key
+            const projection = dispatch.projectionObservation(reopened.journal, 'ses_child_dp002')
+            const claim = projection.pendingClaims.find((value) => value.promptKey === key)
+            coldReads.push({
+              found: Boolean(claim),
+              pending: projection.pendingClaims.length,
+              sequences: projection.claimSequences.length,
+              promptKey: claim ? claim.promptKey : null,
+              receipt: claim ? claim.receipt : 'missing',
+            })
+          } finally {
+            journal.JournalSurface_dispose(reopened.journal)
+          }
+
+          return dispatch.admittedWithReceipt('receipt-dp002-inflight')
+        },
+      }
+
+      const sent = await dispatch.sendAgentOwnerRootAwait(port, opened.journal, 'ses_child_dp002', 'intent must precede the effect', seed)
+      assert.equal(sent.ok, true, sent.error)
+      assert.equal(sends, 1, 'exactly one physical send for one claim')
+
+      const key = sent.key
+      assert.equal(coldReads.length, 1, 'the cold read ran inside the transport window')
+      assert.deepEqual(coldReads[0], {
+        found: true,
+        pending: 1,
+        sequences: 1,
+        promptKey: key,
+        receipt: null,
+      }, 'a cold reader inside the transport window recovers the exact pending claim with no receipt, and the spent sequence stays consumed')
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+}
 
 {
 const { default: assert } = await import('node:assert/strict')
