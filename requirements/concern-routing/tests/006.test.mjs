@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
+// 语言锚定：断言依赖英文投递回执文案（/Message accepted/）；
+// WANXIANGSHU_PROVIDER_LANGUAGE 是语言阶梯最高优先级，显式设为英文，使断言不随宿主环境语言漂移。
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 test('WHAT[concern-routing-006] retirement prevents old messages crossing into a same-concern replacement generation', () => {
   let state = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', concern.empty()).state
   state = concern.publish('sender', 'msg-old', 'build', 'old message', state).state

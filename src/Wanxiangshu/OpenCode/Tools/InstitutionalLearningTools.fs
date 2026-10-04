@@ -26,6 +26,9 @@ module InstitutionalLearningTools =
         let CandidateArgument = "institutional-learning/candidate-argument"
 
         [<Literal>]
+        let AbsorbedRuleArgument = "institutional-learning/absorbed-rule-argument"
+
+        [<Literal>]
         let Absorbed = "institutional-learning/absorbed"
 
         [<Literal>]
@@ -212,6 +215,7 @@ module InstitutionalLearningTools =
         (durable: InstitutionalLearningJournalPort)
         experience
         (candidate: BirthCandidate option)
+        (absorbedRule: string option)
         language
         sessionId
         occurrence
@@ -221,7 +225,7 @@ module InstitutionalLearningTools =
             let load () =
                 liveRules language (durable.ReadState sessionId)
 
-            match InstitutionalEnhancer.commitDecision experience candidate load with
+            match InstitutionalEnhancer.commitDecision experience candidate absorbedRule load with
             | InstitutionalEnhancer.LearnOutcome.LearnRevisionConflict _ ->
                 return Error LearningCommitFailure.RevisionConflict
             | InstitutionalEnhancer.LearnOutcome.LearnCommitted(disposition, revision, _) ->
@@ -262,6 +266,7 @@ module InstitutionalLearningTools =
         (durable: InstitutionalLearningJournalPort)
         experience
         (candidate: BirthCandidate option)
+        (absorbedRule: string option)
         language
         sessionId
         occurrence
@@ -271,7 +276,17 @@ module InstitutionalLearningTools =
             match InstitutionalLearningProjection.tryFind sessionId occurrence (durable.ReadState sessionId) with
             | Some record -> return Ok record.FrozenResult
             | None ->
-                return! commitFreshLearning kind durable experience candidate language sessionId occurrence providerRun
+                return!
+                    commitFreshLearning
+                        kind
+                        durable
+                        experience
+                        candidate
+                        absorbedRule
+                        language
+                        sessionId
+                        occurrence
+                        providerRun
         }
 
     let private executeDurable
@@ -279,6 +294,7 @@ module InstitutionalLearningTools =
         durable
         experience
         (candidate: BirthCandidate option)
+        (absorbedRule: string option)
         language
         callId
         (ctx: HostToolContext)
@@ -288,7 +304,16 @@ module InstitutionalLearningTools =
             let occurrence = ToolCallId.value callId
 
             let! result =
-                commitLearning kind durable experience candidate language sessionId occurrence ctx.ProviderRunId
+                commitLearning
+                    kind
+                    durable
+                    experience
+                    candidate
+                    absorbedRule
+                    language
+                    sessionId
+                    occurrence
+                    ctx.ProviderRunId
 
             match result with
             | Ok frozen -> return frozen
@@ -308,11 +333,12 @@ module InstitutionalLearningTools =
             let experience = args.Text "experience" |> trim
             let language = languageOf ctx
             let candidate = candidateOf args
+            let absorbedRule = args.OptionalText "absorbedRule"
 
             match journal, ctx.ToolCallId with
             | _, _ when experience.Length = 0 -> return instructionResult language Path.Invalid Map.empty
             | Some durable, Some callId when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-                return! executeDurable kind durable experience candidate language callId ctx
+                return! executeDurable kind durable experience candidate absorbedRule language callId ctx
             | _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
@@ -332,13 +358,24 @@ module InstitutionalLearningTools =
                 (ProviderProse.render language Path.CandidateArgument Map.empty)
                 factory
 
+        let absorbedRuleArgument =
+            ToolHostCodec.optionalStringSchemaDescribed
+                (ProviderProse.render language Path.AbsorbedRuleArgument Map.empty)
+                factory
+
         [ { Name = "celebrate"
             Description = ProviderProse.render language Path.CelebrateDescription Map.empty
-            Arguments = [ "experience", argument; "candidate", candidateArgument ]
+            Arguments =
+              [ "experience", argument
+                "candidate", candidateArgument
+                "absorbedRule", absorbedRuleArgument ]
             Admission = admission
             Execute = execute ExperienceKind.Celebrate journal }
           { Name = "regret"
             Description = ProviderProse.render language Path.RegretDescription Map.empty
-            Arguments = [ "experience", argument; "candidate", candidateArgument ]
+            Arguments =
+              [ "experience", argument
+                "candidate", candidateArgument
+                "absorbedRule", absorbedRuleArgument ]
             Admission = admission
             Execute = execute ExperienceKind.Regret journal } ]

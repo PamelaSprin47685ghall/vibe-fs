@@ -46,7 +46,7 @@ module EnforcerRepair =
         kind = "tool" && name = "chronicle"
 
     let chronicleCallCount (step: EnforcerCycleDecode.AssistantStep) : int =
-        step.Parts |> List.filter isBlogToolPart |> List.length
+        EnforcerCycleDecode.chronicleCallCount step
 
     let private blogPartStatus (part: obj) : string option =
         if isNull part || isNull part?state || isNull part?state?status then

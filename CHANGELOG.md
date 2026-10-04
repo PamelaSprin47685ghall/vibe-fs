@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — upstream 31e69b3dd 合并
+
+- 吸收 raw Chronicle 基数统一检查与显式 ABSORB 声明，保持过滤前拒绝及 live 规则名核对。修正新增测试的实际日志观察与排空，保留尚未接通的 registered Host TODO。
+- 两次普通合并的取舍与监督验收见[最新记录](proposals/archive/2026-10-04/Upstream增量-31e69b3dd-2026-10-04.md)；制度学习机制提炼与 S03 剩余边界未关闭。
+
 ## Unreleased — upstream aaa123b12 增量
 
 - 吸收 occurrence frontier/coverage 分离、持久事实兼容解码、review 重放及跨任期 call 防线。补完整 binding 重放和开任期误退邮箱的正式红绿回归。

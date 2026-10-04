@@ -1,5 +1,7 @@
 # 计划与提案入口
 
+当前合并状态与接手边界见[31e69b3dd 同步记录](archive/2026-10-04/Upstream增量-31e69b3dd-2026-10-04.md)，后续施工继续从现行总计划认领。
+
 最新 upstream `aaa123b12` 的 occurrence、重放和终结接线按[本地裁决](archive/2026-10-04/Upstream增量-aaa123b12-2026-10-04.md)吸收：修开任期误退邮箱与完整 binding 重放，未闭环的 Suicide 失败恢复接线撤回，强断言与 TODO 保留。上游“转正”不代替本地证明。
 
 S03 已进入[选定 SDK 准备](archive/2026-10-04/S03选定SDK准备-2026-10-04.md)：完整归档与原 global.json 驱动实际 SDK/runtime 探测。下一步施工 NuGet/tool restore 的精确图与包字节、只读执行及实际 verify；不能将 SDK 准备局部通过当 S03 完成。

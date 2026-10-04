@@ -860,9 +860,10 @@ module BlogSurface =
         | None -> null
         | Some step ->
             let calls = EnforcerCycleDecode.callsOf (fun _ _ -> ()) step
+            let rawCallCount = EnforcerCycleDecode.chronicleCallCount step
 
             let decision =
-                EnforcerCycleDecode.validateCycle step.MessageId calls
+                EnforcerCycleDecode.validateCycle step.MessageId rawCallCount calls
                 |> resultToJs
                     (fun (cycle, identities) ->
                         box
@@ -875,5 +876,6 @@ module BlogSurface =
             box
                 {| messageId = step.MessageId
                    completed = step.Completed
+                   chronicleCallCount = rawCallCount
                    decodedCalls = List.length calls
                    decision = decision |}

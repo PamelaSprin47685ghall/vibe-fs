@@ -634,7 +634,10 @@ module EnforcerContinuation =
         if alreadyEntry || alreadyReceipt then
             resumeCatchUp ctx mainSessionId sessionKey "idempotent-receipt-catch-up-complete"
         else
-            EnforcerCycleDecode.validateCycle ctx.Previous.MessageId calls
+            EnforcerCycleDecode.validateCycle
+                ctx.Previous.MessageId
+                (EnforcerCycleDecode.chronicleCallCount ctx.Previous)
+                calls
             |> commitValidated ctx mainSessionId sessionKey providerRun
 
     /// An owned later step: judge the previous step of the live Host loop. A
