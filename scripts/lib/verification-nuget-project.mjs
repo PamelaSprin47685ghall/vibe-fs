@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 import path from 'node:path'
 import { privateDotnetEnvironment } from './verification-dotnet-environment.mjs'
 import { verificationInputExists } from './verification-input-path.mjs'
@@ -115,14 +116,15 @@ export async function prepareVerificationNugetProject({ source, sdk, projectPath
     sdk.revalidate()
     if (source.sourceDigest !== sourceDigest || source.treeId !== treeId || source.sourceRoot !== sourceRoot || sdk.sdkDigest !== sdkDigest || sdk.toolRoot !== sdkRoot) throw invalidEntry('Project restore changed its selected input identities')
   }
-  const parentRoot = fs.realpathSync(parentDirectory)
-  if (!fs.lstatSync(parentRoot).isDirectory()) throw invalidEntry('Project restore requires a real parent directory')
-  const projectRoot = fs.mkdtempSync(path.join(parentRoot, 'verification-nuget-project-'))
+  const owner = allocateVerificationDirectory(parentDirectory, 'verification-nuget-project-', invalidEntry)
+  const projectRoot = owner.root
   try {
+    owner.assertOwned()
     const env = privateDotnetEnvironment(projectRoot, path.join(sdkRoot, 'dotnet-sdk'), executable)
     const options = { cwd: sourceRoot, env, signal }
     const evaluationOutput = await runVerificationToolProbe(executable, ['msbuild', projectFile, '-getItem:ProjectReference', '-getProperty:TargetFramework,TargetFrameworks,MSBuildProjectFullPath'], options)
     signal?.throwIfAborted()
+    owner.assertOwned()
     assertInputs()
     let evaluated
     try {
@@ -140,6 +142,7 @@ export async function prepareVerificationNugetProject({ source, sdk, projectPath
     const configBytes = Buffer.from(`<configuration><packageSources><clear/><add key="selected" value="${escapedFeed}"/></packageSources><fallbackPackageFolders><clear/></fallbackPackageFolders></configuration>\n`)
     fs.writeFileSync(configPath, configBytes, { flag: 'wx' })
     const assertBootstrap = () => {
+      owner.assertOwned()
       const feedFiles = selected.map(pkg => `${pkg.id}.${pkg.version}.nupkg`).sort()
       if (JSON.stringify(fs.readdirSync(feed).sort()) !== JSON.stringify(feedFiles) || !fs.readFileSync(requireOwnedFile(projectRoot, 'NuGet.Config')).equals(configBytes)) throw invalidEntry('Project restore changed its selected feed or configuration')
       for (const pkg of selected) {
@@ -152,17 +155,20 @@ export async function prepareVerificationNugetProject({ source, sdk, projectPath
     assertBootstrap()
     await runVerificationToolProbe(executable, [...common, '--use-lock-file'], options)
     signal?.throwIfAborted()
+    owner.assertOwned()
     assertInputs()
     captureOrdinaryVerificationFiles(projectRoot, invalidEntry)
     assertBootstrap()
     const graph = privateGraph(projectRoot, projectFile, assetsPath, lockPath, selected)
     const expectedGraph = JSON.stringify(graph)
     const lockBytes = fs.readFileSync(path.join(projectRoot, lockPath))
+    owner.assertOwned()
     fs.rmSync(path.join(projectRoot, 'packages'), { recursive: true })
     fs.mkdirSync(path.join(projectRoot, 'packages'))
     assertBootstrap()
     await runVerificationToolProbe(executable, [...common, '--locked-mode', '--force'], options)
     signal?.throwIfAborted()
+    owner.assertOwned()
     assertInputs()
     captureOrdinaryVerificationFiles(projectRoot, invalidEntry)
     if (!fs.readFileSync(path.join(projectRoot, lockPath)).equals(lockBytes) || JSON.stringify(privateGraph(projectRoot, projectFile, assetsPath, lockPath, selected)) !== expectedGraph) throw invalidEntry('Fresh-cache locked restore changed the selected graph')
@@ -179,16 +185,19 @@ export async function prepareVerificationNugetProject({ source, sdk, projectPath
     const prepared = {
       ...selection,
       revalidate() {
+        owner.assertOwned()
         assertInputs()
         const actual = Object.fromEntries(Object.keys(selection).map(key => [key, prepared[key]]))
         if (JSON.stringify(actual) !== capturedSelection || JSON.stringify(captureOrdinaryVerificationFiles(projectRoot, invalidEntry)) !== expectedEntries) throw invalidEntry('Prepared project receipt differs from its owned inputs and outputs')
+        owner.assertOwned()
       },
-      dispose() { fs.rmSync(projectRoot, { recursive: true, force: true }) },
+      dispose: owner.dispose,
     }
+    owner.assertOwned()
     return prepared
   } catch (error) {
     try {
-      fs.rmSync(projectRoot, { recursive: true, force: true })
+      owner.dispose()
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'Project restore and cleanup failed', { cause: error })
     }

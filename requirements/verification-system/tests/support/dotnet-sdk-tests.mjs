@@ -79,6 +79,60 @@ function capturedInventory(root) {
 }
 
 export function registerDotnetSdkTests() {
+  for (const replaced of ['archive', 'probe']) {
+    test(`WHAT[verification-system-016] successful SDK probe replacing its ${replaced} root cannot start another selected executable`, async () => {
+      const selected = fixture()
+      try {
+        const calls = path.join(selected.root, 'calls')
+        writeExecutable(selected, `
+const fs = require('node:fs')
+const path = require('node:path')
+fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv.slice(2)) + '\\n')
+if (process.argv[2] === '--version') {
+  const owned = ${replaced === 'archive' ? "path.resolve(__dirname, '..')" : 'path.dirname(process.env.HOME)'}
+  fs.renameSync(owned, ${JSON.stringify(path.join(selected.root, 'parked'))})
+  fs.cpSync(${JSON.stringify(path.join(selected.root, 'parked'))}, owned, { recursive: true })
+  fs.writeFileSync(path.join(owned, 'foreign-marker'), 'replacement')
+  console.log('10.0.302')
+} else { console.log('10.0.302 [' + path.join(__dirname, 'sdk') + ']') }
+`)
+        const [outcome] = await Promise.allSettled([prepareSdk(await archive(selected))])
+        assert.equal(outcome.status, 'rejected')
+        assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line)), [['--version']], 'changed ownership stops before the next physical probe')
+        assert.ok(outcome.reason instanceof AggregateError)
+        assert.equal(outcome.reason.cause.code, 'verification-dotnet-sdk-entry-invalid', JSON.stringify(outcome.reason.cause))
+        const remaining = fs.readdirSync(selected.parentDirectory)
+        assert.equal(remaining.length, 1)
+        assert.equal(fs.readFileSync(path.join(selected.parentDirectory, remaining[0], 'foreign-marker'), 'utf8'), 'replacement')
+      } finally {
+        fs.rmSync(selected.root, { recursive: true, force: true })
+      }
+    })
+  }
+  test('WHAT[verification-system-016] failed SDK probe preserves a copied replacement of its private probe root', async () => {
+    const selected = fixture()
+    try {
+      writeExecutable(selected, `
+const fs = require('node:fs')
+const path = require('node:path')
+const root = path.dirname(process.env.HOME)
+fs.renameSync(root, ${JSON.stringify(path.join(selected.root, 'parked-probe'))})
+fs.cpSync(${JSON.stringify(path.join(selected.root, 'parked-probe'))}, root, {recursive:true})
+fs.writeFileSync(path.join(root, 'foreign-marker'), 'replacement')
+process.exit(73)
+`)
+      const [outcome] = await Promise.allSettled([prepareSdk(await archive(selected))])
+      assert.equal(outcome.status, 'rejected')
+      assert.ok(outcome.reason instanceof AggregateError)
+      assert.equal(outcome.reason.cause.exitCode, 73)
+      assert.ok(outcome.reason.errors.some(error => error.code === 'verification-dotnet-sdk-entry-invalid'))
+      const remaining = fs.readdirSync(selected.parentDirectory)
+      assert.equal(remaining.length, 1)
+      assert.equal(fs.readFileSync(path.join(selected.parentDirectory, remaining[0], 'foreign-marker'), 'utf8'), 'replacement')
+    } finally {
+      fs.rmSync(selected.root, { recursive: true, force: true })
+    }
+  })
   test('WHAT[verification-system-016] selected SDK archive failures reclaim private roots and preserve exact global.json bytes', async t => {
     const selected = fixture()
     try {

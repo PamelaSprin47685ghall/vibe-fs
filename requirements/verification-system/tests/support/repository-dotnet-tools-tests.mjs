@@ -181,6 +181,31 @@ export async function repositoryDotnetToolsTest(t) {
       restored = true
     })
     if (!restored) return
+    for (const replacement of ['root', 'parent-with-missing-root']) {
+      await t.test(`WHAT[verification-system-016] actually restored tools reject ${replacement} namespace substitution and preserve foreign data`, () => {
+        const target = replacement === 'root' ? tools.toolRoot : parentDirectory
+        const parked = path.join(root, 'parked-tools-namespace')
+        fs.renameSync(target, parked)
+        try {
+          if (replacement === 'root') {
+            fs.cpSync(parked, target, { recursive: true, preserveTimestamps: true })
+            for (const entry of tools.entries) fs.chmodSync(path.join(target, entry.path), entry.mode)
+          } else fs.mkdirSync(target)
+          if (replacement === 'root') assert.deepEqual(actualInventory(target), tools.entries)
+          assert.throws(() => tools.revalidate(), { code: 'verification-dotnet-tools-entry-invalid' })
+          const marker = path.join(target, 'foreign-marker')
+          fs.writeFileSync(marker, 'foreign namespace must survive')
+          assert.throws(() => tools.dispose(), { code: 'verification-dotnet-tools-entry-invalid' })
+          assert.equal(fs.readFileSync(marker, 'utf8'), 'foreign namespace must survive')
+        } finally {
+          fs.rmSync(target, { recursive: true, force: true })
+          fs.renameSync(parked, target)
+        }
+        tools.revalidate()
+        sdk.revalidate()
+        assertInputs()
+      })
+    }
     await t.test('WHAT[verification-system-016] real restored Fable and Fantomas execute after external archives are removed and release only their owned roots', async () => {
       for (const selected of packageArchives) fs.rmSync(selected.archivePath)
       fs.rmSync(sdkArchivePath)

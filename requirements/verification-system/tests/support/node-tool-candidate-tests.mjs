@@ -43,6 +43,72 @@ async function archiveTools(root) {
 }
 
 export function registerNodeToolCandidateTests() {
+  for (const replaced of ['archive', 'probe']) {
+    test(`WHAT[verification-system-016] successful Node probe replacing its ${replaced} root cannot start another selected executable`, async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'node-probe-success-namespace-'))
+      try {
+        const selected = path.join(root, 'selected/toolchain')
+        fs.mkdirSync(path.join(selected, 'node/bin'), { recursive: true })
+        fs.mkdirSync(path.join(selected, 'npm/bin'), { recursive: true })
+        fs.mkdirSync(path.join(root, 'candidates'))
+        fs.writeFileSync(path.join(selected, 'npm/package.json'), JSON.stringify({ name: 'npm', version: '1.0.0' }))
+        fs.writeFileSync(path.join(selected, 'npm/bin/npm-cli.js'), '')
+        const calls = path.join(root, 'calls')
+        fs.writeFileSync(path.join(selected, 'node/bin/node'), `#!${process.execPath}
+const fs = require('node:fs')
+const path = require('node:path')
+fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv.slice(2)) + '\\n')
+if (process.argv[2] === '--version') {
+  const owned = ${replaced === 'archive' ? "path.resolve(__dirname, '../../..')" : 'path.dirname(process.env.HOME)'}
+  fs.renameSync(owned, ${JSON.stringify(path.join(root, 'parked'))})
+  fs.cpSync(${JSON.stringify(path.join(root, 'parked'))}, owned, { recursive: true })
+  fs.writeFileSync(path.join(owned, 'foreign-marker'), 'replacement')
+  console.log('v22.0.0')
+} else { console.log(JSON.stringify({version:'v22.0.0',platform:process.platform,arch:process.arch})) }
+`, { mode: 0o755 })
+        const [outcome] = await Promise.allSettled([prepareTools(await archiveTools(root))])
+        assert.equal(outcome.status, 'rejected')
+        assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line)), [['--version']], 'changed ownership stops before the next physical probe')
+        assert.ok(outcome.reason instanceof AggregateError)
+        assert.equal(outcome.reason.cause.code, 'verification-tool-entry-invalid', JSON.stringify(outcome.reason.cause))
+        const remaining = fs.readdirSync(path.join(root, 'candidates'))
+        assert.equal(remaining.length, 1)
+        assert.equal(fs.readFileSync(path.join(root, 'candidates', remaining[0], 'foreign-marker'), 'utf8'), 'replacement')
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+      }
+    })
+  }
+  test('WHAT[verification-system-016] failed Node probe preserves a copied replacement of its private probe root', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'node-probe-namespace-'))
+    try {
+      const selected = path.join(root, 'selected/toolchain')
+      fs.mkdirSync(path.join(selected, 'node/bin'), { recursive: true })
+      fs.mkdirSync(path.join(selected, 'npm/bin'), { recursive: true })
+      fs.mkdirSync(path.join(root, 'candidates'))
+      fs.writeFileSync(path.join(selected, 'npm/package.json'), JSON.stringify({ name: 'npm', version: '1.0.0' }))
+      fs.writeFileSync(path.join(selected, 'npm/bin/npm-cli.js'), '')
+      fs.writeFileSync(path.join(selected, 'node/bin/node'), `#!${process.execPath}
+const fs = require('node:fs')
+const path = require('node:path')
+const root = path.dirname(process.env.HOME)
+fs.renameSync(root, ${JSON.stringify(path.join(root, 'parked-probe'))})
+fs.cpSync(${JSON.stringify(path.join(root, 'parked-probe'))}, root, {recursive:true})
+fs.writeFileSync(path.join(root, 'foreign-marker'), 'replacement')
+process.exit(73)
+`, { mode: 0o755 })
+      const [outcome] = await Promise.allSettled([prepareTools(await archiveTools(root))])
+      assert.equal(outcome.status, 'rejected')
+      assert.ok(outcome.reason instanceof AggregateError)
+      assert.equal(outcome.reason.cause.exitCode, 73)
+      assert.ok(outcome.reason.errors.some(error => error.code === 'verification-tool-entry-invalid'))
+      const remaining = fs.readdirSync(path.join(root, 'candidates'))
+      assert.equal(remaining.length, 1)
+      assert.equal(fs.readFileSync(path.join(root, 'candidates', remaining[0], 'foreign-marker'), 'utf8'), 'replacement')
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
   test('WHAT[verification-system-016] Node and npm role admission rejects invalid structure before archive reads or root allocation', async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'verification-tool-role-admission-'))
     const parentDirectory = path.join(root, 'unallocated-parent')

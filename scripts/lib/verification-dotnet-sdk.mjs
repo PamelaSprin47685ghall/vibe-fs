@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 import path from 'node:path'
 import { materializeVerificationArchive } from './verification-archive.mjs'
 import { runVerificationToolProbe } from './verification-tool-probe.mjs'
@@ -105,28 +106,41 @@ export async function prepareVerificationDotnetSdk({ sourceRoot, archivePath, ar
   const archiveBytes = fs.readFileSync(archivePath)
   const candidate = await materializeVerificationArchive({ archiveBytes, archiveSha256, parentDirectory, rootDirectory: 'dotnet-sdk', errorPrefix: 'verification-dotnet-sdk' })
   let probeRoot
+  let probeOwner
   try {
     signal?.throwIfAborted()
+    candidate.revalidate()
     const dotnetEntry = selectedEntry(candidate, dotnetPath, 'File')
     if ((dotnetEntry.mode & 0o111) === 0) throw invalidEntry('Selected dotnet requires executable permission')
-    probeRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-dotnet-sdk-probe-'))
-    probeRoot = fs.realpathSync(probeRoot)
+    probeOwner = allocateVerificationDirectory(parentDirectory, 'verification-dotnet-sdk-probe-', invalidEntry)
+    probeRoot = probeOwner.root
     const globalPath = path.join(probeRoot, 'global.json')
     fs.writeFileSync(globalPath, globalBytes, { flag: 'wx' })
     const executable = path.join(candidate.root, dotnetPath)
     const options = { cwd: probeRoot, env: privateDotnetEnvironment(probeRoot, path.join(candidate.root, 'dotnet-sdk'), executable), signal }
     const version = await runVerificationToolProbe(executable, ['--version'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
     if (version !== expectedSdkVersion) throw invalidEntry('Actual SDK version differs from the selected expected SDK version')
-    const sdks = installedSdks(candidate, await runVerificationToolProbe(executable, ['--list-sdks'], options))
-    const runtimes = installedRuntimes(candidate, await runVerificationToolProbe(executable, ['--list-runtimes'], options))
+    const sdksOutput = await runVerificationToolProbe(executable, ['--list-sdks'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
+    const sdks = installedSdks(candidate, sdksOutput)
+    const runtimesOutput = await runVerificationToolProbe(executable, ['--list-runtimes'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
+    const runtimes = installedRuntimes(candidate, runtimesOutput)
     const sdk = sdks.find(sdk => sdk.version === version)
     if (!sdk) throw invalidEntry('Actual SDK version is absent from the selected installed SDKs')
-    validateSdkInfo(candidate, await runVerificationToolProbe(executable, ['--info'], options), sdk, sdks, runtimes, globalPath)
+    const info = await runVerificationToolProbe(executable, ['--info'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
+    validateSdkInfo(candidate, info, sdk, sdks, runtimes, globalPath)
     for (const directory of ['dotnet-sdk/host', 'dotnet-sdk/host/fxr', 'dotnet-sdk/shared', 'dotnet-sdk/packs']) selectedEntry(candidate, directory, 'Directory')
     signal?.throwIfAborted()
     if (!fs.readFileSync(globalPath).equals(globalBytes)) throw invalidEntry('SDK probe changed the captured global.json')
     candidate.revalidate()
-    fs.rmSync(probeRoot, { recursive: true, force: true })
+    probeOwner.dispose()
     const entriesDigest = sha256(JSON.stringify(candidate.entries))
     const globalJsonSha256 = sha256(globalBytes)
     const dotnet = { path: dotnetPath, sha256: dotnetEntry.sha256 }
@@ -148,7 +162,7 @@ export async function prepareVerificationDotnetSdk({ sourceRoot, archivePath, ar
     const failures = [error]
     if (probeRoot) {
       try {
-        fs.rmSync(probeRoot, { recursive: true, force: true })
+        probeOwner.dispose()
       } catch (cleanupError) {
         failures.push(cleanupError)
       }

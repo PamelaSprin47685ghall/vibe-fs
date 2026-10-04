@@ -160,6 +160,30 @@ async function withReceipt(options, action) {
 }
 
 export function registerDotnetToolRestoreTests() {
+  test('WHAT[verification-system-016] tool restore failure cannot delete a copied replacement of its owned root', async () => {
+    await withFixture(async ({ root, options, parentDirectory }) => {
+      const [outcome] = await Promise.allSettled([prepareTools(options)])
+      const allocated = path.join(parentDirectory, fs.readdirSync(parentDirectory)[0] ?? 'missing')
+      const parked = path.join(root, 'parked-tool-root')
+      try {
+        assert.equal(outcome.status, 'rejected')
+        assert.ok(outcome.reason instanceof AggregateError)
+        assert.equal(outcome.reason.cause.exitCode, 73)
+        assert.ok(outcome.reason.errors.some(error => error.code === 'verification-dotnet-tools-entry-invalid'))
+        assert.equal(fs.readFileSync(path.join(allocated, 'foreign-marker'), 'utf8'), 'replacement')
+      } finally {
+        fs.rmSync(allocated, { recursive: true, force: true })
+        fs.rmSync(parked, { recursive: true, force: true })
+      }
+    }, { executableBody: ({ root }) => `
+const fs = require('node:fs')
+const parked = ${JSON.stringify(path.join(root, 'parked-tool-root'))}
+fs.renameSync(process.cwd(), parked)
+fs.cpSync(parked, process.cwd(), {recursive:true})
+fs.writeFileSync(require('node:path').join(process.cwd(), 'foreign-marker'), 'replacement')
+process.exit(73)
+` })
+  })
   const invalidManifests = [
     ['missing', null],
     ['malformed JSON', '{broken manifest}'],

@@ -1,5 +1,9 @@
 # verification-system 测试说明
 
+2026-10-05 本批状态：gen115 构建/静态检查通过；正式 80 文件在 5042ms 静默失败，仅 58/80 排空，016 未启动；原生同选集 761/11、7 skip、31 TODO，失败在 006/021。目录修复相关用例通过，但原生结果不能代替正式门禁。完整证据及 remaining completed canary 见下方本批记录与总计划，不按旧“待附件”猜绿色。
+
+2026-10-04 最新接续为[目录所有权与生产接线](../../../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。Archive、dotnet tools、NuGet project、Node/SDK probe、npm installation 六 owner 分别捕获私有 parent/root dev/ino，复核和清理拒绝外来 namespace；首次消费与各探针返回后复核完整工具，NuGet fresh-cache 删除前守门。真实替换、取消、失败及已发布工具证据分别记账，最终固定输入门禁见附件。下文 gen113 待验收/Archive 未施工属于历史截面：gen113 已439/0、18/18排空；cc9f44fc5 CI 已4258/0、818/818排空、103skip/404TODO。全过程 readonly/ABA/完整FD/actualverify 与 T418/T419 仍保留，后续成功不抹掉旧9909超时。
+
 最新正式scope仍待final：gen112缺显式SDKroot的18排空436/0/7skip/2TODO（166.36s）因外借SDK反例额外skip，不替原6skip；完整选定Node22/npm11.12.1/SDKroot仍触发5003ms静默、17/18排空，不能只归因环境遗漏。npm工具归档第一正例改为有序`t.test`：真实完整工具准备完成后才发runtime叶判决，实际install及原全部assert/consumer/cleanup随后完成；held负例、强oracle与预算不动，不添加背景进展。gen113新输入结果待[验收附件](../../../proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)，错误001/019名单仅setup。最后Node/npm pass不是唯一故障定位，Archive本轮未施工。
 
 最新接手入口见[源码目录身份与NuGet协议夹具](../../../proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)：source同库存foreign parent/root实际0/2红，私有dev/ino守publication/revalidate前后/dispose/catch后定向12/0；完整Git tree/.git/bytes/mode原断言不动。15个NuGet非法图只共享该组不改写的真实Git前提，各叶SDK/restore/HOME/feed/packages独立，原typed/calls断言保持。最后统一输入待附件，195→13静态Git成本不称CI因果；TOCTOU/ABA、其它archive/tools/NuGet owner、完整FD、runtime readonly与T418/T419保留。

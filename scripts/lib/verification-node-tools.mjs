@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 import path from 'node:path'
 import { materializeVerificationArchive } from './verification-archive.mjs'
 import { runVerificationToolProbe } from './verification-tool-probe.mjs'
@@ -121,8 +122,10 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
   const archiveBytes = fs.readFileSync(archivePath)
   const candidate = await materializeVerificationArchive({ archiveBytes, archiveSha256, parentDirectory, rootDirectory: 'toolchain', errorPrefix: 'verification-tool' })
   let probeRoot
+  let probeOwner
   try {
     signal?.throwIfAborted()
+    candidate.revalidate()
     const nodeEntry = selectedFile(candidate.entries, nodePath, 'toolchain')
     if ((nodeEntry.mode & 0o111) === 0) throw invalidEntry('Selected Node binary requires executable permission')
     const cliEntry = selectedFile(candidate.entries, npmCliPath, 'toolchain/npm')
@@ -135,11 +138,16 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     }
     if (manifest?.name !== 'npm' || typeof manifest.version !== 'string' || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(manifest.version)) throw invalidEntry('Selected npm package requires its declared npm version')
     validateDeclaredNpmLibraries(candidate)
-    probeRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-tool-probe-'))
+    probeOwner = allocateVerificationDirectory(parentDirectory, 'verification-tool-probe-', invalidEntry)
+    probeRoot = probeOwner.root
     const options = { cwd: candidate.root, env: privateEnvironment(probeRoot), signal }
     const nodeExecutable = path.join(candidate.root, nodePath)
     const version = await runVerificationToolProbe(nodeExecutable, ['--version'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
     const runtimeOutput = await runVerificationToolProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
     let runtime
     try {
       runtime = JSON.parse(runtimeOutput)
@@ -148,10 +156,12 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     }
     if (runtime?.version !== version || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node probe identities disagree')
     const npmVersion = await runVerificationToolProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
+    probeOwner.assertOwned()
+    candidate.revalidate()
     if (npmVersion !== manifest.version) throw invalidEntry('Actual npm version differs from the selected package manifest')
     signal?.throwIfAborted()
     candidate.revalidate()
-    fs.rmSync(probeRoot, { recursive: true, force: true })
+    probeOwner.dispose()
     const entriesDigest = sha256(JSON.stringify(candidate.entries))
     const node = { path: nodePath, sha256: nodeEntry.sha256, version, platform: runtime.platform, arch: runtime.arch }
     const npm = { cliPath: npmCliPath, cliSha256: cliEntry.sha256, manifestSha256: manifestEntry.sha256, version: npmVersion }
@@ -162,7 +172,7 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     const failures = [error]
     if (probeRoot) {
       try {
-        fs.rmSync(probeRoot, { recursive: true, force: true })
+        probeOwner.dispose()
       } catch (cleanupError) {
         failures.push(cleanupError)
       }

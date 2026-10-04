@@ -500,6 +500,48 @@ function registerNugetGraphTests() {
 
 export function registerNugetProjectTests() {
   registerNugetGraphTests()
+  test('WHAT[verification-system-016] first restore root replacement cannot authorize deletion of the foreign package cache or locked restore', async () => {
+    await withProjectFixture(async ({ root, options, parentDirectory }) => {
+      const [outcome] = await Promise.allSettled([prepareProject(options)])
+      const remaining = fs.readdirSync(parentDirectory)
+      try {
+        assert.equal(outcome.status, 'rejected')
+        assert.ok(outcome.reason instanceof AggregateError)
+        assert.equal(outcome.reason.cause.code, 'verification-nuget-project-entry-invalid')
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'restore-calls.json'), 'utf8')), ['first'])
+        assert.equal(remaining.length, 1)
+        assert.equal(fs.readFileSync(path.join(parentDirectory, remaining[0], 'packages/fixture.package/1.0.0/first-only-member'), 'utf8'), 'must not survive cache reset')
+      } finally {
+        for (const name of remaining) fs.rmSync(path.join(parentDirectory, name), { recursive: true, force: true })
+        fs.rmSync(path.join(root, 'parked-first-restore'), { recursive: true, force: true })
+      }
+    }, { includeDependency: true, executableBody: ({ root }) => graphExecutor({ root, mutation: `
+fs.renameSync(privateRoot, ${JSON.stringify(path.join(root, 'parked-first-restore'))})
+fs.cpSync(${JSON.stringify(path.join(root, 'parked-first-restore'))}, privateRoot, {recursive:true, preserveTimestamps:true})
+` }) })
+  })
+  for (const replaced of ['parent', 'root']) {
+    test(`WHAT[verification-system-016] prepared NuGet project refuses an exact-copy ${replaced} replacement without deleting foreign data`, async () => {
+      await withPreparedProjectFixture(async ({ root, candidate, originalRoot }) => {
+        const rootMode = fs.statSync(originalRoot).mode & 0o777
+        const target = replaced === 'parent' ? path.dirname(originalRoot) : originalRoot
+        const parked = path.join(root, 'parked-project')
+        fs.renameSync(target, parked)
+        try {
+          fs.cpSync(parked, target, { recursive: true, preserveTimestamps: true })
+          fs.chmodSync(target, fs.statSync(parked).mode & 0o777)
+          fs.chmodSync(originalRoot, rootMode)
+          assert.throws(() => candidate.revalidate(), entryInvalid)
+          assert.throws(() => candidate.dispose(), entryInvalid)
+          assert.equal(fs.existsSync(originalRoot), true)
+        } finally {
+          fs.rmSync(target, { recursive: true, force: true })
+          fs.renameSync(parked, target)
+        }
+        candidate.revalidate()
+      })
+    })
+  }
   for (const relative of ['input.txt', '.git/HEAD']) {
     for (const mutation of ['bytes', 'mode', 'missing']) {
       test(`WHAT[verification-system-016] the prepared Git input revalidates ${mutation} identity of ${relative}`, async () => {

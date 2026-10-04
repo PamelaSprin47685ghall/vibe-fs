@@ -22,7 +22,9 @@ import { repositoryNugetProjectTest } from './support/repository-nuget-project-t
 import { registerFableProjectTests } from './support/fable-project-tests.mjs'
 import { repositoryFableProjectTest } from './support/repository-fable-project-tests.mjs'
 import { integrationTest } from './support/tier-gate.mjs'
+import { registerArchiveNamespaceTests } from './support/archive-namespace-tests.mjs'
 
+registerArchiveNamespaceTests()
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
 registerDotnetSdkTests()
@@ -215,6 +217,38 @@ test('WHAT[verification-system-016] npm installation refuses file git link and w
       })
     }
   } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] cancelled actual npm installation preserves a replacement root and its original cancellation cause', async () => {
+  const fixture = await createNpmInstallFixture()
+  const controller = new AbortController()
+  const reason = new Error('cancel npm after owned root replacement')
+  let settled
+  try {
+    fixture.holdLeaf()
+    const installing = installDependencies({ ...fixture.options, signal: controller.signal })
+    settled = Promise.allSettled([installing])
+    await Promise.race([fixture.leafRequest, installing.then(() => { throw new Error('npm published before held input') })])
+    const names = fs.readdirSync(fixture.parentDirectory)
+    assert.equal(names.length, 1)
+    const installation = path.join(fixture.parentDirectory, names[0])
+    const parked = path.join(fixture.root, 'parked-installation')
+    fs.renameSync(installation, parked)
+    fs.cpSync(parked, installation, { recursive: true })
+    fs.writeFileSync(path.join(installation, 'foreign-marker'), 'replacement')
+    controller.abort(reason)
+    const [outcome] = await settled
+    assert.equal(outcome.status, 'rejected')
+    assert.ok(outcome.reason instanceof AggregateError)
+    assert.equal(outcome.reason.cause, reason)
+    assert.ok(outcome.reason.errors.some(error => error.code === 'verification-npm-lock-invalid'))
+    await fixture.leafClosed
+    assert.equal(fs.readFileSync(path.join(installation, 'foreign-marker'), 'utf8'), 'replacement')
+  } finally {
+    controller.abort(reason)
+    await settled
     await fixture.dispose()
   }
 })

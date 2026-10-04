@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六个目录 owner 的局部修复及 PP-011/T335 证明切片完成，固定输入原生相关用例通过；gen115 构建/静态检查通过，但正式 80 文件静默失败，原生完整选集 761/11、7 skip、31 TODO，失败在 006/021。统一门禁未闭合，下一步取得有效正式选集证据并追查仍有的真实失败。PP-011 的落盘、plugin 重开、独立 crypto 和变异不等于独立 OS 进程重启或关闭整个 GAP-082。下文 gen113 待验收与 Archive 未施工属于历史输入。
+
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
 最新统一输入仍待最终：gen112缺显式SDKroot的18排空436/0/7skip/2TODO不能替原6skip；补齐选定Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空。npm首正例拆真实工具归档准备与实际install/assert的有序判决叶，保原强oracle和held负例，不改预算；gen113待附件，最后Node/npm pass不是唯一归因。001/019误名单只属setup，Archive本批未施工。
@@ -90,6 +92,8 @@ fileWaits诊断已有正式红绿；历史72e83 CI仍仅817/818、无authoritati
 - **验收/停止**：伪文本不产生 admission、terminal 或资源释放，真实 typed 证据仍可产生；全面比较相关事实及副作用。缺少某领域实际消费入口时拆为该领域子卡，不能用 renderer exports 充数。
 
 ### PP-011 · P1 · 生产 Journal 路径的 SHA-256 组装
+
+当前状态：已实现并定向验证，统一验收待上述附件。生产落盘、重开与两接线变异已补，不再按“只有 adapter agreement”重复施工。
 
 - **已有/欠缺**：真正 SHA-256 与参考值一致，忽略易失字段、参数变化必须改变摘要均已证；仍缺生产 composition wiring。
 - **前提/先红**：沿 `Context/Prefix/Wire.fs` 调用 `ProjectionRenderer.cutoffDigest HostDigest.sha256Hex` 到实际持久产物；不用测试直接传正确 hash 函数来替代组装。独立 Node crypto 对准确语义前缀求值，错误 digest/错误截点必须失败。

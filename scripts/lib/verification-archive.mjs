@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { Parser } from 'tar'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 
@@ -107,9 +108,10 @@ export async function materializeVerificationArchive({ archiveBytes, archiveSha2
     if (!children.has(parent)) children.set(parent, [])
     children.get(parent).push(path.posix.basename(member.path))
   }
-  const allocatedRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-archive-'))
+  const owner = allocateVerificationDirectory(parentDirectory, 'verification-archive-', invalidEntry)
   try {
-    const archiveRoot = fs.realpathSync(allocatedRoot)
+    owner.assertOwned()
+    const archiveRoot = owner.root
     for (const member of members.filter(member => member.type !== 'SymbolicLink')) {
       const destination = path.join(archiveRoot, member.path)
       if (member.type === 'Directory') fs.mkdirSync(destination)
@@ -139,6 +141,7 @@ export async function materializeVerificationArchive({ archiveBytes, archiveSha2
     const expectedEntries = entries.map(entry => ({ ...entry }))
     const resolvedTargets = new Map(members.filter(member => member.type === 'SymbolicLink').map(member => [member.path, member.resolvedTarget]))
     function revalidate() {
+      owner.assertOwned()
       if (JSON.stringify(fs.readdirSync(archiveRoot)) !== JSON.stringify([rootDirectory])) throw invalidEntry('Materialized archive root inventory differs')
       for (const entry of expectedEntries) {
         const destination = path.join(archiveRoot, entry.path)
@@ -151,11 +154,13 @@ export async function materializeVerificationArchive({ archiveBytes, archiveSha2
           throw invalidEntry(`Materialized archive link differs: ${entry.path}`)
         }
       }
+      owner.assertOwned()
     }
-    return { root: archiveRoot, archiveSha256, entries, revalidate, dispose() { fs.rmSync(archiveRoot, { recursive: true, force: true }) } }
+    owner.assertOwned()
+    return { root: archiveRoot, archiveSha256, entries, revalidate, dispose: owner.dispose }
   } catch (error) {
     try {
-      fs.rmSync(allocatedRoot, { recursive: true, force: true })
+      owner.dispose()
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'Archive preparation and cleanup failed', { cause: error })
     }

@@ -1,5 +1,7 @@
 # 04：认知材料、诊断、制度学习与 Sphinx
 
+2026-10-05 当前状态：cognitive/015 原 physical 接线、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证，固定输入默认用例通过。安装版两次 POST 的旧证据早于 completed 屏障，不能代替最终终态证明；最终 canary 在 project `/path` 就绪 5030ms 超时，未进入业务，completed 后历史和 journal 验收仍待完成。以[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)附件为准；GAP-077 其他语义 PARTIAL，不重复旧“lease 不落地”调查。
+
 返回[总计划](../TODO施工总计划-2026-10-03.md)。基线 `8cf51cc84`；本分册覆盖 11 个有 TODO 的包、80 个运行时 TODO。每行文件号对应 `requirements/<包>/tests/NNN.test.mjs`；完整标题和理由在[逐项清单](05-逐项清单.md)。本文描述待做工作，不是已执行证明。
 
 共同开工条件：读现行 WHAT 与测试 README，按总计划区分 A—F 类；修改生产前立正式反例；用本包已有真实入口；共享 Rulebook、MarkerText、journal 或 Host run 契约先由一人定边界。表中“变异”是候选验证手段，只在隔离候选副本使用，不改共享 dist、不拿测试内自建状态机充当生产。

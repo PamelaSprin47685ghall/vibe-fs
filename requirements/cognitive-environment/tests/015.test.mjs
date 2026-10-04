@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -10,8 +11,18 @@ import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSu
 import * as JournalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import * as LanguageSurface from '../../../dist/Participant/Provider/LanguageSurface.js'
 import { acceptAuthorityRoot, claimBloggerRequest, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+
+integrationTest('WHAT[cognitive-environment-015] installed Host delivers ephemeral Blogger hints in two actual provider requests', () => {
+  const output = execFileSync(process.execPath, [join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 45000,
+  })
+  assert.deepEqual(JSON.parse(output.trim()), { providerRequests: 2, chronicleCompleted: true, historyClean: true, journalClean: true })
+})
 
 const transformsSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 
@@ -273,6 +284,15 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
   assert.notEqual(marker.parts[0].text, zhResource, 'english binding must not fall back to the zh-CN leaf')
 })
 
+test('WHAT[cognitive-environment-015] B6_missing_physical_identity_cannot_borrow_the_session_model', async () => {
+  const session = 'ses-blog-blogger-1'
+  await acquireLease(session, 'msg-user-b6')
+  const output = { messages: [{ info: { role: 'user' }, parts: [{ type: 'text', text: 'No physical identity.' }] }] }
+  const original = structuredClone(output)
+  BloggerChronicleSurface.maybeInject(journalBoot.journal, session, 'en', output)
+  assert.deepEqual(output, original, 'an active whitelisted session lease cannot substitute for missing exact request identity')
+})
+
 // ---------------------------------------------------------------------------
 // GAP-077 补充（registered Host 链）：经真实插件注册的
 // experimental.chat.messages.transform 走完整 normalTransform（16 步真实
@@ -283,40 +303,9 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
 // initialize 幂等，路由结果继续由本文件顶部的隔离 HOME 配置驱动
 // （globalThis.__wanxiangshu_test_blogger_model）。
 //
-// 第九层（调用条件调查）结论：normalTransform 第 15 步 InjectBloggerChronicle
-// 在 prefixHorizon 分支之外无条件调用（PluginTransforms.fs），链上注入与否由
-// maybeInject 门禁的输入形状决定。companion blogger 会话在第 11 步
-// ApplyEnforcerContinuation 分支：blogger session 是 companion satellite
-// （tryMainSessionOf → Some main）→ handleContinuation 读 liveCtx =
-// tryLiveCycleContext（只读 process-local InFlight flight，scope.TryPeekCurrentRequest，
-// 绝不从 durable open 恢复）。live flight 在时 First-step 分支把 BloggerRequest
-// canonical 视图整体替换 wire（message id replaced）——第 15 步门禁读的
-// lastUserMessageId 变成渲染 id，tryReadExecution 无 lease → 静默 no-op。这就是
-// R1/R3/R4/R6 旧 setup 的 0 注入根因：不是 maybeInject 没被调用，是 continuation
-// 投影替换了门禁读取的 frontier。链上注入的真实形态（本批 setup）：
-// journal Accepted（chat.message admission transaction）+ journal durable open
-// BloggerRequest（plan freeze 的 companion 检查放行，claimBloggerRequest 落地后
-// 立即 dispose——flight 释放使第 11 步 liveCtx None，wire 保持 raw frontier）+
-// frontier physical 的 exact committed lease + 白名单模型。R5 保留 todo：typed
-// boundary failure 经 MessagesTransform TypedPolicyFailClosed membrane 后的
-// 可观察形态（JS 异常或静默诊断返回）未实证。
-//
-// 第十一层（admission lease 归属厘清）结论：第十层“stub chat.message 结构性
-// 无法建立 physical 绑定 lease”的诊断不成立。生产链（HostSignalBootstrap.
-// chatMessageHook → ChatAdmissionTransaction.executeAdmission：Accept →
-// Acquire（ModelRouting.acquireExecutionAdmission 携带 exact frontier
-// physical，activeBySession lease 在此绑定 physical）→ Project → Commit
-// （Pending→Committed））在 root-physical 与 frontier-physical 分开的 stub
-// 形态下完整走完——context-compression-018 的 fresh binding 用例（同链、同
-// 形态、agent=manager）经 transform 的 provider start boundary 租约校验成功
-// 通过，即为 lease 落地的行为证据。第十层的真实干扰源是 chat.message 之后
-// 的第二次手动 acquireSharedExecutionAdmission：admission 已持有 committed
-// lease 时该调用只走幂等 adopt（Acquired + AlreadyApplied），且 acquireLease
-// helper 的 commit observed participant（'chronicler'）与 admission 签发的
-// identity 不匹配——第十层读到的 tryReadExecution null 是这条冗余路径的
-// 产物，不是 admission 形态的结构性缺失。本批修复：R1—R4/R6 删除手动
-// acquireLease，lease 完全由 chat.message admission 建立（admitExecution 即
-// physical-binding admission helper，与生产同序）；R5 保留 todo 原样。
+// The registered transform receives a physical Host history and may replace
+// its frontier with a canonical companion projection. Admission and marker
+// identity must remain bound to the original physical execution.
 // ---------------------------------------------------------------------------
 
 const registeredUserMessage = (session, id) => ({
@@ -387,6 +376,9 @@ const chronicleMarkers = (messages) =>
       (m.parts[0]?.text === zhResource || m.parts[0]?.text === enResource),
   )
 
+const markerIdFor = (session, physical) =>
+  `text-${createHash('sha256').update([session, 'blogger-chronicle-text', physical].join('\u001f')).digest('hex').slice(0, 24)}`
+
 const hostHistoryContainsMarker = (runtime) =>
   runtime.messages.some((message) => {
     const text = JSON.stringify(message?.parts ?? [])
@@ -409,6 +401,62 @@ const journalTreeContainsMarker = (directory) => {
   return walk(join(directory, '.git', 'wanxiang', 'events'))
 }
 
+test('WHAT[cognitive-environment-015] registered companion projection keeps the original execution model gate', async () => {
+  await withEnglishLanguage(async () => {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const session = 'ses-blog-original-execution'
+      const physical = 'msg-blog-original-execution'
+      const main = 'ses-main-original-execution'
+      await appendCompanionBloggerLink(runtime, main, session)
+      const profile = await admitExecution(runtime, hooks, session, physical)
+      const request = await claimBloggerRequest({
+        runtime, mainSession: main, bloggerSession: session, profile,
+        dispatchPhysical: 'msg-dispatch-original-execution', requestId: 'req-original-execution',
+      })
+      request.dispose()
+      runtime.pushHostMessage(session, registeredUserMessage(session, physical))
+      runtime.pushHostMessage(session, {
+        info: { id: 'assistant-original-execution', sessionID: session, parentID: physical,
+          role: 'assistant', agent: 'blogger', providerID: 'test', modelID: 'step-3.5-flash-canary',
+          time: { created: 2 } },
+        parts: [],
+      })
+      const output = { messages: [registeredUserMessage(session, physical)] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, output)
+      assert.notEqual(output.messages.at(-1).info.id, physical, 'the companion projection must actually replace the physical frontier')
+      assert.equal(chronicleMarkers(output.messages).length, 1, 'a rendered frontier must still use the admitted physical execution model')
+      const firstMarker = chronicleMarkers(output.messages)[0]
+      assert.equal(firstMarker.info.id, markerIdFor(session, physical))
+      const firstWire = JSON.stringify(output.messages)
+      const otherSession = 'ses-blog-other-execution'
+      const otherMain = 'ses-main-other-execution'
+      await appendCompanionBloggerLink(runtime, otherMain, otherSession)
+      const otherProfile = await admitExecution(runtime, hooks, otherSession, physical)
+      const otherRequest = await claimBloggerRequest({
+        runtime, mainSession: otherMain, bloggerSession: otherSession, profile: otherProfile,
+        dispatchPhysical: 'msg-dispatch-other-execution', requestId: 'req-other-execution',
+      })
+      otherRequest.dispose()
+      runtime.pushHostMessage(otherSession, registeredUserMessage(otherSession, physical))
+      runtime.pushHostMessage(otherSession, {
+        info: { id: 'assistant-other-execution', sessionID: otherSession, parentID: physical,
+          role: 'assistant', agent: 'blogger', providerID: 'test', modelID: 'step-3.5-flash-canary',
+          time: { created: 2 } },
+        parts: [],
+      })
+      const otherOutput = { messages: [registeredUserMessage(otherSession, physical)] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: otherSession }, otherOutput)
+      const otherMarkers = chronicleMarkers(otherOutput.messages)
+      assert.equal(otherMarkers.length, 1)
+      assert.equal(otherMarkers[0].info.id, markerIdFor(otherSession, physical))
+      assert.notEqual(otherMarkers[0].info.id, firstMarker.info.id, 'another session cannot reuse the first occurrence marker')
+      assert.equal(JSON.stringify(output.messages), firstWire, 'another session cannot mutate the first request projection')
+      assert.equal(hostHistoryContainsMarker(runtime), false)
+      assert.equal(journalTreeContainsMarker(directory), false)
+    })
+  })
+})
+
 test('WHAT[cognitive-environment-015] durable marker oracle observes Git-private event bytes', () => {
   const directory = mkdtempSync(join(tmpdir(), 'chronicle-marker-oracle-'))
   try {
@@ -424,7 +472,7 @@ test('WHAT[cognitive-environment-015] durable marker oracle observes Git-private
   }
 })
 
-const withEnglishLanguage = async (action) => {
+async function withEnglishLanguage(action) {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   LanguageSurface.refreshGlobalLanguage()
@@ -440,7 +488,7 @@ const withEnglishLanguage = async (action) => {
   }
 }
 
-test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'eleventh layer (this round): the pb-helper reshape keeps admitExecution at the same root + chat.message shape as round 18, so the tenth-layer structural conclusion carries over unchanged — the chat.message admission stays session-scoped, the physical binding never lands, tryReadExecution stays null, and the maybeInject gate silently no-ops. R1/R3/R4 fail for the missing injection; R2/R6 pass for the same lease-null reason (green without reaching the gate). The unsealing prerequisite remains a genuine physical-binding admission fixture entry (replicating the production chat.message physical-binding admission), not a rearrangement of existing surface calls. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -453,13 +501,7 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       // exact physical-bound lease itself (emr-011 owner order; eleventh
       // layer — the same admission shape context-compression-018 proves green).
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Durable BloggerRequest chain: the plan freeze companion check needs a
-      // journal open request (BloggerRequestMaterialized). The live flight is
-      // released immediately after the claim — tryLiveCycleContext reads only
-      // the process-local InFlight (TryPeekCurrentRequest, never healed from
-      // durable open), so step 11 keeps the raw wire frontier instead of
-      // projecting the BloggerRequest canonical view (the ninth-layer root
-      // cause of the old zero-injection runs).
+      // The durable open BloggerRequest is required by the attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -508,13 +550,13 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       assert.equal(markers.length, 1, 'registered transform must inject exactly one chronicle marker')
       const marker = markers[0]
       assert.equal(marker.parts[0].text, enResource, 'marker text must be the en leaf under the global language binding')
-      assert.ok(marker.info.id.startsWith('text-'), 'marker id must be digest-derived')
+      assert.equal(marker.info.id, markerIdFor(session, physical), 'the marker identity must bind the original physical execution')
       const markerIndex = outObj.messages.indexOf(marker)
       assert.ok(markerIndex >= 0)
       assert.equal(
-        outObj.messages[markerIndex + 1]?.info?.id,
-        physical,
-        'the marker must sit immediately before the frontier user message',
+        outObj.messages[markerIndex + 1],
+        outObj.messages.at(-1),
+        'the marker must sit immediately before the final projected frontier',
       )
 
       // WHAT 015：提示只作用于当次转换，不写入日志或历史。transform 修改的
@@ -526,12 +568,10 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
   })
 })
 
-test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'eleventh layer (this round): the pb-helper reshape keeps admitExecution at the same root + chat.message shape as round 18, so the tenth-layer structural conclusion carries over unchanged — the chat.message admission stays session-scoped, the physical binding never lands, tryReadExecution stays null, and the maybeInject gate silently no-ops. R1/R3/R4 fail for the missing injection; R2/R6 pass for the same lease-null reason (green without reaching the gate). The unsealing prerequisite remains a genuine physical-binding admission fixture entry (replicating the production chat.message physical-binding admission), not a rearrangement of existing surface calls. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-      // 目标是证明非 companion 被拒绝；当前 admission 尚未绑定 physical lease，
-      // 零注入不能归因于 companion 门禁，因此保留 TODO。
       const session = 'ses-blog-registered-2'
       const physical = 'msg-user-r2'
       await admitExecution(runtime, hooks, session, physical)
@@ -564,18 +604,16 @@ test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_sess
   })
 })
 
-test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'eleventh layer (this round): the pb-helper reshape keeps admitExecution at the same root + chat.message shape as round 18, so the tenth-layer structural conclusion carries over unchanged — the chat.message admission stays session-scoped, the physical binding never lands, tryReadExecution stays null, and the maybeInject gate silently no-ops. R1/R3/R4 fail for the missing injection; R2/R6 pass for the same lease-null reason (green without reaching the gate). The unsealing prerequisite remains a genuine physical-binding admission fixture entry (replicating the production chat.message physical-binding admission), not a rearrangement of existing surface calls. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
-    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
       const session = 'ses-blog-registered-3'
       const main = 'ses-blog-main-registered-3'
       const physical = 'msg-user-r3'
       await appendCompanionBloggerLink(runtime, main, session)
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Same shape as R1: the durable open request feeds the plan freeze
-      // companion check; the live flight is disposed so step 11 keeps the raw
-      // wire frontier (ninth-layer root cause fix).
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -608,22 +646,25 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
       const first = chronicleMarkers(outObj.messages)
       assert.equal(first.length, 1, 'the first pass injects exactly one marker')
 
-      // 同一 outObj（同一 occurrence 的重复 transform）：既有同文本 assistant
-      // 消息被 filter 剔除后重新插入恰好一条，id 保持 digest 稳定。
+      // Host replays the same physical occurrence from its original history,
+      // not from the earlier request's canonical provider projection.
+      outObj.messages = [registeredUserMessage(session, physical)]
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
       const replayed = chronicleMarkers(outObj.messages)
       assert.equal(replayed.length, 1, 'replay must not accumulate duplicate markers')
       assert.equal(replayed[0].info.id, first[0].info.id, 'the same occurrence keeps its digest-derived id stable')
       assert.equal(
-        outObj.messages[outObj.messages.indexOf(replayed[0]) + 1]?.info?.id,
-        physical,
-        'the marker must stay immediately before the frontier user message after replay',
+        outObj.messages[outObj.messages.indexOf(replayed[0]) + 1],
+        outObj.messages.at(-1),
+        'the marker must stay immediately before the projected frontier after replay',
       )
+      assert.equal(hostHistoryContainsMarker(runtime), false, 'Host replay cannot persist an earlier request hint')
+      assert.equal(journalTreeContainsMarker(directory), false, 'canonical capture cannot retain an earlier request hint')
     })
   })
 })
 
-test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'eleventh layer (this round): the pb-helper reshape keeps admitExecution at the same root + chat.message shape as round 18, so the tenth-layer structural conclusion carries over unchanged — the chat.message admission stays session-scoped, the physical binding never lands, tryReadExecution stays null, and the maybeInject gate silently no-ops. R1/R3/R4 fail for the missing injection; R2/R6 pass for the same lease-null reason (green without reaching the gate). The unsealing prerequisite remains a genuine physical-binding admission fixture entry (replicating the production chat.message physical-binding admission), not a rearrangement of existing surface calls. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -638,8 +679,7 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       const userOne = registeredUserMessage(session, physicalOne)
       runtime.pushHostMessage(session, structuredClone(userOne))
       const profile = await admitExecution(runtime, hooks, session, physicalOne)
-      // Same shape as R1: durable open request feeds the plan freeze; the
-      // live flight is disposed so step 11 keeps the raw wire frontier.
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -712,20 +752,22 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       assert.notEqual(secondMarkers[0].info.id, firstMarkerId, 'a new occurrence derives a new marker id')
       const markerIndex = secondRequest.messages.indexOf(secondMarkers[0])
       assert.equal(
-        secondRequest.messages[markerIndex + 1]?.info?.id,
-        physicalTwo,
-        'the fresh marker precedes the new frontier user message',
+        secondRequest.messages[markerIndex + 1],
+        secondRequest.messages.at(-1),
+        'the fresh marker precedes the final projected frontier',
       )
       assert.equal(
-        secondRequest.messages[markerIndex - 1]?.info?.id,
-        physicalOne,
-        'the earlier physical user message remains ahead of the fresh marker',
+        secondMarkers[0].info.id,
+        markerIdFor(session, physicalTwo),
+        'the new marker identity must use the new physical execution, not its rendered projection',
       )
+      assert.equal(hostHistoryContainsMarker(runtime), false)
+      assert.equal(journalTreeContainsMarker(directory), false)
     })
   })
 })
 
-test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_with_typed_rejection', { todo: 'ninth-layer adjudication: setup now isolates the exact committed lease (durable Accepted stays via the chat.message admission transaction, journal open BloggerRequest feeds the plan freeze with the live flight disposed, the exact lease is committed through the ModelRouting surface and then settled away with releasePhysical), so the provider start boundary requireProviderAdmission must read no committed lease and reject with the CommittedAdmissionUnavailable typed failure. Open gap: the MessagesTransform hook is registered TypedPolicyFailClosed (HookPolicy), and the observable shape of that typed boundary failure at the hook boundary — a JS exception surfaced to this test, or a quiet typed-failure return swallowed by the membrane — has not been proven by a real run. Eleventh-layer note: the chat.message admission itself now lands the committed lease, so when this case is unsealed the manual acquireLease step must either be dropped (settle the admission-issued lease directly with releasePhysical) or its Applied assertion adjusted — the surface acquire after an admission-owned lease walks the idempotent AlreadyApplied path. The assertion intent stays: fail closed, never a quiet zero-injection completion. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_at_execution_admission', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -738,9 +780,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
       // Accepted 执行仍先建立——被测的是 lease 缺席，不是 Accepted 缺席。
       const physical = 'msg-user-r5'
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Same shape as R1: the durable open request feeds the plan freeze
-      // companion check; the live flight is disposed so step 11 keeps the raw
-      // wire frontier.
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -772,13 +812,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         parts: [],
       })
 
-      // Ninth-layer adjudication: commit the exact lease through the
-      // ModelRouting surface (the production emr-011 path), then settle it
-      // away on the capacity owner (durable Accepted stays in the journal);
-      // the provider start boundary's requireProviderAdmission must reject
-      // the transform with the CommittedAdmissionUnavailable typed failure —
-      // fail-closed, not a quiet zero-injection completion.
-      await acquireLease(session, physical, 'blogger', 'blogger')
+      // Retire only the admission-issued lease; durable Accepted remains.
       const released = ModelRoutingSurface.releasePhysical(session, physical)
       assert.ok(
         released?.kind === 'Applied' || released?.kind === 'AlreadyApplied',
@@ -791,8 +825,8 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         (error) => {
           assert.match(
             String(error?.message ?? error),
-            /committed-admission-unavailable/,
-            'the rejection must be the CommittedAdmissionUnavailable typed boundary failure',
+            /EMR-010: managed provider step for physical user message msg-user-r5 has no committed model-routing lease/,
+            'the exact execution admission boundary must reject before any projection or injection',
           )
           return true
         },
@@ -803,7 +837,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
   })
 })
 
-test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'eleventh layer (this round): the pb-helper reshape keeps admitExecution at the same root + chat.message shape as round 18, so the tenth-layer structural conclusion carries over unchanged — the chat.message admission stays session-scoped, the physical binding never lands, tryReadExecution stays null, and the maybeInject gate silently no-ops. R1/R3/R4 fail for the missing injection; R2/R6 pass for the same lease-null reason (green without reaching the gate). The unsealing prerequisite remains a genuine physical-binding admission fixture entry (replicating the production chat.message physical-binding admission), not a rearrangement of existing surface calls. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', async () => {
   await withEnglishLanguage(async () => {
     globalThis.__wanxiangshu_test_blogger_model = 'test/other-model'
     try {
@@ -813,8 +847,7 @@ test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_mo
         const physical = 'msg-user-r6'
         await appendCompanionBloggerLink(runtime, main, session)
         const profile = await admitExecution(runtime, hooks, session, physical)
-        // Same shape as R1: durable open request feeds the plan freeze; the
-        // live flight is disposed so step 11 keeps the raw wire frontier.
+        // The durable open request feeds the companion attempt-plan freeze.
         const bloggerRequest = await claimBloggerRequest({
           runtime,
           mainSession: main,

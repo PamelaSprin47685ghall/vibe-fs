@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 import path from 'node:path'
 import { create } from 'tar'
 import { prepareVerificationDependencies } from './verification-dependency-candidate.mjs'
@@ -216,9 +217,11 @@ export async function installVerificationDependenciesFromToolArchive({ sourceRoo
 
 async function installSelectedDependencies({ sourceBytes, selectedRegistry, parentDirectory, execution, signal, output }) {
   signal?.throwIfAborted()
-  const installationRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-npm-install-'))
+  const owner = allocateVerificationDirectory(parentDirectory, 'verification-npm-install-', lockInvalid)
+  const installationRoot = owner.root
   let candidate
   try {
+    owner.assertOwned()
     const workspace = path.join(installationRoot, 'workspace')
     const env = { CI: 'true' }
     for (const name of ['workspace', 'home', 'config', 'cache', 'data', 'state', 'tmp', 'tools']) fs.mkdirSync(path.join(installationRoot, name))
@@ -244,13 +247,18 @@ async function installSelectedDependencies({ sourceBytes, selectedRegistry, pare
       npm_config_update_notifier: 'false',
     })
     const options = { cwd: workspace, env, signal, output }
+    if (execution.kind === 'selected-bundle') execution.revalidate()
     const runtime = JSON.parse(await runBootstrap(privateNode, ['--input-type=module', '-e', 'console.log(JSON.stringify({ platform: process.platform, arch: process.arch }))'], options))
+    owner.assertOwned()
+    if (execution.kind === 'selected-bundle') execution.revalidate()
     if (typeof runtime.platform !== 'string' || typeof runtime.arch !== 'string') throw Object.assign(new Error('Npm bootstrap runtime did not report its platform identity'), { code: 'verification-npm-tool-invalid' })
     const npmVersion = (await runBootstrap(privateNode, [execution.npmCli, '--version'], options)).trim()
-    if (npmVersion !== execution.expectedNpmVersion) throw Object.assign(new Error('Actual npm version differs from its selected version'), { code: 'verification-npm-tool-invalid' })
+    owner.assertOwned()
     if (execution.kind === 'selected-bundle') execution.revalidate()
+    if (npmVersion !== execution.expectedNpmVersion) throw Object.assign(new Error('Actual npm version differs from its selected version'), { code: 'verification-npm-tool-invalid' })
     await runBootstrap(privateNode, [execution.npmCli, 'ci', '--ignore-scripts', '--include=dev', '--include=optional', '--no-audit', '--no-fund', '--workspaces=false', '--install-strategy=hoisted', `--registry=${selectedRegistry.href}`], options)
     signal?.throwIfAborted()
+    owner.assertOwned()
     for (const [name, bytes] of Object.entries(sourceBytes)) {
       const installed = path.join(workspace, name)
       if (!rejectSymbolicVerificationInput(installed).isFile() || !fs.readFileSync(installed).equals(bytes)) throw lockInvalid(`Npm changed selected source bytes: ${name}`)
@@ -259,6 +267,7 @@ async function installSelectedDependencies({ sourceBytes, selectedRegistry, pare
     const chunks = []
     for await (const chunk of create({ cwd: workspace, portable: false, noMtime: true }, ['node_modules'])) {
       signal?.throwIfAborted()
+      owner.assertOwned()
       chunks.push(chunk)
     }
     const archive = Buffer.concat(chunks)
@@ -266,13 +275,14 @@ async function installSelectedDependencies({ sourceBytes, selectedRegistry, pare
     fs.writeFileSync(archivePath, archive, { flag: 'wx' })
     candidate = await prepareVerificationDependencies({ sourceRoot: workspace, parentDirectory, archivePath, archiveSha256: digest(archive) })
     signal?.throwIfAborted()
+    owner.assertOwned()
     if (JSON.stringify(candidate.entries) !== JSON.stringify(expectedEntries)) throw lockInvalid('Prepared dependency inventory differs from the complete npm installation')
     if (execution.kind === 'selected-bundle') execution.revalidate()
     const packageJsonSha256 = digest(sourceBytes['package.json'])
     const installation = { npmVersion, nodeSha256: execution.nodeSha256, npmCliSha256: execution.npmCliSha256, platform: runtime.platform, arch: runtime.arch, lifecycleScripts: 'disabled', identityScope: execution.kind === 'bootstrap' ? 'bootstrap-admission' : 'selected-node-npm-bundle' }
     if (execution.kind === 'selected-bundle') Object.assign(installation, { nodeVersion: execution.nodeVersion, toolDigest: execution.toolDigest })
     const dependencyDigest = digest(JSON.stringify({ preparedDependencyDigest: candidate.dependencyDigest, packageJsonSha256, installation }))
-    fs.rmSync(installationRoot, { recursive: true, force: true })
+    owner.dispose()
     return { ...candidate, packageJsonSha256, installation, dependencyDigest }
   } catch (error) {
     const errors = [error]
@@ -282,7 +292,7 @@ async function installSelectedDependencies({ sourceBytes, selectedRegistry, pare
       errors.push(cleanupError)
     }
     try {
-      fs.rmSync(installationRoot, { recursive: true, force: true })
+      owner.dispose()
     } catch (cleanupError) {
       errors.push(cleanupError)
     }

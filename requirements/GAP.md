@@ -12,6 +12,8 @@
 
 ## 台账
 
+2026-10-05 当前接续见[目录所有权与生产接线](../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六 namespace owner 的局部修复及 PP-011/grounding B 证明切片完成，但正式门禁静默失败，原生选集另有 006/021 共 11 fail；整批未闭合。T418/T419 的全过程只读、ABA 与同候选 actual verify 保留。GAP-077 下方“physical lease 不落地”是旧推断，当前根因是 canonical 投影 id 与原 physical execution 混用；已传原 physical、注册用例通过，completed canary 仍在 project 就绪超时而未进入业务。整体 GAP 均保持 PARTIAL，不能据旧推断重复施工或据旧 POST 证据替代新终态证明。
+
 | GAP | 包 | 命题 | 缺口 | 状态 | 现状承载 | 补法计划 | Owner |
 |---|---|---|---|---|---|---|---|
 | GAP-005 | `requirement-system` | requirement-system-015（直接闭环） | 单次提交原子闭环与 AGENTS.md 豁免约束 | OPEN | 原 `015.test.mjs` 只锁定「普通小型修复…不要求创建 Change」字句，本批删除；未证明实际提交原子闭环 | 保留人工审阅，不能用句子删改即红冒充行为 oracle | requirement-system |
@@ -107,10 +109,10 @@ GAP-099的本地新focused反例：SessionHostPort所属`host-session-contract`�
 | GAP-079 | participant-horizon-001/002/004/006—008/011/014/015 | PARTIAL | 有真实名册、fork 拒绝、热启动与结果渲染；完整 provider 可见性、最新 Blob 读取和多 child 生命周期待证。已知信息省略与最新记录交付的范围待审。 |
 | GAP-080 | participant-horizon-011 | PARTIAL | 旧真实取消场景名册仍列未返回后果，但后续 Join 未结束；保留最终领取/Retired 的 TODO。不得扩大超时或把取消前后名册正确当作闭环。 |
 | GAP-081 | participant-horizon-013；provider-projection-008/012；process-execution-014 | CLOSED | 公共SyntheticToml保留原始值与键，仅原值以LF结束且literal-safe时使用literal，否则basic转义；布局仍为LF。实际warm-start与执行输出的无尾/多尾LF、CRLF/裸CR、引号及控制符先红后绿，ARCH-010不再把预期改成原值加LF。prefix字节计数与真实渲染逐项对照，含代理对拼接；实际Delta保留原始换行且不截断合法代理对。隔离Fable构建及13个关键文件正式回归205 passed、0 failed、5个其余TODO保留。 |
-| GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 保留编码、摘要、真实输入不变和组合用例；011部分证明：HostDigest.sha256Hex与参考哈希一致，timestamp/durationMs/cost/requestId不进语义投影、不影响digest（tests/011）。生产组合实际注入该哈希的接线观察、在线/重放全链、表示不取得权威及统一I/O所有权仍待证。 |
+| GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 011生产接线切片已补：真实注册入口经chronicle/checkpoint/typed continuation到PrefixRebaseCommitted落盘、新plugin incarnation重开、XTrace精确语义截点与独立Node crypto一致；callID/参数配对、坏hash/截点生产变异均有正式oracle，011定向7/0，统一验收见本批附件。它不证明独立安装消费者或新OS进程恢复。其他在线/重放全链、表示不取得权威与统一I/O所有权仍待证，整体PARTIAL。 |
 | GAP-083 | repository-investigation-001—006/009 | OPEN | RoleLaw 词形不能证明 Agent 取证、推理、只读调查或停止时机；需要实际任务和可复核轨迹。局部热启动数据/指令隔离不代替这些行为。 |
 | GAP-084 | repository-investigation-007/008 | PARTIAL | 完整关键词与无跨调用缓存有局部证据；热启动任务字节被添加前缀的反例保留。原始任务保真及容量规则范围仍待统一。 |
-| GAP-085 | requirement-grounding-002/006/007/011/012 | PARTIAL | 自身 tests 覆盖可漏拒；read v1 后重读磁盘 v2 会把未见版本登记为已见。真实输出版本须贯穿原生/程序调用链；插件顺序与独立进程恢复仍缺证。文件/外链覆盖修复需在新构建验证。 |
+| GAP-085 | requirement-grounding-002/006/007/011/012 | PARTIAL | 007 B已补三provider真实注册hook的九工具入口，含实际程序读写；guidance在grounding前、suffix保留、重放/canonical X与三生产接线变异有正式oracle，完整grounding定向24/0、5其他TODO，统一验收见本批附件。002自身tests覆盖漏拒、006实际返回版本、011权限及012独立进程恢复仍待证；007 A原Markdown字节表示契约归GAP-086。 |
 | GAP-086 | requirement-grounding-007；provider-projection-013/014 | PARTIAL | CRLF、空行、尾空格经统一表示被改写；原始事实保真与展示编码需分别定义。严格原字节合同及失败 TODO 保留，不以 normalize 后相等代替。 |
 | GAP-087 | structured-workflow-012 | PARTIAL | 旧 focused build 曾复用其它闭包的 Fable cracked-project cache，声称成功却未生成新模块；同输出先 Core 再 Alpha 的正式回归已迁入。新上游缓存方案须用相同输入验证，不沿用旧绿结论。 |
 | GAP-090 | time-capability-007/008 | PARTIAL | 局部 bind-once/render 不证明首次 prompt durable 采样或重启 marker；工程闭包/静态 gate 也非负向编译及全部消费者能力注入证明。 |

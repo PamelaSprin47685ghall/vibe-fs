@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { allocateVerificationDirectory } from './verification-directory-owner.mjs'
 import path from 'node:path'
 import { privateDotnetEnvironment } from './verification-dotnet-environment.mjs'
 import { verificationInputExists } from './verification-input-path.mjs'
@@ -154,11 +155,10 @@ export async function prepareVerificationDotnetTools({ sdk, sourceRoot, packageA
   const selectedTools = parseManifest(manifestBytes)
   const selectedPackages = capturePackages(packageArchives, selectedTools)
   signal?.throwIfAborted()
-  const parentRoot = fs.realpathSync(parentDirectory)
-  if (!fs.lstatSync(parentRoot).isDirectory()) throw invalidEntry('Tool preparation requires a real parent directory')
-  const allocatedRoot = fs.mkdtempSync(path.join(parentRoot, 'verification-dotnet-tools-'))
+  const owner = allocateVerificationDirectory(parentDirectory, 'verification-dotnet-tools-', invalidEntry)
   try {
-    const toolRoot = fs.realpathSync(allocatedRoot)
+    owner.assertOwned()
+    const toolRoot = owner.root
     const env = privateDotnetEnvironment(toolRoot, sdkRoot, executable)
     fs.mkdirSync(path.join(toolRoot, '.config'))
     fs.writeFileSync(path.join(toolRoot, 'global.json'), globalBytes, { flag: 'wx' })
@@ -172,6 +172,7 @@ export async function prepareVerificationDotnetTools({ sdk, sourceRoot, packageA
     fs.writeFileSync(configFile, configBytes, { flag: 'wx' })
     await runVerificationToolProbe(executable, ['tool', 'restore', '--tool-manifest', manifestPath, '--configfile', configFile, '--disable-parallel', '--verbosity', 'minimal'], { cwd: toolRoot, env, signal })
     signal?.throwIfAborted()
+    owner.assertOwned()
     if (selectedSdk(sdk).sdkDigest !== sdkDigest) throw invalidEntry('Tool restore changed the selected SDK identity')
     if (!fs.readFileSync(path.join(toolRoot, 'global.json')).equals(globalBytes) || !fs.readFileSync(manifestPath).equals(manifestBytes) || !fs.readFileSync(configFile).equals(configBytes)) throw invalidEntry('Tool restore changed captured selection inputs')
     inventory(toolRoot)
@@ -194,17 +195,20 @@ export async function prepareVerificationDotnetTools({ sdk, sourceRoot, packageA
     const prepared = {
       ...selection,
       revalidate() {
+        owner.assertOwned()
         const actual = Object.fromEntries(Object.keys(selection).map(key => [key, prepared[key]]))
         if (JSON.stringify(actual) !== capturedSelection) throw invalidEntry('Restored tool receipt differs from its owned selection')
         if (selectedSdk(sdk).sdkDigest !== sdkDigest) throw invalidEntry('Restored tools no longer use their selected SDK identity')
         if (JSON.stringify(inventory(toolRoot)) !== expectedEntries) throw invalidEntry('Restored tool inventory differs from its captured identity')
+        owner.assertOwned()
       },
-      dispose() { fs.rmSync(allocatedRoot, { recursive: true, force: true }) },
+      dispose: owner.dispose,
     }
+    owner.assertOwned()
     return prepared
   } catch (error) {
     try {
-      fs.rmSync(allocatedRoot, { recursive: true, force: true })
+      owner.dispose()
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'Tool restore and cleanup failed', { cause: error })
     }

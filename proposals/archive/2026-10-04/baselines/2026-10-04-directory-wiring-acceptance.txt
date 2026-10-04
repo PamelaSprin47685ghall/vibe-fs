@@ -1,0 +1,93 @@
+Directory ownership and production wiring acceptance, started 2026-10-04,
+updated 2026-10-05. Base cc9f44fc541d80885353b175b18409a4193916ca.
+
+Status: implementation and limited proof slices complete; unified acceptance
+NOT complete. No budget, worker count, tier or assertion was weakened.
+The first Fable attempt correctly refused concurrent input mutation. All agents
+then stopped editing and the implementation/tests/docs were staged and frozen.
+
+Generation115: Fable build exit0; check.mjs exit0; changed six F# format check
+and git diff --check passed. Focused impact1514 items,170 registered surfaces,
+829 emitted modules. Fable compilation304722ms, owner compile320431ms.
+Compiler inputDigest:
+b3749639a2ed51b3e7a74ae6bd5145c2449f5f8dd090202ff10fe407357f01af
+Generated inputDigest:
+3f3fabff033294aa5a9a184ab00501cdbbdfd8d96c9bdbc5a0c27f473e5cd33c
+
+Selected Node22.23.3, complete npm11.12.1 CLI and SDK10.0.302 supplied.
+Scope80: all numbered tests in verification-system, provider-projection,
+requirement-grounding, cognitive-environment, execution-model-routing, plus
+host-boundary/008. Normal default supervision5000ms /300000ms unchanged.
+Official selected80: exit1, silence5042ms,730 blocking updates.58/80 drained,
+10 active,12 queued.016 not started. No authoritative verdict summary.
+Last-progress file is not a unique fault diagnosis. Residual owned process
+group4290 was reclaimed, accepted=false,264.789ms. The run remains a failure.
+
+Native identical80, diagnostic only: exit1,761 pass,11 fail,0 cancelled,
+7 skipped,31 TODO,859509.124583ms. Native execution is NOT the official
+supervised gate and is NOT a pending-only result. Changed directory and wiring
+cases passed; real failures were in006 and021. Several nested1000ms gates
+expired before any child verdict or even before a planned file started.
+One actual /bin/ps query returned ETIMEDOUT. This records observed causes,
+not proof that local load is the sole cause of all failures.
+
+Limited proof slices preceding final freeze:
+- Archive exact-copy parent/root red0/2 ->green2/0; later symlink and replaced
+  parent with missing root cases included in final native80.
+- .NET tools failed cleanup preserves original failure plus owner refusal;
+  real SDK/NuGet/Fable/Fantomas restored original consumers7/0.
+- NuGet parent/root red0/2 ->green2/0; first restore replacement cannot delete
+  foreign packages or start locked restore. Final native cases passed.
+- Node/SDK failing probe replacement red ->green; successful probe archive
+  replacement prevents next spawn. Combined target42/0 with2 old tier skips.
+- npm held cancellation preserves Error/null and refuses foreign cleanup.
+  Exact copied tool inventory includes modes and verbatim internal links.
+  Actual runtime replacement red started second version; green stopped before
+  next version and package download. Copy-mode/link setup errors are separate
+  fixture mistakes, NOT product reds.
+- PP0117/0, provider-projection140/0 with4 other TODO: actual registered entry,
+  durable PrefixRebaseCommitted, plugin incarnation reopen, independent crypto,
+  callID/path pairs and two compiled production loader mutations. This is not
+  a separate installed consumer or new OS-process restart proof.
+- Grounding0078/0 with1 A TODO, full package24/0 with5 TODO: registered hooks,
+  three providers/nine tools, real js read/write, three wiring mutations.
+  Other native results are controlled adapter fixtures. A bytes contract remains.
+- Cognitive015 registered default19/0 with1 integration skip after review:
+  capture original physical before projection; exact committed model lease,
+  R1-R6, missing physical/other session, stable raw Host replay and clean X.
+  No injected presentation marker is passed as an alleged raw Host replay.
+
+Cognitive final installed canary:0 pass/1 fail,19966.066166ms. Host was listening
+but project /path readiness failed at5030ms before business. Previous successful
+two POST canary predates completed barrier and cannot establish final history.
+Final code waits exact Blogger/callID completed event, then checks SDK history
+and journal. Original failure is preserved while all cleanup actions are tried.
+Earlier post-barrier attempt also failed before business. Bare no-plugin Host
+needed5712ms to listen; independent CLI initially4.69/4.93s. After native80
+exited CLI fell to2317ms, justifying one final unchanged-budget attempt, which
+still failed. No further unchanged blind reruns are accepted evidence.
+
+Remaining: effective same-input official scope and post-completed installed
+canary acceptance. T418/T419, GAP055 readonly/FD/ABA/actualverify and remaining
+GAP077/082/085/086 obligations remain PARTIAL. Old9909 CI backstop is retained.
+Plan/status documentation updated after the above runs; implementation and
+tests unchanged. Documentation-only final build/freshness recorded separately.
+
+Final documentation input: generation116 build exit0, static check exit0,
+freshness ok1796 sources/885 artifacts. Compiler inputDigest unchanged from115;
+generatedInputDigest:
+8f0e4ad5aa56f326e3d3aff95322e4a435b17b03a7a7863a0556a093592796a7
+artifactInputDigest:
+845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c
+No new functional run is claimed for116. Integration discovery dry run includes
+cognitive-environment/015 among42 discovered suite files; its canary is not
+an unreachable default skip. Passing discovery is not passing integration.
+Final source/test/doc diff whitespace check excludes untouched raw .log bytes;
+Node TAP diagnostics contain whitespace-only indented lines, retained verbatim.
+
+Raw files in this directory:
+vibe-fs-directory-wiring-build.log
+vibe-fs-directory-wiring-check.log
+vibe-fs-directory-wiring-official.log
+vibe-fs-directory-wiring-native80.log
+vibe-fs-directory-wiring-canary-final.log

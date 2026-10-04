@@ -28,7 +28,7 @@ function selectedEntries(root) {
   return entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0)
 }
 
-async function toolArchiveFixture() {
+async function toolArchiveFixture({ observeVersions = false } = {}) {
   const fixture = await createNpmInstallFixture()
   try {
     const selected = path.join(fixture.root, 'selected')
@@ -41,10 +41,12 @@ async function toolArchiveFixture() {
     fs.cpSync(path.resolve(fixture.options.npmCli, '../..'), path.join(selected, 'toolchain/npm'), { recursive: true, verbatimSymlinks: true })
     fs.writeFileSync(path.join(selected, 'toolchain/node/sibling.txt'), 'selected Node layout')
     const executionMarker = path.join(fixture.root, 'execution.json')
+    const versionMarker = path.join(fixture.root, 'version-calls.txt')
     const cli = path.join(selected, npmCliPath)
     const original = fs.readFileSync(cli, 'utf8')
     const shebangEnd = original.startsWith('#!') ? original.indexOf('\n') + 1 : 0
     const observe = `
+${observeVersions ? `if (process.argv.includes('--version')) require('node:fs').appendFileSync(${JSON.stringify(versionMarker)}, 'version\\n')` : ''}
 if (process.argv.includes('ci')) {
   const fixtureFs = require('node:fs')
   const fixturePath = require('node:path')
@@ -69,6 +71,7 @@ if (process.argv.includes('ci')) {
     return {
       ...fixture,
       executionMarker,
+      versionMarker,
       toolDigest,
       capturedSelection: { entries, node, npm, identityScope },
       toolArchive: { archivePath, archiveSha256, nodePath, npmCliPath },
@@ -91,6 +94,40 @@ async function waitForHeldInstall(fixture, installing) {
 }
 
 export function registerNpmToolArchiveTests() {
+  test('WHAT[verification-system-016] selected npm tools replaced during the actual runtime probe cannot start the next version probe', async () => {
+    const fixture = await toolArchiveFixture({ observeVersions: true })
+    let replacedRoot
+    let parked
+    try {
+      const output = {
+        write(chunk) {
+          if (replacedRoot || !String(chunk).includes('"platform"')) return
+          const names = fs.readdirSync(fixture.parentDirectory).filter(name => name.startsWith('verification-archive-'))
+          assert.equal(names.length, 1)
+          replacedRoot = path.join(fixture.parentDirectory, names[0])
+          parked = path.join(fixture.root, 'parked-tools')
+          fs.renameSync(replacedRoot, parked)
+          fs.cpSync(parked, replacedRoot, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true })
+          fs.chmodSync(replacedRoot, fs.statSync(parked).mode & 0o777)
+          for (const entry of fixture.capturedSelection.entries) {
+            if (entry.type !== 'SymbolicLink') fs.chmodSync(path.join(replacedRoot, entry.path), entry.mode)
+          }
+          assert.deepEqual(selectedEntries(replacedRoot), fixture.capturedSelection.entries)
+        },
+      }
+      const [outcome] = await Promise.allSettled([installFromArchive({ ...fixture.installOptions, output })])
+      assert.ok(replacedRoot, 'the actual installation runtime probe was observed')
+      assert.equal(outcome.status, 'rejected')
+      assert.ok(outcome.reason instanceof AggregateError)
+      assert.equal(fs.readFileSync(fixture.versionMarker, 'utf8'), 'version\n', 'only the initial tool preparation version probe ran')
+      assert.equal(outcome.reason.cause.code, 'verification-tool-entry-invalid')
+      assert.equal(fs.existsSync(path.join(replacedRoot, fixture.toolArchive.npmCliPath)), true)
+      assert.equal(fs.existsSync(parked), true, 'production cleanup does not guess the parked original directory')
+      assert.deepEqual(fixture.requests, [], 'no package download can start from a replaced tool owner')
+    } finally {
+      await fixture.dispose()
+    }
+  })
   test('WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication', async t => {
     await t.test('WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup', async positive => {
       let fixture
