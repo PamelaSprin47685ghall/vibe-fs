@@ -9,7 +9,7 @@
 | 005—006 | 生产 lifecycle 的提交/拒绝；公开 Host event decoder；005 实际 transform 在 plan 冻结后读取 SDK assistant 并等待 durable Started，missing/foreign 拒绝，后续 assistant 不重复 Started；006 经真实 recovery signal 全链以 held/unknown barrier 验证 terminal append 确认前 exact lease 不释放，确认后仅 exact 释放，竞争 fail closed、等值重放幂等 | 全部事件来源的 cursor、wake 及真实重启 |
 | 008 | 显式 TODO | 构造无状态推进、激活失败、真实因果唤醒；常量信号名单不是证明 |
 | 009 | Accepted 后真实 OS 子进程退出，再开新进程读同一仓库；绑定、容量等旧资源消失 | 只覆盖这一中断点，不能代表全部 crash cuts；三个 codec 样本的字段扫描也不是类型不可表达证明 |
-| 010 | 实际 recovery Host 消费 exact cancel，验证 pre-provider/started 终态、重放及相邻执行不变 | 公开 cancel/delete 枚举、真实持有资源下的完整排空与悬置 append |
+| 010 | 实际 recovery Host 消费 exact cancel，验证 pre-provider/started 终态、重放及相邻执行不变；session.deleted 真实插件事件链结算同会话全部已准入 key 且旁会话事实与容量不动；公开 logical cancel（SignalSession drain owner）与 session delete（ClearSession drain owner）经 held barrier 逐 key 枚举：悬置 terminal append 期间生命周期完成 Promise 不发布、磁盘无 durable terminal 行、exact lease 保留，放行后逐 key Cancelled 终态与 exact 容量归还、旁会话不动 | held 时序经 B1 受控 writer 接缝证明，不在真实 journal 注入 barrier；commitUnknown fail-closed 场景锚定在 lifecycle-019 同链 |
 | 012 | 真实纯决策、解释器逐次端口观察、Host recovery port 接受/拒绝/缺失、实际重复终态结算 | 每个中断点真实输出驱动跨进程恢复；晚到释放与新资源所有者竞态 |
 | 013 | canonical 只读诊断、实际 Host 达终态后撤销 manual | 与实际全量 incident 现场的集成另依 014 |
 | 014 | 实际 incident capture/replay、redaction、版本与篡改拒绝 | 受控 Host contract 证据不等于当前真实 Host canary 已执行 |
