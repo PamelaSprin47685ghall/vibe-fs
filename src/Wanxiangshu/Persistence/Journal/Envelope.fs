@@ -255,8 +255,30 @@ module Envelope =
     let private contextFactDecoder =
         Decode.Auto.generateDecoderCached<ContextFactCases> (extra = extra)
 
-    let private hostFactDecoder =
-        Decode.Auto.generateDecoderCached<HostFactCases> (extra = extra)
+    let private tipPresentationDecoder =
+        Decode.Auto.generateDecoderCached<TipPresentation> (extra = extra)
+
+    /// TipGuidanceDelivered gained `OccurrenceId` (occurrence frontier, WHAT
+    /// guidance-delivery-001). Legacy facts without the field decode with
+    /// OccurrenceId = None and can only restore coverage, never the frontier.
+    let private tipGuidanceDeliveredPayloadDecoder =
+        Decode.object (fun get ->
+            {| SessionId = get.Required.Field "SessionId" sessionIdDecoder
+               TipName = get.Required.Field "TipName" Decode.string
+               OccurrenceId =
+                get.Optional.Field "OccurrenceId" (Decode.option Decode.string)
+                |> Option.bind id
+               Presentation = get.Required.Field "Presentation" tipPresentationDecoder |})
+
+    let private tipGuidanceDeliveredDecoder: Decoder<HostFactCases> =
+        Decode.index 1 tipGuidanceDeliveredPayloadDecoder
+        |> Decode.map HostFactCases.TipGuidanceDelivered
+
+    let private hostFactDecoder: Decoder<HostFactCases> =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (function
+            | "TipGuidanceDelivered" -> tipGuidanceDeliveredDecoder
+            | _ -> Decode.Auto.generateDecoderCached<HostFactCases> (extra = extra))
 
     let private fissionFactDecoder =
         Decode.Auto.generateDecoderCached<FissionFactCases> (extra = extra)

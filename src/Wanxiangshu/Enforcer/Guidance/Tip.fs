@@ -49,7 +49,7 @@ module EnforcerTipGuidance =
         | Some { Kind = ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) } -> Some owner
         | None -> None
 
-    let private latestOwnerTipField (journal: AgentJournal) (mainSessionId: SessionId) : string option =
+    let private latestOwnerTip (journal: AgentJournal) (mainSessionId: SessionId) : RecentTip option =
         match
             (AgentJournal.snapshot journal).AgentProjections.Sessions
             |> Map.tryFind mainSessionId
@@ -60,9 +60,13 @@ module EnforcerTipGuidance =
             |> Option.map EnforcementProjection.recentTips
             |> Option.defaultValue []
             |> List.tryLast
-            |> Option.map (fun tip -> tip.FieldName)
 
-    let private hasFullTipDelivered (journal: AgentJournal) (mainSessionId: SessionId) (tipName: string) : bool =
+    let private isTipIdentityOnly
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (occurrence: string)
+        (tipName: string)
+        : bool =
         match
             (AgentJournal.snapshot journal).AgentProjections.Sessions
             |> Map.tryFind mainSessionId
@@ -70,19 +74,23 @@ module EnforcerTipGuidance =
         | None -> false
         | Some session ->
             session.TipDelivery
-            |> Option.map (TipDeliveryProjection.hasFullDelivered tipName)
+            |> Option.map (TipDeliveryProjection.isIdentityOnly occurrence tipName)
             |> Option.defaultValue false
 
     /// Record that Full tip guidance was injected for this Main session (restart-safe).
+    /// The occurrence identity (RecentTip CycleId) makes the delivery frontier
+    /// per-occurrence: a new occurrence of the same TipName gets its own first Full.
     let private recordFullTipDelivered
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (tipName: string)
+        (occurrence: string)
         : Task<unit> =
         let fact =
             HostFact.TipGuidanceDelivered
                 {| SessionId = mainSessionId
                    TipName = tipName
+                   OccurrenceId = Some occurrence
                    Presentation = TipPresentation.Full |}
 
         task {
@@ -95,6 +103,7 @@ module EnforcerTipGuidance =
                     "tip-guidance-delivery-append-failed"
                     [ "session_id", SessionId.value mainSessionId
                       "tip", tipName
+                      "occurrence", occurrence
                       "result", JournalAppendFailure.describe failure ]
         }
 
@@ -108,6 +117,7 @@ module EnforcerTipGuidance =
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (lang: ProviderLanguage)
+        (occurrence: string)
         (field: string)
         (rule: EnforcerRule)
         : Task<TipGuidance option> =
@@ -116,7 +126,7 @@ module EnforcerTipGuidance =
 
             if tipName.Length = 0 then
                 return None
-            elif hasFullTipDelivered journal mainSessionId tipName then
+            elif isTipIdentityOnly journal mainSessionId occurrence tipName then
                 let guidance: TipGuidance =
                     { TipName = tipName
                       Presentation = TipPresentation.IdentityOnly
@@ -125,7 +135,7 @@ module EnforcerTipGuidance =
                 return Some guidance
             else
                 let text = tipFullText lang tipName rule.MainText
-                do! recordFullTipDelivered journal mainSessionId tipName
+                do! recordFullTipDelivered journal mainSessionId tipName occurrence
 
                 let guidance: TipGuidance =
                     { TipName = tipName
@@ -138,6 +148,7 @@ module EnforcerTipGuidance =
     let private guidanceForField
         (journal: AgentJournal)
         (mainSessionId: SessionId)
+        (occurrence: string)
         (field: string)
         : Task<TipGuidance option> =
         task {
@@ -145,21 +156,24 @@ module EnforcerTipGuidance =
 
             match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
             | None -> return None
-            | Some rule -> return! guidanceForRule journal mainSessionId lang field rule
+            | Some rule -> return! guidanceForRule journal mainSessionId lang occurrence field rule
         }
 
     let private guidanceForOwner (journal: AgentJournal) (mainSessionId: SessionId) : Task<TipGuidance option> =
         task {
-            match latestOwnerTipField journal mainSessionId with
+            match latestOwnerTip journal mainSessionId with
             | None -> return None
-            | Some field -> return! guidanceForField journal mainSessionId field
+            | Some tip -> return! guidanceForField journal mainSessionId tip.CycleId tip.FieldName
         }
 
     /// Resolve Main tip guidance for the auto-injected marker tip half.
     ///
-    /// First Full delivery of a tip in this Main session → main.md body (+ name header).
-    /// Subsequent → compact `tip: <name>` identity only. Decision is TipDeliveryProjection
-    /// (TipGuidanceDelivered fold), not process-local memory.
+    /// First Full delivery of a tip occurrence in this Main session → main.md body
+    /// (+ name header). A new occurrence of the same TipName gets its own first
+    /// Full; a replayed occurrence → compact `tip: <name>` identity only. After
+    /// ContextReanchored the full text is restored once without a new first
+    /// delivery. Decision is TipDeliveryProjection (TipGuidanceDelivered fold),
+    /// not process-local memory.
     ///
     /// `mainOrBloggerSession` may be the Main session id (SpikePlugin) or the Blogger
     /// satellite id; owner is resolved through SessionAssociation.

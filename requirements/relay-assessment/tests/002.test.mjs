@@ -54,7 +54,6 @@ test('WHAT[relay-assessment-002] cross-iteration replay of another iteration ass
   assert.equal(retired.ok, true)
   const next = relay.openIncumbency(retired.state, 'road-1', 'inc-2', 'snapshot-2', 'authority-1')
   assert.equal(next.ok, true)
-
   const replayed = relay.assess(
     next.state,
     'road-1',
@@ -69,12 +68,47 @@ test('WHAT[relay-assessment-002] cross-iteration replay of another iteration ass
 
 const {withReview, scores: reviewScores} = await import('./support/plugin.mjs')
 
-test('WHAT[relay-assessment-002] actual tool exact replay returns the accepted result', {todo: 'GAP-194: observed actual tool gate denies exact replay after first assessment'}, async () => {
+test('WHAT[relay-assessment-002] actual tool exact replay returns the accepted result', async () => {
   await withReview(async ({execute, hooks, session}) => {
     const input = reviewScores('REVISE')
     const first = await execute(input)
     assert.match(first, /recorded = true/)
     const replay = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
     assert.equal(replay, first)
+  })
+})
+
+test('WHAT[relay-assessment-002] same identity with changed input is a replay conflict and the accepted result stays', async () => {
+  await withReview(async ({execute, hooks, session}) => {
+    const input = reviewScores('REVISE')
+    const first = await execute(input)
+    assert.match(first, /recorded = true/)
+    const changed = await hooks.tool.review.execute(reviewScores('PERFECT'), {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.match(changed, /recorded = false/)
+    const exact = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.equal(exact, first)
+  })
+})
+
+test('WHAT[relay-assessment-002] same input under a new call id is already-submitted', async () => {
+  await withReview(async ({execute, hooks, session}) => {
+    const input = reviewScores('REVISE')
+    const first = await execute(input)
+    assert.match(first, /recorded = true/)
+    const second = await execute(input, {call: 'review-call-2', run: 'review-run-2'})
+    assert.match(second, /recorded = false/)
+    const exact = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.equal(exact, first)
+  })
+})
+
+test('WHAT[relay-assessment-002] cross-incumbency replay of a retired review call is rejected', {todo: 'requires a real retirement-chain fixture to open the next incumbency before replaying the retired call; the fold-level AssessmentReplayToolCall gate is in place'}, async () => {
+  await withReview(async ({execute, hooks, session}) => {
+    const input = reviewScores('REVISE')
+    const first = await execute(input)
+    assert.match(first, /recorded = true/)
+    // TODO: retire this incumbency through the real suicide chain, open the next
+    // incumbency, then replay the retired call; the fold-level seen-tool-call gate
+    // must reject the append and the accepted assessment must stay unchanged.
   })
 })

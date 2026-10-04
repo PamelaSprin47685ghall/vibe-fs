@@ -25,6 +25,7 @@ type private RoadState =
       Retired: IncumbencyId list
       RetiredProviderRunIds: Set<string>
       SeenAssessmentIds: Set<string>
+      SeenAssessmentToolCallIds: Set<string>
       Certificate: QualityCertificate option
       LatestRetirement: RetirementSummary option
       BoundDevOps: string option
@@ -46,6 +47,11 @@ type RoadView =
         ActiveAuthorityRevision: AuthorityRevision option
         ActiveCleanupBlockerDigest: string option
         AcceptedAssessmentTransport: (string * string) option
+        /// Snapshot the accepted assessment bound (relay-assessment-003). Distinct
+        /// from ActiveSnapshotId, which stays at the incumbency-opening snapshot;
+        /// an exact replay compares its fresh capture against this one.
+        AcceptedAssessmentSnapshotId: WorkspaceSnapshotId option
+        AcceptedAssessmentScores: ScoreVector option
         RetiredIncumbencies: IncumbencyId list
         RetiredProviderRunIds: Set<string>
         Certificate: QualityCertificate option
@@ -120,6 +126,7 @@ module private Internal =
         { current with
             Active = Some updatedActive
             SeenAssessmentIds = Set.add (AssessmentId.value assessmentId) current.SeenAssessmentIds
+            SeenAssessmentToolCallIds = Set.add binding.ToolCallId current.SeenAssessmentToolCallIds
             Certificate = certificate }
         |> fun updated -> update roadId updated state
         |> Ok
@@ -173,6 +180,7 @@ module private Internal =
         snapshotId
         authorityRevision
         assessmentId
+        (binding: AssessmentBinding)
         =
         if active.Phase <> IncumbencyPhase.AuditPending then
             Error "AssessmentNotAllowedInCurrentPhase"
@@ -180,6 +188,10 @@ module private Internal =
             Error "AuthorityRevisionStale"
         elif Set.contains (AssessmentId.value assessmentId) current.SeenAssessmentIds then
             Error "AssessmentReplayConflict"
+        elif Set.contains binding.ToolCallId current.SeenAssessmentToolCallIds then
+            // relay-assessment-002: one tool call owns at most one assessment on a
+            // road; a later incumbency cannot replay a retired call as fresh work.
+            Error "AssessmentReplayToolCall"
         else
             Ok()
 
@@ -195,7 +207,7 @@ module private Internal =
         scores
         =
         result {
-            do! validateFreshAssessment active current snapshotId authorityRevision assessmentId
+            do! validateFreshAssessment active current snapshotId authorityRevision assessmentId binding
 
             return!
                 acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
@@ -505,6 +517,7 @@ module private Internal =
               Retired = []
               RetiredProviderRunIds = Set.empty
               SeenAssessmentIds = Set.empty
+              SeenAssessmentToolCallIds = Set.empty
               Certificate = None
               LatestRetirement = None
               BoundDevOps = Some("devops:" + RoadId.value roadId)
@@ -545,6 +558,7 @@ module private Internal =
               Retired = []
               RetiredProviderRunIds = Set.empty
               SeenAssessmentIds = Set.empty
+              SeenAssessmentToolCallIds = Set.empty
               Certificate = None
               LatestRetirement = None
               BoundDevOps = Some devopsId
@@ -744,6 +758,13 @@ module Fold =
                 |> Option.bind (fun active ->
                     active.Assessment
                     |> Option.map (fun assessment -> assessment.Binding.ToolCallId, assessment.Binding.PayloadDigest))
+              AcceptedAssessmentSnapshotId =
+                road.Active
+                |> Option.bind (fun active ->
+                    active.Assessment |> Option.map (fun assessment -> assessment.SnapshotId))
+              AcceptedAssessmentScores =
+                road.Active
+                |> Option.bind (fun active -> active.Assessment |> Option.map (fun assessment -> assessment.Scores))
               RetiredIncumbencies = road.Retired
               RetiredProviderRunIds = road.RetiredProviderRunIds
               Certificate = road.Certificate

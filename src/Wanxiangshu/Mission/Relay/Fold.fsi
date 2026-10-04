@@ -16,6 +16,8 @@ type RoadView =
         ActiveAuthorityRevision: AuthorityRevision option
         ActiveCleanupBlockerDigest: string option
         AcceptedAssessmentTransport: (string * string) option
+        AcceptedAssessmentSnapshotId: WorkspaceSnapshotId option
+        AcceptedAssessmentScores: ScoreVector option
         RetiredIncumbencies: IncumbencyId list
         RetiredProviderRunIds: Set<string>
         Certificate: QualityCertificate option

@@ -271,6 +271,18 @@ module SuicideTool =
 
             let! projection = appendPrepared prepared transaction
             let! _ = retirementFromProjection prepared projection
+
+            // concern-routing-006: the retiring participant's mailboxes retire
+            // together with the committed retirement. The retirement fact
+            // replays idempotently, so a durability failure here surfaces as a
+            // typed suicide failure and the next attempt retries the mailbox
+            // retirement instead of leaving a live mailbox behind.
+            let! _ =
+                AttentionConcernJournalAdapter.retireMailboxesOf
+                    prepared.Bound.Journal
+                    prepared.SessionId
+                    (Some prepared.Bound.ProviderRun)
+
             return retiredResult ()
         }
 

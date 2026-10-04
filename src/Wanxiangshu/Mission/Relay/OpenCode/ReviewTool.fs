@@ -42,11 +42,19 @@ module ReviewTool =
         [<Literal>]
         let ScoreArgument = "tool/review/score-argument"
 
+        [<Literal>]
+        let ReplayConflict = "tool/review/replay-conflict"
+
+        [<Literal>]
+        let AlreadySubmitted = "tool/review/already-submitted"
+
     type private ReviewFailure =
         | BindingUnavailable
         | MissingRequest
         | InvalidScores
         | RecordFailed
+        | ReplayConflict
+        | AlreadySubmitted
 
     let private failurePath =
         function
@@ -54,6 +62,8 @@ module ReviewTool =
         | MissingRequest -> Path.MissingRequest
         | InvalidScores -> Path.InvalidScores
         | RecordFailed -> Path.RecordFailed
+        | ReplayConflict -> Path.ReplayConflict
+        | AlreadySubmitted -> Path.AlreadySubmitted
 
     let private gitCapability: WorkspaceSnapshotGitCapability =
         { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
@@ -264,6 +274,22 @@ module ReviewTool =
                       Directory = directory
                       Journal = journal })
 
+    /// relay-assessment-002: a call whose identity matches the accepted assessment
+    /// is an exact-replay candidate; payload, snapshot and score equality are decided
+    /// in runPrepared once the binding is captured. A different accepted call means
+    /// this incumbency's assessment is already submitted; a fresh submission keeps
+    /// the AuditPending gate unchanged.
+    type private ReplayCandidate =
+        { View: RoadView
+          SnapshotId: WorkspaceSnapshotId
+          RootAuthorityUserMessageId: string
+          AcceptedPayloadDigest: string
+          AcceptedScores: ScoreVector }
+
+    type private PreparedReview =
+        | ReplayCandidate of ReplayCandidate
+        | FreshAssessment of PreparedAssessment
+
     let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) =
         let sessionId = SessionId.create context.SessionId
         let roadId = RoadId.create context.SessionId
@@ -272,51 +298,63 @@ module ReviewTool =
             let snapshotId = WorkspaceSnapshot.capture gitCapability bound.Directory
             let state = currentRelayState bound.Journal sessionId
 
-            let activeView =
+            let activeRoad =
                 state
                 |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
                 |> requireSome BindingUnavailable
-                |> Result.bind (fun road ->
-                    road.ActiveIncumbency
-                    |> Option.filter (fun _ -> road.ActivePhase = Some IncumbencyPhase.AuditPending)
-                    |> Option.filter (fun _ -> road.AcceptedAssessmentTransport.IsNone)
-                    |> requireSome BindingUnavailable
-                    |> Result.map (fun incumbencyId -> road, incumbencyId))
 
-            activeView
-            |> Result.bind (fun (road, incumbencyId) ->
+            activeRoad
+            |> Result.bind (fun road ->
                 scope.ActiveProfileFor sessionId
                 |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
                 |> requireSome BindingUnavailable
-                |> Result.map (fun rootAuthorityUserMessageId ->
-                    let assessmentId =
-                        HostDigest.sha256Hex (
-                            String.concat
-                                "\n"
-                                [ "assessment-v2"
-                                  context.SessionId
-                                  IncumbencyId.value incumbencyId
-                                  WorkspaceSnapshotId.value snapshotId
-                                  AuthorityRevision.value road.AuthorityRevision
-                                  ToolCallId.value bound.ToolCallId ]
-                        )
-                        |> fun digest -> AssessmentId.create ("assessment:" + digest)
+                |> Result.bind (fun rootAuthorityUserMessageId ->
+                    match road.AcceptedAssessmentTransport with
+                    | Some(acceptedCall, acceptedPayload) when acceptedCall = ToolCallId.value bound.ToolCallId ->
+                        road.AcceptedAssessmentScores
+                        |> Option.map (fun acceptedScores ->
+                            ReplayCandidate
+                                { View = road
+                                  SnapshotId = snapshotId
+                                  RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                                  AcceptedPayloadDigest = acceptedPayload
+                                  AcceptedScores = acceptedScores })
+                        |> requireSome BindingUnavailable
+                    | Some _ -> Error AlreadySubmitted
+                    | None ->
+                        road.ActiveIncumbency
+                        |> Option.filter (fun _ -> road.ActivePhase = Some IncumbencyPhase.AuditPending)
+                        |> requireSome BindingUnavailable
+                        |> Result.map (fun incumbencyId ->
+                            let assessmentId =
+                                HostDigest.sha256Hex (
+                                    String.concat
+                                        "\n"
+                                        [ "assessment-v2"
+                                          context.SessionId
+                                          IncumbencyId.value incumbencyId
+                                          WorkspaceSnapshotId.value snapshotId
+                                          AuthorityRevision.value road.AuthorityRevision
+                                          ToolCallId.value bound.ToolCallId ]
+                                )
+                                |> fun digest -> AssessmentId.create ("assessment:" + digest)
 
-                    { Bound = bound
-                      SessionId = sessionId
-                      RoadId = roadId
-                      SnapshotId = snapshotId
-                      View = road
-                      RootAuthorityUserMessageId = rootAuthorityUserMessageId
-                      AuthorityRevision = road.AuthorityRevision
-                      IncumbencyId = incumbencyId
-                      AssessmentId = assessmentId }))
+                            FreshAssessment
+                                { Bound = bound
+                                  SessionId = sessionId
+                                  RoadId = roadId
+                                  SnapshotId = snapshotId
+                                  View = road
+                                  RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                                  AuthorityRevision = road.AuthorityRevision
+                                  IncumbencyId = incumbencyId
+                                  AssessmentId = assessmentId })))
         with _ ->
             Error BindingUnavailable
 
-    let private acceptedResult (prepared: PreparedAssessment) =
+    let private acceptedResult (scores: ScoreVector) =
         let instructionPath =
-            if ScoreVector.allPerfect prepared.Bound.Scores then
+            if ScoreVector.allPerfect scores then
                 Path.Finish
             else
                 Path.Work
@@ -344,30 +382,65 @@ module ReviewTool =
             return outcome |> Result.mapError (fun _ -> RecordFailed)
         }
 
-    let private runPrepared (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedAssessment) =
-        taskResult {
-            let! binding =
-                captureBinding
-                    scope
-                    context
-                    prepared.Bound.PhysicalUserMessageId
-                    prepared.RootAuthorityUserMessageId
-                    prepared.Bound.ToolCallId
-                    prepared.Bound.ProviderRun
+    let private runPrepared
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (bound: BoundReviewInvocation)
+        (plan: PreparedReview)
+        =
+        match plan with
+        | ReplayCandidate replay ->
+            taskResult {
+                let! binding =
+                    captureBinding
+                        scope
+                        context
+                        bound.PhysicalUserMessageId
+                        replay.RootAuthorityUserMessageId
+                        bound.ToolCallId
+                        bound.ProviderRun
 
-            let! transaction =
-                assessmentTransaction
-                    prepared.View
-                    prepared.IncumbencyId
-                    prepared.AssessmentId
-                    binding
-                    prepared.SnapshotId
-                    prepared.AuthorityRevision
-                    prepared.Bound.Scores
+                // relay-assessment-002: only payload, snapshot and scores all equal
+                // to the accepted assessment make an exact replay; it returns the
+                // original bytes without appending a second durable fact. Any
+                // difference under the same call identity is a replay conflict, and
+                // the accepted assessment is never overwritten. The snapshot term
+                // compares the fresh capture against the snapshot the accepted
+                // assessment bound — not ActiveSnapshotId, which keeps the
+                // incumbency-opening snapshot and never advances on acceptance.
+                if
+                    binding.PayloadDigest = replay.AcceptedPayloadDigest
+                    && replay.View.AcceptedAssessmentSnapshotId = Some replay.SnapshotId
+                    && bound.Scores = replay.AcceptedScores
+                then
+                    return acceptedResult replay.AcceptedScores
+                else
+                    return! Error ReplayConflict
+            }
+        | FreshAssessment prepared ->
+            taskResult {
+                let! binding =
+                    captureBinding
+                        scope
+                        context
+                        prepared.Bound.PhysicalUserMessageId
+                        prepared.RootAuthorityUserMessageId
+                        prepared.Bound.ToolCallId
+                        prepared.Bound.ProviderRun
 
-            let! _ = appendAssessment prepared transaction
-            return acceptedResult prepared
-        }
+                let! transaction =
+                    assessmentTransaction
+                        prepared.View
+                        prepared.IncumbencyId
+                        prepared.AssessmentId
+                        binding
+                        prepared.SnapshotId
+                        prepared.AuthorityRevision
+                        prepared.Bound.Scores
+
+                let! _ = appendAssessment prepared transaction
+                return acceptedResult prepared.Bound.Scores
+            }
 
     let private renderExecution =
         function
@@ -379,8 +452,8 @@ module ReviewTool =
             let! outcome =
                 taskResult {
                     let! bound = boundInvocation scope args context
-                    let! prepared = prepareAssessment scope context bound
-                    return! runPrepared scope context prepared
+                    let! plan = prepareAssessment scope context bound
+                    return! runPrepared scope context bound plan
                 }
 
             return renderExecution outcome

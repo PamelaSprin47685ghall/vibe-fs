@@ -2,9 +2,9 @@ namespace Wanxiangshu.Enforcer.Guidance
 
 open Fable.Core.JsInterop
 
-/// JS-native owner boundary for the Main tip Full/Identity projection. The
-/// durable fold keeps its typed set and TipPresentation private; callers see
-/// only stable strings and arrays.
+/// JS-native owner boundary for the Main tip delivery projection. The durable
+/// fold keeps its typed frontier/coverage sets and TipPresentation private;
+/// callers see only stable strings and arrays.
 [<RequireQualifiedAccess>]
 module DeliverySurface =
 
@@ -14,19 +14,29 @@ module DeliverySurface =
     let private text (value: obj) : string =
         if isNullish value then "" else string value
 
-    let private namesOf (state: TipDeliveryProjectionState) : string array = state.FullDeliveredTips |> Set.toArray
+    let private optionalText (value: obj) : string option =
+        if isNullish value then None else Some(text value)
 
     let private stateToJs (state: TipDeliveryProjectionState) : obj =
-        box {| fullDeliveredTips = namesOf state |}
+        box
+            {| deliveredOccurrences = state.DeliveredOccurrences |> Set.toArray
+               coveredTipNames = state.CoveredTipNames |> Set.toArray |}
 
     let private stateOfJs (value: obj) : TipDeliveryProjectionState =
-        let names =
-            if isNullish value?fullDeliveredTips then
+        let occurrences =
+            if isNullish value?deliveredOccurrences then
                 [||]
             else
-                unbox<string array> value?fullDeliveredTips
+                unbox<string array> value?deliveredOccurrences
 
-        { FullDeliveredTips = names |> Array.toList |> Set.ofList }
+        let names =
+            if isNullish value?coveredTipNames then
+                [||]
+            else
+                unbox<string array> value?coveredTipNames
+
+        { DeliveredOccurrences = occurrences |> Array.toList |> Set.ofList
+          CoveredTipNames = names |> Array.toList |> Set.ofList }
 
     let private presentationOf (value: obj) : Wanxiangshu.Host.TipPresentation =
         match text value with
@@ -38,8 +48,10 @@ module DeliverySurface =
     let hasFullDelivered (tipName: string) (state: obj) : bool =
         TipDeliveryProjection.hasFullDelivered tipName (stateOfJs state)
 
-    let apply (tipName: string) (presentation: obj) (state: obj) : obj =
-        TipDeliveryProjection.apply tipName (presentationOf presentation) (stateOfJs state)
+    /// `occurrence` is optional on the JS side: omitting it folds the delivery
+    /// without an occurrence identity (coverage only, no frontier advance).
+    let apply (tipName: string) (presentation: obj) (state: obj) (occurrence: obj) : obj =
+        TipDeliveryProjection.apply tipName (optionalText occurrence) (presentationOf presentation) (stateOfJs state)
         |> stateToJs
 
     let applyReanchor (state: obj) : obj =

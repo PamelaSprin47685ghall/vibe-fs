@@ -33,6 +33,7 @@ type HostFactCases =
     | TipGuidanceDelivered of
         {| SessionId: SessionId
            TipName: string
+           OccurrenceId: string option
            Presentation: TipPresentation |}
     | SessionStartedAtBound of
         {| SessionId: SessionId

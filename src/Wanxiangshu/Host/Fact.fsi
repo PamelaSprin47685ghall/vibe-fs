@@ -38,6 +38,7 @@ module HostFact =
         payload:
             {| SessionId: SessionId
                TipName: string
+               OccurrenceId: string option
                Presentation: TipPresentation |} ->
             AgentFact
 

@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as guidance from '../../../dist/Enforcer/Guidance/TipSurface.js'
 import { link, observe, withJournal, main } from './support/journal.mjs'
 
-test('WHAT[guidance-delivery-001] a new occurrence of the same tip has its own first delivery', { todo: 'GAP-115: current delivery stores only TipName; keep the real counterexample until 29-D1 settles occurrence semantics' }, async () => {
+test('WHAT[guidance-delivery-001] a new occurrence of the same tip has its own first delivery', async () => {
   await withJournal(async ({ journal }) => {
     await link(journal)
     await observe(journal)

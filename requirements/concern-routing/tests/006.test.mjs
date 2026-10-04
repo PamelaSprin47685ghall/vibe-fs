@@ -26,17 +26,34 @@ test('WHAT[concern-routing-006] retirement prevents old messages crossing into a
 const { withExecutablePlugin, completeManagerLife } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
 const { admit, context } = await import('./support/plugin.mjs')
 
-test('WHAT[concern-routing-006] completing the actual owner life retires its mailbox before later publish', { todo: 'GAP-157: production does not connect participant termination to mailbox retirement' }, async () => {
+test('WHAT[concern-routing-006] completing the actual owner life retires its mailbox before later publish', async () => {
   await withExecutablePlugin(async (hooks, directory, created, runtime) => {
     const owner = 'retiring-owner'
     const sender = 'retiring-sender'
+    const decoy = 'unrelated-owner'
+    const successor = 'successor-owner'
     await admit(runtime, owner, 'manager')
     await admit(runtime, sender)
+    await admit(runtime, decoy)
+    await admit(runtime, successor)
     await hooks.tool.subscribe.execute({ id: 'build', concern: 'build health' }, context(owner, 'subscribe', 'manager'))
+    // An unrelated participant's mailbox is established before the termination
+    // so isolation is observable on both sides of the lifecycle event.
+    await hooks.tool.subscribe.execute({ id: 'deploy', concern: 'deploy health' }, context(decoy, 'subscribe-decoy'))
     const before = await hooks.tool.publish.execute({ id: 'build', message: 'before retirement' }, context(sender, 'before'))
     assert.match(before, /Message accepted/)
+    const decoyBefore = await hooks.tool.publish.execute({ id: 'deploy', message: 'decoy live' }, context(sender, 'decoy-before'))
+    assert.match(decoyBefore, /Message accepted/)
     await completeManagerLife(runtime, owner)
     const after = await hooks.tool.publish.execute({ id: 'build', message: 'after retirement' }, context(sender, 'after'))
     assert.doesNotMatch(after, /Message accepted/)
+    // The terminated participant's mailbox retirement does not leak onto other owners.
+    const decoyAfter = await hooks.tool.publish.execute({ id: 'deploy', message: 'decoy still live' }, context(sender, 'decoy-after'))
+    assert.match(decoyAfter, /Message accepted/)
+    // A successor earns a fresh generation only through an explicit
+    // same-concern subscribe; the retired generation does not come back.
+    await hooks.tool.subscribe.execute({ id: 'build', concern: 'build health' }, context(successor, 'rebound'))
+    const fresh = await hooks.tool.publish.execute({ id: 'build', message: 'new generation' }, context(sender, 'fresh'))
+    assert.match(fresh, /Message accepted/)
   })
 })

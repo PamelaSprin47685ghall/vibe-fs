@@ -121,7 +121,7 @@
 | GAP-112 | behavior-diagnosis | PARTIAL | 保留真实 loader、codec、journal/coordinator；规则同义、BIRTH/revision、fresh life、原子多投影、fatal结算仍缺独立全链证据。固定数量/词形与自建分类器已撤下。 |
 | GAP-113 | behavior-diagnosis-010/017/019 | PARTIAL | 每个 cycle 必选 tip 不等于已成立违约；缺 provider identity/协议预算耗尽的 attempt 终态与进程 fatal 范围待统一。保持原合同，不扩大真实 kill。 |
 | GAP-114 | behavior-diagnosis 测试接缝 | PARTIAL | 中文完整 Rulebook、额外字段进入真实 decoder 的修正需新基线验证；生产 locale 装配本已正确，不声称修复了不存在的生产中文故障。 |
-| GAP-115 | guidance-delivery-001/002/005 | PARTIAL | TipName 覆盖集合不具独立 occurrence frontier，新 run 仍 IdentityOnly 的真实失败 TODO 保留。当前合同首个 occurrence Full 与已知机制提醒范围需裁决。 |
+| GAP-115 | guidance-delivery-001/002/005 | PARTIAL | TipName 覆盖集合不具独立 occurrence frontier，新 run 仍 IdentityOnly 的真实失败 TODO 保留。当前合同首个 occurrence Full 与已知机制提醒范围需裁决。2026-10-04 第十六批结算：001 已施工——TipGuidanceDelivered 携带 OccurrenceId（RecentTip CycleId，Envelope 手工 decoder 向后兼容——旧事实缺字段解为 None 不破坏重放）、TipDeliveryProjection 拆分为 occurrence Frontier（单调、重锚不重置）与 TipName Coverage（重锚清空）、重放只清 Coverage；tests/001 真实反例转正（新 occurrence 有自己的首投 Full）；005 的 presentation 断言由现行实现满足；DevOps 真实跑绿（001 1/1、003 2/2、005 2/2 + 变异红证——Frontier 键退回 TipName 即红）；「restoration 不新增首投事实」的 journal 级断言仍 TODO（需事实列举表面，归表面登记裁决）。 |
 | GAP-116 | guidance-delivery-002/004/007—012 | PARTIAL | 008部分证明：两次观察后Main resolve只含处置正文、不含检测正文，Blogger侧保留自身视图（tests/008）。已有双语正文、磁盘重开与冻结字节；完整Main Host投影的authority隔离、Full事实与实际交付原子性、动态owner单次读取、权限不变和事务故障仍待证，disposed handle不冒充append失败。 |
 | GAP-117 | guidance-delivery-006 | PARTIAL | 原无 association 时默认作为 guidance owner 的反例与拒绝修复已迁入；需新基线验证，不以单入口拒绝代替所有注入来源证明。 |
 | GAP-118 | attention-regulation | PARTIAL | 002已证abandon不动真实义务账本：seed WorkOwned后abandon，journal全投影deepEqual不变且快照非空（tests/002）。真插件重开、session 隔离与冻结消费有证据；同 SessionId 的 Life 清退已贯通：foldRelay 在 road 完成时 closeLife 清 Attention pending，复用 SessionId 不继承旧 work（tests/004 红绿对照）。同 occurrence 不同正文的拒绝/原值重放政策待审，actual enough 模型行为及完整账本不变仍待证。 |
@@ -148,7 +148,7 @@
 | GAP-153 | delegation | PARTIAL | 实际fork/resume、批次、接收、队列和交接用例保留；Sphinx标准Engineer的完整权限链、全局注册、绑定恢复、重复terminal及fatal settlement→mandatory fuse仍待证。55转入42的四个Mailbox用例仅证明领取顺序和中断；旧只读Sphinx政策已退役。 |
 | GAP-155 | concern-routing | PARTIAL | 002证明engineer/manager/devops各收一次、blogger不收、新合格者重开后仍收到。新增重开测试证明旧occurrence冻结提示byte-identical、新occurrence不重复公告。原“coverage未恢复”声明撤销：原测试将同一placement的合法重放误判为新投递。插件重开不等于OS crash；真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
 | GAP-156 | concern-routing-003 | PARTIAL | 同occurrence不同sender/address/message原被当成功重放；已迁入完整材料一致性裁决、双语拒绝资源和真实入口反例，待新构建验证。 |
-| GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留；手工retire纯测试不证明正式终结驱动durable MailboxRetired，需接通完成/放弃/replacement及恢复。 |
+| GAP-157 | concern-routing-006 | PARTIAL | actual owner life结束后仍能publish的失败TODO保留。2026-10-04 第十六批结算：006 已施工——participant 终结接线落地（ObligationJournalSurface 的 LifeCompleted 分支 + SuicideTool 的 runRetirement → AttentionConcernJournalAdapter.retireMailboxesOf → durable MailboxRetired → ProjectionUpdate.applyConcern 退休投影）；DevOps 根因修复（LifeCompleted 分支缺接线——Engineer 施工缺口 + shard 缺边补 ProjectReference）；006 转正（decoy 隔离 + 后继新代断言 + 手工绿例保留）；变异红证两处（跳过接线红/删 owner 过滤红）；DevOps 真实跑绿（2/2）。session/handle 层终结（clearSession/cancel/HandleAbandoned/Fission）是否同接线的语义裁决归 Manager；SuicideTool 路径无独立测试锚点。 |
 | GAP-158 | intra-participant-parallelism | PARTIAL | participant-identity/008部分证明：InheritedFromOwner缺任一owner字段（空串/空白/null/undefined）全部typed fail-closed，完整witness正常准入；真实Fission lane的identity传递仍待证。已有admission、parser、bundle/ring与权限拒绝局部测试保留；全程identity/责任、unknown/rollback、真实交付、持久恢复、唯一原cell完成及N−1 takeover仍缺证。常量startedLane已删除。 |
 | GAP-159 | intra-participant-parallelism-017；speculative-investigation-004 | PARTIAL | Predictor配置映射Engineer并暴露Fission；真实authority准入也接受，但actual根Fission被origin gate拒绝。保留分别取证的失败TODO，不宣称已发生完整越权。 |
 | GAP-160 | knowledge-reuse | PARTIAL | 真EventStore/fetch/Bookkeeper事务与基线有证据；006新增成功零setter仍推进maintenance基线、completion不变、重开不重复维护及下次精确差分，阻止推进的隔离生产变异被击红。终结自动归档、全部工具访问、真实仓库权限拒绝、并发副本、自动LRU、disabled零影响、fatal与完整请求预算仍缺全链。权限调查只静态定位到共享JsSandbox注入宿主对象的边界，未运行实际越权探针；既不能据此宣称越权成立，也不能把prompt/schema当拒绝证据。删除假维护接口，不补空实现凑绿。 |
@@ -224,7 +224,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-191 | 旧账目故障政策 | RETIRED | 旧语义账本不再成立；新UI交付故障不能悄悄反向决定认知状态，按新合同补证。 |
 | GAP-192 | relay-incumbency | PARTIAL | 真实绑定与fold局部证明保留；固定DevOps映射不再由接缝填默认值。跨任期真实恢复和控制权移交未闭合。 |
 | GAP-193 | relay-assessment | PARTIAL | Manager当前事实只读取证已对齐；评审独立性、实际在途请求和证书失效链仍缺证。 |
-| GAP-194 | relay-assessment精确重放 | PARTIAL | 精确相同评审重放与新评审冲突须区分，不能只改标题或调用两次即认幂等。 |
+| GAP-194 | relay-assessment精确重放 | PARTIAL | 精确相同评审重放与新评审冲突须区分，不能只改标题或调用两次即认幂等。2026-10-04 第十六批结算：002 已施工——ReviewTool 的 prepareAssessment 拆为 ReplayCandidate/FreshAssessment（fresh gate 不放松）、runPrepared 三重精确比对（payload digest/AcceptedAssessmentSnapshotId/scores——DevOps 根因修复：原用 View.ActiveSnapshotId（openIncumbency 占位）永不匹配，改从 AssessmentRecord 透出）、exact replay 返回原 bytes 零新事实、ReplayConflict/AlreadySubmitted 两拒绝路径（资源已补齐）；Fold 的 SeenAssessmentToolCallIds 跨任期挡点；002 转正（5 pass + 1 跨任期 todo）；DevOps 真实跑绿。跨任期反例依赖真实退休链夹具（建议与 relay-context-projection 的 withSuccessor 协调后转正）。 |
 | GAP-195 | relay-context-projection | PARTIAL | 新接缝调用真实NarrativeTransform；旧projectMessages透传API保留兼容但不计证据。完整历史、真实物理发送和stale中断尚需执行。 |
 | GAP-196 | 旧ProjectionCut删owner请求 | RETIRED | 上游改为完整历史，不再要求旧裁剪；新实现保全历史的真实证据仍归GAP-195。 |
 | GAP-197 | relay-retirement | PARTIAL | 真实工具scope与受控资源收束用例保留；跨进程终止、递归live资源与完整退休不等于纯分类结果。 |
