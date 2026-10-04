@@ -962,6 +962,35 @@ module ForkToolSurface =
         }
         :> Task
 
+    /// managed-session-lifecycle-018: inject a stop carrying an exact reason
+    /// and an optional authority root. A non-empty root with a
+    /// MISSING_FINAL_REPORT reason reproduces the provider-retry observation;
+    /// an empty root reproduces the session-scoped stop shape a Fission
+    /// external-abort group failure delivers to the owner's run lifecycle.
+    let emitStopWithReason (value: obj) (owner: string) (root: string) (kind: string) (reason: string) : Task =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild, harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Some childId, Ok runtime ->
+                let stop =
+                    if String.IsNullOrWhiteSpace root then
+                        TerminalStop.session reason
+                    else
+                        TerminalStop.forAuthority (AuthorityRootUserMessageId.create root) reason
+
+                let outcome =
+                    match kind with
+                    | "Failed" -> TerminalOutcome.Failed stop
+                    | "Aborted" -> TerminalOutcome.Aborted stop
+                    | _ -> invalidArg "kind" "unknown stop"
+
+                harness.Sessions.Notify(childId, outcome)
+                do! runtime.AwaitObservedWork()
+            | _ -> invalidOp "no owned child work"
+        }
+        :> Task
+
     let replayWorkCompletion (value: obj) (owner: string) (root: string) : Task<obj> =
         task {
             let harness = unbox<ForkHarness> value
