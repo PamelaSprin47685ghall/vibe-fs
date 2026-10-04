@@ -61,7 +61,7 @@ type SessionAgentProjection =
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
         RequirementGrounding: RequirementGroundingProjectionState option
-        /// Rulebook Main tip Full/Identity delivery (TipGuidanceDelivered fold).
+        /// Rulebook Main tip delivery: occurrence frontier + TipName coverage (TipGuidanceDelivered fold).
         TipDelivery: TipDeliveryProjectionState option
         SessionStartedAt: SessionStartedAtProjectionState option
         DelegatedToolEstimate: DelegatedToolEstimateProjectionState option

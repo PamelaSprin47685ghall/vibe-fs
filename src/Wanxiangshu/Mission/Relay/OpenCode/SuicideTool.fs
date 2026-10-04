@@ -271,6 +271,7 @@ module SuicideTool =
 
             let! projection = appendPrepared prepared transaction
             let! _ = retirementFromProjection prepared projection
+
             return retiredResult ()
         }
 

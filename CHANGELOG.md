@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — upstream aaa123b12 增量
+
+- 吸收 occurrence frontier/coverage 分离、持久事实兼容解码、review 重放及跨任期 call 防线。补完整 binding 重放和开任期误退邮箱的正式红绿回归。
+- 保留 LifeCompleted Surface 的成功接线，撤回未闭合失败恢复的新增 Suicide 邮箱退休调用；GAP-157 与生产终结 TODO 保留。合并与验收见[记录](proposals/archive/2026-10-04/Upstream增量-aaa123b12-2026-10-04.md)。
+
 ## Unreleased — S03 选定 SDK 准备
 
 - 从明确摘要的完整 SDK 归档独立物化，在私有配置目录下使用原 global.json 实际探测 SDK 与 runtime，拒绝越界工具路径、外部 SDK 借用和身份不符。探测后完整复核，失败与取消回收自有目录并保留原原因。

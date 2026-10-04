@@ -257,7 +257,7 @@ async function installSelectedDependencies({ sourceBytes, selectedRegistry, pare
     }
     const expectedEntries = installedEntries(workspace)
     const chunks = []
-    for await (const chunk of create({ cwd: workspace, portable: true, noMtime: true }, ['node_modules'])) {
+    for await (const chunk of create({ cwd: workspace, portable: false, noMtime: true }, ['node_modules'])) {
       signal?.throwIfAborted()
       chunks.push(chunk)
     }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -132,10 +133,21 @@ export function registerNodeToolCandidateTests() {
         }
       })
       await t.test('WHAT[verification-system-016] complete root npm dependencies cannot conceal a missing declared transitive production library', async () => {
-        const library = path.join(root, 'selected/toolchain/npm/node_modules/@gar/promise-retry')
+        const npmRoot = fs.realpathSync(path.join(root, 'selected/toolchain/npm'))
+        const importerPath = path.join(npmRoot, 'node_modules/make-fetch-happen/package.json')
+        const importer = JSON.parse(fs.readFileSync(importerPath))
+        const manifest = JSON.parse(fs.readFileSync(path.join(npmRoot, 'package.json')))
+        const dependency = Object.keys(importer.dependencies).find(name => !Object.hasOwn(manifest.dependencies, name) && !Object.hasOwn(importer.optionalDependencies ?? {}, name))
+        assert.equal(typeof dependency, 'string', 'The actual npm library must declare a required transitive dependency outside root npm dependencies')
+        let library = path.dirname(createRequire(importerPath).resolve(dependency))
+        while (!fs.existsSync(path.join(library, 'package.json'))) {
+          assert.ok(library.startsWith(`${npmRoot}${path.sep}`), 'The actual transitive library must resolve inside the selected npm package')
+          library = path.dirname(library)
+        }
+        assert.ok(library.startsWith(`${npmRoot}${path.sep}`))
+        assert.equal(JSON.parse(fs.readFileSync(path.join(library, 'package.json'))).name, dependency)
         const held = path.join(root, 'held-transitive-library')
-        const manifest = JSON.parse(fs.readFileSync(path.join(root, 'selected/toolchain/npm/package.json')))
-        assert.equal(Object.hasOwn(manifest.dependencies, '@gar/promise-retry'), false)
+        assert.equal(Object.hasOwn(manifest.dependencies, dependency), false)
         fs.renameSync(library, held)
         let incomplete
         try {

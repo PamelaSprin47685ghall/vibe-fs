@@ -25,6 +25,7 @@ type private RoadState =
       Retired: IncumbencyId list
       RetiredProviderRunIds: Set<string>
       SeenAssessmentIds: Set<string>
+      SeenAssessmentToolCallIds: Set<string>
       Certificate: QualityCertificate option
       LatestRetirement: RetirementSummary option
       BoundDevOps: string option
@@ -120,6 +121,7 @@ module private Internal =
         { current with
             Active = Some updatedActive
             SeenAssessmentIds = Set.add (AssessmentId.value assessmentId) current.SeenAssessmentIds
+            SeenAssessmentToolCallIds = Set.add binding.ToolCallId current.SeenAssessmentToolCallIds
             Certificate = certificate }
         |> fun updated -> update roadId updated state
         |> Ok
@@ -151,6 +153,23 @@ module private Internal =
         =
         accepted.Id = assessmentId || accepted.Binding.ToolCallId = binding.ToolCallId
 
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+            let! active = current.Active |> require "NoActiveIncumbency"
+            do! requireMatchingIncumbency active incumbencyId
+            let! accepted = active.Assessment |> require "AssessmentRequired"
+
+            if
+                current.AuthorityRevision = authorityRevision
+                && active.AuthorityRevision = authorityRevision
+                && isExactAssessment accepted accepted.Id binding snapshotId authorityRevision scores
+            then
+                return accepted.Scores
+            else
+                return! Error "AssessmentReplayConflict"
+        }
+
     let private decideStoredAssessment
         (accepted: AssessmentRecord)
         state
@@ -173,6 +192,7 @@ module private Internal =
         snapshotId
         authorityRevision
         assessmentId
+        (binding: AssessmentBinding)
         =
         if active.Phase <> IncumbencyPhase.AuditPending then
             Error "AssessmentNotAllowedInCurrentPhase"
@@ -180,6 +200,10 @@ module private Internal =
             Error "AuthorityRevisionStale"
         elif Set.contains (AssessmentId.value assessmentId) current.SeenAssessmentIds then
             Error "AssessmentReplayConflict"
+        elif Set.contains binding.ToolCallId current.SeenAssessmentToolCallIds then
+            // relay-assessment-002: one tool call owns at most one assessment on a
+            // road; a later incumbency cannot replay a retired call as fresh work.
+            Error "AssessmentReplayToolCall"
         else
             Ok()
 
@@ -195,7 +219,7 @@ module private Internal =
         scores
         =
         result {
-            do! validateFreshAssessment active current snapshotId authorityRevision assessmentId
+            do! validateFreshAssessment active current snapshotId authorityRevision assessmentId binding
 
             return!
                 acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
@@ -505,6 +529,7 @@ module private Internal =
               Retired = []
               RetiredProviderRunIds = Set.empty
               SeenAssessmentIds = Set.empty
+              SeenAssessmentToolCallIds = Set.empty
               Certificate = None
               LatestRetirement = None
               BoundDevOps = Some("devops:" + RoadId.value roadId)
@@ -545,6 +570,7 @@ module private Internal =
               Retired = []
               RetiredProviderRunIds = Set.empty
               SeenAssessmentIds = Set.empty
+              SeenAssessmentToolCallIds = Set.empty
               Certificate = None
               LatestRetirement = None
               BoundDevOps = Some devopsId
@@ -707,6 +733,9 @@ module private Internal =
 
 module Fold =
     let empty = RelayState Map.empty
+
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
+        Internal.tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores
 
     let apply state roadId transaction =
         RelayTransaction.events transaction

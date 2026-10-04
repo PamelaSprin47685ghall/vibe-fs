@@ -1,5 +1,7 @@
 # 计划与提案入口
 
+最新 upstream `aaa123b12` 的 occurrence、重放和终结接线按[本地裁决](archive/2026-10-04/Upstream增量-aaa123b12-2026-10-04.md)吸收：修开任期误退邮箱与完整 binding 重放，未闭环的 Suicide 失败恢复接线撤回，强断言与 TODO 保留。上游“转正”不代替本地证明。
+
 S03 已进入[选定 SDK 准备](archive/2026-10-04/S03选定SDK准备-2026-10-04.md)：完整归档与原 global.json 驱动实际 SDK/runtime 探测。下一步施工 NuGet/tool restore 的精确图与包字节、只读执行及实际 verify；不能将 SDK 准备局部通过当 S03 完成。
 
 本次上游 `590a3f69e` 的吸收、拒绝依据和本地验收见[同步记录](archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。上游历史代数、统计和“结算”不等于本仓当前证明；尤其 S03 仍按实际反例保留未完成范围。

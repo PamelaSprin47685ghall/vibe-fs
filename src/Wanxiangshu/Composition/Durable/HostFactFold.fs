@@ -117,7 +117,8 @@ module HostFactFold =
                     reject "RequirementGroundingAnchored" ("missing grounding request: " + identity)
 
         | HostFactCases.TipGuidanceDelivered payload ->
-            // Idempotent: Full tips accumulate; IdentityOnly is a no-op on the set.
+            // Idempotent: Full records the occurrence frontier (when the fact
+            // carries one) and covers the TipName; IdentityOnly is a no-op.
             Ok(
                 AgentProjection.update
                     payload.SessionId
@@ -125,7 +126,14 @@ module HostFactFold =
                         let prior = session.TipDelivery |> Option.defaultValue TipDeliveryProjection.empty
 
                         { session with
-                            TipDelivery = Some(TipDeliveryProjection.apply payload.TipName payload.Presentation prior) })
+                            TipDelivery =
+                                Some(
+                                    TipDeliveryProjection.apply
+                                        payload.TipName
+                                        payload.OccurrenceId
+                                        payload.Presentation
+                                        prior
+                                ) })
                     projection
             )
 

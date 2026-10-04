@@ -35,6 +35,7 @@ async function toolArchiveFixture() {
     const nodePath = 'toolchain/node/bin/node'
     const npmCliPath = 'toolchain/npm/bin/npm-cli.js'
     fs.mkdirSync(path.join(selected, 'toolchain/node/bin'), { recursive: true })
+    fs.chmodSync(path.join(selected, 'toolchain/node'), 0o775)
     fs.copyFileSync(fixture.options.nodeExecutable, path.join(selected, nodePath))
     fs.chmodSync(path.join(selected, nodePath), 0o755)
     fs.cpSync(path.resolve(fixture.options.npmCli, '../..'), path.join(selected, 'toolchain/npm'), { recursive: true, verbatimSymlinks: true })
@@ -54,7 +55,7 @@ if (process.argv.includes('ci')) {
     fs.writeFileSync(cli, original.slice(0, shebangEnd) + observe + original.slice(shebangEnd))
     const archivePath = path.join(fixture.root, 'tools.tar')
     const chunks = []
-    for await (const chunk of create({ cwd: selected, portable: true, noMtime: true }, ['toolchain'])) chunks.push(chunk)
+    for await (const chunk of create({ cwd: selected, portable: false, noMtime: true }, ['toolchain'])) chunks.push(chunk)
     const archive = Buffer.concat(chunks)
     fs.writeFileSync(archivePath, archive)
     const entries = selectedEntries(selected)
@@ -90,13 +91,18 @@ async function waitForHeldInstall(fixture, installing) {
 
 export function registerNpmToolArchiveTests() {
   test('WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication', async t => {
-    await t.test('WHAT[verification-system-016] two actual locked registry packages use the selected bundle layout and bind its complete identity after tools cleanup', async () => {
+    await t.test('WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup', async () => {
       const fixture = await toolArchiveFixture()
       let candidate
       try {
         const packageBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
         const lockBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
-        candidate = await installFromArchive(fixture.installOptions)
+        const originalUmask = process.umask(0o002)
+        try {
+          candidate = await installFromArchive(fixture.installOptions)
+        } finally {
+          process.umask(originalUmask)
+        }
         const execution = JSON.parse(fs.readFileSync(fixture.executionMarker, 'utf8'))
         assert.ok(execution.nodeExecutable.endsWith(`/${fixture.toolArchive.nodePath}`))
         assert.ok(execution.npmCli.endsWith(`/${fixture.toolArchive.npmCliPath}`))
@@ -106,6 +112,7 @@ export function registerNpmToolArchiveTests() {
         assert.equal(candidate.installation.toolDigest, fixture.toolDigest)
         assert.equal(candidate.installation.npmVersion, fixture.installOptions.expectedNpmVersion)
         assert.equal(candidate.installation.nodeVersion, process.version)
+        assert.ok(candidate.entries.some(entry => entry.type === 'Directory' && entry.mode === 0o775), 'The complete dependency inventory must preserve the group-writable directories produced by this install')
         assert.equal(candidate.packageJsonSha256, sha256(packageBytes))
         assert.equal(candidate.lockfileSha256, sha256(lockBytes))
         const preparedDependencyDigest = sha256(JSON.stringify({ archiveSha256: candidate.archiveSha256, lockfileSha256: candidate.lockfileSha256, entries: candidate.entries }))

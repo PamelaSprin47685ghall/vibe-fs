@@ -319,7 +319,9 @@ module JournalSurface =
                visibleFromOrdinal = state.VisibleFromOrdinal |}
 
     let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =
-        box {| fullDeliveredTips = state.FullDeliveredTips |> Set.toList |> List.toArray |}
+        box
+            {| deliveredOccurrences = state.DeliveredOccurrences |> Set.toList |> List.toArray
+               coveredTipNames = state.CoveredTipNames |> Set.toList |> List.toArray |}
 
     let private sessionStartedAtToJs (state: SessionStartedAtProjectionState) : obj =
         box {| startedAt = (SessionStartedAtProjection.startedAt state).ToString("o") |}
