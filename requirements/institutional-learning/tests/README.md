@@ -10,7 +10,7 @@ born rules 目前只在 InstitutionalLearningTools 的私有规则合流中使�
 | --- | --- | --- |
 | [001] | 真插件两种工具接受口语经验；空白拒绝不消费 occurrence，同一 occurrence 改为有效输入可成功 | 自然语言含义仍需人工审阅 |
 | [002] | evaluator 三值结论含 BIRTH；learn 面证明一次漂移重评与二次冲突失败的纯计算分支 | 生产提交时的 revision 冲突与零提交；实际并发下唯一结论 |
-| [003] | 显式 absorbedRule 命中传入 live 规则名才 ABSORB；无声明时经验提及规则名不决定结论；真实链 raw 命令/路径/时间戳经验 DISCARD 不永久化、零额外文件与请求 | 从经验提炼机制；仅经验与 canonical live Rulebook 输入；真实网络、仓库能力隔离；调用方机制涵盖与泛化判断的人工审阅 |
+| [003] | 显式 absorbedRule 命中传入 live 规则名才 ABSORB；合法 candidate 与显式 absorbedRule 并存时 candidate 优先 BIRTH；无声明时经验提及规则名不决定结论；真实链 raw 命令/路径/时间戳经验 DISCARD 不永久化、零额外文件与请求 | 从经验提炼机制；仅经验与 canonical live Rulebook 输入；真实网络、仓库能力隔离；调用方机制涵盖与泛化判断的人工审阅 |
 | [004] | 真插件返回 BIRTH 并冻结重放；冲突或双语缺失的候选不返回 BIRTH | 与 behavior-diagnosis 共用准入与规则索引；真实预期 revision 预检；现有返回字符串断言不直接证明规则全量投影不变 |
 | [005] | 非空 trigger/negative 的机械检查；无 candidate 的局部路径/时间戳经验回落 DISCARD | 可泛化机制、可识别 trigger、防误诊区分、语义去重与长期价值/注意力成本 |
 | [006] | celebrate 与 regret 均可经合格 candidate 走 BIRTH；无 candidate 时诚实 DISCARD | — |
@@ -26,5 +26,7 @@ born rules 目前只在 InstitutionalLearningTools 的私有规则合流中使�
 ```sh
 WXS_TIER_INTEGRATION=1 node --test requirements/institutional-learning/tests/*.test.mjs
 ```
+
+001 与 006 断言英文处置文案（invalid/en.md 与 discarded/en.md 渲染），两文件顶部已锚定 `WANXIANGSHU_PROVIDER_LANGUAGE = 'en'`，不随宿主环境语言漂移；003 断言均为语言无关的枚举值，无需锚定。
 
 正式交付通过 verification-system runner 选择全部八个编号测试，并联查 attention-regulation 的真实 celebrate/restart 用例。TODO 不计为完成，也不以“文件已整理”表示学习机制已经齐备。
