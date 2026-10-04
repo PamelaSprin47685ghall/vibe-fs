@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 选定本地工具恢复
+
+- 明确包 ID、版本和 SHA512，以已准备 SDK 私有恢复原本地工具 manifest，绑定真实 resolver、运行 DLL 与完整输出库存；取消或失败保留原因并回收自有根。
+- 真实 Fable/Fantomas 版本消费不代替工程 restore 或编译；S03 不可变执行与同候选 verify 仍未闭合。见[记录](proposals/archive/2026-10-04/S03本地工具恢复-2026-10-04.md)。
+
 ## Unreleased — upstream 31e69b3dd 合并
 
 - 吸收 raw Chronicle 基数统一检查与显式 ABSORB 声明，保持过滤前拒绝及 live 规则名核对。修正新增测试的实际日志观察与排空，保留尚未接通的 registered Host TODO。

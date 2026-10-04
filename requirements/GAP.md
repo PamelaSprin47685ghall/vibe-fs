@@ -69,7 +69,7 @@
 
 ## 2026-09-28：35 模块迁移缺口
 
-GAP-055 的后续[选定SDK准备](../proposals/archive/2026-10-04/S03选定SDK准备-2026-10-04.md)已经实施：完整归档及原 global.json 驱动真实 SDK/runtime 探测，路径不借外部 SDK，明确身份与取消回收。下文“SDK只调查/未施工”为此前截面；当前仍缺 NuGet/tool restore 精确图、Git/OS 外部依赖、实际 Fable 只读执行及 verify 同候选，不因此关闭 GAP-055 或 T418/T419。
+GAP-055 的后续[选定SDK准备](../proposals/archive/2026-10-04/S03选定SDK准备-2026-10-04.md)及[本地工具恢复](../proposals/archive/2026-10-04/S03本地工具恢复-2026-10-04.md)已经实施：完整 SDK、原 global/manifest、明确 NuGet 工具包字节、实际私有 restore/resolver 与完整库存绑定。下文“SDK只调查/未施工”为此前截面；当前仍缺工程 NuGet 图、Git/OS 外部依赖、实际 Fable 只读执行及 verify 同候选，不因此关闭 GAP-055 或 T418/T419。
 
 GAP-055的2026-10-04接续增量见[依赖归档准备](../proposals/archive/2026-10-04/S03依赖归档准备-2026-10-04.md)与[真实npm/Node工具准备](../proposals/archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)：真实npm安装定向45项、完整selected Node/npm bundle定向15项通过，均0失败；完整归档成员在工具探针后再次校验。安装receipt的`bootstrap-admission`与工具receipt的`selected-node-npm-bundle`不混称完整工具闭包。早期默认夹具实际npm11.18.0，完整npm11.12.1工具包另15项通过，当时尚未安装实际仓库依赖；现有实际安装增量见下文，不升级早期范围。SDK/Git/dotnet/Fable/NuGet、实际verify同候选/结论绑定与只读执行仍未闭合。步骤边界复核不证明改后恢复，GAP-055仍PARTIAL，T418/T419保留。
 

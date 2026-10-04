@@ -463,7 +463,7 @@ Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输�
 
 实际application依赖现有原生Node定向4项通过、0失败、0skip/TODO（1父3叶）：选定`174c2a2533`的Git tree/sourceDigest，以完整Node22.23.3/npm11.12.1归档真实安装236个仓库锁定包；toolDigest与11693成员完整inventory绑定，平台optional有7项存在、16项缺失，实际Fable List/Acorn/Tar消费者通过且全部ownedroot回收。证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。该结果仅属于明确选定tree及darwin-arm64依赖，不证明当前dirty合并输入、native Host/lifecycle/SDK、实际Fable编译、RO或actualverify，不关闭T418/T419。
 
-接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)已经实现完整归档、原 global.json 的实际 SDK/runtime 选择、外部路径拒绝与取消回收；SDK 准备不再只处于调查。下一项按原 manifest/project 捕获精确 NuGet/tool 解析图与包字节，明确 SDK 内部 feeds，证明实际 restore 与私有缓存回收。之后完成 Git/OS 加载边界、实际 Fable 的只读候选及 verify 同源；不重复准备 owner，不删除 T418/T419。
+接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)已经实现完整归档、原 global.json 的实际 SDK/runtime 选择、外部路径拒绝与取消回收；SDK 准备不再只处于调查。随后已做[本地工具恢复](../archive/2026-10-04/S03本地工具恢复-2026-10-04.md)：原 manifest、明确 nupkg 字节、私有 feed、实际 SDK restore/resolver 与完整库存绑定。下一项是原 project/props 的工程 NuGet 精确图、包字节和 SDK 内部 feeds，不重复工具版本探测。之后完成 Git/OS 加载边界、实际 Fable 的只读候选及 verify 同源；不重复准备 owner，不删除 T418/T419。
 
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 
