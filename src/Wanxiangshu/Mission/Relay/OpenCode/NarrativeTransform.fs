@@ -75,12 +75,12 @@ module RelayNarrativeTransform =
         |> Option.map (fun _ -> RelayProjectionDisposition.CurrentIteration)
         |> Option.defaultValue RelayProjectionDisposition.Unchanged
 
-    let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedHuman gatePhysical =
+    let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot admittedPhysical gatePhysical =
         match physical with
         | Some current ->
             freshRoot = Some current
             || gatePhysical = Some current
-            || (afterCut && acceptedHuman)
+            || (afterCut && admittedPhysical current)
         | _ -> false
 
     let private isSuccessorRequest
@@ -88,7 +88,7 @@ module RelayNarrativeTransform =
         sessionId
         (road: RoadView)
         (retirement: RetirementSummary)
-        acceptedHuman
+        admittedPhysical
         messages
         =
         let currentUser =
@@ -125,12 +125,12 @@ module RelayNarrativeTransform =
             managerLoopGatePhysical journal sessionId retirement
             |> Option.map Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value
 
-        requestBelongsToSuccessor physical afterCut freshRoot acceptedHuman gatePhysical
+        requestBelongsToSuccessor physical afterCut freshRoot admittedPhysical gatePhysical
 
-    let private staleRetirement journal sessionId (road: RoadView) acceptedHuman messages =
+    let private staleRetirement journal sessionId (road: RoadView) admittedPhysical messages =
         road.LatestRetirement
         |> Option.filter (fun retirement ->
-            not (isSuccessorRequest journal sessionId road retirement acceptedHuman messages))
+            not (isSuccessorRequest journal sessionId road retirement admittedPhysical messages))
 
     // The provider view keeps the full physical history after a retirement:
     // the next iteration sees every prior message, the retirement tool call
@@ -142,13 +142,16 @@ module RelayNarrativeTransform =
         HostMessageProjection.replaceMessagesInPlace outObj messages
         dispositionAfterProjection road
 
-    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road acceptedHuman outObj =
+    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road admittedPhysical outObj =
         task {
             let messages = ProviderWireDecode.messagesFromTransformOutput outObj
 
             // An active LogicalRun or a claimed loop gate does not identify this
-            // physical request: both can coexist with the retired attempt.
-            match staleRetirement journal sessionId road acceptedHuman messages with
+            // physical request: both can coexist with the retired attempt. A
+            // successor request is identified by generation membership: the head
+            // sits after the durable cut and holds a durable ChatExecution
+            // admission for exactly this physical id (relay-context-projection-002).
+            match staleRetirement journal sessionId road admittedPhysical messages with
             | Some _ ->
                 do! interruptAttempt sessionId
                 HostMessageProjection.replaceMessagesInPlace outObj []
@@ -158,7 +161,7 @@ module RelayNarrativeTransform =
 
     let apply
         (journal: AgentJournal option)
-        (acceptedHuman: bool)
+        (admittedPhysical: string -> bool)
         (interruptAttempt: SessionId -> Task<unit>)
         (sessionId: string option)
         (outObj: obj)
@@ -175,6 +178,6 @@ module RelayNarrativeTransform =
 
             match resolved with
             | Some(durable, currentSessionId, road) ->
-                return! project durable interruptAttempt currentSessionId road acceptedHuman outObj
+                return! project durable interruptAttempt currentSessionId road admittedPhysical outObj
             | None -> return RelayProjectionDisposition.Unchanged
         }

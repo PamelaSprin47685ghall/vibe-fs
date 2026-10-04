@@ -564,26 +564,27 @@ module PluginTransforms =
                         |> ProviderWireDecode.messagesFromTransformOutput
                         |> ProviderWireCapture.lastUserMessageId
 
-                    // External HumanMessage acceptance lives in ChatExecutions, not
-                    // the claimed-prompt continuation map used by manager-loop gates.
-                    let acceptedHuman =
-                        match journal, sidOpt, physicalUserMessageId with
-                        | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
-                            let key: ChatExecutionKey =
-                                { SessionId = SessionId.create sessionId
-                                  PhysicalUserMessageId = physical }
+                    // Generation membership, not lifecycle: a physical head that
+                    // holds a durable ChatExecution admission for exactly this
+                    // session belongs to the admitted generation, whatever phase
+                    // that execution has since reached (relay-context-projection-002).
+                    let admittedPhysical =
+                        match journal, sidOpt with
+                        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
+                            fun (physical: string) ->
+                                let key: ChatExecutionKey =
+                                    { SessionId = SessionId.create sessionId
+                                      PhysicalUserMessageId = PhysicalUserMessageId.create physical }
 
-                            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                            |> ChatExecutionProjection.byKey key
-                            |> Option.exists (fun execution ->
-                                execution.origin = PromptAuthority.PromptOrigin.Continuation
-                                                       PromptAuthority.ContinuationKind.HumanMessage)
-                        | _ -> false
+                                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                                |> ChatExecutionProjection.byKey key
+                                |> Option.isSome
+                        | _ -> fun _ -> false
 
                     return!
                         RelayNarrativeTransform.apply
                             journal
-                            acceptedHuman
+                            admittedPhysical
                             (fun sid ->
                                 ManagerWorkflow.continueAfterRetiredAttempt
                                     sessionPort
@@ -607,11 +608,24 @@ module PluginTransforms =
 
                                                 return
                                                     interruption
-                                                    |> Result.defaultWith (fun error ->
-                                                        invalidOp (
-                                                            "MANAGER-LOOP-004: retired attempt interrupt failed: "
-                                                            + error
-                                                        ))
+                                                    |> Result.defaultWith (fun (error: string) ->
+                                                        if
+                                                            error.Contains(
+                                                                "MANAGED-SESSION-016",
+                                                                StringComparison.Ordinal
+                                                            )
+                                                        then
+                                                            // The 016 guard is right: a fresh successor
+                                                            // root owns the session and no old-term abort
+                                                            // may be re-issued after successor dispatch
+                                                            // (relay-retirement-008). The stale request is
+                                                            // already cleared, so the refusal stands.
+                                                            ()
+                                                        else
+                                                            invalidOp (
+                                                                "MANAGER-LOOP-004: retired attempt interrupt failed: "
+                                                                + error
+                                                            ))
                                         })
                                     sid)
                             sidOpt

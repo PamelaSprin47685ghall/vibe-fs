@@ -7,7 +7,7 @@ test('WHAT[relay-context-projection-001] actual retirement owner then NarrativeT
   await withSuccessor(async ({history, gate, runtime, session}) => {
     const input = [...history, textMessage('late-old', 'assistant', 'Late prior work'), toolMessage('another-old', 'another-call'), textMessage('wake', 'user', 'Internal wake'), gate]
     const before = structuredClone(input)
-    const result = await projection.apply(runtime.journal, session, false, input)
+    const result = await projection.apply(runtime.journal, session, () => false, input)
     assert.deepEqual(result, {disposition: 'current-iteration', messages: before, interrupted: []})
     assert.deepEqual(input, before)
   })
