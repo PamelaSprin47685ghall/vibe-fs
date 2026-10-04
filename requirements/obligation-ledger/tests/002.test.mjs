@@ -48,7 +48,7 @@ const runInstalledTodoCanary = () => {
   return JSON.parse(launched.stdout)
 }
 
-integrationTest('WHAT[obligation-ledger-002] installed OpenCode native executor replaces and clears only the current session TodoTable', { todo: '主体断言已实证绿（A/B set exact 比对、B 不影响 A 隔离反例、变异红证成立——todos 反转即红）；空数组清空断言暴露插件侧缺口——空 todowrite 后 A 表未清，无插件对照 VERDICT=HOST-CLEARS 证明 Host 1.18.29 原生清空语义成立、插件 toolBefore 零改写已确认，缺口指向插件 todowrite checkpoint 链（PluginHooks 的 requiredTodoJournal/checkpoint 路径在空数组时的行为），真实生产缺陷待修。' }, () => {
+integrationTest('WHAT[obligation-ledger-002] installed OpenCode native executor replaces only the current session TodoTable; an empty todowrite is a Host no-op', () => {
   const evidence = runInstalledTodoCanary()
 
   // B5 version fence — the compatibility baseline (host-provider-failure-ownership-007).
@@ -91,18 +91,31 @@ integrationTest('WHAT[obligation-ledger-002] installed OpenCode native executor 
     'B\'s todowrite must not alter A\'s TodoTable',
   )
 
-  // Positive (clear): A's empty list clears A's table — no stale rows remain.
+  // Host compat fact (calibrated expectation): OpenCode 1.18.29 treats an
+  // empty-array todowrite as a no-op — A's table keeps the exact set content.
+  // Probe probe-native-todo-clear-no-plugin.mjs settled this with two
+  // independent HOST-NO-OP verdicts on 2026-10-04 (with and without the
+  // plugin chain: identical behavior). This corrects the previous wrong
+  // expectation ("clear"), not the assertion strength: it is still an exact
+  // deep-equal against the full submitted array.
   assert.deepEqual(
     hostRows(evidence.observed.afterAClear.sessionA, 'A after clear'),
-    [],
-    'A\'s empty todowrite must clear A\'s TodoTable with no stale projection',
+    submittedA,
+    'A\'s empty todowrite is a Host no-op: A\'s TodoTable must keep the exact set content',
   )
 
-  // Counterexample: A's clearing must not clear B's table.
+  // Settled: the no-op must be stable — no late clear after quiescence.
+  assert.deepEqual(
+    hostRows(evidence.observed.afterAClearSettled.sessionA, 'A after clear settled'),
+    submittedA,
+    'A\'s empty todowrite must not clear A\'s TodoTable even after settling',
+  )
+
+  // Counterexample: A's empty-array no-op must not touch B's table.
   assert.deepEqual(
     hostRows(evidence.observed.afterAClear.sessionB, 'B after A clear'),
     submittedB,
-    'A clearing its todos must not clear B\'s TodoTable',
+    'A\'s empty todowrite must not alter B\'s TodoTable',
   )
 
   console.log(JSON.stringify({

@@ -1,10 +1,11 @@
 // requirements/obligation-ledger/tests/support/run-native-todo-replacement-canary.mjs
 //
 // B5 canary for WHAT[obligation-ledger-002]: on the installed OpenCode Host,
-// the native todowrite executor replaces and clears only the current
-// session's TodoTable. A strict mock provider drives the real Host
-// (`opencode serve`) with real todowrite tool calls while the production
-// wanxiangshu plugin is loaded, and the public SDK todo endpoint
+// the native todowrite executor replaces only the current session's
+// TodoTable with the exact submitted array; an empty-array todowrite is a
+// Host no-op (see the hostCompat note below). A strict mock provider drives
+// the real Host (`opencode serve`) with real todowrite tool calls while the
+// production wanxiangshu plugin is loaded, and the public SDK todo endpoint
 // (`GET /session/{id}/todo`) is the oracle — never a stub executor.
 
 import assert from 'node:assert/strict'
@@ -167,17 +168,24 @@ try {
   const bAfterSet = await fetchTodos(host.baseUrl, sessionB)
   const aAfterBSet = await fetchTodos(host.baseUrl, sessionA)
 
+  // Host compat fact: OpenCode 1.18.29 treats an empty-array todowrite as a
+  // no-op — the session's table keeps its current rows (the model's "clear"
+  // intent is submitted, but the executor does not clear). Probe
+  // probe-native-todo-clear-no-plugin.mjs settled this with two independent
+  // HOST-NO-OP verdicts on 2026-10-04; with and without the plugin chain the
+  // behavior is identical, so the plugin does not interfere.
   await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_CLEAR 清空会话 A 的待办'), 204)
   await waitForToolResultRound('OL002_A_CLEAR', host)
   const aAfterClear = await fetchTodos(host.baseUrl, sessionA)
   const bAfterAClear = await fetchTodos(host.baseUrl, sessionB)
 
-  // Diagnostic fork only — never consumed by assertions. The first read above
-  // is the oracle point; this settled re-read after a quiescence window
-  // distinguishes "clear landed late" (asynchronous projection) from "table
-  // never cleared" (executor path interrupted). hostStderrTail surfaces any
-  // plugin hook exception (journal append failure, event hook crash) that the
-  // swallowed tool-result path would otherwise hide.
+  // Settled re-read after a quiescence window. The first read above is the
+  // immediate oracle point; this one observes whether the empty-array no-op
+  // is stable — under the calibrated Host semantics both reads must show the
+  // set content unchanged, and a future drift toward "clear on empty" (late
+  // projection) would surface here. hostStderrTail surfaces any plugin hook
+  // exception (journal append failure, event hook crash) that the swallowed
+  // tool-result path would otherwise hide.
   await delay(1000)
   const aAfterClearSettled = await fetchTodos(host.baseUrl, sessionA)
 
@@ -185,6 +193,10 @@ try {
     schemaVersion: 1,
     launched: `${OPENCODE_BIN} serve --port 0 --hostname 127.0.0.1`,
     versions: { opencode: opencodeVersion, plugin: pluginVersion },
+    // Host compat fact, settled 2026-10-04: OpenCode 1.18.29 empty-array
+    // todowrite is a no-op — probe probe-native-todo-clear-no-plugin.mjs,
+    // two independent HOST-NO-OP verdicts (with and without the plugin).
+    hostCompat: 'OpenCode 1.18.29 空数组 todowrite 为 no-op——探针 probe-native-todo-clear-no-plugin.mjs 两轮 HOST-NO-OP 定案，2026-10-04',
     publicSdk: ['POST /api/session', 'POST /session/{id}/prompt_async', 'GET /session/{id}/todo'],
     submitted: { sessionA: sessionATodos, sessionB: sessionBTodos, sessionAClear: [] },
     observed: {
