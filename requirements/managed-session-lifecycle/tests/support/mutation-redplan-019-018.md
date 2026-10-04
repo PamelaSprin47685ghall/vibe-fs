@@ -74,6 +74,52 @@
   —— 变异后 started key 的 lease 被提前归还，计数变 0，断言红。第三个 test（cancel）的 149 行同款断言也会红。held 期间的 `terminalLineCount === 0` 与 `phase === 'ProviderStarted'` 断言不受此变异影响（terminal append 仍被 barrier park）。
 - build：focused。
 
+#### 019-① 偏差根因与修订（2026-10-04 调查卡追加，原文保留）
+
+**偏差事实**：第十三批 DevOps 按上图实施变异，`--clean` gen 306 确认 `dist/OpenCode/Host/PluginSessionScope.js:167` 的 release 调用已在提前位置，但 019.test.mjs 4/0 全绿，105 行预期红断言不敏感。
+
+**根因结论**（第十三批候选方向一「drain 链路时序」成立，方向二「routing 观察口径」不成立）：三个事实叠加，变异点在 held 期间从未在唯一可观察的 key 上执行。
+
+1. **串行 drain 按字典序取第一个 key**：`SettleSessionExecutions` 的 `unfinished` 来自 `ChatExecutionProjection.nonTerminal`，而 `current = ByKey |> Map.toList |> List.map snd`（Projection.fs 97-98）。F# `Map.toList` 按键字典序排序，`ChatExecutionKey` 先比 SessionId 再比 PhysicalUserMessageId；fixture 的 `msg-ses-delete-before-provider`（'b' < 's'）排在 `msg-ses-delete-started` 之前——**for 循环第一个 settle 的是 before-provider key**。
+2. **held barrier park 在第一个 key 的 terminal append 上**：第一个 `SettleExecution` 进入后，`PreProviderSettlement.settle` 的 Terminal append 到达 `ControlledTerminalWriter`（SessionRecoveryHostSurface.fs 369-389），arrival 先触发（`awaitTerminalBarrier` 由此返回），gate 未开则 append 挂起——整个串行 for 循环停在第一个 key 上。**started key（唯一持有 live lease 的 key）的 `SettleExecution` 在断言观察时从未进入，变异的 release 前移在该 key 上从未执行**，`executionCount(started)` 保持 1，105 行断言自然绿。
+3. **变异在第一个 key 上是 no-op**：变异后 `releasePhysicalExecution(ses-delete, before-provider)` 确实提前执行了，但该 key 的 lease 已被同 session supersession 原子移除（routing 006；测试 104 行断言其计数本就为 0），`retirePhysicalExecution` 的 exact guard（`lease.PhysicalUserMessageId = Some physical`，ModelRouting.fs 782-786）与 active 的 started lease 不匹配——release 落空，无任何可观察差异。
+
+**方向二排除依据**：`sharedCapacitySnapshot().executions` 直接投影 `activeBySession`（ModelRouting.fs 1363-1374）；release 路径 `ReleasePhysicalExecution → releasePhysicalExecutionLocked → Applied → retirePhysicalExecution` 原子执行 `activeBySession.Remove` + `capacity.ReleasePhysical`（ModelRouting.fs 1345-1350、780-787）。若 release(started) 在 held 期间真的被调用，executionCount 确实变 0——观察口径没有盲区；盲区在断言观察时点早于变异代码的执行时点。
+
+**附带发现（原文预期红的一处错误）**：原文称「第三个 test（cancel）的 149 行同款断言也会红」——不成立。cancel 场景走 `signalSessionCancelled → SessionRecoveryHost.SignalSession → Signal → persistTerminal`（SessionRecoveryHost.fs 200-216），其 release（170-176 行）本就在 terminal await 之后，且整条路径**不经过** `PluginSessionScope.SettleExecution`。019-① 的变异点只覆盖 delete 路径（`ClearSession → SettleSessionExecutions → SettleExecution`）；cancel 侧的 release 时序归 SessionRecoveryHost 拥有，若需 cancel 侧红证须另设变异点（`persistTerminal` 内 `do! release key` 前移到 `let! result` 之前），是否补入由 Manager 裁决。
+
+**019-① 修订（变异点移动，替代上图原变异位置）**：把变异从「`SettleExecution` 内部前移」改为「`SettleSessionExecutions` 在 for 循环之前批量预释放」。
+
+- 改前（PluginSessionScope.fs 153-156 行，与 019-③ 改前共用此段，注意两变异不同轮实施）：
+
+```fsharp
+        task {
+            for durable, execution in unfinished do
+                do! this.SettleExecution(durable, execution)
+        }
+```
+
+- 改后（task 之前插入预释放循环；`SettleExecution` 内部原 release 行不动）：
+
+```fsharp
+        for _, execution in unfinished do
+            ModelRouting.releasePhysicalExecution execution.key.SessionId execution.key.PhysicalUserMessageId
+            |> ignore
+
+        task {
+            for durable, execution in unfinished do
+                do! this.SettleExecution(durable, execution)
+        }
+```
+
+- 还原 diff：删除插入的预释放 for 循环三行。
+- 变异语义不变：仍是「exact capacity release 先于 durable terminal commit」，破坏 managed-session-lifecycle-019 的同一不变量（delete 须等每个 key durable terminal 且 capacity 归还，release 不得先于 terminal 提交确认）。
+- 预期红：delete test held 期间 105 行 `executionCount('ses-delete', 'msg-ses-delete-started') === 1`——预释放循环同步跑完（含 started key），第一个 append park 时 started lease 已归还，计数变 0，断言红。其余断言仍绿：104 行本就为 0；101 行 `completed === false` 不受影响（ClearSession 的 await 结构未动，019-② 的红证锚不冲突）；`terminalLineCount === 0` 与 `phase === 'ProviderStarted'` 不受影响（append 仍被 park；`SettleExecution` 内的 release 变成幂等重放，`AlreadyApplied | StaleFence` 被 `|> ignore` 吞掉，不抛错）。barrier 释放后的最终断言全绿。cancel test 不受此变异影响（见附带发现）。
+- 红证锚与 019-②（101 行 completed）、019-③（124/125 行 decoy）互不重叠，维持原文「三组红证互不重叠」格局。
+- build：focused。
+
+**测试断言观察盲区（归下批，本卡只记录）**：串行 drain + 单一 held gate 的组合下，held 期间结构性只能观察 drain 字典序第一个 key 的行为；started key（唯一 live lease）的逐 key release 时序在当前 fixture 命名下不可观察。若下批选择测试侧修订而非上述变异点移动：把 fixture 的 started key 命名改为字典序第一（如 `msg-a-started` 配 `msg-z-before-provider`），使 started key 成为 drain 第一个被 settle 的 key——此时原 019-① 变异位置（`SettleExecution` 内前移）即可使 105 行红。两个方案二选一，不必都做。
+
 ### 019-② ClearSession 不 await SettleSessionExecutions
 
 - 文件：`src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs`
