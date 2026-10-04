@@ -7,7 +7,11 @@ module InstitutionalEnhancer =
     val rulebookRevision: rules: EnforcerRule list -> string
 
     val evaluate:
-        experience: string -> rules: EnforcerRule list -> candidate: BirthCandidate option -> LearningDisposition
+        experience: string ->
+        rules: EnforcerRule list ->
+        candidate: BirthCandidate option ->
+        absorbedRule: string option ->
+            LearningDisposition
 
     val candidateAdmissible: candidate: BirthCandidate -> rules: EnforcerRule list -> bool
 
@@ -16,4 +20,8 @@ module InstitutionalEnhancer =
         | LearnRevisionConflict of revision: string
 
     val commitDecision:
-        experience: string -> candidate: BirthCandidate option -> load: (unit -> EnforcerRule list) -> LearnOutcome
+        experience: string ->
+        candidate: BirthCandidate option ->
+        absorbedRule: string option ->
+        load: (unit -> EnforcerRule list) ->
+            LearnOutcome

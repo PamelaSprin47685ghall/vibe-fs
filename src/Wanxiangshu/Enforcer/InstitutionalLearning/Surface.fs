@@ -24,6 +24,19 @@ module InstitutionalLearningSurface =
     [<Emit("($0 == null || typeof $0[$1] !== 'string') ? null : $0[$1]")>]
     let private textPropertyOf (owner: obj) (name: string) : string = jsNative
 
+    /// Top-level JS argument as a real string; null unless the value is
+    /// a real string.
+    [<Emit("(typeof $0 === 'string') ? $0 : null")>]
+    let private textOrNull (value: obj) : string = jsNative
+
+    /// Caller's explicit ABSORB claim (WHAT institutional-learning-003):
+    /// a rule name the caller judges to cover the mechanism. Absent for
+    /// null/undefined/non-string values.
+    let private absorbedRuleOf (value: obj) : string option =
+        match textOrNull value with
+        | null -> None
+        | rule -> Some rule
+
     let private rulesOf (ruleNames: string array) =
         ruleNames
         |> Array.mapi (fun index name ->
@@ -48,9 +61,13 @@ module InstitutionalLearningSurface =
                   Trigger = textPropertyOf value "trigger"
                   Negative = textPropertyOf value "negative" }
 
-    let evaluate (experience: string) (ruleNames: string array) (candidate: obj) : obj =
+    let evaluate (experience: string) (ruleNames: string array) (candidate: obj) (absorbedRule: obj) : obj =
         let disposition =
-            InstitutionalEnhancer.evaluate experience (rulesOf ruleNames) (candidateOf candidate)
+            InstitutionalEnhancer.evaluate
+                experience
+                (rulesOf ruleNames)
+                (candidateOf candidate)
+                (absorbedRuleOf absorbedRule)
 
         box {| disposition = dispositionName disposition |}
 
@@ -58,7 +75,7 @@ module InstitutionalLearningSurface =
     /// one evaluation, at most one reevaluation after live-revision drift,
     /// explicit conflict on the second mismatch. Each load consumes the next
     /// rule-name snapshot, mirroring a fresh live-rulebook read.
-    let learn (experience: string) (candidate: obj) (ruleSnapshots: string array array) : obj =
+    let learn (experience: string) (candidate: obj) (ruleSnapshots: string array array) (absorbedRule: obj) : obj =
         let snapshots = if isNull ruleSnapshots then [||] else ruleSnapshots
         // DSL-MUTABLE: algorithm-scratch — rule-snapshot cursor; each load
         // consumes the next snapshot to mirror a fresh live-rulebook read
@@ -78,7 +95,9 @@ module InstitutionalLearningSurface =
             next <- next + 1
             rulesOf names
 
-        match InstitutionalEnhancer.commitDecision experience (candidateOf candidate) load with
+        match
+            InstitutionalEnhancer.commitDecision experience (candidateOf candidate) (absorbedRuleOf absorbedRule) load
+        with
         | InstitutionalEnhancer.LearnOutcome.LearnCommitted(disposition, revision, reevaluated) ->
             box
                 {| disposition = dispositionName disposition

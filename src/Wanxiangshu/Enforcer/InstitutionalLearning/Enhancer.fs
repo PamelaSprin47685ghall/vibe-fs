@@ -32,23 +32,28 @@ module InstitutionalEnhancer =
         && nonEmpty candidate.Negative
         && not (rules |> List.exists (fun rule -> rule.Name = candidate.TipName.Trim()))
 
-    /// One bounded evaluation. An admissible candidate concludes BIRTH; a
-    /// missing or inadmissible candidate falls back to the existing
-    /// absorb-by-explicit-rule-name / discard logic. Pure: no IO, no provider.
+    /// One bounded evaluation (WHAT institutional-learning-003). The caller
+    /// owns the semantic judgment: an admissible candidate concludes BIRTH, an
+    /// explicit absorbedRule naming a rule of the supplied canonical live
+    /// rulebook concludes ABSORB, and everything else discards. The evaluator
+    /// never guesses coverage from the experience text — substring matching
+    /// is not an abstraction oracle. The experience and the live rulebook
+    /// are the only inputs; no network, repository or provider access.
+    /// Pure.
     let evaluate
         (experience: string)
         (rules: EnforcerRule list)
         (candidate: BirthCandidate option)
+        (absorbedRule: string option)
         : LearningDisposition =
+        let claimedRule = absorbedRule |> Option.map (fun rule -> rule.Trim())
+
         match candidate with
         | Some candidate when candidateAdmissible candidate rules -> LearningDisposition.Birth(candidate.TipName.Trim())
         | _ ->
-            let lower = experience.ToLowerInvariant()
-
-            rules
-            |> List.tryFind (fun rule -> lower.Contains(rule.Name.ToLowerInvariant(), StringComparison.Ordinal))
-            |> Option.map (fun rule -> LearningDisposition.Absorb rule.Name)
-            |> Option.defaultValue (LearningDisposition.Discard "no-reusable-mechanism")
+            match claimedRule with
+            | Some name when rules |> List.exists (fun rule -> rule.Name = name) -> LearningDisposition.Absorb name
+            | _ -> LearningDisposition.Discard "no-reusable-mechanism"
 
     /// WHAT institutional-learning-002 revision contract around one
     /// evaluation. Before committing a BIRTH the live revision is re-read; on
@@ -66,28 +71,29 @@ module InstitutionalEnhancer =
         else
             LearnRevisionConflict finalRevision
 
-    let private reevaluateBirth experience candidate load fresh revision =
-        match evaluate experience fresh candidate with
+    let private reevaluateBirth experience candidate absorbedRule load fresh revision =
+        match evaluate experience fresh candidate absorbedRule with
         | LearningDisposition.Birth tip -> confirmReevaluatedBirth load revision tip
         | other -> LearnCommitted(other, revision, true)
 
-    let private confirmBirth experience candidate load revision tip =
+    let private confirmBirth experience candidate absorbedRule load revision tip =
         let fresh = load ()
         let freshRevision = rulebookRevision fresh
 
         if freshRevision = revision then
             LearnCommitted(LearningDisposition.Birth tip, revision, false)
         else
-            reevaluateBirth experience candidate load fresh freshRevision
+            reevaluateBirth experience candidate absorbedRule load fresh freshRevision
 
     let commitDecision
         (experience: string)
         (candidate: BirthCandidate option)
+        (absorbedRule: string option)
         (load: unit -> EnforcerRule list)
         : LearnOutcome =
         let rules = load ()
         let revision = rulebookRevision rules
 
-        match evaluate experience rules candidate with
-        | LearningDisposition.Birth tip -> confirmBirth experience candidate load revision tip
+        match evaluate experience rules candidate absorbedRule with
+        | LearningDisposition.Birth tip -> confirmBirth experience candidate absorbedRule load revision tip
         | other -> LearnCommitted(other, revision, false)

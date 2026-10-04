@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import * as BloggerChronicleSurface from '../../../dist/OpenCode/Host/BloggerChronicleSurface.js'
 import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+import * as JournalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as LanguageSurface from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -129,12 +132,12 @@ test.after(() => {
   BloggerChronicleSurface.disposeJournal(journalBoot.journal)
 })
 
-const acquireLease = async (session, physicalUserMessageId, role = 'blogger') => {
+const acquireLease = async (session, physicalUserMessageId, role = 'blogger', participant = 'chronicler') => {
   const acquisition = await ModelRoutingSurface.acquireSharedExecutionAdmission(
     session,
     physicalUserMessageId,
     role,
-    'chronicler',
+    participant,
     null,
     'normal',
   )
@@ -268,4 +271,292 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
   assert.equal(marker.info.role, 'assistant')
   assert.equal(marker.parts[0].text, enResource, 'english binding must inject the en resource leaf verbatim')
   assert.notEqual(marker.parts[0].text, zhResource, 'english binding must not fall back to the zh-CN leaf')
+})
+
+// ---------------------------------------------------------------------------
+// GAP-077 补充（registered Host 链）：经真实插件注册的
+// experimental.chat.messages.transform 走完整 normalTransform（16 步真实
+// capabilities），而非直调 BloggerChronicleSurface.maybeInject。lease 仍经
+// ModelRouting 正式 surface 建立（与 B1—B5 同一 emr-011 accept→acquire→
+// project owner 顺序），companion link 经 journal surface 写入
+// CompanionBloggerLinked。ModelRouting 是 process singleton，插件二次启动的
+// initialize 幂等，路由结果继续由本文件顶部的隔离 HOME 配置驱动
+// （globalThis.__wanxiangshu_test_blogger_model）。
+// ---------------------------------------------------------------------------
+
+const registeredUserMessage = (session, id) => ({
+  info: { id, sessionID: session, role: 'user', model: { providerID: 'fixture', modelID: 'fixture-model' } },
+  parts: [{ type: 'text', text: '材料已备好，请记账' }],
+})
+
+const appendCompanionBloggerLink = async (runtime, mainSession, bloggerSession) => {
+  const linked = await JournalSurface.JournalSurface_appendAgent(
+    runtime.journal,
+    { kind: 'Session', session: mainSession },
+    null,
+    {
+      family: 'Companion',
+      case: 'CompanionBloggerLinked',
+      payload: { SessionId: mainSession, BloggerSessionId: bloggerSession, BloggerAgent: 'blogger' },
+    },
+  )
+  assert.ok(
+    linked?.ok,
+    `companion link append must succeed: ${linked?.error ?? 'unknown error'}`,
+  )
+}
+
+// The registered transform runs the full normalTransform chain, whose
+// HOST-BOUNDARY-008 step freezes the provider attempt plan only after a durable
+// Accepted execution exists for the exact (session, physical) pair. The
+// production entry for that evidence is acceptHumanRoot followed by the
+// chat.message admission hook (same order as context-compression-018). The
+// chat.message agent must match the lease participant ("chronicler", the same
+// identity acquireLease commits) or the routing step rejects the drift.
+const admitExecution = async (runtime, hooks, session, physical) => {
+  await acceptAuthorityRoot(runtime, session, 'blogger', physical)
+  await hooks['chat.message'](
+    { sessionID: session, messageID: physical },
+    {
+      message: {
+        id: physical,
+        sessionID: session,
+        role: 'user',
+        model: { providerID: 'fixture', modelID: 'fixture-model' },
+      },
+      parts: [{ type: 'text', text: '材料已备好，请记账' }],
+    },
+  )
+}
+
+const chronicleMarkers = (messages) =>
+  messages.filter(
+    (m) => m?.info?.role === 'assistant' && m?.parts?.length === 1 && m.parts[0]?.type === 'text' &&
+      (m.parts[0]?.text === zhResource || m.parts[0]?.text === enResource),
+  )
+
+const hostHistoryContainsMarker = (runtime) =>
+  runtime.messages.some((message) => {
+    const text = JSON.stringify(message?.parts ?? [])
+    return text.includes(zhResource) || text.includes(enResource)
+  })
+
+const journalTreeContainsMarker = (directory) => {
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (statSync(full).isDirectory()) {
+        if (name === '.git') continue
+        if (walk(full)) return true
+      } else {
+        const text = readFileSync(full, 'utf8')
+        if (text.includes(zhResource) || text.includes(enResource)) return true
+      }
+    }
+    return false
+  }
+  return walk(directory)
+}
+
+const withEnglishLanguage = async (action) => {
+  const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+  LanguageSurface.refreshGlobalLanguage()
+  try {
+    await action()
+  } finally {
+    if (previous === undefined) {
+      delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    } else {
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
+    }
+    LanguageSurface.refreshGlobalLanguage()
+  }
+}
+
+test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'registered-transform blogger branch requires the durable BloggerRequest chain (BloggerRequestMaterialized + PromptKey bind + flight claim); combining that chain with the plugin-fixture full transform hook is a fixture-architecture gap — the 018 precedent covers only manager sessions and 009/017 build the blogger request on an isolated journal with surface direct-calls. DevOps proved the first layers (Accepted execution, participant alignment) and stopped at BloggerRequestMissing; fixture extension or strategy change needs Manager adjudication' }, async () => {
+  await withEnglishLanguage(async () => {
+    delete globalThis.__wanxiangshu_test_blogger_model
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const session = 'ses-blog-registered-1'
+      const main = 'ses-blog-main-registered-1'
+      const physical = 'msg-user-r1'
+      await appendCompanionBloggerLink(runtime, main, session)
+      await admitExecution(runtime, hooks, session, physical)
+
+      const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+
+      const markers = chronicleMarkers(outObj.messages)
+      assert.equal(markers.length, 1, 'registered transform must inject exactly one chronicle marker')
+      const marker = markers[0]
+      assert.equal(marker.parts[0].text, enResource, 'marker text must be the en leaf under the global language binding')
+      assert.ok(marker.info.id.startsWith('text-'), 'marker id must be digest-derived')
+      const markerIndex = outObj.messages.indexOf(marker)
+      assert.ok(markerIndex >= 0)
+      assert.equal(
+        outObj.messages[markerIndex + 1]?.info?.id,
+        physical,
+        'the marker must sit immediately before the frontier user message',
+      )
+
+      // WHAT 015：提示只作用于当次转换，不写入日志或历史。transform 修改的
+      // 是 provider wire 投影 outObj；Host 持久历史（stubClient messages）与
+      // journal 字节都不得出现 marker 文本。
+      assert.equal(hostHistoryContainsMarker(runtime), false, 'Host persisted history must not contain the marker')
+      assert.equal(journalTreeContainsMarker(directory), false, 'journal bytes must not contain the marker')
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'blocked by the same registered-transform BloggerRequest fixture gap as R1 (see R1 todo)' }, async () => {
+  await withEnglishLanguage(async () => {
+    delete globalThis.__wanxiangshu_test_blogger_model
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, _runtime) => {
+      // 有 committed lease 但 journal 中没有 CompanionBloggerLinked：会话不是
+      // companion，注入门禁的第二半边必须拒绝。
+      const session = 'ses-blog-registered-2'
+      const physical = 'msg-user-r2'
+      await admitExecution(runtime, hooks, session, physical)
+      await acquireLease(session, physical, 'blogger', 'blogger')
+
+      const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+
+      assert.equal(chronicleMarkers(outObj.messages).length, 0, 'a non-companion session must receive no chronicle marker')
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'blocked by the same registered-transform BloggerRequest fixture gap as R1 (see R1 todo)' }, async () => {
+  await withEnglishLanguage(async () => {
+    delete globalThis.__wanxiangshu_test_blogger_model
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const session = 'ses-blog-registered-3'
+      const main = 'ses-blog-main-registered-3'
+      const physical = 'msg-user-r3'
+      await appendCompanionBloggerLink(runtime, main, session)
+      await admitExecution(runtime, hooks, session, physical)
+      await acquireLease(session, physical, 'blogger', 'blogger')
+
+      const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+      const first = chronicleMarkers(outObj.messages)
+      assert.equal(first.length, 1, 'the first pass injects exactly one marker')
+
+      // 同一 outObj（同一 occurrence 的重复 transform）：既有同文本 assistant
+      // 消息被 filter 剔除后重新插入恰好一条，id 保持 digest 稳定。
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+      const replayed = chronicleMarkers(outObj.messages)
+      assert.equal(replayed.length, 1, 'replay must not accumulate duplicate markers')
+      assert.equal(replayed[0].info.id, first[0].info.id, 'the same occurrence keeps its digest-derived id stable')
+      assert.equal(
+        outObj.messages[outObj.messages.indexOf(replayed[0]) + 1]?.info?.id,
+        physical,
+        'the marker must stay immediately before the frontier user message after replay',
+      )
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'blocked by the same registered-transform BloggerRequest fixture gap as R1 (see R1 todo)' }, async () => {
+  await withEnglishLanguage(async () => {
+    delete globalThis.__wanxiangshu_test_blogger_model
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const session = 'ses-blog-registered-4'
+      const main = 'ses-blog-main-registered-4'
+      await appendCompanionBloggerLink(runtime, main, session)
+
+      // 第一条物理 user 消息：Host 持久化它，插件为它建立 exact lease。
+      const physicalOne = 'msg-user-r4-1'
+      const userOne = registeredUserMessage(session, physicalOne)
+      runtime.pushHostMessage(session, structuredClone(userOne))
+      await admitExecution(runtime, hooks, session, physicalOne)
+      await acquireLease(session, physicalOne, 'blogger', 'blogger')
+
+      const firstRequest = { messages: [structuredClone(userOne)] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, firstRequest)
+      const firstMarkers = chronicleMarkers(firstRequest.messages)
+      assert.equal(firstMarkers.length, 1, 'the first provider request carries its marker')
+      const firstMarkerId = firstMarkers[0].info.id
+
+      // 注入没有污染任何持久位置：Host 历史与 journal 都不含 marker 文本。
+      assert.equal(hostHistoryContainsMarker(runtime), false, 'Host persisted history stays free of the injected marker')
+      assert.equal(journalTreeContainsMarker(directory), false, 'journal bytes stay free of the injected marker')
+
+      // 后续请求：Host 从持久历史构建 wire 输入——历史里只有原始 user 消息，
+      // 上一次注入的 marker 不出现在下一请求的输入中。
+      const physicalTwo = 'msg-user-r4-2'
+      const userTwo = registeredUserMessage(session, physicalTwo)
+      await admitExecution(runtime, hooks, session, physicalTwo)
+      await acquireLease(session, physicalTwo, 'blogger', 'blogger')
+
+      const secondRequest = { messages: [structuredClone(userOne), structuredClone(userTwo)] }
+      assert.equal(
+        chronicleMarkers(secondRequest.messages).length,
+        0,
+        'the next request input must not carry the previous request marker',
+      )
+
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, secondRequest)
+      const secondMarkers = chronicleMarkers(secondRequest.messages)
+      assert.equal(secondMarkers.length, 1, 'the follow-up request injects exactly one fresh marker')
+      assert.notEqual(secondMarkers[0].info.id, firstMarkerId, 'a new occurrence derives a new marker id')
+      const markerIndex = secondRequest.messages.indexOf(secondMarkers[0])
+      assert.equal(
+        secondRequest.messages[markerIndex + 1]?.info?.id,
+        physicalTwo,
+        'the fresh marker precedes the new frontier user message',
+      )
+      assert.equal(
+        secondRequest.messages[markerIndex - 1]?.info?.id,
+        physicalOne,
+        'the earlier physical user message remains ahead of the fresh marker',
+      )
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_injects_nothing', { todo: 'blocked by the same registered-transform BloggerRequest fixture gap as R1 (see R1 todo)' }, async () => {
+  await withEnglishLanguage(async () => {
+    delete globalThis.__wanxiangshu_test_blogger_model
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      const session = 'ses-blog-registered-5'
+      const main = 'ses-blog-main-registered-5'
+      await appendCompanionBloggerLink(runtime, main, session)
+
+      // companion 成立但没有 exact committed lease：host-boundary-008 的模型
+      // 门禁读不到本请求的模型身份，绝不借用其它执行的 current model。
+      // Accepted 执行仍先建立——被测的是 lease 缺席，不是 Accepted 缺席。
+      const physical = 'msg-user-r5'
+      await admitExecution(runtime, hooks, session, physical)
+      const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+
+      assert.equal(chronicleMarkers(outObj.messages).length, 0, 'no committed lease means no model identity and no injection')
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'blocked by the same registered-transform BloggerRequest fixture gap as R1 (see R1 todo)' }, async () => {
+  await withEnglishLanguage(async () => {
+    globalThis.__wanxiangshu_test_blogger_model = 'test/other-model'
+    try {
+      await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+        const session = 'ses-blog-registered-6'
+        const main = 'ses-blog-main-registered-6'
+        const physical = 'msg-user-r6'
+        await appendCompanionBloggerLink(runtime, main, session)
+        await admitExecution(runtime, hooks, session, physical)
+        await acquireLease(session, physical, 'blogger', 'blogger')
+
+        const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
+        await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
+
+        assert.equal(chronicleMarkers(outObj.messages).length, 0, 'a non-whitelisted lease target must not inject')
+      })
+    } finally {
+      delete globalThis.__wanxiangshu_test_blogger_model
+    }
+  })
 })
