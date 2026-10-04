@@ -1,6 +1,8 @@
 # 历史计划与施工记录
 
-[S03 独立工具进程回收](2026-10-04/S03独立工具进程回收-2026-10-04.md)是第二批入口：薄monitor在EOF/实际exit后回收自有tool组，supervisor只等待观察到的额外组；注册/仅屏障红例和实际接入单项1/1分开，最终验收待附件。fullsetsid/crash/ABA及/bin/ps控制面身份未闭合。
+[S03 编译目录身份与清理](2026-10-04/S03编译目录身份与清理-2026-10-04.md)记录Fable同库存foreign parent/root被接受并真的删除的0/2红例，以及私有dev/ino边界检查、幂等cleanup和Error/null Aggregate cause。新批结果待附件，TOCTOU/ABA、其它owner、完整FD与只读执行未闭合。
+
+[S03 独立工具进程回收](2026-10-04/S03独立工具进程回收-2026-10-04.md)已提交9909a7bb9，gen110正式18/18排空、429/0/6skip/2TODO、原组accepted=true。薄monitor、同步判决输送与即时failure诊断各证据保持；fullsetsid/crash/ABA及/bin/ps控制面身份未闭合，后续从顶部记录接续。
 
 [S03 运行器因果输送与回收](2026-10-04/S03运行器因果输送与回收-2026-10-04.md)收录第一原子批有限Fable编译、coverage真实HTTP/signal/stdin EOF、supervisor原组/HOME和early role边界。74fc/gen108正式18/18排空、418/0/6skip/2TODO；这不关闭runtime readonly或T418/T419，后续从顶部记录接续。
 

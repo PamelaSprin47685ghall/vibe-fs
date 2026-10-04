@@ -44,8 +44,29 @@ export async function compileVerificationFableProject({ source, sdk, tools, proj
   const artifacts = path.join(projectRoot, 'artifacts')
   const artifactEntries = captureOrdinaryVerificationFiles(artifacts, invalidEntry)
   const selectedArtifacts = JSON.stringify(artifactEntries)
-  const compileRoot = fs.mkdtempSync(path.join(fs.realpathSync(parentDirectory), 'verification-fable-project-'))
+  const parentRoot = fs.realpathSync(parentDirectory)
+  const parentIdentity = fs.lstatSync(parentRoot, { bigint: true })
+  if (!parentIdentity.isDirectory()) throw invalidEntry('Cannot verify owned identity of the compilation parent')
+  const compileRoot = fs.mkdtempSync(path.join(parentRoot, 'verification-fable-project-'))
+  const rootIdentity = fs.lstatSync(compileRoot, { bigint: true })
+  function assertOwnedRoot(allowMissing = false) {
+    for (const [directory, identity] of [[parentRoot, parentIdentity], [compileRoot, rootIdentity]]) {
+      let current
+      try {
+        current = fs.lstatSync(directory, { bigint: true })
+      } catch (cause) {
+        if (allowMissing && directory === compileRoot && cause.code === 'ENOENT') return false
+        throw Object.assign(invalidEntry(`Cannot verify owned identity of the compilation directory: ${directory}`), { cause })
+      }
+      if (!current.isDirectory() || current.dev !== identity.dev || current.ino !== identity.ino) throw invalidEntry(`Cannot verify owned identity of the compilation directory: ${directory}`)
+    }
+    return true
+  }
+  function dispose() {
+    if (assertOwnedRoot(true)) fs.rmSync(compileRoot, { recursive: true, force: true })
+  }
   try {
+    assertOwnedRoot()
     const env = privateDotnetEnvironment(compileRoot, path.join(sdkRoot, 'dotnet-sdk'), executable)
     const seed = path.join(compileRoot, 'artifacts')
     fs.cpSync(artifacts, seed, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true })
@@ -59,9 +80,11 @@ export async function compileVerificationFableProject({ source, sdk, tools, proj
     const outputPath = 'js'
     fs.mkdirSync(path.join(compileRoot, outputPath))
     assertInputs()
+    assertOwnedRoot()
     await runVerificationToolProbe(executable, [compiler, projectFile, '--noRestore', '--noCache', '--noGitignore', '--outDir', path.join(compileRoot, outputPath)], { cwd: sourceRoot, env, signal })
     signal?.throwIfAborted()
     assertInputs()
+    assertOwnedRoot()
     const entries = captureOrdinaryVerificationFiles(compileRoot, invalidEntry)
     if (!entries.some(entry => entry.type === 'File' && entry.path.startsWith('js/') && entry.path.endsWith('.js'))) throw invalidEntry('Compilation produced no owned JavaScript files')
     const expectedEntries = JSON.stringify(entries)
@@ -74,15 +97,18 @@ export async function compileVerificationFableProject({ source, sdk, tools, proj
       ...selection,
       revalidate() {
         assertInputs()
+        assertOwnedRoot()
         const actual = Object.fromEntries(Object.keys(selection).map(key => [key, prepared[key]]))
         if (JSON.stringify(actual) !== capturedSelection || JSON.stringify(captureOrdinaryVerificationFiles(compileRoot, invalidEntry)) !== expectedEntries) throw invalidEntry('Compiled receipt differs from its selected inputs and complete outputs')
+        assertOwnedRoot()
       },
-      dispose() { fs.rmSync(compileRoot, { recursive: true, force: true }) },
+      dispose,
     }
+    assertOwnedRoot()
     return prepared
   } catch (error) {
     try {
-      fs.rmSync(compileRoot, { recursive: true, force: true })
+      dispose()
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'Compilation and cleanup failed', { cause: error })
     }

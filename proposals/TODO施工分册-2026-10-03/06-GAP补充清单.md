@@ -2,7 +2,7 @@
 
 GAP-055 最新增量见[实际单项目 Fable 编译](../archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)：原四 owner 保持、原 artifacts 的自有 seed、实际编译产物与完整库存身份绑定，正式结果见附件。前批单项目 NuGet 的派生 lock、raw/contentHash 和源码库存证据保持；SDK packs/tool bundled FSharp.Core 也参加编译，四包图不是所有编译输入闭包。历史“工程 NuGet/Fable 待施工”由此有限范围接续，不能推导全仓工程、真正只读执行或 actualverify 已经通过；GAP-055 PARTIAL 与 T418/T419 保持。
 
-最新接续[独立工具进程回收](../archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)：首批74fc/gen108正式18排空、418/0/6skip/2TODO；第二批薄monitor的EOF/actual exit回收与supervisor只等已观察额外组已有单项真实正反例，最终验收待附件。正常取消Error/null保持，cleanup失败保Aggregate cause，四项既有取消仅将第二signal移到settlement后并加强ESRCH。完整descendant、setsid/crash/ABA及/bin/ps控制面来源不在该有限证明内。gen103失败/72e83无结论保持，新fe9 CI818排空、4188/0/102skip/404TODO只证明新输入。GAP-054全阶段接线与GAP-055/T418/T419的runtime readonly和同候选actualverify均未关闭；不删测试、调workers或扩300000/5000。
+最新接续[编译目录身份与清理](../archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110正式18排空、429/0/6skip/2TODO、groupaccepted=true。Fable新正式0/2证明同库存foreign parent/root被接受并实际删除，现私有dev/ino边界检查typed拒绝；正常rootENOENT幂等，cleanup失败保原Error/null Aggregate cause。新批验收待附件，不称已修其它tools/NuGet/source/archive owner，也不消除TOCTOU/ABA或提供完整FD保证。monitor fullsetsid/crash和/bin/ps来源、GAP-054全阶段审阅、GAP-055/T418/T419的runtime readonly/actualverify均未关闭；历史gen103/gen109失败和72e83无结论保持，不删测试、调workers或扩300000/5000。
 
 GAP-055接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-2026-10-04.md)：独立物化所选摘要归档，复核完整成员、mode/字节及闭合链接；新增真实npm安装定向45项、完整selected Node/npm bundle定向15项通过，均0失败，见[本批记录](../archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)与[016测试说明](../../requirements/verification-system/tests/README.md)。安装receipt的`bootstrap-admission`与工具receipt的`selected-node-npm-bundle`范围不同；工具探针后共用归档owner重新核对完整物理成员，只是步骤边界复核。本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖；SDK、Git、dotnet/Fable/NuGet、只读保护和实际verify同源/结论绑定未闭合，仍PARTIAL，不删除T418/T419。
 

@@ -307,15 +307,24 @@ export function registerFableProjectTests() {
       }, { mutatedInput: owner })
     })
   }
-  for (const reason of [new Error('cancel actual held Fable process'), null]) {
-    test(`WHAT[verification-system-016] held Fable compilation preserves ${reason === null ? 'null' : 'Error'} cancellation and drains the actual process group`, { skip: process.platform === 'win32' }, async () => {
-      await withCompileFixture(async ({ root, options }) => {
+  for (const { reason, replaceParent } of [
+    { reason: new Error('cancel actual held Fable process'), replaceParent: false },
+    { reason: null, replaceParent: false },
+    { reason: new Error('cancel after actual compilation parent replacement'), replaceParent: true },
+    { reason: null, replaceParent: true },
+  ]) {
+    const title = replaceParent ? `Fable namespace cancellation preserves ${reason === null ? 'null' : 'Error'} and reports refused foreign cleanup` : `held Fable compilation preserves ${reason === null ? 'null' : 'Error'} cancellation and drains the actual process group`
+    test(`WHAT[verification-system-016] ${title}`, { skip: process.platform === 'win32' }, async () => {
+      await withCompileFixture(async ({ root, options, parentDirectory }) => {
         const marker = path.join(root, 'started.json')
+        const parked = path.join(root, 'parked-held-compile-parent')
+        const foreignParent = path.join(root, 'foreign-held-compile-parent')
         const controller = new AbortController()
         const started = Promise.withResolvers()
         let physical
         let settled
         let actionFailure
+        let namespaceChanged = false
         const watcher = fs.watch(root, (_event, filename) => {
           if (filename !== path.basename(marker) || !fs.existsSync(marker)) return
           try {
@@ -331,11 +340,31 @@ export function registerFableProjectTests() {
           physical = await Promise.race([started.promise, compiling.then(() => { throw new Error('Held Fable process unexpectedly published') })])
           assert.ok(Number.isInteger(physical.parent) && Number.isInteger(physical.child))
           assert.equal(fs.readdirSync(options.parentDirectory).length, 1)
+          let foreignRoot
+          if (replaceParent) {
+            foreignRoot = path.join(foreignParent, path.basename(physical.compileRoot))
+            fs.mkdirSync(foreignRoot, { recursive: true })
+            fs.writeFileSync(path.join(foreignRoot, 'caller-owned'), 'foreign held bytes must survive')
+            fs.renameSync(parentDirectory, parked)
+            fs.symlinkSync(foreignParent, parentDirectory)
+            namespaceChanged = true
+          }
           controller.abort(reason)
           const [outcome] = await settled
           assert.equal(outcome.status, 'rejected')
-          assert.equal(outcome.reason, reason)
-          assert.equal(fs.existsSync(physical.compileRoot), false)
+          if (replaceParent) {
+            assert.ok(outcome.reason instanceof AggregateError)
+            assert.equal(outcome.reason.cause, reason)
+            assert.equal(outcome.reason.errors[0], reason)
+            assert.equal(outcome.reason.errors.length, 2)
+            assert.ok(entryInvalid(outcome.reason.errors[1]))
+            assert.match(outcome.reason.errors[1].message, /cannot verify owned identity/i)
+            assert.equal(fs.readFileSync(path.join(foreignRoot, 'caller-owned'), 'utf8'), 'foreign held bytes must survive')
+            assert.equal(fs.existsSync(path.join(parked, path.basename(physical.compileRoot))), true, 'Unknown namespace leaves the original output intact rather than guessing its location')
+          } else {
+            assert.equal(outcome.reason, reason)
+            assert.equal(fs.existsSync(physical.compileRoot), false)
+          }
           for (const pid of [physical.parent, physical.child]) assert.throws(() => process.kill(pid, 0), error => error.code === 'ESRCH')
         } catch (error) {
           actionFailure = { error }
@@ -359,6 +388,16 @@ export function registerFableProjectTests() {
               } catch (error) {
                 failures.push(error)
               }
+            }
+          }
+          if (namespaceChanged) {
+            try {
+              fs.unlinkSync(parentDirectory)
+              fs.renameSync(parked, parentDirectory)
+              fs.rmSync(physical.compileRoot, { recursive: true })
+              assert.deepEqual(fs.readdirSync(parentDirectory), [], 'Fixture reclaims the original output only after restoring its owned namespace')
+            } catch (error) {
+              failures.push(error)
             }
           }
           if (failures.length) throw new AggregateError(actionFailure ? [actionFailure.error, ...failures] : failures, 'Held Fable fixture cleanup failed', { cause: actionFailure ? actionFailure.error : failures[0] })
@@ -388,6 +427,78 @@ export function registerFableProjectTests() {
       }, { parentAlias: field === 'compileRoot' })
     })
   }
+  for (const replacement of ['canonical parent', 'ordinary root']) {
+    test(`WHAT[verification-system-016] Fable namespace ${replacement} replacement cannot authorize revalidation or foreign disposal`, async () => {
+      await withCompiledFixture(async ({ root, candidate, originalRoot, parentDirectory }) => {
+        const parked = path.join(root, 'parked-compile-owner')
+        const foreignParent = path.join(root, 'foreign-namespace')
+        const foreignRoot = replacement === 'canonical parent' ? path.join(foreignParent, path.basename(originalRoot)) : originalRoot
+        const expected = inventory(originalRoot)
+        const marker = path.join(foreignRoot, 'js/Fixture.js')
+        const markerBytes = fs.readFileSync(path.join(originalRoot, 'js/Fixture.js'))
+        if (replacement === 'canonical parent') {
+          fs.renameSync(parentDirectory, parked)
+          fs.mkdirSync(foreignParent)
+          fs.cpSync(path.join(parked, path.basename(originalRoot)), foreignRoot, { recursive: true, preserveTimestamps: true })
+          fs.symlinkSync(foreignParent, parentDirectory)
+        } else {
+          fs.renameSync(originalRoot, parked)
+          fs.cpSync(parked, foreignRoot, { recursive: true, preserveTimestamps: true })
+        }
+        for (const entry of expected) fs.chmodSync(path.join(foreignRoot, entry.path), entry.mode)
+        try {
+          assert.deepEqual(inventory(foreignRoot), expected, 'Foreign replacement has the same complete bytes, modes and members')
+          let revalidationFailure
+          let disposalFailure
+          try {
+            candidate.revalidate()
+          } catch (error) {
+            revalidationFailure = error
+          }
+          try {
+            candidate.dispose()
+          } catch (error) {
+            disposalFailure = error
+          }
+          assert.deepEqual(fs.readFileSync(marker), markerBytes, 'Captured path cannot authorize deleting a foreign directory')
+          assert.deepEqual(inventory(foreignRoot), expected, 'Foreign namespace remains entirely unchanged')
+          assert.ok(entryInvalid(revalidationFailure), 'Revalidation must reject the replaced directory identity')
+          assert.ok(entryInvalid(disposalFailure), 'Disposal must reject the replaced directory identity')
+          assert.match(disposalFailure.message, /cannot verify owned identity/i)
+        } finally {
+          if (replacement === 'canonical parent') {
+            fs.unlinkSync(parentDirectory)
+            fs.renameSync(parked, parentDirectory)
+          } else {
+            if (fs.existsSync(originalRoot)) fs.renameSync(originalRoot, foreignParent)
+            fs.renameSync(parked, originalRoot)
+          }
+          candidate.dispose()
+          assert.doesNotThrow(() => candidate.dispose(), 'Absent output is idempotent only within the restored original parent')
+          assert.deepEqual(fs.readdirSync(parentDirectory), [], 'Restored namespace permits actual owned output reclamation')
+        }
+      })
+    })
+  }
+  test('WHAT[verification-system-016] Fable namespace missing root under a replaced parent cannot claim completed disposal', async () => {
+    await withCompiledFixture(async ({ root, candidate, originalRoot, parentDirectory }) => {
+      const parked = path.join(root, 'parked-absent-compile-parent')
+      const foreignParent = path.join(root, 'foreign-absent-compile-parent')
+      fs.mkdirSync(foreignParent)
+      fs.writeFileSync(path.join(foreignParent, 'caller-owned'), 'foreign parent bytes must survive')
+      fs.renameSync(parentDirectory, parked)
+      fs.symlinkSync(foreignParent, parentDirectory)
+      try {
+        assert.equal(fs.existsSync(originalRoot), false)
+        assert.throws(() => candidate.dispose(), entryInvalid)
+        assert.equal(fs.readFileSync(path.join(foreignParent, 'caller-owned'), 'utf8'), 'foreign parent bytes must survive')
+        assert.equal(fs.existsSync(path.join(parked, path.basename(originalRoot))), true)
+      } finally {
+        fs.unlinkSync(parentDirectory)
+        fs.renameSync(parked, parentDirectory)
+      }
+    })
+  })
   test('WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members', async t => {
     await withCompiledFixture(async ({ candidate, originalRoot }) => {
       const file = path.join(originalRoot, 'js/Fixture.js')

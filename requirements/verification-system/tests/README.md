@@ -1,10 +1,14 @@
 # verification-system 测试说明
 
-最新接手入口见[独立工具进程回收](../../../proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)：首批74fc/gen108正式18/18排空、418/0/6skip/2TODO；第二批薄monitor在EOF或actual exit时收自有tool组，supervisor只等观察到的额外组。注册/仅屏障的正式反例仍红，实际接入后该项1/1；最终统一输入结果待附件。原300000/5000和默认workers不变，不能称全部descendant、fullsetsid/crash/ABA或OS闭包已完成，/bin/ps是尚未完整固定的控制面输入。
+最新接手入口见[编译目录身份与清理](../../../proposals/archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110正式18/18排空、429/0/6skip/2TODO、groupaccepted=true；新Fable namespace正式0/2证明canonical parent或ordinary root被同库存foreign置换后，旧revalidate接受且dispose真的删除foreign。现私有dev/ino检查在消费/发布/revalidate/cleanup前typed拒绝，root正常ENOENT幂等，cleanup失败保Error/null Aggregate cause；新批结果待附件。这仍是preflight，TOCTOU/ABA、其它owner、完整FD和runtime readonly未闭合，原300000/5000与默认workers不变。
 
 历史gen103静默失败与72e83 CI的300000ms backstop/817完成/无权威summary和活动身份保持；gen102的398/0不能替代二者。新fe9 CI `37195699694` 已818/818排空、4188 passed/0 failed/102 skipped/404 TODO，exit1 solely pending proof，仅证明新输入，不定位旧72e83。重复fixture准备只按语义等价证据评估，不删测试、调workers或扩大时限；runtime readonly/ABA/同候选actualverify和T418/T419仍未闭合。
 
 016 最新接续[实际单项目 Fable 编译](../../../proposals/archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)。`compileVerificationFableProject` 消费 source/SDK/tools/project 四 owner：原 artifacts 字节/mode进入自有 seed，选定 dotnet 运行原 Fable DLL、原 project 路径，MSBuild 合法生成仅在 seed，自有 JS 输出和整个 compileRoot 库存绑定四 input digest。正式轻量 adapter 与实际 SDK/Fable integration 分开记账，未结束或诊断成功不算正式通过，最终范围见验收附件。
+
+016的namespace反例实际rename parent/root、复制完整bytes/mode后核对foreign文件保留，不用源码shape证明归属。owner拒绝失配时不能扫描/删除unknown parked原根；正常parent且root已删除可重复dispose。初次cp未保mode属于fixture setup失败，不作为产品红。新的目录检查不替其它tools/NuGet/source/archive owner发行清理保证，更不是阶段内ABA、完整FD或全过程只读证明，T418/T419保持。
+
+该修复冻结源码的完整轻量Fable定向34/0、0skip/TODO（30top+4inventory子叶），包含四原输入变异、实际parent/root置换、missing root/replaced parent拒绝以及原取消/receipt/完整库存边界。实际SDK编译范围没有新增；该34项与统一18输入验收分开由[本批附件入口](../../../proposals/archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)记录，不能以旧29项pattern或定向绿色替代未执行的统一门禁。
 
 轻量正式首轮 19 项为 14/5，暴露 cpSync 丢失原目录 0700 模式；修复先验全成员/字节，再仅对自有 seed 恢复捕获模式，保留完整精确库存断言。真实 integration 另加载生成 Identity/Quiescence JavaScript 的公开行为并核对四 owner 生命周期；测试 Node consumer 不等于 actualverify 工具闭包。归档保留各自原始红绿，不把 copy/chmod 的物化忠实性称为不可变保护。
 

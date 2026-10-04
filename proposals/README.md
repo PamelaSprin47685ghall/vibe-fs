@@ -1,8 +1,8 @@
 # 计划与提案入口
 
-S03 最新入口见[独立工具进程回收](archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)：首批74fc/gen108已18/18排空、418/0/6skip/2TODO。第二批薄monitor接管actual工具组，EOF/实际exit回收，supervisor只等已观察额外组；最终验收待附件，不称全部descendant/fullsetsid/crash/ABA或OS闭包。runtime readonly、同候选actualverify和T418/T419仍保留。
+S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 
-证据分开：gen103静默失败与72e83 CI的817/818、无summary/活动身份保留，不猜唯一016；新fe9 CI `37195699694` 已818排空、4188/0/102skip/404TODO、solely pending proof，只证明新输入，不定位旧失败。第二批统一验收后接同候选实际阶段；重复夹具准备只按语义等价评估，不删测试、调workers或扩大300000/5000。
+证据分开：gen103/gen109静默失败与72e83 CI的817/818、无summary/活动身份保留，不猜唯一016；新fe9 CI `37195699694` 的818排空及gen110的429/0各自只证明对应输入，不定位旧失败。后续先目录身份批验收，再逐owner调查命名空间边界和同候选实际阶段；不删测试、调workers或扩大300000/5000。
 
 下文各次 S03 增量保留其当时截面；其中的“下一步”不是新的认领指令。施工按上段最新记录与现行总计划，不重复已完成的源码、依赖、工具和单项目工程准备。
 

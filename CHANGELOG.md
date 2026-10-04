@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 编译目录身份与清理
+
+- Fable编译owner私有捕获canonical parent/root物理dev/ino；消费、发布、revalidate与cleanup拒绝同路径foreign目录，即使完整库存相同也不能删除foreign。正常parent且rootENOENT幂等，清理拒绝保留原Error/null与Aggregate cause，不扫描unknown parked路径。
+- 正式parent/root置换0/2真实红例保留；初次cp mode setup失败不冒称产品红。新批结果以[验收附件入口](proposals/archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)为准，preflight仍有TOCTOU/ABA，不声称其它owner、完整FD或readonly已闭合。
+- 第二批9909/gen110已429/0/6skip/2TODO、18/18排空、groupaccepted=true；其绿色不替代新输入验收，T418/T419保持。
+
 ## Unreleased — S03 独立工具进程回收
 
 - 判决输送让步移到beforeEach，前一项runtime判决可在下一段同步工作之前送出；原三项正式回归3/3。真实失败完整原因/位置/stack立即打印，后续挂住仍可见；相同事实不重印，不合并共享Error的不同测试，021完整18/18。
