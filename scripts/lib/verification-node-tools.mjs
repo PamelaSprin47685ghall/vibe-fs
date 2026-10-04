@@ -142,9 +142,6 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     probeRoot = probeOwner.root
     const options = { cwd: candidate.root, env: privateEnvironment(probeRoot), signal }
     const nodeExecutable = path.join(candidate.root, nodePath)
-    const version = await runVerificationToolProbe(nodeExecutable, ['--version'], options)
-    probeOwner.assertOwned()
-    candidate.revalidate()
     const runtimeOutput = await runVerificationToolProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
     probeOwner.assertOwned()
     candidate.revalidate()
@@ -154,16 +151,15 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     } catch (cause) {
       throw Object.assign(invalidEntry('Selected Node must report its actual runtime identity'), { cause })
     }
-    if (runtime?.version !== version || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node probe identities disagree')
+    if (typeof runtime?.version !== 'string' || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(runtime.version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node must report a valid runtime identity')
     const npmVersion = await runVerificationToolProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
     probeOwner.assertOwned()
     candidate.revalidate()
     if (npmVersion !== manifest.version) throw invalidEntry('Actual npm version differs from the selected package manifest')
     signal?.throwIfAborted()
-    candidate.revalidate()
     probeOwner.dispose()
     const entriesDigest = sha256(JSON.stringify(candidate.entries))
-    const node = { path: nodePath, sha256: nodeEntry.sha256, version, platform: runtime.platform, arch: runtime.arch }
+    const node = { path: nodePath, sha256: nodeEntry.sha256, version: runtime.version, platform: runtime.platform, arch: runtime.arch }
     const npm = { cliPath: npmCliPath, cliSha256: cliEntry.sha256, manifestSha256: manifestEntry.sha256, version: npmVersion }
     const identityScope = 'selected-node-npm-bundle'
     const toolDigest = sha256(JSON.stringify({ archiveSha256, entriesDigest, node, npm, identityScope }))

@@ -58,23 +58,66 @@ export function registerNodeToolCandidateTests() {
 const fs = require('node:fs')
 const path = require('node:path')
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv.slice(2)) + '\\n')
-if (process.argv[2] === '--version') {
+if (process.argv[2] === '--input-type=module') {
   const owned = ${replaced === 'archive' ? "path.resolve(__dirname, '../../..')" : 'path.dirname(process.env.HOME)'}
   fs.renameSync(owned, ${JSON.stringify(path.join(root, 'parked'))})
   fs.cpSync(${JSON.stringify(path.join(root, 'parked'))}, owned, { recursive: true })
   fs.writeFileSync(path.join(owned, 'foreign-marker'), 'replacement')
-  console.log('v22.0.0')
-} else { console.log(JSON.stringify({version:'v22.0.0',platform:process.platform,arch:process.arch})) }
+  console.log(JSON.stringify({version:'v22.0.0',platform:process.platform,arch:process.arch}))
+} else { console.log('1.0.0') }
 `, { mode: 0o755 })
         const [outcome] = await Promise.allSettled([prepareTools(await archiveTools(root))])
         assert.equal(outcome.status, 'rejected')
-        assert.deepEqual(fs.readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line)), [['--version']], 'changed ownership stops before the next physical probe')
+        const probes = fs.readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+        assert.equal(probes.length, 1, 'changed runtime ownership stops before the next physical npm probe')
+        assert.deepEqual(probes[0].slice(0, 2), ['--input-type=module', '-e'])
         assert.ok(outcome.reason instanceof AggregateError)
         assert.equal(outcome.reason.cause.code, 'verification-tool-entry-invalid', JSON.stringify(outcome.reason.cause))
         const remaining = fs.readdirSync(path.join(root, 'candidates'))
         assert.equal(remaining.length, 1)
         assert.equal(fs.readFileSync(path.join(root, 'candidates', remaining[0], 'foreign-marker'), 'utf8'), 'replacement')
       } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+      }
+    })
+  }
+  for (const runtimeVersion of ['v22.0.0', '22.0.0']) {
+    test(`WHAT[verification-system-016] controlled runtime probe protocol ${runtimeVersion.startsWith('v') ? 'alone supplies Node version platform and architecture before npm admission' : 'rejects an invalid Node version before npm admission'}`, async () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'node-runtime-identity-'))
+      let candidate
+      try {
+        const selected = path.join(root, 'selected/toolchain')
+        fs.mkdirSync(path.join(selected, 'node/bin'), { recursive: true })
+        fs.mkdirSync(path.join(selected, 'npm/bin'), { recursive: true })
+        fs.mkdirSync(path.join(root, 'candidates'))
+        fs.writeFileSync(path.join(selected, 'npm/package.json'), JSON.stringify({ name: 'npm', version: '1.0.0' }))
+        fs.writeFileSync(path.join(selected, 'npm/bin/npm-cli.js'), '')
+        const calls = path.join(root, 'calls')
+        fs.writeFileSync(path.join(selected, 'node/bin/node'), `#!${process.execPath}
+const fs = require('node:fs')
+fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv.slice(2)) + '\\n')
+if (process.argv[2] === '--input-type=module') console.log(JSON.stringify({version:${JSON.stringify(runtimeVersion)},platform:process.platform,arch:process.arch}))
+else if (process.argv[2].endsWith('/npm-cli.js')) console.log('1.0.0')
+else process.exit(74)
+`, { mode: 0o755 })
+        const [outcome] = await Promise.allSettled([prepareTools(await archiveTools(root))])
+        if (outcome.status === 'fulfilled') candidate = outcome.value
+        const probes = fs.readFileSync(calls, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+        assert.deepEqual(probes[0].slice(0, 2), ['--input-type=module', '-e'])
+        if (runtimeVersion.startsWith('v')) {
+          assert.equal(outcome.status, 'fulfilled')
+          assert.deepEqual({version:candidate.node.version,platform:candidate.node.platform,arch:candidate.node.arch}, {version:runtimeVersion,platform:process.platform,arch:process.arch})
+          assert.equal(candidate.npm.version, '1.0.0')
+          assert.deepEqual(probes.slice(1), [[path.join(candidate.toolRoot, 'toolchain/npm/bin/npm-cli.js'), '--version']])
+          candidate.dispose()
+        } else {
+          assert.equal(outcome.status, 'rejected')
+          assert.equal(outcome.reason.code, 'verification-tool-entry-invalid')
+          assert.equal(probes.length, 1, 'invalid runtime identity cannot authorize the npm probe')
+        }
+        assert.deepEqual(fs.readdirSync(path.join(root, 'candidates')), [])
+      } finally {
+        candidate?.dispose()
         fs.rmSync(root, { recursive: true, force: true })
       }
     })

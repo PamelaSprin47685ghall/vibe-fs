@@ -181,3 +181,37 @@ parent case can be inferred from the shared capture title alone.
 Raw:vibe-fs-directory-wiring-gen119-{build,check,official}.log.
 Production compiler/artifact inputs and015 bytes unchanged since gen117's full
 21/0 integration; that result retains its own input, not a gen119 rerun.
+
+Node preparation simplification (after generation120):
+Controlled runtime protocol/return-replacement contract4/4 red before,4/4 green
+after; exact final protocol titles and fixture branches rerun4/0. Real full
+Node/npm bundle and archive install siblings52/0,54152.196959ms. Each remaining
+async probe return still checks probeOwner and complete archive before parse or
+next consumer. Runtime now supplies version/platform/arch in one real invocation;
+independent Node --version and adjacent repeated inventory removed.
+External before-stage instrumentation is investigative, not formal acceptance.
+After same actual bundle:materialize497.27ms,initialinventory110.94ms,
+first runtime1373.74ms,returninventory111.29ms,npmversion190.87ms,
+returninventory120.45ms,prepare2448.76ms,cleanup[]. First copied executable
+startup still costs1374ms; cannot promise savings equal to old --version cost.
+Raw:vibe-fs-node-runtime-contract-{red,green}.log,
+vibe-fs-node-runtime-protocol-final.log,vibe-fs-node-runtime-after-phases.log,
+vibe-fs-npm-probe-stage-observation.log.
+
+FINAL generation121 frozen source/test/doc official same80:
+build/check/freshness exit0; compiler/artifact digests unchanged;
+generatedInputDigest:dce823602600d92e63a8643f74ddd2fd449f938fa02a9f34e7882a0ffd53d276.
+80/80 completed,783pass/0fail/8skip/31TODO,149.06s wall/286.21s testtime.
+Group58377 accepted=true,19.152ms. Exit1 solely pending proof, exclusions not
+passes. Original5000/300000ms and defaultworkers unchanged. This supersedes
+prior final-gate pending status, but does not erase or uniquely diagnose older
+failures. Final plan status sync changes only docs, no production/test change.
+Raw:vibe-fs-directory-wiring-gen121-{build,check,official}.log.
+
+Separate Linux CI input84683dc4d,run37220536019 (before Node simplification):
+300000ms physical backstop,817/818 drained,only016 active,lastpass sharedcapture,
+no authoritative summary. Group3006 accepted=true8.903ms (clean reclamation
+does not make incomplete run pass). Build/static gates passed; full release
+stopped without authoritative unit result. NOT pending-only and not replaced by
+generation121 local80. Raw:vibe-fs-846-ci.log. New pushed input CI has its own
+identity/result; do not infer all818 from related80 or prior cf6fullunit pass.
