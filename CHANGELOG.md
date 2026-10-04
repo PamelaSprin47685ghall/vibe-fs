@@ -1,5 +1,14 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 源码目录身份与 NuGet 协议夹具
+
+- gen112完整Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空；缺SDKroot的436/0/7skip/2TODO只属较窄截面，误名单仅setup。npm第一正例拆真实准备完成与实际install/assert判决叶，保原强断言/held负例/预算，gen113最终待附件，不提前记绿；Archive本批未施工。
+
+- Git源码owner私有捕获canonical parent/root dev/ino，在publication、revalidate前后和cleanup拒绝foreign；同库存目录置换正式0/2→定向12/0，完整Git/.git/bytes/mode断言保留。TOCTOU/ABA、完整FD与其它owner仍未闭合。
+- 15个NuGet非法图仅共享真实不改写Git前提，每叶SDK/restore/HOME/feed/packages独立，原typed/calls断言不变；195→13是静态Git成本，不冒称CI改善。最终输入结果待[本批附件](proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)。
+- 9909真实CI在300000ms backstop仅817/818、active016、无权威summary，是实际超时而非pending-only；预算与默认workers不变，T418/T419继续保留。
+- aac79 CI另已818/818、4253/0/103skip/404TODO，仅pending退出1，未含本批修复，不认作9909原因消除。NuGet同15叶各15/0、23.782s→13.165s只是本机单次观测；source第三个parent失配/rootmissing例加入后完整定向13/0、2.942s，最终统一输入仍待验收。source红例只观察旧revalidate接受，未运行旧dispose删除；修复后dispose拒绝与foreign库存另有正式断言。
+
 ## Unreleased — S03 编译目录身份与清理
 
 - Fable编译owner私有捕获canonical parent/root物理dev/ino；消费、发布、revalidate与cleanup拒绝同路径foreign目录，即使完整库存相同也不能删除foreign。正常parent且rootENOENT幂等，清理拒绝保留原Error/null与Aggregate cause，不扫描unknown parked路径。

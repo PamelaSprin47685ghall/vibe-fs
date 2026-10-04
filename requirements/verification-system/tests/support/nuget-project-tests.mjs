@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import test, { after, before, describe } from 'node:test'
 import { prepareGitSourceCandidate } from '../../../../scripts/lib/verification-source-candidate.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -112,31 +112,36 @@ if (args[0] === 'msbuild') {
 `
 }
 
-async function withProjectFixture(action, { projectReferences = false, evaluation, executableBody, includeDependency = false } = {}) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'verification-nuget-project-test-')))
+function prepareProjectFixtureSource(root, projectReferences = false) {
   const repositoryRoot = path.join(root, 'repository')
   const sourceParent = path.join(root, 'sources')
+  fs.mkdirSync(path.join(repositoryRoot, 'src'), { recursive: true })
+  fs.mkdirSync(sourceParent)
+  fs.writeFileSync(path.join(repositoryRoot, 'global.json'), '{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}\n')
+  fs.writeFileSync(path.join(repositoryRoot, 'Directory.Build.props'), '<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework><DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference></PropertyGroup></Project>\n')
+  fs.writeFileSync(path.join(repositoryRoot, projectPath), `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="fixture.package" Version="1.0.0"/>${projectReferences ? '<ProjectReference Include="Other.fsproj"/>' : ''}</ItemGroup></Project>\n`)
+  if (projectReferences) fs.writeFileSync(path.join(repositoryRoot, 'src/Other.fsproj'), '<Project Sdk="Microsoft.NET.Sdk"/>\n')
+  execFileSync('git', ['init', '--quiet', '--object-format=sha1', '--template=', repositoryRoot])
+  execFileSync('git', ['-C', repositoryRoot, 'add', '.'])
+  const treeId = execFileSync('git', ['-C', repositoryRoot, 'write-tree'], { encoding: 'utf8' }).trim()
+  return prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirectory: sourceParent })
+}
+
+async function withProjectFixture(action, { projectReferences = false, evaluation, executableBody, includeDependency = false, sharedSource } = {}) {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'verification-nuget-project-test-')))
   const parentDirectory = path.join(root, 'projects')
   const toolRoot = path.join(root, 'sdk')
-  const globalBytes = Buffer.from('{"sdk":{"version":"10.0.100","rollForward":"latestFeature"}}\n')
   let source
   let baselineSource
   let baselineSdk
   let actionFailure
   try {
-    fs.mkdirSync(path.join(repositoryRoot, 'src'), { recursive: true })
-    fs.mkdirSync(sourceParent)
     fs.mkdirSync(parentDirectory)
     fs.mkdirSync(path.join(toolRoot, 'dotnet-sdk'), { recursive: true })
-    fs.writeFileSync(path.join(repositoryRoot, 'global.json'), globalBytes)
-    fs.writeFileSync(path.join(repositoryRoot, 'Directory.Build.props'), '<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework><DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference></PropertyGroup></Project>\n')
-    fs.writeFileSync(path.join(repositoryRoot, projectPath), `<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="fixture.package" Version="1.0.0"/>${projectReferences ? '<ProjectReference Include="Other.fsproj"/>' : ''}</ItemGroup></Project>\n`)
-    if (projectReferences) fs.writeFileSync(path.join(repositoryRoot, 'src/Other.fsproj'), '<Project Sdk="Microsoft.NET.Sdk"/>\n')
-    execFileSync('git', ['init', '--quiet', '--object-format=sha1', '--template=', repositoryRoot])
-    execFileSync('git', ['-C', repositoryRoot, 'add', '.'])
-    const treeId = execFileSync('git', ['-C', repositoryRoot, 'write-tree'], { encoding: 'utf8' }).trim()
-    source = prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirectory: sourceParent })
+    source = sharedSource ?? prepareProjectFixtureSource(root, projectReferences)
+    source.revalidate()
     baselineSource = inventory(source.sourceRoot)
+    const globalBytes = fs.readFileSync(path.join(source.sourceRoot, 'global.json'))
     // This executable is a Node protocol/failure adapter, not an actual SDK or
     // evidence that NuGet restored the declared fixture package.
     const executable = path.join(toolRoot, 'dotnet-sdk/dotnet')
@@ -187,7 +192,7 @@ async function withProjectFixture(action, { projectReferences = false, evaluatio
       failures.push(error)
     }
     try {
-      source?.dispose()
+      if (!sharedSource) source?.dispose()
     } catch (error) {
       failures.push(error)
     }
@@ -288,14 +293,48 @@ function registerNugetGraphTests() {
     ['missing runtime file', "fs.unlinkSync(path.join(packageDirectory, 'lib', 'net10.0', 'fixture.dll'))", 'entry-invalid'],
     ['foreign package folder', "assets.packageFolders = {'/foreign/packages':{}}\n" + writeAssets, 'entry-invalid'],
   ]
-  for (const [description, mutation, code] of invalidGraphs) {
-    test(`WHAT[verification-system-016] project graph rejects ${description} without publishing a restore receipt`, async () => {
-      await withProjectFixture(async ({ root, options }) => {
-        await rejectsProject(options, error => error.code === `verification-nuget-project-${code}`)
-        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'restore-calls.json'), 'utf8')), ['first'], 'A corrupt graph cannot authorize a subsequent locked restore')
-      }, { includeDependency: true, executableBody: ({ root }) => graphExecutor({ root, mutation }) })
+  describe('WHAT[verification-system-016] corrupt graph cases preserve one shared actual Git candidate and own independent restore resources', () => {
+    let root
+    let source
+    let capturedSource
+    before(() => {
+      root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'verification-nuget-graph-source-')))
+      source = prepareProjectFixtureSource(root)
+      capturedSource = inventory(source.sourceRoot)
     })
-  }
+    after(() => {
+      const failures = []
+      try {
+        if (source) {
+          source.revalidate()
+          assert.deepEqual(inventory(source.sourceRoot), capturedSource, 'All graph cases preserve the shared complete Git input, including .git')
+        }
+      } catch (error) {
+        failures.push(error)
+      }
+      try {
+        source?.dispose()
+      } catch (error) {
+        failures.push(error)
+      }
+      try {
+        if (root) fs.rmSync(root, { recursive: true, force: true })
+      } catch (error) {
+        failures.push(error)
+      }
+      if (failures.length) throw new AggregateError(failures, 'Shared graph input validation and cleanup failed', { cause: failures[0] })
+    })
+    for (const [description, mutation, code] of invalidGraphs) {
+      test(`WHAT[verification-system-016] project graph rejects ${description} without publishing a restore receipt`, async () => {
+        await withProjectFixture(async ({ root, options }) => {
+          assert.deepEqual(inventory(source.sourceRoot), capturedSource)
+          await rejectsProject(options, error => error.code === `verification-nuget-project-${code}`)
+          assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'restore-calls.json'), 'utf8')), ['first'], 'A corrupt graph cannot authorize a subsequent locked restore')
+          assert.deepEqual(inventory(source.sourceRoot), capturedSource)
+        }, { sharedSource: source, includeDependency: true, executableBody: ({ root }) => graphExecutor({ root, mutation }) })
+      })
+    }
+  })
   const changedInputs = [
     ['an added feed archive', "fs.writeFileSync(path.join(feed, 'unselected.9.9.9.nupkg'), 'unselected bytes')", 'entry-invalid'],
     ['selected feed bytes', "fs.appendFileSync(path.join(feed, 'fixture.package.1.0.0.nupkg'), 'changed bytes')", 'integrity-invalid'],
@@ -536,6 +575,70 @@ export function registerNugetProjectTests() {
       assert.deepEqual(ownership, { originalRootExists: false, foreignMarkerExists: true })
       assert.equal(fs.readFileSync(marker, 'utf8'), 'foreign bytes must survive')
     }, { aliasedParent: true })
+  })
+  for (const replacement of ['canonical parent link', 'ordinary root']) {
+    test(`WHAT[verification-system-016] prepared Git input refuses validation and disposal through a replaced ${replacement}`, async () => {
+      await withSourceFixture(async ({ root, source, parentDirectory }) => {
+        const originalRoot = source.sourceRoot
+        const foreignParent = path.join(root, 'foreign-parent')
+        const foreignRoot = path.join(foreignParent, path.basename(originalRoot))
+        fs.mkdirSync(foreignParent)
+        fs.cpSync(originalRoot, foreignRoot, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true })
+        for (const entry of inventory(originalRoot)) fs.chmodSync(path.join(foreignRoot, entry.path), entry.mode)
+        const capturedInventory = inventory(originalRoot)
+        assert.deepEqual(inventory(foreignRoot), capturedInventory)
+        const capturedBytes = fs.readFileSync(path.join(foreignRoot, 'input.txt'))
+        const parked = path.join(root, 'parked-owned')
+        if (replacement === 'canonical parent link') {
+          fs.renameSync(parentDirectory, parked)
+          fs.symlinkSync(foreignParent, parentDirectory)
+        } else {
+          fs.renameSync(originalRoot, parked)
+          fs.renameSync(foreignRoot, originalRoot)
+        }
+        const selectedForeignRoot = replacement === 'ordinary root' ? originalRoot : foreignRoot
+        try {
+          assert.throws(() => source.revalidate(), error => error.code === 'source-candidate-entry-invalid')
+          assert.throws(() => source.dispose(), error => error.code === 'source-candidate-entry-invalid')
+          assert.deepEqual(inventory(selectedForeignRoot), capturedInventory)
+          assert.deepEqual(fs.readFileSync(path.join(selectedForeignRoot, 'input.txt')), capturedBytes)
+        } finally {
+          if (replacement === 'canonical parent link') {
+            fs.unlinkSync(parentDirectory)
+            fs.renameSync(parked, parentDirectory)
+          } else {
+            fs.renameSync(originalRoot, foreignRoot)
+            fs.renameSync(parked, originalRoot)
+          }
+        }
+        source.revalidate()
+        source.dispose()
+        source.dispose()
+        assert.equal(fs.existsSync(originalRoot), false)
+        assert.deepEqual(fs.readFileSync(path.join(foreignRoot, 'input.txt')), capturedBytes)
+      })
+    })
+  }
+  test('WHAT[verification-system-016] prepared Git input refuses missing-root disposal when its canonical parent was replaced', async () => {
+    await withSourceFixture(async ({ root, source, parentDirectory }) => {
+      const originalRoot = source.sourceRoot
+      const parked = path.join(root, 'parked-owned')
+      fs.renameSync(parentDirectory, parked)
+      fs.mkdirSync(parentDirectory)
+      try {
+        assert.equal(fs.existsSync(originalRoot), false)
+        assert.throws(() => source.dispose(), error => error.code === 'source-candidate-entry-invalid')
+        assert.equal(fs.readFileSync(path.join(parked, path.basename(originalRoot), 'input.txt'), 'utf8'), 'captured tracked source bytes\n')
+        assert.deepEqual(fs.readdirSync(parentDirectory), [])
+      } finally {
+        fs.rmdirSync(parentDirectory)
+        fs.renameSync(parked, parentDirectory)
+      }
+      source.revalidate()
+      source.dispose()
+      source.dispose()
+      assert.equal(fs.existsSync(originalRoot), false)
+    })
   })
   for (const selectedPath of ['missing.fsproj', '../outside.fsproj', '/absolute.fsproj', 'src/../src/Fixture.fsproj']) {
     test(`WHAT[verification-system-016] project preparation rejects missing or nonordinary selected path ${selectedPath}`, async () => {

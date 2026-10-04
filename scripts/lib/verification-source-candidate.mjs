@@ -81,8 +81,30 @@ export function prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirect
   }
   if (offset !== batch.length) throw failure('source-candidate-blob-invalid', 'Unexpected trailing blob data')
 
-  const sourceRoot = fs.mkdtempSync(path.join(fs.realpathSync(parentDirectory), 'verification-source-'))
+  const invalidEntry = message => failure('source-candidate-entry-invalid', message)
+  const parentRoot = fs.realpathSync(parentDirectory)
+  const parentIdentity = fs.lstatSync(parentRoot, { bigint: true })
+  if (!parentIdentity.isDirectory()) throw invalidEntry('Cannot verify owned identity of the source parent')
+  const sourceRoot = fs.mkdtempSync(path.join(parentRoot, 'verification-source-'))
+  const rootIdentity = fs.lstatSync(sourceRoot, { bigint: true })
+  function assertOwnedRoot(allowMissing = false) {
+    for (const [directory, identity] of [[parentRoot, parentIdentity], [sourceRoot, rootIdentity]]) {
+      let current
+      try {
+        current = fs.lstatSync(directory, { bigint: true })
+      } catch (cause) {
+        if (allowMissing && directory === sourceRoot && cause.code === 'ENOENT') return false
+        throw Object.assign(invalidEntry(`Cannot verify owned identity of the source directory: ${directory}`), { cause })
+      }
+      if (!current.isDirectory() || current.dev !== identity.dev || current.ino !== identity.ino) throw invalidEntry(`Cannot verify owned identity of the source directory: ${directory}`)
+    }
+    return true
+  }
+  function dispose() {
+    if (assertOwnedRoot(true)) fs.rmSync(sourceRoot, { recursive: true, force: true })
+  }
   try {
+    assertOwnedRoot()
     git(sourceRoot, ['init', '--quiet', `--object-format=${objectFormat}`, '--template='])
     for (const entry of entries) {
       const destination = path.join(sourceRoot, entry.path)
@@ -108,20 +130,23 @@ export function prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirect
     const sourceDigest = createHash('sha256').update(JSON.stringify({ objectFormat, treeId, entries })).digest('hex')
     const selection = { sourceRoot, treeId, objectFormat, entries, sourceDigest }
     const capturedSelection = JSON.stringify(selection)
-    const invalidEntry = message => failure('source-candidate-entry-invalid', message)
+    assertOwnedRoot()
     const capturedInventory = JSON.stringify(captureOrdinaryVerificationFiles(sourceRoot, invalidEntry))
     const prepared = {
       ...selection,
       revalidate() {
+        assertOwnedRoot()
         const actual = Object.fromEntries(Object.keys(selection).map(key => [key, prepared[key]]))
         if (JSON.stringify(actual) !== capturedSelection || JSON.stringify(captureOrdinaryVerificationFiles(sourceRoot, invalidEntry)) !== capturedInventory) throw invalidEntry('Prepared source receipt or complete input inventory changed')
+        assertOwnedRoot()
       },
-      dispose() { fs.rmSync(sourceRoot, { recursive: true, force: true }) },
+      dispose,
     }
+    assertOwnedRoot()
     return prepared
   } catch (error) {
     try {
-      fs.rmSync(sourceRoot, { recursive: true, force: true })
+      dispose()
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], 'Source preparation and cleanup failed', { cause: error })
     }

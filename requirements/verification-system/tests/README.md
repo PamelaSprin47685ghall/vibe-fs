@@ -1,6 +1,12 @@
 # verification-system 测试说明
 
-最新接手入口见[编译目录身份与清理](../../../proposals/archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110正式18/18排空、429/0/6skip/2TODO、groupaccepted=true；新Fable namespace正式0/2证明canonical parent或ordinary root被同库存foreign置换后，旧revalidate接受且dispose真的删除foreign。现私有dev/ino检查在消费/发布/revalidate/cleanup前typed拒绝，root正常ENOENT幂等，cleanup失败保Error/null Aggregate cause；新批结果待附件。这仍是preflight，TOCTOU/ABA、其它owner、完整FD和runtime readonly未闭合，原300000/5000与默认workers不变。
+最新正式scope仍待final：gen112缺显式SDKroot的18排空436/0/7skip/2TODO（166.36s）因外借SDK反例额外skip，不替原6skip；完整选定Node22/npm11.12.1/SDKroot仍触发5003ms静默、17/18排空，不能只归因环境遗漏。npm工具归档第一正例改为有序`t.test`：真实完整工具准备完成后才发runtime叶判决，实际install及原全部assert/consumer/cleanup随后完成；held负例、强oracle与预算不动，不添加背景进展。gen113新输入结果待[验收附件](../../../proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)，错误001/019名单仅setup。最后Node/npm pass不是唯一故障定位，Archive本轮未施工。
+
+最新接手入口见[源码目录身份与NuGet协议夹具](../../../proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)：source同库存foreign parent/root实际0/2红，私有dev/ino守publication/revalidate前后/dispose/catch后定向12/0；完整Git tree/.git/bytes/mode原断言不动。15个NuGet非法图只共享该组不改写的真实Git前提，各叶SDK/restore/HOME/feed/packages独立，原typed/calls断言保持。最后统一输入待附件，195→13静态Git成本不称CI因果；TOCTOU/ABA、其它archive/tools/NuGet owner、完整FD、runtime readonly与T418/T419保留。
+
+9909 CI `37200928231`实际在300000ms physical backstop结束：817/818文件完成、1active016、0queued、无authoritative summary，不能称pending-only。最后进展是null lock framework dependency map反例test:pass，不推定其为唯一物理原因；gen110本地429/0与新输入验收各自绑定，预算/默认workers未放宽。
+
+aac79 CI `37202396189`另为818/818、4253/0/103skip/404TODO，244.51s wall/370.10s testtime，仅pending退出1；未含当前source/NuGet共享修复，不能定位9909原因。NuGet同15叶独立/共享前提正式各15/0、23.782s/13.165s只属本机单次观测，195→13静态Git成本不作CI归因。source新增parent失配/rootmissing第三例后完整定向13/0、2.942s，原12/0为此前截面，统一输入待附件。原0/2红在revalidate断言处先失败，未执行旧dispose；误删是旧按路径删除的实现风险，修复后另正式核对dispose拒绝与foreign库存不变。
 
 历史gen103静默失败与72e83 CI的300000ms backstop/817完成/无权威summary和活动身份保持；gen102的398/0不能替代二者。新fe9 CI `37195699694` 已818/818排空、4188 passed/0 failed/102 skipped/404 TODO，exit1 solely pending proof，仅证明新输入，不定位旧72e83。重复fixture准备只按语义等价证据评估，不删测试、调workers或扩大时限；runtime readonly/ABA/同候选actualverify和T418/T419仍未闭合。
 
@@ -23,6 +29,8 @@ SDK reference packs 与工具自带 FSharp.Core 也参加实际编译；四包 N
 工程 owner 实际执行两次 restore：先派生私有 lock，再清空 packages，`--locked-mode --force` 复验同图与 lock 字节。只有私有 config/feed/cache，禁用 SDK 隐式 feeds 与 pack 下载；完整 assets/lock/cache 集合须等于四个明确选定包。raw nupkg SHA512/sidecar 与 assets.sha512、lock/metadata contentHash 分别核对，后面三者一致不等于前者。完整输出库存、source/SDK身份与公开receipt参加revalidate；dispose不删除调用方的source/SDK。源码owner另补canonical parent、包含Git metadata的普通全库存和公开receipt复核，仍只证明步骤边界。
 
 首阶段验收必须发生在后续 effect 之前：evaluation 后复核 source/SDK；首次 restore 后完整检查输入、普通输出、feed/config 及 graph，再清空 cache 和启动 locked restore。正式首阶段反例断言调用记录仅有 `first`；外借输出、非法 asset map、越界或不一致的依赖边不得进入第二阶段。阶段/receipt 定向 28/28 通过的两包正例使用实际 Node adapter 进程，证明空缓存的两阶段协议和完整身份绑定，不等同真实 NuGet 的版本解析；版本求解仍由实际 NuGet 完成，owner 不复写 semver 模型。实际 SDK 四包 integration 与这些机械用例分开记账，最终输入范围见验收附件。
+
+NuGet bad-graph组的共享仅限不被该组改写的真实Git源码前提，消费前后完整复核并按owner释放；会改变源码的独立反例不共享。每个叶仍启动自己的实际adapter并拥有SDK、工作根、HOME、feed/packages和原调用记录，不能跨叶复用错误图、缓存或产物。静态Git195→13不是实际CI性能证明；原图拒绝/首次失败不得启动locked restore的精确断言保持，新输入绿色只按已结束正式日志填写。
 
 该新增scope为`selected-nuget-project-restore`，没有source已有lock、全仓项目图、实际Fable编译、Git/OS加载闭包、RO或actualverify接线结论；T418/T419与GAP-055 PARTIAL保留。下文本地工具/SDK的证明限制按各批范围阅读，工程准备不反向升级历史证据。
 
