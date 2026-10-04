@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { captureOrdinaryVerificationFiles } from './verification-ordinary-files.mjs'
 
 function failure(code, message) {
   return Object.assign(new Error(message), { code })
@@ -80,7 +81,7 @@ export function prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirect
   }
   if (offset !== batch.length) throw failure('source-candidate-blob-invalid', 'Unexpected trailing blob data')
 
-  const sourceRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-source-'))
+  const sourceRoot = fs.mkdtempSync(path.join(fs.realpathSync(parentDirectory), 'verification-source-'))
   try {
     git(sourceRoot, ['init', '--quiet', `--object-format=${objectFormat}`, '--template='])
     for (const entry of entries) {
@@ -105,10 +106,19 @@ export function prepareGitSourceCandidate({ repositoryRoot, treeId, parentDirect
       throw failure('source-candidate-tree-invalid', 'Materialized source inventory differs from the selected tree')
     }
     const sourceDigest = createHash('sha256').update(JSON.stringify({ objectFormat, treeId, entries })).digest('hex')
-    return {
-      sourceRoot, treeId, objectFormat, entries, sourceDigest,
+    const selection = { sourceRoot, treeId, objectFormat, entries, sourceDigest }
+    const capturedSelection = JSON.stringify(selection)
+    const invalidEntry = message => failure('source-candidate-entry-invalid', message)
+    const capturedInventory = JSON.stringify(captureOrdinaryVerificationFiles(sourceRoot, invalidEntry))
+    const prepared = {
+      ...selection,
+      revalidate() {
+        const actual = Object.fromEntries(Object.keys(selection).map(key => [key, prepared[key]]))
+        if (JSON.stringify(actual) !== capturedSelection || JSON.stringify(captureOrdinaryVerificationFiles(sourceRoot, invalidEntry)) !== capturedInventory) throw invalidEntry('Prepared source receipt or complete input inventory changed')
+      },
       dispose() { fs.rmSync(sourceRoot, { recursive: true, force: true }) },
     }
+    return prepared
   } catch (error) {
     try {
       fs.rmSync(sourceRoot, { recursive: true, force: true })

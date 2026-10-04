@@ -1,5 +1,13 @@
 # verification-system 测试说明
 
+016 最新接续[工程 NuGet 单项目准备](../../../proposals/archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)。轻量用例证明输入/公开receipt、实际子进程失败与取消、非支持项目图的拒绝和资源回收，不冒充实际 NuGet restore。独立 integration 明确 `WXS_VERIFICATION_NUGET_PROJECT_TREE_ID`、`WXS_VERIFICATION_DOTNET_ROOT` 与 `WXS_VERIFICATION_NUGET_PROJECT_PACKAGES_JSON`（`id/version/archivePath/sha512`），恢复原 foundation-identity 单 net10.0/no ProjectReference 项目；原 project/props/global 字节和完整源码库存保持。最终统计以记录所链验收附件为准，未结束运行不计通过。
+
+工程 owner 实际执行两次 restore：先派生私有 lock，再清空 packages，`--locked-mode --force` 复验同图与 lock 字节。只有私有 config/feed/cache，禁用 SDK 隐式 feeds 与 pack 下载；完整 assets/lock/cache 集合须等于四个明确选定包。raw nupkg SHA512/sidecar 与 assets.sha512、lock/metadata contentHash 分别核对，后面三者一致不等于前者。完整输出库存、source/SDK身份与公开receipt参加revalidate；dispose不删除调用方的source/SDK。源码owner另补canonical parent、包含Git metadata的普通全库存和公开receipt复核，仍只证明步骤边界。
+
+首阶段验收必须发生在后续 effect 之前：evaluation 后复核 source/SDK；首次 restore 后完整检查输入、普通输出、feed/config 及 graph，再清空 cache 和启动 locked restore。正式首阶段反例断言调用记录仅有 `first`；外借输出、非法 asset map、越界或不一致的依赖边不得进入第二阶段。阶段/receipt 定向 28/28 通过的两包正例使用实际 Node adapter 进程，证明空缓存的两阶段协议和完整身份绑定，不等同真实 NuGet 的版本解析；版本求解仍由实际 NuGet 完成，owner 不复写 semver 模型。实际 SDK 四包 integration 与这些机械用例分开记账，最终输入范围见验收附件。
+
+该新增scope为`selected-nuget-project-restore`，没有source已有lock、全仓项目图、实际Fable编译、Git/OS加载闭包、RO或actualverify接线结论；T418/T419与GAP-055 PARTIAL保留。下文本地工具/SDK的证明限制按各批范围阅读，工程准备不反向升级历史证据。
+
 016 接续[本地工具恢复](../../../proposals/archive/2026-10-04/S03本地工具恢复-2026-10-04.md)：已准备 SDK 真实执行原 manifest 的 tool restore，明确包 SHA512、仅自有 feed、实际 resolver/运行 DLL 与完整库存绑定。轻量真实进程边界与实际 .NET integration 分开；后者要求显式 `WXS_VERIFICATION_DOTNET_ROOT` 及 `WXS_VERIFICATION_DOTNET_TOOLS_PACKAGES_JSON`（`id/version/archivePath/sha512` 数组），不会默认借用户缓存。它不证明工程 NuGet 图、Fable 编译、OS加载边界、只读执行或 actual verify，原两 TODO 保留。
 
 Node/npm 回归按实际声明的 transitive 依赖选缺库叶，不将某个 npm 版本的包名硬编码为通用结构。完整工具归档正例固定0775成员，真实安装在 umask002 下执行并恢复原mask，完整产物模式与库存必须保持；不以 portable 归整模式后放宽摘要相等取绿。远端 Linux 原失败、本地明确 npm10/11 的证明层级与最终 CI 状态见[aaa记录](../../../proposals/archive/2026-10-04/Upstream增量-aaa123b12-2026-10-04.md)。
@@ -77,7 +85,7 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 
 第二批安装入口与输出边界详见[工具归档安装与输出根](../../../proposals/archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)。Mac真实只读输入内的可写输出挂载证明reset保留root、只清子项、不改输入和owned挂载回收；`compileIncremental`使用受控spawn替身，只证明输出发布清理，不能算actual Fable只读执行。upstream `590a3f69e` copy/chmod实际审核中，check读取父目录替换后的新字节，再恢复原父目录与文件inode/ctime，verify仍报告PASS、exitCode0。该反例不是TODO通过，也不由归档安装回归闭合；真正只读输入阻止替换或实际替换使运行失效才满足命题。
 
-T418/T419与GAP-055 PARTIAL保留。工具prepare/runProbe取消、完整工具归档安装及选定仓库源码的实际依赖安装已具备有限证据，不重做已完成接线。下一步闭合SDK、Git、dotnet/Fable/NuGet、实际只读输入/可写输出、actualverify统一候选及结论绑定。准备owner的定向绿色不能替代这两条TODO。
+T418/T419与GAP-055 PARTIAL保留。工具、SDK、单项目工程依赖准备已有分开的有限scope，不重做已完成owner。下一步接实际Fable读取选定工程资产与自有输出，再证明Git/OS、实际只读输入/可写输出、actualverify统一候选及结论绑定；多项目/多目标闭包单独扩展。准备owner的定向绿色不能替代这两条TODO。
 
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 

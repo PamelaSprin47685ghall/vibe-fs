@@ -4,6 +4,8 @@ import path from 'node:path'
 import { privateDotnetEnvironment } from './verification-dotnet-environment.mjs'
 import { verificationInputExists } from './verification-input-path.mjs'
 import { runVerificationToolProbe } from './verification-tool-probe.mjs'
+import { captureVerificationNugetArchives } from './verification-nuget-archives.mjs'
+import { captureOrdinaryVerificationFiles } from './verification-ordinary-files.mjs'
 
 const hash = (algorithm, bytes, encoding = 'hex') => createHash(algorithm).update(bytes).digest(encoding)
 const invalidEntry = message => Object.assign(new Error(message), { code: 'verification-dotnet-tools-entry-invalid' })
@@ -44,17 +46,7 @@ function parseManifest(bytes) {
 }
 
 function capturePackages(packageArchives, tools) {
-  if (!Array.isArray(packageArchives) || !packageArchives.length) throw invalidEntry('Tool restore requires explicitly identified package archives')
-  const packages = packageArchives.map(selected => {
-    const { id, version, archivePath, sha512 } = selected ?? {}
-    if (!ordinaryName(id) || id !== id.toLowerCase() || !exactVersion(version)) throw invalidEntry('Package requires an ordinary lowercase ID and exact version')
-    if (typeof sha512 !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(sha512) || Buffer.from(sha512, 'base64').toString('base64') !== sha512) throw integrityError('Package requires an explicit SHA512 identity')
-    if (!fs.lstatSync(archivePath).isFile()) throw invalidEntry('Selected package archive requires a real file')
-    const bytes = fs.readFileSync(archivePath)
-    if (hash('sha512', bytes, 'base64') !== sha512) throw integrityError(`Package differs from its selected identity: ${id}/${version}`)
-    return { id, version, sha512, bytes }
-  }).sort((left, right) => `${left.id}/${left.version}`.localeCompare(`${right.id}/${right.version}`, 'en'))
-  if (new Set(packages.map(pkg => `${pkg.id}/${pkg.version}`)).size !== packages.length) throw invalidEntry('Selected package identities must be distinct')
+  const packages = captureVerificationNugetArchives(packageArchives, 'verification-dotnet-tools')
   if (tools.some(tool => !packages.some(pkg => pkg.id === tool.id && pkg.version === tool.version))) throw invalidEntry('Selected archives must include each manifest tool version')
   return packages
 }
@@ -75,22 +67,7 @@ function selectedSdk(sdk) {
 }
 
 function inventory(root) {
-  const entries = []
-  function inspect(relative) {
-    const file = path.join(root, relative)
-    const stat = fs.lstatSync(file)
-    if (stat.isDirectory()) {
-      entries.push({ path: relative, type: 'Directory', mode: stat.mode & 0o777 })
-      for (const name of fs.readdirSync(file).sort()) inspect(relative === '.' ? name : `${relative}/${name}`)
-    } else if (stat.isFile()) {
-      const bytes = fs.readFileSync(file)
-      entries.push({ path: relative, type: 'File', mode: stat.mode & 0o777, size: bytes.length, sha256: hash('sha256', bytes) })
-    } else {
-      throw invalidEntry(`Restored tools require ordinary owned members: ${relative}`)
-    }
-  }
-  inspect('.')
-  return entries
+  return captureOrdinaryVerificationFiles(root, invalidEntry)
 }
 
 function restoredPackages(root, selected) {

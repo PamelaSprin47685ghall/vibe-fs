@@ -17,15 +17,19 @@ import { repositoryNpmInstallTest } from './support/repository-npm-install-tests
 import { registerDotnetSdkTests, repositoryDotnetSdkTest } from './support/dotnet-sdk-tests.mjs'
 import { registerDotnetToolRestoreTests } from './support/dotnet-tool-restore-tests.mjs'
 import { repositoryDotnetToolsTest } from './support/repository-dotnet-tools-tests.mjs'
+import { registerNugetProjectTests } from './support/nuget-project-tests.mjs'
+import { repositoryNugetProjectTest } from './support/repository-nuget-project-tests.mjs'
 import { integrationTest } from './support/tier-gate.mjs'
 
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
 registerDotnetSdkTests()
 registerDotnetToolRestoreTests()
+registerNugetProjectTests()
 integrationTest('WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers', repositoryNpmInstallTest)
 integrationTest('WHAT[verification-system-016] a complete selected SDK archive resolves the captured repository global.json and reclaims its owned roots', repositoryDotnetSdkTest)
 integrationTest('WHAT[verification-system-016] selected complete SDK restores original repository local tools from explicitly identified NuGet archives', repositoryDotnetToolsTest)
+integrationTest('WHAT[verification-system-016] selected complete Git source and SDK restore the original foundation identity project through a fresh-cache locked NuGet graph', repositoryNugetProjectTest)
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'

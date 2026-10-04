@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 工程 NuGet 单项目准备
+
+- 从已准备源码与 SDK 恢复原单 net10.0/no ProjectReference 项目，使用明确归档和私有 feed；派生 lock 后清空包缓存，再实际 locked 复验，完整 graph/产物身份绑定原输入。
+- 区分 raw nupkg SHA512 与 NuGet contentHash；源码准备补 canonical parent、普通全库存及公开 receipt 复核。实际 Fable、全仓工程图、只读执行及同候选 verify 仍待证明，见[记录](proposals/archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)。
+
 ## Unreleased — S03 选定本地工具恢复
 
 - 明确包 ID、版本和 SHA512，以已准备 SDK 私有恢复原本地工具 manifest，绑定真实 resolver、运行 DLL 与完整输出库存；取消或失败保留原因并回收自有根。

@@ -2,6 +2,8 @@
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
+S03 最新增量是[工程 NuGet 单项目准备](../archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)：原 foundation-identity 单 net10.0/no ProjectReference、私有 feed、派生 lock 与清空缓存后的实际 locked 复验，完整 raw nupkg 身份和 assets/lock/metadata contentHash 分开核对。它不关闭实际 Fable、只读执行或同候选 verify；后续从本分册 VS-016 接续，T418/T419 与 GAP-055 PARTIAL 保留。
+
 本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。VS-016的T418/T419与GAP-055仍PARTIAL，源码/依赖/工具准备不等于实际同候选verify或只读执行；DIST-001/005/007不能假定同候选快照已可用。最新上游取舍见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
 
 本地focused编译新证据：Controller使用SessionHostPort的ChatExecutionKey/ManagedChatAcceptanceWitness时，`host-session-contract`缺`execution-session-chatexecution-facts`真实边；SW012 production-plan正式红0通过/1失败，单边修正后定向2项通过。独立Controller闭包112→132个fs/fsi，fs计数由56→66（此前48→56另有8个source增长），facts shard分组带入10个typed ChatExecution合同及既有支持模块fs，不含具体Host/文件/网络适配器，单边不新授capability；028 recovery反增长ratchet据实66，其余预算未超，WHAT185及禁止实现source断言不变。统一正式构建/受影响套件仍待验收；SDK只调查未实施，S03其余边界保持PARTIAL，详情见590同步记录。
@@ -463,7 +465,7 @@ Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输�
 
 实际application依赖现有原生Node定向4项通过、0失败、0skip/TODO（1父3叶）：选定`174c2a2533`的Git tree/sourceDigest，以完整Node22.23.3/npm11.12.1归档真实安装236个仓库锁定包；toolDigest与11693成员完整inventory绑定，平台optional有7项存在、16项缺失，实际Fable List/Acorn/Tar消费者通过且全部ownedroot回收。证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。该结果仅属于明确选定tree及darwin-arm64依赖，不证明当前dirty合并输入、native Host/lifecycle/SDK、实际Fable编译、RO或actualverify，不关闭T418/T419。
 
-接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)已经实现完整归档、原 global.json 的实际 SDK/runtime 选择、外部路径拒绝与取消回收；SDK 准备不再只处于调查。随后已做[本地工具恢复](../archive/2026-10-04/S03本地工具恢复-2026-10-04.md)：原 manifest、明确 nupkg 字节、私有 feed、实际 SDK restore/resolver 与完整库存绑定。下一项是原 project/props 的工程 NuGet 精确图、包字节和 SDK 内部 feeds，不重复工具版本探测。之后完成 Git/OS 加载边界、实际 Fable 的只读候选及 verify 同源；不重复准备 owner，不删除 T418/T419。
+接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)和[本地工具恢复](../archive/2026-10-04/S03本地工具恢复-2026-10-04.md)，本批已实施[单项目工程 owner](../archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)。实际 SDK 先评价原 project，只允许单 net10.0/no ProjectReference；唯一私有 feed 取代用户缓存、外部与 SDK 隐式 feeds，派生 lock 后删 packages，再 locked --force 复验原图。完整 nupkg raw SHA512 与 NuGet contentHash 分开绑定，不把派生 lock 写成源码已经提供的 lock。源码普通全库存、公开 receipt 与 canonical parent 亦补复核。下一项接实际 Fable 对该次工程资产的消费和自有输出，再完成 Git/OS、只读候选及 verify 同源；其它工程图需单独证明，不重复准备 owner，不删除 T418/T419。
 
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 
