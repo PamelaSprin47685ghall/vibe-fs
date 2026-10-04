@@ -6,6 +6,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createWatchdogHarness } from './support/watchdog-harness.mjs'
+import { registerSupervisedToolReclamationTests } from './support/supervised-tool-reclamation-tests.mjs'
+import { registerOwnedToolTests } from './support/owned-tool-tests.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
 import * as testSupervisor from './e2e/support/supervise-node-test.mjs'
 import { observeCausalProgress } from './e2e/support/causal-observation.js'
@@ -16,6 +18,9 @@ import { StrictMockSignals } from './e2e/support/strict-mock-signals.js'
 import { createScenarioTurn } from './e2e/support/scenario-turn.js'
 import { DIAGNOSTIC_RACE_MS, WATCHDOG_TIMEOUT_MS } from './e2e/support/time-budget.js'
 import { attachEventCeilings, eventCeilingSetupProblems, isCountedSseEvent, normalizeEventCeilings } from './e2e/support/event-ceiling.js'
+
+registerSupervisedToolReclamationTests()
+registerOwnedToolTests()
 
 test('WHAT[verification-system-006] event safety ceilings validate input and count actual non-heartbeat events', () => {
   assert.deepEqual(normalizeEventCeilings({}), {})

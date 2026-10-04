@@ -67,6 +67,61 @@ function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
   })
 }
 
+function processRecords(deadline) {
+  const remaining = deadline - Date.now()
+  if (remaining <= 0) throw new Error('Owned termination observation deadline expired')
+  const output = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], {
+    encoding: 'utf8', timeout: Math.min(PROCESS_TREE_TIMEOUT_MS, remaining),
+  })
+  if (!output.trim()) throw new Error('process inspection returned no records')
+  return output.trim().split('\n').map(line => {
+    const fields = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
+    if (!fields) throw new Error(`unparseable process record: ${line}`)
+    return { pid: Number(fields[1]), parent: Number(fields[2]), group: Number(fields[3]), state: fields[4] }
+  }).filter(record => !/^[ZX]/.test(record.state))
+}
+
+async function captureFrozenDescendantGroups(pgid, deadline) {
+  try {
+    process.kill(-pgid, 'SIGSTOP')
+  } catch (error) {
+    if (error.code === 'ESRCH') return []
+    throw error
+  }
+  let records
+  while (true) {
+    records = processRecords(deadline)
+    const owned = records.filter(record => record.group === pgid)
+    if (owned.every(record => /^[Tt]/.test(record.state))) break
+    if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
+    await delay(5)
+  }
+  const descendants = new Set(records.filter(record => record.group === pgid).map(record => record.pid))
+  let added
+  do {
+    added = false
+    for (const record of records) {
+      if (descendants.has(record.parent) && !descendants.has(record.pid)) {
+        descendants.add(record.pid)
+        added = true
+      }
+    }
+  } while (added)
+  return [...new Set(records.filter(record => descendants.has(record.pid) && record.group !== pgid).map(record => record.group))]
+}
+
+async function awaitObservedGroups(groups, deadline) {
+  if (groups.length === 0) return
+  while (true) {
+    const survivors = processRecords(deadline).filter(record => groups.includes(record.group))
+    if (survivors.length === 0) return
+    if (Date.now() >= deadline) {
+      throw new Error(`Observed descendant groups did not drain: ${survivors.map(record => `${record.pid}/${record.group}`).join(', ')}`)
+    }
+    await delay(10)
+  }
+}
+
 async function verifyExitedGroup(pgid, logPrefix) {
   try {
     const members = liveGroupMembers(pgid)
@@ -184,21 +239,32 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   let silenceFired = false
   let exitDeadline = null
   let finishExit
+  let termination = null
   const requestTermination = () => {
+    if (termination !== null) return
+    const deadline = Date.now() + SIGKILL_GRACE_MS
     if (exitDeadline === null) {
       exitDeadline = setTimeout(() => {
         console.error(`${logPrefix}: inner runner exit was not observed within ${SIGKILL_GRACE_MS}ms after termination`)
         finishExit({ code: null, signal: null, observed: false })
       }, SIGKILL_GRACE_MS)
     }
-    try {
-      if (child?.pid) process.kill(-child.pid, 'SIGKILL')
-    } catch (error) {
-      if (error.code !== 'ESRCH') {
-        runnerError = { message: `Could not terminate the inner process group: ${error.message}` }
-        console.error(`${logPrefix}: ${runnerError.message}`)
+    termination = (async () => {
+      let groups = []
+      try {
+        if (child?.pid) groups = await captureFrozenDescendantGroups(child.pid, deadline)
+      } finally {
+        try {
+          if (child?.pid) process.kill(-child.pid, 'SIGKILL')
+        } catch (error) {
+          if (error.code !== 'ESRCH') throw error
+        }
       }
-    }
+      await awaitObservedGroups(groups, deadline)
+    })().catch(error => {
+      runnerError = { message: `Could not complete owned runner termination: ${error.message}` }
+      console.error(`${logPrefix}: ${runnerError.message}`)
+    })
   }
 
   const watchdog = new Watchdog({
@@ -298,6 +364,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
 
   watchdog.stop()
   clearTimeout(backstop)
+  if (termination !== null) await termination
   const groupVerificationStarted = performance.now()
   const processGroupClean = child.pid ? await verifyExitedGroup(child.pid, logPrefix) : false
   console.error(

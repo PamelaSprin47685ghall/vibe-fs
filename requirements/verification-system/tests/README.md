@@ -1,6 +1,6 @@
 # verification-system 测试说明
 
-最新接手入口见[运行器因果输送与回收](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)：coverage 的真实HTTP异步等待、signal拒绝和stdin EOF、supervisor原进程组/HOME及异常收口、工具角色typed提前拒绝已有定向红绿；统一18文件结果待验收附件。fileWaits诊断已补，原300000/5000和默认workers不变。detached tool正式红例留下一独立监护批，不能把原PGID/HOME清理称作全部descendant回收。
+最新接手入口见[独立工具进程回收](../../../proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)：首批74fc/gen108正式18/18排空、418/0/6skip/2TODO；第二批薄monitor在EOF或actual exit时收自有tool组，supervisor只等观察到的额外组。注册/仅屏障的正式反例仍红，实际接入后该项1/1；最终统一输入结果待附件。原300000/5000和默认workers不变，不能称全部descendant、fullsetsid/crash/ABA或OS闭包已完成，/bin/ps是尚未完整固定的控制面输入。
 
 历史gen103静默失败与72e83 CI的300000ms backstop/817完成/无权威summary和活动身份保持；gen102的398/0不能替代二者。新fe9 CI `37195699694` 已818/818排空、4188 passed/0 failed/102 skipped/404 TODO，exit1 solely pending proof，仅证明新输入，不定位旧72e83。重复fixture准备只按语义等价证据评估，不删测试、调workers或扩大时限；runtime readonly/ABA/同候选actualverify和T418/T419仍未闭合。
 
@@ -46,7 +46,11 @@ Node/npm 回归按实际声明的 transitive 依赖选缺库叶，不将某个 n
 
 文件启动和结果流排空另报生命周期事实，用于区分尚未派发、正在运行、已有文件判决但流未排空；这些消息不续期。超时诊断列出活动文件及其最近判决，不把尚未派发的整个选集当作活动集合。watchdog 的 background 计数是本轮累计值，显示的 lane 只属于最后一条消息；Node 每个单文件运行结束都会产生汇总 diagnostic，不能由累计数推断该 lane 输出异常。
 
-006新增真实caller反例：silence失败先有界终止并观察inner原进程组清空，exact HOME回收后才交还失败，caller catch/finally必须实际执行；同步spawn抛错保留原TypeError且停watchdog，standalone inner只释放自己分配的HOME。实际清理失败同时保留原verdict与cleanup cause，null原值不能被真假判断吞掉。权限反例在无法诚实制造访问拒绝的平台/用户下不冒称证明。此范围不含另开进程组的detached tool；已取得正式资源泄漏红例，但其生产监护属于下一原子批。
+006首批真实caller反例证明：silence失败先观察inner原进程组清空，exact HOME回收后才交还失败，caller catch/finally实际执行；同步spawn抛错保留原TypeError且停watchdog，standalone inner只释放自己分配的HOME。清理失败保留原verdict与cleanup cause，null原值不被吞掉；权限反例不冒称无法诚实制造的访问拒绝。该首批只证明原组，后续独立监护批另补actual detached tool及同组后代，foreign组保持。
+
+第二批006在同一1000ms终止deadline内冻结原组，确认该ps截面的T/t成员并捕获额外PGID，finally只kill原组，只等待观察组清空；inspect失败或残留拒绝。monitor actual工具不继承lifeline/IPC，EOF、exit/error先回收，不先等后代持管道的close；外层须收到唯一合法typed终局且monitor实际close/输出排空才settle。caller已死时没有可交回的消息，不能据此称crash、重parent或setsid逃逸已闭合。正式单项readiness前缺caught.json的尝试只记诊断失败，不当产品红。
+
+薄owner协议正式定向8/8核对实际env、PGID、exit23、self SIGTERM、ENOENT和missing/malformed/duplicate终局；Darwin CF编码的首轮6/2是fixture误差，最终仍全字段deepEqual。016在helper修改期间的238/9/6skip/2TODO只属诊断，冻结后结果待[第二批附件](../../../proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)。monitor crash而工具继续持管道时可能只有exit、尚无close；本批不称此路径已取得有界回收。
 
 连续同步操作与已完成 Promise 可使 Node 子进程的原生 reporter 得不到事件循环调度：测试已完成，父进程却迟迟收不到判决。运行器通过专用 `verdict-transport.mjs` 在测试完成后的 `afterEach` 中让出一次调度，使原生 reporter 能发送真实结果；让步本身不发送进展，不改变静默窗口。006 的真实子进程反例覆盖文件总时长超过窗口但逐项完成、完成若干项后持续打印并挂起，以及 after hook 抛错。挂起用例不会进入完成后的让步，背景输出仍不能续期。
 
@@ -103,7 +107,7 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 
 T418/T419与GAP-055 PARTIAL保留。工具、SDK、单项目工程与编译各有有限scope，不重做已完成owner。下一步沿编译owner核对并接入实际构建/验证阶段，再证明Git/OS、真正只读输入/可写输出、actualverify统一候选及结论绑定；多项目/多目标闭包单独扩展。准备或单项目编译的定向绿色不能替代这两条TODO。
 
-最新016角色准入反例在缺归档、parent未分配时检验越界/alias/absolute/空值/非字符串先返回`verification-tool-entry-invalid`，已取消Error/null仍优先保持原原因。仅将原词法谓词移到归档读取前，不normalize或放宽角色；合法但缺失的missing.js仍需真实物化库存拒绝。该新定向10/0和既有完整工具父组原生15/0分开记录在[本批附件入口](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)，不升级任意加载/OS/只读证明。当前施工顺序为第一批统一18验收→detached tool独立监护批→编译owner接同候选实际阶段。
+016角色准入反例在缺归档、parent未分配时检验越界/alias/absolute/空值/非字符串先返回`verification-tool-entry-invalid`，已取消Error/null仍优先保持原原因。仅将原词法谓词移到归档读取前，不normalize或放宽角色；合法但缺失的missing.js仍需真实物化库存拒绝。定向10/0和既有完整工具父组原生15/0仍记录在[首批](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)，不升级任意加载/OS/只读证明。第二批的四个既有取消场景先await实际settlement，再发第二SIGTERM并断言ESRCH，Error/null、fallback未执行、后代退出及ownedroot清理断言保持；cleanup失败需AggregateError保原cause。后续沿独立监护批验收→编译owner接同候选实际阶段。
 
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 

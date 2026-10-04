@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -45,6 +45,102 @@ test('WHAT[verification-system-021] compact and verbose reports preserve outcome
   }
   assert.deepEqual(reports[0], reports[1])
   assert.deepEqual(counts(reports[0]), { passed: 1, failed: 1, skipped: 1, todo: 1, cancelled: 0 })
+})
+
+test('WHAT[verification-system-021] an actual failure retains its detailed cause when later work prevents the file from draining', async () => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'failed-before-hang-')))
+  try {
+    const file = join(directory, 'fail-then-hang.fixture.mjs')
+    writeFileSync(file, `import assert from 'node:assert/strict'
+import test from 'node:test'
+test('early failed assertion', () => {
+  assert.equal('actual material', 'selected material', 'EARLY_FAILURE_CAUSE_MUST_REMAIN_VISIBLE')
+})
+test('later unfinished work', async () => {
+  const hold = setInterval(() => {}, 1000)
+  try { await new Promise(() => {}) }
+  finally { clearInterval(hold) }
+})
+`)
+    const launcher = join(directory, 'supervise.mjs')
+    const supervisorUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(supervisorUrl)}
+await superviseNodeTest({ files: [${JSON.stringify(file)}], label: 'fail-then-hang', silenceMs: 1000 })
+`)
+    const child = spawn(process.execPath, [launcher], {
+      stdio: ['ignore', 'pipe', 'pipe'], env: { ...childEnv, NODE_TEST_CONCURRENCY: '1' },
+    })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', text => { stdout += text })
+    child.stderr.on('data', text => { stderr += text })
+    const exit = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', (code, signal) => resolveExit({ code, signal }))
+    })
+    assert.deepEqual(exit, { code: 1, signal: null }, stderr)
+    assert.match(stderr, /WATCHDOG.*silent for/)
+    assert.match(stderr, /last progress: test:(?:fail|complete):early failed assertion/)
+    assert.match(stderr, /0 drained, 1 active, 0 queued/)
+    assert.match(stderr, /verdict counts unavailable; no authoritative summary/)
+    assert.match(stderr, /EARLY_FAILURE_CAUSE_MUST_REMAIN_VISIBLE/)
+    assert.match(stderr, /AssertionError/)
+    assert.match(stderr, /actual material/)
+    assert.match(stderr, /selected material/)
+    assert.ok(stderr.includes(`test at ${file}:`), stderr)
+    assert.equal(stderr.match(/✖ failing tests:/g)?.length, 1, stderr)
+    assert.equal(stderr.match(/EARLY_FAILURE_CAUSE_MUST_REMAIN_VISIBLE/g)?.length, 1, stderr)
+    assert.ok(stderr.indexOf('EARLY_FAILURE_CAUSE_MUST_REMAIN_VISIBLE') < stderr.indexOf('WATCHDOG'), stderr)
+    assert.doesNotMatch(stdout + stderr, /\[test-summary\]/)
+    const reclaimed = /post-exit group verification\/reclamation: pid=(\d+);.*accepted=true/.exec(stderr)
+    assert.ok(reclaimed, stderr)
+    assert.throws(() => process.kill(Number(reclaimed[1]), 0), error => error.code === 'ESRCH')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-021] immediate failure details print each verdict once without collapsing distinct verdicts that share an Error', async () => {
+  const error = new Error('SHARED_ERROR_HAS_FOUR_DISTINCT_VERDICTS')
+  const first = verdict('first failed leaf', 'test:fail', { testId: 1, details: { error } })
+  const second = verdict('second failed leaf', 'test:fail', { testId: 2, details: { error } })
+  const firstContainer = verdict('same failed suite', 'test:fail', { testId: 3, details: { type: 'suite', error } })
+  const secondContainer = verdict('same failed suite', 'test:fail', { testId: 4, details: { type: 'suite', error } })
+  const events = [
+    first, first, second, second, firstContainer, firstContainer, secondContainer, secondContainer,
+    verdict('skipped work', 'test:pass', { testId: 5, skip: 'unavailable execution tier' }),
+    verdict('pending proof', 'test:fail', { testId: 6, todo: 'known incomplete proof', details: { error } }),
+    { type: 'test:summary', data: { duration_ms: 4 } },
+  ]
+  for (const verbose of [false, true]) {
+    const state = createRunState()
+    let stderr = ''
+    let summary
+    const reporter = createCompactReporter({
+      verbose, state, stdout: { write() {} }, stderr: { write(text) { stderr += text } },
+      onSummary(value) { summary = value },
+    })
+    async function* source() {
+      for (const event of events) {
+        if (event.type === 'test:summary') {
+          assert.equal(stderr.match(/SHARED_ERROR_HAS_FOUR_DISTINCT_VERDICTS/g)?.length, 4, stderr)
+        }
+        state.applyEvent(event)
+        yield event
+      }
+    }
+    for await (const _ of reporter(source())) {}
+    assert.equal(stderr.match(/✖ failing tests:/g)?.length, 1, stderr)
+    assert.equal(stderr.match(/✖ first failed leaf/g)?.length, 1, stderr)
+    assert.equal(stderr.match(/✖ second failed leaf/g)?.length, 1, stderr)
+    assert.equal(stderr.match(/✖ same failed suite/g)?.length, 2, stderr)
+    assert.equal(stderr.match(/SHARED_ERROR_HAS_FOUR_DISTINCT_VERDICTS/g)?.length, 4, stderr)
+    assert.equal(stderr.includes('✖ pending proof'), false, stderr)
+    assert.deepEqual(counts(summary), { passed: 0, failed: 2, skipped: 1, todo: 1, cancelled: 0 })
+    assert.equal(summary.containerFailures, 2)
+    assert.match(stderr, /unavailable execution tier/)
+    assert.match(stderr, /known incomplete proof/)
+  }
 })
 
 test('WHAT[verification-system-021] cancelled and TODO failures are not ordinary assertion verdicts', () => {

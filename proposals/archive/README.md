@@ -1,12 +1,14 @@
 # 历史计划与施工记录
 
-[S03 运行器因果输送与回收](2026-10-04/S03运行器因果输送与回收-2026-10-04.md)是当前第一原子批入口：收录有限Fable编译、coverage真实HTTP/signal/stdin EOF、supervisor原进程组/HOME与异常收口、early role预拒绝，统一18结果待附件。detached tool正式红例另留下一监护批，runtime readonly/ABA/T418/T419均未闭合。
+[S03 独立工具进程回收](2026-10-04/S03独立工具进程回收-2026-10-04.md)是第二批入口：薄monitor在EOF/实际exit后回收自有tool组，supervisor只等待观察到的额外组；注册/仅屏障红例和实际接入单项1/1分开，最终验收待附件。fullsetsid/crash/ABA及/bin/ps控制面身份未闭合。
+
+[S03 运行器因果输送与回收](2026-10-04/S03运行器因果输送与回收-2026-10-04.md)收录第一原子批有限Fable编译、coverage真实HTTP/signal/stdin EOF、supervisor原组/HOME和early role边界。74fc/gen108正式18/18排空、418/0/6skip/2TODO；这不关闭runtime readonly或T418/T419，后续从顶部记录接续。
 
 [2588f89d0 合并与冲突处理](2026-10-04/Upstream增量-2588f89d0-2026-10-04.md)保留注册注入六项 TODO 与制度学习语义欠账，记录双方冲突裁决和本地有限验收。
 
 [S03 实际单项目 Fable 编译](2026-10-04/S03实际单项目Fable编译-2026-10-04.md)记录选定四 owner、原 artifacts 的自有工作 seed、实际编译与完整输出身份关联。正式结果以其验收附件为准；SDK packs/tool bundled FSharp.Core 也参与实际加载，不把四包 NuGet graph 称全部编译闭包，不关闭只读执行或同候选 verify。
 
-同记录保留gen103静默失败和72e83 CI因physical backstop仅817/818完成、缺authoritative summary与活动身份的无结论状态。新fe9 CI `37195699694` 的818排空、4188/0/102skip/404TODO、solely pending proof只证明新输入，不能定位旧72e83或替代本批统一18验收；当前后续从顶部记录认领。
+同记录保留gen103静默失败和72e83 CI因physical backstop仅817/818完成、缺authoritative summary与活动身份的无结论状态。新fe9 CI `37195699694` 的818排空、4188/0/102skip/404TODO、solely pending proof只证明新输入，不能定位旧72e83；首批gen108和第二批验收分别绑定，当前后续从顶部记录认领。
 
 [S03 工程 NuGet 单项目准备](2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)记录原 foundation-identity 项目、私有 feed、派生 lock 的新缓存 locked 复验，以及 raw 归档摘要、实际 graph 和完整库存的有限准备边界。真实结果以其验收附件为准；实际编译、只读执行和 verify 同候选仍按现行计划接续。
 

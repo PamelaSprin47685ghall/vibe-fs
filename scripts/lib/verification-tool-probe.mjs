@@ -1,24 +1,17 @@
-import { spawn } from 'node:child_process'
+import { spawnOwnedVerificationTool } from './verification-owned-tool.mjs'
 
 export function runVerificationToolProbe(executable, argv, { cwd, env, signal }) {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, argv, { cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] })
+    const owned = spawnOwnedVerificationTool(executable, argv, { cwd, env })
+    const child = owned.child
     let failure
     let cancellation
     let stdout = ''
     let stderr = ''
-    const stop = () => {
-      try {
-        if (process.platform === 'win32') child.kill('SIGKILL')
-        else if (child.pid) process.kill(-child.pid, 'SIGKILL')
-      } catch (error) {
-        if (error.code !== 'ESRCH') failure ??= error
-      }
-    }
     const abort = () => {
       cancellation ??= { reason: signal.reason }
-      stop()
+      owned.stop()
     }
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) abort()
@@ -29,20 +22,30 @@ export function runVerificationToolProbe(executable, argv, { cwd, env, signal })
         else stderr += chunk
         if (stdout.length + stderr.length > 65536) {
           failure ??= new Error('Tool identity probe exceeded its output boundary')
-          stop()
+          owned.stop()
         }
       })
       stream.once('error', error => {
         failure ??= error
-        stop()
+        owned.stop()
       })
     }
-    child.once('exit', stop)
-    child.once('close', (exitCode, exitSignal) => {
+    const complete = ({ exitCode, signal: exitSignal, failure: cleanupFailure }) => {
       signal?.removeEventListener('abort', abort)
-      if (cancellation) reject(cancellation.reason)
-      else if (failure || exitCode !== 0) reject(Object.assign(new Error('Selected tool identity probe failed', { cause: failure }), { code: 'verification-tool-probe-failed', exitCode, signal: exitSignal, stdout, stderr }))
+      if (cancellation) {
+        if (cleanupFailure !== null) reject(new AggregateError([cancellation.reason, cleanupFailure], 'Tool cancellation and owned cleanup failed', { cause: cancellation.reason }))
+        else reject(cancellation.reason)
+      } else if (failure || cleanupFailure !== null || exitCode !== 0 || exitSignal !== null) {
+        const cause = failure && cleanupFailure !== null && failure !== cleanupFailure
+          ? new AggregateError([failure, cleanupFailure], 'Tool observation and owned cleanup failed', { cause: failure })
+          : failure ?? cleanupFailure ?? undefined
+        reject(Object.assign(new Error('Selected tool identity probe failed', { cause }), { code: 'verification-tool-probe-failed', exitCode, signal: exitSignal, stdout, stderr }))
+      }
       else resolve(stdout.trim())
-    })
+    }
+    owned.completed.then(complete, error => complete({
+      exitCode: null, signal: null,
+      failure: new Error('Owned tool completion failed', { cause: error }),
+    }))
   })
 }

@@ -1,10 +1,18 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 独立工具进程回收
+
+- 判决输送让步移到beforeEach，前一项runtime判决可在下一段同步工作之前送出；原三项正式回归3/3。真实失败完整原因/位置/stack立即打印，后续挂住仍可见；相同事实不重印，不合并共享Error的不同测试，021完整18/18。
+
+- 薄monitor拥有actual工具组，EOF或实际exit/error后回收；调用方取消Error/null在正常cleanup后精确保留，cleanup失败保留Aggregate cause。supervisor冻结原组并只等待已观察额外组，foreign对照保持。
+- 四个既有取消用例先await settlement，再发第二SIGTERM并加强ESRCH；完整库存、原原因及资源断言保留。注册/仅屏障正式红例后实际接入单项1/1，最终选集待[本批附件](proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)绑定。
+- 首批74fc/gen108已有18/18排空、418/0/6skip/2TODO；新批不升级为fullsetsid/crash/ABA/OS或readonly闭包，控制面/bin/ps未完整固定，T418/T419保持。
+
 ## Unreleased — S03 运行器因果输送与回收
 
 - coverage 改为异步等待真实runner/c8，父进程可响应子进程HTTP；完整报告不能掩盖signal失败，silent子进程获得stdin EOF。原分母/报告断言保留，011定向18/0。
 - supervisor静默失败先收原进程组和exact HOME，再交还caller；同步spawn错误停watchdog并保原cause，真实清理失败不吞verdict或null原因。Node/npm非法角色在读归档/分配root前typed拒绝，合法库存和完整探针不变。
-- [记录](proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)分开绑定正式定向红绿与待执行的统一18验收。新fe9 CI4188/0只证明其输入，保gen103失败/旧72e83无结论；detached tool监护留下一原子批，runtime readonly、ABA、T418/T419未闭合。
+- [记录](proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)分开绑定正式定向红绿与gen108的统一18验收（418/0/6skip/2TODO）。新fe9 CI4188/0只证明其输入，保gen103失败/旧72e83无结论；detached tool接上方独立监护批，runtime readonly、ABA、T418/T419未闭合。
 
 ## Unreleased — S03 实际单项目 Fable 编译
 

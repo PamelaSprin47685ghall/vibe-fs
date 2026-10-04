@@ -249,14 +249,11 @@ export function registerDotnetToolRestoreTests() {
             fs.symlinkSync(foreignParent, selectedParent)
           }
           controller.abort(reason)
-          try {
-            process.kill(physical.pid, 'SIGTERM')
-          } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-          }
+          // EOF cancellation drains asynchronously; a second signal is only valid after settlement.
           const [outcome] = await settled
           assert.equal(outcome.status, 'rejected')
           assert.equal(outcome.reason, reason)
+          assert.throws(() => process.kill(physical.pid, 'SIGTERM'), error => error.code === 'ESRCH')
           assert.equal(fs.existsSync(fallback), false, 'The restore owner must drain the process group before returning')
           for (const pid of [physical.pid, physical.childPid]) {
             assert.throws(() => process.kill(pid, 0), error => error.code === 'ESRCH')

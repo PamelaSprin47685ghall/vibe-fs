@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,6 +5,7 @@ import { create } from 'tar'
 import { prepareVerificationDependencies } from './verification-dependency-candidate.mjs'
 import { prepareVerificationNodeTools } from './verification-node-tools.mjs'
 import { rejectSymbolicVerificationInput } from './verification-input-path.mjs'
+import { spawnOwnedVerificationTool } from './verification-owned-tool.mjs'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const lockInvalid = message => Object.assign(new Error(message), { code: 'verification-npm-lock-invalid' })
@@ -92,21 +92,14 @@ function installedEntries(root) {
 function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const child = spawn(nodeExecutable, argv, { cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] })
+    const owned = spawnOwnedVerificationTool(nodeExecutable, argv, { cwd, env })
+    const child = owned.child
     let failure
     let stdout = ''
     let stderr = ''
-    const stop = () => {
-      try {
-        if (process.platform === 'win32') child.kill('SIGKILL')
-        else if (child.pid) process.kill(-child.pid, 'SIGKILL')
-      } catch (error) {
-        if (error.code !== 'ESRCH') failure ??= { error }
-      }
-    }
     const abort = () => {
       failure ??= { error: signal.reason }
-      stop()
+      owned.stop()
     }
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) abort()
@@ -117,12 +110,12 @@ function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
         output?.write(chunk)
       } catch (error) {
         failure ??= { error }
-        stop()
+        owned.stop()
       }
     })
     child.stdout.on('error', error => {
       failure ??= { error }
-      stop()
+      owned.stop()
     })
     child.stderr.setEncoding('utf8').on('data', chunk => {
       stderr = (stderr + chunk).slice(-65536)
@@ -130,20 +123,27 @@ function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
         output?.write(chunk)
       } catch (error) {
         failure ??= { error }
-        stop()
+        owned.stop()
       }
     })
     child.stderr.on('error', error => {
       failure ??= { error }
-      stop()
+      owned.stop()
     })
-    child.once('exit', stop)
-    child.once('close', (exitCode, exitSignal) => {
+    const complete = ({ exitCode, signal: exitSignal, failure: cleanupFailure }) => {
       signal?.removeEventListener('abort', abort)
-      if (failure) reject(failure.error)
-      else if (exitCode !== 0) reject(Object.assign(new Error('Npm dependency preparation failed'), { code: 'verification-npm-install-failed', exitCode, signal: exitSignal, stdout, stderr }))
+      if (failure) {
+        if (cleanupFailure !== null && cleanupFailure !== failure.error) reject(new AggregateError([failure.error, cleanupFailure], 'Npm execution and owned cleanup failed', { cause: failure.error }))
+        else reject(failure.error)
+      } else if (cleanupFailure !== null || exitCode !== 0 || exitSignal !== null) {
+        reject(Object.assign(new Error('Npm dependency preparation failed', { cause: cleanupFailure ?? undefined }), { code: 'verification-npm-install-failed', exitCode, signal: exitSignal, stdout, stderr }))
+      }
       else resolve(stdout)
-    })
+    }
+    owned.completed.then(complete, error => complete({
+      exitCode: null, signal: null,
+      failure: new Error('Owned npm completion failed', { cause: error }),
+    }))
   })
 }
 
