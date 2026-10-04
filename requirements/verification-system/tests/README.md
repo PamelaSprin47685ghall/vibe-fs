@@ -1,6 +1,6 @@
 # verification-system 测试说明
 
-2026-10-05 本批状态：gen115 构建/静态检查通过；正式 80 文件在 5042ms 静默失败，仅 58/80 排空，016 未启动；原生同选集 761/11、7 skip、31 TODO，失败在 006/021。目录修复相关用例通过，但原生结果不能代替正式门禁。完整证据及 remaining completed canary 见下方本批记录与总计划，不按旧“待附件”猜绿色。
+2026-10-05 本批状态：六 owner 局部修复及三接线切片已验收；gen116 正式 80/80、772/0、7 skip、31 TODO，进程组 accepted=true；cf6fb31e8 Linux 818/818、4292/0、104 skip、396 TODO，仅 pending exit1。实际 completed canary 及晚到 HTTP 错误回归完整 integration 21/0。最终冻结附件另列；先期 gen115 静默和原生 761/11 均保留，不用新成功替代旧失败或推断唯一原因。整体 readonly/FD/ABA/actual verify 仍未完成。
 
 2026-10-04 最新接续为[目录所有权与生产接线](../../../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。Archive、dotnet tools、NuGet project、Node/SDK probe、npm installation 六 owner 分别捕获私有 parent/root dev/ino，复核和清理拒绝外来 namespace；首次消费与各探针返回后复核完整工具，NuGet fresh-cache 删除前守门。真实替换、取消、失败及已发布工具证据分别记账，最终固定输入门禁见附件。下文 gen113 待验收/Archive 未施工属于历史截面：gen113 已439/0、18/18排空；cc9f44fc5 CI 已4258/0、818/818排空、103skip/404TODO。全过程 readonly/ABA/完整FD/actualverify 与 T418/T419 仍保留，后续成功不抹掉旧9909超时。
 

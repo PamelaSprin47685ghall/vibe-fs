@@ -12,7 +12,7 @@
 
 ## 台账
 
-2026-10-05 当前接续见[目录所有权与生产接线](../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六 namespace owner 的局部修复及 PP-011/grounding B 证明切片完成，但正式门禁静默失败，原生选集另有 006/021 共 11 fail；整批未闭合。T418/T419 的全过程只读、ABA 与同候选 actual verify 保留。GAP-077 下方“physical lease 不落地”是旧推断，当前根因是 canonical 投影 id 与原 physical execution 混用；已传原 physical、注册用例通过，completed canary 仍在 project 就绪超时而未进入业务。整体 GAP 均保持 PARTIAL，不能据旧推断重复施工或据旧 POST 证据替代新终态证明。
+2026-10-05 当前接续见[目录所有权与生产接线](../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)：六 namespace owner、PP-011/T335、grounding B/T387 和 cognitive/015 注册投递切片验收完成，gen116 正式 80/80、772/0；cf6fb31e8 Linux 818/818、4292/0，仅 pending exit1。真实 completed 后 SDK/journal 隔离和晚到 HTTP 错误回归完整 integration 21/0。先期静默/就绪失败保留，不据新成功定位其唯一原因。GAP-077 的旧“physical lease 不落地”推断被原 physical/投影 id 混用反例修正。T418/T419 的全过程只读/FD/ABA/同候选 actual verify 及整体 GAP 其他义务继续 PARTIAL。
 
 | GAP | 包 | 命题 | 缺口 | 状态 | 现状承载 | 补法计划 | Owner |
 |---|---|---|---|---|---|---|---|

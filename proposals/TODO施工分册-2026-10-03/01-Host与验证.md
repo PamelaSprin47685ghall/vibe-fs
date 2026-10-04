@@ -1,6 +1,6 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六个目录 owner 的局部修复及 PP-011/T335 证明切片完成，固定输入原生相关用例通过；gen115 构建/静态检查通过，但正式 80 文件静默失败，原生完整选集 761/11、7 skip、31 TODO，失败在 006/021。统一门禁未闭合，下一步取得有效正式选集证据并追查仍有的真实失败。PP-011 的落盘、plugin 重开、独立 crypto 和变异不等于独立 OS 进程重启或关闭整个 GAP-082。下文 gen113 待验收与 Archive 未施工属于历史输入。
+2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六个目录 owner 局部修复及 PP-011/T335 验收完成：gen116 正式 80/80、772/0、7 skip、31 TODO；cf6fb31e8 Linux CI 818/818、4292/0、104 skip、396 TODO，两者仅 pending exit1。原 gen115 失败保留，不据后续成功定位其唯一原因。PP-011 的 plugin 重开不等于独立 OS 进程恢复，GAP-082 其他义务保留；T418/T419 的完整只读/FD/ABA/actual verify 接续施工。下文 gen113 待验收与 Archive 未施工属于历史输入。
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
@@ -93,9 +93,9 @@ fileWaits诊断已有正式红绿；历史72e83 CI仍仅817/818、无authoritati
 
 ### PP-011 · P1 · 生产 Journal 路径的 SHA-256 组装
 
-当前状态：已实现并定向验证，统一验收待上述附件。生产落盘、重开与两接线变异已补，不再按“只有 adapter agreement”重复施工。
+当前状态：T335 已验收完成；定向 7/0、gen116 正式选集和 cf6fb31e8 Linux 全量 unit 均通过。生产落盘、plugin 重开与两接线变异已补，不再按“只有 adapter agreement”重复施工，GAP-082 其他义务保持 PARTIAL。
 
-- **已有/欠缺**：真正 SHA-256 与参考值一致，忽略易失字段、参数变化必须改变摘要均已证；仍缺生产 composition wiring。
+- **已有/剩余边界**：SHA-256 参考值、易失字段排除、参数配对和实际 production composition wiring 已证；本卡不覆盖独立 OS 进程恢复或全部重试/压缩分支。
 - **前提/先红**：沿 `Context/Prefix/Wire.fs` 调用 `ProjectionRenderer.cutoffDigest HostDigest.sha256Hex` 到实际持久产物；不用测试直接传正确 hash 函数来替代组装。独立 Node crypto 对准确语义前缀求值，错误 digest/错误截点必须失败。
 - **步骤**：从公开 transform 驱动真实 journal 写入，观察持久 digest 及语义来源；发现错误注入才修 composition。保留“物理 call ID 改变不影响、真实参数改变影响”的正反配对。
 - **验收/停止**：真实落盘值等于独立 oracle，重开后一致；不能把 `XWireSurface` 另一次手工 wiring 当生产入口。

@@ -24,6 +24,17 @@ integrationTest('WHAT[cognitive-environment-015] installed Host delivers ephemer
   assert.deepEqual(JSON.parse(output.trim()), { providerRequests: 2, chronicleCompleted: true, historyClean: true, journalClean: true })
 })
 
+integrationTest('WHAT[cognitive-environment-015] a late actual provider callback failure cannot turn into a successful canary', () => {
+  assert.throws(() => execFileSync(process.execPath, [join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs'), '--late-provider-error'], {
+    cwd: root, encoding: 'utf8', timeout: 45000, stdio: 'pipe',
+  }), error => {
+    assert.equal(error.status, 1)
+    assert.match(error.stderr, /SyntaxError/)
+    assert.equal(error.stdout.includes('"chronicleCompleted":true'), false, 'failure must not publish a success result')
+    return true
+  }, 'a malformed actual HTTP request after both Blogger responses must still reject the canary')
+})
+
 const transformsSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 
 const bloggerSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs'), 'utf8')

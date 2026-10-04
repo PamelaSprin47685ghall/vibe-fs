@@ -1,6 +1,6 @@
 # 06：GAP 补充清单与无 TODO 义务
 
-2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。GAP-055 六 namespace owner、GAP-082 PP-011/T335、GAP-085 grounding B/T387 的局部修复/证明切片完成，固定输入相关用例通过；整批正式门禁静默失败，原生选集另有 006/021 共 11 fail。cognitive/015 注册投递完成，但 completed canary 在 project 就绪超时，实网终态待验收。整体 GAP 状态不变；旧 gen113 待验收/Archive 未施工及 lease 不落地推断是历史截面，当前优先读总计划状态表。
+2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。本批六 namespace owner、PP-011/T335、grounding B/T387 与 cognitive/015 注册投递切片已验收完成；gen116 正式 80/80、772/0，cf6fb31e8 Linux 818/818、4292/0，仅既有 pending 退出1。canary completed 后隔离及晚到 HTTP 错误回归最终 integration 21/0。原失败记录保留，整体 GAP 状态不变；后续 S03 只读/FD/ABA/actual verify 及其他语义按原卡继续，不重做本批切片。
 
 当前scope仍pending final：gen112缺显式SDKroot的436/0/7skip/2TODO排空不替代6skip范围；完整Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空。npm第一正例只拆真实准备完成与实际install/assert判决边界，原强断言/held负例/5000及300000保持，gen113最终待附件，不因此关闭任何GAP。误名单setup与不同输入单列，Archive未施工。
 

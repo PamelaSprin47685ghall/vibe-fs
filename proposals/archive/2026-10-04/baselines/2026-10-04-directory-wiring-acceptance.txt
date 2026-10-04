@@ -1,7 +1,8 @@
 Directory ownership and production wiring acceptance, started 2026-10-04,
 updated 2026-10-05. Base cc9f44fc541d80885353b175b18409a4193916ca.
 
-Status: implementation and limited proof slices complete; unified acceptance
+Initial gen115 status (superseded by continuation/final entries below):
+implementation and limited proof slices complete; unified acceptance
 NOT complete. No budget, worker count, tier or assertion was weakened.
 The first Fable attempt correctly refused concurrent input mutation. All agents
 then stopped editing and the implementation/tests/docs were staged and frozen.
@@ -67,7 +68,7 @@ needed5712ms to listen; independent CLI initially4.69/4.93s. After native80
 exited CLI fell to2317ms, justifying one final unchanged-budget attempt, which
 still failed. No further unchanged blind reruns are accepted evidence.
 
-Remaining: effective same-input official scope and post-completed installed
+Remaining before recovery: effective same-input official scope and post-completed installed
 canary acceptance. T418/T419, GAP055 readonly/FD/ABA/actualverify and remaining
 GAP077/082/085/086 obligations remain PARTIAL. Old9909 CI backstop is retained.
 Plan/status documentation updated after the above runs; implementation and
@@ -91,3 +92,92 @@ vibe-fs-directory-wiring-check.log
 vibe-fs-directory-wiring-official.log
 vibe-fs-directory-wiring-native80.log
 vibe-fs-directory-wiring-canary-final.log
+
+Continuation, same committed implementation cf6fb31e8 /generation116:
+Independent installed serve --version453.921459ms, unlike earlier2317ms.
+Full015 integration20 pass/0 fail/0 skip/0 TODO,9258.618792ms. Installed
+completed canary5532.617792ms: actual two POSTs, exact completed terminal,
+SDK history and journal clean. No timeout/concurrency/code changed for this run.
+Raw: vibe-fs-directory-wiring-canary-recovered.log.
+Subsequent read-only review found late callback error accounting and allocation
+cleanup gaps in the fixture; this is a successful pre-hardening slice, not the
+final acceptance of that later fixture change.
+
+Identical80 official selection:80/80 completed,772 pass/0 fail/7 skip/31 TODO,
+164.21s wall/312.29s testtime. Group24893 accepted=true,20.032ms. Exit1 is
+solely pending proof. Original5000/300000ms and defaultworkers unchanged.
+Raw: vibe-fs-directory-wiring-official-recovered.log. Earlier failed115 official
+and native runs remain separate valid failure observations, not overwritten.
+
+PR Linux CI cf6fb31e8, run37216856662 (completed failure):818/818 completed,
+4292 pass/0 fail/104 skip/396 TODO,224.53s wall/346.90s testtime.
+Group2818 accepted=true,8.688ms. Release pipeline stopped at pending unit exit1,
+so this is NOT a successful full release/integration/package run. It verifies
+its own clean-build/full-unit input; does not prove local slowdown's sole cause.
+Raw: vibe-fs-cf6-ci.log.
+
+Canary fixture hardening after review:
+Actual installed Host completed both Blogger requests and chronicle; a subsequent
+real malformed HTTP request returned500. Old fixture still exited0: the formal
+late callback regression failed with Missing expected exception (5.848s).
+Raw: cognitive-late-http-red.log. New callback errors remain accounted after
+observed resolve; shutdown stops Host/server then drains callbacks, preserves
+business/provider causes before cleanup failures, and only then emits success.
+Server/temp/Git allocation is inside try and cleanup checks allocated resources.
+Full015 integration final21 pass/0 fail/0 skip/0 TODO,13229ms.
+Raw: cognitive-late-http-final.log. Production and original budgets unchanged.
+All agents have stopped edits; final source/test/doc freeze follows.
+
+Generation117 final freeze: build/check exit0, freshness1796sources/885artifacts.
+Compiler inputDigest unchanged; generatedInputDigest:
+144b08dcfe0d8f16cfea3df37448dacebb5321e0eb09172f507c3a51957bd1a7
+Full015 integration21/0/0skip/0TODO,14094.108584ms, confirms current callback fix.
+Official identical80 failed5000ms silence:79/80 drained,only016 active,0 queued,
+1203blockingupdates; last pass was selected Node/npm complete preparation.
+No authoritative summary. Group43050 residual43784 reclaimed,accepted=false,
+41.833ms. This failure is NOT combined with generation116's completed result.
+Next registered leaf captures complete npm tools and executes the actual runtime
+namespace replacement counterexample; investigate actual work boundaries before
+changing anything. No unique cause is asserted merely from last progress.
+
+Measured next npm counterexample without fake progress: normal unsplit leaf
+6381.4ms; complete archive capture1514.9ms,actual runtime refusal4580.5ms,
+including genuine rename/copy/full inventory542.8ms. This demonstrates a real
+single expectation can cross5000ms, not a unique diagnosis of every old run.
+Split into ordered full input capture oracle then actual runtime refusal oracle;
+normal split leaves1559.6ms/4523.0ms,total6406.4ms. All original physical
+inventory/modes,only-first-version,typed AggregateError cause,foreign/parked
+preservation and zero registry request assertions retained. Cleanup now keeps
+the original failure when cleanup also fails. No production/budget/worker change.
+Related actual npm archive positives/mutations/Error-null cancellations15/0,
+40060ms. Raw:vibe-fs-npm-tool-archive-final.log,vibe-fs-npm-negative-split.log,
+vibe-fs-npm-negative-phase-run.log. Final source/test/doc freeze follows.
+
+Generation118:build/check/freshness passed; same compiler/artifact digests,
+generatedInputDigest:c2a597ff1f046eaa577e67fb4ae94a70ce564d483d236452c2ef3e986bff6ac8.
+Official80 failed5002ms,79/80 drained,only016 active,0 queued,1215blockingupdates.
+The new runtime negative and the complete install positive had passed; lastpass
+was two actual locked registry packages preserve modes ... . Remaining held
+cases also capture full tool archives before actual execution. Their common
+capture/execution boundaries now being examined, without asserting unique cause
+from the lastpass. Group47718 reclaimed,accepted=false,42.834ms;no summary.
+
+Shared complete capture oracle for eight heavy npm cases, plus actual selected
+tool consumption / held locked request / final publication boundaries:
+22 pass/0 fail/0 skip/0 TODO,44.0s in directed real npm archive regression.
+Positive phases1472.6ms/4441.9ms/608.3ms. All original execution, digest, mode,
+owner replacement, cancellation Error/null and cleanup assertions retained.
+Raw:vibe-fs-npm-tool-archive-held-final.log. This is directed evidence, not a
+formal selection pass or proof that all historical silence has one cause.
+
+Generation119 build/check/freshness exit0. Compiler and artifact digests unchanged;
+generatedInputDigest:10ebb6c9787e52cf98e6837960c4aede86c128b751267fa1f26b6889f832b52f.
+Official80 failed5003ms,79/80 drained,only016 active,0 queued,1211blockingupdates.
+Lastpass shared complete capture, no authoritative summary. Group53376 residual
+54100 reclaimed,accepted=false,77.833ms. Remaining fixture cNITLV has only
+archive/probe roots and npm compile-cache, no installRoot/execution marker:
+real preparation was still active, not actual install/held download. No unique
+parent case can be inferred from the shared capture title alone.
+Raw:vibe-fs-directory-wiring-gen119-{build,check,official}.log.
+Production compiler/artifact inputs and015 bytes unchanged since gen117's full
+21/0 integration; that result retains its own input, not a gen119 rerun.

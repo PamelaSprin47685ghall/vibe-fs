@@ -13,11 +13,13 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../../../..')
 const marker = fs.readFileSync(path.join(root, 'resources/provider/cognitive-environment/blogger-chronicle-text/en.md'), 'utf8').trim()
 const bloggerRequests = []
+const providerErrors = []
+const callbacks = new Set()
 let finish
 let fail
 const observed = new Promise((resolve, reject) => { finish = resolve; fail = reject })
-const timeout = setTimeout(() => fail(new Error(`Blogger provider requests missing: observed ${bloggerRequests.length}`)), 30000)
-const provider = await startHttpServer(async (request, response) => {
+observed.catch(() => {})
+const handleProviderRequest = async (request, response) => {
   try {
     const chunks = []
     for await (const chunk of request) chunks.push(chunk)
@@ -51,17 +53,20 @@ const provider = await startHttpServer(async (request, response) => {
     }), 1))
     finish()
   } catch (error) {
+    providerErrors.push(error)
     fail(error)
     sendJSON(response, 500, { error: error.message })
   }
-})
+}
 
-const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-chronicle-provider-'))
-fs.mkdirSync(path.join(scenarioDir, 'workspace'))
-await initGitWorkspace(path.join(scenarioDir, 'workspace'))
 const host = new ProcessHost()
+let provider
+let scenarioDir
+let timeout
 let probe
-let failure
+let result
+const failures = []
+const cleanupErrors = []
 const api = async (pathname, body) => {
   const response = await fetch(host.baseUrl + pathname, {
     method: body === undefined ? 'GET' : 'POST',
@@ -74,6 +79,18 @@ const api = async (pathname, body) => {
 }
 const valueOf = response => response?.data?.data ?? response?.data ?? response
 try {
+  timeout = setTimeout(() => fail(new Error(`Blogger provider requests missing: observed ${bloggerRequests.length}`)), 30000)
+  provider = await startHttpServer((request, response) => {
+    const callback = handleProviderRequest(request, response).catch(error => {
+      providerErrors.push(error)
+      fail(error)
+    })
+    callbacks.add(callback)
+    callback.then(() => callbacks.delete(callback))
+  })
+  scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-chronicle-provider-'))
+  fs.mkdirSync(path.join(scenarioDir, 'workspace'))
+  await initGitWorkspace(path.join(scenarioDir, 'workspace'))
   await host.start({
     scenarioDir,
     providerUrl: `${provider.url}/v1`,
@@ -121,22 +138,24 @@ export default function route(role) { return { model: role === 'blogger' ? 'test
     }
   }
   walk(events)
-  console.log(JSON.stringify({ providerRequests: bloggerRequests.length, chronicleCompleted: true, historyClean: true, journalClean: true }))
+  if (process.argv.includes('--late-provider-error')) {
+    const response = await fetch(`${provider.url}/v1/chat/completions`, { method: 'POST', body: '{' })
+    assert.equal(response.status, 500, 'the real late HTTP request must reach the provider callback error path')
+    await response.text()
+  }
+  result = { providerRequests: bloggerRequests.length, chronicleCompleted: true, historyClean: true, journalClean: true }
 } catch (error) {
   console.error(host.stdoutLog)
-  failure = error
+  failures.push(error)
 } finally {
   clearTimeout(timeout)
-  const cleanupErrors = []
-  for (const cleanup of [() => probe?.close(), () => host.stop(), () => stopHttpServer(provider.server),
-    () => fs.rmSync(scenarioDir, { recursive: true, force: true })]) {
+  for (const cleanup of [() => probe?.close(), () => host.stop(), () => provider && stopHttpServer(provider.server),
+    () => Promise.all(callbacks), () => scenarioDir && fs.rmSync(scenarioDir, { recursive: true, force: true })]) {
     try { await cleanup() } catch (error) { cleanupErrors.push(error) }
   }
-  if (failure && cleanupErrors.length > 0) {
-    throw new AggregateError([failure, ...cleanupErrors], 'Provider canary and cleanup failed', { cause: failure })
-  }
-  if (failure) throw failure
-  if (cleanupErrors.length > 0) {
-    throw new AggregateError(cleanupErrors, 'Provider canary cleanup failed', { cause: cleanupErrors[0] })
-  }
 }
+const errors = [...new Set([...failures, ...providerErrors, ...cleanupErrors])]
+if (errors.length === 1) throw errors[0]
+if (errors.length > 1) throw new AggregateError(errors, 'Provider canary failed', { cause: errors[0] })
+assert.equal(bloggerRequests.length, 2, 'shutdown must not conceal extra Blogger requests')
+console.log(JSON.stringify(result))

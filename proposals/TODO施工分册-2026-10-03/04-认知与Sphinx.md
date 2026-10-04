@@ -1,6 +1,6 @@
 # 04：认知材料、诊断、制度学习与 Sphinx
 
-2026-10-05 当前状态：cognitive/015 原 physical 接线、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证，固定输入默认用例通过。安装版两次 POST 的旧证据早于 completed 屏障，不能代替最终终态证明；最终 canary 在 project `/path` 就绪 5030ms 超时，未进入业务，completed 后历史和 journal 验收仍待完成。以[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)附件为准；GAP-077 其他语义 PARTIAL，不重复旧“lease 不落地”调查。
+2026-10-05 当前状态：cognitive/015 注册投递切片已验收完成。原 physical、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证；实际安装版两次 POST、exact chronicle completed、随后 SDK 历史及 journal 清洁已证。晚到实际 HTTP 错误旧版退出成功的正式红例已修；初始化清理受保护、Host/server 停止及 callbacks 排空后判决。最终完整 integration 21/0、无 skip/TODO，原 project 5030ms 超时及旧无 completed 屏障证据仍保留。以[本批附件](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)为准，GAP-077 其他语义 PARTIAL，不重复旧 lease 调查。
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)。基线 `8cf51cc84`；本分册覆盖 11 个有 TODO 的包、80 个运行时 TODO。每行文件号对应 `requirements/<包>/tests/NNN.test.mjs`；完整标题和理由在[逐项清单](05-逐项清单.md)。本文描述待做工作，不是已执行证明。
 

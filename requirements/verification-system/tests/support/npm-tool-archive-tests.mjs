@@ -78,9 +78,59 @@ if (process.argv.includes('ci')) {
       installOptions: { sourceRoot: fixture.sourceRoot, parentDirectory: fixture.parentDirectory, toolArchive: { archivePath, archiveSha256, nodePath, npmCliPath }, expectedNpmVersion: npm.version, expectedNodeVersion: node.version, registry: fixture.registry },
     }
   } catch (error) {
-    await fixture.dispose()
+    try {
+      await fixture.dispose()
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Complete tool archive capture and cleanup failed', { cause: error })
+    }
     throw error
   }
+}
+
+async function captureToolArchive(t, options) {
+  let fixture
+  let failure
+  try {
+    await t.test('WHAT[verification-system-016] complete selected Node and npm archive capture preserves locked inputs before execution', async () => {
+      try {
+        fixture = await toolArchiveFixture(options)
+        const packageBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
+        const lockBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
+        const { entries, node, npm, identityScope } = fixture.capturedSelection
+        assert.equal(sha256(fs.readFileSync(fixture.toolArchive.archivePath)), fixture.toolArchive.archiveSha256)
+        assert.equal(node.path, fixture.toolArchive.nodePath)
+        assert.equal(npm.cliPath, fixture.toolArchive.npmCliPath)
+        assert.equal(entries.find(entry => entry.path === node.path)?.sha256, node.sha256)
+        assert.equal(node.sha256, sha256(fs.readFileSync(fixture.options.nodeExecutable)))
+        assert.equal(entries.find(entry => entry.path === npm.cliPath)?.sha256, npm.cliSha256)
+        assert.equal(entries.find(entry => entry.path === 'toolchain/npm/package.json')?.sha256, npm.manifestSha256)
+        assert.ok(entries.some(entry => entry.path === 'toolchain/npm/lib/cli.js' && entry.type === 'File'))
+        assert.equal(node.version, process.version)
+        assert.equal(npm.version, fixture.installOptions.expectedNpmVersion)
+        assert.equal(JSON.parse(packageBytes).packageManager, `npm@${npm.version}`)
+        assert.equal(JSON.parse(lockBytes).lockfileVersion, 3)
+        assert.equal(fixture.toolDigest, sha256(JSON.stringify({ archiveSha256: fixture.toolArchive.archiveSha256, entriesDigest: sha256(JSON.stringify(entries)), node, npm, identityScope })))
+        assert.deepEqual(fixture.requests, [])
+        assert.equal(fs.existsSync(fixture.executionMarker), false)
+        assert.equal(fs.existsSync(fixture.versionMarker), false)
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      } catch (error) {
+        failure = { error }
+        throw error
+      }
+    })
+  } catch (error) {
+    failure ??= { error }
+  }
+  if (failure) {
+    try {
+      await fixture?.dispose()
+    } catch (cleanupError) {
+      throw new AggregateError([failure.error, cleanupError], 'Tool archive capture verification and cleanup failed', { cause: failure.error })
+    }
+    throw failure.error
+  }
+  return fixture
 }
 
 async function waitForHeldInstall(fixture, installing) {
@@ -90,43 +140,67 @@ async function waitForHeldInstall(fixture, installing) {
   assert.equal(execution.nodeExecutable, path.join(toolRoot, fixture.toolArchive.nodePath))
   assert.equal(execution.npmCli, path.join(toolRoot, fixture.toolArchive.npmCliPath))
   assert.equal(path.dirname(toolRoot), fs.realpathSync(fixture.parentDirectory))
+  assert.ok(Number.isInteger(execution.pid))
+  process.kill(execution.pid, 0)
+  assert.deepEqual(selectedEntries(toolRoot), fixture.capturedSelection.entries)
+  assert.ok(fixture.requests.some(request => request.method === 'GET' && request.path === `/${fixture.leafName}/-/${fixture.leafName}-1.0.0.tgz`))
   return toolRoot
 }
 
 export function registerNpmToolArchiveTests() {
-  test('WHAT[verification-system-016] selected npm tools replaced during the actual runtime probe cannot start the next version probe', async () => {
-    const fixture = await toolArchiveFixture({ observeVersions: true })
+  test('WHAT[verification-system-016] selected npm tools replaced during the actual runtime probe cannot start the next version probe', async t => {
+    let fixture
     let replacedRoot
     let parked
+    let operationFailure
+    const cleanupFailures = []
     try {
-      const output = {
-        write(chunk) {
-          if (replacedRoot || !String(chunk).includes('"platform"')) return
-          const names = fs.readdirSync(fixture.parentDirectory).filter(name => name.startsWith('verification-archive-'))
-          assert.equal(names.length, 1)
-          replacedRoot = path.join(fixture.parentDirectory, names[0])
-          parked = path.join(fixture.root, 'parked-tools')
-          fs.renameSync(replacedRoot, parked)
-          fs.cpSync(parked, replacedRoot, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true })
-          fs.chmodSync(replacedRoot, fs.statSync(parked).mode & 0o777)
-          for (const entry of fixture.capturedSelection.entries) {
-            if (entry.type !== 'SymbolicLink') fs.chmodSync(path.join(replacedRoot, entry.path), entry.mode)
+      fixture = await captureToolArchive(t, { observeVersions: true })
+      let rejectionFailure
+      await t.test('WHAT[verification-system-016] actual runtime probe refuses a complete copied tool owner before version or registry execution', async () => {
+        try {
+          const output = {
+            write(chunk) {
+              if (replacedRoot || !String(chunk).includes('"platform"')) return
+              const names = fs.readdirSync(fixture.parentDirectory).filter(name => name.startsWith('verification-archive-'))
+              assert.equal(names.length, 1)
+              replacedRoot = path.join(fixture.parentDirectory, names[0])
+              parked = path.join(fixture.root, 'parked-tools')
+              fs.renameSync(replacedRoot, parked)
+              fs.cpSync(parked, replacedRoot, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true })
+              fs.chmodSync(replacedRoot, fs.statSync(parked).mode & 0o777)
+              for (const entry of fixture.capturedSelection.entries) {
+                if (entry.type !== 'SymbolicLink') fs.chmodSync(path.join(replacedRoot, entry.path), entry.mode)
+              }
+              assert.deepEqual(selectedEntries(replacedRoot), fixture.capturedSelection.entries)
+            },
           }
-          assert.deepEqual(selectedEntries(replacedRoot), fixture.capturedSelection.entries)
-        },
-      }
-      const [outcome] = await Promise.allSettled([installFromArchive({ ...fixture.installOptions, output })])
-      assert.ok(replacedRoot, 'the actual installation runtime probe was observed')
-      assert.equal(outcome.status, 'rejected')
-      assert.ok(outcome.reason instanceof AggregateError)
-      assert.equal(fs.readFileSync(fixture.versionMarker, 'utf8'), 'version\n', 'only the initial tool preparation version probe ran')
-      assert.equal(outcome.reason.cause.code, 'verification-tool-entry-invalid')
-      assert.equal(fs.existsSync(path.join(replacedRoot, fixture.toolArchive.npmCliPath)), true)
-      assert.equal(fs.existsSync(parked), true, 'production cleanup does not guess the parked original directory')
-      assert.deepEqual(fixture.requests, [], 'no package download can start from a replaced tool owner')
+          const [outcome] = await Promise.allSettled([installFromArchive({ ...fixture.installOptions, output })])
+          assert.ok(replacedRoot, 'the actual installation runtime probe was observed')
+          assert.equal(outcome.status, 'rejected')
+          assert.ok(outcome.reason instanceof AggregateError)
+          assert.equal(fs.readFileSync(fixture.versionMarker, 'utf8'), 'version\n', 'only the initial tool preparation version probe ran')
+          assert.equal(outcome.reason.cause.code, 'verification-tool-entry-invalid')
+          assert.equal(fs.existsSync(path.join(replacedRoot, fixture.toolArchive.npmCliPath)), true)
+          assert.equal(fs.existsSync(parked), true, 'production cleanup does not guess the parked original directory')
+          assert.deepEqual(fixture.requests, [], 'no package download can start from a replaced tool owner')
+        } catch (error) {
+          rejectionFailure = { error }
+          throw error
+        }
+      })
+      if (rejectionFailure) throw rejectionFailure.error
+    } catch (error) {
+      operationFailure = { error }
     } finally {
-      await fixture.dispose()
+      try {
+        await fixture?.dispose()
+      } catch (error) {
+        cleanupFailures.push(error)
+      }
     }
+    if (cleanupFailures.length) throw new AggregateError(operationFailure ? [operationFailure.error, ...cleanupFailures] : cleanupFailures, 'Runtime replacement fixture cleanup failed', { cause: operationFailure ? operationFailure.error : cleanupFailures[0] })
+    if (operationFailure) throw operationFailure.error
   })
   test('WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication', async t => {
     await t.test('WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup', async positive => {
@@ -135,45 +209,32 @@ export function registerNpmToolArchiveTests() {
       let packageBytes
       let lockBytes
       let operationFailure
+      let settled
+      let originalUmask
+      const controller = new AbortController()
       const cleanupFailures = []
       try {
-        let preparationFailure
-        await positive.test('WHAT[verification-system-016] complete selected Node and npm archive preparation preserves locked inputs before installation', async () => {
+        fixture = await captureToolArchive(positive)
+        packageBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
+        lockBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
+        fixture.holdLeaf()
+        originalUmask = process.umask(0o002)
+        const installing = installFromArchive({ ...fixture.installOptions, signal: controller.signal })
+        settled = Promise.allSettled([installing])
+        let installationFailure
+        await positive.test('WHAT[verification-system-016] actual selected complete tools consume the locked request before its held tarball is released', async () => {
           try {
-            fixture = await toolArchiveFixture()
-            packageBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
-            lockBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
-            const { entries, node, npm, identityScope } = fixture.capturedSelection
-            assert.equal(sha256(fs.readFileSync(fixture.toolArchive.archivePath)), fixture.toolArchive.archiveSha256)
-            assert.equal(node.path, fixture.toolArchive.nodePath)
-            assert.equal(npm.cliPath, fixture.toolArchive.npmCliPath)
-            assert.equal(entries.find(entry => entry.path === node.path)?.sha256, node.sha256)
-            assert.equal(node.sha256, sha256(fs.readFileSync(fixture.options.nodeExecutable)))
-            assert.equal(entries.find(entry => entry.path === npm.cliPath)?.sha256, npm.cliSha256)
-            assert.equal(entries.find(entry => entry.path === 'toolchain/npm/package.json')?.sha256, npm.manifestSha256)
-            assert.ok(entries.some(entry => entry.path === 'toolchain/npm/lib/cli.js' && entry.type === 'File'))
-            assert.equal(node.version, process.version)
-            assert.equal(npm.version, fixture.installOptions.expectedNpmVersion)
-            assert.equal(JSON.parse(packageBytes).packageManager, `npm@${npm.version}`)
-            assert.equal(fixture.toolDigest, sha256(JSON.stringify({ archiveSha256: fixture.toolArchive.archiveSha256, entriesDigest: sha256(JSON.stringify(entries)), node, npm, identityScope })))
-            assert.deepEqual(fixture.requests, [])
-            assert.equal(fs.existsSync(fixture.executionMarker), false)
-            assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+            await waitForHeldInstall(fixture, installing)
           } catch (error) {
-            preparationFailure = { error }
+            installationFailure = { error }
             throw error
           }
         })
-        if (preparationFailure) throw preparationFailure.error
-        let installationFailure
+        if (installationFailure) throw installationFailure.error
         await positive.test('WHAT[verification-system-016] actual locked registry installation consumes the captured complete tool archive and reclaims selected tools', async () => {
           try {
-            const originalUmask = process.umask(0o002)
-            try {
-              candidate = await installFromArchive(fixture.installOptions)
-            } finally {
-              process.umask(originalUmask)
-            }
+            fixture.releaseLeaf()
+            candidate = await installing
             const execution = JSON.parse(fs.readFileSync(fixture.executionMarker, 'utf8'))
             assert.ok(execution.nodeExecutable.endsWith(`/${fixture.toolArchive.nodePath}`))
             assert.ok(execution.npmCli.endsWith(`/${fixture.toolArchive.npmCliPath}`))
@@ -205,6 +266,9 @@ export function registerNpmToolArchiveTests() {
       } catch (error) {
         operationFailure = { error }
       } finally {
+        controller.abort(new Error('tool archive positive fixture cleanup'))
+        await settled
+        if (originalUmask !== undefined) process.umask(originalUmask)
         try {
           candidate?.dispose()
         } catch (error) {
@@ -220,8 +284,8 @@ export function registerNpmToolArchiveTests() {
       if (operationFailure) throw operationFailure.error
     })
     for (const mutation of ['non-CLI library bytes', 'new tool member']) {
-      await t.test(`WHAT[verification-system-016] npm tool archive rejects ${mutation} changed during a real held install and reclaims unpublished dependencies`, async () => {
-        const fixture = await toolArchiveFixture()
+      await t.test(`WHAT[verification-system-016] npm tool archive rejects ${mutation} changed during a real held install and reclaims unpublished dependencies`, async held => {
+        const fixture = await captureToolArchive(held)
         const controller = new AbortController()
         let settled
         try {
@@ -243,8 +307,8 @@ export function registerNpmToolArchiveTests() {
       })
     }
     for (const reason of [new Error('controlled tool archive install cancellation'), null]) {
-      await t.test(`WHAT[verification-system-016] npm tool archive held install cancellation preserves ${reason === null ? 'null' : 'Error'} and reclaims tools installation and dependencies`, async () => {
-        const fixture = await toolArchiveFixture()
+      await t.test(`WHAT[verification-system-016] npm tool archive held install cancellation preserves ${reason === null ? 'null' : 'Error'} and reclaims tools installation and dependencies`, async held => {
+        const fixture = await captureToolArchive(held)
         const controller = new AbortController()
         let settled
         try {
@@ -269,8 +333,8 @@ export function registerNpmToolArchiveTests() {
       })
     }
     for (const role of ['Node', 'npm']) {
-      await t.test(`WHAT[verification-system-016] npm tool archive rejects a mismatched actual ${role} version before registry execution`, async () => {
-        const fixture = await toolArchiveFixture()
+      await t.test(`WHAT[verification-system-016] npm tool archive rejects a mismatched actual ${role} version before registry execution`, async mismatch => {
+        const fixture = await captureToolArchive(mismatch)
         try {
           const options = { ...fixture.installOptions }
           if (role === 'Node') options.expectedNodeVersion = 'v0.0.0'
