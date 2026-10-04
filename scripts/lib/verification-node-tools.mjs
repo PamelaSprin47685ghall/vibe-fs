@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { materializeVerificationArchive } from './verification-archive.mjs'
+import { runVerificationToolProbe } from './verification-tool-probe.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const invalidEntry = message => Object.assign(new Error(message), { code: 'verification-tool-entry-invalid' })
@@ -84,53 +84,6 @@ function validateDeclaredNpmLibraries(candidate) {
   inspect(npmRoot)
 }
 
-function runProbe(nodeExecutable, argv, { cwd, env, signal }) {
-  signal?.throwIfAborted()
-  return new Promise((resolve, reject) => {
-    const child = spawn(nodeExecutable, argv, { cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] })
-    let failure
-    let cancellation
-    let stdout = ''
-    let stderr = ''
-    const stop = () => {
-      try {
-        if (process.platform === 'win32') child.kill('SIGKILL')
-        else if (child.pid) process.kill(-child.pid, 'SIGKILL')
-      } catch (error) {
-        if (error.code !== 'ESRCH') failure ??= error
-      }
-    }
-    const abort = () => {
-      cancellation ??= { reason: signal.reason }
-      stop()
-    }
-    signal?.addEventListener('abort', abort, { once: true })
-    if (signal?.aborted) abort()
-    child.once('error', error => { failure ??= error })
-    for (const [name, stream] of [['stdout', child.stdout], ['stderr', child.stderr]]) {
-      stream.setEncoding('utf8').on('data', chunk => {
-        if (name === 'stdout') stdout += chunk
-        else stderr += chunk
-        if (stdout.length + stderr.length > 65536) {
-          failure ??= new Error('Tool identity probe exceeded its output boundary')
-          stop()
-        }
-      })
-      stream.once('error', error => {
-        failure ??= error
-        stop()
-      })
-    }
-    child.once('exit', stop)
-    child.once('close', (exitCode, exitSignal) => {
-      signal?.removeEventListener('abort', abort)
-      if (cancellation) reject(cancellation.reason)
-      else if (failure || exitCode !== 0) reject(Object.assign(new Error('Selected tool identity probe failed', { cause: failure }), { code: 'verification-tool-probe-failed', exitCode, signal: exitSignal, stdout, stderr }))
-      else resolve(stdout.trim())
-    })
-  })
-}
-
 function privateEnvironment(root) {
   for (const name of ['home', 'config', 'cache', 'data', 'state', 'tmp']) {
     fs.mkdirSync(path.join(root, name))
@@ -179,8 +132,8 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     probeRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-tool-probe-'))
     const options = { cwd: candidate.root, env: privateEnvironment(probeRoot), signal }
     const nodeExecutable = path.join(candidate.root, nodePath)
-    const version = await runProbe(nodeExecutable, ['--version'], options)
-    const runtimeOutput = await runProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
+    const version = await runVerificationToolProbe(nodeExecutable, ['--version'], options)
+    const runtimeOutput = await runVerificationToolProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
     let runtime
     try {
       runtime = JSON.parse(runtimeOutput)
@@ -188,7 +141,7 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
       throw Object.assign(invalidEntry('Selected Node must report its actual runtime identity'), { cause })
     }
     if (runtime?.version !== version || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node probe identities disagree')
-    const npmVersion = await runProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
+    const npmVersion = await runVerificationToolProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
     if (npmVersion !== manifest.version) throw invalidEntry('Actual npm version differs from the selected package manifest')
     signal?.throwIfAborted()
     candidate.revalidate()

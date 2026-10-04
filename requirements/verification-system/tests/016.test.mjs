@@ -14,11 +14,14 @@ import { registerNodeToolCandidateTests } from './support/node-tool-candidate-te
 import { registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
 import { assertParentReplacementInvalidatesVerification } from './support/parent-replacement.mjs'
 import { repositoryNpmInstallTest } from './support/repository-npm-install-tests.mjs'
+import { registerDotnetSdkTests, repositoryDotnetSdkTest } from './support/dotnet-sdk-tests.mjs'
 import { integrationTest } from './support/tier-gate.mjs'
 
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
+registerDotnetSdkTests()
 integrationTest('WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers', repositoryNpmInstallTest)
+integrationTest('WHAT[verification-system-016] a complete selected SDK archive resolves the captured repository global.json and reclaims its owned roots', repositoryDotnetSdkTest)
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'

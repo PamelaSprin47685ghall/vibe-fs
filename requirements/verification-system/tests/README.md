@@ -1,5 +1,7 @@
 # verification-system 测试说明
 
+016 增加选定 SDK 的正式轻量用例与显式 integration 入口；完整归档及原 global.json 驱动实际版本、SDK/runtime 路径、库存与回收断言。integration 要求明确 `WXS_VERIFICATION_DOTNET_ROOT`，缺少该选择不默认跳过；默认层只跳过 integration，外借实际 SDK 反例另外显式披露工具条件。实际计数和证明范围见[SDK准备记录](../../../proposals/archive/2026-10-04/S03选定SDK准备-2026-10-04.md)。不证明 NuGet、实际 Fable、只读执行或实际 verify；原两个 TODO 保留。
+
 [WHAT](../WHAT.md) 定义必要边界及必须统一的方法；本说明解释当前测试，不另立规则。2026-09-28用户确认008按命题要求判断断言完整性，并在成本核查后采用016固定隔离快照方向；016运行器改造与证明仍未完成。测试通过不表示全仓已满足每项证明义务。
 
 ## [006] 的测试用例与证明范围

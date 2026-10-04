@@ -463,6 +463,8 @@ Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输�
 
 实际application依赖现有原生Node定向4项通过、0失败、0skip/TODO（1父3叶）：选定`174c2a2533`的Git tree/sourceDigest，以完整Node22.23.3/npm11.12.1归档真实安装236个仓库锁定包；toolDigest与11693成员完整inventory绑定，平台optional有7项存在、16项缺失，实际Fable List/Acorn/Tar消费者通过且全部ownedroot回收。证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。该结果仅属于明确选定tree及darwin-arm64依赖，不证明当前dirty合并输入、native Host/lifecycle/SDK、实际Fable编译、RO或actualverify，不关闭T418/T419。
 
+接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)已经实现完整归档、原 global.json 的实际 SDK/runtime 选择、外部路径拒绝与取消回收；SDK 准备不再只处于调查。下一项按原 manifest/project 捕获精确 NuGet/tool 解析图与包字节，明确 SDK 内部 feeds，证明实际 restore 与私有缓存回收。之后完成 Git/OS 加载边界、实际 Fable 的只读候选及 verify 同源；不重复准备 owner，不删除 T418/T419。
+
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 
 - **已有**：完整tracked输入集合及Git inventory失败传播已补；源码/资源/规范/脚本等输入和步骤边界变化能拒绝。本次补符号链接枚举前置：输入根、普通文件/目录及tracked corpus父目录的未知链接一律拒绝，不跟随外部可写目标；普通文件不会因名叫obj而被当作输出。见[S03记录](../archive/2026-10-03/S03输入链接边界-2026-10-03.md)。当前仍在可变工作区执行，“一步内改后恢复”是现存 executable TODO。

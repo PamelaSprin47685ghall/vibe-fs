@@ -1,5 +1,10 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 选定 SDK 准备
+
+- 从明确摘要的完整 SDK 归档独立物化，在私有配置目录下使用原 global.json 实际探测 SDK 与 runtime，拒绝越界工具路径、外部 SDK 借用和身份不符。探测后完整复核，失败与取消回收自有目录并保留原原因。
+- 真实 SDK10.0.302 完整库存及原10.0.100/latestFeature选择有正式定向证据；这只证明准备边界，NuGet/tool restore、实际 Fable、只读执行与 verify 同候选仍待施工。见[记录](proposals/archive/2026-10-04/S03选定SDK准备-2026-10-04.md)。
+
 ## Unreleased — upstream 590a3f69e 增量
 
 - 合入会话 dormant 身份登记、冷读取持久消费投影刷新、取消与删除的公开 Surface，以及沙箱顶层无 JSON 返回值的类型化拒绝。吸收实际工程缺边及持久化、effect、生命周期回归。
