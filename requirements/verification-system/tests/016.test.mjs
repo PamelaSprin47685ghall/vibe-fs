@@ -19,6 +19,8 @@ import { registerDotnetToolRestoreTests } from './support/dotnet-tool-restore-te
 import { repositoryDotnetToolsTest } from './support/repository-dotnet-tools-tests.mjs'
 import { registerNugetProjectTests } from './support/nuget-project-tests.mjs'
 import { repositoryNugetProjectTest } from './support/repository-nuget-project-tests.mjs'
+import { registerFableProjectTests } from './support/fable-project-tests.mjs'
+import { repositoryFableProjectTest } from './support/repository-fable-project-tests.mjs'
 import { integrationTest } from './support/tier-gate.mjs'
 
 registerNodeToolCandidateTests()
@@ -26,10 +28,12 @@ registerNpmToolArchiveTests()
 registerDotnetSdkTests()
 registerDotnetToolRestoreTests()
 registerNugetProjectTests()
+registerFableProjectTests()
 integrationTest('WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers', repositoryNpmInstallTest)
 integrationTest('WHAT[verification-system-016] a complete selected SDK archive resolves the captured repository global.json and reclaims its owned roots', repositoryDotnetSdkTest)
 integrationTest('WHAT[verification-system-016] selected complete SDK restores original repository local tools from explicitly identified NuGet archives', repositoryDotnetToolsTest)
 integrationTest('WHAT[verification-system-016] selected complete Git source and SDK restore the original foundation identity project through a fresh-cache locked NuGet graph', repositoryNugetProjectTest)
+integrationTest('WHAT[verification-system-016] four selected input owners compile the original foundation identity project with Fable into isolated outputs', repositoryFableProjectTest)
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'

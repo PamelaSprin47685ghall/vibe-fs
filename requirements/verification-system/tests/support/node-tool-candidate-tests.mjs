@@ -43,6 +43,41 @@ async function archiveTools(root) {
 }
 
 export function registerNodeToolCandidateTests() {
+  test('WHAT[verification-system-016] Node and npm role admission rejects invalid structure before archive reads or root allocation', async t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'verification-tool-role-admission-'))
+    const parentDirectory = path.join(root, 'unallocated-parent')
+    const options = { archivePath: path.join(root, 'missing-tools.tar'), archiveSha256: '0'.repeat(64), parentDirectory }
+    try {
+      for (const [name, roles] of [
+        ['outside Node path', { nodePath: '../node' }],
+        ['Node traversal alias', { nodePath: 'toolchain/node/bin/../bin/node' }],
+        ['non-string Node role', { nodePath: null }],
+        ['absolute npm path', { npmCliPath: '/foreign/npm-cli.js' }],
+        ['npm role outside its package', { npmCliPath: 'toolchain/node/bin/node' }],
+        ['npm traversal alias', { npmCliPath: 'toolchain/npm/bin/../../foreign/npm-cli.js' }],
+        ['empty npm role', { npmCliPath: '' }],
+      ]) {
+        await t.test(`WHAT[verification-system-016] ${name} fails with the typed role error before reading a missing archive`, async () => {
+          await assert.rejects(prepareTools({ ...options, ...roles }), error => error.code === 'verification-tool-entry-invalid')
+          assert.equal(fs.existsSync(parentDirectory), false, 'Structural role rejection cannot allocate the supplied parent or owned roots')
+          assert.deepEqual(fs.readdirSync(root), [])
+        })
+      }
+      for (const reason of [new Error('controlled cancelled role admission'), null]) {
+        await t.test(`WHAT[verification-system-016] already cancelled role admission preserves ${reason === null ? 'null' : 'Error'} before role validation`, async () => {
+          const controller = new AbortController()
+          controller.abort(reason)
+          const [outcome] = await Promise.allSettled([prepareTools({ ...options, nodePath: '../node', npmCliPath: '/foreign/npm-cli.js', signal: controller.signal })])
+          assert.equal(outcome.status, 'rejected')
+          assert.equal(outcome.reason, reason)
+          assert.equal(fs.existsSync(parentDirectory), false)
+          assert.deepEqual(fs.readdirSync(root), [])
+        })
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
   test('WHAT[verification-system-016] selected Node and complete npm bundle preparation binds actual probes without borrowing ambient configuration', async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'verification-node-tools-fixture-'))
     let options

@@ -1,5 +1,19 @@
 # verification-system 测试说明
 
+最新接手入口见[运行器因果输送与回收](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)：coverage 的真实HTTP异步等待、signal拒绝和stdin EOF、supervisor原进程组/HOME及异常收口、工具角色typed提前拒绝已有定向红绿；统一18文件结果待验收附件。fileWaits诊断已补，原300000/5000和默认workers不变。detached tool正式红例留下一独立监护批，不能把原PGID/HOME清理称作全部descendant回收。
+
+历史gen103静默失败与72e83 CI的300000ms backstop/817完成/无权威summary和活动身份保持；gen102的398/0不能替代二者。新fe9 CI `37195699694` 已818/818排空、4188 passed/0 failed/102 skipped/404 TODO，exit1 solely pending proof，仅证明新输入，不定位旧72e83。重复fixture准备只按语义等价证据评估，不删测试、调workers或扩大时限；runtime readonly/ABA/同候选actualverify和T418/T419仍未闭合。
+
+016 最新接续[实际单项目 Fable 编译](../../../proposals/archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)。`compileVerificationFableProject` 消费 source/SDK/tools/project 四 owner：原 artifacts 字节/mode进入自有 seed，选定 dotnet 运行原 Fable DLL、原 project 路径，MSBuild 合法生成仅在 seed，自有 JS 输出和整个 compileRoot 库存绑定四 input digest。正式轻量 adapter 与实际 SDK/Fable integration 分开记账，未结束或诊断成功不算正式通过，最终范围见验收附件。
+
+轻量正式首轮 19 项为 14/5，暴露 cpSync 丢失原目录 0700 模式；修复先验全成员/字节，再仅对自有 seed 恢复捕获模式，保留完整精确库存断言。真实 integration 另加载生成 Identity/Quiescence JavaScript 的公开行为并核对四 owner 生命周期；测试 Node consumer 不等于 actualverify 工具闭包。归档保留各自原始红绿，不把 copy/chmod 的物化忠实性称为不可变保护。
+
+实际 Fable integration 第二轮已 5/5、0 skip/TODO（约59.14s）：选定72e83 tree、Fable5.13.0、195成员完整输出，Node22实际消费SessionId、JournalRevision `7n→8n` 与Quiescence class/reflection；四输入完整库存不变、移除归档后可复核且全部ownedroot回收。第一轮0/2为夹具误拒SDK内部合法链接，不记产品红。该例没有RO或actualverify，轻量最终计数及统一输入门禁见验收附件，不能将这5项当全仓编译或整体验收。
+
+fe9选定tree `8544d7651e99e1137495d62d424b287f9924f1fb` 的原生正式Fable integration另为5/5、49.9秒、196成员，Node22公开消费者通过。它仍`readOnlyMounted=false/actualVerifyBound=false`，身份和日志见[接续记录](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)；不能与72e83的195成员或本批统一18门禁混成同一证书。
+
+SDK reference packs 与工具自带 FSharp.Core 也参加实际编译；四包 NuGet graph 不是全部编译输入闭包。scope `selected-fable-project-compile` 不证明全仓工程图、RO、运行期 ABA、Git/OS 闭包或 actualverify 接线；T418/T419/GAP-055 PARTIAL 保留。下文“尚未实际 Fable”是各此前批次的证据边界，不能用来重复当前有限 owner，也不能用后批结果升级旧证明。
+
 016 最新接续[工程 NuGet 单项目准备](../../../proposals/archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)。轻量用例证明输入/公开receipt、实际子进程失败与取消、非支持项目图的拒绝和资源回收，不冒充实际 NuGet restore。独立 integration 明确 `WXS_VERIFICATION_NUGET_PROJECT_TREE_ID`、`WXS_VERIFICATION_DOTNET_ROOT` 与 `WXS_VERIFICATION_NUGET_PROJECT_PACKAGES_JSON`（`id/version/archivePath/sha512`），恢复原 foundation-identity 单 net10.0/no ProjectReference 项目；原 project/props/global 字节和完整源码库存保持。最终统计以记录所链验收附件为准，未结束运行不计通过。
 
 工程 owner 实际执行两次 restore：先派生私有 lock，再清空 packages，`--locked-mode --force` 复验同图与 lock 字节。只有私有 config/feed/cache，禁用 SDK 隐式 feeds 与 pack 下载；完整 assets/lock/cache 集合须等于四个明确选定包。raw nupkg SHA512/sidecar 与 assets.sha512、lock/metadata contentHash 分别核对，后面三者一致不等于前者。完整输出库存、source/SDK身份与公开receipt参加revalidate；dispose不删除调用方的source/SDK。源码owner另补canonical parent、包含Git metadata的普通全库存和公开receipt复核，仍只证明步骤边界。
@@ -32,6 +46,8 @@ Node/npm 回归按实际声明的 transitive 依赖选缺库叶，不将某个 n
 
 文件启动和结果流排空另报生命周期事实，用于区分尚未派发、正在运行、已有文件判决但流未排空；这些消息不续期。超时诊断列出活动文件及其最近判决，不把尚未派发的整个选集当作活动集合。watchdog 的 background 计数是本轮累计值，显示的 lane 只属于最后一条消息；Node 每个单文件运行结束都会产生汇总 diagnostic，不能由累计数推断该 lane 输出异常。
 
+006新增真实caller反例：silence失败先有界终止并观察inner原进程组清空，exact HOME回收后才交还失败，caller catch/finally必须实际执行；同步spawn抛错保留原TypeError且停watchdog，standalone inner只释放自己分配的HOME。实际清理失败同时保留原verdict与cleanup cause，null原值不能被真假判断吞掉。权限反例在无法诚实制造访问拒绝的平台/用户下不冒称证明。此范围不含另开进程组的detached tool；已取得正式资源泄漏红例，但其生产监护属于下一原子批。
+
 连续同步操作与已完成 Promise 可使 Node 子进程的原生 reporter 得不到事件循环调度：测试已完成，父进程却迟迟收不到判决。运行器通过专用 `verdict-transport.mjs` 在测试完成后的 `afterEach` 中让出一次调度，使原生 reporter 能发送真实结果；让步本身不发送进展，不改变静默窗口。006 的真实子进程反例覆盖文件总时长超过窗口但逐项完成、完成若干项后持续打印并挂起，以及 after hook 抛错。挂起用例不会进入完成后的让步，背景输出仍不能续期。
 
 005 的插件夹具回归用子进程加载钩子观察并拒绝真实包入口：仅导入夹具或跳过 integration 测试不会初始化插件；实际创建时仍加载真实入口，导入异常不得被吞掉。夹具其它同步导出及生产模块保持原契约。
@@ -56,7 +72,7 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 | 008 | 按命题要求检查完整结果与副作用；规范要求精确结构或文本时完整比较。没有可忠实判定任意测试断言充分性的机械检查器，仍需人工审阅；不为此添加措辞扫描或恒真占位用例 |
 | 009 | 真实目标路径、发现集和执行集，排除路径不存在造成的空跑 |
 | 010 | 事件预算和不重试调度的局部证据；不能证明全部冻结判据从未被放宽 |
-| 011 | 完整生产分母、未载入模块计零、损坏或陈旧覆盖率报告被拒绝 |
+| 011 | 完整生产分母、未载入模块计零、损坏或陈旧覆盖率报告被拒绝；实际runner/c8向同父进程请求HTTP时异步等待不阻塞响应，完成报告后signal仍拒绝，silent stdin提供EOF。完整011定向18/0不是全仓验收 |
 | 012、018 | 已知机械行数/FCS 扫描模式；受控正反例调用与仓库扫描相同的检查逻辑，仍不是任意动态构造的完备检测 |
 | 015 | UTF-8/行边界、正文诱饵、损坏、冲突、截断、身份替换、多写者、通知和关闭；不替日志写入方证明原子追加 |
 | 016 | 输入集合和步骤边界变更检测；真实 Git 夹具证明 loop-detector 的 tracked corpus 文件（含 proposals）内容和跟踪集合均进入验证身份，Git inventory 失败由生成输入与验证输入收集入口传出，验证不启动阶段。新增输入根、普通输入和corpus父目录符号链接拒绝；真实外部目标反例证明未知映射不被漏收或跟随，输出根链接和同名普通文件保留原边界。这是输入闭包的前置修复，不等价于不可变快照。“阶段内改后恢复”仍是尚未通过的可执行反例；固定隔离快照方案已选，实际隔离、准备时一致性、各阶段同源及结论绑定待证。需区别原工作区继续编辑与快照输入被改写，不能把复制耗时测量当隔离证明。55撤掉的旧Change绑定伪证明仍待真实证据替代 |
@@ -85,7 +101,9 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 
 第二批安装入口与输出边界详见[工具归档安装与输出根](../../../proposals/archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)。Mac真实只读输入内的可写输出挂载证明reset保留root、只清子项、不改输入和owned挂载回收；`compileIncremental`使用受控spawn替身，只证明输出发布清理，不能算actual Fable只读执行。upstream `590a3f69e` copy/chmod实际审核中，check读取父目录替换后的新字节，再恢复原父目录与文件inode/ctime，verify仍报告PASS、exitCode0。该反例不是TODO通过，也不由归档安装回归闭合；真正只读输入阻止替换或实际替换使运行失效才满足命题。
 
-T418/T419与GAP-055 PARTIAL保留。工具、SDK、单项目工程依赖准备已有分开的有限scope，不重做已完成owner。下一步接实际Fable读取选定工程资产与自有输出，再证明Git/OS、实际只读输入/可写输出、actualverify统一候选及结论绑定；多项目/多目标闭包单独扩展。准备owner的定向绿色不能替代这两条TODO。
+T418/T419与GAP-055 PARTIAL保留。工具、SDK、单项目工程与编译各有有限scope，不重做已完成owner。下一步沿编译owner核对并接入实际构建/验证阶段，再证明Git/OS、真正只读输入/可写输出、actualverify统一候选及结论绑定；多项目/多目标闭包单独扩展。准备或单项目编译的定向绿色不能替代这两条TODO。
+
+最新016角色准入反例在缺归档、parent未分配时检验越界/alias/absolute/空值/非字符串先返回`verification-tool-entry-invalid`，已取消Error/null仍优先保持原原因。仅将原词法谓词移到归档读取前，不normalize或放宽角色；合法但缺失的missing.js仍需真实物化库存拒绝。该新定向10/0和既有完整工具父组原生15/0分开记录在[本批附件入口](../../../proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)，不升级任意加载/OS/只读证明。当前施工顺序为第一批统一18验收→detached tool独立监护批→编译owner接同候选实际阶段。
 
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 

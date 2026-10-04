@@ -253,6 +253,264 @@ await superviseNodeTest({ files: process.argv.slice(2), label: 'file-wait-fixtur
   }
 })
 
+test('WHAT[verification-system-006] silence failure reclaims its process group before the caller catches it and completes cleanup', { skip: process.platform === 'win32' }, async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'silence-caller-cleanup-'))
+  const ownershipMarker = path.join(directory, 'ownership.json')
+  const caughtMarker = path.join(directory, 'caught.json')
+  const cleanupMarker = path.join(directory, 'cleanup.txt')
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const held = path.join(directory, 'held.fixture.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(held, `import fs from 'node:fs'
+import test from 'node:test'
+test('held actual file resource', async () => {
+  fs.watch(${JSON.stringify(directory)}, () => {})
+  fs.writeFileSync(${JSON.stringify(ownershipMarker)}, JSON.stringify({ innerPid: process.ppid, filePid: process.pid, home: process.env.HOME }))
+  await new Promise(() => {})
+})
+`)
+    fs.writeFileSync(launcher, `import fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+try {
+  await superviseNodeTest({ files: process.argv.slice(2), label: 'silence-caller-cleanup', silenceMs: 1000, throwOnFailure: true })
+  throw new Error('Held resource unexpectedly completed')
+} catch (error) {
+  const { innerPid } = JSON.parse(fs.readFileSync(${JSON.stringify(ownershipMarker)}, 'utf8'))
+  const live = execFileSync('ps', ['-eo', 'pid=,pgid=,stat='], { encoding: 'utf8' }).trim().split('\\n').filter(line => {
+    const [pid, pgid, state] = line.trim().split(/\\s+/)
+    return Number(pgid) === innerPid && !/^[ZX]/.test(state)
+  })
+  fs.writeFileSync(${JSON.stringify(caughtMarker)}, JSON.stringify({ message: error.message, live }))
+  process.exitCode = 1
+} finally {
+  fs.writeFileSync(${JSON.stringify(cleanupMarker)}, 'caller cleanup completed')
+}
+`)
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1', TMPDIR: directory }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, held], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 1, output)
+    assert.match(output, /WATCHDOG: 'silence-caller-cleanup' silent for/)
+    assert.equal(fs.existsSync(ownershipMarker), true, 'The real held leaf must have started before silence')
+    assert.equal(fs.existsSync(caughtMarker), true, 'Silence must reject to its caller instead of exiting the caller process')
+    const caught = JSON.parse(fs.readFileSync(caughtMarker, 'utf8'))
+    assert.match(caught.message, /supervised suite failed/)
+    assert.deepEqual(caught.live, [], 'The owned group must already be empty when the caller handles failure')
+    assert.equal(fs.readFileSync(cleanupMarker, 'utf8'), 'caller cleanup completed')
+    assert.match(output, /post-exit group verification\/reclamation: pid=\d+;.*accepted=true/)
+    assert.match(output, /verdict counts unavailable; no authoritative summary; 0\/1 planned file\(s\) completed/)
+    const { home } = JSON.parse(fs.readFileSync(ownershipMarker, 'utf8'))
+    assert.equal(fs.existsSync(home), false, 'The supervisor reclaims the exact suite HOME after its inner owner is killed')
+  } finally {
+    if (fs.existsSync(ownershipMarker)) {
+      const { innerPid } = JSON.parse(fs.readFileSync(ownershipMarker, 'utf8'))
+      try { process.kill(-innerPid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') throw error }
+    }
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] synchronous runner spawn failure preserves its cause and stops its watchdog', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spawn-failure-cleanup-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+try {
+  await superviseNodeTest({ files: ['unused.fixture.mjs'], label: 'invalid-spawn', silenceMs: 100, env: { BAD: Symbol('invalid environment value') }, throwOnFailure: true })
+  assert.fail('Spawn must reject an actual invalid environment value')
+} catch (error) {
+  assert.ok(error instanceof TypeError)
+  assert.match(error.message, /Symbol/)
+  assert.deepEqual(fs.readdirSync(${JSON.stringify(directory)}), ['supervise.mjs'])
+}
+setTimeout(() => console.log('caller remains live after the former silence window'), 400)
+`)
+    const env = { ...process.env, TMPDIR: directory }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 0, output)
+    assert.match(output, /caller remains live after the former silence window/)
+    assert.doesNotMatch(output, /WATCHDOG|inner runner exit was not observed/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] suite HOME cleanup failure preserves the original failed verdict and rejects acceptance', {
+  skip: process.platform === 'win32' || process.getuid?.() === 0,
+}, async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'home-cleanup-failure-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const fixture = path.join(directory, 'failure.fixture.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(fixture, `import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import test from 'node:test'
+test('real verdict followed by inaccessible HOME parent', () => {
+  fs.chmodSync(${JSON.stringify(directory)}, 0)
+  assert.fail('original leaf failure')
+})
+`)
+    fs.writeFileSync(launcher, `import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+try {
+  await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'home-cleanup-failure', silenceMs: 5000, throwOnFailure: true })
+  assert.fail('The failed verdict cannot be accepted')
+} catch (error) {
+  fs.chmodSync(${JSON.stringify(directory)}, 0o700)
+  assert.ok(error instanceof AggregateError, 'Both the suite failure and actual cleanup failure must remain observable')
+  assert.equal(error.errors.length, 2)
+  assert.equal(error.cause, error.errors[0])
+  assert.match(error.errors[0].message, /supervised suite failed/)
+  assert.equal(error.errors[1].code, 'EACCES')
+  console.log('original verdict and cleanup failure both retained')
+} finally {
+  fs.chmodSync(${JSON.stringify(directory)}, 0o700)
+}
+`)
+    const env = { ...process.env, TMPDIR: directory, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 0, output)
+    assert.match(output, /original verdict and cleanup failure both retained/)
+    assert.match(output, /1 passed, 1 failed|0 passed, 1 failed/)
+  } finally {
+    fs.chmodSync(directory, 0o700)
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] standalone inner owns only its allocated HOME and always releases it', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'standalone-home-'))
+  try {
+    const fixture = path.join(directory, 'home.fixture.mjs')
+    const marker = path.join(directory, 'home.json')
+    fs.writeFileSync(fixture, `import fs from 'node:fs'
+import test from 'node:test'
+test('actual isolated HOME', () => fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify(process.env.HOME)))
+`)
+    const suppliedHome = fs.realpathSync(fs.mkdtempSync(path.join(directory, 'caller-owned-')))
+    fs.writeFileSync(path.join(suppliedHome, 'caller.txt'), 'owned by the caller')
+    const env = { ...process.env, TMPDIR: directory, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    for (const mode of ['allocated', 'supplied', 'invalid-concurrency']) {
+      const args = mode === 'supplied' ? ['--owned-test-home', suppliedHome, fixture] : [fixture]
+      const child = spawn(process.execPath, [testSupervisor.NODE_TEST_INNER, ...args], {
+        env: { ...env, NODE_TEST_CONCURRENCY: mode === 'invalid-concurrency' ? 'invalid' : '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let output = ''
+      child.stdout.on('data', chunk => { output += chunk })
+      child.stderr.on('data', chunk => { output += chunk })
+      const code = await new Promise((resolveExit, reject) => {
+        child.on('error', reject)
+        child.on('close', resolveExit)
+      })
+      assert.equal(code, mode === 'invalid-concurrency' ? 1 : 0, output)
+      if (mode === 'allocated') {
+        const home = JSON.parse(fs.readFileSync(marker, 'utf8'))
+        assert.equal(path.dirname(home), fs.realpathSync(directory))
+        assert.equal(fs.existsSync(home), false)
+      } else if (mode === 'supplied') {
+        assert.equal(JSON.parse(fs.readFileSync(marker, 'utf8')), suppliedHome)
+        assert.equal(fs.readFileSync(path.join(suppliedHome, 'caller.txt'), 'utf8'), 'owned by the caller')
+      } else {
+        assert.match(output, /NODE_TEST_CONCURRENCY/)
+      }
+      assert.deepEqual(fs.readdirSync(directory).sort(), [path.basename(suppliedHome), 'home.fixture.mjs', 'home.json'].sort())
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] physical backstop diagnostics retain active verdicts and queued files while completed leaves continue advancing', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'backstop-file-waits-'))
+  try {
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: process.argv.slice(2), label: 'backstop-file-waits', silenceMs: 5000 })
+`)
+    const drained = fileURLToPath(new URL('./support/fixtures/all-pass.fixture.mjs', import.meta.url))
+    const active = path.join(directory, 'finite-work.fixture.mjs')
+    const queued = path.join(directory, 'queued.fixture.mjs')
+    const queuedMarker = path.join(directory, 'queued-started')
+    fs.writeFileSync(active, `import assert from 'node:assert/strict'
+import test from 'node:test'
+import { setTimeout } from 'node:timers/promises'
+let completed = 0
+for (let index = 0; index < 100; index++) {
+  test('bounded work ' + index, async () => {
+    await setTimeout(100)
+    assert.equal(completed, index)
+    completed++
+  })
+}
+`)
+    fs.writeFileSync(queued, `import fs from 'node:fs'
+import test from 'node:test'
+fs.writeFileSync(${JSON.stringify(queuedMarker)}, 'queued entry started')
+test('queued work', () => {})
+`)
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1', NODE_TEST_VERBOSE: '1', SUITE_BACKSTOP_MS: '1500' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher, drained, active, queued], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.on('error', reject)
+      child.on('close', resolveExit)
+    })
+    assert.equal(code, 1, output)
+    assert.match(output, /suite exceeded the 1500ms physical backstop/)
+    assert.doesNotMatch(output, /WATCHDOG/)
+    assert.equal(fs.existsSync(queuedMarker), false, 'The queued entry never acquires the occupied lane')
+    const verdicts = [...output.matchAll(/✔ bounded work (\d+) /g)]
+    assert.ok(verdicts.length >= 2, output)
+    assert.match(output, /file streams: 1 drained, 1 active, 1 queued/)
+    const activeWaits = output.split('\n').filter(line => line.includes('active file '))
+    assert.equal(activeWaits.length, 1, output)
+    assert.ok(activeWaits[0].includes(path.relative(process.cwd(), active)), output)
+    assert.match(activeWaits[0], new RegExp(`last verdict: test:(?:pass|complete):bounded work ${verdicts.at(-1)[1]}$`))
+    assert.match(output, /1 queued file\(s\) have not started/)
+    const reclamation = /post-exit group verification\/reclamation: pid=(\d+);.*accepted=true/.exec(output)
+    assert.ok(reclamation, output)
+    assert.throws(() => process.kill(Number(reclamation[1]), 0), error => error.code === 'ESRCH')
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 async function superviseSynchronousVerdicts(probe) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'synchronous-verdicts-'))
   try {

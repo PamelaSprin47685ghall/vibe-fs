@@ -7,10 +7,14 @@ import { runVerificationToolProbe } from './verification-tool-probe.mjs'
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const invalidEntry = message => Object.assign(new Error(message), { code: 'verification-tool-entry-invalid' })
 
-function selectedFile(entries, relativePath, prefix) {
+function requireRolePath(relativePath, prefix) {
   if (typeof relativePath !== 'string' || !relativePath.startsWith(`${prefix}/`) || relativePath.split('/').some(segment => !segment || segment === '.' || segment === '..' || segment.includes('\\'))) {
     throw invalidEntry(`Tool role requires an ordinary path inside ${prefix}`)
   }
+}
+
+function selectedFile(entries, relativePath, prefix) {
+  requireRolePath(relativePath, prefix)
   const entry = entries.find(entry => entry.path === relativePath)
   if (entry?.type !== 'File') throw invalidEntry(`Tool role requires a real file: ${relativePath}`)
   return entry
@@ -112,6 +116,8 @@ function privateEnvironment(root) {
 
 export async function prepareVerificationNodeTools({ archivePath, archiveSha256, parentDirectory, nodePath = 'toolchain/node/bin/node', npmCliPath = 'toolchain/npm/bin/npm-cli.js', signal }) {
   signal?.throwIfAborted()
+  requireRolePath(nodePath, 'toolchain')
+  requireRolePath(npmCliPath, 'toolchain/npm')
   const archiveBytes = fs.readFileSync(archivePath)
   const candidate = await materializeVerificationArchive({ archiveBytes, archiveSha256, parentDirectory, rootDirectory: 'toolchain', errorPrefix: 'verification-tool' })
   let probeRoot

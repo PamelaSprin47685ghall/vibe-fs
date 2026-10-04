@@ -6,7 +6,9 @@
  */
 
 import { execFileSync, spawn } from 'node:child_process'
-import { relative, resolve } from 'node:path'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, relative, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -129,9 +131,35 @@ export async function superviseNodeTest({
     process.exit(1)
   }
 
+  const ownedHome = inner === NODE_TEST_INNER
+    ? realpathSync(mkdtempSync(join(tmpdir(), 'wxs-runner-home-')))
+    : null
+  let result
+  let failure
+  try {
+    result = await superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome })
+  } catch (error) {
+    failure = { error }
+  } finally {
+    try {
+      if (ownedHome !== null) rmSync(ownedHome, { recursive: true, force: true })
+    } catch (error) {
+      failure = { error: failure
+        ? new AggregateError([failure.error, error], 'Supervised suite failed and its owned HOME could not be reclaimed', { cause: failure.error })
+        : error }
+    }
+  }
+  if (failure) {
+    if (throwOnFailure) throw failure.error
+    console.error(failure.error)
+    process.exit(failure.error.exitCode ?? 1)
+  }
+  return result
+}
+
+async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome }) {
   const fail = (code = 1) => {
-    if (throwOnFailure) throw new Error(`${logPrefix}: supervised suite failed (exit ${code})`)
-    process.exit(code)
+    throw Object.assign(new Error(`${logPrefix}: supervised suite failed (exit ${code})`), { exitCode: code })
   }
 
   console.error(`${logPrefix}: ${files.length} test file(s), ${silenceMs}ms verdict-silence window`)
@@ -139,14 +167,49 @@ export async function superviseNodeTest({
   // Absolute paths: test:complete reports absolute `data.file`.
   const outstanding = new Set(files.map((file) => resolve(file)))
   const fileWaits = createFileWaitTracker(files)
+  const reportFileWaits = () => {
+    const waits = fileWaits.snapshot()
+    console.error(`${logPrefix}: file streams: ${waits.drained.length} drained, ${waits.active.length} active, ${waits.queued.length} queued`)
+    for (const { file, lastVerdict } of waits.active) {
+      console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
+    }
+    if (waits.queued.length > 0) {
+      console.error(`${logPrefix}: ${waits.queued.length} queued file(s) have not started`)
+    }
+  }
   let runnerSummary = null
   let drained = false
   let runnerError = null
   let child
+  let silenceFired = false
+  let exitDeadline = null
+  let finishExit
+  const requestTermination = () => {
+    if (exitDeadline === null) {
+      exitDeadline = setTimeout(() => {
+        console.error(`${logPrefix}: inner runner exit was not observed within ${SIGKILL_GRACE_MS}ms after termination`)
+        finishExit({ code: null, signal: null, observed: false })
+      }, SIGKILL_GRACE_MS)
+    }
+    try {
+      if (child?.pid) process.kill(-child.pid, 'SIGKILL')
+    } catch (error) {
+      if (error.code !== 'ESRCH') {
+        runnerError = { message: `Could not terminate the inner process group: ${error.message}` }
+        console.error(`${logPrefix}: ${runnerError.message}`)
+      }
+    }
+  }
 
   const watchdog = new Watchdog({
     timeoutMs: silenceMs,
     label,
+    deps: {
+      terminate() {
+        silenceFired = true
+        requestTermination()
+      },
+    },
     onTimeout: () => {
       if (outstanding.size === 0) {
         console.error(
@@ -158,39 +221,34 @@ export async function superviseNodeTest({
           `${logPrefix}: ${outstanding.size} file(s) had not reported completion`,
         )
       }
-      const waits = fileWaits.snapshot()
-      console.error(`${logPrefix}: file streams: ${waits.drained.length} drained, ${waits.active.length} active, ${waits.queued.length} queued`)
-      for (const { file, lastVerdict } of waits.active) {
-        console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
-      }
-      if (waits.queued.length > 0) {
-        console.error(`${logPrefix}: ${waits.queued.length} queued file(s) have not started`)
-      }
+      reportFileWaits()
       console.error(runnerSummary
         ? `${logPrefix}: ${runnerSummary.passed} passed, ${runnerSummary.failed} failed before the silence`
         : `${logPrefix}: verdict counts unavailable; no authoritative summary before the silence`)
       try {
         process.stderr.write('')
       } catch {}
-      try {
-        if (child?.pid) process.kill(-child.pid, 'SIGKILL')
-      } catch {}
     },
   })
 
-  child = spawn(process.execPath, [inner, ...files], {
-    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-    detached: true,
-    env,
-  })
+  const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
+  try {
+    child = spawn(process.execPath, [inner, ...homeArguments, ...files], {
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+      detached: true,
+      env,
+    })
+  } catch (error) {
+    watchdog.stop()
+    throw error
+  }
 
   let backstopFired = false
   const backstop = setTimeout(() => {
     backstopFired = true
     console.error(`${logPrefix}: suite exceeded the ${SUITE_BACKSTOP_MS}ms physical backstop`)
-    try {
-      if (child?.pid) process.kill(-child.pid, 'SIGKILL')
-    } catch {}
+    reportFileWaits()
+    requestTermination()
   }, SUITE_BACKSTOP_MS)
   backstop.unref()
 
@@ -212,9 +270,7 @@ export async function superviseNodeTest({
     } catch (error) {
       runnerError = { message: error.message }
       console.error(`${logPrefix}: invalid file lifecycle: ${error.message}`)
-      try {
-        if (child?.pid) process.kill(-child.pid, 'SIGKILL')
-      } catch {}
+      requestTermination()
       return
     }
     if (isFileCompletionEvent(event)) {
@@ -226,10 +282,17 @@ export async function superviseNodeTest({
   })
 
   const exit = await new Promise((resolveExit) => {
-    child.on('exit', (code, signal) => resolveExit({ code, signal }))
+    let settled = false
+    finishExit = (outcome) => {
+      if (settled) return
+      settled = true
+      if (exitDeadline !== null) clearTimeout(exitDeadline)
+      resolveExit(outcome)
+    }
+    child.on('exit', (code, signal) => finishExit({ code, signal, observed: true }))
     child.on('error', (error) => {
       console.error(`${logPrefix}: could not start the inner runner: ${error.message}`)
-      resolveExit({ code: 1, signal: null })
+      finishExit({ code: 1, signal: null, observed: true })
     })
   })
 
@@ -242,7 +305,7 @@ export async function superviseNodeTest({
       `elapsedMs=${(performance.now() - groupVerificationStarted).toFixed(3)}; accepted=${processGroupClean}`,
   )
 
-  if (!runnerSummary && exit.signal === null) {
+  if (!runnerSummary && exit.observed && exit.signal === null) {
     console.error(`${logPrefix}: inner runner failed to provide authoritative summary`)
   }
 
@@ -259,6 +322,8 @@ export async function superviseNodeTest({
   )
 
   if (failed > 0) fail(1)
+
+  if (silenceFired || !exit.observed) fail(1)
 
   if (backstopFired) fail(1)
 

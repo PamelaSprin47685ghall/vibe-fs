@@ -1,6 +1,8 @@
 # 计划与提案入口
 
-S03 最新增量见[工程 NuGet 单项目准备](archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)：选定 SDK 私有恢复原单 net10.0/no ProjectReference 项目，派生 lock 后清空缓存再 locked 复验；raw 包摘要与 NuGet contentHash 分开绑定。下一项接实际 Fable 和该次工程资产，其它工程图、只读执行与实际 verify 继续从现行总计划认领，T418/T419 保留。
+S03 最新入口见[运行器因果输送与回收](archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)：第一原子批收录有限Fable编译、coverage异步HTTP/signal/stdin EOF、supervisor原PGID/HOME与异常收口、early role typed预拒绝。定向红绿已有，统一18验收待附件；后续detached tool及后代监护独立施工，不把原进程组回收称完整descendant收口。runtime readonly、ABA、同候选actualverify、T418/T419仍保留。
+
+证据分开：gen103静默失败与72e83 CI的817/818、无summary/活动身份保留，不猜唯一016；新fe9 CI `37195699694` 已818排空、4188/0/102skip/404TODO、solely pending proof，只证明新输入，不定位旧失败。先完成第一批统一验收，再补已正式击红的detached tool监护；重复夹具准备只按语义等价评估，不删测试、调workers或扩大300000/5000。
 
 下文各次 S03 增量保留其当时截面；其中的“下一步”不是新的认领指令。施工按上段最新记录与现行总计划，不重复已完成的源码、依赖、工具和单项目工程准备。
 

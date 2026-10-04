@@ -9,7 +9,7 @@
 // 6. verify input/output freshness has not drifted (INPUT_CHANGED check)
 // 7. fail if test runner failed, or if coverage was corrupted/drifted
 
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import fs, { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,6 +27,29 @@ import {
 } from '../requirements/verification-system/tests/support/coverage-policy.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+function runCoverageChild(argv, options) {
+  return new Promise(resolve => {
+    let child
+    try {
+      child = spawn(process.execPath, argv, options)
+    } catch (error) {
+      resolve({ status: null, signal: null, error })
+      return
+    }
+    let failure
+    child.once('error', error => { failure ??= error })
+    for (const stream of [child.stdout, child.stderr]) {
+      if (!stream) continue
+      stream.once('error', error => {
+        failure ??= error
+        child.kill('SIGKILL')
+      })
+      stream.resume()
+    }
+    child.once('close', (status, signal) => resolve({ status, signal, error: failure }))
+  })
+}
 
 export async function runCoverage(options = {}) {
   let root
@@ -72,9 +95,9 @@ export async function runCoverage(options = {}) {
   // 2. Spawn unit runner with NODE_V8_COVERAGE=rawDir
   console.log(`coverage: running tests with NODE_V8_COVERAGE in ${rawDir}...`)
   const runnerArgs = options.runnerArgs ?? [unitRunnerScript]
-  const runnerResult = spawnSync(process.execPath, runnerArgs, {
+  const runnerResult = await runCoverageChild(runnerArgs, {
     cwd: root,
-    stdio: options.silent ? 'pipe' : 'inherit',
+    stdio: options.silent ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     env: {
       UNIT_VERDICT_SILENCE_MS: process.env.UNIT_VERDICT_SILENCE_MS ?? '20000',
       ...env,
@@ -83,9 +106,9 @@ export async function runCoverage(options = {}) {
   })
 
   // Check if runner crashed before starting or exited non-zero
-  if (runnerResult.error) {
-    console.error(`coverage: test runner failed to execute: ${runnerResult.error.message}`)
-    return { ok: false, code: 'COVERAGE_RUNNER_ERROR', error: runnerResult.error }
+  if (runnerResult.error || runnerResult.signal !== null) {
+    console.error(`coverage: test runner failed to execute: ${runnerResult.error?.message ?? runnerResult.signal}`)
+    return { ok: false, code: 'COVERAGE_RUNNER_ERROR', error: runnerResult.error, status: runnerResult.status, signal: runnerResult.signal }
   }
 
   const rawEntries = existsSync(rawDir) ? readdirSync(rawDir) : []
@@ -135,15 +158,15 @@ export async function runCoverage(options = {}) {
     '**/node_modules/**',
   ]
 
-  const c8Result = spawnSync(process.execPath, c8Args, {
+  const c8Result = await runCoverageChild(c8Args, {
     cwd: root,
-    stdio: options.silent ? 'pipe' : 'inherit',
+    stdio: options.silent ? ['ignore', 'pipe', 'pipe'] : 'inherit',
     env,
   })
 
-  if (c8Result.error || (c8Result.status !== 0 && c8Result.status !== null)) {
+  if (c8Result.error || c8Result.status !== 0 || c8Result.signal !== null) {
     console.error(`coverage: c8 report generation failed`)
-    return { ok: false, code: 'C8_REPORT_ERROR', error: c8Result.error, status: c8Result.status }
+    return { ok: false, code: 'C8_REPORT_ERROR', error: c8Result.error, status: c8Result.status, signal: c8Result.signal }
   }
 
   // 4. Verify denominator against dist files

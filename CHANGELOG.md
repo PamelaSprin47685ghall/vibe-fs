@@ -1,5 +1,17 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 运行器因果输送与回收
+
+- coverage 改为异步等待真实runner/c8，父进程可响应子进程HTTP；完整报告不能掩盖signal失败，silent子进程获得stdin EOF。原分母/报告断言保留，011定向18/0。
+- supervisor静默失败先收原进程组和exact HOME，再交还caller；同步spawn错误停watchdog并保原cause，真实清理失败不吞verdict或null原因。Node/npm非法角色在读归档/分配root前typed拒绝，合法库存和完整探针不变。
+- [记录](proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)分开绑定正式定向红绿与待执行的统一18验收。新fe9 CI4188/0只证明其输入，保gen103失败/旧72e83无结论；detached tool监护留下一原子批，runtime readonly、ABA、T418/T419未闭合。
+
+## Unreleased — S03 实际单项目 Fable 编译
+
+- 以选定 SDK/Fable DLL 编译已准备单项目；原 artifacts 精确复制到自有 seed，原源码、SDK、工具与工程 owner 保持，JS 及中间产物完整库存绑定四份输入身份。
+- 正式编译、进程 adapter 与诊断分开记证；SDK packs 和工具自带 FSharp.Core 不被四包 NuGet graph 覆盖，只读执行、完整工程图、OS 与实际 verify 同候选仍待证明。见[记录](proposals/archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)。
+- 保留前批72e83 CI在300000ms backstop下817/818完成、无权威summary/活动身份的无结论状态；最新接续从上方运行器记录认领，不以新输入CI或本地定向通过替代旧次结果。
+
 ## Unreleased — S03 工程 NuGet 单项目准备
 
 - 从已准备源码与 SDK 恢复原单 net10.0/no ProjectReference 项目，使用明确归档和私有 feed；派生 lock 后清空包缓存，再实际 locked 复验，完整 graph/产物身份绑定原输入。
