@@ -6,7 +6,7 @@
 
 ## [002] Cut 只判定请求身份
 
-`ProjectionCut = { ProviderRunId; ToolCallId }` 随退休原子持久化，只用于精确识别退休 attempt。其迟到 parts 和后续请求在 transform 边界按 stale 拦截，只可记入审计或诊断，不得作为新任活跃请求。真实权威输入与新任 owner-admitted `manager-assess` 不受拦截；身份按位置、role 与 typed message identity 判定，不猜文本、run 或到达顺序。
+`ProjectionCut = { ProviderRunId; ToolCallId }` 随退休原子持久化，只用于精确识别退休 attempt。其迟到 parts 和后续请求在 transform 边界按 stale 拦截，只可记入审计或诊断，不得作为新任活跃请求。真实权威输入、新任 owner-admitted `manager-assess` 以及切段后经准入落盘的后继活跃请求（包括 `ProviderRetryAttempt`、`HumanMessage` 等）不受拦截；身份按位置、role 与 typed message identity 判定，不猜文本、run 或到达顺序。
 
 ## [003] 历史不代替工作区
 

@@ -13,4 +13,12 @@ test('WHAT[host-boundary-019] a tentative prefix suppresses historical auxiliari
   assert.equal(tentative.at(-1), 'sanitize')
 })
 
+test('WHAT[host-boundary-019] ordinary transform runs companion and prefix compression without suppression', async () => {
+  const current = await ordinaryEffects(false)
+  assert.ok(current.includes('companion'), 'ordinary material must execute companion to trigger blogger')
+  assert.ok(current.includes('prefix'), 'ordinary material must execute XWire to apply prefix compression')
+  const companionIndex = current.indexOf('companion')
+  const prefixIndex = current.indexOf('prefix')
+  assert.ok(companionIndex < prefixIndex, 'companion runs before prefix compression')
+})
 test.todo('WHAT[host-boundary-019] every required Host capability needs a real supported-Host canary; injected transform ports prove only composition')

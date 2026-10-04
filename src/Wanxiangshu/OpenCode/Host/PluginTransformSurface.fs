@@ -35,9 +35,9 @@ module PluginTransformSurface =
                         Task.FromResult { RawMessages = []; Current = None }
                   CommitStrengthTrace = fun _ _ _ -> complete "commit-trace"
                   RefreshCompanionXTrace = fun _ _ -> record "refresh-companion"
-                  ApplyCompanion = fun _ _ _ _ -> complete "companion"
+                  ApplyCompanion = fun _ _ _ -> complete "companion"
                   ApplyXWire =
-                    fun _ _ ->
+                    fun _ ->
                         record "prefix"
 
                         Task.FromResult(

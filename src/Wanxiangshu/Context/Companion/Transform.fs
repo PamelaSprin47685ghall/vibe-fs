@@ -78,17 +78,26 @@ module CompanionTransform =
                 companions.[sessionId] <- value
                 value)
 
+    let private messageContainer message =
+        if isNull message then null
+        elif isNull message?info then message
+        else message?info
+
     let private tryMessageSessionId message =
-        if isNull message?info?sessionID then
+        let container = messageContainer message
+
+        if isNull container || isNull container?sessionID then
             None
         else
-            Some(unbox<string> message?info?sessionID)
+            Some(unbox<string> container?sessionID)
 
     let private tryMessageRole message =
-        if isNull message?info?agent then
+        let container = messageContainer message
+
+        if isNull container || isNull container?agent then
             None
         else
-            Some(unbox<string> message?info?agent)
+            Some(unbox<string> container?agent)
 
     let private tryMessageContext message =
         if isNull message || isNull message?info then

@@ -30,7 +30,7 @@ test('WHAT[relay-retirement-008] actual Continue starts one same-session success
     }
     assert.ok(output.messages.some(message => messageId(message) === messageId(gate)))
     assert.deepEqual(runtime.abortedIds, [session])
-    assert.equal(runtime.prompts.length, 1)
+    assert.equal(runtime.prompts.filter(p => p.sessionID === session).length, 1)
   })
 })
 
