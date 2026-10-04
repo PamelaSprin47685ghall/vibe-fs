@@ -447,7 +447,13 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 ### VS-016 · P0 · 实际验收绑定同一个不可变候选（2 TODO）
 
-接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-2026-10-04.md)只证明产物忠实于明确摘要归档，绑定锁文件字节但不证明安装来源。后续真实npm准备、完整工具链、统一候选自举及只读执行按该记录继续，两个TODO保持。
+接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-2026-10-04.md)已补真实npm安装45项与完整selected Node/npm bundle 15项定向通过，0失败；详细入口与证明范围见[本批记录](../archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)和[016测试说明](../../requirements/verification-system/tests/README.md)。真实安装使用独立HOME/npmrc/cache及私有Node执行`npm ci --ignore-scripts`，原始package/lock一次读取，实际安装完整成员与发布归档物化结果相等，安装临时root回收后才返回。非法registry/依赖/override/workspace/link、工具身份不符、真实integrity失败、lock缺项和取消均有公开反例，`null`取消仍保留原原因。
+
+安装receipt的`bootstrap-admission`只检查选中Node字节与npm CLI入口；独立工具owner的`selected-node-npm-bundle`才绑定选定归档中的完整Node/npm成员并执行真实探针。二者共用归档校验，工具探针后重新验证完整物理成员；实际CLI新增文件被拒绝。步骤边界复核不是只读保护或同阶段改后恢复证明。
+
+npm声明的必需生产依赖图须在所选npm包内闭合；direct `graceful-fs`及transitive `@gar/promise-retry`缺失、父目录实际补包的正式反例拒绝。optional缺失允许，存在则递归校验，不宣称任意loaded module、绝对文件读取或OS闭包已封闭。完整npm11.12.1工具包另取得15项定向通过，仍不是实际仓库依赖安装。Homebrew Node26的58项定向只有45通过、13失败，真实缺`libnode`被拒绝；后续平台证据统一见本批记录，旧失败保留。
+
+本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。下一步将完整工具能力用于真实安装、准备仓库锁定依赖，闭合SDK、Git及dotnet/Fable/NuGet外部依赖，落实只读输入/可写输出和实际verify候选绑定。Windows子树回收未证；GAP-055仍PARTIAL，两个TODO保持，不把局部绿色当完整工具链或实际验收完成。
 
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 

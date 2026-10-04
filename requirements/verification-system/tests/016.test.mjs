@@ -9,6 +9,10 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { Header } from 'tar'
+import { createNpmInstallFixture } from './support/npm-install-fixture.mjs'
+import { registerNodeToolCandidateTests } from './support/node-tool-candidate-tests.mjs'
+
+registerNodeToolCandidateTests()
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
@@ -58,6 +62,307 @@ function computeFileDigest(bytes) {
 }
 
 const prepareDependencies = async options => (await import('../../../scripts/lib/verification-dependency-candidate.mjs')).prepareVerificationDependencies(options)
+const installDependencies = async options => (await import('../../../scripts/lib/verification-npm-candidate.mjs')).installVerificationDependencies(options)
+
+test('WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration', async () => {
+  const fixture = await createNpmInstallFixture()
+  let candidate
+  const poisonedHome = path.join(fixture.root, 'foreign-home')
+  const poisonedCache = path.join(fixture.root, 'foreign-cache')
+  const poisonedPrefix = path.join(fixture.root, 'foreign-prefix')
+  for (const directory of [poisonedHome, poisonedCache, poisonedPrefix]) fs.mkdirSync(directory)
+  const preload = path.join(fixture.root, 'poison.cjs')
+  const npmrc = path.join(fixture.root, 'foreign.npmrc')
+  fs.writeFileSync(preload, 'throw new Error("ambient Node launcher was inherited")\n')
+  fs.writeFileSync(npmrc, 'dry-run=true\nignore-scripts=false\nregistry=http://127.0.0.1:1/poison\n')
+  const poison = {
+    HOME: poisonedHome,
+    XDG_CONFIG_HOME: poisonedHome,
+    NODE_OPTIONS: `--require=${preload}`,
+    NODE_PATH: poisonedHome,
+    npm_config_userconfig: npmrc,
+    NPM_CONFIG_GLOBALCONFIG: npmrc,
+    npm_config_registry: 'http://127.0.0.1:1/poison',
+    npm_config_cache: poisonedCache,
+    npm_config_prefix: poisonedPrefix,
+    npm_config_dry_run: 'true',
+    npm_config_ignore_scripts: 'false',
+  }
+  const previous = new Map(Object.keys(poison).map(name => [name, process.env[name]]))
+  const packageJson = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
+  const lockfile = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
+  try {
+    try {
+      Object.assign(process.env, poison)
+      candidate = await installDependencies(fixture.options)
+    } finally {
+      for (const [name, value] of previous) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+    assert.deepEqual(candidate.installation, {
+      npmVersion: fixture.options.expectedNpmVersion,
+      nodeSha256: fixture.options.nodeSha256,
+      npmCliSha256: fixture.options.npmCliSha256,
+      platform: process.platform,
+      arch: process.arch,
+      lifecycleScripts: 'disabled',
+      identityScope: 'bootstrap-admission',
+    })
+    assert.equal(candidate.packageJsonSha256, computeFileDigest(packageJson))
+    assert.equal(candidate.lockfileSha256, computeFileDigest(lockfile))
+    assert.match(candidate.archiveSha256, /^[a-f0-9]{64}$/)
+    assert.match(candidate.dependencyDigest, /^[a-f0-9]{64}$/)
+    for (const name of [fixture.parentName, fixture.leafName]) {
+      assert.ok(fixture.requests.some(request => request.path === `/${name}/-/${name}-1.0.0.tgz`))
+      assert.ok(candidate.entries.some(entry => entry.path === `node_modules/${name}/index.js`))
+    }
+    assert.deepEqual(fs.readFileSync(path.join(fixture.sourceRoot, 'package.json')), packageJson)
+    assert.deepEqual(fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json')), lockfile)
+    assert.deepEqual(fs.readdirSync(poisonedHome), [])
+    assert.deepEqual(fs.readdirSync(poisonedCache), [])
+    assert.deepEqual(fs.readdirSync(poisonedPrefix), [])
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [path.basename(candidate.dependencyRoot)])
+    const answer = execFileSync(process.execPath, ['--input-type=module', '-e', `console.log((await import('${fixture.parentName}')).default)`], {
+      cwd: candidate.dependencyRoot,
+      env: { PATH: process.env.PATH, NODE_PATH: '', NODE_OPTIONS: '' },
+      encoding: 'utf8',
+    })
+    assert.equal(answer, '42\n')
+    candidate.dispose()
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    candidate?.dispose()
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources', async () => {
+  const fixture = await createNpmInstallFixture()
+  try {
+    fixture.corruptLeaf()
+    await assert.rejects(installDependencies(fixture.options), error => {
+      assert.equal(typeof error.exitCode, 'number')
+      assert.notEqual(error.exitCode, 0)
+      assert.match(String(error.stderr), /EINTEGRITY|integrity checksum failed/)
+      return true
+    })
+    assert.ok(fixture.requests.some(request => request.path === `/${fixture.leafName}/-/${fixture.leafName}-1.0.0.tgz`))
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation fails through real npm ci when a required transitive package is missing from the lock inventory', async () => {
+  const fixture = await createNpmInstallFixture()
+  try {
+    fixture.updateLock(lock => { delete lock.packages[`node_modules/${fixture.leafName}`] })
+    await assert.rejects(installDependencies(fixture.options), error => {
+      assert.equal(typeof error.exitCode, 'number')
+      assert.notEqual(error.exitCode, 0)
+      assert.match(String(error.stderr), /Missing: wxs-fixture-leaf@1\.0\.0 from lock file/)
+      return true
+    })
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation refuses file git link and workspace dependency authorities before making registry requests', async (t) => {
+  const fixture = await createNpmInstallFixture()
+  const packagePath = path.join(fixture.sourceRoot, 'package.json')
+  const lockPath = path.join(fixture.sourceRoot, 'package-lock.json')
+  const originalPackage = fs.readFileSync(packagePath)
+  const originalLock = fs.readFileSync(lockPath)
+  try {
+    for (const dependency of ['file:../foreign', 'git+https://example.invalid/foreign.git', 'link:../foreign', 'workspace:*', '.', '..', 'foreign.tgz', 'foreign.tar.gz', 'foreign.tar']) {
+      await t.test(`WHAT[verification-system-016] npm installation refuses ${dependency}`, async () => {
+        fs.writeFileSync(packagePath, originalPackage)
+        fs.writeFileSync(lockPath, originalLock)
+        const manifest = JSON.parse(originalPackage)
+        manifest.dependencies[fixture.parentName] = dependency
+        fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        fixture.updateLock(lock => { lock.packages[''].dependencies[fixture.parentName] = dependency })
+        let outputStarted = false
+        await assert.rejects(installDependencies({ ...fixture.options, output: { write() { outputStarted = true } } }), { code: 'verification-npm-lock-invalid' })
+        assert.equal(outputStarted, false)
+        assert.deepEqual(fixture.requests, [])
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      })
+    }
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation cancellation closes the actual held tarball request preserves its original reason and reclaims partial installation', async () => {
+  const fixture = await createNpmInstallFixture()
+  const controller = new AbortController()
+  const reason = new Error('controlled npm preparation cancellation')
+  let settled
+  try {
+    fixture.holdLeaf()
+    const installing = installDependencies({ ...fixture.options, signal: controller.signal })
+    settled = Promise.allSettled([installing])
+    await Promise.race([
+      fixture.leafRequest,
+      installing.then(() => { throw new Error('npm published before the held tarball completed') }),
+    ])
+    assert.ok(fs.readdirSync(fixture.parentDirectory).length > 0)
+    controller.abort(reason)
+    await assert.rejects(installing, error => error === reason)
+    await fixture.leafClosed
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    controller.abort(reason)
+    await settled
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation null reason cancellation preserves the exact reason after a real tarball request starts', async () => {
+  const fixture = await createNpmInstallFixture()
+  const controller = new AbortController()
+  let settled
+  try {
+    fixture.holdLeaf()
+    const installing = installDependencies({ ...fixture.options, signal: controller.signal })
+    settled = Promise.allSettled([installing])
+    await Promise.race([
+      fixture.leafRequest,
+      installing.then(() => { throw new Error('npm published before the held tarball completed') }),
+    ])
+    assert.ok(fixture.requests.some(request => request.path.includes(fixture.leafName) && request.path.endsWith('.tgz')))
+    assert.ok(fs.readdirSync(fixture.parentDirectory).length > 0)
+    controller.abort(null)
+    const [outcome] = await settled
+    assert.equal(outcome.status, 'rejected')
+    assert.equal(outcome.reason, null)
+    await fixture.leafClosed
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    controller.abort(null)
+    await settled
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation refuses source overrides with foreign dependency authority before launching npm', async () => {
+  const fixture = await createNpmInstallFixture()
+  try {
+    const packagePath = path.join(fixture.sourceRoot, 'package.json')
+    const manifest = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+    manifest.overrides = { [fixture.leafName]: 'file:../foreign' }
+    fs.writeFileSync(packagePath, JSON.stringify(manifest))
+    await assert.rejects(installDependencies(fixture.options), { code: 'verification-npm-lock-invalid' })
+    assert.deepEqual(fixture.requests, [])
+    assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation rejects registry escapes linked lock entries and source workspace authority before network or allocation', async (t) => {
+  const fixture = await createNpmInstallFixture()
+  const packagePath = path.join(fixture.sourceRoot, 'package.json')
+  const lockPath = path.join(fixture.sourceRoot, 'package-lock.json')
+  const originalPackage = fs.readFileSync(packagePath)
+  const originalLock = fs.readFileSync(lockPath)
+  const cases = [
+    { name: 'different registry origin', lock: lock => { lock.packages[`node_modules/${fixture.leafName}`].resolved = `${fixture.registry.replace('127.0.0.1', 'localhost')}/foreign.tgz` } },
+    { name: 'registry path prefix sibling', options: { registry: `${fixture.registry}/selected/` }, lock: lock => { for (const [entryPath, entry] of Object.entries(lock.packages)) if (entryPath) entry.resolved = `${fixture.registry}/selected-other/package.tgz` } },
+    { name: 'registry credentials', options: { registry: fixture.registry.replace('http://', 'http://user:password@') } },
+    { name: 'registry query', options: { registry: `${fixture.registry}/?registry=foreign` } },
+    { name: 'registry fragment', options: { registry: `${fixture.registry}/#foreign` } },
+    { name: 'nonlocal plaintext registry', options: { registry: 'http://registry.example.invalid/' } },
+    { name: 'locked tarball credentials', lock: lock => { lock.packages[`node_modules/${fixture.leafName}`].resolved = lock.packages[`node_modules/${fixture.leafName}`].resolved.replace('http://', 'http://user:password@') } },
+    { name: 'locked tarball query', lock: lock => { lock.packages[`node_modules/${fixture.leafName}`].resolved += '?foreign=true' } },
+    { name: 'locked tarball fragment', lock: lock => { lock.packages[`node_modules/${fixture.leafName}`].resolved += '#foreign' } },
+    { name: 'linked lock member', lock: lock => { lock.packages[`node_modules/${fixture.leafName}`].link = true } },
+    { name: 'source workspaces', manifest: manifest => { manifest.workspaces = ['packages/*'] } },
+    { name: 'locked root workspaces', lock: lock => { lock.packages[''].workspaces = ['packages/*'] } },
+    { name: 'nested git override', manifest: manifest => { manifest.overrides = { [fixture.parentName]: { [fixture.leafName]: 'git+https://example.invalid/foreign.git' } } } },
+    { name: 'link override', manifest: manifest => { manifest.overrides = { [fixture.leafName]: 'link:../foreign' } } },
+    { name: 'workspace override', manifest: manifest => { manifest.overrides = { [fixture.leafName]: 'workspace:*' } } },
+    ...['.', '..', 'foreign.tgz', 'foreign.tar.gz', 'foreign.tar'].map(spec => ({
+      name: `local archive or directory override ${spec}`,
+      manifest: manifest => { manifest.overrides = { [fixture.leafName]: spec } },
+    })),
+  ]
+  try {
+    for (const entry of cases) {
+      await t.test(`WHAT[verification-system-016] npm installation refuses ${entry.name}`, async () => {
+        fs.writeFileSync(packagePath, originalPackage)
+        fs.writeFileSync(lockPath, originalLock)
+        if (entry.manifest) {
+          const manifest = JSON.parse(originalPackage)
+          entry.manifest(manifest)
+          fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        }
+        if (entry.lock) fixture.updateLock(entry.lock)
+        let outputStarted = false
+        await assert.rejects(installDependencies({ ...fixture.options, ...entry.options, output: { write() { outputStarted = true } } }), { code: 'verification-npm-lock-invalid' })
+        assert.equal(outputStarted, false)
+        assert.deepEqual(fixture.requests, [])
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      })
+    }
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation admits only the selected Node CLI hashes version and declared package manager', async (t) => {
+  const fixture = await createNpmInstallFixture()
+  const packagePath = path.join(fixture.sourceRoot, 'package.json')
+  const originalPackage = fs.readFileSync(packagePath)
+  const cases = [
+    { name: 'Node byte identity mismatch', options: { nodeSha256: '0'.repeat(64) }, code: 'verification-npm-tool-invalid' },
+    { name: 'npm CLI byte identity mismatch', options: { npmCliSha256: '0'.repeat(64) }, code: 'verification-npm-tool-invalid' },
+    { name: 'actual npm version mismatch', options: { expectedNpmVersion: '0.0.0' }, manifest: manifest => { manifest.packageManager = 'npm@0.0.0' }, code: 'verification-npm-tool-invalid' },
+    { name: 'declared package manager mismatch', manifest: manifest => { manifest.packageManager = 'npm@0.0.0' }, code: 'verification-npm-lock-invalid' },
+  ]
+  try {
+    for (const entry of cases) {
+      await t.test(`WHAT[verification-system-016] npm installation refuses ${entry.name}`, async () => {
+        fs.writeFileSync(packagePath, originalPackage)
+        if (entry.manifest) {
+          const manifest = JSON.parse(originalPackage)
+          entry.manifest(manifest)
+          fs.writeFileSync(packagePath, JSON.stringify(manifest))
+        }
+        await assert.rejects(installDependencies({ ...fixture.options, ...entry.options }), { code: entry.code })
+        assert.deepEqual(fixture.requests, [])
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      })
+    }
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('WHAT[verification-system-016] npm installation already aborted admission preserves Error and null reasons before reading missing source files', async (t) => {
+  const fixture = await createNpmInstallFixture()
+  try {
+    for (const reason of [new Error('cancelled before npm admission'), null]) {
+      await t.test(`WHAT[verification-system-016] npm installation already aborted with ${reason === null ? 'null' : 'Error'}`, async () => {
+        const controller = new AbortController()
+        controller.abort(reason)
+        const [outcome] = await Promise.allSettled([installDependencies({ ...fixture.options, sourceRoot: path.join(fixture.root, 'missing-source'), signal: controller.signal })])
+        assert.equal(outcome.status, 'rejected')
+        assert.equal(outcome.reason, reason)
+        assert.deepEqual(fixture.requests, [])
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      })
+    }
+  } finally {
+    await fixture.dispose()
+  }
+})
+
 const dependencyMembers = () => [
   { path: 'node_modules/', type: 'Directory', mode: 0o755 },
   { path: 'node_modules/.package-lock.json', bytes: '{"hidden":true}\n' },

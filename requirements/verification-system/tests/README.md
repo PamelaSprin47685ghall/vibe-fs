@@ -52,7 +52,20 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 
 016的2026-10-04准备增量使用真实Git tree/blob/index证明指定源码身份：工作区/index后改不污染原tree，特殊路径/二进制/执行位保留，SHA1/SHA256均可重构；attributes与replace refs不改原blob，继承Git环境不重定向读取或写回，缺对象/不支持的entry/promisor仓/无法忠实物化的tree都拒绝并回收自有root。该API尚未接实际verify；源码receipt不证明运行期不可改、依赖封闭或全阶段同源，两个TODO仍保留。
 
-接续依赖准备回归校验明确SHA-256归档、gzip/tar完整性和独立物化目录；真实Node import与完整字节/mode/隐藏文件/内部.bin链接证明所选依赖可独立读取。外部、悬空、循环、重复、特殊entry、链接祖先及受限语法外的路径拒绝，失败不发布root。摘要绑定lock字节，但不证明安装来源符合lock，也不证明工具链、实际verify或运行期只读；两个TODO不变。
+原依赖归档准备回归校验明确SHA-256归档、gzip/tar完整性和独立物化目录；真实Node import与完整字节/mode/隐藏文件/内部.bin链接证明所选依赖可独立读取。外部、悬空、循环、重复、特殊entry、链接祖先及受限语法外的路径拒绝，失败不发布root。该API只绑定所选归档与lock字节，不单独证明安装来源符合lock。
+
+2026-10-04接续[真实npm与Node工具准备](../../../proposals/archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)，由正式`016.test.mjs`调用实际owner与支持夹具。下列数字是Node22定向用例报告计数（含父组），不是assert调用数，也不是本批官方选集或全仓验收数量。
+
+| 定向范围 | 已取得的证据 | 仍不证明 |
+|---|---|---|
+| 真实npm安装：45 passed / 0 failed | 显式Node与真实npm CLI，两个锁定registry包及独立候选内真实import；失败的lifecycle scripts被禁用，恶意HOME/NODE_OPTIONS/NODE_PATH/npm配置不进入执行；真实EINTEGRITY与缺transitive lock失败；registry origin/path、link/workspace/非法依赖及递归override预拒绝，裸本地目录或tar路径也在启动前拒绝；工具SHA/版本/packageManager不符拒绝；挂起实际tarball请求后取消、原Error/null原因保留、HTTP关闭及安装root回收 | receipt的`bootstrap-admission`只绑定启动Node和npm CLI入口准入，不冻结整个npm工具包。fixture实际npm11.18.0，不证明仓库声明11.12.1依赖已实际安装 |
+| 完整selected Node/npm bundle：15 passed / 0 failed | 明确摘要归档包含完整选定Node/npm包；从独立root运行实际版本/platform/arch探针；摘要错、入口越界/链接/无执行位、缺真实npm内部模块均拒绝；ambient配置隔离；npm声明的必需生产依赖图闭合于所选npm包，direct `graceful-fs`/transitive `@gar/promise-retry`缺失时不能借父目录实际补包；实际copied CLI新增文件后，即使真实版本正确也不能发布旧成员身份；实际挂起npm探针取消保留Error/null原原因，POSIX进程组与后代退出、pipe排空及ownedroot回收，已取消调用先于缺失归档读取 | `selected-node-npm-bundle`绑定完整所选成员及实际探针；optional缺失允许，存在则递归。仍不证明任意loaded module、绝对文件读取、官方分发来源、OS动态加载库或全部外部工具闭包；Windows子树回收未证 |
+
+归档实现共用`scripts/lib/verification-archive.mjs`，完整核对路径、类型、mode、字节、目录成员与内部链接。工具探针后按独立预期清单重新验证实际物理目录；去掉该复核的隔离变异使新增文件用例失败，这是oracle敏感性证据，不冒充原生产基线缺陷。复核只是步骤边界检查，输入及receipt仍可写，不证明阶段内write→restore不可发生。
+
+默认夹具实际npm为11.18.0；完整npm11.12.1工具包另取得15项定向通过，这仍不是以仓库声明版本安装实际仓库依赖。追加Homebrew Node26的58项定向只有45通过、13失败，缺`libnode`导致真实启动拒绝，原失败保留。后续平台证据统一见[本批记录](../../../proposals/archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)，不从下载完成推导通过。
+
+T418/T419与GAP-055 PARTIAL保留。工具prepare/runProbe取消的四个新增正式用例已先红后绿，不再作为缺失能力排工；下一步把完整工具能力用于安装仓库精确依赖。SDK、Git、dotnet/Fable/NuGet、只读输入/可写输出、实际verify统一候选及结论绑定均未闭合。两个准备owner的定向绿色不能替代这两条TODO。
 
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 
