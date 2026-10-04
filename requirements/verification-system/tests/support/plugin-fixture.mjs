@@ -26,6 +26,8 @@ const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceShar
 const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface.js')
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
+const bloggerRuntimeSurface = await import('../../../../dist/Context/Companion/RuntimeSurface.js')
+const bloggerOwnership = await import('./blogger-ownership.mjs')
 
 const withJournalRuntime = async (directory, action) => {
   const journalResult = await workspaceHost.acquireSharedForWorkspace(
@@ -390,6 +392,59 @@ export const acceptAuthorityRoot = async (runtime, sessionId, agent, physicalMes
     throw new Error(`AcceptHumanRoot(${sessionId}, ${agent}) rejected: ${JSON.stringify(result?.error ?? 'unknown error')}`)
   }
   return result.profile
+}
+
+/**
+ * Durable BloggerRequest chain (flight claim → landed dispatch PromptKey →
+ * BloggerRequestMaterialized) for a companion Blogger session inside a
+ * plugin-fixture workspace: the behavior-diagnosis-017 owner setup lifted
+ * into the fixture registration context. `createScope` isolates the
+ * process-shared flight registry, the exact live flight is claimed through
+ * the RuntimeSurface entry, and `blogger-ownership.ownRequest` lands one
+ * real dispatch and binds it as the request's durable open PromptKey through
+ * the production binder (BlogSurface.bindRequestDispatch →
+ * BloggerCoordinator.bindContinuationContext). The registered transform's
+ * provider-attempt plan freeze (HOST-BOUNDARY-008) rejects companion Blogger
+ * sessions that have no such durable open request (blogger-request-missing).
+ *
+ * `profile` is the accepted HumanRoot profile of the Blogger session (the
+ * acceptAuthorityRoot return): sendContinuation only continues the exact
+ * active run. The dispatch lands on its own physical message id, distinct
+ * from the transform frontier user message, mirroring 017 where root,
+ * dispatch and transform identities stay separate. Call the returned
+ * `dispose` (e.g. via t.after) when the owning test ends.
+ */
+export const claimBloggerRequest = async ({
+  runtime,
+  mainSession,
+  bloggerSession,
+  profile,
+  dispatchPhysical,
+  requestId,
+  toml = 'fixture-blogger-request',
+}) => {
+  const scope = bloggerRuntimeSurface.createScope()
+  const request = bloggerRuntimeSurface.main({ requestId, mainSession, bloggerSession, toml })
+  const claim = bloggerRuntimeSurface.claimCurrentRequest(scope, bloggerSession, request)
+  if (claim !== 'Claimed') {
+    bloggerRuntimeSurface.dispose(scope)
+    throw new Error(`claimCurrentRequest(${bloggerSession}, ${requestId}) returned ${claim}`)
+  }
+  try {
+    const promptKey = await bloggerOwnership.ownRequest({
+      handle: runtime.journal,
+      durable: runtime.journal.journal,
+      scope,
+      bloggerSession,
+      profile,
+      request,
+      physical: dispatchPhysical,
+    })
+    return { scope, request, promptKey, dispose: () => bloggerRuntimeSurface.dispose(scope) }
+  } catch (error) {
+    bloggerRuntimeSurface.dispose(scope)
+    throw error
+  }
 }
 
 /**

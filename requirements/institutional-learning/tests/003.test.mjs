@@ -36,6 +36,14 @@ test('WHAT[institutional-learning-003] GAP-181: candidate admission is mechanica
   assert.deepEqual(learning.evaluate('known-rule covered it', ['known-rule'], candidate), { disposition: 'BIRTH' })
 })
 
+test('WHAT[institutional-learning-003] GAP-181: an admissible candidate outranks a simultaneous explicit absorb claim — both supplied, BIRTH concludes', () => {
+  // Both channels are legal and supplied together: a mechanically admissible
+  // candidate (unique TipName) and an explicit claim naming a live rule. The
+  // candidate channel concludes BIRTH; an evaluation that checked the absorb
+  // claim first would conclude ABSORB here instead.
+  assert.deepEqual(learning.evaluate('known-rule covered it', ['known-rule'], candidate, 'known-rule'), { disposition: 'BIRTH' })
+})
+
 test('WHAT[institutional-learning-003] GAP-181: substring matching is not an abstraction oracle — a mention without a caller claim never absorbs, and raw command/path/timestamp text never promotes', () => {
   // Same word, different mechanism: the experience names a live rule but the
   // caller does not claim coverage, so nothing absorbs.
