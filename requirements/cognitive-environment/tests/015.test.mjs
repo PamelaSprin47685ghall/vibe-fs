@@ -378,7 +378,7 @@ const withEnglishLanguage = async (action) => {
   }
 }
 
-test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async (t) => {
+test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'seventh layer (this round): after the sixth layer cleared, the transform completes without boundary errors but injects zero markers — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async (t) => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -405,6 +405,29 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       })
       t.after(bloggerRequest.dispose)
 
+      // The provider start boundary needs a bindable Host run: the physical
+      // user message plus an unsealed assistant child in the runtime snapshot
+      // (same shape as context-compression-018's transform fixture). The
+      // stubClient does not simulate the real Host publishing the assistant
+      // when the provider run starts, so the pair is pushed explicitly.
+      runtime.pushHostMessage(session, {
+        info: { id: physical, sessionID: session, role: 'user', time: { created: 1 } },
+        parts: [{ type: 'text', text: '材料已备好，请记账' }],
+      })
+      runtime.pushHostMessage(session, {
+        info: {
+          id: 'assistant-r1',
+          sessionID: session,
+          parentID: physical,
+          role: 'assistant',
+          agent: 'blogger',
+          providerID: 'fixture',
+          modelID: 'fixture-model',
+          time: { created: 2 },
+        },
+        parts: [],
+      })
+
       const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
 
@@ -430,16 +453,36 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
   })
 })
 
-test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async () => {
+test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'seventh layer (this round): after the sixth layer cleared, the transform completes without boundary errors but injects zero markers — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       // 有 committed lease 但 journal 中没有 CompanionBloggerLinked：会话不是
-      // companion，注入门禁的第二半边必须拒绝。
+      // companion，注入门禁的第二半边必须拒绝。lease 由 chat.message admission
+      // 独占 commit（与 R1 同一修复），手动 acquireLease 已移除。
       const session = 'ses-blog-registered-2'
       const physical = 'msg-user-r2'
       await admitExecution(runtime, hooks, session, physical)
-      await acquireLease(session, physical, 'blogger', 'blogger')
+
+      // Bindable Host run for the provider start boundary (same shape as
+      // context-compression-018's transform fixture).
+      runtime.pushHostMessage(session, {
+        info: { id: physical, sessionID: session, role: 'user', time: { created: 1 } },
+        parts: [{ type: 'text', text: '材料已备好，请记账' }],
+      })
+      runtime.pushHostMessage(session, {
+        info: {
+          id: 'assistant-r2',
+          sessionID: session,
+          parentID: physical,
+          role: 'assistant',
+          agent: 'blogger',
+          providerID: 'fixture',
+          modelID: 'fixture-model',
+          time: { created: 2 },
+        },
+        parts: [],
+      })
 
       const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
@@ -449,7 +492,7 @@ test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_sess
   })
 })
 
-test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async (t) => {
+test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'seventh layer (this round): after the sixth layer cleared, the transform completes without boundary errors but injects zero markers — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async (t) => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -458,7 +501,6 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
       const physical = 'msg-user-r3'
       await appendCompanionBloggerLink(runtime, main, session)
       const profile = await admitExecution(runtime, hooks, session, physical)
-      await acquireLease(session, physical, 'blogger', 'blogger')
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -468,6 +510,27 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
         requestId: 'req-blog-r3',
       })
       t.after(bloggerRequest.dispose)
+
+      // Bindable Host run for the provider start boundary (same shape as
+      // context-compression-018's transform fixture); the lease is committed
+      // by the chat.message admission alone (manual acquireLease removed).
+      runtime.pushHostMessage(session, {
+        info: { id: physical, sessionID: session, role: 'user', time: { created: 1 } },
+        parts: [{ type: 'text', text: '材料已备好，请记账' }],
+      })
+      runtime.pushHostMessage(session, {
+        info: {
+          id: 'assistant-r3',
+          sessionID: session,
+          parentID: physical,
+          role: 'assistant',
+          agent: 'blogger',
+          providerID: 'fixture',
+          modelID: 'fixture-model',
+          time: { created: 2 },
+        },
+        parts: [],
+      })
 
       const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
@@ -489,7 +552,7 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
   })
 })
 
-test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async (t) => {
+test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'seventh layer (this round): after the sixth layer cleared, the transform completes without boundary errors but injects zero markers — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async (t) => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -498,11 +561,12 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       await appendCompanionBloggerLink(runtime, main, session)
 
       // 第一条物理 user 消息：Host 持久化它，插件为它建立 exact lease。
+      // lease 由 chat.message admission 独占 commit（与 R1 同一修复，
+      // 手动 acquireLease 已移除）。
       const physicalOne = 'msg-user-r4-1'
       const userOne = registeredUserMessage(session, physicalOne)
       runtime.pushHostMessage(session, structuredClone(userOne))
       const profile = await admitExecution(runtime, hooks, session, physicalOne)
-      await acquireLease(session, physicalOne, 'blogger', 'blogger')
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -512,6 +576,22 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
         requestId: 'req-blog-r4',
       })
       t.after(bloggerRequest.dispose)
+
+      // Bindable Host run for the first provider request's start boundary
+      // (same shape as context-compression-018's transform fixture).
+      runtime.pushHostMessage(session, {
+        info: {
+          id: 'assistant-r4-1',
+          sessionID: session,
+          parentID: physicalOne,
+          role: 'assistant',
+          agent: 'blogger',
+          providerID: 'fixture',
+          modelID: 'fixture-model',
+          time: { created: 2 },
+        },
+        parts: [],
+      })
 
       const firstRequest = { messages: [structuredClone(userOne)] }
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, firstRequest)
@@ -528,7 +608,21 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       const physicalTwo = 'msg-user-r4-2'
       const userTwo = registeredUserMessage(session, physicalTwo)
       await admitExecution(runtime, hooks, session, physicalTwo)
-      await acquireLease(session, physicalTwo, 'blogger', 'blogger')
+      // Bindable Host run for the follow-up request's start boundary.
+      runtime.pushHostMessage(session, structuredClone(userTwo))
+      runtime.pushHostMessage(session, {
+        info: {
+          id: 'assistant-r4-2',
+          sessionID: session,
+          parentID: physicalTwo,
+          role: 'assistant',
+          agent: 'blogger',
+          providerID: 'fixture',
+          modelID: 'fixture-model',
+          time: { created: 4 },
+        },
+        parts: [],
+      })
 
       const secondRequest = { messages: [structuredClone(userOne), structuredClone(userTwo)] }
       assert.equal(
@@ -556,7 +650,7 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
   })
 })
 
-test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_injects_nothing', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async (t) => {
+test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_injects_nothing', { todo: 'seventh layer — semantic conflict, needs Manager adjudication: the sixth-layer snapshotOpt diagnosis was resolved (the wiring is same-source: PluginHostWiring input=boot.Input → PluginHost.createHost → SessionSnapshotPort.create input → SdkSnapshotPort reads input.client, which IS runtime.client; the sixth-layer NoBindableRun on R1-R4/R6 came from the stubClient never publishing an unsealed assistant child, fixed by pushing the pair like context-compression-018). R5 however cannot pass with its assertions verbatim: confirmProviderStarted (PluginTransforms.fs) calls requireProviderAdmission BEFORE observeProviderRun, and a missing committed lease makes the provider start boundary fail closed with CommittedAdmissionUnavailable — a typed rejection, not a silent zero injection. The R5 assertion expects the transform to complete quietly with zero markers, which contradicts the production fail-closed boundary. Adjudication needed: either R5 asserts the typed rejection (assertion change), or the case is redesigned around a different lease-absent seam. Assertions and setup preserved verbatim' }, async (t) => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -589,7 +683,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
   })
 })
 
-test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'registered-transform chain: this round fixed the admission Conflict (chat.message already commits the exact lease — manual acquireLease removed) and the BloggerRequest gap (fixture claimBloggerRequest), but the sixth layer MANAGED-CHAT-005 HostRunUnavailable(NoBindableRun) remains: the runtime snapshot carries the physical user + unsealed assistant pair yet the transform snapshotOpt read still finds no bindable run — the SnapshotOpt wiring source needs investigation beyond this round. Assertions and setup preserved for the next unsealing round' }, async (t) => {
+test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'seventh layer (this round): after the sixth layer cleared, the transform completes without boundary errors but injects zero markers — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async (t) => {
   await withEnglishLanguage(async () => {
     globalThis.__wanxiangshu_test_blogger_model = 'test/other-model'
     try {
@@ -599,7 +693,10 @@ test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_mo
         const physical = 'msg-user-r6'
         await appendCompanionBloggerLink(runtime, main, session)
         const profile = await admitExecution(runtime, hooks, session, physical)
-        await acquireLease(session, physical, 'blogger', 'blogger')
+        // The lease is committed by the chat.message admission alone (the
+        // scheduler routes this admission to the non-whitelisted model via
+        // __wanxiangshu_test_blogger_model); manual acquireLease removed to
+        // match the R1 conflict fix.
         const bloggerRequest = await claimBloggerRequest({
           runtime,
           mainSession: main,
