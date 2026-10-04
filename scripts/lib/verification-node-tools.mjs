@@ -198,7 +198,7 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     const npm = { cliPath: npmCliPath, cliSha256: cliEntry.sha256, manifestSha256: manifestEntry.sha256, version: npmVersion }
     const identityScope = 'selected-node-npm-bundle'
     const toolDigest = sha256(JSON.stringify({ archiveSha256, entriesDigest, node, npm, identityScope }))
-    return { toolRoot: candidate.root, entries: candidate.entries, entriesDigest, archiveSha256, node, npm, toolDigest, identityScope, dispose: candidate.dispose }
+    return { toolRoot: candidate.root, entries: candidate.entries, entriesDigest, archiveSha256, node, npm, toolDigest, identityScope, revalidate: candidate.revalidate, dispose: candidate.dispose }
   } catch (error) {
     const failures = [error]
     if (probeRoot) {

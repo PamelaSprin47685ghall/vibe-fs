@@ -453,7 +453,11 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 npm声明的必需生产依赖图须在所选npm包内闭合；direct `graceful-fs`及transitive `@gar/promise-retry`缺失、父目录实际补包的正式反例拒绝。optional缺失允许，存在则递归校验，不宣称任意loaded module、绝对文件读取或OS闭包已封闭。完整npm11.12.1工具包另取得15项定向通过，仍不是实际仓库依赖安装。Homebrew Node26的58项定向只有45通过、13失败，真实缺`libnode`被拒绝；后续平台证据统一见本批记录，旧失败保留。
 
-本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。下一步将完整工具能力用于真实安装、准备仓库锁定依赖，闭合SDK、Git及dotnet/Fable/NuGet外部依赖，落实只读输入/可写输出和实际verify候选绑定。Windows子树回收未证；GAP-055仍PARTIAL，两个TODO保持，不把局部绿色当完整工具链或实际验收完成。
+本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。
+
+第二批见[工具归档安装与输出根](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)：新增`installVerificationDependenciesFromToolArchive`，真实定向10项通过、0失败（含父组）；安装器自己准备完整工具，直接使用原bundle角色路径，最终发布前完整复核工具，固定`toolDigest`进入installation/dependencyDigest，返回独立依赖前回收工具与安装root。两锁定包、held tarball后非CLI库/成员改动、actual Node/npm版本拒绝、Error/null取消及启动前取消都有正式证据。新入口未升级旧raw bootstrap的证明范围，也未接实际verify或提供只读能力。
+
+Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输入及owned挂载回收；受控编译spawn证明发布清理，不证明实际Fable只读执行。upstream `590a3f69e` copy/chmod实际父目录替换反例仍报告PASS、exitCode0，文件inode/ctime恢复不能闭合运行期输入。下一步用新入口准备仓库锁定依赖，闭合SDK、Git及dotnet/Fable/NuGet，执行真正只读候选并绑定实际verify。Windows子树回收未证；GAP-055仍PARTIAL，T418/T419保持。
 
 2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
 

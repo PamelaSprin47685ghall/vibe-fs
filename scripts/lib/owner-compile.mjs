@@ -1307,8 +1307,17 @@ export function removeOutputDirectory(outputDir) {
 
 export function resetOutputDirectory(outputDir) {
   if (!outputDir) throw new Error('outputDir is required')
-  fs.rmSync(outputDir, { recursive: true, force: true })
-  fs.mkdirSync(outputDir, { recursive: true })
+  const directory = path.resolve(outputDir)
+  const root = fs.lstatSync(directory, { throwIfNoEntry: false })
+  if (root && !root.isDirectory()) {
+    const error = new Error(`Output root must be a real directory: ${directory}`)
+    error.code = 'OUTPUT_ROOT_NOT_DIRECTORY'
+    throw error
+  }
+  if (!root) fs.mkdirSync(directory, { recursive: true })
+  for (const child of fs.readdirSync(directory)) {
+    fs.rmSync(path.join(directory, child), { recursive: true, force: true })
+  }
 }
 
 /**
@@ -1782,10 +1791,7 @@ export async function compileIncremental({
       rebaseEmittedImports(stagingOutputDir, resolvedOutputDir)
 
       if (needsFullReset) {
-        if (fs.existsSync(resolvedOutputDir)) {
-          fs.rmSync(resolvedOutputDir, { recursive: true, force: true })
-        }
-        fs.mkdirSync(resolvedOutputDir, { recursive: true })
+        resetOutputDirectory(resolvedOutputDir)
       } else if (!fs.existsSync(resolvedOutputDir)) {
         fs.mkdirSync(resolvedOutputDir, { recursive: true })
       }

@@ -1,0 +1,214 @@
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
+import { create } from 'tar'
+import { createNpmInstallFixture } from './npm-install-fixture.mjs'
+
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+const installFromArchive = async options => (await import('../../../../scripts/lib/verification-npm-candidate.mjs')).installVerificationDependenciesFromToolArchive(options)
+
+function selectedEntries(root) {
+  const entries = []
+  function read(relative) {
+    const absolute = path.join(root, relative)
+    const stat = fs.lstatSync(absolute)
+    if (stat.isSymbolicLink()) entries.push({ path: relative, type: 'SymbolicLink', target: fs.readlinkSync(absolute) })
+    else if (stat.isDirectory()) {
+      entries.push({ path: relative, type: 'Directory', mode: stat.mode & 0o777 })
+      for (const name of fs.readdirSync(absolute)) read(`${relative}/${name}`)
+    } else {
+      assert.ok(stat.isFile())
+      entries.push({ path: relative, type: 'File', mode: stat.mode & 0o777, size: stat.size, sha256: sha256(fs.readFileSync(absolute)) })
+    }
+  }
+  read('toolchain')
+  return entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0)
+}
+
+async function toolArchiveFixture() {
+  const fixture = await createNpmInstallFixture()
+  try {
+    const selected = path.join(fixture.root, 'selected')
+    const nodePath = 'toolchain/node/bin/node'
+    const npmCliPath = 'toolchain/npm/bin/npm-cli.js'
+    fs.mkdirSync(path.join(selected, 'toolchain/node/bin'), { recursive: true })
+    fs.copyFileSync(fixture.options.nodeExecutable, path.join(selected, nodePath))
+    fs.chmodSync(path.join(selected, nodePath), 0o755)
+    fs.cpSync(path.resolve(fixture.options.npmCli, '../..'), path.join(selected, 'toolchain/npm'), { recursive: true, verbatimSymlinks: true })
+    fs.writeFileSync(path.join(selected, 'toolchain/node/sibling.txt'), 'selected Node layout')
+    const executionMarker = path.join(fixture.root, 'execution.json')
+    const cli = path.join(selected, npmCliPath)
+    const original = fs.readFileSync(cli, 'utf8')
+    const shebangEnd = original.startsWith('#!') ? original.indexOf('\n') + 1 : 0
+    const observe = `
+if (process.argv.includes('ci')) {
+  const fixtureFs = require('node:fs')
+  const fixturePath = require('node:path')
+  if (fixtureFs.readFileSync(fixturePath.resolve(process.execPath, '../../sibling.txt'), 'utf8') !== 'selected Node layout') throw new Error('Selected Node directory layout was lost')
+  fixtureFs.writeFileSync(${JSON.stringify(executionMarker)}, JSON.stringify({ nodeExecutable: process.execPath, npmCli: __filename, pid: process.pid }))
+}
+`
+    fs.writeFileSync(cli, original.slice(0, shebangEnd) + observe + original.slice(shebangEnd))
+    const archivePath = path.join(fixture.root, 'tools.tar')
+    const chunks = []
+    for await (const chunk of create({ cwd: selected, portable: true, noMtime: true }, ['toolchain'])) chunks.push(chunk)
+    const archive = Buffer.concat(chunks)
+    fs.writeFileSync(archivePath, archive)
+    const entries = selectedEntries(selected)
+    const archiveSha256 = sha256(archive)
+    const node = { path: nodePath, sha256: sha256(fs.readFileSync(path.join(selected, nodePath))), version: process.version, platform: process.platform, arch: process.arch }
+    const manifest = fs.readFileSync(path.join(selected, 'toolchain/npm/package.json'))
+    const npm = { cliPath: npmCliPath, cliSha256: sha256(fs.readFileSync(cli)), manifestSha256: sha256(manifest), version: JSON.parse(manifest).version }
+    const identityScope = 'selected-node-npm-bundle'
+    const toolDigest = sha256(JSON.stringify({ archiveSha256, entriesDigest: sha256(JSON.stringify(entries)), node, npm, identityScope }))
+    fs.rmSync(selected, { recursive: true })
+    return {
+      ...fixture,
+      executionMarker,
+      toolDigest,
+      toolArchive: { archivePath, archiveSha256, nodePath, npmCliPath },
+      installOptions: { sourceRoot: fixture.sourceRoot, parentDirectory: fixture.parentDirectory, toolArchive: { archivePath, archiveSha256, nodePath, npmCliPath }, expectedNpmVersion: npm.version, expectedNodeVersion: node.version, registry: fixture.registry },
+    }
+  } catch (error) {
+    await fixture.dispose()
+    throw error
+  }
+}
+
+async function waitForHeldInstall(fixture, installing) {
+  await Promise.race([fixture.leafRequest, installing.then(() => { throw new Error('Installation completed before the real held tarball') })])
+  const execution = JSON.parse(fs.readFileSync(fixture.executionMarker, 'utf8'))
+  const toolRoot = path.resolve(execution.nodeExecutable, '../../../..')
+  assert.equal(execution.nodeExecutable, path.join(toolRoot, fixture.toolArchive.nodePath))
+  assert.equal(execution.npmCli, path.join(toolRoot, fixture.toolArchive.npmCliPath))
+  assert.equal(path.dirname(toolRoot), fs.realpathSync(fixture.parentDirectory))
+  return toolRoot
+}
+
+export function registerNpmToolArchiveTests() {
+  test('WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication', async t => {
+    await t.test('WHAT[verification-system-016] two actual locked registry packages use the selected bundle layout and bind its complete identity after tools cleanup', async () => {
+      const fixture = await toolArchiveFixture()
+      let candidate
+      try {
+        const packageBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package.json'))
+        const lockBytes = fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json'))
+        candidate = await installFromArchive(fixture.installOptions)
+        const execution = JSON.parse(fs.readFileSync(fixture.executionMarker, 'utf8'))
+        assert.ok(execution.nodeExecutable.endsWith(`/${fixture.toolArchive.nodePath}`))
+        assert.ok(execution.npmCli.endsWith(`/${fixture.toolArchive.npmCliPath}`))
+        assert.equal(fs.existsSync(execution.nodeExecutable), false)
+        assert.equal(fs.existsSync(execution.npmCli), false)
+        assert.equal(candidate.installation.identityScope, 'selected-node-npm-bundle')
+        assert.equal(candidate.installation.toolDigest, fixture.toolDigest)
+        assert.equal(candidate.installation.npmVersion, fixture.installOptions.expectedNpmVersion)
+        assert.equal(candidate.installation.nodeVersion, process.version)
+        assert.equal(candidate.packageJsonSha256, sha256(packageBytes))
+        assert.equal(candidate.lockfileSha256, sha256(lockBytes))
+        const preparedDependencyDigest = sha256(JSON.stringify({ archiveSha256: candidate.archiveSha256, lockfileSha256: candidate.lockfileSha256, entries: candidate.entries }))
+        assert.equal(candidate.dependencyDigest, sha256(JSON.stringify({ preparedDependencyDigest, packageJsonSha256: candidate.packageJsonSha256, installation: candidate.installation })))
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [path.basename(candidate.dependencyRoot)])
+        assert.equal(execFileSync(process.execPath, ['--input-type=module', '-e', `import value from '${fixture.parentName}'; console.log(value)`], { cwd: candidate.dependencyRoot, encoding: 'utf8' }).trim(), '42')
+        assert.ok(fixture.requests.some(request => request.path.includes(fixture.parentName) && request.path.endsWith('.tgz')))
+        assert.ok(fixture.requests.some(request => request.path.includes(fixture.leafName) && request.path.endsWith('.tgz')))
+        assert.deepEqual(fs.readFileSync(path.join(fixture.sourceRoot, 'package.json')), packageBytes)
+        assert.deepEqual(fs.readFileSync(path.join(fixture.sourceRoot, 'package-lock.json')), lockBytes)
+        candidate.dispose()
+        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+      } finally {
+        candidate?.dispose()
+        await fixture.dispose()
+      }
+    })
+    for (const mutation of ['non-CLI library bytes', 'new tool member']) {
+      await t.test(`WHAT[verification-system-016] npm tool archive rejects ${mutation} changed during a real held install and reclaims unpublished dependencies`, async () => {
+        const fixture = await toolArchiveFixture()
+        const controller = new AbortController()
+        let settled
+        try {
+          fixture.holdLeaf()
+          const installing = installFromArchive({ ...fixture.installOptions, signal: controller.signal })
+          settled = Promise.allSettled([installing])
+          const toolRoot = await waitForHeldInstall(fixture, installing)
+          if (mutation === 'non-CLI library bytes') fs.appendFileSync(path.join(toolRoot, 'toolchain/npm/lib/cli.js'), '\n// controlled library mutation\n')
+          else fs.writeFileSync(path.join(toolRoot, 'toolchain/npm/bin/unselected-member.txt'), 'controlled extra member')
+          fixture.releaseLeaf()
+          await assert.rejects(installing, { code: 'verification-tool-entry-invalid' })
+          await fixture.leafClosed
+          assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+        } finally {
+          controller.abort(new Error('tool mutation fixture cleanup'))
+          await settled
+          await fixture.dispose()
+        }
+      })
+    }
+    for (const reason of [new Error('controlled tool archive install cancellation'), null]) {
+      await t.test(`WHAT[verification-system-016] npm tool archive held install cancellation preserves ${reason === null ? 'null' : 'Error'} and reclaims tools installation and dependencies`, async () => {
+        const fixture = await toolArchiveFixture()
+        const controller = new AbortController()
+        let settled
+        try {
+          fixture.holdLeaf()
+          const installing = installFromArchive({ ...fixture.installOptions, signal: controller.signal })
+          settled = Promise.allSettled([installing])
+          await waitForHeldInstall(fixture, installing)
+          const execution = JSON.parse(fs.readFileSync(fixture.executionMarker, 'utf8'))
+          assert.ok(Number.isInteger(execution.pid))
+          controller.abort(reason)
+          const [outcome] = await settled
+          assert.equal(outcome.status, 'rejected')
+          assert.equal(outcome.reason, reason)
+          await fixture.leafClosed
+          assert.throws(() => process.kill(execution.pid, 0), error => error.code === 'ESRCH')
+          assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+        } finally {
+          controller.abort(reason)
+          await settled
+          await fixture.dispose()
+        }
+      })
+    }
+    for (const role of ['Node', 'npm']) {
+      await t.test(`WHAT[verification-system-016] npm tool archive rejects a mismatched actual ${role} version before registry execution`, async () => {
+        const fixture = await toolArchiveFixture()
+        try {
+          const options = { ...fixture.installOptions }
+          if (role === 'Node') options.expectedNodeVersion = 'v0.0.0'
+          else {
+            options.expectedNpmVersion = '0.0.0'
+            const packagePath = path.join(fixture.sourceRoot, 'package.json')
+            const manifest = JSON.parse(fs.readFileSync(packagePath))
+            manifest.packageManager = 'npm@0.0.0'
+            fs.writeFileSync(packagePath, JSON.stringify(manifest))
+          }
+          await assert.rejects(installFromArchive(options), { code: 'verification-npm-tool-invalid' })
+          assert.deepEqual(fixture.requests, [])
+          assert.equal(fs.existsSync(fixture.executionMarker), false)
+          assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+        } finally {
+          await fixture.dispose()
+        }
+      })
+    }
+    for (const reason of [new Error('cancelled before tool archive installation'), null]) {
+      await t.test(`WHAT[verification-system-016] npm tool archive already aborted preserves ${reason === null ? 'null' : 'Error'} before reading missing source or archive`, async () => {
+        const fixture = await createNpmInstallFixture()
+        try {
+          const controller = new AbortController()
+          controller.abort(reason)
+          const [outcome] = await Promise.allSettled([installFromArchive({ sourceRoot: path.join(fixture.root, 'missing-source'), parentDirectory: fixture.parentDirectory, toolArchive: { archivePath: path.join(fixture.root, 'missing-tools.tar'), archiveSha256: '0'.repeat(64) }, expectedNpmVersion: fixture.options.expectedNpmVersion, signal: controller.signal })])
+          assert.equal(outcome.status, 'rejected')
+          assert.equal(outcome.reason, reason)
+          assert.deepEqual(fixture.requests, [])
+          assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+        } finally {
+          await fixture.dispose()
+        }
+      })
+    }
+  })
+}

@@ -6,6 +6,8 @@ GAP-055接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-20
 
 工具owner还校验npm声明的必需生产依赖图在所选npm包内闭合：direct `graceful-fs`/transitive `@gar/promise-retry`缺失时不能借父目录实际补包。optional缺失允许，存在则递归；非任意loaded module、绝对文件读取或OS闭包证明。完整npm11.12.1工具包另15项通过，不是实际仓库安装。Homebrew Node26定向58项45通过、13失败，缺`libnode`真实拒绝；后续平台证据统一见本批记录，不隐藏失败。
 
+第二批见[工具归档安装与输出根](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)：归档安装入口`installVerificationDependenciesFromToolArchive`真实10报告项通过、0失败（含父组），完整工具自己准备/回收，原bundle路径执行，公开发布前full revalidate，固定toolDigest绑定installation/dependencyDigest；真实held请求后工具库/成员改动、版本拒绝和Error/null取消均证明不发布。旧bootstrap仍只有原45项有限范围。Mac真实挂载仅补输出root保留、子项清理与owned挂载回收，受控spawn不证明actual Fable只读执行。upstream `590a3f69e` copy/chmod父目录替换后恢复的实际反例仍报告PASS、exitCode0，保留T418/T419、GAP-055 PARTIAL及SDK/Git/NuGet/RO/actualverify剩余义务。
+
 返回[总计划](../TODO施工总计划-2026-10-03.md)。来源为基线 `8cf51cc84` 的 [GAP 台账](../../requirements/GAP.md)，本次没有修改其状态。逐行核对得到 **137 项未闭合记录：10 OPEN、127 PARTIAL**。它们与 424 个 TODO 是多对多关系，不能相加作为任务数。
 
 2026-10-03实施增量：调查曾新增GAP-223，使未闭合数达到138项（11 OPEN、127 PARTIAL）；后续R01—R04正式完成并关闭该项，当前回到 **137项未闭合：10 OPEN、127 PARTIAL**。证据见[Host就绪与Guard替代记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。006判决输送及Host就绪只补齐GAP-054的有限证明，不关闭全阶段审阅债；下一批是总计划S03的T418/T419。
@@ -60,7 +62,7 @@ GAP-055接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-20
 | GAP-052 · PARTIAL | requirement-system-001/002/005/007/008/010 | [requirement-system](01-Host与验证.md)：无运行时 TODO；仍按本卡审阅 | 格式检查不能判定语义重复、隐性规则、组织权或历史编号复用；001、004—008、011、017、018 保留可识别形式的正反例，其余人工审阅。 |
 | GAP-053 · PARTIAL | feature-ablation-002 | [feature-ablation](04-认知与Sphinx.md)：无运行时 TODO；仍按本卡审阅 | registry、执行/schema/事实/角色 gate 的行为有反例；尚未证明每个业务包关闭后全链零副作用及借用面完整。新 registry 接口不改变此证明限制。 |
 | GAP-054 · PARTIAL | verification-system-004/005/006/007/010/012/018/019 | [verification-system](01-Host与验证.md)：016 | 保留真实监督与门禁反例；尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
-| GAP-055 · PARTIAL | verification-system-006/016 | [verification-system](01-Host与验证.md)：016 | 已补真实corpus输入闭包、输入链接拒绝及指定Git tree完整原blob准备/自有tree回验。接续真实npm安装45项与完整selected Node/npm bundle 15项定向通过，含实际探针取消后的POSIX进程组回收和npm声明的必需依赖图闭合；bootstrap准入与完整selected bundle身份分开。默认夹具npm11.18.0，完整npm11.12.1工具已定向通过但实际仓库依赖未安装；SDK/Git/NuGet外部依赖、只读输入及实际verify同候选结论仍未闭合，Homebrew Node26缺库失败保留。步骤边界复核不能证明阶段中途改后恢复，T418/T419保留；copy、chmod或fs.watch均不当作完整隔离证明。详见本分册开头及[本批记录](../archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)。 |
+| GAP-055 · PARTIAL | verification-system-006/016 | [verification-system](01-Host与验证.md)：016 | 已补真实corpus输入闭包、输入链接拒绝及指定Git tree完整原blob准备/自有tree回验。接续bootstrap安装45项、selected工具15项、归档安装10报告项定向通过，包含取消/完整toolDigest绑定与边界复核；bootstrap准入不升级为不可变工具闭包。默认npm11.18.0、完整npm11.12.1工具已证但实际仓库依赖未安装，Homebrew Node26缺库失败保留。Mac挂载输出清理不证明actual Fable只读执行；SDK/Git/NuGet、RO及actualverify同候选结论仍未闭合。upstream590 copy/chmod实际父目录替换仍PASS exitCode0，T418/T419保留；copy、chmod或fs.watch均不当作完整隔离证明。详见本分册开头及[第二批记录](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)。 |
 | GAP-056 · PARTIAL | verification-system-008/020 | [verification-system](01-Host与验证.md)：016 | 用户已确认断言完整性按规范要求的结果和副作用判断；精确结构/文本仍完整比较。生成器设施的重放成功不等于全仓 oracle 独立、充分，继续人工审阅。 |
 | GAP-057 · PARTIAL | verification-system-021 | [verification-system](01-Host与验证.md)：016 | 计数、容器失败、结果流与文件完成已有回归；其它入口对未完成原因和范围的传播仍待证，TODO 应阻断完整验收。 |
 | GAP-058 · PARTIAL | js-semantic-surface-001/006 | [js-semantic-surface](01-Host与验证.md)：001/006 | `.mjs` 辅助文件义务与既有 `.js` 依赖、真实退出探针对内部物理入口的导入例外尚待裁决。保留可执行 TODO，不删除物理退出证据。 |

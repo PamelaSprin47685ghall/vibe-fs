@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { create } from 'tar'
 import { prepareVerificationDependencies } from './verification-dependency-candidate.mjs'
+import { prepareVerificationNodeTools } from './verification-node-tools.mjs'
 import { rejectSymbolicVerificationInput } from './verification-input-path.mjs'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -146,7 +147,7 @@ function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
   })
 }
 
-export async function installVerificationDependencies({ sourceRoot, parentDirectory, nodeExecutable, npmCli, nodeSha256, npmCliSha256, expectedNpmVersion, registry = 'https://registry.npmjs.org/', signal, output }) {
+function readNpmSource({ sourceRoot, expectedNpmVersion, registry, signal }) {
   signal?.throwIfAborted()
   rejectSymbolicVerificationInput(sourceRoot)
   const sourceBytes = Object.fromEntries(['package.json', 'package-lock.json'].map(name => {
@@ -164,10 +165,57 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
   }
   const selectedRegistry = registryUrl(registry)
   validateLock(manifest, lock, selectedRegistry, expectedNpmVersion)
+  return { sourceBytes, selectedRegistry }
+}
+
+export async function installVerificationDependencies({ sourceRoot, parentDirectory, nodeExecutable, npmCli, nodeSha256, npmCliSha256, expectedNpmVersion, registry = 'https://registry.npmjs.org/', signal, output }) {
+  const source = readNpmSource({ sourceRoot, expectedNpmVersion, registry, signal })
   const nodeBytes = fs.readFileSync(nodeExecutable)
   if (!/^[a-f0-9]{64}$/.test(nodeSha256) || !/^[a-f0-9]{64}$/.test(npmCliSha256) || digest(nodeBytes) !== nodeSha256 || digest(fs.readFileSync(npmCli)) !== npmCliSha256) {
     throw Object.assign(new Error('Npm bootstrap files differ from their explicit selected identities'), { code: 'verification-npm-tool-invalid' })
   }
+  return installSelectedDependencies({ ...source, parentDirectory, execution: { kind: 'bootstrap', nodeBytes, npmCli: path.resolve(npmCli), nodeSha256, npmCliSha256, expectedNpmVersion }, signal, output })
+}
+
+export async function installVerificationDependenciesFromToolArchive({ sourceRoot, parentDirectory, toolArchive, expectedNpmVersion, expectedNodeVersion, registry = 'https://registry.npmjs.org/', signal, output }) {
+  const source = readNpmSource({ sourceRoot, expectedNpmVersion, registry, signal })
+  let tools
+  let candidate
+  try {
+    tools = await prepareVerificationNodeTools({ archivePath: toolArchive.archivePath, archiveSha256: toolArchive.archiveSha256, nodePath: toolArchive.nodePath, npmCliPath: toolArchive.npmCliPath, parentDirectory, signal })
+    if (tools.npm.version !== expectedNpmVersion || (expectedNodeVersion !== undefined && tools.node.version !== expectedNodeVersion)) {
+      throw Object.assign(new Error('Actual selected tool versions differ from the installation contract'), { code: 'verification-npm-tool-invalid' })
+    }
+    candidate = await installSelectedDependencies({
+      ...source,
+      parentDirectory,
+      execution: { kind: 'selected-bundle', nodeExecutable: path.join(tools.toolRoot, tools.node.path), npmCli: path.join(tools.toolRoot, tools.npm.cliPath), nodeSha256: tools.node.sha256, npmCliSha256: tools.npm.cliSha256, expectedNpmVersion, nodeVersion: tools.node.version, toolDigest: tools.toolDigest, revalidate: tools.revalidate },
+      signal,
+      output,
+    })
+    signal?.throwIfAborted()
+    tools.revalidate()
+    tools.dispose()
+    return candidate
+  } catch (error) {
+    const errors = [error]
+    try {
+      candidate?.dispose()
+    } catch (cleanupError) {
+      errors.push(cleanupError)
+    }
+    try {
+      tools?.dispose()
+    } catch (cleanupError) {
+      errors.push(cleanupError)
+    }
+    if (errors.length > 1) throw new AggregateError(errors, 'Tool archive installation and cleanup failed', { cause: error })
+    throw error
+  }
+}
+
+async function installSelectedDependencies({ sourceBytes, selectedRegistry, parentDirectory, execution, signal, output }) {
+  signal?.throwIfAborted()
   const installationRoot = fs.mkdtempSync(path.join(path.resolve(parentDirectory), 'verification-npm-install-'))
   let candidate
   try {
@@ -175,8 +223,8 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
     const env = { CI: 'true' }
     for (const name of ['workspace', 'home', 'config', 'cache', 'data', 'state', 'tmp', 'tools']) fs.mkdirSync(path.join(installationRoot, name))
     for (const [name, bytes] of Object.entries(sourceBytes)) fs.writeFileSync(path.join(workspace, name), bytes, { flag: 'wx' })
-    const privateNode = path.join(installationRoot, 'tools/node')
-    fs.writeFileSync(privateNode, nodeBytes, { flag: 'wx', mode: 0o755 })
+    const privateNode = execution.kind === 'bootstrap' ? path.join(installationRoot, 'tools/node') : execution.nodeExecutable
+    if (execution.kind === 'bootstrap') fs.writeFileSync(privateNode, execution.nodeBytes, { flag: 'wx', mode: 0o755 })
     for (const name of ['user.npmrc', 'global.npmrc']) fs.writeFileSync(path.join(installationRoot, name), '')
     Object.assign(env, {
       HOME: path.join(installationRoot, 'home'),
@@ -187,7 +235,7 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
       TMPDIR: path.join(installationRoot, 'tmp'),
       TMP: path.join(installationRoot, 'tmp'),
       TEMP: path.join(installationRoot, 'tmp'),
-      PATH: path.join(installationRoot, 'tools'),
+      PATH: path.dirname(privateNode),
       npm_config_userconfig: path.join(installationRoot, 'user.npmrc'),
       npm_config_globalconfig: path.join(installationRoot, 'global.npmrc'),
       npm_config_cache: path.join(installationRoot, 'cache'),
@@ -198,9 +246,10 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
     const options = { cwd: workspace, env, signal, output }
     const runtime = JSON.parse(await runBootstrap(privateNode, ['--input-type=module', '-e', 'console.log(JSON.stringify({ platform: process.platform, arch: process.arch }))'], options))
     if (typeof runtime.platform !== 'string' || typeof runtime.arch !== 'string') throw Object.assign(new Error('Npm bootstrap runtime did not report its platform identity'), { code: 'verification-npm-tool-invalid' })
-    const npmVersion = (await runBootstrap(privateNode, [path.resolve(npmCli), '--version'], options)).trim()
-    if (npmVersion !== expectedNpmVersion) throw Object.assign(new Error('Actual npm version differs from its selected version'), { code: 'verification-npm-tool-invalid' })
-    await runBootstrap(privateNode, [path.resolve(npmCli), 'ci', '--ignore-scripts', '--include=dev', '--include=optional', '--no-audit', '--no-fund', '--workspaces=false', '--install-strategy=hoisted', `--registry=${selectedRegistry.href}`], options)
+    const npmVersion = (await runBootstrap(privateNode, [execution.npmCli, '--version'], options)).trim()
+    if (npmVersion !== execution.expectedNpmVersion) throw Object.assign(new Error('Actual npm version differs from its selected version'), { code: 'verification-npm-tool-invalid' })
+    if (execution.kind === 'selected-bundle') execution.revalidate()
+    await runBootstrap(privateNode, [execution.npmCli, 'ci', '--ignore-scripts', '--include=dev', '--include=optional', '--no-audit', '--no-fund', '--workspaces=false', '--install-strategy=hoisted', `--registry=${selectedRegistry.href}`], options)
     signal?.throwIfAborted()
     for (const [name, bytes] of Object.entries(sourceBytes)) {
       const installed = path.join(workspace, name)
@@ -218,8 +267,10 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
     candidate = await prepareVerificationDependencies({ sourceRoot: workspace, parentDirectory, archivePath, archiveSha256: digest(archive) })
     signal?.throwIfAborted()
     if (JSON.stringify(candidate.entries) !== JSON.stringify(expectedEntries)) throw lockInvalid('Prepared dependency inventory differs from the complete npm installation')
+    if (execution.kind === 'selected-bundle') execution.revalidate()
     const packageJsonSha256 = digest(sourceBytes['package.json'])
-    const installation = { npmVersion, nodeSha256, npmCliSha256, platform: runtime.platform, arch: runtime.arch, lifecycleScripts: 'disabled', identityScope: 'bootstrap-admission' }
+    const installation = { npmVersion, nodeSha256: execution.nodeSha256, npmCliSha256: execution.npmCliSha256, platform: runtime.platform, arch: runtime.arch, lifecycleScripts: 'disabled', identityScope: execution.kind === 'bootstrap' ? 'bootstrap-admission' : 'selected-node-npm-bundle' }
+    if (execution.kind === 'selected-bundle') Object.assign(installation, { nodeVersion: execution.nodeVersion, toolDigest: execution.toolDigest })
     const dependencyDigest = digest(JSON.stringify({ preparedDependencyDigest: candidate.dependencyDigest, packageJsonSha256, installation }))
     fs.rmSync(installationRoot, { recursive: true, force: true })
     return { ...candidate, packageJsonSha256, installation, dependencyDigest }

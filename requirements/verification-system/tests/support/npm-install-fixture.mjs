@@ -65,6 +65,7 @@ export async function createNpmInstallFixture() {
   const leafRequest = Promise.withResolvers()
   const leafClosed = Promise.withResolvers()
   let holdLeaf = false
+  let heldLeafResponse
   let corruptLeaf = false
   let registry
   const server = http.createServer((request, response) => {
@@ -77,6 +78,7 @@ export async function createNpmInstallFixture() {
     }
     if (requestPath.endsWith('.tgz')) {
       if (name === leafName && holdLeaf) {
+        heldLeafResponse = response
         response.once('close', () => leafClosed.resolve())
         leafRequest.resolve()
         return
@@ -125,6 +127,13 @@ export async function createNpmInstallFixture() {
       options: { sourceRoot, parentDirectory, nodeExecutable: process.execPath, nodeSha256: sha256(fs.readFileSync(process.execPath)), registry, ...tools },
       corruptLeaf() { corruptLeaf = true },
       holdLeaf() { holdLeaf = true },
+      releaseLeaf() {
+        assert.ok(heldLeafResponse && !heldLeafResponse.destroyed, 'A real leaf tarball request must be held before release')
+        holdLeaf = false
+        const bytes = corruptLeaf ? archives[parentName] : archives[leafName]
+        heldLeafResponse.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': bytes.length }).end(bytes)
+        heldLeafResponse = undefined
+      },
       leafRequest: leafRequest.promise,
       leafClosed: leafClosed.promise,
       updateLock(change) {

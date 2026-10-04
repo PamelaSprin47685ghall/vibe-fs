@@ -11,8 +11,11 @@ import test from 'node:test'
 import { Header } from 'tar'
 import { createNpmInstallFixture } from './support/npm-install-fixture.mjs'
 import { registerNodeToolCandidateTests } from './support/node-tool-candidate-tests.mjs'
+import { registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
+import { assertParentReplacementInvalidatesVerification } from './support/parent-replacement.mjs'
 
 registerNodeToolCandidateTests()
+registerNpmToolArchiveTests()
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
@@ -1059,6 +1062,7 @@ test('WHAT[verification-system-016] a mutation restored within one step still in
     })
     assert.equal(result.exitCode, 1, 'changing and restoring an input is not a stable verification run')
     assert.equal(result.outcome, 'fail')
+    await assertParentReplacementInvalidatesVerification({ verify, root: fixture })
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
   }

@@ -60,12 +60,15 @@ ProcessHost 的 health 与项目 `/path` 各自在原阶段 deadline 内观察�
 |---|---|---|
 | 真实npm安装：45 passed / 0 failed | 显式Node与真实npm CLI，两个锁定registry包及独立候选内真实import；失败的lifecycle scripts被禁用，恶意HOME/NODE_OPTIONS/NODE_PATH/npm配置不进入执行；真实EINTEGRITY与缺transitive lock失败；registry origin/path、link/workspace/非法依赖及递归override预拒绝，裸本地目录或tar路径也在启动前拒绝；工具SHA/版本/packageManager不符拒绝；挂起实际tarball请求后取消、原Error/null原因保留、HTTP关闭及安装root回收 | receipt的`bootstrap-admission`只绑定启动Node和npm CLI入口准入，不冻结整个npm工具包。fixture实际npm11.18.0，不证明仓库声明11.12.1依赖已实际安装 |
 | 完整selected Node/npm bundle：15 passed / 0 failed | 明确摘要归档包含完整选定Node/npm包；从独立root运行实际版本/platform/arch探针；摘要错、入口越界/链接/无执行位、缺真实npm内部模块均拒绝；ambient配置隔离；npm声明的必需生产依赖图闭合于所选npm包，direct `graceful-fs`/transitive `@gar/promise-retry`缺失时不能借父目录实际补包；实际copied CLI新增文件后，即使真实版本正确也不能发布旧成员身份；实际挂起npm探针取消保留Error/null原原因，POSIX进程组与后代退出、pipe排空及ownedroot回收，已取消调用先于缺失归档读取 | `selected-node-npm-bundle`绑定完整所选成员及实际探针；optional缺失允许，存在则递归。仍不证明任意loaded module、绝对文件读取、官方分发来源、OS动态加载库或全部外部工具闭包；Windows子树回收未证 |
+| 完整工具归档安装：10 passed / 0 failed | `installVerificationDependenciesFromToolArchive`自己准备并回收完整工具，直接使用原Node/npm角色路径，保留实际Node布局；真实安装两锁定包并独立import；在ci前、依赖物化后及公开发布段完整复核工具，固定toolDigest纳入installation/dependencyDigest；held真实tarball后改非CLI库/新增成员，npm正常结束后拒绝发布并回收；actual Node/npm版本不符拒绝，Error/null取消保留原原因、PID退出及所有ownedroot回收，启动前取消先于缺失输入读取 | 新入口不升级旧raw bootstrap的45项范围；API缺失10失败是入口红，不冒称旧实现已执行工具变更的行为红。边界复核与digest绑定不证明阶段内改后恢复、不可写输入或actualverify同候选 |
 
 归档实现共用`scripts/lib/verification-archive.mjs`，完整核对路径、类型、mode、字节、目录成员与内部链接。工具探针后按独立预期清单重新验证实际物理目录；去掉该复核的隔离变异使新增文件用例失败，这是oracle敏感性证据，不冒充原生产基线缺陷。复核只是步骤边界检查，输入及receipt仍可写，不证明阶段内write→restore不可发生。
 
 默认夹具实际npm为11.18.0；完整npm11.12.1工具包另取得15项定向通过，这仍不是以仓库声明版本安装实际仓库依赖。追加Homebrew Node26的58项定向只有45通过、13失败，缺`libnode`导致真实启动拒绝，原失败保留。后续平台证据统一见[本批记录](../../../proposals/archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)，不从下载完成推导通过。
 
-T418/T419与GAP-055 PARTIAL保留。工具prepare/runProbe取消的四个新增正式用例已先红后绿，不再作为缺失能力排工；下一步把完整工具能力用于安装仓库精确依赖。SDK、Git、dotnet/Fable/NuGet、只读输入/可写输出、实际verify统一候选及结论绑定均未闭合。两个准备owner的定向绿色不能替代这两条TODO。
+第二批安装入口与输出边界详见[工具归档安装与输出根](../../../proposals/archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)。Mac真实只读输入内的可写输出挂载证明reset保留root、只清子项、不改输入和owned挂载回收；`compileIncremental`使用受控spawn替身，只证明输出发布清理，不能算actual Fable只读执行。upstream `590a3f69e` copy/chmod实际审核中，check读取父目录替换后的新字节，再恢复原父目录与文件inode/ctime，verify仍报告PASS、exitCode0。该反例不是TODO通过，也不由归档安装回归闭合；真正只读输入阻止替换或实际替换使运行失效才满足命题。
+
+T418/T419与GAP-055 PARTIAL保留。工具prepare/runProbe取消和完整工具归档安装已具备有限证据，下一步用新入口安装仓库精确依赖，不重做已完成接线。SDK、Git、dotnet/Fable/NuGet、实际只读输入/可写输出、actualverify统一候选及结论绑定均未闭合。准备owner的定向绿色不能替代这两条TODO。
 
 009 的覆盖检查实际调用父集成入口和 distribution 子入口的 `--dry-run`，将二者公布的文件计划与独立发现的声明集核对，拒绝漏项、过时项和重复归属。正式入口共用 `support/discover-suite-tests.mjs`：只选择实际 `integrationTest` 声明，不把注释、示例字符串或单独导入当作集成用例；必需目录缺失、非目录以及源码解析错误向上报告。计划核对证明可达性，不代表这些集成用例已执行或通过。
 
