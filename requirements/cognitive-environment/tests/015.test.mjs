@@ -276,12 +276,31 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
 // ---------------------------------------------------------------------------
 // GAP-077 补充（registered Host 链）：经真实插件注册的
 // experimental.chat.messages.transform 走完整 normalTransform（16 步真实
-// capabilities），而非直调 BloggerChronicleSurface.maybeInject。lease 仍经
+// capabilities），而非直调 BloggerChronicleSurface.maybeInject。lease 经
 // ModelRouting 正式 surface 建立（与 B1—B5 同一 emr-011 accept→acquire→
 // project owner 顺序），companion link 经 journal surface 写入
 // CompanionBloggerLinked。ModelRouting 是 process singleton，插件二次启动的
 // initialize 幂等，路由结果继续由本文件顶部的隔离 HOME 配置驱动
 // （globalThis.__wanxiangshu_test_blogger_model）。
+//
+// 第九层（调用条件调查）结论：normalTransform 第 15 步 InjectBloggerChronicle
+// 在 prefixHorizon 分支之外无条件调用（PluginTransforms.fs），链上注入与否由
+// maybeInject 门禁的输入形状决定。companion blogger 会话在第 11 步
+// ApplyEnforcerContinuation 分支：blogger session 是 companion satellite
+// （tryMainSessionOf → Some main）→ handleContinuation 读 liveCtx =
+// tryLiveCycleContext（只读 process-local InFlight flight，scope.TryPeekCurrentRequest，
+// 绝不从 durable open 恢复）。live flight 在时 First-step 分支把 BloggerRequest
+// canonical 视图整体替换 wire（message id replaced）——第 15 步门禁读的
+// lastUserMessageId 变成渲染 id，tryReadExecution 无 lease → 静默 no-op。这就是
+// R1/R3/R4/R6 旧 setup 的 0 注入根因：不是 maybeInject 没被调用，是 continuation
+// 投影替换了门禁读取的 frontier。链上注入的真实形态（本批 setup）：
+// journal Accepted（chat.message admission transaction）+ journal durable open
+// BloggerRequest（plan freeze 的 companion 检查放行，claimBloggerRequest 落地后
+// 立即 dispose——flight 释放使第 11 步 liveCtx None，wire 保持 raw frontier）+
+// frontier physical 的 exact committed lease（B 系列同款 surface 直落；第八层已
+// 实证 stub chat.message 的 physical binding 不落地，lease 不再依赖 chat.message）+
+// 白名单模型。R5 保留 todo：typed boundary failure 经 MessagesTransform
+// TypedPolicyFailClosed membrane 后的可观察形态（JS 异常或静默诊断返回）未实证。
 // ---------------------------------------------------------------------------
 
 const registeredUserMessage = (session, id) => ({
@@ -392,7 +411,7 @@ const withEnglishLanguage = async (action) => {
   }
 }
 
-test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'eighth-layer fix disproved by real run: with the root/dispatch physical separation the lease still reads null (tryReadExecution after chat.message) and the companion transform takes the blogger continuation branch — it projects the BloggerRequest toml material onto the wire (message id replaced, chronicle-instruction text) and completes quietly without reaching maybeInject, so zero markers and no typed rejection. The physical binding the injection gate needs still never lands under the stub chat.message shape; the fixture admission alignment remains open. Assertions and setup preserved' }, async (t) => {
+test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker_and_writes_no_durable_history', { todo: 'tenth layer (this round): the acquireLease-surface-direct design is disproved — acquire adopts the chat.message session-scoped lease (kind Acquired), the manual commit returns AlreadyApplied (idempotent, chat.message already committed), and tryReadExecution(session, physical) stays null through all of it. The adopt path never writes the physical binding onto the session-scoped lease, and the fresh-reserve path is unreachable because the session lease pre-exists. Structural conclusion: under the stub chat.message shape the physical-bound lease the injection gate reads cannot be established at all — the production chat.message builds the physical binding directly on admission, which the stub does not replicate. Fixture admission-shape alignment (physical-binding admission entry) remains the open prerequisite. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -400,15 +419,19 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       const main = 'ses-blog-main-registered-1'
       const physical = 'msg-user-r1'
       await appendCompanionBloggerLink(runtime, main, session)
+      // chat.message admission transaction writes the durable Accepted
+      // execution (the plan freeze requires it); the exact lease is committed
+      // through the ModelRouting surface below (eighth layer proved the stub
+      // chat.message shape never lands the physical binding the injection
+      // gate reads).
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // The chat.message admission already acquires and commits the exact
-      // lease (target routed by the scheduler); a second manual acquireLease
-      // commit conflicts with it, so the registered chain relies on the
-      // chat.message admission alone.
-      // Durable BloggerRequest chain (fixture extension): the registered
-      // transform's plan freeze rejects a companion Blogger session without
-      // an open materialized request; the dispatch lands on its own physical
-      // message, distinct from the transform frontier user message.
+      // Durable BloggerRequest chain: the plan freeze companion check needs a
+      // journal open request (BloggerRequestMaterialized). The live flight is
+      // released immediately after the claim — tryLiveCycleContext reads only
+      // the process-local InFlight (TryPeekCurrentRequest, never healed from
+      // durable open), so step 11 keeps the raw wire frontier instead of
+      // projecting the BloggerRequest canonical view (the ninth-layer root
+      // cause of the old zero-injection runs).
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -417,7 +440,12 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
         dispatchPhysical: 'msg-dispatch-r1',
         requestId: 'req-blog-r1',
       })
-      t.after(bloggerRequest.dispose)
+      bloggerRequest.dispose()
+
+      // The exact committed lease the injection model gate reads
+      // (bloggerChronicleTextEnabled → ModelRouting.tryReadExecution), same
+      // emr-011 surface path as B1—B5.
+      await acquireLease(session, physical, 'blogger', 'blogger')
 
       // The provider start boundary needs a bindable Host run: the physical
       // user message plus an unsealed assistant child in the runtime snapshot
@@ -467,16 +495,21 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
   })
 })
 
-test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'eighth-layer run (updated): the sixth layer stays cleared, but the lease still reads null and the transform takes the blogger continuation branch — it projects the BloggerRequest toml material and completes without reaching maybeInject — diagnostic proof: ModelRouting.tryReadExecution(session, physical) returns null even though chat.message acquired and committed the admission (commit AlreadyApplied). The chat.message admission is session-scoped; the physical binding the injection gate reads never lands under the stub chat.message shape, so the maybeInject gate silently no-ops. R2/R6 pass for the same lease-null reason (their green is not the companion/whitelist gate refusing — it never reaches it). Root: the stub chat.message admission shape differs from the real Host physical-binding admission; needs fixture admission-shape alignment. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_session_injects_nothing', { todo: 'tenth layer (this round): the acquireLease-surface-direct design is disproved — acquire adopts the chat.message session-scoped lease (kind Acquired), the manual commit returns AlreadyApplied (idempotent, chat.message already committed), and tryReadExecution(session, physical) stays null through all of it. The adopt path never writes the physical binding onto the session-scoped lease, and the fresh-reserve path is unreachable because the session lease pre-exists. Structural conclusion: under the stub chat.message shape the physical-bound lease the injection gate reads cannot be established at all — the production chat.message builds the physical binding directly on admission, which the stub does not replicate. Fixture admission-shape alignment (physical-binding admission entry) remains the open prerequisite. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-      // 有 committed lease 但 journal 中没有 CompanionBloggerLinked：会话不是
-      // companion，注入门禁的第二半边必须拒绝。lease 由 chat.message admission
-      // 独占 commit（与 R1 同一修复），手动 acquireLease 已移除。
+      // A committed whitelisted lease but no CompanionBloggerLinked in the
+      // journal: the session is not a companion, so the isCompanion half of
+      // the injection gate must refuse — the only reason this case injects
+      // nothing. The exact lease is committed through the ModelRouting
+      // surface (ninth layer: the stub chat.message shape never lands the
+      // physical binding), so the zero-injection verdict is attributable to
+      // the companion gate alone, not a lease read miss.
       const session = 'ses-blog-registered-2'
       const physical = 'msg-user-r2'
       await admitExecution(runtime, hooks, session, physical)
+      await acquireLease(session, physical, 'blogger', 'blogger')
 
       // Bindable Host run for the provider start boundary (same shape as
       // context-compression-018's transform fixture).
@@ -506,7 +539,7 @@ test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_sess
   })
 })
 
-test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'eighth-layer fix disproved by real run: with the root/dispatch physical separation the lease still reads null (tryReadExecution after chat.message) and the companion transform takes the blogger continuation branch — it projects the BloggerRequest toml material onto the wire (message id replaced, chronicle-instruction text) and completes quietly without reaching maybeInject, so zero markers and no typed rejection. The physical binding the injection gate needs still never lands under the stub chat.message shape; the fixture admission alignment remains open. Assertions and setup preserved' }, async (t) => {
+test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', { todo: 'tenth layer (this round): the acquireLease-surface-direct design is disproved — acquire adopts the chat.message session-scoped lease (kind Acquired), the manual commit returns AlreadyApplied (idempotent, chat.message already committed), and tryReadExecution(session, physical) stays null through all of it. The adopt path never writes the physical binding onto the session-scoped lease, and the fresh-reserve path is unreachable because the session lease pre-exists. Structural conclusion: under the stub chat.message shape the physical-bound lease the injection gate reads cannot be established at all — the production chat.message builds the physical binding directly on admission, which the stub does not replicate. Fixture admission-shape alignment (physical-binding admission entry) remains the open prerequisite. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -515,6 +548,9 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
       const physical = 'msg-user-r3'
       await appendCompanionBloggerLink(runtime, main, session)
       const profile = await admitExecution(runtime, hooks, session, physical)
+      // Same shape as R1: the durable open request feeds the plan freeze
+      // companion check; the live flight is disposed so step 11 keeps the raw
+      // wire frontier (ninth-layer root cause fix).
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -523,11 +559,8 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
         dispatchPhysical: 'msg-dispatch-r3',
         requestId: 'req-blog-r3',
       })
-      t.after(bloggerRequest.dispose)
-
-      // Bindable Host run for the provider start boundary (same shape as
-      // context-compression-018's transform fixture); the lease is committed
-      // by the chat.message admission alone (manual acquireLease removed).
+      bloggerRequest.dispose()
+      await acquireLease(session, physical, 'blogger', 'blogger')
       runtime.pushHostMessage(session, {
         info: { id: physical, sessionID: session, role: 'user', time: { created: 1 } },
         parts: [{ type: 'text', text: '材料已备好，请记账' }],
@@ -566,7 +599,7 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
   })
 })
 
-test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'eighth-layer fix disproved by real run: with the root/dispatch physical separation the lease still reads null (tryReadExecution after chat.message) and the companion transform takes the blogger continuation branch — it projects the BloggerRequest toml material onto the wire (message id replaced, chronicle-instruction text) and completes quietly without reaching maybeInject, so zero markers and no typed rejection. The physical binding the injection gate needs still never lands under the stub chat.message shape; the fixture admission alignment remains open. Assertions and setup preserved' }, async (t) => {
+test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_history_boundary', { todo: 'tenth layer (this round): the acquireLease-surface-direct design is disproved — acquire adopts the chat.message session-scoped lease (kind Acquired), the manual commit returns AlreadyApplied (idempotent, chat.message already committed), and tryReadExecution(session, physical) stays null through all of it. The adopt path never writes the physical binding onto the session-scoped lease, and the fresh-reserve path is unreachable because the session lease pre-exists. Structural conclusion: under the stub chat.message shape the physical-bound lease the injection gate reads cannot be established at all — the production chat.message builds the physical binding directly on admission, which the stub does not replicate. Fixture admission-shape alignment (physical-binding admission entry) remains the open prerequisite. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -574,13 +607,15 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       const main = 'ses-blog-main-registered-4'
       await appendCompanionBloggerLink(runtime, main, session)
 
-      // 第一条物理 user 消息：Host 持久化它，插件为它建立 exact lease。
-      // lease 由 chat.message admission 独占 commit（与 R1 同一修复，
-      // 手动 acquireLease 已移除）。
+      // 第一条物理 user 消息：Host 持久化它，插件为它建立 exact lease
+      // （ninth layer：lease 经 ModelRouting surface 直落——stub chat.message
+      // 的 physical binding 不落地）。
       const physicalOne = 'msg-user-r4-1'
       const userOne = registeredUserMessage(session, physicalOne)
       runtime.pushHostMessage(session, structuredClone(userOne))
       const profile = await admitExecution(runtime, hooks, session, physicalOne)
+      // Same shape as R1: durable open request feeds the plan freeze; the
+      // live flight is disposed so step 11 keeps the raw wire frontier.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -589,7 +624,8 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
         dispatchPhysical: 'msg-dispatch-r4',
         requestId: 'req-blog-r4',
       })
-      t.after(bloggerRequest.dispose)
+      bloggerRequest.dispose()
+      await acquireLease(session, physicalOne, 'blogger', 'blogger')
 
       // Bindable Host run for the first provider request's start boundary
       // (same shape as context-compression-018's transform fixture).
@@ -622,6 +658,7 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       const physicalTwo = 'msg-user-r4-2'
       const userTwo = registeredUserMessage(session, physicalTwo)
       await admitExecution(runtime, hooks, session, physicalTwo)
+      await acquireLease(session, physicalTwo, 'blogger', 'blogger')
       // Bindable Host run for the follow-up request's start boundary.
       runtime.pushHostMessage(session, structuredClone(userTwo))
       runtime.pushHostMessage(session, {
@@ -664,7 +701,7 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
   })
 })
 
-test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_with_typed_rejection', { todo: 'eighth-layer fix disproved by real run: with the root/dispatch physical separation the lease still reads null (tryReadExecution after chat.message) and the companion transform takes the blogger continuation branch — it projects the BloggerRequest toml material onto the wire (message id replaced, chronicle-instruction text) and completes quietly without reaching maybeInject, so zero markers and no typed rejection. The physical binding the injection gate needs still never lands under the stub chat.message shape; the fixture admission alignment remains open. Assertions and setup preserved' }, async (t) => {
+test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_with_typed_rejection', { todo: 'ninth-layer adjudication: setup now isolates the exact committed lease (durable Accepted stays via the chat.message admission transaction, journal open BloggerRequest feeds the plan freeze with the live flight disposed, the exact lease is committed through the ModelRouting surface and then settled away with releasePhysical), so the provider start boundary requireProviderAdmission must read no committed lease and reject with the CommittedAdmissionUnavailable typed failure. Open gap: the MessagesTransform hook is registered TypedPolicyFailClosed (HookPolicy), and the observable shape of that typed boundary failure at the hook boundary — a JS exception surfaced to this test, or a quiet typed-failure return swallowed by the membrane — has not been proven by a real run. The assertion intent stays: fail closed, never a quiet zero-injection completion. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -677,9 +714,9 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
       // Accepted 执行仍先建立——被测的是 lease 缺席，不是 Accepted 缺席。
       const physical = 'msg-user-r5'
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // The durable BloggerRequest chain is established (the plan freeze
-      // requires it for every companion transform); the committed lease is
-      // the only missing half, which is what this case isolates.
+      // Same shape as R1: the durable open request feeds the plan freeze
+      // companion check; the live flight is disposed so step 11 keeps the raw
+      // wire frontier.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -688,7 +725,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         dispatchPhysical: 'msg-dispatch-r5',
         requestId: 'req-blog-r5',
       })
-      t.after(bloggerRequest.dispose)
+      bloggerRequest.dispose()
 
       // Bindable Host run for the provider start boundary (same shape as R1);
       // the pair is present so the only missing precondition is the committed
@@ -711,11 +748,13 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         parts: [],
       })
 
-      // Eighth-layer adjudication: settle away only the exact committed lease
-      // on the capacity owner (durable Accepted stays in the journal); the
-      // provider start boundary's requireProviderAdmission must reject the
-      // transform with the CommittedAdmissionUnavailable typed failure —
+      // Ninth-layer adjudication: commit the exact lease through the
+      // ModelRouting surface (the production emr-011 path), then settle it
+      // away on the capacity owner (durable Accepted stays in the journal);
+      // the provider start boundary's requireProviderAdmission must reject
+      // the transform with the CommittedAdmissionUnavailable typed failure —
       // fail-closed, not a quiet zero-injection completion.
+      await acquireLease(session, physical, 'blogger', 'blogger')
       const released = ModelRoutingSurface.releasePhysical(session, physical)
       assert.ok(
         released?.kind === 'Applied' || released?.kind === 'AlreadyApplied',
@@ -740,7 +779,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
   })
 })
 
-test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'eighth-layer fix disproved by real run: with the root/dispatch physical separation the lease still reads null (tryReadExecution after chat.message) and the companion transform takes the blogger continuation branch — it projects the BloggerRequest toml material onto the wire (message id replaced, chronicle-instruction text) and completes quietly without reaching maybeInject, so zero markers and no typed rejection. The physical binding the injection gate needs still never lands under the stub chat.message shape; the fixture admission alignment remains open. Assertions and setup preserved' }, async (t) => {
+test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_model_injects_nothing', { todo: 'tenth layer (this round): the acquireLease-surface-direct design is disproved — acquire adopts the chat.message session-scoped lease (kind Acquired), the manual commit returns AlreadyApplied (idempotent, chat.message already committed), and tryReadExecution(session, physical) stays null through all of it. The adopt path never writes the physical binding onto the session-scoped lease, and the fresh-reserve path is unreachable because the session lease pre-exists. Structural conclusion: under the stub chat.message shape the physical-bound lease the injection gate reads cannot be established at all — the production chat.message builds the physical binding directly on admission, which the stub does not replicate. Fixture admission-shape alignment (physical-binding admission entry) remains the open prerequisite. Assertions and setup preserved' }, async () => {
   await withEnglishLanguage(async () => {
     globalThis.__wanxiangshu_test_blogger_model = 'test/other-model'
     try {
@@ -750,10 +789,8 @@ test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_mo
         const physical = 'msg-user-r6'
         await appendCompanionBloggerLink(runtime, main, session)
         const profile = await admitExecution(runtime, hooks, session, physical)
-        // The lease is committed by the chat.message admission alone (the
-        // scheduler routes this admission to the non-whitelisted model via
-        // __wanxiangshu_test_blogger_model); manual acquireLease removed to
-        // match the R1 conflict fix.
+        // Same shape as R1: durable open request feeds the plan freeze; the
+        // live flight is disposed so step 11 keeps the raw wire frontier.
         const bloggerRequest = await claimBloggerRequest({
           runtime,
           mainSession: main,
@@ -762,7 +799,12 @@ test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_mo
           dispatchPhysical: 'msg-dispatch-r6',
           requestId: 'req-blog-r6',
         })
-        t.after(bloggerRequest.dispose)
+        bloggerRequest.dispose()
+        // The exact lease is committed through the ModelRouting surface; the
+        // scheduler routes this admission to the non-whitelisted model via
+        // __wanxiangshu_test_blogger_model, so the whitelist half of the
+        // injection gate is the only reason this case injects nothing.
+        await acquireLease(session, physical)
 
       const outObj = { messages: [structuredClone(registeredUserMessage(session, physical))] }
       // The provider start boundary needs a bindable Host run: the physical
