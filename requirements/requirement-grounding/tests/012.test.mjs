@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as host from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
+
+const originalWhat = '\uFEFFwhat-v1\r\n\rbare CR\0中文 😀  \r\nlast  '
+const originalCarrier = body => `${body}\n\nrequirement_source_path = "requirements/alpha/WHAT.md"\n`
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-delivery-'))
@@ -24,6 +27,28 @@ const terminalRead = (path) => [{
   info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
+
+test('WHAT[requirement-grounding-012] a legacy inline carrier is restored verbatim instead of being rendered with the new representation', async () => {
+  const { dir, cleanup } = sandbox()
+  let opened
+  try {
+    const receipt = JSON.parse(readFileSync(new URL('./support/012-legacy-cursor-receipt.json', import.meta.url), 'utf8'))
+    assert.equal(existsSync(receipt.originalWorkspace), false, 'the actual old producer workspace has been removed')
+    const events = join(dir, 'wanxiang', 'events')
+    mkdirSync(events, { recursive: true })
+    writeFileSync(join(events, 'legacy.ndjson'), readFileSync(new URL('./support/012-legacy-cursor-occurrence.ndjson', import.meta.url)))
+    rmSync(join(dir, 'requirements', 'alpha', 'WHAT.md'))
+    opened = await host.createJournal(dir)
+    const replay = await host.projectWithJournal(opened.journal, receipt.sessionID, receipt.raw)
+    assert.equal(replay.ok, true)
+    assert.deepEqual(replay.value, receipt.projected, 'the actual old producer carrier survives the real codec and cold replay unchanged')
+    assert.ok(replay.value[0].parts[0].state.output.includes(host.cursorSeparator + '# genuine-old-body'))
+    assert.equal(replay.value[0].parts[0].state.output.includes(originalCarrier(receipt.originalBody)), false, 'old facts are not upgraded to the new carrier')
+  } finally {
+    if (opened) host.disposeJournal(opened.journal)
+    cleanup()
+  }
+})
 
 test('WHAT[requirement-grounding-012] reopening the durable journal replays exact messages and appends changed content only to a new terminal result', async () => {
   const { dir, cleanup } = sandbox()
@@ -90,6 +115,7 @@ test('WHAT[requirement-grounding-012] separate registered producer and restarted
   }
   try {
     execFileSync('git', ['init', '--quiet', dir])
+    writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), originalWhat)
     await t.test('WHAT[requirement-grounding-012] the registered producer anchors a real covered read and persists its inline occurrence', () => {
       const first = run('produce')
       assert.equal(first.occurrences, 1)
@@ -159,7 +185,8 @@ test('WHAT[requirement-grounding-012] separate registered producer and restarted
     }
     const what = reads.find(read => read.Path === 'requirements/alpha/WHAT.md')
     assert.ok(what)
-    assert.equal(what.ResultBytes, 'what-v1\n')
+    assert.equal(what.ResultBytes, originalWhat)
+    assert.equal(what.CursorResultBytes, originalCarrier(originalWhat), 'cold replay carries the entire independently specified original body and source footer')
     assert.ok(receipts.produce.projected[0].parts[0].state.output.includes(what.CursorResultBytes))
     lines[index] = '{BROKEN-GROUNDING-OCCURRENCE'
     writeFileSync(writer, lines.join('\n'))

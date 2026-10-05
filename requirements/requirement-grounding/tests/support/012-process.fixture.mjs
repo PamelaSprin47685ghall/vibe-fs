@@ -26,7 +26,7 @@ try {
       assert.equal(output, 'source\n')
       await incarnation.hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
       raw = [...raw, { info: { id: `result-${callID}`, role: 'assistant', sessionID, providerID: 'anthropic' },
-        parts: [{ type: 'tool', tool: 'read', callID, state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
+        parts: [{ id: `part-${callID}`, type: 'tool', tool: 'read', callID, state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
     }
     const project = async () => {
       const projection = { messages: structuredClone(raw) }

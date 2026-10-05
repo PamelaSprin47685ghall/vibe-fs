@@ -182,3 +182,31 @@ GeneratedInputDigest:
 Only status Markdown/raw evidence changed after formal generation131 execution.
 No repeated test claim for generation132; gen131 evidence remains input-bound.
 Raw:vibe-fs-n05-n06-gen132-build.log,vibe-fs-n05-n06-gen132-check.log.
+
+Delivered-head CI d5992761ebdfedf0cc874d0c11d4c853ca419166:
+run37290902446/job111700785521; format/check/build passed.
+Original300000ms physical backstop:817/818 drained,verification016 sole active.
+Group3125 accepted=true8.928ms; no authoritative counts or downstream release.
+Complete uploaded unit.log filters outer PID3125 (006 nested runners excluded).
+016 is admission797 at283833.175ms; only16.167s remained. Actual body-entry
+names self-modifying npm CLI, not last-verdict non-executable selected Node.
+Its archive15441.772->15799.436ms,prepare15886.929ms; no monitor spawn before
+the global cutoff. Previous spawned tools exited and drained. This run proves
+late admission followed by total-budget exhaustion, not a tool hang or5s silence.
+Raw:vibe-fs-n00-d599-ci.log,vibe-fs-n00-d599-ci-unit.log.
+The complete artifact already preserves all fixture/body phases; no extra sink.
+
+Same source/generation132, local single016 original5000/300000/defaultworkers:
+Node22.23.3/npm10.9.4/SDK10.0.302 explicit paths,caffeinate-i prevents idle sleep.
+1/1 drained,286pass0fail14skip2TODO,150.759s wall217.8s testtime;exit1 pending.
+Node group18.020s/npm-archive group29.931s. Node archive14 calls1.523s;
+prepare29 calls18.929s;npm complete capture8 calls4.064s;version21 calls1.367s;
+archive-install10 calls24.909s. Parent/child testtime overlaps are not walltime.
+Raw:vibe-fs-n00-d599-local016.log. This is not a Linux full-suite certificate.
+CI817 completed file occupancy576.799 worker-seconds; only with those fixed
+observations is the two-worker estimate288.399s. Reordering can change costs;
+neither permutation nor splitting alone is proven to meet300s. Next measure
+Linux single016 complete original-budget cost before choosing group boundaries.
+Node mutated archives differ; do not memoize final tar or reuse prepared owners.
+Real SDK integration did not execute in this CI; static repetition is not its
+established cause. Old33dc/0d539 and local silence failures remain input-bound.

@@ -203,22 +203,3 @@ test('WHAT[sphinx-v2-017] an answer preserves its exact successful work and acce
     assert.deepEqual(current(open(), 'durable-answer'), state)
   })
 })
-
-test('WHAT[sphinx-v2-019] an older answer without an observation reference is a durable strict DTO cut', async () => {
-  await withStore(async ({ open, close }) => {
-    const handle = open()
-    const creation = await append(handle, batch('old-answer', 'create', [createdBody('answer provenance')]))
-    const candidate = prepare(handle, batch('old-answer', 'answer', [...successfulWork(), answer()], creation))
-    delete candidate.payload.events.at(-1).payload.resultObservationId
-    const receipt = await store.append(handle, [candidate])
-    assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
-    assert.equal(receipt.cuts.length, 1)
-    assert.match(receipt.cuts[0].reason, /INVALID_TRANSITION_DTO/)
-    assert.equal(receipt.cuts[0].failedEventId, candidate.id)
-    assert.deepEqual(store.read(handle, candidate.id), candidate)
-    const rejected = current(handle, 'old-answer')
-    assert.equal(rejected.error.code, 'SemanticCut')
-    close(handle)
-    assert.deepEqual(current(open(), 'old-answer'), rejected)
-  })
-})

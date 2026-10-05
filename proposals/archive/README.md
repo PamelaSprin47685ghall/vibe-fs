@@ -1,5 +1,7 @@
 # 历史计划与施工记录
 
+[原始材料载体与后缀重放](2026-10-05/原始材料载体与后缀重放-2026-10-05.md)记录N05-B/T388有限修复：原UTF-8材料、exact durable工具呈现、None身份与capture副本。gen137正式223/223、1454/0及实际Host integration1/0已验收，旧失败原样保存；native Partial、legacy/user、完整Long Stroke与整体GAP保留。后续从现行总计划N06-A及N00成本调查接续。
+
 [失败候选与已提交前缀](2026-10-05/失败候选与已提交前缀-2026-10-05.md)记录N03真实retry Failed及错误settlement变异、rebase/reanchor四组合和第二Blogger producer前提。T292/T298已验收，native56/0及gen127正式137选集通过，GAP-106其它义务保留。N04首个实际只读原工程与生命周期证据从[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)接续。
 
 [Grounding 权限与跨进程重放](2026-10-05/Grounding权限与跨进程重放-2026-10-05.md)记录N01/N02的实际权限、副作用变异、五进程inline occurrence重放与损坏拒绝。T389/T390已验收，native分别5/0、7/0及gen127正式137选集通过，GAP-085其它义务保留。[N00合并记录](2026-10-05/baselines/2026-10-05-n00-acceptance.txt)保存gen127正式137/137、1041/0及实际015 Host21/0，也保留旧合并CI817/818 physical backstop，不能互相替代。

@@ -1,6 +1,6 @@
 # 计划与提案入口
 
-2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：T386当前读取修复和Sphinx核心答案来源守门已验收，gen131正式212/212、1547/0，native006 integration3/0；完整Runtime/renderer和N00全仓CI仍待证。下一项N05-B/T388原字节suffix与N06-A真实创建/读取，不能重新按下列旧S03“下一步”或已完成T386排工。证据见[本批归档](archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
+2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：T386当前读取、Sphinx核心答案来源及T388有限原字节/工具后缀修复已验收；gen137正式223/223、1454/0，真实Host integration1/0。下一主线N06-A真实创建/读取，N04-C可独立推进；N00先量化Linux单016成本。不能重新按下列旧S03“下一步”或已完成卡排工，整体GAP与完整Runtime/Long Stroke/发布边界保持。证据见[最新归档](archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)。
 
 S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 

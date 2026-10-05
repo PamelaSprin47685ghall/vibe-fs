@@ -4,6 +4,8 @@ namespace Wanxiangshu.Foundation
 module LlmFacing =
     type DataBlock = private DataBlock of string
 
+    type OriginalMaterial = private OriginalMaterial of content: string * metadata: DataBlock
+
     type Document =
         private
             { Instructions: string list
@@ -17,6 +19,8 @@ module LlmFacing =
     val withData: blocks: DataBlock list -> document: Document -> Document
     val combine: documents: Document list -> Document
     val render: document: Document -> string
+    val originalMaterial: content: string -> metadata: DataBlock -> OriginalMaterial
+    val renderOriginalMaterial: material: OriginalMaterial -> string
     val renderInstruction: text: string -> string
     val renderInstructions: texts: string list -> string
     val normalizeNewlines: (string -> string)

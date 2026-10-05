@@ -1,8 +1,8 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-05 当前状态：N00 非续期诊断切片、N05-A/T386 当前读取版本修复及 Sphinx 核心答案来源守门前置已完成。统一 gen131 通过 Fable/check 与前后 freshness；正式选集212/212排空、1547pass/0fail、31skip、94TODO，166.97s wall/422.80s test time，group64270 accepted=true、19.321ms，exit1仅pending。native006 integration 严格 cleanup oracle3/0、5.493s，无skip/TODO。T388 原生完整字节覆盖、T406 Runtime/profile/公开入口及全仓新头 CI 仍待施工/验收。详见[本批记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
+2026-10-05 当前状态：N00 非续期诊断、N05-A/T386 当前读取及 Sphinx 核心答案来源守门前置已交付；N05-B/T388 自动Grounding原材料与工具后缀有限范围已验收。gen137正式223/223排空、1454pass/0fail、21skip、87TODO，仅pending exit1；真实Host integration1/0、无skip/TODO。正文保真不复原native read已丢失的字节，native仍PartialFile；legacy/user、完整插件Long Stroke、T406 Runtime/profile/公开入口及新头全仓CI另验。见[最新记录](../archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
 
-历史33dc03ba6 CI仍817/818在原300s截断，仅016活动，无权威汇总，整体N00未验收完成；最后non-executable Node判决不指认下一段故障，旧失败仍未唯一归因。真实父用例/进程身份及工具spawn/exit/drain的非续期诊断现已落地。一次成本probe的原始15/0、975.422s包含952秒OS Sleep/DarkWake，不作为有效成本绿，不映射Linux根因；本轮没有实施快照复用优化，也未改变预算或并发。
+N00仍未整体验收：d5992761e CI的完整artifact已保存，016第797个准入、283.833s启动，原300s截断817/818，无权威汇总。实际活动叶是self-modifying npm CLI的prepare，尚未spawn；此前工具均退出并排空。这个输入证明晚准入后预算耗尽，不把last-verdict nonexec、5秒静默或未执行的SDK组当成原因。单016本地原预算286/0、14skip、2TODO、150.759s完整排空，只是Darwin观测。下一步先量化Linux单016全成本，再决定独立组的负载分界；不得缓存变异归档或复用prepared owner。历史33dc失败仍未唯一归因，952秒IdleSleep样本不解释Linux；预算和worker不变。见[完整unit日志](../archive/2026-10-05/baselines/vibe-fs-n00-d599-ci-unit.log)。
 
 2026-10-05 新排期以[总计划 N00—N09](../TODO施工总计划-2026-10-03.md)为准：e7a60a769已合并，gen127正式137/137排空、1041/0、19skip、72TODO，实际015 Host21/0。旧0d539 CI817/818原300s backstop及旧本地静默仍保留；新头CI另记，不以选集或旧6a2替代。N04-B首个Darwin原工程已真实readonly Fable/Node5/5、小物理8/8、轻量33/0+2skip及相关正式回归通过，见[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)。N04-C/N08的backing/FD/ABA/native/OS、同候选actual verify和完整T418/T419继续施工，不能以局部绿升级为全发布通过。
 

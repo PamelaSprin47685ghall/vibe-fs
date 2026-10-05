@@ -177,6 +177,32 @@ module PluginTransforms =
         fuse reason
         raise (InvalidOperationException reason)
 
+    let private canonicalCaptureMessages (journal: AgentJournal option) session rawMessages =
+        let restore durable =
+            task {
+                match!
+                    PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
+                        durable
+                        session
+                        PairProgrammingThoughtTransform.CursorPresentationOwner.PairGuidance
+                        []
+                        rawMessages
+                with
+                | Error error -> return Error error
+                | Ok paired ->
+                    return!
+                        PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
+                            durable
+                            session
+                            PairProgrammingThoughtTransform.CursorPresentationOwner.RequirementGrounding
+                            []
+                            paired
+            }
+
+        journal
+        |> Option.map restore
+        |> Option.defaultWith (fun () -> Task.FromResult(Ok rawMessages))
+
     let private decodePromptOrigin (label: string) : PromptAuthority.PromptOrigin =
         match label with
         | "HumanRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
@@ -627,8 +653,13 @@ module PluginTransforms =
                             { RawMessages = rawMessages
                               Current = None }
                     | Some sessionId ->
+                        let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
+
+                        let captureMessages =
+                            canonical |> Result.defaultWith (raiseFailClosed strengthFailFuse)
+
                         let observations =
-                            rawMessages
+                            captureMessages
                             |> List.choose (fun rawMessage ->
                                 ProviderWireCapture.decodeCapturedMessage rawMessage
                                 |> Option.map (fun message ->

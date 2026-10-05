@@ -10,10 +10,14 @@ namespace Wanxiangshu.Foundation
 /// record handed to its parent can therefore be instruction even though it is
 /// factual text. Callers never assemble comments, TOML fields, tables, blank-line
 /// separators, or multiple rendered documents themselves.
+/// OriginalMaterial separately preserves already-read content verbatim; only
+/// its source metadata is synthesized through the Data Plane.
 [<RequireQualifiedAccess>]
 module LlmFacing =
 
     type DataBlock = private DataBlock of string
+
+    type OriginalMaterial = private OriginalMaterial of content: string * metadata: DataBlock
 
     type Document =
         private
@@ -47,6 +51,12 @@ module LlmFacing =
     let render (document: Document) : string =
         let body = document.Data |> List.map (fun (DataBlock block) -> block)
         SyntheticToml.document document.Instructions body
+
+    let originalMaterial (content: string) (metadata: DataBlock) : OriginalMaterial =
+        OriginalMaterial(content, metadata)
+
+    let renderOriginalMaterial (OriginalMaterial(content, DataBlock metadata)) : string =
+        content + "\n\n" + metadata + "\n"
 
     let renderInstruction (text: string) : string = instruction text |> render
 
