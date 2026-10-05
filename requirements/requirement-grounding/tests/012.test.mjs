@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import * as grounding from '../../../dist/Requirement/Grounding/Surface.js'
 import * as host from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 
 const sandbox = () => {
@@ -69,4 +69,107 @@ test('WHAT[requirement-grounding-012] reopening the durable journal replays exac
   } finally { cleanup() }
 })
 
-test.todo('WHAT[requirement-grounding-012] a separate restarted process replays the durable bytes at the same anchors; reopening a journal in one process does not cross that boundary (GAP-085)')
+test('WHAT[requirement-grounding-012] separate registered producer and restarted processes replay inline occurrence bytes at their original anchors', async t => {
+  const { dir, cleanup } = sandbox()
+  const processes = new Set()
+  const receipts = {}
+  const receiptPath = phase => join(dir, `${phase}-receipt.json`)
+  const run = phase => {
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawnSync(process.execPath, [new URL('./support/012-process.fixture.mjs', import.meta.url).pathname, dir, phase, receiptPath(phase), receiptPath('produce'), receiptPath('append')], { encoding: 'utf8', env, timeout: 30000 })
+    assert.equal(child.error, undefined, `${phase}: the independent process completed: ${child.stderr}`)
+    assert.equal(child.signal, null)
+    assert.equal(child.status, 0, child.stderr)
+    const receipt = JSON.parse(readFileSync(receiptPath(phase), 'utf8'))
+    assert.notEqual(receipt.pid, process.pid)
+    assert.equal(processes.has(receipt.pid), false, 'each phase crosses an independent OS process')
+    processes.add(receipt.pid)
+    assert.throws(() => process.kill(receipt.pid, 0), error => error.code === 'ESRCH', 'the prior process has really exited')
+    return receipt
+  }
+  try {
+    execFileSync('git', ['init', '--quiet', dir])
+    await t.test('WHAT[requirement-grounding-012] the registered producer anchors a real covered read and persists its inline occurrence', () => {
+      const first = run('produce')
+      assert.equal(first.occurrences, 1)
+      assert.ok(first.projected.at(-1).parts[0].state.output.includes('what-v1'))
+      assert.ok(first.projected.at(-1).parts[0].state.output.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
+      assert.deepEqual(first.projected.map(message => message.info), first.raw.map(message => message.info))
+      receipts.produce = first
+    })
+    assert.ok(receipts.produce, 'a failed producer cannot authorize later test phases')
+    rmSync(join(dir, 'requirements', 'alpha', 'WHAT.md'))
+    await t.test('WHAT[requirement-grounding-012] an independent normal boot replays exact prior messages while the original material is absent', () => {
+      const replay = run('replay')
+      assert.equal(replay.occurrences, 1)
+      assert.deepEqual(replay.projected, receipts.produce.projected, 'deleted source cannot be reread to replace frozen bytes')
+      assert.deepEqual(replay.raw, receipts.produce.raw)
+    })
+    writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'what-v2\n')
+    await t.test('WHAT[requirement-grounding-012] a fresh actual read in an independent process appends changed material after the frozen prefix', () => {
+      const appended = run('append')
+      assert.equal(appended.occurrences, 2)
+      assert.deepEqual(appended.projected.slice(0, receipts.produce.projected.length), receipts.produce.projected)
+      assert.ok(appended.projected.at(-1).parts[0].state.output.includes('what-v2'))
+      assert.equal(appended.projected[0].parts[0].state.output.includes('what-v2'), false)
+      assert.deepEqual(appended.repeated, appended.projected)
+      receipts.append = appended
+    })
+    assert.ok(receipts.append, 'a failed fresh-read phase cannot authorize its replay')
+    rmSync(join(dir, 'requirements', 'alpha'), { recursive: true })
+    await t.test('WHAT[requirement-grounding-012] another normal process replays both saved inline versions with stable anchors and no source package', () => {
+      const replay = run('replay-appended')
+      assert.equal(replay.occurrences, 2)
+      assert.deepEqual(replay.projected, receipts.append.projected)
+      assert.deepEqual(replay.raw, receipts.append.raw)
+    })
+    const eventsDirectory = join(dir, '.git', 'wanxiang', 'events')
+    const writer = readdirSync(eventsDirectory).map(name => join(eventsDirectory, name)).find(file => readFileSync(file, 'utf8').split('\n').some(line => line.includes('RequirementGroundingAnchored') && line.includes('what-v1')))
+    assert.ok(writer, 'the actual producer wrote a typed grounding occurrence to its durable writer')
+    const lines = readFileSync(writer, 'utf8').split('\n')
+    const index = lines.findIndex(line => line.includes('RequirementGroundingAnchored') && line.includes('what-v1'))
+    const event = JSON.parse(lines[index])
+    assert.deepEqual(event.payload_refs, [], 'grounding occurrence result bytes are inline, without an invented grounding blob')
+    const fact = event.payload.Fact
+    assert.ok(Array.isArray(fact))
+    assert.equal(fact.length, 2)
+    assert.equal(fact[0], 'Agent')
+    const agent = fact[1]
+    assert.ok(Array.isArray(agent))
+    assert.equal(agent.length, 2)
+    assert.equal(agent[0], 'Host')
+    const grounding = agent[1]
+    assert.ok(Array.isArray(grounding))
+    assert.equal(grounding.length, 2)
+    assert.equal(grounding[0], 'RequirementGroundingAnchored')
+    const occurrence = grounding[1].Occurrence
+    for (const gap of [occurrence.CallGap, occurrence.ResultGap]) {
+      assert.deepEqual(gap, ['After', ['TranscriptMessageAddress', receipts.produce.raw[0].info.id]])
+    }
+    const reads = occurrence.Reads
+    assert.ok(Array.isArray(reads))
+    assert.ok(reads.length > 0)
+    assert.equal(new Set(reads.map(read => read.CallId[1])).size, reads.length)
+    for (const read of reads) {
+      assert.equal(typeof read.CallId[1], 'string')
+      assert.ok(read.CallId[1])
+      assert.deepEqual(read.CallId, ['ToolCallId', read.CallId[1]])
+      assert.deepEqual(JSON.parse(read.ArgsJson), { filePath: read.Path })
+    }
+    const what = reads.find(read => read.Path === 'requirements/alpha/WHAT.md')
+    assert.ok(what)
+    assert.equal(what.ResultBytes, 'what-v1\n')
+    assert.ok(receipts.produce.projected[0].parts[0].state.output.includes(what.CursorResultBytes))
+    lines[index] = '{BROKEN-GROUNDING-OCCURRENCE'
+    writeFileSync(writer, lines.join('\n'))
+    assert.throws(() => JSON.parse(readFileSync(writer, 'utf8').split('\n')[index]), SyntaxError)
+    await t.test('WHAT[requirement-grounding-012] corruption of the actual persisted occurrence prevents a fresh normal boot from reporting replay success', () => {
+      const rejected = run('corrupt')
+      assert.equal(rejected.rejected, true)
+      assert.equal(rejected.failure, 'MalformedEnvelope')
+      assert.match(rejected.error, /^local EventStore boot failed: local event history read failed: MalformedEnvelope/)
+      assert.equal(rejected.projected, undefined)
+    })
+  } finally { cleanup() }
+})

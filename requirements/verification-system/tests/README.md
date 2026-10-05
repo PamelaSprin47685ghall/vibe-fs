@@ -1,5 +1,9 @@
 # verification-system 测试说明
 
+2026-10-05 N04-B接续：Darwin的原foundation-identity工程已在四prepared owner的显式UDRO view上实际Fable/Node5/5、完整196entries，小物理8/8、轻量Fable/API33/0（2integration skip）。原owner不假认挂载inode，consumer排空后才detach，原Error/null、原目录恢复和过期receipt拒绝已证。统一gen127正式137/137排空、1041/0、19skip、72TODO，162.23s，仅pending exit1；readonly integration仍单独记账。[契约与原始记录](../../../proposals/N04真实只读Fable执行契约-2026-10-05.md)明列身份及范围。actual verify、backing/FD/ABA/native/OS与Linux/Windows不据此关闭，T418/T419保留。旧0d539 CI817/818总300s backstop及旧静默失败不抹去，新头CI另记。
+
+readonly repository integration 必须显式给 `WXS_VERIFICATION_NUGET_PROJECT_TREE_ID`、两个 NuGet 包选择 JSON，以及 `WXS_VERIFICATION_READONLY_SDK_ARCHIVE`/`WXS_VERIFICATION_READONLY_SDK_ARCHIVE_SHA256` 的绝对路径/raw SHA256。它经原 SDK prepare 完整校验，不回退环境 SDK；normal 原工程 fixture 保持原 copy/archive 路径。挂载入口当前只支持 Darwin，其余平台在消费前拒绝；默认 unit 只跳过声明的 integration。
+
 2026-10-05 本批状态：六 owner 局部修复及三接线切片已验收；gen116 正式 80/80、772/0、7 skip、31 TODO，进程组 accepted=true；cf6fb31e8 Linux 818/818、4292/0、104 skip、396 TODO，仅 pending exit1。实际 completed canary 及晚到 HTTP 错误回归完整 integration 21/0。最终冻结附件另列；先期 gen115 静默和原生 761/11 均保留，不用新成功替代旧失败或推断唯一原因。整体 readonly/FD/ABA/actual verify 仍未完成。
 
 2026-10-04 最新接续为[目录所有权与生产接线](../../../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。Archive、dotnet tools、NuGet project、Node/SDK probe、npm installation 六 owner 分别捕获私有 parent/root dev/ino，复核和清理拒绝外来 namespace；首次消费与各探针返回后复核完整工具，NuGet fresh-cache 删除前守门。真实替换、取消、失败及已发布工具证据分别记账，最终固定输入门禁见附件。下文 gen113 待验收/Archive 未施工属于历史截面：gen113 已439/0、18/18排空；cc9f44fc5 CI 已4258/0、818/818排空、103skip/404TODO。全过程 readonly/ABA/完整FD/actualverify 与 T418/T419 仍保留，后续成功不抹掉旧9909超时。

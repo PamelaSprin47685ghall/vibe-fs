@@ -12,7 +12,7 @@
 
 ## 台账
 
-2026-10-05排期更新：[总计划N00—N09](../proposals/TODO施工总计划-2026-10-03.md)。6a282ecfc全仓CI818/818、4303pass/0fail、105skip、396TODO，退出1仅pending；此前超时仍保留。先同步新增upstream，再并行推进Grounding/前缀证明、真实只读执行、Sphinx与原子制度学习。本次只更新计划和证据，不改变任何GAP状态；既有九项完成切片不重复认领，下面旧批记录不作为当前排期。
+2026-10-05排期更新：[总计划N00—N09](../proposals/TODO施工总计划-2026-10-03.md)。新增upstream已合入，gen127正式137/137排空、1041pass/0fail、19skip、72TODO，仅pending exit1；实际015 Host复核21/0。N01/N02/T389/T390与N03/T292/T298验收完成，N04-B有限Darwin原工程readonly Fable/Node5/5、小物理8/8及相关正式回归完成。旧6a282ecfc CI818/818只属原输入，0d539 CI817/818总300s backstop及旧本地静默失败仍保留、未唯一归因。新头全仓CI另记，不以选集替代。各整体GAP状态保持，既有完成切片不重复认领，下面旧批记录不作为当前排期。
 
 2026-10-05 当前接续见[目录所有权与生产接线](../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)：六 namespace owner、PP-011/T335、grounding B/T387 和 cognitive/015 注册投递切片验收完成，gen116 正式 80/80、772/0；cf6fb31e8 Linux 818/818、4292/0，仅 pending exit1。真实 completed 后 SDK/journal 隔离和晚到 HTTP 错误回归完整 integration 21/0。先期静默/就绪失败保留，不据新成功定位其唯一原因。GAP-077 的旧“physical lease 不落地”推断被原 physical/投影 id 混用反例修正。T418/T419 的全过程只读/FD/ABA/同候选 actual verify 及整体 GAP 其他义务继续 PARTIAL。
 
@@ -96,7 +96,7 @@ GAP-099的本地新focused反例：SessionHostPort所属`host-session-contract`�
 | GAP-052 | requirement-system-001/002/005/007/008/010 | PARTIAL | 格式检查不能判定语义重复、隐性规则、组织权或历史编号复用；001、004—008、011、017、018 保留可识别形式的正反例，其余人工审阅。 |
 | GAP-053 | feature-ablation-002 | PARTIAL | registry、执行/schema/事实/角色 gate 的行为有反例；尚未证明每个业务包关闭后全链零副作用及借用面完整。新 registry 接口不改变此证明限制。 |
 | GAP-054 | verification-system-004/005/006/007/010/012/018/019 | PARTIAL | 保留真实监督与门禁反例；2026-10-03补正式同步工作/微任务反例并修复Node原生reporter输送饥饿：已完成叶afterEach单次让步，不自造进展、不改5000ms，挂起噪声及after异常仍失败，Node22/26先红后绿。尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
-| GAP-055 | verification-system-006/016 | PARTIAL | 已补真实corpus输入闭包：tracked proposals内容与Git跟踪集合身份参与验证digest，Git inventory失败阻止任何阶段启动；6项反例先红后绿。S03输入根/普通输入/corpus父目录链接拒绝7项先红后绿，合法输出边界及同名普通文件保持。指定Git tree完整原blob准备、自有index/tree回验及失败回收已证；bootstrap安装45项、完整selected Node/npm工具15项、归档安装10报告项定向通过，含真实取消/完整工具digest绑定及边界复核。接续选定174c2a2533源码的实际仓库依赖安装4报告项通过，以完整Node22.23.3/npm11.12.1归档绑定11693成员及toolDigest，实际Fable List/Acorn/Tar消费及资源回收已证；不升级早期npm11.18.0夹具范围，也不绑定dirty合并输入。Mac挂载输出清理不证明实际Fable只读执行；native Host/lifecycle/SDK、Git/NuGet等外部依赖、只读输入、actualverify同候选及结论仍缺证，Homebrew Node26缺库失败保留。upstream590 copy/chmod真实父目录替换反例仍PASS exitCode0，阶段内改后恢复未闭合，T418/T419保留。copy、chmod或fs.watch均不当作完整隔离证明。 |
+| GAP-055 | verification-system-006/016 | PARTIAL | 既有corpus/普通输入/链接、Git tree准备、依赖安装与六owner修复证明保留。N04-B在Darwin以四prepared owner显式UDRO view实际编译原foundation-identity，Fable/Node5/5、196完整entries；小物理8/8覆盖consumer排空后detach、Error/null、取消与漏await，轻量33/0+2integration skip。gen127正式137选集完整排空、1041/0，readonly integration单独记账，见2026-10-05执行契约。该原工程切片不关闭selected Node/monitor/OS/native/FD、backing bytes/ABA、其它平台/多工程及actualverify同候选/结论绑定，T418/T419保留。旧Homebrew Node26缺库、upstream590 copy/chmod换父恢复假PASS与原超时均保留；copy/chmod/fs.watch不是完整隔离证明。 |
 | GAP-056 | verification-system-008/020 | PARTIAL | 用户已确认断言完整性按规范要求的结果和副作用判断；精确结构/文本仍完整比较。生成器设施的重放成功不等于全仓 oracle 独立、充分，继续人工审阅。 |
 | GAP-057 | verification-system-021 | PARTIAL | 计数、容器失败、结果流与文件完成已有回归；其它入口对未完成原因和范围的传播仍待证，TODO 应阻断完整验收。 |
 | GAP-058 | js-semantic-surface-001/006 | PARTIAL | `.mjs` 辅助文件义务与既有 `.js` 依赖、真实退出探针对内部物理入口的导入例外尚待裁决。保留可执行 TODO，不删除物理退出证据。 |
@@ -114,7 +114,7 @@ GAP-099的本地新focused反例：SessionHostPort所属`host-session-contract`�
 | GAP-082 | provider-projection-001/003—005/010/011/013/014 | PARTIAL | 011生产接线切片已补：真实注册入口经chronicle/checkpoint/typed continuation到PrefixRebaseCommitted落盘、新plugin incarnation重开、XTrace精确语义截点与独立Node crypto一致；callID/参数配对、坏hash/截点生产变异均有正式oracle，011定向7/0，统一验收见本批附件。它不证明独立安装消费者或新OS进程恢复。其他在线/重放全链、表示不取得权威与统一I/O所有权仍待证，整体PARTIAL。 |
 | GAP-083 | repository-investigation-001—006/009 | OPEN | RoleLaw 词形不能证明 Agent 取证、推理、只读调查或停止时机；需要实际任务和可复核轨迹。局部热启动数据/指令隔离不代替这些行为。 |
 | GAP-084 | repository-investigation-007/008 | PARTIAL | 完整关键词与无跨调用缓存有局部证据；热启动任务字节被添加前缀的反例保留。原始任务保真及容量规则范围仍待统一。 |
-| GAP-085 | requirement-grounding-002/006/007/011/012 | PARTIAL | 007 B已补三provider真实注册hook的九工具入口，含实际程序读写；guidance在grounding前、suffix保留、重放/canonical X与三生产接线变异有正式oracle，完整grounding定向24/0、5其他TODO，统一验收见本批附件。002自身tests覆盖漏拒、006实际返回版本、011权限及012独立进程恢复仍待证；007 A原Markdown字节表示契约归GAP-086。 |
+| GAP-085 | requirement-grounding-002/006/007/011/012 | PARTIAL | 007 B三provider九入口及正式验收保留。N01/011实际知识交付后的权限/副作用与错放行变异native5/0；N02/012五独立进程inline occurrence原字节/锚点重放与真实日志损坏拒绝native7/0。T389/T390已纳入gen127正式137选集，1041/0、全部排空，目标无TODO，见2026-10-05批次。002自身tests覆盖漏拒、006实际返回版本仍待证；007 A原Markdown字节表示契约归GAP-086，不据局部证明关闭整项。 |
 | GAP-086 | requirement-grounding-007；provider-projection-013/014 | PARTIAL | CRLF、空行、尾空格经统一表示被改写；原始事实保真与展示编码需分别定义。严格原字节合同及失败 TODO 保留，不以 normalize 后相等代替。 |
 | GAP-087 | structured-workflow-012 | PARTIAL | 旧 focused build 曾复用其它闭包的 Fable cracked-project cache，声称成功却未生成新模块；同输出先 Core 再 Alpha 的正式回归已迁入。新上游缓存方案须用相同输入验证，不沿用旧绿结论。 |
 | GAP-090 | time-capability-007/008 | PARTIAL | 局部 bind-once/render 不证明首次 prompt durable 采样或重启 marker；工程闭包/静态 gate 也非负向编译及全部消费者能力注入证明。 |
@@ -132,7 +132,7 @@ GAP-099的本地新focused反例：SessionHostPort所属`host-session-contract`�
 | GAP-102 | semantic-trace-010；SyncDelegate 首次 Opening | PARTIAL | 旧捕获只看“已有”而接受冲突；真实回归与纯裁决已迁入。SyncDelegate 仅初次 assignment 捕获 Opening，续接保留原文；待新基线回归确认。 |
 | GAP-103 | dispatch 物理接受生命周期 | PARTIAL | 旧成功路径未取消 Promise.race 的 timeout，断言后进程滞留；清理与回归属本批必要依赖。既有 ambient timer 不因修复就满足完整时间能力合同。 |
 | GAP-105 | context-compression-004、effect-accounting-004 | PARTIAL | 第二次 receipt 被纯 fold 拒绝不等于实际 commit 不幂等；实际入口可返回 KnownCommitted。完整 payload 冲突仍待证。压缩正文“非纯 XML”与当前拒绝任意工具样式标签、允许其它 XML 的实现边界仍待决定。 |
-| GAP-106 | prefix-stability | PARTIAL | 保留真实 candidate 历史拒绝/tail 正例、stable identity 与局部渲染；重建 provider wire、旧字符串或成员缺失不证明真实 seal/重启/冷边界全链。 |
+| GAP-106 | prefix-stability | PARTIAL | N03-A/B真实registered retry Failed不提交、错settlement变异、实际rebase/reanchor×Failed/Aborted及drain/冷reopen/新准入native56/0。T292/T298已纳入gen127正式137选集，1041/0、全部排空，目标无TODO。reanchor前通过实际第二Blogger ingest4→6取得material终态；不把缺前提的旧等待当生产红。同进程reopen不升级为独立进程或安装版Host wire；seal/跨生命等剩余义务及既有candidate/tail/stable identity证明仍分别保留。 |
 | GAP-107 | prefix-stability-002/008/013 | PARTIAL | 身份变化不自动产生第四种合法 epoch 来源；low-trust 要在完整请求呈现中成立。保留 NUL+BOM、首轮例外和 occurrence 必要一致性，不用关键词制造隔离证明。 |
 | GAP-108 | prefix-stability-014 | PARTIAL | 将实际 guidance 注入输出送到 capture，重开后仍含后缀的反例保留；尚未贯通 Host 原始输入回流，不能扩大为所有正常请求污染，也不能按文本关键字删除业务正文。 |
 | GAP-109 | work-record-005/008/009/013/015/017 | PARTIAL | 真 Opening 与原始完整区间仍缺完整生命周期证据；context-compression-017/028/029 现以成功 native todowrite checkpoint、固定 K=3 窗口、coverage 与完整 semantic turn 裁剪，同时永久保留所有真实用户消息。旧 BlindPlan/T1/Assume 阶段都不再是 cutoff 来源；Opening/P0/跨界 frame 的材料与截断权仍需联审。 |

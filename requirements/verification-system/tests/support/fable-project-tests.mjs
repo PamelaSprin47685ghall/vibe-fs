@@ -206,6 +206,15 @@ async function withCompiledFixture(action, behavior) {
 }
 
 export function registerFableProjectTests() {
+  test('WHAT[verification-system-016] malformed Fable admission preserves the public rejected Promise contract', async () => {
+    const { compileVerificationFableProject } = await import('../../../../scripts/lib/verification-fable-project.mjs')
+    for (const options of [undefined, null]) {
+      let pending
+      assert.doesNotThrow(() => { pending = compileVerificationFableProject(options) })
+      assert.ok(pending instanceof Promise)
+      await assert.rejects(pending, TypeError)
+    }
+  })
   test('WHAT[verification-system-016] Fable compilation requires four prepared input owners before publishing an output', async () => {
     await assert.rejects(compileProject({}), error => error.code === 'verification-fable-project-entry-invalid')
   })

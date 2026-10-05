@@ -5,6 +5,7 @@ import { privateDotnetEnvironment } from './verification-dotnet-environment.mjs'
 import { verificationInputExists } from './verification-input-path.mjs'
 import { captureOrdinaryVerificationFiles } from './verification-ordinary-files.mjs'
 import { runVerificationToolProbe } from './verification-tool-probe.mjs'
+import { assertReadonlyVerificationInputs, consumeReadonlyVerificationInputs } from './verification-readonly-inputs.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const invalidEntry = message => Object.assign(new Error(message), { code: 'verification-fable-project-entry-invalid' })
@@ -15,10 +16,21 @@ function ownedFile(root, relative) {
   return path.join(root, relative)
 }
 
-export async function compileVerificationFableProject({ source, sdk, tools, project, parentDirectory, signal }) {
+export function compileVerificationFableProject(options) {
+  try {
+    if (options.readonlyInputs !== undefined) return consumeReadonlyVerificationInputs(options.readonlyInputs, signal => compileProject({ ...options, signal: options.signal ? AbortSignal.any([options.signal, signal]) : signal }))
+    return compileProject(options)
+  } catch (error) { return Promise.reject(error) }
+}
+
+async function compileProject({ source, sdk, tools, project, parentDirectory, readonlyInputs, signal }) {
   signal?.throwIfAborted()
   if ([source, sdk, tools, project].some(owner => typeof owner?.revalidate !== 'function') || sdk.identityScope !== 'selected-dotnet-sdk-bundle' || tools.identityScope !== 'selected-dotnet-tool-restore' || project.identityScope !== 'selected-nuget-project-restore') throw invalidEntry('Compilation requires prepared source, SDK, tools and project owners')
-  for (const owner of [source, sdk, tools, project]) owner.revalidate()
+  const validateOwners = () => {
+    if (readonlyInputs !== undefined) assertReadonlyVerificationInputs(readonlyInputs, [source, sdk, tools, project], parentDirectory)
+    else for (const owner of [source, sdk, tools, project]) owner.revalidate()
+  }
+  validateOwners()
   const { sourceDigest, treeId, sourceRoot } = source
   const { sdkDigest, toolRoot: sdkRoot } = sdk
   const { toolsDigest, toolRoot: toolsRoot } = tools
@@ -37,7 +49,7 @@ export async function compileVerificationFableProject({ source, sdk, tools, proj
   const compiler = ownedFile(toolsRoot, fable.executable)
   const capturedInputs = JSON.stringify({ sourceDigest, treeId, sourceRoot, sdkDigest, sdkRoot, toolsDigest, toolsRoot, projectDigest, projectPath, projectRoot })
   const assertInputs = () => {
-    for (const owner of [source, sdk, tools, project]) owner.revalidate()
+    validateOwners()
     const actual = { sourceDigest: source.sourceDigest, treeId: source.treeId, sourceRoot: source.sourceRoot, sdkDigest: sdk.sdkDigest, sdkRoot: sdk.toolRoot, toolsDigest: tools.toolsDigest, toolsRoot: tools.toolRoot, projectDigest: project.projectDigest, projectPath: project.projectPath, projectRoot: project.projectRoot }
     if (JSON.stringify(actual) !== capturedInputs) throw invalidEntry('Compilation changed its selected input identities')
   }

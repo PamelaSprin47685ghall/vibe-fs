@@ -60,3 +60,69 @@ cognitive-e7a-preceding.log
 Merged input Linux CI and actual015 Host canary remain pending at this checkpoint.
 N00 is not complete. N01/N02/N03 implementation can use the frozen merged
 interfaces; one owner must later freeze all source/test/docs for final acceptance.
+
+Subsequent merged-input CI result, head0d5395518cb608fe40e4587c7b77c8bc4c5043f3:
+run37270655618,job111636734888; format/check/build passed.
+Unit physical backstop300000ms,817/818 drained; only verification-system/016 active.
+Last verdict: complete selected Node and npm archive capture preserves locked
+inputs before execution. Group3712 accepted=true8.873ms.
+No authoritative count summary; release stopped before integration/e2e/package.
+Raw job log: vibe-fs-n00-0d539-ci.log; this is not a pending-only result.
+
+Readonly timing audit: CI uses NODE_TEST_CONCURRENCY=2 and lexically sorted files.
+016 runs near the tail; its preparation shares the whole-suite300s physical budget.
+Neighbour006's final output is approximately280s in old846 and0d539, but170s in
+the completely drained6a2 input. The actual016 file-start and complete parent
+identity were not retained, so tail scheduling plus real tool costs is a mechanism
+inference, not an established sole cause or proof that the failed run was healthy.
+Five relevant npm/archive/Node/owned-tool/monitor files have no diff between6a2
+and0d539; both use selected Node22.23.3/npm10.9.9. The capture label is shared by
+eight parents; capture is not installation completion. Future observations must
+retain file-start, parent identity and actual tool/registry/monitor transitions
+without renewing verdict silence, changing worker count or enlarging budgets.
+
+Subsequent frozen batch N01/N02/N03/N04-B, generation127:
+ParentHEAD0d5395518cb608fe40e4587c7b77c8bc4c5043f3 plus staged owned changes.
+Fable build exit0,829 emitted modules,170 registered surfaces.
+scripts/check.mjs exit0; freshness passed before and after formal execution.
+Compiler input digest:
+65c26187919efb0c1986cd548b0b55a037fee9fa8eada9553ec1ed064905566f
+Generated input digest:
+c50c7f26d3f17665d41d29c9e144d2a7512e42de6a15894d420f5b39a691e8ab
+Artifact input digest:
+845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c
+Selected Node22.23.3/npm11.12.1/SDK10.0.302 explicit original paths.
+Formal scope137 original5000ms verdict silence/defaultworkers/300000ms backstop:
+137/137 drained,1041passed,0failed,19skipped,72TODO,162.23s wall,
+376.05s testtime;group34677 accepted=true19.511ms;exit1 solely pendingproof.
+Nested gate-fixture failed-container summaries are controlled negative cases;
+they are not the outer137 summary. Raw:vibe-fs-n01-n04-gen127-related137.log.
+T389/T390/T292/T298 no longer TODO; complete target proofs pass in this scope.
+Defaultunit explicitly skips readonlyintegration. Native real-project5/5,
+smallphysical8/8 and lightFable/API33/0 are separately scoped N04-B evidence,
+not wholeintegration,actualverify,FD/ABA/native/OS or multiplatform closure.
+
+Same frozen compiler/artifact input, installed actual015 Host independent run:
+21passed,0fail/skip/TODO/cancel,12.292s; original45s child/30s observer/5s ready.
+Two actual provider requests and late callback rejection both pass.
+Raw:vibe-fs-n00-gen127-actual015-host.log.
+
+Read-only N00 context diagnosis: exact original Node22 runner/all-pass fixture
+ctxabsent1/1 and ctxchild-v8 immediate recursive skip/zero completed files.
+This shape does not match previous5s silence with partial verdicts; context
+inheritance is not an established cause. No runner change or budget increase.
+Raw:n00-original-runner-no-context.log,n00-original-runner-child-context.log.
+Previous5s failures and0d539 CI300s cutoff remain unexplained failures;
+this new input's successful scope does not erase them or establish a sole cause.
+Status Markdown updated after these runs; final documentation generation and
+new-head CI must be recorded separately, not substituted into gen127 evidence.
+
+Final status-document generation128: Fable/check/freshness exit0.
+Compiler and artifact digests unchanged from gen127.
+Generated input digest:
+073202e7d8820895d3eade93d50470ed09e5da35fd4965a5690f467a729343bf
+Only status Markdown and archived logs changed after gen127 test execution.
+No repeat test claim for generation128; gen127 results retain original input.
+Raw:vibe-fs-n01-n04-gen128-build.log,vibe-fs-n01-n04-gen128-check.log.
+Source/docs scoped diff-check passed; raw archived logs intentionally retain
+upstream timestamps/whitespace verbatim and are excluded from whitespace QA.

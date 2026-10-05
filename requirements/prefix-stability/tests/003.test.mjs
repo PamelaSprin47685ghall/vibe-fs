@@ -22,6 +22,77 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
+test('WHAT[prefix-stability-003] the registered failure proof rejects production promotion of Failed candidates', async t => {
+  const assert = (await import('node:assert/strict')).default
+  const { spawn } = await import('node:child_process')
+  const { createInterface } = await import('node:readline')
+  const { join } = await import('node:path')
+  const { checkedTest } = await import('./support/registered-prefix.mjs')
+  const env = { ...process.env }
+  delete env.NODE_TEST_CONTEXT
+  env.WANXIANGSHU_FAILED_PREFIX_PROMOTION_MUTATION = 'enabled'
+  const stages = [
+    'registered authority and Host history create the real Blogger request',
+    'actual Chronicle execution and Host transcript commit the covered frame',
+    'native checkpoint tool completion opens the real phase window',
+    'exact first provider failure establishes the retry budget without promotion',
+    'admitted retry renders its candidate without changing committed state',
+  ].map(name => ({ name, receipt: Promise.withResolvers() }))
+  const child = spawn(process.execPath, [
+    join(import.meta.dirname, 'support/promotion-proof-runner.mjs'),
+    import.meta.filename, join(import.meta.dirname, 'support/failed-promotion-loader.mjs'),
+  ], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  let output = ''
+  const rejected = Promise.withResolvers()
+  let fullyDrained = false
+  const lines = createInterface({ input: child.stdout })
+  lines.on('line', line => {
+    const data = JSON.parse(line)
+    if (data.type === 'drained') {
+      fullyDrained = true
+      return
+    }
+    if (data.runEntry !== import.meta.filename) return
+    if (![import.meta.filename, join(import.meta.dirname, 'support/registered-prefix.mjs')].includes(data.file)) return
+    if (!data.passed) output += data.error
+    for (const stage of stages) {
+      if (data.name === stage.name) stage.receipt.resolve(data.passed === true && !data.skipped && !data.todo)
+    }
+    if (data.name === 'exact retry failure discards its candidate without a prefix commit or rollback') rejected.resolve(data)
+  })
+  child.stderr.on('data', chunk => { output += chunk })
+  const exit = Promise.withResolvers()
+  child.on('error', exit.reject)
+  child.on('close', code => {
+    for (const stage of stages) stage.receipt.resolve(false)
+    rejected.resolve(null)
+    exit.resolve(code)
+  })
+  try {
+    for (const stage of stages) {
+      await checkedTest(t, `the production mutant passes ${stage.name}`, async () => {
+        assert.equal(await stage.receipt.promise, true, output)
+      })
+    }
+    await checkedTest(t, 'the real retry settlement detects the wrong production promotion', async () => {
+      const verdict = await rejected.promise
+      assert.ok(verdict, output)
+      assert.equal(verdict.passed, false, output)
+      assert.equal(verdict.skipped, false, output)
+      assert.equal(verdict.todo, false, output)
+      assert.match(output, /a failed retry must not append a prefix commit or rollback/)
+    })
+    await checkedTest(t, 'the production mutant finishes and releases its owned test process', async () => {
+      assert.equal(await exit.promise, 1, output)
+      assert.equal(fullyDrained, true, output)
+    })
+  } finally {
+    if (child.exitCode === null) child.kill('SIGTERM')
+    await exit.promise
+    lines.close()
+  }
+})
+
 test('WHAT[prefix-stability-003] absent candidate selects the supplied committed snapshot', () => {
   const committed = snapshotAt(4)
 
@@ -73,4 +144,92 @@ test('WHAT[prefix-stability-003] CTX_010_the_required_blob_follows_the_choice_no
 })
 }
 
-test.todo('WHAT[prefix-stability-003] actual failed probe leaves no prefix commit or rollback in durable history; missing export names do not prove this; GAP-106')
+test('WHAT[prefix-stability-003] an actual admitted retry candidate is discarded on exact provider failure and stays discarded after reopen', async t => {
+  const assert = (await import('node:assert/strict')).default
+  const { configureManagedPlugin, withRestartablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { checkedTest, coveredSession, continuation, completeToolAttempt, failAttempt, facts, observeFact, prefixHistory, prefixState, state } = await import('./support/registered-prefix.mjs')
+  const check = (name, action) => checkedTest(t, name, action)
+  const sessionID = 'ses-prefix-failed-retry'
+  await withRestartablePlugin(async (start, directory, host) => {
+    const hooks = await start()
+    await configureManagedPlugin(hooks)
+    let baseline
+    let history
+    let session
+    let retry
+    await host.withRuntime(async journalRuntime => {
+      const runtime = { ...journalRuntime, ...host }
+      await check('registered producer commits the covered material', async producer => {
+        session = await coveredSession(hooks, runtime, directory, sessionID, producer)
+        history = prefixHistory(directory)
+        assert.deepEqual(history.rebases, [])
+        assert.deepEqual(history.reanchors, [])
+      })
+      await check('exact first provider failure establishes the retry budget without promotion', async () => {
+        const initial = await continuation(hooks, runtime, session, 'msg-first-candidate')
+        assert.ok(initial.projected.messages.some(message => message.info?.source === 'companion-memory'))
+        await observeFact(directory, 'FailureRecorded', () => failAttempt(hooks, runtime, session, initial, 'Failed'))
+        assert.deepEqual(prefixHistory(directory), history, 'failed candidate must not be promoted')
+        assert.equal(state(runtime, sessionID).providerFailures.consecutiveFailureCount, 1)
+        baseline = prefixState(runtime, sessionID)
+      })
+      await check('admitted retry renders its candidate without changing committed state', async () => {
+        retry = await continuation(hooks, runtime, session, 'msg-failed-retry', 'ProviderRetryAttempt')
+        assert.equal(retry.message.metadata.wanxiangshu_origin, 'ProviderRetryAttempt')
+        assert.ok(retry.projected.messages.some(message => message.info?.source === 'companion-memory'), 'the actual retry must carry a candidate')
+        const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === retry.physical)
+        assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', retry.run.info.id])
+        assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ProviderRetryAttempt'])
+        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
+        assert.deepEqual(prefixState(runtime, sessionID), baseline, 'candidate rendering cannot commit its epoch')
+      })
+      await check('exact retry failure discards its candidate without a prefix commit or rollback', async () => {
+        if (process.env.WANXIANGSHU_FAILED_PREFIX_PROMOTION_MUTATION === 'enabled') {
+          globalThis.__wanxiangshu_failed_prefix_promotion = true
+        }
+        try {
+          await observeFact(directory, 'FailureRecorded', () => failAttempt(hooks, runtime, session, retry, 'Failed'))
+          const failures = facts(directory, 'FailureRecorded')
+          assert.deepEqual(failures.at(-1).ProviderRun, ['ProviderRunIdentity', retry.run.info.id])
+          assert.deepEqual(prefixHistory(directory), history, 'a failed retry must not append a prefix commit or rollback')
+          assert.equal(state(runtime, sessionID).providerFailures.consecutiveFailureCount, 2, 'exact retry settlement records the second failure')
+          assert.deepEqual(prefixState(runtime, sessionID), baseline)
+        } finally {
+          delete globalThis.__wanxiangshu_failed_prefix_promotion
+          await continuation(hooks, runtime, session, 'msg-admitted-after-retry-failure', 'ProviderRetryAttempt')
+          await host.stop(hooks)
+        }
+        assert.deepEqual(prefixHistory(directory), history, 'draining settlement must preserve the complete prefix history')
+        assert.deepEqual(prefixState(runtime, sessionID), baseline)
+      })
+    })
+    await host.stop(hooks)
+    const reopened = await start()
+    await configureManagedPlugin(reopened)
+    await host.withRuntime(async journalRuntime => {
+      const runtime = { ...journalRuntime, ...host }
+      let next
+      await check('reopened journal preserves state and a normal request receives its own admission', async () => {
+        assert.deepEqual(prefixHistory(directory), history)
+        assert.deepEqual(prefixState(runtime, sessionID), baseline)
+        next = await continuation(reopened, runtime, session, 'msg-normal-after-failure')
+        assert.deepEqual(prefixHistory(directory), history)
+        assert.deepEqual(prefixState(runtime, sessionID), baseline)
+        assert.equal(next.message.metadata.wanxiangshu_origin, 'ManagedDelegationAssignment')
+        const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === next.physical)
+        assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ManagedDelegationAssignment'])
+        assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', next.run.info.id])
+        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
+      })
+      await check('only the new successful provider run commits the later rebase', async () => {
+        await completeToolAttempt(session, next, reopened)
+        const committed = prefixHistory(directory).rebases
+        assert.equal(committed.length, 1, 'only the later successful ordinary attempt may commit')
+        assert.deepEqual(committed[0].SolvingProviderRun, ['ProviderRunIdentity', next.run.info.id])
+        assert.notDeepEqual(committed[0].SolvingProviderRun, ['ProviderRunIdentity', 'run-msg-failed-retry'])
+      })
+    })
+  })
+})

@@ -1,5 +1,9 @@
 # 历史计划与施工记录
 
+[失败候选与已提交前缀](2026-10-05/失败候选与已提交前缀-2026-10-05.md)记录N03真实retry Failed及错误settlement变异、rebase/reanchor四组合和第二Blogger producer前提。T292/T298已验收，native56/0及gen127正式137选集通过，GAP-106其它义务保留。N04首个实际只读原工程与生命周期证据从[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)接续。
+
+[Grounding 权限与跨进程重放](2026-10-05/Grounding权限与跨进程重放-2026-10-05.md)记录N01/N02的实际权限、副作用变异、五进程inline occurrence重放与损坏拒绝。T389/T390已验收，native分别5/0、7/0及gen127正式137选集通过，GAP-085其它义务保留。[N00合并记录](2026-10-05/baselines/2026-10-05-n00-acceptance.txt)保存gen127正式137/137、1041/0及实际015 Host21/0，也保留旧合并CI817/818 physical backstop，不能互相替代。
+
 [S03 编译目录身份与清理](2026-10-04/S03编译目录身份与清理-2026-10-04.md)记录Fable同库存foreign parent/root被接受并真的删除的0/2红例，以及私有dev/ino边界检查、幂等cleanup和Error/null Aggregate cause。新批结果待附件，TOCTOU/ABA、其它owner、完整FD与只读执行未闭合。
 
 [S03 独立工具进程回收](2026-10-04/S03独立工具进程回收-2026-10-04.md)已提交9909a7bb9，gen110正式18/18排空、429/0/6skip/2TODO、原组accepted=true。薄monitor、同步判决输送与即时failure诊断各证据保持；fullsetsid/crash/ABA及/bin/ps控制面身份未闭合，后续从顶部记录接续。

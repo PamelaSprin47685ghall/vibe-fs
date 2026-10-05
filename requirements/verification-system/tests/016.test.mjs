@@ -20,10 +20,12 @@ import { repositoryDotnetToolsTest } from './support/repository-dotnet-tools-tes
 import { registerNugetProjectTests } from './support/nuget-project-tests.mjs'
 import { repositoryNugetProjectTest } from './support/repository-nuget-project-tests.mjs'
 import { registerFableProjectTests } from './support/fable-project-tests.mjs'
-import { repositoryFableProjectTest } from './support/repository-fable-project-tests.mjs'
+import { repositoryFableProjectTest, repositoryReadonlyFableProjectTest } from './support/repository-fable-project-tests.mjs'
 import { integrationTest } from './support/tier-gate.mjs'
 import { registerArchiveNamespaceTests } from './support/archive-namespace-tests.mjs'
+import { registerReadonlyInputTests } from './support/readonly-input-tests.mjs'
 
+registerReadonlyInputTests()
 registerArchiveNamespaceTests()
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
@@ -36,6 +38,7 @@ integrationTest('WHAT[verification-system-016] a complete selected SDK archive r
 integrationTest('WHAT[verification-system-016] selected complete SDK restores original repository local tools from explicitly identified NuGet archives', repositoryDotnetToolsTest)
 integrationTest('WHAT[verification-system-016] selected complete Git source and SDK restore the original foundation identity project through a fresh-cache locked NuGet graph', repositoryNugetProjectTest)
 integrationTest('WHAT[verification-system-016] four selected input owners compile the original foundation identity project with Fable into isolated outputs', repositoryFableProjectTest)
+integrationTest('WHAT[verification-system-016] mac readonly views protect actual original-project Fable inputs and restore all prepared owners', { skip: process.platform !== 'darwin' }, repositoryReadonlyFableProjectTest)
 
 test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
