@@ -149,3 +149,18 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 - src/Wanxiangshu/OpenCode/Host/ModelRouting.fs（exact run lookup 的所有权与清理边界）
 
 最初记录于2026-10-05 gen152冻结期间；D0在gen159有限验收。下一批按这里冻结归属与资源合同、取得真正 successor 的业务红灯，再实施三类 producer 的因果交接。
+
+## 9. D0之后的接口冻结与分包（198e8251e只读复核）
+
+本节是下一批指引，尚未实现、未取得正式红绿，不能另销TODO。按依赖串行冻结公共类型，再分工修改独立producer；不要三人同时猜低层签名。
+
+1. **先定资源合同。** register的三个真实owner是Send root、Send claimed continuation和Fork/Host/RunLifecycle的Unknown reattach。下一包可在现PhysicalAcceptance模块内为每次注册返回opaque lease，每次都有不同token，即使callback实例相同也不能共用身份；Dispose只compare-remove自己的callback，幂等、不碰waiter、不写journal、不调用Abandon。不要新建registry。Sender必须在Host effect之前把实际lease交给具体call scope，不能在Detached返回时用`use`释放。Fork reattach必须同时迁移，不能留下按全keycancel清其它owner的路径。
+2. **单独核实等待与通知异常。** 现awaitConfirmation共享每key TCS，但每caller有独立timeout，任一timeout会全keycancel；现accepted先移除callback/waiter再调用callback，异常能阻止waiter结算。这两项目前只有源码证据。先用薄公开接缝制造真实行为红：短waiter timeout后长waiter和observer仍能由实际ingress结算；callback抛错时durable accepted不倒退、另owner waiter仍得到exact physical。确认等待和callback registration是不同资源，不能把lease.Dispose写成cancel waiter。异常处置依原owner合同，不伪造Refused，也不在Surface吞错充成功。
+3. **再定低层source载体。** 原生四字段为SessionId、source PhysicalUserMessageId、source AuthorityRootUserMessageId、source ProviderRunIdentity。Guard的SessionContract处于低层，只依Foundation.Identity的source record和窄opaque handoff；不得反向引用高层SyncDelegate/Dispatch、偷渡完整ReconciledTurn或obj。类型名和签名在此冻结后才改fsi，不把本节候选当成现存API。
+4. **冻结exact occasion读取。** Dispatch owner从原projection返回未准入、原key Pending、原key actually Accepted的原生证据，accepted核对精确PhysicalLandings。保留RunGateNudgeOnce的single-flight；不自行解析payload或另建flight。retry的recoveryAlreadyAdmitted会在redispatchAfterFailure提前返回Superseded，只改fresh sendRecoveryContinuation会漏接这条路。同key不证明同call；缺原call证据时明确未确认，不转移给新call、不重发。
+5. **接具体call binder及retry。** source在effect前核对所有权，返回只捕获该具体call的observer；实际accepted才加入它的attempt集合。lease Attach和call Close由同一个owner排序，已结束后Attach立即释放；accepted已取出callback时退订不能撤回在途通知，closure仍核对自己的call/resource存活。随后一次下传RetryPort、PluginSessionWiring、ProviderRecoveryWorkflow、SessionNudge，fresh与AlreadyAdmitted两路共同验收。
+6. **接普通repair。** 在sendRepair仍持有完整turn时绑定，观察能力随原quiescence permit穿过trySendIdleGateRepair/idle wrapper/SendIdleGateNudge；保留最后physicalsend处TryConsume及definiteNotSent才release的政策。没有SyncDelegate call的普通repair仍按原owner执行。Blogger repair是另一生命周期，留在原路径，不顺手统一。
+7. **接guard。** armed/activeInterrupt只有session/run，没有physical/root。HostTurnObserver必须在ConsumeAbortCause之前从完整turn绑定source，再沿原StartContinueWork/ContinueWorkerTask/owned proxy/runOwnedWork传到HostSignalBootstrap.continueFn与原Detached sender。保留exact-run、task ReferenceEquals、interrupt await和finally FinishContinue。不得在continueFn补查latest physical，或在Consume返回后才绑定，此时effect已启动。
+8. **最后删宽匹配。** 三个真正生产入口各完成第6节矩阵及晚acceptance反例后，才删除same-root+历史kind分支；不可先只认initial physical破坏本次合法retry，也不可保旧分支作兼容兜底。ordinary HandleTurn和fallback分别证明不污染B，合法B仍可完成。原key冷启动缺同call持久证据不授予新call。lease、等待/异常、来源接线、真实Host和冷恢复分别更新状态，整A2/B1/GAP仍按实际范围结算。
+
+每包验收都先保存实际红灯和正控、冻结input、Fable构建、相关正式套件与freshness，再同步本卡状态、证据和未证边界。新API缺失只能记能力前置，不能算业务红；标题仍保持NNN文件对应的唯一WHAT锚点。

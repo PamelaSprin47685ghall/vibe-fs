@@ -1,5 +1,7 @@
 # sphinx-v2 测试证明范围
 
+2026-10-06 A2-D0仅完成现SyncDelegate下层Detached通知前置，Sphinx尚未消费它。gen159相关238/238、1178/0；随后gen161 clean build去掉两份无源码旧本地产物、828模块闭包通过，同范围仍1178/0。[A2活动卡](../../../proposals/TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)已细化registration lease、等待/异常、exact source和三producer的冻结顺序，均未施工；034/GAP-219不由通知能力或本地绿色关闭。
+
 2026-10-05 B2-0有限守门：002/029通过真实ContributionKind→EstimateKind→Decision证明Unestimated即使带Rank/Location也不可用、空集合不宣称数值比较、ordinal/provisional保持原种类，旧rank0约定保留。gen151已有正式业务红灯，gen154相关宽选集225/225、1125/0；最后静态等价调整的交付复验另见[本批记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。这不是实际profile/model绑定或完整规划/renderer证明；002/029整体TODO、B1—B6与GAP-219保持。
 
 本目录是取代旧 epistemic-reasoning 的活动测试。WHAT 保持新上游 36 条合同，旧价格公式、阶段工具和内核不得通过测试迁回复活。历史对应见 [SUPERSEDES](../SUPERSEDES.md)。
