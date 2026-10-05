@@ -187,19 +187,19 @@
 
 ### N06-B 接手卡：先让运行事实可恢复，再接真实执行
 
-本卡取代下方完整义务索引中的开工顺序。A已验收，不重做创建/读取。B0—B6均待施工；此次只读调查不算交付，也不授权用空delta或测试Surface冒充生产执行。
+本卡取代下方完整义务索引中的开工顺序。A和B0有限验收已完成，不重做创建/读取及canonical派发接纳。2026-10-05的[本批记录](../archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)保存gen144/146/148正式红例、gen149目标23/23、230/0与宽选集75/75的独立性能失败。B1-A契约已定，B1—B6整体仍未完成；不用空delta或测试Surface冒充生产执行。
 
 | 子包 | 状态 | 本包退出条件 |
 | --- | --- | --- |
-| B0 canonical派发事实 | 待施工，下一件事 | 合法intent/receipt真正进入唯一Current，坏引用与冲突拒绝，原子批次/冷重开通过；不宣称实际Host派发 |
-| B1 实际Host绑定 | 待施工，依赖B0 | 真owner SessionId、family parent、terminal订阅、public prompt与实际receipt可观察；禁止InquiryId冒充SessionId |
-| B2 executable profile | 待施工，可并行只读设计 | 实际plugin/schema/ABI lock、prompt、model/provider授权与资源绑定；一个有限profile可真实规划与渲染 |
+| B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
+| B1 实际Host绑定 | B1-A契约已定，待实现 | 先在现有生产SyncDelegate instance公开一次调用的typed Admission/Completion；沿原send owner保留原生carrier与PromptKey，actual terminal/checkpoint后交正式文本。之后再接真owner SessionId、family parent、public prompt与Sphinx持久绑定；本小包不关闭034 |
+| B2 executable profile | B2-0已调查，待正式红绿；完整profile待施工 | 先使Unestimated无论是否带rank都不可用，保留ordinal/provisional种类与实际Decision选择；不改rank范围。真实plugin/schema/ABI lock、prompt、授权/资源与原Goal/material仍须另接 |
 | B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
 | B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |
 | B5 accepted renderer答案 | 待施工，依赖B3/B4 | 实际renderer结果先accepted，再AnswerCommitted；公开正文和来源可取、停止标签诚实 |
 | B6 公开闭环验收 | 待施工，依赖B0—B5 | 017/036实际入口闭环、新OS冷重开、034实际Host证据，局部/受控/实际Host分别结算 |
 
-**B0，一次独立提交先闭合canonical派发事实。** 先读sphinx WHAT003/007/009/010/019及Core Events/State/Reducer、BodyDto/Codec。当前DispatchRequested/DispatchReceiptRecorded在Reducer中为Ok state，PhysicalBindings没有生产写入；不能将append receipt当作已恢复运行事实。先通过公开Persistence Surface写合法intent和receipt并读取Current，取得旧实现binding为空的正式红例。然后按真实body契约检查work、当前attempt/fence、已接受intent，保存intent与真实physicalRef/receipt；same identity不同receipt拒绝。错误引用、错attempt/fence/intent、冲突receipt、batch后项失败无前缀Current、冷重开与删派生cache独立覆盖。需要保存的新事实只能进入同一Current，不从export trace再fold。仅结算Core接纳与恢复，不关闭034实际Host或010完整receipt丢失对账。
+**B0，已验收的有限边界。** 原no-op路径已退出：DispatchRequested保完整Work/publicEnvelope/privateTicket，Receipt保完整intent/work/attempt/fence/physicalRef/native envelope，内部只有Dispatches一个map。fresh派发要求当前Ready/同fence Leased、完整Spec、真实成功依赖、已存在Some round及本work持久预留；None独立work允许。同intent exact replay先于fresh守门，同identity改内容拒绝；receipt同时核对Spec及Running物理引用。native字段仍叫physicalBindings，空值字节保持原seal；实际gen143旧创建/未派发work原样恢复，缺round旧派发和错误aggregate预留分别durable cut，原历史不删不重封。004/007/010/019/020覆盖正式Persistence/Current、原子批次、冷重开及hash。真实Host来源、副作用前append失败与receipt丢失对账、usage/容量完整义务保留，T401/T402/034不关闭。
 
 **B1，实际Host调用的第一条合法路径。** 先读sphinx WHAT010/023/034、session-ontology WHAT006、delegation WHAT007及真实Sessions.SendPrompt。Adapter目前把InquiryId转成SessionId，且没有terminal订阅就SendPrompt；真实Host会以listener-before-send拒绝。由真实Host入口注入typed owner SessionId，独立MCP的执行上下文由composition明确供应，缺能力仍具名拒绝；不能用createdBy/configHash替代物理身份。遵循真实family root压平和标准Engineer的authority/委托owner。先订阅再send，订阅由同一effect owner持有至真实terminal/Dispose；仅public envelope进入prompt，private ticket留Host侧。receipt、physical message、child session与provider run分型保存，acceptance-unknown不重发。先让owner SessionId与InquiryId故意不同击红，再观察真实parent、prompt、订阅顺序和实际Host返回；能力字符串不算派发证据。Provider adapter现用HostForkRunLifecycleSurface.create(receipt string)制造无关联pending cell，必须清理，消费真实执行owner，不能走这条捷径。
 

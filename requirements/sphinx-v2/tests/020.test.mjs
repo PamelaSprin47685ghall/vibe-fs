@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import * as Core from '../../../dist/Sphinx/V2/Core/Surface.js'
 import * as Wire from '../../../dist/Sphinx/V2/Wire/Surface.js'
-import {store, digest, body, work, transition, batch, prepare, append} from './persistence-support.mjs'
+import {store, digest, body, envelope, work, transition, batch, prepare, append} from './persistence-support.mjs'
 
 test('WHAT[sphinx-v2-020] an actual created state has a usable content-sensitive semantic hash', () => {
   const states = ['\n原文甲\r\n  ', '\n原文乙\r\n  '].map(text => {
@@ -252,6 +252,61 @@ test('WHAT[sphinx-v2-020] actual physical work references change state and trace
       assert.equal(histories[0].semanticHash, histories[1].semanticHash)
       assert.notEqual(histories[0].stateHash, histories[1].stateHash)
       assert.notEqual(histories[0].traceHash, histories[1].traceHash)
+    })
+  })
+})
+
+test('WHAT[sphinx-v2-020] complete canonical dispatch bindings change full hashes and retain the same semantic view', async () => {
+  await withRuntime(async first => {
+    await withRuntime(async second => {
+      const handle = first.open()
+      const created = successful(await Wire.start(handle, startArgs('dispatch-hash', 'same logical goal')))
+      const origin = storeEvent(fullExport(handle, created.inquiryId).events[0])
+      const copied = await store.append(second.openStore(), [origin])
+      assert.equal(copied.ok, true)
+      assert.deepEqual(copied.cuts, [])
+      const other = second.open()
+      const histories = []
+      for (const [runtime, writer, physicalRef] of [
+        [handle, first.openStore(), 'host-child-A'],
+        [other, second.openStore(), 'host-child-B'],
+      ]) {
+        const spec = {...work('dispatch-hash-work'), roundId: null, reserved: [{key: 'calls', value: 0}]}
+        const request = {
+          work: spec, dispatchIntentId: 'dispatch-hash-intent', publicEnvelope: envelope('{}'),
+          privateTicket: envelope(JSON.stringify({hostOwner: physicalRef})),
+        }
+        const intent = await append(writer, batch(created.inquiryId, 'intent', [
+          body('WorkPlanned', {work: [spec]}),
+          transition(spec.id, 'Planned', {case: 'Ready'}),
+          body('BudgetReserved', {
+            reservation: {workId: spec.id, attempt: 1, resources: spec.reserved, moneyMinor: null},
+            renderReserve: [{key: 'calls', value: 0}],
+          }),
+          body('DispatchRequested', request),
+        ], origin))
+        const pending = fullExport(runtime, created.inquiryId)
+        const receipt = {
+          workId: spec.id, attempt: 1, fence: spec.fence, dispatchIntentId: request.dispatchIntentId,
+          physicalRef, receipt: envelope(JSON.stringify({transportReceipt: 'receipt-for-' + physicalRef})),
+        }
+        await append(writer, batch(created.inquiryId, 'receipt', [body('DispatchReceiptRecorded', receipt)], intent))
+        const bound = fullExport(runtime, created.inquiryId)
+        assert.deepEqual(bound.state.physicalBindings, [{key: request.dispatchIntentId, value: {request, receipt}}])
+        assert.deepEqual(bound.inquiry, pending.inquiry)
+        assert.equal(bound.semanticHash, pending.semanticHash)
+        assert.notEqual(bound.stateHash, pending.stateHash)
+        assert.notEqual(bound.traceHash, pending.traceHash)
+        histories.push(bound)
+      }
+      assert.deepEqual(histories[0].inquiry, histories[1].inquiry)
+      assert.equal(histories[0].semanticHash, histories[1].semanticHash)
+      assert.notEqual(histories[0].stateHash, histories[1].stateHash)
+      assert.notEqual(histories[0].traceHash, histories[1].traceHash)
+      first.close(handle)
+      assert.deepEqual(fullExport(first.open(), created.inquiryId), histories[0])
+      second.close(other)
+      assert.deepEqual(fullExport(second.open(), created.inquiryId), histories[1])
     })
   })
 })

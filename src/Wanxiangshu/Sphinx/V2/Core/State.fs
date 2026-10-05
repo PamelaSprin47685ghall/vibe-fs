@@ -2,9 +2,9 @@ namespace Wanxiangshu.Sphinx.V2.Core
 
 /// The single v2 inquiry state.
 ///
-/// WHAT[sphinx-v2-018]: physical bindings — session ids, provider request ids, SSE
+/// WHAT[sphinx-v2-008]: physical bindings — session ids, provider request ids, SSE
 /// cursors, transport receipts — are stored because recovery and billing need them,
-/// but they are kept in `PhysicalBindings` and excluded from the semantic projection.
+/// but they are kept in dispatch records and excluded from the semantic projection.
 /// A semantic projection that included them could not claim to be Host-independent.
 
 [<RequireQualifiedAccess>]
@@ -45,13 +45,10 @@ type OverrunFact =
       Attempt: Attempt
       Resources: Map<string, float> }
 
-/// A physical binding recovered from a Host. Never participates in semantic hashing.
-type PhysicalBinding =
-    { WorkId: WorkId
-      Attempt: Attempt
-      DispatchIntentId: string
-      PhysicalRef: string option
-      Receipt: string option }
+/// An accepted intent and its optional complete Host receipt.
+type DispatchRecord =
+    { Request: DispatchRequestedBody
+      Receipt: DispatchReceiptRecordedBody option }
 
 /// One durable command identity owns its content fingerprint and original receipt.
 type CommandReceipt =
@@ -88,7 +85,7 @@ type InquiryState =
         Answer: AnswerCommittedBody option
         /// Command identity -> immutable content-bound receipt, rebuilt from transitions.
         CommandReceipts: Map<string, CommandReceipt>
-        PhysicalBindings: Map<string, PhysicalBinding>
+        Dispatches: Map<string, DispatchRecord>
         Status: InquiryStatus
     }
 

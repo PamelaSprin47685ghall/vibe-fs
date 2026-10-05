@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as persistence from '../../../dist/Sphinx/V2/Persistence/Surface.js'
 import {
@@ -7,6 +8,48 @@ import {
 } from './persistence-support.mjs'
 
 const text = '\n原文保留\r\n  不归一化  '
+
+const priorSealed = JSON.parse(readFileSync(new URL('./fixtures/gen143-sealed-transitions.json', import.meta.url), 'utf8'))
+
+test('WHAT[sphinx-v2-019] previously sealed @2 creation and undispatched work retain their exact complete state through cold replay', async t => {
+  assert.equal(priorSealed.head, '45e4137e4fd58c9788f160246401d562dc0e5d29')
+  assert.equal(priorSealed.generation, 143)
+  for (const scenario of priorSealed.scenarios.slice(0, 2)) {
+    await t.test('WHAT[sphinx-v2-019] preserves actual prior seal for ' + scenario.inquiry, async () => {
+      await withStore(async ({ open, close }) => {
+        const writer = open()
+        const receipt = await store.append(writer, [scenario.event])
+        assert.equal(receipt.ok, true)
+        assert.deepEqual(receipt.cuts, [])
+        const live = current(writer, scenario.inquiry)
+        assert.deepEqual(mustOk(live), scenario.state)
+        assert.equal(live.stateHash, scenario.event.payload.postStateFingerprint)
+        close(writer)
+        assert.deepEqual(current(open(), scenario.inquiry), live)
+      })
+    })
+  }
+})
+
+test('WHAT[sphinx-v2-019] prior missing-round dispatch and aggregate reservation seals become explicit durable cuts', async t => {
+  for (const scenario of priorSealed.scenarios.slice(2)) {
+    await t.test('WHAT[sphinx-v2-019] refuses the prior incorrect seal for ' + scenario.inquiry, async () => {
+      await withStore(async ({ open, close }) => {
+        const writer = open()
+        const receipt = await store.append(writer, [scenario.event])
+        assert.equal(receipt.ok, true)
+        assert.equal(receipt.cuts.length, 1)
+        assert.match(receipt.cuts[0].reason, scenario.inquiry === 'legacy-noop-dispatch' ? /unknown-round/ : /post-state-mismatch/)
+        assert.deepEqual(store.read(writer, scenario.event.id), scenario.event, 'the original history remains intact')
+        const refused = current(writer, scenario.inquiry)
+        assert.equal(refused.ok, false)
+        assert.equal(refused.error.code, 'SemanticCut')
+        close(writer)
+        assert.deepEqual(current(open(), scenario.inquiry), refused)
+      })
+    })
+  }
+})
 
 const expectCut = async (handle, event, code) => {
   const receipt = await store.append(handle, [event])
@@ -364,6 +407,26 @@ const cases = [
   body('InquiryStatusChanged', { status: 'input-required', reason: 'authorization needed' }),
 ]
 
+const dispatchSeedBodies = includeIntent => [
+  createdBody(text),
+  body('RoundOpened', { roundId: 'round-1', scopeId: 'scope-1', expectedWork: ['work-2'] }),
+  body('WorkPlanned', { work: [work('work-2')] }),
+  transition('work-2', 'Planned', { case: 'Ready' }),
+  body('BudgetReserved', {
+    reservation: { workId: 'work-2', attempt: 1, resources: [{ key: 'calls', value: 1 }], moneyMinor: null },
+    renderReserve: [{ key: 'calls', value: 1 }],
+  }),
+  transition('work-2', 'Ready', { case: 'Leased', fence: 'work-2:1:logical' }),
+  ...(includeIntent ? [cases.find(value => value.case === 'DispatchRequested')] : []),
+]
+
+const bodySeed = value => {
+  if (value.case === 'InquiryCreated') return [value]
+  if (value.case === 'DispatchRequested') return dispatchSeedBodies(false)
+  if (value.case === 'DispatchReceiptRecorded') return dispatchSeedBodies(true)
+  return seedBodies(text)
+}
+
 test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-writer canonical replay without losing public DTO fields', async () => {
   assert.equal(cases.length, 30)
   assert.equal(new Set(cases.map(value => value.case)).size, 30)
@@ -371,7 +434,7 @@ test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-w
     assert.deepEqual(mustOk(persistence.canonicalizeBody(value)), value, value.case)
     await withStore(async ({ open, close }) => {
       const first = open()
-      const creation = await append(first, batch('body-inquiry', 'seed', value.case === 'InquiryCreated' ? [value] : seedBodies(text)))
+      const creation = await append(first, batch('body-inquiry', 'seed', bodySeed(value)))
       const encoded = value.case === 'InquiryCreated' ? creation
         : await append(first, batch('body-inquiry', 'body', [value], creation))
       const durable = store.read(first, encoded.id)

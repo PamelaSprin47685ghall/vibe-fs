@@ -1,5 +1,7 @@
 # 历史计划与施工记录
 
+[Sphinx派发事实与资源预留](2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)记录N06-B0完整canonical intent/receipt、逐work预留、round/身份/冲突守门、实际旧seal与冷恢复。gen149目标23/23、230/0已证；宽选集75/75仍有014性能失败，不冒称全绿。下一步B1-A现有SyncDelegate的typed接纳/终态观察与独立B2-0；实际Host/profile/答案整体未完成。[45e413 CI原artifact](2026-10-05/baselines/45e413-ci/receipt.txt)已820/820排空，唯一J11旧断言在本批修复待新头CI，不能沿用f0ead作为最新失败。
+
 [Sphinx持久创建与读取](2026-10-05/Sphinx持久创建与读取-2026-10-05.md)记录N06-A真实SDK/JS持久创建、内容绑定receipt、唯一Current的accepted trace/native DTO、三哈希与新OS进程冷重开。gen142正式73/73、437/0，公开输入缺陷红绿与原始失败完整保留；036两个TODO、Host/renderer/首个答案及GAP-219仍缺。下一主线按现行总计划N06-B接手卡，不重复施工A。另收[f0ead CI原artifact](2026-10-05/baselines/f0ead-ci/receipt.txt)，813/818截断不是pending-only。
 
 [原始材料载体与后缀重放](2026-10-05/原始材料载体与后缀重放-2026-10-05.md)记录N05-B/T388有限修复：原UTF-8材料、exact durable工具呈现、None身份与capture副本。gen137正式223/223、1454/0及实际Host integration1/0已验收，旧失败原样保存；native Partial、legacy/user、完整Long Stroke与整体GAP保留。后续从现行总计划N06-A及N00成本调查接续。

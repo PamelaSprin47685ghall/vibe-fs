@@ -38,13 +38,10 @@ type OverrunFact =
       Attempt: Attempt
       Resources: Map<string, float> }
 
-/// A physical binding recovered from a Host. Never participates in semantic hashing.
-type PhysicalBinding =
-    { WorkId: WorkId
-      Attempt: Attempt
-      DispatchIntentId: string
-      PhysicalRef: string option
-      Receipt: string option }
+/// An accepted intent and its optional complete Host receipt.
+type DispatchRecord =
+    { Request: DispatchRequestedBody
+      Receipt: DispatchReceiptRecordedBody option }
 
 type CommandReceipt =
     { Fingerprint: string
@@ -80,7 +77,7 @@ type InquiryState =
         Answer: AnswerCommittedBody option
         /// Command identity -> immutable content-bound receipt, rebuilt from transitions.
         CommandReceipts: Map<string, CommandReceipt>
-        PhysicalBindings: Map<string, PhysicalBinding>
+        Dispatches: Map<string, DispatchRecord>
         Status: InquiryStatus
     }
 

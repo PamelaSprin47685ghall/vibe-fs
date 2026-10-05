@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, realpathSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { rolePredicate, capabilityToolNames } from '../../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
@@ -308,6 +308,10 @@ test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_d
   try {
     writeFileSync(join(dir, 'read1.txt'), 'content1', 'utf8')
     writeFileSync(join(dir, 'read2.txt'), 'content2', 'utf8')
+    const expectedReads = [
+      { path: realpathSync(join(dir, 'read1.txt')), resultBytes: 'content1' },
+      { path: realpathSync(join(dir, 'read2.txt')), resultBytes: 'content2' },
+    ]
 
     let recordedReads = []
     let recordedEffects = []
@@ -337,9 +341,9 @@ test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_d
     )
     assert.equal(caseName(outcome), 'Succeeded')
     // 真实成功只记一次（去重）
-    assert.deepEqual(recordedReads.sort(), ['read1.txt', 'read2.txt'])
+    assert.deepEqual([...recordedReads].sort((left, right) => left.path.localeCompare(right.path)), expectedReads)
     // 失败/被拒读取不计入成功观察
-    assert.equal(recordedReads.includes('missing.txt'), false, 'failed read must not be recorded')
+    assert.equal(recordedReads.some(read => read.path === join(realpathSync(dir), 'missing.txt')), false, 'failed read must not be recorded')
     assert.deepEqual(recordedEffects, [], 'read-only manager execution produces no effect paths')
   } finally {
     rmSync(dir, { recursive: true, force: true })

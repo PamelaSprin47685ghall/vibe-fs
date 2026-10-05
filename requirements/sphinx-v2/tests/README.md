@@ -2,6 +2,10 @@
 
 本目录是取代旧 epistemic-reasoning 的活动测试。WHAT 保持新上游 36 条合同，旧价格公式、阶段工具和内核不得通过测试迁回复活。历史对应见 [SUPERSEDES](../SUPERSEDES.md)。
 
+2026-10-05 N06-B0有限验收完成：完整派发Request与可选完整Receipt由同一Reducer保存至唯一Current。004证明每work预留不混入其它work合计，新增预留不重复扣旧值；007证明缺Some round及batch内逆序引用拒绝、None独立work允许；010覆盖当前Spec/attempt/fence/依赖/状态/本work预留、intent内容绑定与receipt物理冲突，exact replay不抹掉已有receipt；019保留全部30body公开编码/持久恢复及实际gen143旧seal，020核对完整bindings只改变规定的三哈希对象。正式红例与原始失败见[本批记录](../../../proposals/archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)。gen149全部Sphinx+J11为23/23排空、230pass/0fail、15TODO、group accepted=true；宽选集75/75、516pass/1fail，唯一durable-events/014性能失败，不能将目标证书写成宽选集绿色。
+
+native complete state仍用physicalBindings字段，空bindings与gen143原seal字节一致；非空值为完整request及receipt option，内部不是第二truth。旧缺round派发产生unknown-round cut，旧错误aggregate预留产生post-state-mismatch cut；历史原envelope保留，不忽略指纹或另造legacy fold。此处数据来自实际旧生产prepare/append/Current，不是手算旧seal。B0证明canonical事实接纳，尚未证明Host实际来源、append拒绝零effect、receipt丢失对账、取消/usage/容量全链；004/010/034完整TODO、T406/T411与GAP-219继续保留。
+
 2026-10-05 N06-A真实创建与读取有限验收完成：gen142正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall；Fable/check/format与前后freshness通过，原进程组accepted=true，exit1仅pending。MCP与JS入口共享`Composition/Commands`、canonical store和唯一Reducer；start保存原目标与显式授权引用，以命令命名空间+commandId定位inquiry，完整请求和实际启动配置绑定receipt。唯一Integrator在接受迁移后成对发布state/envelope；status/export只刷新并查询该Current，沿exact accepted parent导出，unknown/cut/fork均拒绝，不读History或另fold。020用独立canonical JSON/SHA-256 oracle核对三哈希，036用真实SDK、JS交叉入口和新OS服务进程核对原receipt与冷重开。输入身份、完整失败与剩余范围见[本批记录](../../../proposals/archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)；下面gen70/gen131证书仍只属于其原输入。
 
 MCP启动继续必需`SPHINX_COMMON_DIR`。可选`SPHINX_START_CONFIG`是显式JSON：`commandNamespace`、`createdBy`、`profileRef="sphinx.default@2"`、`executionMode="delegated"|"independent"`、非空`resourceSpecs`和`renderReserve`。资源项形如`{"name":"calls","kind":{"case":"consumed","payload":"calls"},"authorizedLimit":0}`，容量kind使用`capacity`；额度为有限非负数，reserve为资源名到有限非负数的对象且不超授权。零额度也必须显式供应。缺配置只允许读取，start返回`CONFIG_REQUIRED`；非法配置启动失败。JS使用`create(commonDir,writerId,configuration)`返回opaque资源句柄，随后`start/status/exportInquiry`接原生JSON参数；`dispose`结束句柄。无store的旧模板成功入口已删除。

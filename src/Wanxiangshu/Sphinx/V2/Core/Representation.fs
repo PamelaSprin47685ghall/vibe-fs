@@ -226,6 +226,22 @@ module Representation =
     let private reasonPayload reason = record [ "reason", box reason ]
 
     /// Every body has a named DTO. No DU, Option, F# list or map crosses canonical JSON.
+    let private dispatchRequest (value: DispatchRequestedBody) =
+        record
+            [ "work", workSpec value.Work
+              "dispatchIntentId", box value.DispatchIntentId
+              "publicEnvelope", envelope value.PublicEnvelope
+              "privateTicket", envelope value.PrivateTicket ]
+
+    let private dispatchReceipt (value: DispatchReceiptRecordedBody) =
+        record
+            [ "workId", box (WorkId.value value.WorkId)
+              "attempt", attempt value.Attempt
+              "fence", box (Fence.value value.Fence)
+              "dispatchIntentId", box value.DispatchIntentId
+              "physicalRef", box value.PhysicalRef
+              "receipt", envelope value.Receipt ]
+
     let body value =
         match value with
         | InquiryEventBody.InquiryCreated value ->
@@ -261,24 +277,8 @@ module Representation =
             tagged "ReservationReleased" (record [ "workId", box (WorkId.value work); "attempt", attempt value ])
         | InquiryEventBody.UsageOverrunRecorded value ->
             tagged "UsageOverrunRecorded" (record [ "usage", usage value.Usage ])
-        | InquiryEventBody.DispatchRequested value ->
-            tagged
-                "DispatchRequested"
-                (record
-                    [ "work", workSpec value.Work
-                      "dispatchIntentId", box value.DispatchIntentId
-                      "publicEnvelope", envelope value.PublicEnvelope
-                      "privateTicket", envelope value.PrivateTicket ])
-        | InquiryEventBody.DispatchReceiptRecorded value ->
-            tagged
-                "DispatchReceiptRecorded"
-                (record
-                    [ "workId", box (WorkId.value value.WorkId)
-                      "attempt", attempt value.Attempt
-                      "fence", box (Fence.value value.Fence)
-                      "dispatchIntentId", box value.DispatchIntentId
-                      "physicalRef", box value.PhysicalRef
-                      "receipt", envelope value.Receipt ])
+        | InquiryEventBody.DispatchRequested value -> tagged "DispatchRequested" (dispatchRequest value)
+        | InquiryEventBody.DispatchReceiptRecorded value -> tagged "DispatchReceiptRecorded" (dispatchReceipt value)
         | InquiryEventBody.WorkAttemptTransitioned value ->
             tagged
                 "WorkAttemptTransitioned"
@@ -437,14 +437,11 @@ module Representation =
               "physicalBindings",
               pairs
                   id
-                  (fun (binding: PhysicalBinding) ->
+                  (fun (dispatch: DispatchRecord) ->
                       record
-                          [ "workId", box (WorkId.value binding.WorkId)
-                            "attempt", attempt binding.Attempt
-                            "dispatchIntentId", box binding.DispatchIntentId
-                            "physicalRef", optional box binding.PhysicalRef
-                            "receipt", optional box binding.Receipt ])
-                  value.PhysicalBindings
+                          [ "request", dispatchRequest dispatch.Request
+                            "receipt", optional dispatchReceipt dispatch.Receipt ])
+                  value.Dispatches
               "status", status value.Status ]
 
     let fingerprint (digest: string -> string) value =

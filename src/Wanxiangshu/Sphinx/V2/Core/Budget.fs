@@ -198,9 +198,11 @@ module Budget =
         let oversubscribedNames =
             specs
             |> List.filter (fun spec ->
-                let projectedForSpec = projected |> Map.tryFind spec.Name |> Option.defaultValue 0.0
+                let requested =
+                    reservation.Resources |> Map.tryFind spec.Name |> Option.defaultValue 0.0
+
                 let available = availableForNewWork specs settled reserved spec.Name
-                projectedForSpec > available)
+                requested > available)
             |> List.map (fun spec -> spec.Name)
 
         let admissible =
