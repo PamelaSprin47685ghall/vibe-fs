@@ -25,6 +25,8 @@ import { integrationTest } from './support/tier-gate.mjs'
 import { registerArchiveNamespaceTests } from './support/archive-namespace-tests.mjs'
 import { registerReadonlyInputTests } from './support/readonly-input-tests.mjs'
 
+process.env.WXS_VERIFICATION_TOOL_DIAGNOSTICS = '1'
+
 registerReadonlyInputTests()
 registerArchiveNamespaceTests()
 registerNodeToolCandidateTests()

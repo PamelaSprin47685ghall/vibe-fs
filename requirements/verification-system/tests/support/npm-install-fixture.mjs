@@ -7,6 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { Header } from 'tar'
+import { fixturePhase } from './fixture-phase.mjs'
 
 const parentName = 'wxs-fixture-parent'
 const leafName = 'wxs-fixture-leaf'
@@ -27,7 +28,9 @@ function selectedNpm() {
     if (path.basename(npmCli) !== 'npm-cli.js') continue
     const manifest = JSON.parse(fs.readFileSync(path.resolve(npmCli, '../../package.json'), 'utf8'))
     assert.equal(manifest.name, 'npm')
+    fixturePhase('npm:version-enter', { npmCli })
     const version = execFileSync(process.execPath, [npmCli, '--version'], { encoding: 'utf8' }).trim()
+    fixturePhase('npm:version-completed', { npmCli, version })
     assert.equal(version, manifest.version)
     return { npmCli, expectedNpmVersion: version, npmCliSha256: sha256(fs.readFileSync(npmCli)) }
   }
@@ -71,6 +74,7 @@ export async function createNpmInstallFixture() {
   const server = http.createServer((request, response) => {
     const requestPath = new URL(request.url, registry).pathname
     requests.push({ method: request.method, path: requestPath })
+    fixturePhase('npm:registry-request', { root, method: request.method, path: requestPath })
     const name = [parentName, leafName].find(value => requestPath === `/${value}` || requestPath === `/${value}/-/${value}-1.0.0.tgz`)
     if (!name || request.method !== 'GET') {
       response.writeHead(404).end('Unexpected fixture registry request')
@@ -103,6 +107,7 @@ export async function createNpmInstallFixture() {
       server.listen(0, '127.0.0.1', resolve)
     })
     registry = `http://127.0.0.1:${server.address().port}`
+    fixturePhase('npm:registry-listening', { root, registry })
     const packageJson = { name: 'verification-install-fixture', version: '1.0.0', private: true, packageManager: `npm@${tools.expectedNpmVersion}`, dependencies: { [parentName]: '1.0.0' }, scripts: { postinstall: 'node -e "process.exit(71)"' } }
     const lockfile = {
       name: packageJson.name,
@@ -142,9 +147,11 @@ export async function createNpmInstallFixture() {
         fs.writeFileSync(path.join(sourceRoot, 'package-lock.json'), JSON.stringify(lock))
       },
       async dispose() {
+        fixturePhase('npm:fixture-dispose-enter', { root })
         for (const socket of sockets) socket.destroy()
         await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
         fs.rmSync(root, { recursive: true, force: true })
+        fixturePhase('npm:fixture-disposed', { root })
       },
     }
   } catch (error) {

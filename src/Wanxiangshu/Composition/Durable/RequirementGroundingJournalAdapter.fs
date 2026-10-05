@@ -29,14 +29,14 @@ module RequirementGroundingJournalAdapter =
 
                     return res |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
                 }
-          RequirementGroundingPort.AppendMaterialObserved =
+          RequirementGroundingPort.AppendReadObserved =
             fun sessionId observation ->
                 task {
                     let! res =
                         AgentJournal.appendAgent
                             (StreamId.Session sessionId)
                             None
-                            (HostFact.RequirementGroundingMaterialObserved
+                            (HostFact.RequirementGroundingReadObserved
                                 {| SessionId = sessionId
                                    Observation = observation |})
                             journal

@@ -99,6 +99,7 @@ type BudgetProjection =
 
 type AnswerProjection =
     { RenderWork: string
+      ResultObservation: string
       AnswerRef: string
       StopReason: string }
 

@@ -216,6 +216,7 @@ module Representation =
     let private answer (value: AnswerCommittedBody) =
         record
             [ "renderWorkId", box (WorkId.value value.RenderWorkId)
+              "resultObservationId", box (ObservationId.value value.ResultObservationId)
               "answerRef", box value.AnswerRef
               "stopReason", box value.StopReason ]
 

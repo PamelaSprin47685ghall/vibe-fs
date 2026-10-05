@@ -138,7 +138,7 @@ export async function runTestFiles({
     active.add(controller)
     try {
       const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal, execArgv })
-      send({ type: 'runner:file-start', data: { entryFile: resolve(file) } })
+      send({ type: 'runner:file-start', data: { entryFile: resolve(file), pid: process.pid, parentPid: process.ppid } })
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
       const attribute = (event) => {
@@ -154,7 +154,8 @@ export async function runTestFiles({
             send({ type, data: {
               name: data?.name, file: data?.file, entryFile: event.data.entryFile,
               testId: data?.testId, line: data?.line, column: data?.column,
-              nesting: data?.nesting, durationMs: data?.details?.duration_ms,
+              nesting: data?.nesting, testNumber: data?.testNumber, durationMs: data?.details?.duration_ms,
+              pid: process.pid, parentPid: process.ppid,
             } })
           } catch (error) { reportError(error) }
         })

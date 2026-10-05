@@ -22,11 +22,16 @@ module JsWorkflowSurface =
     [<Emit("Promise.resolve($0)")>]
     let private promiseOf (value: obj) : JS.Promise<obj> = jsNative
 
-    let private observationOf callback readPaths effectPaths =
+    let private observationOf callback (reads: JsExplicitFileRead list) effectPaths =
         task {
             let! _ =
                 unbox<Task<obj>> (
-                    promiseOf (apply2 callback (box (List.toArray readPaths)) (box (List.toArray effectPaths)))
+                    let observed =
+                        reads
+                        |> List.map (fun read -> createObj [ "path" ==> read.Path; "resultBytes" ==> read.ResultBytes ])
+                        |> List.toArray
+
+                    promiseOf (apply2 callback (box observed) (box (List.toArray effectPaths)))
                 )
 
             return ()

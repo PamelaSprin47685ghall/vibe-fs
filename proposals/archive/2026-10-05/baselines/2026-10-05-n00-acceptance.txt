@@ -126,3 +126,59 @@ No repeat test claim for generation128; gen127 results retain original input.
 Raw:vibe-fs-n01-n04-gen128-build.log,vibe-fs-n01-n04-gen128-check.log.
 Source/docs scoped diff-check passed; raw archived logs intentionally retain
 upstream timestamps/whitespace verbatim and are excluded from whitespace QA.
+
+Subsequent delivered-head CI33dc03ba61c0474cf20e59e71e74accab72ec0f1:
+run37279070919/job111662639261; format/check/build passed.
+Unit original300000ms backstop,817/818 drained,verification016 sole active.
+Last verdict: a non-executable selected Node file cannot authorize a tool probe.
+Group3105 accepted=true9.317ms. No authoritative summary; no release stages.
+Raw:vibe-fs-n00-33dc-ci.log. This is a timeout failure, not pending-only.
+
+N00 diagnostic follow-up, not CI acceptance:
+True runtime body start retains parent chain and actual file PID/PPID; all
+diagnostics remain non-renewal. Tool monitor observation uses independent IPC,
+preserving original probe stdout/stderr and the unique typed terminal authority.
+The CLI never receives the private diagnostic control field. Closed fd2 cannot
+overwrite original results or cleanup. No timer/worker/snapshot behavior change.
+Local one-group raw15/0,975.422s using Node22.23.3/npm10.9.4 (CI npm10.9.9).
+Actual tool61969 spawn16:12:29.388 to exit16:28:21.821 spans952433ms.
+pmset records IdleSleep16:12:27 for952secs and DarkWake16:28:19. Monotonic
+prepare/leaf durations include the same interval; the cost sample is sleep
+contaminated, not an effective performance proof or a LinuxCI root cause.
+Other archive durations130-244ms do not support snapshot reuse this batch.
+Raw:n00-node-tools-cost-phase.log,n00-node-tools-cost-power.log.
+
+Frozen N05-A/Core answer provenance/N00 diagnostics generation131:
+Parent HEAD33dc03ba61c0474cf20e59e71e74accab72ec0f1 plus staged owned changes.
+Fable build/check/format passed,829 modules/170 surfaces.
+CompilerInputDigest:
+8179ac6a8d02afa0c15fbfb7e1f365027d4eb4196c67f464b6264ec8aa2f0ed8
+GeneratedInputDigest:
+ddf1a537e384a324140969ddc18c04207576ced47fc5a5cb9030283306396854
+ArtifactInputDigest:
+845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c
+Freshness identical before and after formal execution.
+Node22.23.3/npm11.12.1/SDK10.0.302 explicit selected paths; macOS caffeinate-i
+prevents idle sleep during this proof. Original5000/300000/defaultworkers remain.
+Formal212/212,1547pass0fail31skip94TODO,166.97s wall422.80s testtime.
+Group64270 accepted=true19.321ms;exit1 solely pending proof.
+Separate native006 integration strict failure/cleanup oracle3pass0fail,
+0skip0TODO,5492.589ms; original readiness5s/observer30s/child45s remain.
+Raw:vibe-fs-n05-n06-gen131-related.log,vibe-fs-n05-gen131-native-integration.log,
+vibe-fs-n05-n06-gen131-build.log,vibe-fs-n05-n06-gen131-check.log.
+Prior gen129 typing/pyramid/marker failure and target45/1 (absent empty journal
+directory observer),gen130 target46/0+1skip1TODO retain their exact inputs.
+Expanded prebuild answer tests with the new DTO were rejected by the old DTO;
+not business red. Valid old-schema unexecuted-work answer red is separately kept.
+T386 current-read repair accepted. Legacy decode does not recertify historical
+read attribution. Core answer guard accepted, full renderer/Runtime T406 pending.
+T388/GAP085/086/219/full readonly/release stay partial. No CI result for the new
+delivery head is implied by this related scope; CI33dc300s failure still stands.
+
+Final status-document generation132: Fable/check/freshness exit0.
+Compiler and artifact input digests unchanged from generation131.
+GeneratedInputDigest:
+9b0dde04e27744990c609e1def6327b3f91ab44c48f1f1d810e88c2bec2753ea
+Only status Markdown/raw evidence changed after formal generation131 execution.
+No repeated test claim for generation132; gen131 evidence remains input-bound.
+Raw:vibe-fs-n05-n06-gen132-build.log,vibe-fs-n05-n06-gen132-check.log.

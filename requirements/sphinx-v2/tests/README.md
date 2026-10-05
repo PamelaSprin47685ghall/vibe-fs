@@ -2,6 +2,10 @@
 
 本目录是取代旧 epistemic-reasoning 的活动测试。WHAT 保持新上游 36 条合同，旧价格公式、阶段工具和内核不得通过测试迁回复活。历史对应见 [SUPERSEDES](../SUPERSEDES.md)。
 
+2026-10-05 N06-B前置Core答案来源守门已验收：gen131完整Sphinx套件纳入正式212/212、1547/0，31skip/94TODO；Fable/check/freshness前后通过。AnswerCommitted必需`resultObservationId`，Core要求当前work同attempt成功，accepted结果的work/attempt/fence/完整SchemaRef匹配。017的prepare/append/Current、durable semantic cut和合法冷重开已证，019同步全部body DTO；旧@2缺字段严格cut，不补填来源。见[本批记录](../../../proposals/archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
+
+这一切片只证明成功工作与已接受结果的来源关联；Core不猜某个capability字符串必定代表renderer。实际profile的renderer选择、公开start/claim/submit、Runtime完成与资源/Host取消仍未接通，017/T406等业务TODO继续保留，不据此声称已有首个公开持久答案。
+
 本地前轮按当前条款修正错配：provider usage 归004，旧011的意图恢复分类归010，旧012的空工作分类归017，旧022的abstain/tie解码归025，Bayes局部模型计算归026。选择用例调用真实 Decision 选择路径；旧021的 Surface 自行排名/数值判别不再充当两阶段解释证明，也不保留其错误参数签名。读取源码、寻找类型名或匹配分支文本不能证明运行行为；撤下这些伪证明后保留正式可执行TODO，不以新增局部绿色删除未接通的业务义务。本次合并接纳上游新增的parser、canonical persistence和真实SDK协议回归，以下分别说明它们能证明什么。
 
 - `001/002`：目标与profile局部边界；001新增真实EventStore写入和新writer重开，核对原文、提议不改目标与显式修订。它不证明用户授权经过MCP/OpenCode真实命令入口，也不证明所有依赖估值已失效。

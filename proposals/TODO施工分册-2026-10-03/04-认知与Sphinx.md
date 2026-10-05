@@ -177,6 +177,8 @@
 
 ## sphinx-v2
 
+2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。下一主线仍是N06-A唯一command owner的真实创建/读取，然后完成B；不能把Core守门当用户已获得答案。
+
 **入口与判断。** [WHAT](../../requirements/sphinx-v2/WHAT.md)、[SUPERSEDES](../../requirements/sphinx-v2/SUPERSEDES.md)、[README](../../requirements/sphinx-v2/tests/README.md)、[MCP Server](../../src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Server.fs)、[OpenCode Adapter](../../src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Adapter.fs)、[Runtime Driver](../../src/Wanxiangshu/Sphinx/V2/Runtime/Driver.fs)、[Wire Surface](../../src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs)。GAP-219/222；D01/D02；W5。
 
 创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`的新实现替代：七工具独立解码/typed拒绝，cancel有canonical准入/落盘，Persistence有canonical batch、冷重开和原子拒绝入口。GAP-219现在PARTIAL。start/work_next/work_submit/goal_amend仍明确unsupported，export traceUnavailable，现存inquiry status的JSON正向出口仍待证。OpenCode可dispatch/request-cancel，但ReadStatus仍Unknown，ReadResult/Reconcile因port缺读取能力拒绝；不能称状态/结果已能观察。先保留本批真实SDK协议与持久化基础证明，不重复造第二份decoder/store；从真实driver、读取DTO/trace及物理能力owner开始，继续下面的完整dispatch、worker结果、accepted renderer、取消/恢复与外部结果交付。

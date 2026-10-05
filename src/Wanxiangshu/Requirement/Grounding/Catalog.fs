@@ -114,6 +114,14 @@ module GroundingCatalog =
         |> canonicalTarget
         |> Option.bind (relativeWithin canonicalRoot)
 
+    let workspaceRelativePath workspace path =
+        let root = pathResolve workspace
+        let absolute = absolutePath root path
+
+        match relativeWithin (canonicalWorkspace workspace) absolute with
+        | Some relative -> Some relative
+        | None -> relativeWithin root absolute
+
     let private matches pattern path =
         match GlobMatch.matchesPathPattern pattern path with
         | Ok matched -> matched
@@ -231,7 +239,7 @@ module GroundingCatalog =
         |> List.sort
 
     let private materializePaths root package packageRelativePaths =
-        let materials =
+        let materials: GroundingMaterial list =
             packageRelativePaths
             |> List.map (fun packageRelative ->
                 let full = pathJoin (package.Root, packageRelative)
@@ -279,21 +287,3 @@ module GroundingCatalog =
         |> List.map (fun (_, matches) ->
             let package = List.head matches
             materializePackageMaterials root package)
-
-    let materialsForExactPaths workspace paths =
-        let root = canonicalWorkspace workspace
-
-        let relativePaths =
-            paths |> List.choose (workspaceRelative workspace root) |> Set.ofList
-
-        discover root
-        |> List.collect (fun package ->
-            materializePackageMaterials root package
-            |> fun snapshot ->
-                snapshot.Materials
-                |> List.choose (fun material ->
-                    if Set.contains material.Path relativePaths then
-                        Some(snapshot, material)
-                    else
-                        None))
-        |> List.sortBy (fun (snapshot, material) -> snapshot.PackageName, material.Path)

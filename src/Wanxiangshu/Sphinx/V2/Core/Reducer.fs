@@ -647,13 +647,32 @@ module Reducer =
                     Graph = nodes
                     Edges = edges })
 
+    let private successfulAnswerWork (item: WorkItem) : Result<WorkItem, CoreError> =
+        match item.State with
+        | WorkState.Succeeded attempt when attempt = item.Spec.Attempt -> Ok item
+        | _ -> Error(coreError "answer-work-not-succeeded" "answer work must have succeeded in its current attempt")
+
+    let private acceptedAnswerResult (state: InquiryState) (body: AnswerCommittedBody) (item: WorkItem) =
+        match state.Observations |> Map.tryFind (ObservationId.value body.ResultObservationId) with
+        | None -> Error(coreError "answer-observation-missing" "answer must reference an accepted result")
+        | Some result when
+            result.WorkId <> item.Spec.Id
+            || result.Attempt <> item.Spec.Attempt
+            || result.Fence <> item.Spec.Fence
+            || item.Spec.OutputSchema <> Some result.ResultSchema
+            ->
+            Error(coreError "answer-observation-mismatch" "answer result does not match the successful work")
+        | Some _ -> Ok()
+
     let private applyAnswer (state: InquiryState) (body: AnswerCommittedBody) : Result<InquiryState, CoreError> =
         match state.Answer with
         | Some existing when existing = body -> Ok state
         | Some _ -> Error(coreError "answer-conflict" "inquiry answer is immutable")
         | None ->
             currentWork state body.RenderWorkId
-            |> Result.map (fun _ ->
+            |> Result.bind successfulAnswerWork
+            |> Result.bind (acceptedAnswerResult state body)
+            |> Result.map (fun () ->
                 { state with
                     Answer = Some body
                     Status = InquiryStatus.StopReached body.StopReason })

@@ -1,8 +1,10 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
+import { publishVerificationToolPhase } from './verification-tool-diagnostics.mjs'
 
 const cleanupGraceMs = 1000
+const diagnostics = process.env.WXS_VERIFICATION_TOOL_DIAGNOSTICS === '1'
 const failures = []
 let tool = null
 let cleanup = null
@@ -80,6 +82,7 @@ async function reclaimTool() {
   } finally {
     clearTimeout(exitTimer)
   }
+  publishVerificationToolPhase(diagnostics, failures.length === 0 ? 'group-drained' : 'group-drain-failed', { toolPid: tool?.pid })
   publishTerminal()
 }
 
@@ -98,11 +101,14 @@ try {
   const env = { ...process.env }
   delete env.NODE_CHANNEL_FD
   delete env.NODE_CHANNEL_SERIALIZATION_MODE
+  delete env.WXS_VERIFICATION_TOOL_DIAGNOSTICS
   tool = spawn(process.argv[2], process.argv.slice(3), {
     cwd: process.cwd(), env,
     detached: process.platform !== 'win32', stdio: ['ignore', 'inherit', 'inherit'],
   })
+  tool.once('spawn', () => publishVerificationToolPhase(diagnostics, 'tool-spawned', { toolPid: tool.pid, executable: process.argv[2] }))
   tool.once('exit', (exitCode, signal) => {
+    publishVerificationToolPhase(diagnostics, 'tool-exited', { toolPid: tool.pid, exitCode, signal })
     terminal = { exitCode, signal }
     resolveExit()
     stop()

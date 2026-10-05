@@ -24,6 +24,22 @@ type RequirementGroundingMaterialObserved =
       Path: string
       Digest: string }
 
+[<RequireQualifiedAccess>]
+type GroundingReadCoverage =
+    | CompleteFile
+    | PartialFile
+
+type GroundingFileRead =
+    { Path: string
+      ResultBytes: string
+      Coverage: GroundingReadCoverage }
+
+type RequirementGroundingReadObserved =
+    { Workspace: string
+      Path: string
+      Digest: string
+      Coverage: GroundingReadCoverage }
+
 type RequirementGroundingOccurrence =
     { Workspace: string
       PackageName: string

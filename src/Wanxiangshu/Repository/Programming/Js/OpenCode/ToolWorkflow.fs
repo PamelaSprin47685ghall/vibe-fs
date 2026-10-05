@@ -133,7 +133,7 @@ module JsToolsData =
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
-    type FileAccessObservation = string list -> string list -> Task<unit>
+    type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
@@ -254,7 +254,10 @@ module JsToolWorkflow =
                     // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
                     let readSnapshots = ResizeArray<JsReadSnapshot>()
-                    let api = JsToolsBindings.createApi capabilities root staging readSnapshots
+                    let explicitReads = ResizeArray<JsExplicitFileRead>()
+
+                    let api =
+                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads
 
                     let! resultJson =
                         JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
@@ -262,7 +265,7 @@ module JsToolWorkflow =
                     let! value = JsToolsData.parse resultJson
                     let mutations = staging |> Seq.toList
                     let snapshots = readSnapshots |> Seq.toList
-                    let readPaths = snapshots |> List.map _.Path |> List.distinct
+                    let readPaths = explicitReads |> Seq.distinct |> Seq.toList
                     let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
                     let hasMutationCapability =

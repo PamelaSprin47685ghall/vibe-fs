@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { writeVerificationToolPhase } from './verification-tool-diagnostics.mjs'
 
 const monitorPath = fileURLToPath(new URL('./verification-tool-monitor.mjs', import.meta.url))
 
@@ -38,9 +39,14 @@ function decodeTerminal(message) {
 export function spawnOwnedVerificationTool(executable, argv, { cwd, env }) {
   if (typeof executable !== 'string' || executable.length === 0) throw new TypeError('The selected tool executable must be a non-empty string')
   if (!Array.isArray(argv)) throw new TypeError('The selected tool arguments must be an array')
+  const diagnostics = process.env.WXS_VERIFICATION_TOOL_DIAGNOSTICS === '1'
+  const monitorEnv = { ...(env ?? process.env) }
+  delete monitorEnv.WXS_VERIFICATION_TOOL_DIAGNOSTICS
+  if (diagnostics) monitorEnv.WXS_VERIFICATION_TOOL_DIAGNOSTICS = '1'
   const child = spawn(process.execPath, [monitorPath, executable, ...argv], {
-    cwd, env, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+    cwd, env: monitorEnv, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
   })
+  child.once('spawn', () => writeVerificationToolPhase(diagnostics, 'monitor-spawned', { monitorPid: child.pid, executable }))
   const failures = []
   const stop = () => {
     try { child.stdin?.destroy() }
@@ -55,12 +61,20 @@ export function spawnOwnedVerificationTool(executable, argv, { cwd, env }) {
     child.once('error', error => fail(monitorFailure('The tool monitor could not start', error)))
     child.stdin?.on('error', error => fail(monitorFailure('The tool monitor lifeline failed', error)))
     child.on('message', message => {
+      if (diagnostics && message?.type === 'verification-tool-phase') {
+        if (['tool-spawned', 'tool-exited', 'group-drained', 'group-drain-failed'].includes(message.phase) &&
+            message.data?.pid === child.pid && message.data?.parentPid === process.pid) {
+          writeVerificationToolPhase(true, message.phase, message.data)
+        }
+        return
+      }
       try {
         if (terminal !== null) throw monitorFailure('The tool monitor supplied more than one terminal record')
         terminal = decodeTerminal(message)
       } catch (error) { fail(error) }
     })
     child.once('close', (exitCode, signal) => {
+      writeVerificationToolPhase(diagnostics, 'monitor-closed', { monitorPid: child.pid, exitCode, signal })
       if (terminal === null) failures.push(monitorFailure('The tool monitor closed without a valid terminal record'))
       if (exitCode !== 0 || signal !== null) failures.push(monitorFailure(`The tool monitor exited unexpectedly (${exitCode ?? signal})`))
       const allFailures = [...(terminal?.failures ?? []), ...failures]

@@ -327,7 +327,7 @@ const cases = [
   body('CertificateInvalidated', { invalidation: envelope('{}'), reason: 'goal changed' }),
   body('DecisionRecorded', { decision: envelope('{}') }),
   body('AnswerPrepared', { renderWorkId: 'work-1', draftRef: 'draft-1' }),
-  body('AnswerCommitted', { renderWorkId: 'work-1', answerRef: 'answer-1', stopReason: 'resource-limited' }),
+  body('AnswerCommitted', { renderWorkId: 'work-1', resultObservationId: 'observation-1', answerRef: 'answer-1', stopReason: 'resource-limited' }),
   body('CancelRequested', { reason: 'user stop' }),
   body('InquiryCancelled', { reason: 'settled' }),
   body('InquirySuspended', { reason: 'missing capability' }),

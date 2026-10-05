@@ -2,8 +2,11 @@ namespace Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 open System.Threading.Tasks
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingGate =
+    val nativeReadObservations: toolName: string -> args: obj -> output: obj -> GroundingFileRead list
+
     val decideMutation:
         journal: AgentJournal option ->
         workspace: string ->
@@ -15,7 +18,7 @@ module RequirementGroundingGate =
         journal: AgentJournal option ->
         workspace: string ->
         sessionId: string ->
-        paths: string list ->
+        reads: GroundingFileRead list ->
             Task<Result<RequirementGroundingDecision, string>>
 
     val before:
@@ -28,6 +31,6 @@ module RequirementGroundingGate =
         journal: AgentJournal option ->
         workspace: string ->
         sessionId: string ->
-        readPaths: string list ->
+        reads: GroundingFileRead list ->
         effectPaths: string list ->
             Task<unit>

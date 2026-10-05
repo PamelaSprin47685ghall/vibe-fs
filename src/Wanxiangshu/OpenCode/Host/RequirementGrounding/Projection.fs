@@ -7,6 +7,7 @@ type RequirementGroundingProjectionState =
     { Pending: Map<string, GroundingSnapshot>
       OccurrencesRev: RequirementGroundingOccurrence list
       VisibleMaterials: Set<string>
+      ObservedReads: Set<RequirementGroundingReadObserved>
       VisibleFromOrdinal: int64 }
 
 [<RequireQualifiedAccess>]
@@ -21,6 +22,7 @@ module RequirementGroundingProjection =
         { Pending = Map.empty
           OccurrencesRev = []
           VisibleMaterials = Set.empty
+          ObservedReads = Set.empty
           VisibleFromOrdinal = 1L }
 
     let private occurrenceKey (occurrence: RequirementGroundingOccurrence) =
@@ -29,10 +31,18 @@ module RequirementGroundingProjection =
     let private observedMaterialKey workspace packageName path digest =
         GroundingIdentity.materialVersionKey workspace packageName path digest
 
+    let private materialVisible (snapshot: GroundingSnapshot) (material: GroundingMaterial) state =
+        Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) state.VisibleMaterials
+        || Set.contains
+            { Workspace = snapshot.Workspace
+              Path = material.Path
+              Digest = GroundingIdentity.materialDigest material.Path material.ResultBytes
+              Coverage = GroundingReadCoverage.CompleteFile }
+            state.ObservedReads
+
     let isSnapshotGrounded snapshot state =
         snapshot.Materials
-        |> List.forall (fun material ->
-            Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) state.VisibleMaterials)
+        |> List.forall (fun material -> materialVisible snapshot material state)
 
     let snapshotRequested snapshot state =
         Map.containsKey (GroundingIdentity.snapshotKey snapshot) state.Pending
@@ -44,10 +54,7 @@ module RequirementGroundingProjection =
         |> List.choose (fun snapshot ->
             let missing =
                 snapshot.Materials
-                |> List.filter (fun material ->
-                    not (
-                        Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) state.VisibleMaterials
-                    ))
+                |> List.filter (fun material -> not (materialVisible snapshot material state))
 
             if List.isEmpty missing then
                 None
@@ -72,6 +79,7 @@ module RequirementGroundingProjection =
     let applyReanchor state =
         { state with
             VisibleMaterials = Set.empty
+            ObservedReads = Set.empty
             VisibleFromOrdinal = nextOrdinal state }
 
     let applyRequested snapshot state =
@@ -100,6 +108,16 @@ module RequirementGroundingProjection =
             Pending = pending
             VisibleMaterials = visible }
 
+    let applyReadObserved observation state =
+        let observed =
+            { state with
+                ObservedReads = Set.add observation state.ObservedReads }
+
+        { observed with
+            Pending =
+                observed.Pending
+                |> Map.filter (fun _ snapshot -> not (isSnapshotGrounded snapshot observed)) }
+
     let applyAnchored occurrence state =
         let key = occurrenceKey occurrence
         let expected = nextOrdinal state
@@ -126,4 +144,5 @@ module RequirementGroundingProjection =
                 { Pending = Map.remove key state.Pending
                   OccurrencesRev = occurrence :: state.OccurrencesRev
                   VisibleMaterials = visible
+                  ObservedReads = state.ObservedReads
                   VisibleFromOrdinal = state.VisibleFromOrdinal }

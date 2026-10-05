@@ -26,8 +26,9 @@ export function createFileWaitTracker(files) {
     observe(event) {
       const starts = event?.type === 'runner:file-start'
       const drains = event?.type === 'runner:file-drained'
+      const testStarts = event?.type === 'test:start'
       const verdict = classifyVerdict(event)
-      if (!starts && !drains && !verdict?.blocking) return
+      if (!starts && !drains && !testStarts && !verdict?.blocking) return
       const entryFile = starts || drains ? event?.data?.entryFile : testEntryFile(event)
       if (typeof entryFile !== 'string' || entryFile.length === 0) {
         throw new Error('File lifecycle event requires entryFile')
@@ -41,12 +42,15 @@ export function createFileWaitTracker(files) {
       }
       if (starts) entry.phase = 'active'
       else if (drains) entry.phase = 'drained'
+      else if (testStarts) entry.lastStart = { ...event.data }
       else entry.lastVerdict = verdict.reason
     },
     snapshot() {
       const snapshot = { queued: [], active: [], drained: [] }
       for (const [file, entry] of entries) {
-        if (entry.phase === 'active') snapshot.active.push({ file, lastVerdict: entry.lastVerdict })
+        if (entry.phase === 'active') snapshot.active.push({ file, lastVerdict: entry.lastVerdict,
+          ...(entry.lastStart ? { lastStart: { ...entry.lastStart } } : {}),
+        })
         else snapshot[entry.phase].push(file)
       }
       return snapshot
@@ -225,8 +229,9 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   const reportFileWaits = () => {
     const waits = fileWaits.snapshot()
     console.error(`${logPrefix}: file streams: ${waits.drained.length} drained, ${waits.active.length} active, ${waits.queued.length} queued`)
-    for (const { file, lastVerdict } of waits.active) {
+    for (const { file, lastVerdict, lastStart } of waits.active) {
       console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
+      if (lastStart) console.error(`${logPrefix}: last runtime test start ${JSON.stringify(lastStart)}`)
     }
     if (waits.queued.length > 0) {
       console.error(`${logPrefix}: ${waits.queued.length} queued file(s) have not started`)
@@ -318,6 +323,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   }, SUITE_BACKSTOP_MS)
   backstop.unref()
 
+  const startedAt = performance.now()
   child.on('message', (event) => {
     if (event?.type === 'runner:summary') {
       runnerSummary = event?.data
@@ -338,6 +344,9 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       console.error(`${logPrefix}: invalid file lifecycle: ${error.message}`)
       requestTermination()
       return
+    }
+    if (event?.type === 'runner:file-start' || event?.type === 'runner:file-drained') {
+      console.error(`${logPrefix}: file lifecycle ${JSON.stringify({ ...event.data, type: event.type, elapsedMs: performance.now() - startedAt })}`)
     }
     if (isFileCompletionEvent(event)) {
       outstanding.delete(resolve(testEntryFile(event)))

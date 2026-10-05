@@ -91,14 +91,21 @@ module RequirementGroundingRepositorySurface =
                 with
                 | None -> return raise (InvalidOperationException "Engineer js surface unavailable")
                 | Some surface ->
-                    let observe readPaths effectPaths =
+                    let observe (reads: JsExplicitFileRead list) effectPaths =
                         task {
+                            let observed =
+                                reads
+                                |> List.map (fun read ->
+                                    { Path = read.Path
+                                      ResultBytes = read.ResultBytes
+                                      Coverage = GroundingReadCoverage.CompleteFile })
+
                             do!
                                 RequirementGroundingGate.programObservation
                                     (Some runtime.Handle.Journal)
                                     runtime.Workspace
                                     runtime.SessionId
-                                    readPaths
+                                    observed
                                     effectPaths
 
                             if failObservation then

@@ -7,9 +7,17 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { create } from 'tar'
+import { fixturePhase } from './fixture-phase.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
-const prepareTools = async options => (await import('../../../../scripts/lib/verification-node-tools.mjs')).prepareVerificationNodeTools(options)
+const prepareTools = async options => {
+  fixturePhase('node-tools:prepare-enter', { archivePath: options.archivePath })
+  try {
+    return await (await import('../../../../scripts/lib/verification-node-tools.mjs')).prepareVerificationNodeTools(options)
+  } finally {
+    fixturePhase('node-tools:prepare-settled', { archivePath: options.archivePath })
+  }
+}
 
 function selectedNpmRoot() {
   const candidates = process.env.WXS_VERIFICATION_NPM_CLI
@@ -33,12 +41,14 @@ function selectedNpmRoot() {
 
 async function archiveTools(root) {
   const archivePath = path.join(root, 'tools.tar')
+  fixturePhase('node-tools:archive-enter', { archivePath })
   const chunks = []
   for await (const chunk of create({ cwd: path.join(root, 'selected'), portable: true, noMtime: true }, ['toolchain'])) {
     chunks.push(chunk)
   }
   const bytes = Buffer.concat(chunks)
   fs.writeFileSync(archivePath, bytes)
+  fixturePhase('node-tools:archive-written', { archivePath, bytes: bytes.length })
   return { archivePath, archiveSha256: sha256(bytes), parentDirectory: path.join(root, 'candidates') }
 }
 

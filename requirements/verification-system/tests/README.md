@@ -1,5 +1,9 @@
 # verification-system 测试说明
 
+2026-10-05 当前冻结输入 gen131 已通过 Fable/check、前后 freshness 与正式选集：212/212 文件排空、1547 passed/0 failed、31 skipped、94 TODO，166.97s wall/422.80s test time；group64270 accepted=true、19.321ms，exit1 仅 pending。N00 非续期诊断切片已完成，保存真实测试父链、文件/进程身份及工具 spawn/exit/group-drain/monitor-close；真实关闭诊断 fd2 不改变原工具结果。诊断不改变预算、并发或续期分类，未实施快照复用优化。N05-A/T386 当前读取版本修复及 Sphinx 核心答案来源守门前置也已纳入该选集；native006 integration 严格 cleanup oracle 为3/0、5.493s，无 skip/TODO。完整 T406 Runtime/profile/公开入口与全仓新头 CI 仍待验收，详见[本批交付记录](../../../proposals/archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
+
+历史33dc03ba6的CI通过format/check/build，unit仍在原300000ms截断：817/818排空，仅016活动，最后判决为non-executable selected Node，group3105 accepted=true、9.317ms，无权威汇总。见[原始记录](../../../proposals/archive/2026-10-05/baselines/vibe-fs-n00-33dc-ci.log)。该失败仍未唯一归因，不能称仅pending或拿gen131选集替代全仓通过。本机成本probe原始15/0、975.422s中有952秒实际工具区间对应OS Sleep/DarkWake；样本受睡眠污染，不用于解释Linux CI或证明优化收益。
+
 2026-10-05 N04-B接续：Darwin的原foundation-identity工程已在四prepared owner的显式UDRO view上实际Fable/Node5/5、完整196entries，小物理8/8、轻量Fable/API33/0（2integration skip）。原owner不假认挂载inode，consumer排空后才detach，原Error/null、原目录恢复和过期receipt拒绝已证。统一gen127正式137/137排空、1041/0、19skip、72TODO，162.23s，仅pending exit1；readonly integration仍单独记账。[契约与原始记录](../../../proposals/N04真实只读Fable执行契约-2026-10-05.md)明列身份及范围。actual verify、backing/FD/ABA/native/OS与Linux/Windows不据此关闭，T418/T419保留。旧0d539 CI817/818总300s backstop及旧静默失败不抹去，新头CI另记。
 
 readonly repository integration 必须显式给 `WXS_VERIFICATION_NUGET_PROJECT_TREE_ID`、两个 NuGet 包选择 JSON，以及 `WXS_VERIFICATION_READONLY_SDK_ARCHIVE`/`WXS_VERIFICATION_READONLY_SDK_ARCHIVE_SHA256` 的绝对路径/raw SHA256。它经原 SDK prepare 完整校验，不回退环境 SDK；normal 原工程 fixture 保持原 copy/archive 路径。挂载入口当前只支持 Darwin，其余平台在消费前拒绝；默认 unit 只跳过声明的 integration。
@@ -72,7 +76,7 @@ Node/npm 回归按实际声明的 transitive 依赖选缺库叶，不将某个 n
 
 薄owner协议正式定向8/8核对实际env、PGID、exit23、self SIGTERM、ENOENT和missing/malformed/duplicate终局；Darwin CF编码的首轮6/2是fixture误差，最终仍全字段deepEqual。016在helper修改期间的238/9/6skip/2TODO只属诊断，冻结后结果待[第二批附件](../../../proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)。monitor crash而工具继续持管道时可能只有exit、尚无close；本批不称此路径已取得有界回收。
 
-连续同步操作与已完成 Promise 可使 Node 子进程的原生 reporter 得不到事件循环调度：测试已完成，父进程却迟迟收不到判决。运行器通过专用 `verdict-transport.mjs` 在测试完成后的 `afterEach` 中让出一次调度，使原生 reporter 能发送真实结果；让步本身不发送进展，不改变静默窗口。006 的真实子进程反例覆盖文件总时长超过窗口但逐项完成、完成若干项后持续打印并挂起，以及 after hook 抛错。挂起用例不会进入完成后的让步，背景输出仍不能续期。
+连续同步操作与已完成 Promise 可使 Node 子进程的原生 reporter 得不到事件循环调度：测试已完成，父进程却迟迟收不到判决。运行器通过专用 `verdict-transport.mjs` 的全局 `beforeEach`，在下一用例开始前让出一次调度；上一用例的真实判决只有在其 after hooks 完成后才成立。当前 hook 同时记录真实 body-start 的 entryFile、父用例全名与 pid/ppid；该观察和让步均不续期，不改变原静默窗口。006 的真实子进程反例覆盖文件总时长超过窗口但逐项完成、完成若干项后持续打印并挂起、after hook 抛错，以及持续 body-start 输出仍须超时。挂起用例不会得到完成判决，背景输出仍不能续期。
 
 005 的插件夹具回归用子进程加载钩子观察并拒绝真实包入口：仅导入夹具或跳过 integration 测试不会初始化插件；实际创建时仍加载真实入口，导入异常不得被吞掉。夹具其它同步导出及生产模块保持原契约。
 

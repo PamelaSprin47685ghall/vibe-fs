@@ -191,6 +191,39 @@ test('WHAT[verification-system-006] scheduling events do not renew the silence w
   assert.equal(h.terminated, true)
 })
 
+test('WHAT[verification-system-006] the real verdict transport records body entry with its actual parent test and process identity', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'verdict-parent-identity-'))
+  try {
+    const fixture = path.join(directory, 'parent.test.mjs')
+    fs.writeFileSync(fixture, `import test from 'node:test'
+test('actual parent', async t => { await t.test('actual child', () => {}) })
+`)
+    const transport = fileURLToPath(new URL('./support/verdict-transport.mjs', import.meta.url))
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [`--import=${transport}`, '--test', fixture], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', resolveExit)
+    })
+    assert.equal(code, 0, output)
+    const facts = output.split('\n').filter(line => line.includes('[verification-test-start] '))
+      .map(line => JSON.parse(line.slice(line.indexOf('[verification-test-start] ') + '[verification-test-start] '.length)))
+    const entry = facts.find(fact => fact.name === 'actual child')
+    assert.ok(entry, output)
+    assert.equal(entry.fullName, 'actual parent > actual child')
+    assert.equal(fs.realpathSync(entry.entryFile), fs.realpathSync(fixture))
+    assert.ok(Number.isInteger(entry.pid) && Number.isInteger(entry.parentPid))
+    assert.notEqual(entry.pid, child.pid, 'the fact comes from the actual file process, not its CLI parent')
+    assert.equal(entry.parentPid, child.pid)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[verification-system-006] file waits distinguish queued, active and verdicts awaiting stream drain', () => {
   const files = ['drained.mjs', 'verdict.mjs', 'active.mjs', 'queued.mjs'].map((file) => path.resolve(file))
   const waits = testSupervisor.createFileWaitTracker(files)
@@ -225,6 +258,115 @@ test('WHAT[verification-system-006] file lifecycle facts reject unknown entries 
   waits.observe(event('runner:file-drained'))
   assert.throws(() => waits.observe(event('test:pass')), /drained/)
   assert.deepEqual(waits.snapshot(), { queued: [], active: [], drained: [file] })
+})
+
+test('WHAT[verification-system-006] a pending runtime test start remains diagnostic evidence without becoming a verdict', () => {
+  const file = path.resolve('pending-runtime.mjs')
+  const waits = testSupervisor.createFileWaitTracker([file])
+  waits.observe({ type: 'runner:file-start', data: { entryFile: file } })
+  const event = { type: 'test:start', data: {
+    entryFile: file, file: path.resolve('registration.mjs'), name: 'pending child',
+    nesting: 1, testId: 17, testNumber: 2, pid: 101, parentPid: 99,
+  } }
+  waits.observe(event)
+  assert.equal(classifyVerdict(event), null)
+  assert.deepEqual(waits.snapshot().active[0].lastStart, event.data)
+  assert.equal(waits.snapshot().active[0].lastVerdict, null)
+})
+
+test('WHAT[verification-system-006] continuing body entry diagnostics cannot keep a genuinely pending test alive', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'body-start-noise-'))
+  try {
+    const fixture = path.join(directory, 'pending.test.mjs')
+    const launcher = path.join(directory, 'supervise.mjs')
+    fs.writeFileSync(fixture, `import test from 'node:test'
+test('pending parent', async t => {
+  await t.test('pending child', async context => {
+    setInterval(() => process.stdout.write('[verification-test-start] ' + JSON.stringify({name: context.name, fullName: context.fullName, pid: process.pid, parentPid: process.ppid}) + '\\n'), 10)
+    await new Promise(() => {})
+  })
+})
+`)
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'body-start-noise', silenceMs: 300 })
+`)
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', resolveExit)
+    })
+    assert.equal(code, 1, output)
+    assert.ok(output.split('[verification-test-start] ').length > 3, output)
+    assert.match(output, /verdict.silence|silent|silence/i)
+    assert.match(output, /accepted=true/)
+    assert.doesNotMatch(output, /\[test-summary\].*passed/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] real tool diagnostics preserve stdout failure and complete cleanup without forwarding the control field', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tool-phase-equivalence-'))
+  try {
+    const launcher = path.join(directory, 'probe.mjs')
+    const moduleUrl = new URL('../../../scripts/lib/verification-tool-probe.mjs', import.meta.url).href
+    fs.writeFileSync(launcher, `import { closeSync } from 'node:fs'
+import { runVerificationToolProbe } from ${JSON.stringify(moduleUrl)}
+if (process.argv[3] === 'closed') closeSync(2)
+const program = "if (process.env.WXS_VERIFICATION_TOOL_DIAGNOSTICS !== undefined) throw new Error('diagnostic control leaked'); console.log('actual probe stdout'); if (process.argv[1] === 'fail') { console.error('actual probe stderr'); process.exit(17) }"
+try {
+  const stdout = await runVerificationToolProbe(process.execPath, ['-e', program, process.argv[2]], { cwd: process.cwd(), env: { HOME: process.cwd() } })
+  console.log(JSON.stringify({ok: true, stdout}))
+} catch (error) {
+  console.log(JSON.stringify({ok: false, code: error.code, exitCode: error.exitCode, stdout: error.stdout, stderr: error.stderr}))
+}
+`)
+    const run = async (enabled, outcome, sink = 'open') => {
+      const env = { ...process.env, WXS_VERIFICATION_TOOL_DIAGNOSTICS: enabled ? '1' : '0' }
+      delete env.NODE_TEST_CONTEXT
+      const child = spawn(process.execPath, [launcher, outcome, sink], { cwd: directory, env, stdio: ['ignore', 'pipe', 'pipe'] })
+      let stdout = ''
+      let stderr = ''
+      child.stdout.on('data', chunk => { stdout += chunk })
+      child.stderr.on('data', chunk => { stderr += chunk })
+      const exit = await new Promise((resolveExit, reject) => {
+        child.once('error', reject)
+        child.once('close', resolveExit)
+      })
+      assert.equal(exit, 0, stderr)
+      return { result: JSON.parse(stdout), stderr }
+    }
+    for (const outcome of ['pass', 'fail']) {
+      const disabled = await run(false, outcome)
+      const enabled = await run(true, outcome)
+      assert.deepEqual(enabled.result, disabled.result)
+      const closed = await run(true, outcome, 'closed')
+      assert.deepEqual(closed.result, disabled.result, 'a physically closed diagnostic sink preserves the original tool outcome')
+      assert.equal(enabled.result.ok, outcome === 'pass')
+      if (outcome === 'fail') {
+        assert.equal(enabled.result.exitCode, 17)
+        assert.equal(enabled.result.stderr, 'actual probe stderr\n')
+      }
+      assert.doesNotMatch(disabled.stderr, /verification-tool-phase/)
+      const phases = enabled.stderr.split('\n').filter(line => line.startsWith('[verification-tool-phase] '))
+        .map(line => JSON.parse(line.slice('[verification-tool-phase] '.length)))
+      for (const phase of ['monitor-spawned', 'tool-spawned', 'tool-exited', 'group-drained', 'monitor-closed']) {
+        assert.ok(phases.some(fact => fact.phase === phase), `${phase}: ${enabled.stderr}`)
+      }
+      const tool = phases.find(fact => fact.phase === 'tool-spawned')
+      assert.throws(() => process.kill(tool.toolPid, 0), error => error.code === 'ESRCH')
+      const monitor = phases.find(fact => fact.phase === 'monitor-spawned')
+      assert.throws(() => process.kill(monitor.monitorPid, 0), error => error.code === 'ESRCH')
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[verification-system-006] real silence diagnostics identify active waits separately from queued files', async () => {

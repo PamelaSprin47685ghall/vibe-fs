@@ -9,6 +9,8 @@ type JsStagedMutation =
 
 type JsReadSnapshot = { Path: string; Text: string }
 
+type JsExplicitFileRead = { Path: string; ResultBytes: string }
+
 [<RequireQualifiedAccess>]
 type JsCommitMutation =
     | RewriteFile of path: string * expectedCurrent: string * newText: string

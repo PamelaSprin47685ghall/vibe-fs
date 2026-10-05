@@ -1,5 +1,9 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-05 当前状态：N00 非续期诊断切片、N05-A/T386 当前读取版本修复及 Sphinx 核心答案来源守门前置已完成。统一 gen131 通过 Fable/check 与前后 freshness；正式选集212/212排空、1547pass/0fail、31skip、94TODO，166.97s wall/422.80s test time，group64270 accepted=true、19.321ms，exit1仅pending。native006 integration 严格 cleanup oracle3/0、5.493s，无skip/TODO。T388 原生完整字节覆盖、T406 Runtime/profile/公开入口及全仓新头 CI 仍待施工/验收。详见[本批记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
+
+历史33dc03ba6 CI仍817/818在原300s截断，仅016活动，无权威汇总，整体N00未验收完成；最后non-executable Node判决不指认下一段故障，旧失败仍未唯一归因。真实父用例/进程身份及工具spawn/exit/drain的非续期诊断现已落地。一次成本probe的原始15/0、975.422s包含952秒OS Sleep/DarkWake，不作为有效成本绿，不映射Linux根因；本轮没有实施快照复用优化，也未改变预算或并发。
+
 2026-10-05 新排期以[总计划 N00—N09](../TODO施工总计划-2026-10-03.md)为准：e7a60a769已合并，gen127正式137/137排空、1041/0、19skip、72TODO，实际015 Host21/0。旧0d539 CI817/818原300s backstop及旧本地静默仍保留；新头CI另记，不以选集或旧6a2替代。N04-B首个Darwin原工程已真实readonly Fable/Node5/5、小物理8/8、轻量33/0+2skip及相关正式回归通过，见[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)。N04-C/N08的backing/FD/ABA/native/OS、同候选actual verify和完整T418/T419继续施工，不能以局部绿升级为全发布通过。
 
 2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六个目录 owner 局部修复及 PP-011/T335 验收完成：gen116 正式 80/80、772/0、7 skip、31 TODO；cf6fb31e8 Linux CI 818/818、4292/0、104 skip、396 TODO，两者仅 pending exit1。原 gen115 失败保留，不据后续成功定位其唯一原因。PP-011 的 plugin 重开不等于独立 OS 进程恢复，GAP-082 其他义务保留；T418/T419 的完整只读/FD/ABA/actual verify 接续施工。下文 gen113 待验收与 Archive 未施工属于历史输入。

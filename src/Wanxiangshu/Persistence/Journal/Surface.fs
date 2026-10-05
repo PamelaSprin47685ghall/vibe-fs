@@ -316,6 +316,18 @@ module JournalSurface =
             {| pendingCount = Map.count state.Pending
                occurrenceCount = List.length state.OccurrencesRev
                visibleMaterialCount = Set.count state.VisibleMaterials
+               readObservations =
+                state.ObservedReads
+                |> Set.toArray
+                |> Array.map (fun read ->
+                    box
+                        {| workspace = read.Workspace
+                           path = read.Path
+                           digest = read.Digest
+                           coverage =
+                            match read.Coverage with
+                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.CompleteFile -> "CompleteFile"
+                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.PartialFile -> "PartialFile" |})
                visibleFromOrdinal = state.VisibleFromOrdinal |}
 
     let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =

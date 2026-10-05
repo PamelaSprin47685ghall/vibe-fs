@@ -128,6 +128,7 @@ type BudgetProjection =
 
 type AnswerProjection =
     { RenderWork: string
+      ResultObservation: string
       AnswerRef: string
       StopReason: string }
 
@@ -311,6 +312,7 @@ module Projection =
             state.Answer
             |> Option.map (fun answer ->
                 { RenderWork = WorkId.value answer.RenderWorkId
+                  ResultObservation = ObservationId.value answer.ResultObservationId
                   AnswerRef = answer.AnswerRef
                   StopReason = answer.StopReason }) }
 

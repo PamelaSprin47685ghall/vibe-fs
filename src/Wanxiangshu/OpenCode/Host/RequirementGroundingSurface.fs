@@ -109,17 +109,9 @@ module RequirementGroundingSurface =
         (output: obj)
         : Task<obj> =
         task {
-            let paths =
-                if toolName.ToLowerInvariant() <> "read" || isNull args then
-                    []
-                elif not (isNull args?filePath) then
-                    [ string args?filePath ]
-                elif not (isNull args?path) then
-                    [ string args?path ]
-                else
-                    []
+            let reads = RequirementGroundingGate.nativeReadObservations toolName args output
 
-            let! result = RequirementGroundingGate.decideRead (Some(agentJournalOf journal)) workspace sessionId paths
+            let! result = RequirementGroundingGate.decideRead (Some(agentJournalOf journal)) workspace sessionId reads
 
             return
                 match result with

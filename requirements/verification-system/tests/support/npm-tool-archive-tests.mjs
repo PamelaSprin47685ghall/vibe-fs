@@ -6,9 +6,17 @@ import path from 'node:path'
 import test from 'node:test'
 import { create } from 'tar'
 import { createNpmInstallFixture } from './npm-install-fixture.mjs'
+import { fixturePhase } from './fixture-phase.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
-const installFromArchive = async options => (await import('../../../../scripts/lib/verification-npm-candidate.mjs')).installVerificationDependenciesFromToolArchive(options)
+const installFromArchive = async options => {
+  fixturePhase('npm:archive-install-enter', { archivePath: options.toolArchive.archivePath })
+  try {
+    return await (await import('../../../../scripts/lib/verification-npm-candidate.mjs')).installVerificationDependenciesFromToolArchive(options)
+  } finally {
+    fixturePhase('npm:archive-install-settled', { archivePath: options.toolArchive.archivePath })
+  }
+}
 
 function selectedEntries(root) {
   const entries = []
@@ -31,6 +39,7 @@ function selectedEntries(root) {
 async function toolArchiveFixture({ observeVersions = false } = {}) {
   const fixture = await createNpmInstallFixture()
   try {
+    fixturePhase('npm:tool-capture-enter', { root: fixture.root })
     const selected = path.join(fixture.root, 'selected')
     const nodePath = 'toolchain/node/bin/node'
     const npmCliPath = 'toolchain/npm/bin/npm-cli.js'
@@ -60,6 +69,7 @@ if (process.argv.includes('ci')) {
     for await (const chunk of create({ cwd: selected, portable: false, noMtime: true }, ['toolchain'])) chunks.push(chunk)
     const archive = Buffer.concat(chunks)
     fs.writeFileSync(archivePath, archive)
+    fixturePhase('npm:tool-archive-written', { archivePath, bytes: archive.length })
     const entries = selectedEntries(selected)
     const archiveSha256 = sha256(archive)
     const node = { path: nodePath, sha256: sha256(fs.readFileSync(path.join(selected, nodePath))), version: process.version, platform: process.platform, arch: process.arch }

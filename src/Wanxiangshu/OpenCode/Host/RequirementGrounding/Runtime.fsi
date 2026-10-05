@@ -27,11 +27,11 @@ module RequirementGroundingRuntime =
         paths: string list ->
             Task<Result<RequirementGroundingDecision, string>>
 
-    val observeReadPaths:
+    val observeFileReads:
         port: RequirementGroundingPort ->
         workspace: string ->
         sessionId: SessionId ->
-        paths: string list ->
+        reads: GroundingFileRead list ->
             Task<Result<RequirementGroundingDecision, string>>
 
     val appendAnchored:

@@ -28,7 +28,9 @@ module JsRuntimeSurface =
                   JsCapability.Glob
                   JsCapability.Grep ]
 
-        let api = JsToolsBindings.createApi allCapabilities root staging readSnapshots
+        let api =
+            JsToolsBindings.createApi allCapabilities root staging readSnapshots (ResizeArray<JsExplicitFileRead>())
+
         box (JsBindingsHandle(api, staging, readSnapshots))
 
     let private capabilityOfLabel (label: string) : JsCapability option =
@@ -45,7 +47,10 @@ module JsRuntimeSurface =
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
         let capabilities = permissionLabels |> Array.choose capabilityOfLabel |> Set.ofArray
-        let api = JsToolsBindings.createApi capabilities root staging readSnapshots
+
+        let api =
+            JsToolsBindings.createApi capabilities root staging readSnapshots (ResizeArray<JsExplicitFileRead>())
+
         box (JsBindingsHandle(api, staging, readSnapshots))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api

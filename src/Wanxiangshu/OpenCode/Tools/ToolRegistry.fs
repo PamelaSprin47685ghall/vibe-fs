@@ -19,6 +19,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Ablation
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
@@ -163,11 +164,19 @@ module ToolRegistry =
         let jsProse: JsCanonicalDescription.Prose =
             JsDescriptionAssets.load providerLanguage
 
-        let groundingObservation (ctx: HostToolContext) readPaths effectPaths =
+        let groundingObservation (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
             match workspaceDirectory with
             | None -> Task.FromResult(())
             | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
-            | Some root -> RequirementGroundingGate.programObservation journal root ctx.SessionId readPaths effectPaths
+            | Some root ->
+                let observed =
+                    reads
+                    |> List.map (fun read ->
+                        { Path = read.Path
+                          ResultBytes = read.ResultBytes
+                          Coverage = GroundingReadCoverage.CompleteFile })
+
+                RequirementGroundingGate.programObservation journal root ctx.SessionId observed effectPaths
 
         let runtime =
             new ToolRuntimeScope(

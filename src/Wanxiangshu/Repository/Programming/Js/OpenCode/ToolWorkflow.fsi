@@ -15,7 +15,7 @@ module JsToolsData =
 /// Prepared BEFORE any filesystem effect and Committed AFTER, so crash
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
-    type FileAccessObservation = string list -> string list -> Task<unit>
+    type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
