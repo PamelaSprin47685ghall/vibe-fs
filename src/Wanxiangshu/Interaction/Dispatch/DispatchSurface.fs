@@ -247,6 +247,7 @@ module DispatchSurface =
     /// claim/persist/send semantics remain PromptDispatcher.Runtime.
     let private sendAgentOwnerRootWithMode
         (awaitMode: PromptDispatcher.AwaitMode)
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
         (port: obj)
         (handle: JournalHandle)
         (session: string)
@@ -276,7 +277,7 @@ module DispatchSurface =
                         identitySeed
                         None
                         awaitMode
-                        None
+                        onAccepted
 
                 return
                     match result with
@@ -301,7 +302,7 @@ module DispatchSurface =
         (text: string)
         (identitySeed: obj)
         : Task<obj> =
-        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Detached port handle session text identitySeed
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Detached None port handle session text identitySeed
 
     let sendAgentOwnerRootAwait
         (port: obj)
@@ -310,7 +311,7 @@ module DispatchSurface =
         (text: string)
         (identitySeed: obj)
         : Task<obj> =
-        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await port handle session text identitySeed
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await None port handle session text identitySeed
 
     let sendManagedAssignment
         (port: obj)
@@ -377,6 +378,37 @@ module DispatchSurface =
             | "Detached" -> PromptDispatcher.AwaitMode.Detached
             | _ -> PromptDispatcher.AwaitMode.Await
 
+    let sendAgentOwnerRootWithAcceptance
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        : Task<obj> =
+        sendAgentOwnerRootWithMode
+            (awaitModeOf awaitMode)
+            (Some(PhysicalUserMessageId.value >> onAccepted))
+            port
+            handle
+            session
+            text
+            identitySeed
+
+    let deliverDetachedVerdict (listener: obj) (kind: string) (reason: string) : Task<obj> =
+        let verdict =
+            match kind with
+            | "OwnedSettled" -> DetachedSendVerdict.OwnedSettled
+            | "Refused" -> DetachedSendVerdict.Refused reason
+            | "OutcomeUnknown" -> DetachedSendVerdict.OutcomeUnknown reason
+            | _ -> invalidArg "kind" (sprintf "Unknown detached verdict: %s" kind)
+
+        task {
+            do! (unbox<DetachedSendListener> listener) verdict
+            return box {| delivered = true |}
+        }
+
     /// Continuation may only attach to the target's own active Logical Run
     /// (interaction-authority-017). This Surface always holds a JournalHandle, so
     /// the journal-less branch HostSessionNudge must handle cannot occur here;
@@ -416,7 +448,7 @@ module DispatchSurface =
                     (LogicalRunId.value authorityProfile.LogicalRunId)
             )
 
-    let sendContinuation
+    let private sendContinuationWithObserver
         (port: obj)
         (handle: JournalHandle)
         (session: string)
@@ -424,6 +456,7 @@ module DispatchSurface =
         (continuation: string)
         (profile: obj)
         (awaitMode: string)
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
         : Task<obj> =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
@@ -457,7 +490,7 @@ module DispatchSurface =
                             authorityProfile
                             None
                             (awaitModeOf awaitMode)
-                            None
+                            onAccepted
 
                     return
                         match result with
@@ -488,6 +521,37 @@ module DispatchSurface =
                            error = error
                            observation = null |}
         }
+
+    let sendContinuation
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        : Task<obj> =
+        sendContinuationWithObserver port handle session text continuation profile awaitMode None
+
+    let sendContinuationWithAcceptance
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        : Task<obj> =
+        sendContinuationWithObserver
+            port
+            handle
+            session
+            text
+            continuation
+            profile
+            awaitMode
+            (Some(PhysicalUserMessageId.value >> onAccepted))
 
     let sendGateNudgesConcurrently
         (port: obj)

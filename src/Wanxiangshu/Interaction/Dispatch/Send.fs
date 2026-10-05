@@ -429,12 +429,12 @@ module PromptDispatcherSend =
                             Some(fun verdict -> this.SettleDetachedSend key sessionId verdict onDetachedFailure)
                         | PromptDispatcher.AwaitMode.Await -> None }
 
+                onAccepted |> Option.iter (PromptPhysicalAcceptance.register key)
+
                 let confirmationWaiterOpt =
                     match awaitMode, onAccepted with
-                    | PromptDispatcher.AwaitMode.Await, Some callback ->
-                        PromptPhysicalAcceptance.register key callback
-                        let confirmationTask = PromptPhysicalAcceptance.awaitConfirmation key None
-                        Some confirmationTask
+                    | PromptDispatcher.AwaitMode.Await, Some _ ->
+                        Some(PromptPhysicalAcceptance.awaitConfirmation key None)
                     | _ -> None
 
                 let sendTask =
@@ -553,9 +553,7 @@ module PromptDispatcherSend =
                         | PromptDispatcher.AwaitMode.Await -> None }
 
 
-                match awaitMode, onAccepted with
-                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
-                | _ -> ()
+                onAccepted |> Option.iter (PromptPhysicalAcceptance.register key)
 
                 // The admission check and the Host call are deliberately
                 // synchronous neighbours. No await may reopen a window where

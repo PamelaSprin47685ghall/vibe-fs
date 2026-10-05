@@ -1,8 +1,8 @@
 # N06-B1-A2：让恢复 successor 属于实际触发它的 call
 
-状态：只读调查和设计接手卡；未修改生产代码，未增加正式测试，未构建、未运行 red/green。本文不代表 WHAT[delegation-025] 已闭合。
+状态：A2-D0 Detached acceptance 通知前置已有限验收；三类 producer 的具体 call 因果归属仍只有调查和设计，未修复。本文不代表 WHAT[delegation-025] 已闭合。
 
-本轮 B1-A 正在验证 observed API、receipt 与 physical acceptance 分离、普通 exact terminal、fallback 守门和异常结算；验收状态以[总计划](../TODO施工总计划-2026-10-03.md)为准。下一步将它接入 Sphinx 的 Host 执行前，必须先处理本卡；不能把这批有限证据升级成完整 continuation 因果证明。
+B1-A 已有限验收 observed API、receipt 与 physical acceptance 分离、普通 exact terminal、fallback 守门和异常结算；D0 已取得真实 callback-empty 红灯并修复注册条件，gen159 正式238/238、1178/0，全静态通过。证据见[Detached 通知记录](../archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)。下一步将它接入 Sphinx 的 Host 执行前，必须先处理本卡的来源归属和资源交接；不能把有限证据升级成完整 continuation 因果证明。
 
 ## 1. 已确认的问题与规范依据
 
@@ -64,11 +64,13 @@ terminal 判断最终只认该 call 的实际 accepted attempts 和已接受 roo
 
 ## 4. 接线时必须额外核实的真实边界
 
-### 4.1 Detached guard 的 observer 当前不工作
+### 4.1 Detached acceptance 通知前置已完成
 
-SendClaimedContinuation 当前仅在 `AwaitMode.Await, Some callback` 时调用 PromptPhysicalAcceptance.register。生产 DegenerationGuard 使用 Detached。只给 guard sender 传 Some callback 会被现有条件忽略，不能宣称接线完成。
+原 SendClaimedContinuation 和 SendAgentOwnerRootCore 只在 `AwaitMode.Await, Some callback` 时注册，Detached 的 callback 被忽略。D0 已把 register 与 confirmation waiter 分开：Some callback 在两种模式都于 Host 调用前注册，waiter 仍仅属于 Await root；实际通知点仍由 canonical managed acceptance 持久成功后拥有。gen157 六个真实业务红、gen159 八个新用例及相关238文件复绿证明这个有限能力。不要重复施工此条件。
 
-必须把 actual acceptance notification 与 transport 等待策略分开：Detached 保持原发送语义，仍可注册该 prompt 的 acceptance observer；通知由真正 PhysicalAccepted 写入后的现有 accepted 路径执行。按 dispatch requirement 验证 refusal、unknown、cancel 和异常时 observer 生命周期，不靠改成 Await 掩盖该缺口。
+D0 证明 SDK 未决时早返回、OwnedSettled 不构成落地、Unknown 保 Pending 后实际接纳通知，以及既有明确 Refused 后原 key 拒绝晚接纳；不证明 SDK 分类、回调抛错、取消、Dispose 或内存 subscription 释放。尤其 `PhysicalAcceptance.accepted` 先移除 callback/waiter 再调用 callback：若 callback 抛错，Await waiter 后续结算可能丢失。这是相邻源码线索，未取得正式反例，D0 没有增加吞错或 fatal 政策。
+
+具体 call 接线前先冻结观察资源合同。现 register 返回 unit、每 key 单 callback，journal Dispose 不释放它；call 完成后捕获旧对象可避免污染新 call，但不能据此宣称资源已释放。若扩展已有 registration lease，释放须核对同一个 registration 的所有权，只解除本地观察，不将 Unknown 写成 Abandoned，也不取消其它 owner 的等待。不要另造执行 registry 或恢复状态机；正式取消/释放反例按实际合同补齐后单独结算。
 
 ### 4.2 AlreadyAdmitted 与 Pending 不等于 Accepted
 
@@ -90,7 +92,7 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 
 现 Harness 已保存构造实际 Runtime 的原 dispatcher，且 SessionPort 保存 prompt native metadata 的 actual PromptKey。这些资源足够扩展一个有限 facade：走实际 producer/send owner，再由实际 dispatcher 接受 retry/repair/guard physical。禁止直接塞 AcceptedContinuationIds 或伪造 observed terminal。
 
-建议先在 delegation 的 025 正式文件增加因果用例；若接手时 transport 仍拥有 025，可按协议由一个 owner 手工合并，或在 031 增加同时锚定 WHAT[delegation-025] 与 WHAT[delegation-031] 的 frontier 防污染用例。测试名称要直接描述旧 successor 与新 work，不声称覆盖整个 requirement。
+建议先在 delegation 的 025 正式文件增加因果用例；若接手时另一个 owner 仍修改025，由一个 owner 手工合并。031只放它自己要求的 frontier/单次交付证明。每个 NNN 文件的测试标题必须且只能使用对应唯一 WHAT 锚点；跨条款关系写 README 和本卡，不在一个标题并列025/031。D0 gen158 的 requirement-system/017 正式失败已证明这一门禁，随后只改标题复绿，业务断言未动。测试名称直接描述旧 successor 与新 work，不声称覆盖整个 requirement。
 
 新 facade 缺失/import 错误不是 business red。先生成 test-only 的冻结 artifact，使 facade 能制造真实 canonical accepted successor；生产 belongsToCall 保留旧实现，再跑正式 runner 证明业务断言失败。
 
@@ -124,7 +126,7 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 
 ## 8. 可原子推进的实施顺序
 
-1. 冻结具体 call observer、source key 与 successor evidence 签名；核对当前 active WHAT023/025/026/031、dispatch physical acceptance 和 guard exact-run 规则。不得新增 retry 预算或 rank 等政策。
+1. D0 已完成，不重复改 Detached 注册条件。先冻结具体 call observer、source key、successor evidence 与本地观察资源释放合同；核对当前 active WHAT023/025/026/031、dispatch physical acceptance 和 guard exact-run 规则。不得新增 retry 预算或 rank 等政策。
 2. 手工增加窄 public fixture，证明它真的产生 Claimed→Submitted→PhysicalAccepted、原 PromptKey 和不同 physical。写上述 business red，旧业务实现下正式失败；保存 build generation、freshness 和排空证据。
 3. 增加 call 本地 accepted attempts 和 exact source 绑定；同步三个 producer 的 observer 交接，包括 Detached、AlreadyAdmitted/Pending 和晚 callback。删除 root+kind 推定分支。
 4. 跑 delegation 对应 023/025/031 与实际新增跨包边界的 dispatch、interaction repair、degeneration guard 定向套件。保持 runner 原预算，不通过放大 timeout/改变 worker 数掩盖问题。
@@ -146,4 +148,4 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 - src/Wanxiangshu/Interaction/Authority/Model.fs、Run.fs、ProjectionQueries.fs（actual accepted landing）
 - src/Wanxiangshu/OpenCode/Host/ModelRouting.fs（exact run lookup 的所有权与清理边界）
 
-记录于 2026-10-05；gen152 source 冻结期间完成调查。本卡是活动施工指引，下一批按这里冻结契约、取得真正业务红灯，再实施三类 producer 的因果交接。
+最初记录于2026-10-05 gen152冻结期间；D0在gen159有限验收。下一批按这里冻结归属与资源合同、取得真正 successor 的业务红灯，再实施三类 producer 的因果交接。

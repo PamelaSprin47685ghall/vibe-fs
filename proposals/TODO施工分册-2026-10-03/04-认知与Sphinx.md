@@ -191,10 +191,13 @@
 
 B1-A的普通terminal有限观察完成后，必须先做[B1-A2恢复因果接手卡](07-Sphinx恢复因果.md)，再接Sphinx实际Host。现same-root+continuation-kind没有assignment归属；retry、repair、guard三类producer都需在effect前绑定具体call，并从真正PhysicalAccepted回传successor。只修一类、按时间排除旧id或仅匹配初始physical都不够。该缺口已完成源码调查，尚无真正successor fixture的正式业务红灯，不记作修复。
 
+A2-D0通知前置已有限完成，见[正式记录](../archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)：gen157六个真实callback-empty红灯，gen159相关238/238、1178/0。Detached注册通知与Await等待分开，callback读到真实managed Accepted；不证明call归属或取消/Dispose/抛错。下一包先冻结观察资源与source合同，不能用D0代替三个producer的正反矩阵。
+
 | 子包 | 状态 | 本包退出条件 |
 | --- | --- | --- |
 | B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
 | B1 实际Host绑定 | B1-A有限验收完成；A2待施工 | typed Admission/Completion保原生carrier/key、持久physical/root、普通formal terminal与原checkpoint；四真实业务红后修fallback身份/单次结算和observed准备误发。最终gen155全静态及225/225、1125/0通过。先补A2的retry/repair/guard归属，再接真owner/family/public prompt与Sphinx持久绑定；034不关闭 |
+| B1-A2-D0 | 通知前置有限验收完成 | Detached支持已有actual acceptance callback且不新增等待；gen159全静态和238/238、1178/0。其余A2来源/资源合同仍待，Host绑定和034不关闭 |
 | B2 executable profile | B2-0有限验收完成；完整profile待施工 | Unestimated带rank仍不可用，空集合不称数值比较，ordinal/provisional由真实Decision保种类；gen151正式红、最终gen155宽绿与全静态通过，原rank0保持。完整schema/plugin/ABI lock、prompt、授权/资源与Goal/material另接，不关闭002/029整体TODO |
 | B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
 | B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |

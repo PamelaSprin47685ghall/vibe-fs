@@ -41,6 +41,18 @@ module DispatchSurface =
     val sendAgentOwnerRootAwait:
         port: obj -> handle: JournalHandle -> session: string -> text: string -> identitySeed: obj -> Task<obj>
 
+    val sendAgentOwnerRootWithAcceptance:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        identitySeed: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+            Task<obj>
+
+    val deliverDetachedVerdict: listener: obj -> kind: string -> reason: string -> Task<obj>
+
     val sendManagedAssignment:
         port: obj ->
         handle: JournalHandle ->
@@ -58,6 +70,17 @@ module DispatchSurface =
         continuation: string ->
         profile: obj ->
         awaitMode: string ->
+            Task<obj>
+
+    val sendContinuationWithAcceptance:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
             Task<obj>
 
     val sendGateNudgesConcurrently:

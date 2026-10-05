@@ -8,6 +8,8 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
+import { withJournal, hostPort } from './support/authority.mjs'
 
 const capturingPort = (captured, outcome = () => dispatch.admittedWithReceipt('accepted-007')) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -333,3 +335,148 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_owned_settled_late_deliver
     rmSync(base, { recursive: true, force: true })
   }
 })
+
+const prepareAcceptanceObserver = async (handle, path, label) => {
+  const session = `d0-${path}-${label}`
+  const owner = await acceptOwner(handle, `owner-${session}`)
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(issued.ok, true, issued.error)
+  if (path === 'root') return { session, seed: issued.value, profile: null }
+  const root = await dispatch.sendAgentOwnerRoot(
+    hostPort(async () => dispatch.admittedWithReceipt(`bootstrap-${session}`)),
+    handle, session, 'bootstrap this exact child', issued.value,
+  )
+  assert.equal(root.ok, true, root.error)
+  const accepted = await dispatch.acceptManagedPromptClaim(
+    handle, session, `bootstrap-physical-${session}`, root.key, 'engineer',
+  )
+  assert.equal(accepted.ok, true, accepted.error)
+  const profile = dispatch.projectionObservation(handle, session).activeLogicalRun
+  assert.equal(profile.session, session)
+  assert.equal(dispatch.pendingClaimCount(handle, session), 0)
+  return { session, seed: issued.value, profile }
+}
+
+const sendWithAcceptanceObserver = (path, port, handle, context, onAccepted) => path === 'root'
+  ? dispatch.sendAgentOwnerRootWithAcceptance(
+      port, handle, context.session, 'observe the real detached acceptance',
+      context.seed, 'Detached', onAccepted,
+    )
+  : dispatch.sendContinuationWithAcceptance(
+      port, handle, context.session, 'observe the real detached successor',
+      'DegenerationGuard', context.profile, 'Detached', onAccepted,
+    )
+
+const acceptObservedPhysical = (handle, context, key, physical) => dispatch.acceptManagedPromptClaim(
+  handle, context.session, physical, key, 'engineer',
+)
+
+const acceptanceObservation = (handle, context, physical) => ({
+  physical,
+  pending: dispatch.pendingClaimCount(handle, context.session),
+  accepted: executionStatus.query(handle, context.session, physical).accepted,
+})
+
+const deliverHostVerdict = async (options, kind, reason = null) => {
+  assert.equal(typeof options.DetachedListener, 'function')
+  assert.deepEqual(await dispatch.deliverDetachedVerdict(options.DetachedListener, kind, reason), { delivered: true })
+}
+
+for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-009] detached ${path} returns while SDK is unresolved and observes actual managed acceptance`, async () => {
+    await withJournal(`d0-${path}-pending-sdk`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'pending-sdk')
+      const seen = []
+      let release
+      let sends = 0
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort(() => { sends += 1; return sdk }), handle, context,
+          physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assert.equal(sent.ok, true, sent.error)
+        assert.equal(sends, 1)
+        assert.equal(dispatch.pendingClaimCount(handle, context.session), 1)
+        assert.deepEqual(seen, [])
+        const physical = `actual-${context.session}`
+        const accepted = await acceptObservedPhysical(handle, context, sent.key, physical)
+        assert.equal(accepted.ok, true, accepted.error)
+        assert.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+        assert.equal(sends, 1)
+      } finally { release(dispatch.admittedWithReceipt(`late-${context.session}`)) }
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-009] detached ${path} OwnedSettled delivery retains its observer without proving physical acceptance`, async () => {
+    await withJournal(`d0-${path}-owned`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'owned')
+      const seen = []
+      let options
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort((_session, _text, supplied) => { options = supplied; return sdk }),
+          handle, context, physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assert.equal(sent.ok, true, sent.error)
+        // This awaits the real Host listener's no-op verdict, not the still
+        // unresolved SDK task or its detached observer.
+        await deliverHostVerdict(options, 'OwnedSettled')
+        assert.deepEqual(seen, [])
+        assert.equal(dispatch.pendingClaimCount(handle, context.session), 1)
+        const physical = `ingress-${context.session}`
+        assert.equal((await acceptObservedPhysical(handle, context, sent.key, physical)).ok, true)
+        assert.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+      } finally { release(dispatch.admittedWithReceipt('late-owned-sdk-result')) }
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-009] detached ${path} retains its observer after a real Host Unknown delivery until actual physical evidence`, async () => {
+    await withJournal(`d0-${path}-unknown`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'unknown')
+      const seen = []
+      let options
+      let release
+      let sends = 0
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort((_session, _text, supplied) => { sends += 1; options = supplied; return sdk }),
+          handle, context, physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assert.equal(sent.ok, true, sent.error)
+        await deliverHostVerdict(options, 'OutcomeUnknown', 'the eventual response cannot be read')
+        assert.equal(dispatch.pendingClaimCount(handle, context.session), 1)
+        assert.deepEqual(seen, [])
+        const physical = `proven-after-unknown-${context.session}`
+        assert.equal((await acceptObservedPhysical(handle, context, sent.key, physical)).ok, true)
+        assert.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+        assert.equal(sends, 1)
+      } finally { release(dispatch.admittedWithReceipt('late-unknown-sdk-result')) }
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-009] detached ${path} definite Host refusal rejects later acceptance of the abandoned key without notifying`, async () => {
+    await withJournal(`d0-${path}-refused`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'refused')
+      const seen = []
+      let options
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort((_session, _text, supplied) => { options = supplied; return sdk }),
+          handle, context, physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assert.equal(sent.ok, true, sent.error)
+        await deliverHostVerdict(options, 'Refused', 'Host proved this enqueue was never accepted')
+        assert.equal(dispatch.pendingClaimCount(handle, context.session), 0)
+        const rejected = await acceptObservedPhysical(handle, context, sent.key, `invalid-after-refusal-${context.session}`)
+        assert.equal(rejected.ok, false)
+        assert.deepEqual(seen, [])
+      } finally { release(dispatch.admittedWithReceipt('late-refused-sdk-result')) }
+    })
+  })
+}
