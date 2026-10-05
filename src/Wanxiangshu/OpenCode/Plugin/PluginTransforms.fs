@@ -137,8 +137,8 @@ module PluginTransforms =
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-          ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
-          ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
+          ApplyCompanion: string option -> obj -> obj -> Task<unit>
+          ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyReadonlyDelegation: string option -> obj -> Task<unit>
@@ -565,9 +565,9 @@ module PluginTransforms =
                         |> ProviderWireDecode.messagesFromTransformOutput
                         |> ProviderWireCapture.lastUserMessageId
 
-                    // External HumanMessage acceptance lives in ChatExecutions, not
-                    // the claimed-prompt continuation map used by manager-loop gates.
-                    let acceptedHuman =
+                    // External human messages and internal recovery/guard continuations
+                    // admitted into ChatExecutions belong to this active iteration.
+                    let acceptedSuccessorRequest =
                         match journal, sidOpt, physicalUserMessageId with
                         | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
                             let key: ChatExecutionKey =
@@ -576,15 +576,13 @@ module PluginTransforms =
 
                             (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
                             |> ChatExecutionProjection.byKey key
-                            |> Option.exists (fun execution ->
-                                execution.origin = PromptAuthority.PromptOrigin.Continuation
-                                    PromptAuthority.ContinuationKind.HumanMessage)
+                            |> Option.isSome
                         | _ -> false
 
                     return!
                         RelayNarrativeTransform.apply
                             journal
-                            acceptedHuman
+                            acceptedSuccessorRequest
                             (fun sid ->
                                 ManagerWorkflow.continueAfterRetiredAttempt
                                     sessionPort
@@ -695,10 +693,7 @@ module PluginTransforms =
 
                     (host.RootWorkspace.TryRead())
 
-            fun relayProjection projectionSessionIdOpt inObj outObj ->
-                match relayProjection with
-                | RelayProjectionDisposition.CurrentIteration -> Task.FromResult()
-                | _ -> apply projectionSessionIdOpt inObj outObj
+            apply
           ApplyXWire =
             let isReplica =
                 fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
@@ -711,12 +706,7 @@ module PluginTransforms =
                   TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
             let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
-            let apply = XWire.applyTransform isReplica snapshotOpt wirePort attempts
-
-            fun relayProjection outObj ->
-                match relayProjection with
-                | RelayProjectionDisposition.CurrentIteration -> Task.FromResult PrefixPresentationHorizon.TentativeCold
-                | _ -> apply outObj
+            XWire.applyTransform isReplica snapshotOpt wirePort attempts
           FreezeProviderAttemptPlan = freezeProviderAttemptPlan
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
@@ -852,12 +842,12 @@ module PluginTransforms =
             caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
 
             // 8. applyCompanionForOrdinaryMaterial
-            do! caps.ApplyCompanion relayProjection projectionSessionIdOpt inObj outObj
+            do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
 
             // 9. XWire.applyTransform. A selected prefix probe creates a
             // tentative cold horizon for this physical request; downstream
             // historical auxiliaries must not replay the old horizon into it.
-            let! prefixHorizon = caps.ApplyXWire relayProjection outObj
+            let! prefixHorizon = caps.ApplyXWire outObj
 
             // 10. ProviderLifecycle.freezeProviderAttemptPlanForTransform
             // Freeze the exact plan, then confirm the Host's real assistant

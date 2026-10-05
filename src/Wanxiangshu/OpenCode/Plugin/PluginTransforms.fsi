@@ -26,8 +26,8 @@ module PluginTransforms =
             CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
             CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
             RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-            ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
-            ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
+            ApplyCompanion: string option -> obj -> obj -> Task<unit>
+            ApplyXWire: obj -> Task<PrefixPresentationHorizon>
             FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
             ApplyEnforcerContinuation: string option -> obj -> Task<unit>
             ApplyReadonlyDelegation: string option -> obj -> Task<unit>

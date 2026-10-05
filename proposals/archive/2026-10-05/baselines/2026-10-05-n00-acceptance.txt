@@ -1,0 +1,62 @@
+N00 upstream synchronization, 2026-10-05 Asia/Singapore
+Starting HEAD: 161cc4d3da73539e02788689ce4440536c9e4009
+Selected upstream increment: e7a60a76927672d435a8c418ca199b0eed073ace
+Ordinary non-fast-forward merge. One PluginTransforms.fs conflict resolved;
+the existing original PhysicalUserMessageId capture/injection remains intact.
+
+Compiler input digest (gen124/125):
+65c26187919efb0c1986cd548b0b55a037fee9fa8eada9553ec1ed064905566f
+Artifact input digest:
+845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c
+Generated input digest gen124:
+11c5896885db68830a0ba768cf146dbcd522130a86c73e4d82741b88364913f7
+Fable gen123/124/125 exit0; gen124 scripts/check.mjs exit0.
+
+Registered relay002 scenarios: exact admitted successor retry reaches real
+ProviderStarted; copied metadata/wrong key cannot admit that request; a terminal
+successor retains its journal record but is rejected by the earlier committed
+model-routing lease boundary before projection or dispatch. Option.isSome in
+relay lookup is not the whole admission gate; no new terminal bypass was proven.
+Native three scenarios passed. These runs are diagnostic, not official acceptance.
+
+Gen124 official related122, static check concurrent:
+5006ms verdict silence;30/122 drained,10active,82queued;320blocking updates;
+group7208 accepted=true109.037ms. No authoritative count summary.
+Same gen124 selected122, static check completed:
+5032ms verdict silence;31/122 drained,10active,81queued;335blocking updates;
+group7656 accepted=true125.997ms. No authoritative count summary.
+Gen124 relay package+host019 selected10:
+5018ms silence;4/10 drained,6active,0queued;12blocking updates;
+group8039 accepted=true133.488ms. No authoritative count summary.
+Gen124 relay002 selected1:
+5008ms silence;0/1 drained;group8285 accepted=true126.350ms;no verdict.
+Gen125 relay002 selected1 after separate-role wrong-session fixture adjustment:
+5015ms silence;0/1 drained;group9551 accepted=true92.657ms;no verdict.
+All use original5000/300000ms and defaultworkers; background never renews.
+
+015 independent diagnosis completed with 30s physical budget:
+original-identity-only1pass0fail,leaf7591ms;B1-B6+original7pass0fail,
+original leaf5421ms. Router ignores running and always returns target, so no
+same-target quota deadlock was established. Companion satellite branch returns
+without creating another Blogger. These completed long leaves explain why direct
+functional results cannot be upgraded to the5s official proof; unique temporal
+root cause is not established. Do not enlarge budget, changeworkers or fake feed.
+
+Raw original logs under/private/tmp:
+vibe-fs-n00-merged-baseline-build.log
+vibe-fs-n00-proof-build.log
+vibe-fs-n00-session-key-build.log
+vibe-fs-n00-gen124-check.log
+vibe-fs-n00-gen124-related.log
+vibe-fs-n00-gen124-related-sequential.log
+vibe-fs-n00-relay-package.log
+vibe-fs-n00-exact-key-official.log
+vibe-fs-n00-gen125-exact-key-official.log
+vibe-fs-n00-registered-relay.log
+vibe-fs-n00-registered-relay-session-key.log
+cognitive-e7a-isolated.log
+cognitive-e7a-preceding.log
+
+Merged input Linux CI and actual015 Host canary remain pending at this checkpoint.
+N00 is not complete. N01/N02/N03 implementation can use the frozen merged
+interfaces; one owner must later freeze all source/test/docs for final acceptance.

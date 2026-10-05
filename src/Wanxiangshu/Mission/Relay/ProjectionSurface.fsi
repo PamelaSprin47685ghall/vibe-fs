@@ -6,4 +6,4 @@ open Wanxiangshu.Persistence.Journal
 module ProjectionSurface =
     val projectMessages: messages: obj array -> obj
 
-    val apply: journal: JournalHandle -> sessionId: string -> acceptedHuman: bool -> messages: obj array -> Task<obj>
+    val apply: journal: JournalHandle -> sessionId: string -> acceptedRequest: bool -> messages: obj array -> Task<obj>

@@ -18,7 +18,7 @@ module ProjectionSurface =
             {| audit = messages
                provider = messages |}
 
-    let apply (journal: JournalHandle) (sessionId: string) (acceptedHuman: bool) (messages: obj array) : Task<obj> =
+    let apply (journal: JournalHandle) (sessionId: string) (acceptedRequest: bool) (messages: obj array) : Task<obj> =
         task {
             let interrupted = ResizeArray<string>()
             let output = createObj [ "messages" ==> messages ]
@@ -28,7 +28,7 @@ module ProjectionSurface =
                 Task.FromResult()
 
             let! disposition =
-                RelayNarrativeTransform.apply (Some journal.Journal) acceptedHuman interrupt (Some sessionId) output
+                RelayNarrativeTransform.apply (Some journal.Journal) acceptedRequest interrupt (Some sessionId) output
 
             return
                 box
