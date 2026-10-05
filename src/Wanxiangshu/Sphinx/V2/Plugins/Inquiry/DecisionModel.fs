@@ -30,12 +30,16 @@ type DecisionModelError = { Code: string; Message: string }
 
 module DecisionModel =
 
+    /// An absent comparison never becomes usable merely by carrying a rank.
+    let usable (estimate: ContributionEstimate) : bool =
+        estimate.Kind <> ContributionKind.Unestimated && estimate.Rank.IsSome
+
     /// Ranks estimates within one scope. Unestimated plans are never placed, and never
     /// given a rank below the lowest estimated one — "no data" is not "last place".
     let rankInScope (scopeId: string) (estimates: ContributionEstimate list) : ContributionEstimate list =
         let estimated =
             estimates
-            |> List.filter (fun estimate -> estimate.Rank.IsSome)
+            |> List.filter usable
             |> List.sortBy (fun estimate -> defaultArg estimate.Rank System.Int32.MaxValue)
 
         let renumbered =
@@ -49,30 +53,24 @@ module DecisionModel =
         @ (estimates
            |> List.filter (fun estimate -> not (Set.contains estimate.PlanId renumberedIds)))
 
-    /// An estimate is usable only when it carries a rank in the same scope.
-    let usable (estimate: ContributionEstimate) : bool = estimate.Rank.IsSome
-
     /// Whether a scope's estimates can support a numeric comparison. A single-response
     /// provisional order is a real answer with a real limitation: it is not an
     /// independent panel (WHAT[sphinx-v2-021]).
     let supportsNumericComparison (estimates: ContributionEstimate list) : bool =
         let kinds =
-            estimates
-            |> List.filter (fun estimate -> estimate.Rank.IsSome)
-            |> List.map (fun estimate -> estimate.Kind)
+            estimates |> List.filter usable |> List.map (fun estimate -> estimate.Kind)
 
-        kinds
-        |> List.forall (fun kind ->
-            match kind with
-            | ContributionKind.ModelEstimate _ -> true
-            | _ -> false)
+        not (List.isEmpty kinds)
+        && (kinds
+            |> List.forall (fun kind ->
+                match kind with
+                | ContributionKind.ModelEstimate _ -> true
+                | _ -> false))
 
     /// Whether the set is provisional only: usable for a first decision, not for a
     /// claim about the ranking's stability.
     let isProvisionalOnly (estimates: ContributionEstimate list) : bool =
         let kinds =
-            estimates
-            |> List.filter (fun estimate -> estimate.Rank.IsSome)
-            |> List.map (fun estimate -> estimate.Kind)
+            estimates |> List.filter usable |> List.map (fun estimate -> estimate.Kind)
 
         kinds |> List.contains ContributionKind.SingleResponseProvisional

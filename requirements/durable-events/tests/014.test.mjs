@@ -160,21 +160,38 @@ test('WHAT[durable-events-014] DURABLE_EVENTS_014_k_way_merge_is_writer_enumerat
   assert.equal(right.ok, true)
   assert.deepEqual(left.events.map((e) => e.id), right.events.map((e) => e.id))
 })
-test('WHAT[durable-events-014] k-way merge does not re-sort every writer head for every event', () => {
+test('WHAT[durable-events-014] k-way merge bounds actual ready-cursor comparisons', (t) => {
   const writers = 512
   const eventsPerWriter = 16
   let nextId = 0
   const streams = Array.from({ length: writers }, (_, writer) => [
     `writer-${String(writer).padStart(4, '0')}`,
-    Array.from({ length: eventsPerWriter }, () => envelope((nextId++).toString(16).padStart(40, '0'))),
+    Array.from({ length: eventsPerWriter }, (_, offset) =>
+      envelope((nextId++).toString(16).padStart(40, '0'), [], 'proof/merge', { writer, offset })),
   ])
+  const expected = streams.flatMap(([, events]) => events)
+  const eventCount = writers * eventsPerWriter
+  const heapHeight = Math.ceil(Math.log2(writers))
+  const comparisonBound = BigInt(3 * eventCount * heapHeight + 2 * writers)
+
+  assert.equal(typeof eventMerge.mergeWithDiagnostics, 'function',
+    'the native merge owner must report comparisons from its actual execution')
 
   const started = performance.now()
-  const merged = eventMerge.merge(streams)
+  const merged = eventMerge.mergeWithDiagnostics(streams)
   const elapsedMs = performance.now() - started
+  t.diagnostic(`${eventCount}-event / ${writers}-writer merge wall time: ${elapsedMs.toFixed(1)}ms`)
 
   assert.equal(merged.ok, true)
-  assert.equal(merged.events.length, writers * eventsPerWriter)
-  assert.ok(elapsedMs < 500, `8192-event / 512-writer merge took ${elapsedMs.toFixed(1)}ms`)
+  assert.equal(merged.events.length, eventCount)
+  assert.deepEqual(merged.events, expected)
+  assert.equal(new Set(merged.events.map((event) => event.id)).size, eventCount)
+  assert.equal(typeof merged.diagnostics?.readyComparisons, 'string')
+  assert.match(merged.diagnostics.readyComparisons, /^(0|[1-9][0-9]*)$/)
+  const comparisons = BigInt(merged.diagnostics.readyComparisons)
+  assert.ok(comparisons > 0n, 'a nontrivial merge must observe actual ready-cursor comparisons')
+  t.diagnostic(`actual ready-cursor comparisons: ${comparisons}; heap bound: ${comparisonBound}`)
+  assert.ok(comparisons <= comparisonBound,
+    `${eventCount}-event / ${writers}-writer merge used ${comparisons} ready-cursor comparisons; bound ${comparisonBound}`)
 })
 }

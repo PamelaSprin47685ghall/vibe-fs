@@ -305,8 +305,10 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/SyncDelegate/Surface.js',
     owner: 'delegation',
-    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'MANAGED-SESSION-001', 'MANAGED-SESSION-004', 'MANAGED-SESSION-009', 'MANAGED-SESSION-014'],
+    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'DELEG-025', 'DELEG-031', 'DISPATCH-PROTOCOL-003', 'DISPATCH-PROTOCOL-007', 'MANAGED-SESSION-001', 'MANAGED-SESSION-004', 'MANAGED-SESSION-009', 'MANAGED-SESSION-014'],
     lawOwners: {
+      'DISPATCH-PROTOCOL-003': 'dispatch-protocol',
+      'DISPATCH-PROTOCOL-007': 'dispatch-protocol',
       'MANAGED-SESSION-001': 'managed-session-lifecycle',
       'MANAGED-SESSION-004': 'managed-session-lifecycle',
       'MANAGED-SESSION-009': 'managed-session-lifecycle',

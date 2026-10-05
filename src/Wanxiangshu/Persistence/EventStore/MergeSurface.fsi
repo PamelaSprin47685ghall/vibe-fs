@@ -8,3 +8,4 @@ module EventMergeSurface =
     /// Merge named JS-native writer streams. Writer names only break impossible
     /// duplicate ties; causal readiness and EventId determine the order.
     val merge: streams: obj array -> obj
+    val mergeWithDiagnostics: streams: obj array -> obj

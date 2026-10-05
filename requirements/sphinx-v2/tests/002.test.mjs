@@ -104,3 +104,63 @@ test('WHAT[sphinx-v2-002] delegated execution claims no independence', () => {
   const independent = Loop.profileWith({ ExecutionMode: 1 })
   assert.equal(Loop.profileClaimsIndependence(independent), true)
 })
+
+const estimateScope = 'scope-unestimated-guard'
+const declaredEstimate = (PlanId, Kind, Rank, Location = null) => ({
+  PlanId, ScopeId: estimateScope, Kind, Rank, Location,
+})
+
+test('WHAT[sphinx-v2-002] an Unestimated plan cannot gain a usable estimate from supplied Rank or Location', () => {
+  const compared = declaredEstimate('compared-plan', 'ordinal-only', 2)
+  for (const [Rank, Location] of [[0, 1], [1, 0], [null, 1], [undefined, 0]]) {
+    const neverCompared = declaredEstimate('never-compared', 'unestimated', Rank, Location)
+    for (const candidates of [[neverCompared, compared], [compared, neverCompared]]) {
+      assert.deepEqual(Loop.decisionRank(estimateScope, candidates), [{
+        PlanId: compared.PlanId, ScopeId: estimateScope, Rank: compared.Rank, Kind: compared.Kind,
+      }])
+      assert.equal(Loop.decisionSelect(estimateScope, candidates).SelectedPlanId, compared.PlanId)
+    }
+  }
+})
+
+test('WHAT[sphinx-v2-002] a collection of only Unestimated plans has no selected alternative', () => {
+  const candidates = [
+    declaredEstimate('never-compared-zero', 'unestimated', 0, 1),
+    declaredEstimate('never-compared-one', 'unestimated', 1, 0),
+  ]
+  assert.deepEqual(Loop.decisionRank(estimateScope, candidates), [])
+  const selected = Loop.decisionSelect(estimateScope, candidates)
+  assert.equal(selected.SelectedPlanId, undefined)
+  assert.equal(typeof selected.error, 'string')
+  assert.notEqual(selected.error.trim(), '')
+})
+
+test('WHAT[sphinx-v2-002] declared estimates retain the existing zero-rank convention', () => {
+  for (const Kind of ['ordinal-only', 'single-response-provisional', 'model-estimate']) {
+    const compared = declaredEstimate('compared-zero', Kind, 0, Kind === 'model-estimate' ? 0.5 : null)
+    assert.deepEqual(Loop.decisionRank(estimateScope, [compared]), [{
+      PlanId: compared.PlanId, ScopeId: estimateScope, Rank: 0, Kind,
+    }])
+    assert.equal(Loop.decisionSelect(estimateScope, [compared]).SelectedPlanId, compared.PlanId)
+  }
+})
+
+test('WHAT[sphinx-v2-002] an empty comparison or missing estimates cannot claim numerical comparability', () => {
+  assert.equal(Loop.decisionSupportsNumeric([]), false)
+  assert.equal(Loop.decisionSupportsNumeric([
+    declaredEstimate('not-compared', 'model-estimate', null, null),
+  ]), false)
+  assert.equal(Loop.decisionSupportsNumeric([
+    declaredEstimate('never-compared', 'unestimated', 1, 1),
+  ]), false)
+
+  assert.equal(Loop.decisionSupportsNumeric([
+    declaredEstimate('declared-model-left', 'model-estimate', 1, 0.8),
+    declaredEstimate('declared-model-right', 'model-estimate', 2, 0.2),
+  ]), true)
+  for (const Kind of ['ordinal-only', 'single-response-provisional']) {
+    assert.equal(Loop.decisionSupportsNumeric([
+      declaredEstimate('declared-comparison', Kind, 1),
+    ]), false)
+  }
+})

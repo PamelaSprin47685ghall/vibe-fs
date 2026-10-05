@@ -92,6 +92,13 @@ type SyncDelegateRuntime =
         ?isCancelled: (unit -> bool) ->
             Task<Result<string, string>>
 
+    member InvokeObservedPrepared:
+        ownerSessionId: SessionId *
+        charge: string *
+        prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) *
+        ?isCancelled: (unit -> bool) ->
+            SyncDelegateObservedExecution
+
     member HandleTurn:
         turn: ReconciledTurn *
         failure: Wanxiangshu.Execution.Failure.ExecutionFailure option *

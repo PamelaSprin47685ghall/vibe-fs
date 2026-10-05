@@ -5,22 +5,34 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Plugins
-open Wanxiangshu.Sphinx.V2.Plugins
 
 /// The JS-native surface for the decision loop. Pure: no store, no clock, no model call.
 ///
 /// A caller supplies plain records: planId, scopeId, location (NaN for none), rank
-/// (-1 for never compared), and a kind string naming the estimate kind. `Rank` alone
-/// decides — id order never does.
+/// (-1 for never compared), and a kind string naming the estimate kind. Only usable
+/// estimates participate; their rank decides, never their id order.
 module Surface =
 
-    /// The plain shape the surface reads; a JS caller builds one with an object literal.
-    type PlainEstimate =
-        { PlanId: string
-          ScopeId: string
-          Location: float
-          Rank: int
-          Kind: string }
+    let private contributionKind =
+        function
+        | "model-estimate" -> ContributionKind.ModelEstimate("model-estimate", "surface")
+        | "ordinal-only" -> ContributionKind.OrdinalOnly
+        | "single-response-provisional" -> ContributionKind.SingleResponseProvisional
+        | _ -> ContributionKind.Unestimated
+
+    let private estimateKind =
+        function
+        | ContributionKind.ModelEstimate(modelRef, approximation) -> EstimateKind.ModelEstimate(modelRef, approximation)
+        | ContributionKind.OrdinalOnly -> EstimateKind.OrdinalOnly
+        | ContributionKind.SingleResponseProvisional -> EstimateKind.SingleResponseProvisional
+        | ContributionKind.Unestimated -> EstimateKind.Unestimated
+
+    let private kindName =
+        function
+        | EstimateKind.ModelEstimate _ -> "model-estimate"
+        | EstimateKind.OrdinalOnly -> "ordinal-only"
+        | EstimateKind.SingleResponseProvisional -> "single-response-provisional"
+        | EstimateKind.Unestimated -> "unestimated"
 
     /// A rank present at all? A JS `null` coerced to zero would place an unestimated
     /// plan first, which is exactly the failure this guards against.
@@ -32,15 +44,17 @@ module Surface =
 
     /// `Rank` may be absent, which means 'never compared'. Reading a missing rank as
     /// zero would place an unestimated plan first.
-    let private plainOf (candidate: obj) : PlainEstimate =
+    let private plainOf (candidate: obj) : ContributionEstimate =
         let present = rankPresent candidate
         let rankValue = rankOf candidate
+        let rank = if present then int rankValue else -1
+        let location = float candidate?Location
 
         { PlanId = string candidate?PlanId
           ScopeId = string candidate?ScopeId
-          Location = float candidate?Location
-          Rank = if present then int rankValue else -1
-          Kind = string candidate?Kind }
+          Location = if Double.IsNaN location then None else Some location
+          Rank = if rank >= 0 then Some rank else None
+          Kind = contributionKind (string candidate?Kind) }
 
     /// Ranked within one scope. Unestimated plans are never placed, so a missing rank
     /// stays missing rather than becoming a rank of zero.
@@ -48,50 +62,43 @@ module Surface =
         candidates
         |> List.ofSeq
         |> List.map plainOf
-        |> List.filter (fun item -> item.Rank >= 0 && item.ScopeId = scopeId)
-        |> List.sortBy (fun item -> item.Rank)
+        |> List.filter (fun item -> item.ScopeId = scopeId && DecisionModel.usable item)
+        |> List.sortBy (fun item -> defaultArg item.Rank System.Int32.MaxValue)
         |> List.map (fun item ->
             box
                 {| PlanId = item.PlanId
                    ScopeId = item.ScopeId
                    Rank = item.Rank
-                   Kind = item.Kind |})
+                   Kind = item.Kind |> estimateKind |> kindName |})
         |> List.toArray
 
     /// Whether the set can support a numeric comparison. A provisional order is a real
     /// answer with a real limitation: usable for a first decision, never for a numeric
     /// comparison.
     let decisionSupportsNumeric (candidates: obj list) : bool =
-        let kinds =
-            candidates |> List.ofSeq |> List.map plainOf |> List.map (fun item -> item.Kind)
-
-        let modeled = kinds |> List.filter (fun kind -> kind.StartsWith "model-estimate")
-
-        List.length modeled = List.length kinds
+        candidates
+        |> List.ofSeq
+        |> List.map plainOf
+        |> DecisionModel.supportsNumericComparison
 
     /// Selects the highest-ranked plan in one scope and returns why. The estimate kind
     /// survives selection so a degraded ordering stays labelled.
     let decisionSelect (scopeId: string) (candidates: obj list) : obj =
-        let ranked =
+        let estimates =
             candidates
             |> List.ofSeq
             |> List.map plainOf
-            |> List.filter (fun item -> item.Rank >= 0 && item.ScopeId = scopeId)
-            |> List.sortBy (fun item -> item.Rank)
+            |> List.filter (fun item -> item.ScopeId = scopeId)
             |> List.map (fun item ->
                 ({ PlanId = PlanId.create item.PlanId
                    ScopeId = item.ScopeId
-                   Kind = EstimateKind.ModelEstimate(item.Kind, "surface")
-                   Location =
-                     if System.Double.IsNaN item.Location then
-                         None
-                     else
-                         Some item.Location
-                   Rank = Some item.Rank }
+                   Kind = estimateKind item.Kind
+                   Location = item.Location
+                   Rank = item.Rank }
                 : PlanEstimate))
 
         let chosen =
-            Decision.choose scopeId "highest-estimate" "1" (Map.empty) (Map.empty) [] [] [] ranked []
+            Decision.choose scopeId "highest-estimate" "1" (Map.empty) (Map.empty) [] [] [] estimates []
 
         match chosen with
         | Ok outcome ->
@@ -100,6 +107,7 @@ module Surface =
             box
                 {| SelectedPlanId = PlanId.value selected.PlanId
                    SelectedRank = selected.Rank
+                   SelectedKind = kindName selected.Kind
                    Alternatives = outcome.Alternatives |> List.map (fun plan -> PlanId.value plan.PlanId) |}
         | Error fault -> box {| error = fault.Code |}
 

@@ -30,6 +30,39 @@ module SyncDelegateSurface =
     /// Exact formal response from the accepted terminal of this invocation.
     val invokeResponse: value: obj -> owner: string -> question: string -> Task<obj>
 
+    val startObserved: value: obj -> owner: string -> charge: string -> obj
+    val startObservedWithPreparationFailure: value: obj -> owner: string -> charge: string -> reason: string -> obj
+    val observedAdmission: execution: obj -> Task<obj>
+    val observedCompletion: execution: obj -> Task<obj>
+    val returnPromptOutcome: value: obj -> owner: string -> role: string -> index: int -> outcome: obj -> bool
+    val rejectPrompt: value: obj -> owner: string -> role: string -> index: int -> reason: string -> bool
+
+    val confirmPromptPhysical:
+        value: obj -> owner: string -> role: string -> index: int -> physical: string -> Task<bool>
+
+    val promptIdentity: value: obj -> owner: string -> role: string -> index: int -> obj
+    val promptClaimState: value: obj -> owner: string -> role: string -> index: int -> obj
+    val terminalListenerCount: value: obj -> int
+
+    val settleExactTerminal:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        formalText: string ->
+        reasoningText: string ->
+            Task<bool>
+
+    val settleExactFallback:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        formalText: string ->
+            bool
+
     /// Settle the current managed child through the real HandleTurn path.
     val settleWithAuthorityRoot:
         value: obj ->

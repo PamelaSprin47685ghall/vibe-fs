@@ -18,6 +18,11 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
 
+    [<RequireQualifiedAccess>]
+    type PromptSendObservation =
+        | Sending of PromptKey
+        | Answered of PromptKey * SendOutcome
+
     let internal originLabel = PromptAuthority.originLabel
 
     [<RequireQualifiedAccess>]

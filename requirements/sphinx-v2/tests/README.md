@@ -1,5 +1,7 @@
 # sphinx-v2 测试证明范围
 
+2026-10-05 B2-0有限守门：002/029通过真实ContributionKind→EstimateKind→Decision证明Unestimated即使带Rank/Location也不可用、空集合不宣称数值比较、ordinal/provisional保持原种类，旧rank0约定保留。gen151已有正式业务红灯，gen154相关宽选集225/225、1125/0；最后静态等价调整的交付复验另见[本批记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。这不是实际profile/model绑定或完整规划/renderer证明；002/029整体TODO、B1—B6与GAP-219保持。
+
 本目录是取代旧 epistemic-reasoning 的活动测试。WHAT 保持新上游 36 条合同，旧价格公式、阶段工具和内核不得通过测试迁回复活。历史对应见 [SUPERSEDES](../SUPERSEDES.md)。
 
 2026-10-05 N06-B0有限验收完成：完整派发Request与可选完整Receipt由同一Reducer保存至唯一Current。004证明每work预留不混入其它work合计，新增预留不重复扣旧值；007证明缺Some round及batch内逆序引用拒绝、None独立work允许；010覆盖当前Spec/attempt/fence/依赖/状态/本work预留、intent内容绑定与receipt物理冲突，exact replay不抹掉已有receipt；019保留全部30body公开编码/持久恢复及实际gen143旧seal，020核对完整bindings只改变规定的三哈希对象。正式红例与原始失败见[本批记录](../../../proposals/archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)。gen149全部Sphinx+J11为23/23排空、230pass/0fail、15TODO、group accepted=true；宽选集75/75、516pass/1fail，唯一durable-events/014性能失败，不能将目标证书写成宽选集绿色。

@@ -187,13 +187,15 @@
 
 ### N06-B 接手卡：先让运行事实可恢复，再接真实执行
 
-本卡取代下方完整义务索引中的开工顺序。A和B0有限验收已完成，不重做创建/读取及canonical派发接纳。2026-10-05的[本批记录](../archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)保存gen144/146/148正式红例、gen149目标23/23、230/0与宽选集75/75的独立性能失败。B1-A契约已定，B1—B6整体仍未完成；不用空delta或测试Surface冒充生产执行。
+本卡取代下方完整义务索引中的开工顺序。A和B0有限验收已完成，不重做创建/读取及canonical派发接纳。[B0记录](../archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)保留派发红绿与旧宽选集014墙钟失败；[观察与估值记录](../archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)另记gen153四业务红、真实sort变异与最终gen155全静态及正式225/225、1125/0。B1-A/B2-0有限验收完成；B1—B6整体未完成，不用空delta或测试Surface冒充生产执行。
+
+B1-A的普通terminal有限观察完成后，必须先做[B1-A2恢复因果接手卡](07-Sphinx恢复因果.md)，再接Sphinx实际Host。现same-root+continuation-kind没有assignment归属；retry、repair、guard三类producer都需在effect前绑定具体call，并从真正PhysicalAccepted回传successor。只修一类、按时间排除旧id或仅匹配初始physical都不够。该缺口已完成源码调查，尚无真正successor fixture的正式业务红灯，不记作修复。
 
 | 子包 | 状态 | 本包退出条件 |
 | --- | --- | --- |
 | B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
-| B1 实际Host绑定 | B1-A契约已定，待实现 | 先在现有生产SyncDelegate instance公开一次调用的typed Admission/Completion；沿原send owner保留原生carrier与PromptKey，actual terminal/checkpoint后交正式文本。之后再接真owner SessionId、family parent、public prompt与Sphinx持久绑定；本小包不关闭034 |
-| B2 executable profile | B2-0已调查，待正式红绿；完整profile待施工 | 先使Unestimated无论是否带rank都不可用，保留ordinal/provisional种类与实际Decision选择；不改rank范围。真实plugin/schema/ABI lock、prompt、授权/资源与原Goal/material仍须另接 |
+| B1 实际Host绑定 | B1-A有限验收完成；A2待施工 | typed Admission/Completion保原生carrier/key、持久physical/root、普通formal terminal与原checkpoint；四真实业务红后修fallback身份/单次结算和observed准备误发。最终gen155全静态及225/225、1125/0通过。先补A2的retry/repair/guard归属，再接真owner/family/public prompt与Sphinx持久绑定；034不关闭 |
+| B2 executable profile | B2-0有限验收完成；完整profile待施工 | Unestimated带rank仍不可用，空集合不称数值比较，ordinal/provisional由真实Decision保种类；gen151正式红、最终gen155宽绿与全静态通过，原rank0保持。完整schema/plugin/ABI lock、prompt、授权/资源与Goal/material另接，不关闭002/029整体TODO |
 | B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
 | B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |
 | B5 accepted renderer答案 | 待施工，依赖B3/B4 | 实际renderer结果先accepted，再AnswerCommitted；公开正文和来源可取、停止标签诚实 |

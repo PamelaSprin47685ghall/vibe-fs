@@ -1,5 +1,7 @@
 # durable-events 测试
 
+2026-10-05的014成本oracle改为同一原生ready heap的真实cursor比较次数，墙钟保诊断。仍512 writers×16=8192，先深核完整输出、数量、唯一性，再核3NH+2K=222208上界。正式normal6/0；实际生产heapPop排序变异保完整输出但3605957比较越界唯一红，随后手工恢复，gen154相关225/225、1125/0。变异整叶234.281ms亦低于历史500ms，墙钟不能独立证明复杂度；旧并行973.2ms失败原样保留。[日志、patch与边界](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)明确不扩大监督预算、不降低worker、不把诊断wrapper当第二算法。
+
 WHAT 是验收依据；本目录说明当前证据，不额外规定实现。
 
 001—018 主要驱动实际 canonical codec、EventStore、Journal、payload、Git Hook 和 Integrator：包括字节身份、损坏拒绝、提交门禁、提交前后 Current、并发分支、retention、合并顺序及物理操作计数。临时目录与受控故障用于隔离被测执行；正常 dispose/reopen 不是进程崩溃证明。

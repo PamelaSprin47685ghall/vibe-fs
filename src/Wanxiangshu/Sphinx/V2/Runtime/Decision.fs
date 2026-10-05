@@ -70,7 +70,7 @@ module Decision =
     let private selectBest (candidates: PlanEstimate list) : Result<PlanEstimate, DecisionError> =
         let ranked =
             candidates
-            |> List.filter (fun estimate -> estimate.Rank.IsSome)
+            |> List.filter (fun estimate -> estimate.Kind <> EstimateKind.Unestimated && estimate.Rank.IsSome)
             |> List.sortBy (fun estimate -> defaultArg estimate.Rank System.Int32.MaxValue)
 
         match ranked with

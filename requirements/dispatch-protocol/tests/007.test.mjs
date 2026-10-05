@@ -1,4 +1,33 @@
 import test from 'node:test'
+import assertObserved from 'node:assert/strict'
+import * as syncObserved from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as dispatchObserved from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { withSyncRuntime as withObservedRuntime } from '../../delegation/tests/support/sync-runtime.mjs'
+
+for (const [kind, outcome, admissionKind, claimKind] of [
+  ['AcceptanceUnknown', () => dispatchObserved.acceptanceUnknown('SAME-NATIVE-REASON'), 'Unconfirmed', 'Pending'],
+  ['Fatal', () => dispatchObserved.fatal('SAME-NATIVE-REASON'), 'Refused', 'Missing'],
+]) {
+  test(`WHAT[dispatch-protocol-007] observed ${kind} retains its actual PromptKey and native verdict without resending or guessing from reason text`, async () => {
+    assertObserved.equal(typeof syncObserved.startObserved, 'function', 'new observed API missing; capability red, not an existing business failure')
+    const owner = `observed-native-${kind}`
+    await withObservedRuntime(owner, async runtime => {
+      const execution = syncObserved.startObserved(runtime, owner, 'NATIVE-OUTCOME')
+      await syncObserved.awaitPromptCount(runtime, owner, 'Engineer', 1)
+      const sent = syncObserved.promptIdentity(runtime, owner, 'Engineer', 0)
+      assertObserved.equal(syncObserved.returnPromptOutcome(runtime, owner, 'Engineer', 0, outcome()), true)
+      const admission = await syncObserved.observedAdmission(execution)
+      assertObserved.equal(admission.kind, admissionKind)
+      assertObserved.equal(admission.sessionId, sent.sessionId)
+      assertObserved.equal(admission.promptKey, sent.promptKey)
+      assertObserved.deepEqual(admission.hostOutcome, { kind, value: 'SAME-NATIVE-REASON' })
+      assertObserved.equal((await syncObserved.observedCompletion(execution)).ok, false)
+      assertObserved.equal(syncObserved.promptClaimState(runtime, owner, 'Engineer', 0).kind, claimKind)
+      assertObserved.equal(syncObserved.promptCount(runtime, owner, 'Engineer'), 1)
+      assertObserved.equal(syncObserved.terminalListenerCount(runtime), 0)
+    })
+  })
+}
 
 {
 const { default: assert } = await import("node:assert/strict");

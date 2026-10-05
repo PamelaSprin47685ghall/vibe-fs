@@ -196,12 +196,12 @@ Execution/Session/SyncDelegateRole.fsi
 Execution/Session/SyncDelegateRole.fs
 Execution/Session/Attachment/AttachmentLeaseCore.fsi
 Execution/Session/Attachment/AttachmentLeaseCore.fs
+Foundation/Outcome.fsi
+Foundation/Outcome.fs
 Execution/Delegation/SyncDelegate/Model.fsi
 Execution/Delegation/SyncDelegate/Model.fs
 Execution/Delegation/HandoffIdentity.fsi
 Execution/Delegation/HandoffIdentity.fs
-Foundation/Outcome.fsi
-Foundation/Outcome.fs
 Requirement/Grounding/Model.fsi
 Requirement/Grounding/Model.fs
 Interaction/Authority/IdentitySeed.fsi

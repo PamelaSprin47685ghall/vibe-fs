@@ -23,6 +23,23 @@ open Wanxiangshu.Foundation.Identity
 [<AutoOpen>]
 module PromptDispatcherSend =
 
+    let private observeHostSend
+        (key: PromptKey)
+        (observer: (PromptDispatcher.PromptSendObservation -> unit) option)
+        (send: unit -> Task<SendOutcome>)
+        : Task<SendOutcome> =
+        match observer with
+        | None -> send ()
+        | Some observe ->
+            observe (PromptDispatcher.PromptSendObservation.Sending key)
+            let pending = send ()
+
+            task {
+                let! outcome = pending
+                observe (PromptDispatcher.PromptSendObservation.Answered(key, outcome))
+                return outcome
+            }
+
     /// PROMPT-011: the key is derived, never generated.
     ///
     /// Every input comes from the journal fold or the payload, so the same logical
@@ -364,6 +381,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (onDetachedFailure: (string -> Task) option)
             (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
@@ -419,7 +437,8 @@ module PromptDispatcherSend =
                         Some confirmationTask
                     | _ -> None
 
-                let sendTask = port.SendPrompt(sessionId, text, options)
+                let sendTask =
+                    observeHostSend key onSendObserved (fun () -> port.SendPrompt(sessionId, text, options))
 
                 let acceptFn physicalId =
                     this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId claim.IdentitySeed
@@ -452,7 +471,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None
+            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None None
 
         member this.SendAgentOwnerRootDetachedObserved
             (port: IDispatchSessionPort)
@@ -470,6 +489,7 @@ module PromptDispatcherSend =
                 directory
                 PromptDispatcher.AwaitMode.Detached
                 None
+                None
                 (Some onFailure)
                 None
 
@@ -481,6 +501,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool>)
             : Task<Result<PromptKey, string>> =
             this.SendAgentOwnerRootCore
@@ -491,6 +512,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 None
                 (Some tools)
 
@@ -510,6 +532,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             (key: PromptKey)
@@ -540,7 +563,8 @@ module PromptDispatcherSend =
                 // proven but before SendPrompt is invoked.
                 let sendAdmitted () : Task<PromptDispatcher.SendAttemptOutcome> =
                     task {
-                        let sendTask = port.SendPrompt(sessionId, text, options)
+                        let sendTask =
+                            observeHostSend key onSendObserved (fun () -> port.SendPrompt(sessionId, text, options))
 
                         let acceptFn physicalId =
                             this.AcceptContinuation key sessionId physicalId
@@ -587,6 +611,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             : Task<PromptDispatcher.SendAttemptOutcome> =
@@ -629,6 +654,7 @@ module PromptDispatcherSend =
                             directory
                             awaitMode
                             onAccepted
+                            onSendObserved
                             tools
                             physicalAdmission
                             key
@@ -644,6 +670,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigestAttempt
@@ -656,6 +683,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 tools
                 None
             |> TaskValue.map publicResultOfAttempt
@@ -680,6 +708,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
                 None
 
         /// Non-idle gate reminder with exact terminal occasion identity. Used by
@@ -721,6 +750,7 @@ module PromptDispatcherSend =
                         awaitMode
                         onAccepted
                         None
+                        None
             )
 
         member this.SendContinuationWithTools
@@ -732,6 +762,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool>)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
@@ -744,6 +775,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 (Some tools)
 
         member private this.SendAgentOwnerRootWithSeed
@@ -764,6 +796,7 @@ module PromptDispatcherSend =
                     identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Detached
+                    None
                     None
                     None
                     tools
@@ -787,6 +820,7 @@ module PromptDispatcherSend =
                     profile
                     directory
                     PromptDispatcher.AwaitMode.Detached
+                    None
                     None
                     tools
             | None -> this.SendAgentOwnerRootWithSeed port sessionId text directory tools issueIdentitySeed
@@ -824,6 +858,7 @@ module PromptDispatcherSend =
                 awaitMode
                 onAccepted
                 None
+                None
 
         /// HOST-004: idle-derived continuation whose quiescence permit is
         /// consumed at the final physical SendPrompt boundary, after durable
@@ -850,6 +885,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
                 None
                 (Some physicalAdmission)
 
@@ -878,6 +914,7 @@ module PromptDispatcherSend =
                 awaitMode
                 None
                 None
+                None
                 (Some physicalAdmission)
 
         member internal this.SendIdleInteractionRepair
@@ -901,6 +938,7 @@ module PromptDispatcherSend =
                 profile
                 directory
                 awaitMode
+                None
                 None
                 None
                 (Some physicalAdmission)

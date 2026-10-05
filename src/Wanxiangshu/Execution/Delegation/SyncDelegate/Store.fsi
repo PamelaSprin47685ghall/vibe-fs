@@ -29,7 +29,8 @@ and internal SyncDelegateInvocation =
       Charge: string
       ExpectedToolCalls: int option
       PrepareProviderPrompt: unit -> Task<LlmFacing.Document>
-      CaptureResponse: (string -> unit) option
+      ObserveAdmission: (SyncDelegateObservedAdmission -> unit) option
+      CaptureResponse: (SyncDelegateTerminalResponse -> unit) option
       IsCancelled: unit -> bool
       Batch: SyncDelegateBatch option
       Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>

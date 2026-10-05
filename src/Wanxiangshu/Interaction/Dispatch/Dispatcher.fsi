@@ -12,6 +12,11 @@ open Wanxiangshu.Participant.Persona
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
+    [<RequireQualifiedAccess>]
+    type PromptSendObservation =
+        | Sending of PromptKey
+        | Answered of PromptKey * SendOutcome
+
     val internal originLabel: (PromptAuthority.PromptOrigin -> string)
 
     [<RequireQualifiedAccess>]

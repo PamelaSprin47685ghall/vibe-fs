@@ -1,5 +1,7 @@
 # delegation 测试与证明范围
 
+2026-10-05 N06-B1-A只结算现有SyncDelegate的typed观察：真实native send/key、持久physical/root、普通正式响应与原checkpoint，receipt-only仍待physical、原生Unknown/Refused不按文案猜测、真Promise异常及本地订阅释放。025新增错root/旧physical/重复fallback和observed preparation误发四个独立正式业务红；修后gen154相关225/225、1125/0，最终静态复验见[本批记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。恢复retry/repair/guard仅凭same-root+kind仍缺当前assignment归属，[A2接手卡](../../../proposals/TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)尚未取得真正successor业务red；025/T111/GAP-153不关闭。Dispose只证明本地等待和订阅，不冒充物理abort/drain；Sphinx实际调用未接入。
+
 e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际证明取消期新assignment零放置/发送、固定DevOps原回调仍能结算、取消失败后全部两个owner订阅清理、同步异常后可重新取消以及重开不新建child；025/026与加载恢复沿实际scoped owner运行。TODO、OS crash与永久丢失替换不由这些断言代证；汇总和原始失败见[同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。
 
 规则来自本包 WHAT。用例标题中的 WHAT 锚点是映射；本页说明当前证据，不增加合同。TODO 是未完成，不计通过。本站对应人工巡检 42，完整 Manager/Orchestrator 场景仍需后续站收证。

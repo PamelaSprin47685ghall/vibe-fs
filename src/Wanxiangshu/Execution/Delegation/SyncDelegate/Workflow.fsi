@@ -43,12 +43,13 @@ module internal SyncDelegateWorkflow =
     val invoke:
         store: SyncDelegateCallStore ->
         deps: Dependencies ->
-        ownerSessionKey: string ->
+        ownerSessionId: SessionId ->
         role: SyncDelegateRole ->
         charge: string ->
         expectedToolCalls: int option ->
         batch: SyncDelegateBatch option ->
         prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) ->
-        captureResponse: (string -> unit) option ->
+        observeAdmission: (SyncDelegateObservedAdmission -> unit) option ->
+        captureResponse: (SyncDelegateTerminalResponse -> unit) option ->
         isCancelled: (unit -> bool) ->
             Task<Result<SyncDelegateInvocationResult, string>>

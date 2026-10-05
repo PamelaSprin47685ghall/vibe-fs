@@ -41,6 +41,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 
 /// Host-observable exact identity for a reusable SyncDelegate child. The title
@@ -67,10 +68,15 @@ module internal SyncDelegateInternals =
     /// The response belongs to the accepted terminal, not the reusable session
     /// or its historical WorkRecord. Reasoning and tool material are excluded.
     let captureResponse (call: SyncDelegateCall) (turn: ReconciledTurn) =
-        let text = CompletedTurnClassifier.partsText turn.Parts
+        let response =
+            { SessionId = turn.SessionId
+              PhysicalUserMessageId = turn.PhysicalUserMessageId
+              AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+              ProviderRun = turn.ProviderRun
+              FormalText = CompletedTurnClassifier.partsText turn.Parts }
 
         for invocation in call.Invocations do
-            invocation.CaptureResponse |> Option.iter (fun capture -> capture text)
+            invocation.CaptureResponse |> Option.iter (fun capture -> capture response)
 
     let settleCompletedFromParts
         (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
@@ -245,9 +251,46 @@ type SyncDelegateRuntime
                 |> ignore
         }
 
-    let sendDelegatePrompt
+    let publishObservedAdmission
+        (call: SyncDelegateCall)
+        (observation: PromptDispatcher.PromptSendObservation option)
+        (result: Result<PreparedDelegationHandoff, string>)
+        =
+        let evidence key outcome =
+            { SessionId = call.Delegate
+              PromptKey = key
+              HostOutcome = outcome }
+
+        let admission =
+            match result, observation, call.AcceptedPhysical, call.AcceptedAuthorityRoot with
+            | Ok _,
+              Some(PromptDispatcher.PromptSendObservation.Answered(key,
+                                                                   ((AdmittedWithReceipt _ | AdmittedWithPhysicalMessage _) as outcome))),
+              Some physical,
+              Some root ->
+                SyncDelegateObservedAdmission.Accepted
+                    { Dispatch = evidence key (Some outcome)
+                      PhysicalUserMessageId = physical
+                      AuthorityRootUserMessageId = root }
+            | Ok _, _, _, _ ->
+                invalidOp "Successful managed delegation lacked exact Host and physical acceptance evidence"
+            | Error reason, None, _, _ -> SyncDelegateObservedAdmission.NotDispatched reason
+            | Error reason,
+              Some(PromptDispatcher.PromptSendObservation.Answered(key, ((Retryable _ | Fatal _) as outcome))),
+              _,
+              _ -> SyncDelegateObservedAdmission.Refused(evidence key (Some outcome), reason)
+            | Error reason, Some(PromptDispatcher.PromptSendObservation.Answered(key, outcome)), _, _ ->
+                SyncDelegateObservedAdmission.Unconfirmed(evidence key (Some outcome), reason)
+            | Error reason, Some(PromptDispatcher.PromptSendObservation.Sending key), _, _ ->
+                SyncDelegateObservedAdmission.Unconfirmed(evidence key None, reason)
+
+        for invocation in call.Invocations do
+            invocation.ObserveAdmission |> Option.iter (fun observe -> observe admission)
+
+    let sendDelegatePromptCore
         (call: SyncDelegateCall)
         (request: SyncDelegatePromptRequest)
+        (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
         : Task<Result<PreparedDelegationHandoff, string>> =
         taskResult {
             let requireLiveCall () =
@@ -310,6 +353,7 @@ type SyncDelegateRuntime
                         (Some(fun physical ->
                             let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
                             accept physical root (FreshAuthorityRoot root)))
+                        onSendObserved
                         tools
 
                 ()
@@ -340,6 +384,7 @@ type SyncDelegateRuntime
                         PromptDispatcher.AwaitMode.Await
                         (Some(fun physical ->
                             accept physical profile.AuthorityRootUserMessageId (ExistingAuthorityContinuation physical)))
+                        onSendObserved
                         tools
 
                 ()
@@ -351,6 +396,42 @@ type SyncDelegateRuntime
             let! _ = call.AcceptedRoot.Task |> TaskResultCE.ofTask
             return prepared
         }
+
+    let sendObservedDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
+        task {
+            // DSL-MUTABLE: resource — raw Host evidence for this call's physical send.
+            let observation = ref None
+
+            try
+                let! result =
+                    sendDelegatePromptCore call request (Some(fun observed -> observation.Value <- Some observed))
+
+                publishObservedAdmission call observation.Value result
+                return result
+            with error ->
+                publishObservedAdmission call observation.Value (Error error.Message)
+                return raise error
+        }
+
+    let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
+        if
+            call.Invocations
+            |> List.exists (fun invocation -> invocation.ObserveAdmission.IsSome)
+        then
+            sendObservedDelegatePrompt call request
+        else
+            sendDelegatePromptCore call request None
+
+    let finishObservedInvocation observe (response: SyncDelegateTerminalResponse option) result =
+        match result with
+        | Error reason ->
+            observe (SyncDelegateObservedAdmission.NotDispatched reason)
+            Error reason
+        | Ok _ ->
+            response
+            |> Option.filter (fun terminal -> not (String.IsNullOrWhiteSpace terminal.FormalText))
+            |> Option.map Ok
+            |> Option.defaultValue (Error "Completed delegation did not supply a formal response")
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
@@ -622,12 +703,13 @@ type SyncDelegateRuntime
         SyncDelegateWorkflow.invoke
             store
             deps
-            ownerSessionKey
+            (SessionId.create ownerSessionKey)
             role
             charge
             expectedToolCalls
             None
             (fun () -> Task.FromResult(LlmFacing.instruction charge))
+            None
             None
             (fun () -> false)
         |> singletonResult
@@ -645,12 +727,13 @@ type SyncDelegateRuntime
         SyncDelegateWorkflow.invoke
             store
             deps
-            ownerSessionKey
+            (SessionId.create ownerSessionKey)
             role
             charge
             expectedToolCalls
             None
             prepareProviderPrompt
+            None
             None
             (fun () -> false)
         |> singletonResult
@@ -673,13 +756,14 @@ type SyncDelegateRuntime
                 SyncDelegateWorkflow.invoke
                     store
                     deps
-                    ownerSessionKey
+                    (SessionId.create ownerSessionKey)
                     role
                     charge
                     None
                     None
                     prepareProviderPrompt
-                    (Some(fun text -> response.Value <- Some text))
+                    None
+                    (Some(fun terminal -> response.Value <- Some terminal.FormalText))
                     (defaultArg isCancelled (fun () -> false))
                 |> singletonResult
 
@@ -690,6 +774,48 @@ type SyncDelegateRuntime
                     | Some text when not (String.IsNullOrWhiteSpace text) -> Ok text
                     | _ -> Error "Completed delegation did not supply a formal response")
         }
+
+    member _.InvokeObservedPrepared
+        (
+            ownerSessionId: SessionId,
+            charge: string,
+            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
+            ?isCancelled: unit -> bool
+        ) : SyncDelegateObservedExecution =
+        let admission =
+            TaskCompletionSource<SyncDelegateObservedAdmission>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let observe outcome =
+            AsyncSupport.trySetResult admission outcome |> ignore
+        // DSL-MUTABLE: resource — exact causal terminal captured for this invocation.
+        let response = ref None
+
+        let completion =
+            task {
+                try
+                    let! result =
+                        SyncDelegateWorkflow.invoke
+                            store
+                            deps
+                            ownerSessionId
+                            SyncDelegateRole.Engineer
+                            charge
+                            None
+                            None
+                            prepareProviderPrompt
+                            (Some observe)
+                            (Some(fun terminal -> response.Value <- Some terminal))
+                            (defaultArg isCancelled (fun () -> false))
+                        |> singletonResult
+
+                    return finishObservedInvocation observe response.Value result
+                with error ->
+                    observe (SyncDelegateObservedAdmission.NotDispatched error.Message)
+                    return Error error.Message
+            }
+
+        { Admission = admission.Task
+          Completion = completion }
 
     member _.InvokeBatchPrepared
         (
@@ -703,12 +829,13 @@ type SyncDelegateRuntime
         SyncDelegateWorkflow.invoke
             store
             deps
-            ownerSessionKey
+            (SessionId.create ownerSessionKey)
             role
             charge
             expectedToolCalls
             (Some batch)
             prepareProviderPrompt
+            None
             None
             (fun () -> false)
 
@@ -749,9 +876,13 @@ type SyncDelegateRuntime
     /// consumed the turn. The checkpoint stays pending-evidence; the earned
     /// completion is delivered from the turn, never dropped, never re-executed.
     member _.SettleCompletedFromTurn(turn: ReconciledTurn) : bool =
-        match store.TryPeekCallByDelegate turn.SessionId with
-        | Some call -> SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
-        | None -> false
+        store.TryPeekCallByDelegate turn.SessionId
+        |> Option.filter (fun call ->
+            call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
+            && belongsToCall call turn)
+        |> Option.bind (fun _ -> store.TryPopCallByDelegate turn.SessionId)
+        |> Option.map (fun call -> SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn)
+        |> Option.defaultValue false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =
         match store.TryPeekCallByDelegate sessionId with

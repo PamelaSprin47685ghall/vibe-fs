@@ -37,6 +37,7 @@ module PromptDispatcherSend =
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option ->
             tools: Map<string, bool> ->
                 Task<Result<PromptKey, string>>
 
@@ -73,6 +74,7 @@ module PromptDispatcherSend =
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option ->
             tools: Map<string, bool> ->
                 Task<Result<PromptKey, string>>
 

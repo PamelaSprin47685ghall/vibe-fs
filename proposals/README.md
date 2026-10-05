@@ -1,6 +1,6 @@
 # 计划与提案入口
 
-2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A与B0有限验收完成；B0正式目标23/23、230/0，完整派发事实、引用守门、逐work预留与冷恢复已证。下一件事B1-A公开现有SyncDelegate的真实接纳/终态观察，独立B2-0先修Unestimated误入排名；再接实际Host/profile/结果/答案。N00的45e413 Linux全仓已排空，J11旧断言已修待新CI，本地宽选集014性能失败继续调查。不能按下列旧S03“下一步”或已完成卡排工；整体GAP边界保持。[最新归档](archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)与[45e413完整CI receipt](archive/2026-10-05/baselines/45e413-ci/receipt.txt)分别记账。
+2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A观察接口、B2-0估值守门和014比较oracle均已有限验收；最终gen155全静态通过、正式225/225、1125/0，skip/TODO另记。生产排序退化红灯与旧墙钟失败保留。下一件事先按[A2恢复因果接手卡](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)补三类successor归属，再接真实Host/profile/结果/答案；不重复已完成卡。N00最新[f136 CI](archive/2026-10-05/baselines/f136a-ci/receipt.txt)是821准入/820排空的总预算超时，没有权威汇总，整体GAP与全仓失败保持。[本批归档](archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)分别记账，不能按下列旧S03“下一步”排工。
 
 S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 

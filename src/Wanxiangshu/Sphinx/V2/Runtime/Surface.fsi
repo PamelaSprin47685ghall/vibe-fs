@@ -9,7 +9,7 @@ open Wanxiangshu.Sphinx.V2.Plugins
 ///
 /// A caller supplies plain records. `Location` is NaN when absent, `Rank` is -1 when
 /// the plan was never compared, and `Kind` is a plain string naming the estimate kind.
-/// `Rank` alone decides.
+/// Usable estimates retain their declared kind and rank.
 module Surface =
     // Decision
     val decisionRank: string -> obj list -> obj array
