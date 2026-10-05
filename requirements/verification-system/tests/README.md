@@ -1,5 +1,9 @@
 # verification-system 测试说明
 
+2026-10-06 N04-C3：正式016新增三个Darwin native integration case，先等实际Node consumer读只读member并exit73、实际进程组排空，再让action返回成功或抛原Error/null。scope必须拒绝同consumerError，或以原cause和精确两项errors聚合；每例同时验证原字节、PID ESRCH、四owner完整dev/ino/mode/size/bytes及清单恢复。gen167真实3/0；丢弃consumer失败变异0/3，null回退变异2/1，实际资源恢复先通过，生产helper已恢复原SHA256。最终固定输入的小物理和正式unit收据见[执行契约](../../../proposals/N04真实只读Fable执行契约-2026-10-05.md)。native定向运行不冒称完整integration orchestrator，默认unit的native skip不算通过；T418/T419/GAP-055及FD/backing/ABA/actualverify保持未闭合。
+
+N00最新[a15 CI](../../../proposals/archive/2026-10-05/baselines/a15-ci/receipt.txt)实际merge08ba7bb7，format/check/build通过，unit原300秒794/821排空、006/011活动、25排队，缺权威summary，outer groupaccepted=true。与此前6b共同794文件790项变慢、成本增163.730 worker-seconds；输入及host不同，缺CPU/IO因果证据。该失败和历史完整排空结果分别适用于各自输入，不按最后判决归因或改变预算/worker。
+
 2026-10-05 当前冻结输入 gen131 已通过 Fable/check、前后 freshness 与正式选集：212/212 文件排空、1547 passed/0 failed、31 skipped、94 TODO，166.97s wall/422.80s test time；group64270 accepted=true、19.321ms，exit1 仅 pending。N00 非续期诊断切片已完成，保存真实测试父链、文件/进程身份及工具 spawn/exit/group-drain/monitor-close；真实关闭诊断 fd2 不改变原工具结果。诊断不改变预算、并发或续期分类，未实施快照复用优化。N05-A/T386 当前读取版本修复及 Sphinx 核心答案来源守门前置也已纳入该选集；native006 integration 严格 cleanup oracle 为3/0、5.493s，无 skip/TODO。完整 T406 Runtime/profile/公开入口与全仓新头 CI 仍待验收，详见[本批交付记录](../../../proposals/archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
 
 历史33dc03ba6的CI通过format/check/build，unit仍在原300000ms截断：817/818排空，仅016活动，最后判决为non-executable selected Node，group3105 accepted=true、9.317ms，无权威汇总。见[原始记录](../../../proposals/archive/2026-10-05/baselines/vibe-fs-n00-33dc-ci.log)。该失败仍未唯一归因，不能称仅pending或拿gen131选集替代全仓通过。本机成本probe原始15/0、975.422s中有952秒实际工具区间对应OS Sleep/DarkWake；样本受睡眠污染，不用于解释Linux CI或证明优化收益。

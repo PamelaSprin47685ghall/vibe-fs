@@ -1,6 +1,8 @@
 # 计划与提案入口
 
-2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A、B2-0、014成本oracle及A2-D0/D1均已有限验收。D0的gen162相关238/238、1178/0复验与[D1](archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)的旧业务6红、gen165定向36/0均保留，skip/TODO另记。下一包按[A2卡第11节](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)先装配同一owner的真实恢复夹具（managed acceptance、隔离ModelRouting、实际Host scope及shared stop fence），再冻结lease/source、并行三producer、最后删宽匹配；脚本retry不能验收来源。Sphinx实际Host/profile/结果/答案依赖此完整A2。N00最新[6b CI](archive/2026-10-05/baselines/6b-ci/receipt.txt)已821/821排空、4577pass/0fail、116skip/390TODO，原预算内285.43秒；退出1仅pending proof，完整发布仍未通过。此证书不消除历史198e/3bde/f136的真实总预算超时，不能据环境成本变化宣称性能修复。排序退化红灯及墙钟失败均保留，不能按下列旧S03“下一步”排工。
+2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A、B2-0、014成本oracle及A2-D0/D1均已有限验收；D1最终gen166相关238/238、1186pass/0fail、28skip/129TODO。[D1记录](archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)保留旧业务6红与剩余边界。下一包按[A2卡第11节](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)先装配同一owner的真实恢复夹具（managed acceptance、隔离ModelRouting、实际Host scope及shared stop fence），再冻结lease/source、并行三producer、最后删宽匹配；脚本retry不能验收来源。Sphinx实际Host/profile/结果/答案依赖此完整A2。
+
+N04-C3已补三项真实独立consumer失败证明与两份有效变异红灯，生产helper未改，最终收据见[执行契约](N04真实只读Fable执行契约-2026-10-05.md)。后续C-R0—C-R3先明确FD/backing/ABA的实际OS强制能力，不能重复小镜像正例就关闭T418/T419。N00最新[a15 CI](archive/2026-10-05/baselines/a15-ci/receipt.txt)在原300秒时794/821排空、006/011活动、25排队、无权威summary，是实质超时；format/check/build通过。此前[6b CI](archive/2026-10-05/baselines/6b-ci/receipt.txt)821/821、4577/0仅pending仍保留。共同794文件790项变慢，输入及host不同，缺CPU/IO因果证据；不以一次排空、D1三文件或last verdict推定吞吐根因。排序退化红灯及历史墙钟失败都保留，不能按下列旧S03“下一步”排工。
 
 S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 

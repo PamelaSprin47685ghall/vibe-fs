@@ -1,6 +1,8 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-06 最新N00证书见[6b原始CI](../archive/2026-10-05/baselines/6b-ci/receipt.txt)：实际merge1c90280a，原预算/双worker下821/821排空、4577pass/0fail、116skip/390TODO，285.43秒；format/check/build通过，发布因pending proof退出1。016真实完整Linux成本67.209秒，201个工具全回收。本次host和输入不同，不能把成本下降记成已实现的性能修复；下方d599、33dc等超时仍是历史实质失败，其旧“下一步”不得盖过总计划当前顺序。
+2026-10-06 最新N00证据见[a15原始CI](../archive/2026-10-05/baselines/a15-ci/receipt.txt)：实际merge08ba7bb7，原300秒/双worker下794/821排空、006/011活动、25排队，无权威summary；format/check/build通过，outer group3076 accepted=true、10.290ms。006准入仅余13.802秒，011仅余0.076秒；没有内部工具phase证据，不宣称每个工具已回收。与6b共同794文件成本增163.730 worker-seconds，790项变慢、中位比1.403，D1三文件合计仅增1.646秒。输入及host不同，缺CPU/IO因果，下一步先分析全局实际执行成本，不删测试或扩预算。[6b完整821/821、4577/0仅pending](../archive/2026-10-05/baselines/6b-ci/receipt.txt)仍是该输入的证书；其016完整67.209秒/201工具回收不代替本次截断。下方历史超时与旧“下一步”不得盖过总计划当前顺序。
+
+N04-C3只补现有scope的独立消费者失败证明：真实exit73后action正常返回仍拒绝，Error/null精确AggregateError；两份受控变异有效，生产helper恢复原SHA256。[执行契约的新接续](../N04真实只读Fable执行契约-2026-10-05.md)要求先调查FD/backing/祖先路径ABA的实际强制能力，再做暂停consumer的mounted路径矩阵及foreign资源拒绝；最终小物理、正式unit与各项证明分别记账。N04-C/N08/T418/T419和GAP-055仍未闭合。
 
 2026-10-05 当前状态：N00 非续期诊断、N05-A/T386 当前读取及 Sphinx 核心答案来源守门前置已交付；N05-B/T388 自动Grounding原材料与工具后缀有限范围已验收。gen137正式223/223排空、1454pass/0fail、21skip、87TODO，仅pending exit1；真实Host integration1/0、无skip/TODO。正文保真不复原native read已丢失的字节，native仍PartialFile；legacy/user、完整插件Long Stroke、T406 Runtime/profile/公开入口及新头全仓CI另验。见[最新记录](../archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
 

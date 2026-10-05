@@ -34,6 +34,23 @@ async function withDirectories(action) {
   }
 }
 
+function snapshotReadonlyFixtureInputs(directories) {
+  return directories.map(directory => {
+    const root = fs.lstatSync(directory.root, { bigint: true })
+    const member = fs.lstatSync(path.join(directory.root, 'member'), { bigint: true })
+    assert.equal(root.isDirectory(), true)
+    assert.equal(member.isFile(), true)
+    assert.deepEqual(fs.readdirSync(directory.root).sort(), ['member'])
+    return {
+      root: { dev: root.dev, ino: root.ino, mode: root.mode },
+      member: {
+        dev: member.dev, ino: member.ino, mode: member.mode, size: member.size,
+        bytes: fs.readFileSync(path.join(directory.root, 'member')),
+      },
+    }
+  })
+}
+
 export function registerReadonlyInputTests() {
   const platform = { skip: process.platform !== 'darwin' }
   integrationTest('WHAT[verification-system-016] a real readonly mount protects original role paths and rejects foreign or expired view capabilities', platform, async () => {
@@ -122,6 +139,74 @@ export function registerReadonlyInputTests() {
         directories.forEach(directory => directory.assertOwned())
         assert.deepEqual(fs.readdirSync(root).sort(), ['inputs', 'output'])
       })
+    })
+  }
+  for (const reason of [undefined, new Error('primary readonly action failed'), null]) {
+    const title = reason === undefined
+      ? 'a normal action return cannot conceal an independently failed actual readonly Node consumer'
+      : `the original ${reason === null ? 'null' : 'Error'} action failure remains the cause alongside an independently failed actual readonly Node consumer`
+    integrationTest(`WHAT[verification-system-016] ${title}`, platform, async t => {
+      let outcome
+      let consumerFailure
+      let consumerPid
+      const expectedStderr = 'actual readonly consumer exit 73\n'
+      await withDirectories(async ({ root, directories, options }) => {
+        const original = snapshotReadonlyFixtureInputs(directories)
+        const program = `
+import fs from 'node:fs'
+const bytes = fs.readFileSync(${JSON.stringify(path.join(directories[0].root, 'member'))})
+fs.writeSync(1, JSON.stringify({ pid: process.pid, readHex: bytes.toString('hex') }))
+fs.writeSync(2, ${JSON.stringify(expectedStderr)})
+process.exit(73)
+`
+        const scopeResults = await Promise.allSettled([
+          withReadonlyVerificationInputs({ ...options, signal: t.signal }, async view => {
+            const consumer = consumeReadonlyVerificationInputs(view, signal => runVerificationToolProbe(
+              process.execPath, ['--input-type=module', '-e', program],
+              { cwd: root, env: { PATH: path.dirname(process.execPath) }, signal },
+            ))
+            consumerFailure = await consumer.then(
+              () => { throw new Error('Actual readonly consumer unexpectedly exited successfully') },
+              error => error,
+            )
+            assert.equal(consumerFailure.code, 'verification-tool-probe-failed')
+            assert.equal(consumerFailure.exitCode, 73)
+            assert.equal(consumerFailure.signal, null)
+            assert.equal(consumerFailure.stderr, expectedStderr)
+            assert.equal(consumerFailure.cause, undefined, 'The actual nonzero terminal must not hide a cleanup failure')
+            const observed = JSON.parse(consumerFailure.stdout)
+            consumerPid = observed.pid
+            assert.ok(Number.isSafeInteger(consumerPid) && consumerPid > 0)
+            assert.equal(observed.readHex, original[0].member.bytes.toString('hex'))
+            assert.throws(() => process.kill(consumerPid, 0), { code: 'ESRCH' })
+            assert.throws(() => directories[0].assertOwned(), /owned directory identity/, 'The actual process has drained before restoring the mounted input namespace')
+            view.revalidate()
+            if (reason !== undefined) throw reason
+            return 'this normal action result must never be published'
+          }),
+        ])
+        outcome = scopeResults[0]
+        directories.forEach(directory => directory.assertOwned())
+        assert.deepEqual(snapshotReadonlyFixtureInputs(directories), original)
+        assert.throws(() => process.kill(consumerPid, 0), { code: 'ESRCH' })
+        assert.deepEqual(fs.readdirSync(root).sort(), ['inputs', 'output'])
+        t.diagnostic(JSON.stringify({
+          actualPid: consumerPid, actualExitCode: consumerFailure.exitCode,
+          actualSignal: consumerFailure.signal, scopeOutcome: outcome.status,
+          restoredOwners: directories.length, remainingRootEntries: fs.readdirSync(root).sort(),
+        }))
+      })
+      // Finish physical cleanup before checking the refusal outcome.
+      assert.equal(outcome.status, 'rejected')
+      if (reason === undefined) {
+        assert.equal(outcome.reason, consumerFailure)
+      } else {
+        assert.ok(outcome.reason instanceof AggregateError)
+        assert.equal(outcome.reason.cause, reason)
+        assert.equal(outcome.reason.errors.length, 2)
+        assert.equal(outcome.reason.errors[0], reason)
+        assert.equal(outcome.reason.errors[1], consumerFailure)
+      }
     })
   }
 }

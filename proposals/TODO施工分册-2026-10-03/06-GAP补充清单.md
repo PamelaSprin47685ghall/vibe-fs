@@ -1,5 +1,7 @@
 # 06：GAP 补充清单与无 TODO 义务
 
+2026-10-06接续：GAP-055仍PARTIAL。[N04-C3](../N04真实只读Fable执行契约-2026-10-05.md)补真实独立consumer的exit73、正常action拒绝、Error/null精确聚合和四owner完整恢复，生产helper不改；两份手工变异红灯证明oracle有效。此项不替代FD/backing/ABA、全过程物理保护与同候选actual verify，T418/T419保留。N00最新[a15 CI](../archive/2026-10-05/baselines/a15-ci/receipt.txt)是原300秒实质截断，794/821、006/011活动、25排队，无权威summary；不能沿用下方历史“仅pending”描述作为新头结论。
+
 2026-10-05最新状态：6a282ecfc全仓CI已818/818、4303/0、105skip、396TODO，仅pending退出1；gen121正式相关80文件783/0。后续按[总计划N00—N09](../TODO施工总计划-2026-10-03.md)施工。本页历史表中GAP-077的inline/未接registered、GAP-181的仅ABSORB/DISCARD叙述均已过时；015交付已证，机械BIRTH已存在，剩余分别是认知语义以及统一Rulebook、原子生效和私有机制提炼。GAP状态不因规划或旧TODO消失自动关闭。
 
 2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。本批六 namespace owner、PP-011/T335、grounding B/T387 与 cognitive/015 注册投递切片已验收完成；gen116 正式 80/80、772/0，cf6fb31e8 Linux 818/818、4292/0，仅既有 pending 退出1。canary completed 后隔离及晚到 HTTP 错误回归最终 integration 21/0。原失败记录保留，整体 GAP 状态不变；后续 S03 只读/FD/ABA/actual verify 及其他语义按原卡继续，不重做本批切片。
