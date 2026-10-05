@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {createHash} from 'node:crypto'
-import {accessSync, mkdtempSync, realpathSync, rmSync} from 'node:fs'
+import {accessSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -9,7 +9,8 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js'
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js'
 import {ErrorCode, McpError} from '@modelcontextprotocol/sdk/types.js'
 import {Watchdog} from '../../verification-system/tests/e2e/support/watchdog.js'
-import {Surface_isTool as isTool} from '../../../dist/Sphinx/V2/Wire/Surface.js'
+import {isTool} from '../../../dist/Sphinx/V2/Wire/Surface.js'
+import * as Wire from '../../../dist/Sphinx/V2/Wire/Surface.js'
 import {isOk, isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
   Tool_decodeStart as decodeStart,
@@ -68,6 +69,30 @@ test('WHAT[sphinx-v2-036] every registered tool decodes its own arguments instea
     // same empty ones are refused by the field that is missing.
     assert.equal(isOk(decoders[name](argumentsOf[name])), true, name)
     assert.equal(isError(decoders[name]({})), true, name)
+  }
+})
+
+test('WHAT[sphinx-v2-036] invalid inquiry identities are refused by the real JS reader instead of escaping as exceptions', () => {
+  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-invalid-read-id-'))
+  const handle = Wire.create(commonDir, 'invalid-read-owner', null)
+  try {
+    const before = journalBytes(commonDir)
+    for (const inquiryId of ['a b', 'inq\nx', 'inq\0x']) {
+      for (const result of [
+        Wire.status(handle, {inquiryId}),
+        Wire.exportInquiry(handle, {inquiryId, mode: 'summary'}),
+        Wire.exportInquiry(handle, {inquiryId, mode: 'full'}),
+      ]) {
+        assert.equal(result.outcome, 'refused')
+        assert.equal(result.refusal.code, 'INVALID_SCHEMA')
+        assert.equal(result.refusal.path, 'inquiryId')
+        assert.notEqual(result.refusal.message.trim(), '')
+      }
+    }
+    assert.deepEqual(journalBytes(commonDir), before)
+  } finally {
+    Wire.dispose(handle)
+    rmSync(commonDir, {recursive: true, force: true})
   }
 })
 
@@ -204,17 +229,21 @@ async function closeAndObserveExit(client, transport, exited, diagnostic) {
   finally { watchdog.stop() }
 }
 
-async function withSphinxStdio(t, scenario) {
+async function withSphinxStdio(t, scenario, options = {}) {
   try { accessSync(serveEntry) }
   catch (cause) { throw new Error('MCP_ENTRY_UNAVAILABLE: 需要最终集成产物 ' + serveEntry, {cause}) }
-  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-mcp-contract-'))
+  const ownsCommonDir = options.commonDir === undefined
+  const commonDir = options.commonDir ?? mkdtempSync(join(tmpdir(), 'sphinx-mcp-contract-'))
   const entryPath = realpathSync(serveEntry)
   // SDK 默认安全环境加本次目录，不继承父测试的 fatal-disable 或 NODE_OPTIONS。
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [entryPath],
     cwd: commonDir,
-    env: {SPHINX_COMMON_DIR: commonDir},
+    env: {
+      SPHINX_COMMON_DIR: commonDir,
+      ...(options.startConfig === undefined ? {} : {SPHINX_START_CONFIG: JSON.stringify(options.startConfig)}),
+    },
     stderr: 'pipe',
   })
   const client = new Client({name: 'sphinx-stdio-contract', version: '1'}, {capabilities: {}})
@@ -275,6 +304,7 @@ async function withSphinxStdio(t, scenario) {
       serverInfo: client.getServerVersion(),
       listTools: () => step('tools/list', () => client.listTools(undefined, {signal}), 'MCP_DISCOVERY_FAILED'),
       callTool: (name, args, label) => step(label, () => client.callTool({name, arguments: args}, undefined, {signal}), 'MCP_PROTOCOL_RESPONSE_FAILED'),
+      commonDir,
     }
     await scenario(session)
   } catch (error) { failure = error }
@@ -289,8 +319,9 @@ async function withSphinxStdio(t, scenario) {
     signal.removeEventListener('abort', interrupt)
     transport.stderr.off('data', onStderr)
     // 未见退出时保留目录作为失败材料，不能删除它并冒充资源已收束。
-    if (closed || !startAttempted) rmSync(commonDir, {recursive: true, force: true})
-    else t.diagnostic('MCP_SERVER_EXIT_UNOBSERVED: 保留 ' + commonDir)
+    if (closed || !startAttempted) {
+      if (ownsCommonDir) rmSync(commonDir, {recursive: true, force: true})
+    } else t.diagnostic('MCP_SERVER_EXIT_UNOBSERVED: 保留 ' + commonDir)
   }
   if (failure) throw failure
   assert.equal(closed, true, 'MCP_SERVER_EXIT_UNOBSERVED: fixture 未取得实际退出事件')
@@ -328,6 +359,12 @@ test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and p
     })
 
     const inquiryId = 'protocol-only-absent-inquiry'
+    await t.test('WHAT[sphinx-v2-036] public start requires explicit startup configuration', async () => {
+      await expectMcpRefusal(session, 'sphinx_inquiry_start', {
+        commandId: 'unconfigured-start', goalText: 'an authorized goal', constraints: [],
+        materialRefs: [], authorizationRef: 'user-authorizer', profileRef: 'sphinx.default@2',
+      }, 'CONFIG_REQUIRED', 'configuration', 'unconfigured start')
+    })
     const cancel = {tool: 'sphinx_inquiry_cancel', arguments: {commandId: 'cancel-1', inquiryId, expectedRevision: '0', reason: 'stop'}}
     const mutations = {
       command: cancel,
@@ -363,13 +400,8 @@ test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and p
       const label = name + '.' + (args.mode ?? 'status')
       await t.test('WHAT[sphinx-v2-036] ' + label + ' clean input is not a business read/export proof', async () => {
         const refusal = mcpRefusal(await session.callTool(name, args, label + '.clean'), label + '.clean')
-        if (name === 'sphinx_inquiry_status') {
-          assert.equal(refusal.path, 'inquiryId')
-          assert.equal(refusal.code, 'UNKNOWN_INQUIRY', 'valid status must reach the actual absent-inquiry branch')
-        } else {
-          assert.equal(refusal.code, 'EXPORT_TRACE_UNAVAILABLE')
-          assert.equal(refusal.path, 'tool')
-        }
+        assert.equal(refusal.path, 'inquiryId')
+        assert.equal(refusal.code, 'UNKNOWN_INQUIRY', 'valid read/export must reach the actual absent-inquiry branch')
       })
       for (const [field, value] of Object.entries(mutations)) {
         await t.test('WHAT[sphinx-v2-036] public ' + label + ' refuses explicit ' + field, async () => {
@@ -424,6 +456,298 @@ test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and p
       })
     }
   })
+})
+
+const startConfig = {
+  commandNamespace: 'test-owner', createdBy: 'authorized-controller', profileRef: 'sphinx.default@2',
+  executionMode: 'delegated', resourceSpecs: [{name: 'calls', kind: {case: 'consumed', payload: 'calls'}, authorizedLimit: 0}],
+  renderReserve: {calls: 0},
+}
+
+test('WHAT[sphinx-v2-036] invalid material identities are refused by the real JS creator without a durable write', async () => {
+  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-invalid-material-id-'))
+  const handle = Wire.create(commonDir, 'invalid-material-owner', startConfig)
+  const command = {commandId: 'invalid-material', goalText: 'goal with whitespace is lawful', constraints: [],
+    materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
+  try {
+    const before = journalBytes(commonDir)
+    for (const reference of ['ref a', 'ref\nx', 'ref\0x']) {
+      const result = await Wire.start(handle, {...command, materialRefs: [reference]})
+      assert.equal(result.outcome, 'refused')
+      assert.equal(result.refusal.code, 'INVALID_SCHEMA')
+      assert.equal(result.refusal.path, 'materialRefs[0]')
+      assert.notEqual(result.refusal.message.trim(), '')
+    }
+    assert.deepEqual(journalBytes(commonDir), before)
+  } finally {
+    Wire.dispose(handle)
+    rmSync(commonDir, {recursive: true, force: true})
+  }
+})
+
+test('WHAT[sphinx-v2-036] actual JS start refuses malformed string lists without coercion or exceptions', async t => {
+  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-start-list-types-'))
+  const handle = Wire.create(commonDir, 'start-list-owner', startConfig)
+  const command = {goalText: 'original goal with spaces', constraints: ['a lawful constraint with spaces'],
+    materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
+  const cases = [
+    ['missing', undefined], ['null', null], ['object', {}], ['string', 'reference'],
+    ['numeric entry', [1]], ['object entry', [{}]], ['null entry', [null]], ['boolean entry', [true]],
+  ]
+  try {
+    for (const field of ['constraints', 'materialRefs']) {
+      for (const [index, [label, value]] of cases.entries()) {
+        await t.test('WHAT[sphinx-v2-036] actual start rejects ' + field + ' ' + label, async () => {
+          const args = {...command, commandId: field + '-invalid-' + index, [field]: value}
+          if (value === undefined) delete args[field]
+          const before = journalBytes(commonDir)
+          const result = await Wire.start(handle, args)
+          assert.equal(result.outcome, 'refused')
+          assert.equal(result.refusal.code, 'INVALID_SCHEMA')
+          assert.equal(result.refusal.path, field)
+          assert.notEqual(result.refusal.message.trim(), '')
+          assert.deepEqual(journalBytes(commonDir), before)
+        })
+      }
+    }
+    const before = journalBytes(commonDir)
+    const created = await Wire.start(handle, {...command, commandId: 'lawful-list-positive-control'})
+    assert.equal(created.outcome, 'created', 'text fields with interior spaces remain lawful')
+    assert.notDeepEqual(journalBytes(commonDir), before, 'valid lists still cause an actual durable creation')
+  } finally {
+    Wire.dispose(handle)
+    rmSync(commonDir, {recursive: true, force: true})
+  }
+})
+
+test('WHAT[sphinx-v2-036] invalid inquiry identities and material identities receive named refusals over real stdio', async t => {
+  await withSphinxStdio(t, async session => {
+    const before = journalBytes(session.commonDir)
+    for (const inquiryId of ['a b', 'inq\nx', 'inq\0x']) {
+      for (const [name, args] of [
+        ['sphinx_inquiry_status', {inquiryId}],
+        ['sphinx_inquiry_export', {inquiryId, mode: 'full'}],
+        ['sphinx_inquiry_cancel', {inquiryId, commandId: 'invalid-identity', reason: 'stop'}],
+      ]) {
+        await t.test('WHAT[sphinx-v2-036] real ' + name + ' rejects invalid inquiry identity ' + JSON.stringify(inquiryId), async () => {
+          await expectMcpRefusal(session, name, args, 'INVALID_SCHEMA', 'inquiryId', 'invalid inquiry identity')
+        })
+      }
+    }
+    for (const reference of ['ref a', 'ref\nx', 'ref\0x']) {
+      await t.test('WHAT[sphinx-v2-036] real start rejects invalid material identity ' + JSON.stringify(reference), async () => {
+        await expectMcpRefusal(session, 'sphinx_inquiry_start', {
+          commandId: 'invalid-material', goalText: 'goal with whitespace is lawful', constraints: [],
+          materialRefs: [reference], authorizationRef: 'user', profileRef: startConfig.profileRef,
+        }, 'INVALID_SCHEMA', 'materialRefs[0]', 'invalid material identity')
+      })
+    }
+    assert.deepEqual(journalBytes(session.commonDir), before)
+  }, {startConfig})
+})
+
+function mcpBusiness(result, outcome, label) {
+  assert.equal(plainObject(result) && nativeJson(result), true, 'MCP_BUSINESS_LAYOUT: ' + label)
+  const texts = result.content?.filter(block => block.type === 'text') ?? []
+  assert.equal(texts.length, 1, 'MCP_BUSINESS_LAYOUT: one readable JSON payload, ' + label)
+  const textPayload = JSON.parse(texts[0].text)
+  const payload = result.structuredContent ?? textPayload
+  assert.equal(plainObject(payload) && nativeJson(payload), true, 'MCP_BUSINESS_LAYOUT: native business JSON, ' + label)
+  assert.deepEqual(textPayload, payload, 'MCP_BUSINESS_LAYOUT: structured and text payload agree, ' + label)
+  assert.equal(payload.apiVersion, '2', label)
+  assert.equal(payload.outcome, outcome, 'N06_A_BUSINESS_OUTCOME: ' + label)
+  assert.equal(result.isError, false, 'MCP_BUSINESS_LAYOUT: successful business outcome, ' + label)
+  return payload
+}
+
+function wireBusiness(payload, outcome, label) {
+  assert.equal(plainObject(payload) && nativeJson(payload), true, 'JS_BUSINESS_LAYOUT: ' + label)
+  assert.equal(payload.apiVersion, '2', label + '.apiVersion')
+  assert.equal(payload.outcome, outcome, 'JS_BUSINESS_OUTCOME: ' + label)
+  return payload
+}
+
+function journalBytes(directory, prefix = '') {
+  return readdirSync(directory, {withFileTypes: true}).sort((left, right) => left.name.localeCompare(right.name)).flatMap(entry => {
+    const relative = prefix + entry.name
+    if (entry.isDirectory()) return journalBytes(join(directory, entry.name), relative + '/')
+    assert.equal(entry.isFile(), true, 'journal fixture contains only owned directories and files: ' + relative)
+    return [{path: relative, bytes: readFileSync(join(directory, entry.name)).toString('base64')}]
+  })
+}
+
+function physicalInquiryEvents(snapshot, inquiryId) {
+  return snapshot.filter(file => file.path.endsWith('.ndjson')).flatMap(file =>
+    Buffer.from(file.bytes, 'base64').toString('utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)))
+    .filter(event => event.event_type === 'sphinx/v2-transition@2' && event.payload.inquiry === inquiryId)
+    .sort((left, right) => Number(BigInt(left.payload.revision) - BigInt(right.payload.revision)))
+}
+
+function assertHashes(payload, label) {
+  for (const field of ['traceHash', 'stateHash', 'semanticHash']) {
+    assert.equal(typeof payload[field], 'string', label + '.' + field)
+    assert.match(payload[field], /^[a-f0-9]{64}$/, label + '.' + field)
+  }
+}
+
+function assertCreation(payload, goalText, label) {
+  for (const field of ['inquiryId', 'eventId']) {
+    assert.equal(typeof payload[field], 'string', label + '.' + field)
+    assert.notEqual(payload[field].trim(), '', label + '.' + field)
+  }
+  assert.equal(payload.revision, '0', label + '.original revision')
+  assert.equal(payload.status, 'active', label + '.status')
+  assert.equal(payload.advance.outcome, 'no-runnable-work', label + '.advance')
+  assert.equal(typeof payload.advance.detail, 'string', label + '.advance.detail')
+  assert.notEqual(payload.advance.detail.trim(), '', label + '.advance.detail')
+  assert.notEqual(goalText.trim(), '')
+}
+
+async function readInquiry(session, creation, goalText, label) {
+  const before = journalBytes(session.commonDir)
+  const status = mcpBusiness(await session.callTool('sphinx_inquiry_status', {inquiryId: creation.inquiryId}, label + '.status'), 'read', label + '.status')
+  assert.equal(status.inquiryId, creation.inquiryId, label + '.inquiryId')
+  assert.equal(typeof status.revision, 'string', label + '.revision')
+  assert.equal(status.inquiry.goal.originalText, goalText, label + '.original goal bytes')
+  assert.deepEqual(Buffer.from(status.inquiry.goal.originalText), Buffer.from(goalText), label + '.UTF8 goal bytes')
+  assert.equal(plainObject(status.inquiry.goal), true, label + '.native goal DTO')
+  const summary = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: creation.inquiryId, mode: 'summary'}, label + '.summary'), 'exported', label + '.summary')
+  assert.equal(summary.mode, 'summary', label + '.summary mode')
+  assert.equal(summary.replayability, 'summary-only', label + '.summary replayability')
+  assert.deepEqual(summary.inquiry, status.inquiry, label + '.summary semantic view')
+  assertHashes(summary, label + '.summary')
+  const full = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: creation.inquiryId, mode: 'full'}, label + '.full'), 'exported', label + '.full')
+  assert.equal(full.mode, 'full', label + '.full mode')
+  assert.equal(full.replayability, 'requires-external-inputs', label + '.full replayability')
+  assert.equal(full.externalInputsComplete, false, label + '.full does not claim all external inputs are available')
+  assert.equal(typeof full.replayabilityReason, 'string', label + '.full replayability reason')
+  assert.notEqual(full.replayabilityReason.trim(), '', label + '.full names the remaining external input boundary')
+  assert.equal(Array.isArray(full.externalInputs), true, label + '.explicit external inputs')
+  assert.equal(Array.isArray(full.events), true, label + '.canonical events')
+  assertHashes(full, label + '.full')
+  for (const field of ['traceHash', 'stateHash', 'semanticHash']) assert.equal(full[field], summary[field], label + '.same accepted head ' + field)
+  const events = physicalInquiryEvents(before, creation.inquiryId)
+  assert.ok(events.length > 0, label + '.creation really persisted')
+  assert.deepEqual(full.events, events, label + '.full exports actual canonical origin-to-head envelopes')
+  assert.equal(full.events[0].event_id, creation.eventId, label + '.origin receipt')
+  assert.equal(full.events[0].payload.events[0].case, 'InquiryCreated', label + '.creation event')
+  assert.equal(full.events[0].payload.events[0].payload.goal.originalText, goalText, label + '.stored goal bytes')
+  const created = full.events[0].payload.events[0].payload
+  assert.deepEqual(full.externalInputs, [
+    {kind: 'startup-configuration', ref: created.configHash},
+    ...created.goal.materialRefs.map(ref => ({kind: 'material', ref})),
+  ], label + '.external inputs bind actual creation configuration and material references')
+  assert.deepEqual(journalBytes(session.commonDir), before, label + '.status/export do not write journal bytes')
+  return {status, summary, full}
+}
+
+test('WHAT[sphinx-v2-036] configured real stdio start persists byte-exact goals and content-bound receipts, while native reads survive a new OS server', async t => {
+  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-mcp-durable-start-'))
+  const goals = ['第一目标\r\n空值:\u0000；café 😀 尾部  ', '第二目标\r\n空值:\u0000；naïve 雪 尾部  ']
+  const commands = goals.map((goalText, index) => ({
+    commandId: 'stdio-create-' + index, goalText, constraints: ['keep the supplied text'],
+    materialRefs: ['material:原始-' + index], authorizationRef: 'authorized-user', profileRef: 'sphinx.default@2',
+  }))
+  const creations = []
+  let acceptedReads
+  let sharedHandle
+  let completed = false
+  try {
+    await withSphinxStdio(t, async session => {
+      const before = journalBytes(commonDir)
+      for (const [index, command] of commands.entries()) {
+        const creation = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.' + index), 'created', 'start.' + index)
+        assertCreation(creation, goals[index], 'start.' + index)
+        creations.push(creation)
+      }
+      assert.notEqual(creations[0].inquiryId, creations[1].inquiryId, 'distinct commands create distinct inquiries')
+      assert.notDeepEqual(journalBytes(commonDir), before, 'positive control: actual creation changes journal bytes')
+      sharedHandle = Wire.create(commonDir, 'stdio-js-writer', startConfig)
+      for (const [index, command] of commands.entries()) {
+        const creation = creations[index]
+        const receipt = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.repeat.' + index), 'replayed', 'start.repeat.' + index)
+        for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(receipt[field], creation[field], 'exact repeat keeps original ' + field)
+        const frozen = journalBytes(commonDir)
+        for (const [field, value] of [
+          ['goalText', command.goalText + '!'], ['constraints', ['a changed constraint']],
+          ['materialRefs', ['material:changed']], ['profileRef', 'different-profile'], ['authorizationRef', 'different-user'],
+        ]) {
+          await expectMcpRefusal(session, 'sphinx_inquiry_start', {...command, [field]: value}, 'COMMAND_CONFLICT', 'commandId', 'start.conflict.' + field)
+          assert.deepEqual(journalBytes(commonDir), frozen, 'conflicting ' + field + ' does not change durable bytes')
+        }
+      }
+      const first = await readInquiry(session, creations[0], goals[0], 'first.goal')
+      const second = await readInquiry(session, creations[1], goals[1], 'second.goal')
+      const beforeJsReads = journalBytes(commonDir)
+      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: creations[0].inquiryId}), 'read', 'JS reads MCP creation'), first.status, 'JS and MCP resolve the same canonical status')
+      for (const mode of ['summary', 'full']) {
+        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: creations[0].inquiryId, mode}), 'exported', 'JS reads MCP ' + mode), first[mode], 'JS and MCP export the same accepted ' + mode)
+      }
+      assert.deepEqual(journalBytes(commonDir), beforeJsReads, 'JS status/export over MCP creation do not write journal bytes')
+      const thirdGoal = 'JS 创建的第三目标\r\n边界:\u0000 雪 😀 尾部  '
+      const thirdCommand = {...commands[0], commandId: 'js-create-third', goalText: thirdGoal, materialRefs: ['material:JS-原始']}
+      const beforeJsCreation = journalBytes(commonDir)
+      const third = wireBusiness(await Wire.start(sharedHandle, thirdCommand), 'created', 'JS actual third creation')
+      assertCreation(third, thirdGoal, 'JS actual third creation')
+      assert.ok(creations.every(creation => creation.inquiryId !== third.inquiryId), 'JS creates a distinct third inquiry in the shared owner')
+      assert.notDeepEqual(journalBytes(commonDir), beforeJsCreation, 'positive control: JS start changes the shared journal bytes')
+      const thirdReads = await readInquiry(session, third, thirdGoal, 'MCP.refresh.JS-creation')
+      const beforeSharedReads = journalBytes(commonDir)
+      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: third.inquiryId}), 'read', 'JS third status'), thirdReads.status, 'MCP refreshes the canonical inquiry created through JS')
+      for (const mode of ['summary', 'full']) {
+        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: third.inquiryId, mode}), 'exported', 'JS third ' + mode), thirdReads[mode], 'MCP and JS share third inquiry ' + mode)
+      }
+      assert.deepEqual(journalBytes(commonDir), beforeSharedReads, 'cross-surface reads keep the same durable bytes')
+      assert.equal(first.full.events.length, second.full.events.length, 'same-length trace comparison')
+      for (const field of ['traceHash', 'stateHash', 'semanticHash']) assert.notEqual(first.full[field], second.full[field], 'different goal content changes ' + field)
+      assert.deepEqual(await readInquiry(session, creations[0], goals[0], 'first.repeat'), first, 'same accepted facts yield the same native reads')
+      const beforeCancel = journalBytes(commonDir)
+      const cancelled = mcpBusiness(await session.callTool('sphinx_inquiry_cancel', {
+        commandId: 'stdio-cancel', inquiryId: creations[0].inquiryId, reason: 'authorized stop',
+      }, 'cancel.first'), 'applied', 'cancel.first')
+      assert.equal(cancelled.inquiryId, creations[0].inquiryId)
+      assert.equal(cancelled.revision, '1')
+      assert.notDeepEqual(journalBytes(commonDir), beforeCancel, 'positive control: actual cancellation changes journal bytes')
+      const afterCancel = await readInquiry(session, creations[0], goals[0], 'first.cancelled')
+      assert.equal(afterCancel.status.revision, '1')
+      assert.equal(afterCancel.status.status, 'cancelling', 'unconfirmed cancellation is not a drained fact')
+      assert.equal(afterCancel.full.events.length, 2)
+      assert.deepEqual(afterCancel.full.events[1].parents, [creations[0].eventId], 'accepted trace follows its actual parent')
+      for (const field of ['traceHash', 'stateHash']) assert.notEqual(afterCancel.full[field], first.full[field], 'actual cancellation changes ' + field)
+      assert.equal(afterCancel.full.semanticHash, first.full.semanticHash, 'cancellation control history does not change the semantic facts')
+      assert.deepEqual(afterCancel.status.inquiry, first.status.inquiry, 'cancellation leaves the original semantic projection unchanged')
+      const beforeJsRefresh = journalBytes(commonDir)
+      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: creations[0].inquiryId}), 'read', 'JS.refresh.MCP-cancellation'), afterCancel.status, 'JS refresh sees MCP cancellation status and revision')
+      for (const mode of ['summary', 'full']) {
+        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: creations[0].inquiryId, mode}), 'exported', 'JS.refresh.MCP-cancellation.' + mode), afterCancel[mode], 'JS refresh sees the current accepted cancellation ' + mode)
+      }
+      assert.deepEqual(journalBytes(commonDir), beforeJsRefresh, 'JS refresh over MCP cancellation writes no journal bytes')
+      const replay = mcpBusiness(await session.callTool('sphinx_inquiry_start', commands[0], 'start.repeat.after-cancel'), 'replayed', 'start.repeat.after-cancel')
+      for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(replay[field], creations[0][field], 'later revision does not change the original start ' + field)
+      assert.equal(replay.revision, '0')
+      acceptedReads = [afterCancel, second]
+    }, {commonDir, startConfig})
+    await withSphinxStdio(t, async session => {
+      for (const [index, command] of commands.entries()) {
+        assert.deepEqual(await readInquiry(session, creations[index], goals[index], 'cold.' + index), acceptedReads[index], 'new OS process replays the original native facts')
+        const beforeReplay = journalBytes(commonDir)
+        const replay = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'cold.start.repeat.' + index), 'replayed', 'cold.start.repeat.' + index)
+        for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(replay[field], creations[index][field], 'cold replay retains original ' + field)
+        assert.deepEqual(journalBytes(commonDir), beforeReplay, 'cold exact replay does not append another creation')
+      }
+    }, {commonDir, startConfig})
+    await withSphinxStdio(t, async session => {
+      const beforeConflict = journalBytes(commonDir)
+      await expectMcpRefusal(session, 'sphinx_inquiry_start', commands[0], 'COMMAND_CONFLICT', 'commandId', 'cold.changed-startup-config')
+      assert.deepEqual(journalBytes(commonDir), beforeConflict, 'changed startup configuration cannot rewrite the original command')
+      assert.deepEqual(await readInquiry(session, creations[0], goals[0], 'changed-config.read'), acceptedReads[0], 'read resolves the durable original configuration')
+    }, {commonDir, startConfig: {...startConfig, resourceSpecs: [{...startConfig.resourceSpecs[0], authorizedLimit: 1}]}})
+    completed = true
+  } finally {
+    if (sharedHandle) Wire.dispose(sharedHandle)
+    if (completed) rmSync(commonDir, {recursive: true, force: true})
+    else t.diagnostic('N06_A_FAILURE_EVIDENCE: shared durable directory retained at ' + commonDir)
+  }
 })
 
 test.todo('WHAT[sphinx-v2-036] registered writable MCP tools drive durable creation, work claim, result admission and authorized goal amendment through the single runtime')

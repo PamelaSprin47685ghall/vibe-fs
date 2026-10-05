@@ -90,7 +90,11 @@ module Mcp =
     [<Emit("console.error($0)")>]
     let private consoleError (line: string) : unit = jsNative
 
-    let private classify = Wanxiangshu.Sphinx.V2.Runtime.Surface.classifyOutcome
+    [<Emit("process.exitCode = 1")>]
+    let private markStartupFailure () : unit = jsNative
+
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (text: string) : obj = jsNative
 
     let private record (fields: (string * obj) list) : obj = createObj fields
 
@@ -165,24 +169,11 @@ module Mcp =
     let private previousHead (state: InquiryState) : Wanxiangshu.Sphinx.V2.Core.EventId option =
         state.EventHead |> Option.map (fun head -> head)
 
-    /// A read-only status query. It creates no lease, never calls a model and never
-    /// changes business state; the next step is the Runtime's own classification.
-    let private statusResult (store: IEventStore) (args: StatusArgs) : Task<obj> =
+    let private runtimeResult (result: Result<obj, ToolRefusal>) : Task<obj> =
         task {
-            match currentState store (InquiryId.create args.InquiryId) with
-            | Error fault -> return! refused (currentRefusal fault)
-            | Ok None -> return! refused (unknownInquiry args.InquiryId)
-            | Ok(Some found) ->
-                return
-                    record
-                        [ ("apiVersion", box Contract.apiVersion)
-                          ("outcome", box "read")
-                          ("inquiryId", box args.InquiryId)
-                          ("status", box (Encode.statusOf found))
-                          ("revision", Encode.revision found.Revision)
-                          ("advance", classify found)
-                          ("inquiry", Encode.semanticView found) ]
-                    |> toolResult false
+            match result with
+            | Error refusal -> return! refused refusal
+            | Ok payload -> return toolResult false payload
         }
 
     /// A durable receipt and the readable Current are different facts. A fork formed
@@ -275,9 +266,7 @@ module Mcp =
             | Ok(IdempotencyOutcome.Fresh _) -> return! freshCancellation store args state fingerprint
         }
 
-    /// Requests cancellation through the canonical fold; a repeated command returns
-    /// the original receipt. An unconfirmed physical abort stays cancelling.
-    let private cancelResult (store: IEventStore) (args: CancelArgs) : Task<obj> =
+    let private cancelFromCurrent (store: IEventStore) (args: CancelArgs) : Task<obj> =
         match currentState store (InquiryId.create args.InquiryId) with
         | Error fault -> refused (currentRefusal fault)
         | Ok None -> refused (unknownInquiry args.InquiryId)
@@ -294,9 +283,22 @@ module Mcp =
 
             admittedCancellation store args state fingerprint
 
+    /// Requests cancellation through the canonical fold; a repeated command returns
+    /// the original receipt. An unconfirmed physical abort stays cancelling.
+    let private cancelResult (store: IEventStore) (args: CancelArgs) : Task<obj> =
+        match store.ReloadLocal() with
+        | Error reason ->
+            refused
+                { Code = "PERSISTENCE_READ_FAILED"
+                  Path = "inquiryId"
+                  Message = reason }
+        | Ok _ -> cancelFromCurrent store args
+
     /// Registers the seven public tools. Each one decodes its own arguments and then
     /// goes to the one Runtime; none of them decides what comes next.
-    let private registerTools (server: obj) (store: IEventStore) : unit =
+    let private registerTools (server: obj) (handle: RuntimeHandle) : unit =
+        let store = Commands.store handle
+
         let register (tool: SphinxTool) (description: string) (inputSchema: obj) (handler: obj -> Task<obj>) =
             let config =
                 createObj
@@ -381,12 +383,16 @@ module Mcp =
 
         register
             SphinxTool.InquiryStart
-            "Starts a v2 inquiry and advances it. Refused for now: the start driver is not wired to durable creation and planning. The call changes nothing."
+            "Creates a durable v2 inquiry under explicitly configured authorization, preserving the original goal and returning its persisted command receipt. Planning and dispatch are not yet connected."
             startSchema
-            (refusedAfterDecoding
-                SphinxTool.InquiryStart
-                (Tool.unsupported (Contract.toolName SphinxTool.InquiryStart))
-                Tool.decodeStart)
+            (fun args ->
+                task {
+                    match Tool.decodeStart args with
+                    | Error refusal -> return! refused refusal
+                    | Ok decoded ->
+                        let! result = Commands.start handle decoded
+                        return! runtimeResult result
+                })
 
         register
             SphinxTool.WorkNext
@@ -413,7 +419,7 @@ module Mcp =
             (fun args ->
                 match Tool.decodeStatus args with
                 | Error refusal -> refused refusal
-                | Ok decoded -> statusResult store decoded)
+                | Ok decoded -> Commands.status handle decoded |> runtimeResult)
 
         register
             SphinxTool.InquiryCancel
@@ -426,12 +432,12 @@ module Mcp =
 
         register
             SphinxTool.InquiryExport
-            "Exports one inquiry. Refused for now: an export bundle must state a trace hash over the accepted envelopes, and this adapter reads published state only, so it cannot enumerate them. Read-only either way: no lease, no model call, no state change."
+            "Exports one inquiry from its accepted canonical envelopes, with separate trace, state and semantic hashes and an explicit replayability declaration. It creates no lease, calls no model and changes no business state."
             exportSchema
-            (refusedAfterDecoding
-                SphinxTool.InquiryExport
-                (Tool.traceUnavailable (Contract.toolName SphinxTool.InquiryExport))
-                Tool.decodeExport)
+            (fun args ->
+                match Tool.decodeExport args with
+                | Error refusal -> refused refusal
+                | Ok decoded -> Commands.exportInquiry handle decoded |> runtimeResult)
 
         register
             SphinxTool.GoalAmend
@@ -444,20 +450,54 @@ module Mcp =
 
     /// Boots the server against a durable store. The store already carries the v2 rule
     /// program, so replay happens through the same fold the caller reads.
-    let serve (store: IEventStore) : JS.Promise<unit> =
-        let server =
-            construct
-                mcpServerConstructor
-                (createObj [ "name" ==> "sphinx"; "version" ==> Contract.apiVersion ])
-                (createObj [])
+    let serveConfigured (store: IEventStore) (configuration: obj option) : JS.Promise<unit> =
+        match Commands.create store configuration with
+        | Error refusal ->
+            consoleError (
+                sprintf "[sphinx-mcp] configuration rejected: %s at %s: %s" refusal.Code refusal.Path refusal.Message
+            )
 
-        registerTools server store
-        connect server (constructEmpty stdioTransportConstructor)
+            markStartupFailure ()
+            resolved
+        | Ok handle ->
+            let server =
+                construct
+                    mcpServerConstructor
+                    (createObj [ "name" ==> "sphinx"; "version" ==> Contract.apiVersion ])
+                    (createObj [])
+
+            registerTools server handle
+            connect server (constructEmpty stdioTransportConstructor)
+
+    let serve (store: IEventStore) : JS.Promise<unit> = serveConfigured store None
+
+    let private parseConfiguration (text: string) : Result<obj, string> =
+        try
+            Ok(parseJson text)
+        with error ->
+            Error(sprintf "SPHINX_START_CONFIG must be valid JSON: %s" error.Message)
+
+    let private readConfiguration () : Result<obj option, string> =
+        let text = Environment.GetEnvironmentVariable "SPHINX_START_CONFIG"
+
+        if isNull text then
+            Ok None
+        else
+            parseConfiguration text |> Result.map Some
+
+    let private bootConfigured (commonDir: string) (configuration: obj option) : JS.Promise<unit> =
+        match Bind.createDurableStore commonDir (System.Guid.NewGuid().ToString("N")) with
+        | Ok store -> serveConfigured store configuration
+        | Error reason ->
+            consoleError (sprintf "[sphinx-mcp] durable boot failed: %s" reason)
+            markStartupFailure ()
+            resolved
 
     /// Starts a stdio server, reporting a boot failure through stderr and exit code.
     let boot (commonDir: string) : JS.Promise<unit> =
-        match Bind.createDurableStore commonDir (System.Guid.NewGuid().ToString("N")) with
-        | Ok store -> serve store
+        match readConfiguration () with
         | Error reason ->
-            consoleError (sprintf "[sphinx-mcp] durable boot failed: %s" reason)
+            consoleError (sprintf "[sphinx-mcp] configuration boot failed: %s" reason)
+            markStartupFailure ()
             resolved
+        | Ok configuration -> bootConfigured commonDir configuration

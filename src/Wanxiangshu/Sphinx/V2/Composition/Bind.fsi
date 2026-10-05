@@ -18,3 +18,6 @@ module Bind =
 
     /// Reads the published state for one inquiry.
     val tryInquiry: IEventStore -> InquiryId -> Result<InquiryState option, CurrentError>
+
+    /// Reads the accepted origin-to-head envelope chain from one canonical Current snapshot.
+    val tryTrace: IEventStore -> InquiryId -> Result<EventEnvelope list option, CurrentError>

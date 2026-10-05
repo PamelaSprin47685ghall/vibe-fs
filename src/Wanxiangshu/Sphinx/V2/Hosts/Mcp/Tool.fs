@@ -97,23 +97,35 @@ module Tool =
                 "%s is refused: this Runtime operation is not connected to a verified durable transition path. The call changed nothing."
                 tool }
 
-    /// An export must state all three hashes, and the trace hash covers the accepted
-    /// envelopes in order. This adapter reads published state and has no access to
-    /// that envelope sequence, so it refuses rather than presenting a hash of an
-    /// empty trace as if it described the inquiry.
-    let traceUnavailable (tool: string) : ToolRefusal =
-        { Code = "EXPORT_TRACE_UNAVAILABLE"
-          Path = "tool"
-          Message =
-            sprintf
-                "%s is refused: this adapter reads published state and cannot enumerate accepted envelopes, so it cannot state the trace hash an export bundle requires. The call changed nothing."
-                tool }
-
     let refusalCode (refusal: ToolRefusal) : string = refusal.Code
 
     let refusalPath (refusal: ToolRefusal) : string = refusal.Path
 
     let refusalMessage (refusal: ToolRefusal) : string = refusal.Message
+
+    let private inquiryIdField raw =
+        Decode.stringField raw "inquiryId"
+        |> Result.mapError fromWire
+        |> Result.bind (fun value ->
+            InquiryId.tryCreate value
+            |> Result.map InquiryId.value
+            |> Result.mapError (fromText "inquiryId"))
+
+    let private materialRefsField raw =
+        let validate references =
+            let rec collect index accepted remaining =
+                match remaining with
+                | [] -> Ok(List.rev accepted)
+                | reference :: rest ->
+                    ArtifactRef.tryCreate reference
+                    |> Result.mapError (fromText (sprintf "materialRefs[%d]" index))
+                    |> Result.bind (fun reference -> collect (index + 1) (ArtifactRef.value reference :: accepted) rest)
+
+            collect 0 [] references
+
+        Decode.uniqueStringListField raw "materialRefs"
+        |> Result.mapError fromWire
+        |> Result.bind validate
 
     let decodeStart (raw: obj) : Result<StartArgs, ToolRefusal> =
         Decode.stringField raw "commandId"
@@ -125,8 +137,7 @@ module Tool =
                 Decode.uniqueStringListField raw "constraints"
                 |> Result.mapError fromWire
                 |> Result.bind (fun constraints ->
-                    Decode.uniqueStringListField raw "materialRefs"
-                    |> Result.mapError fromWire
+                    materialRefsField raw
                     |> Result.bind (fun materialRefs ->
                         Decode.stringField raw "authorizationRef"
                         |> Result.mapError fromWire
@@ -145,8 +156,7 @@ module Tool =
         Decode.stringField raw "commandId"
         |> Result.mapError fromWire
         |> Result.bind (fun commandId ->
-            Decode.stringField raw "inquiryId"
-            |> Result.mapError fromWire
+            inquiryIdField raw
             |> Result.bind (fun inquiryId ->
                 Decode.nonNegativeIntegerField raw "limit"
                 |> Result.mapError fromWire
@@ -213,8 +223,7 @@ module Tool =
             Decode.stringField raw "commandId"
             |> Result.mapError fromWire
             |> Result.bind (fun commandId ->
-                Decode.stringField raw "inquiryId"
-                |> Result.mapError fromWire
+                inquiryIdField raw
                 |> Result.bind (fun inquiryId ->
                     Decode.stringField raw "workId"
                     |> Result.mapError fromWire
@@ -250,17 +259,13 @@ module Tool =
 
     let decodeStatus (raw: obj) : Result<StatusArgs, ToolRefusal> =
         rejectReadMutation raw
-        |> Result.bind (fun () ->
-            Decode.stringField raw "inquiryId"
-            |> Result.mapError fromWire
-            |> Result.map (fun inquiryId -> { InquiryId = inquiryId }))
+        |> Result.bind (fun () -> inquiryIdField raw |> Result.map (fun inquiryId -> { InquiryId = inquiryId }))
 
     let decodeCancel (raw: obj) : Result<CancelArgs, ToolRefusal> =
         Decode.stringField raw "commandId"
         |> Result.mapError fromWire
         |> Result.bind (fun commandId ->
-            Decode.stringField raw "inquiryId"
-            |> Result.mapError fromWire
+            inquiryIdField raw
             |> Result.bind (fun inquiryId ->
                 Decode.stringField raw "reason"
                 |> Result.mapError fromWire
@@ -271,7 +276,7 @@ module Tool =
 
     let decodeExport (raw: obj) : Result<ExportArgs, ToolRefusal> =
         rejectReadMutation raw
-        |> Result.bind (fun () -> Decode.stringField raw "inquiryId" |> Result.mapError fromWire)
+        |> Result.bind (fun () -> inquiryIdField raw)
         |> Result.bind (fun inquiryId ->
             Decode.stringField raw "mode"
             |> Result.mapError fromWire
@@ -295,8 +300,7 @@ module Tool =
         Decode.stringField raw "commandId"
         |> Result.mapError fromWire
         |> Result.bind (fun commandId ->
-            Decode.stringField raw "inquiryId"
-            |> Result.mapError fromWire
+            inquiryIdField raw
             |> Result.bind (fun inquiryId ->
                 Decode.revisionField raw "expectedRevision"
                 |> Result.mapError (fun fault ->

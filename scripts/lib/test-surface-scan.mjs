@@ -570,10 +570,10 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Sphinx/V2/Wire/Surface.js',
     owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-036'],
+    laws: ['SPHINX-V2-009', 'SPHINX-V2-011', 'SPHINX-V2-020', 'SPHINX-V2-033', 'SPHINX-V2-036'],
     source: 'src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Sphinx/V2/Plugins/Bayes/Surface.js',

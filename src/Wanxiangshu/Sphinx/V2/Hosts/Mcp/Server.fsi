@@ -10,5 +10,8 @@ module Mcp =
     /// Registers the seven public tools against the same Runtime surface.
     val serve: IEventStore -> JS.Promise<unit>
 
+    /// Binds explicit start authorization to the same durable Runtime used by reads.
+    val serveConfigured: IEventStore -> configuration: obj option -> JS.Promise<unit>
+
     /// Starts a stdio server, reporting a boot failure through stderr.
     val boot: commonDir: string -> JS.Promise<unit>

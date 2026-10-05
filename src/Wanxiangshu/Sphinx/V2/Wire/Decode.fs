@@ -91,28 +91,23 @@ module Decode =
     let revisionField (raw: obj) (name: string) : Result<Revision, WireError> =
         stringField raw name |> Result.bind parsedRevision
 
+    let private uniqueStrings name listed =
+        let unique = List.length listed = (listed |> Set.ofList |> Set.count)
+
+        match List.exists isBlank listed, unique with
+        | true, _ -> error "INVALID_SCHEMA" name (sprintf "field %s must not contain blank entries" name)
+        | _, false -> error "INVALID_SCHEMA" name (sprintf "field %s must not repeat an entry" name)
+        | false, true -> Ok listed
+
+    let private stringEntries name (values: obj array) =
+        match Array.forall isString values with
+        | false -> error "INVALID_SCHEMA" name (sprintf "field %s must contain only strings" name)
+        | true -> values |> Array.map unbox<string> |> Array.toList |> uniqueStrings name
+
     /// A list of unique, non-blank strings. A repeated entry is a defect.
     let uniqueStringListField (raw: obj) (name: string) : Result<string list, WireError> =
         let value = field raw name
 
-        let items () =
-            unbox<obj array> value |> Array.map string |> Array.toList
-
-        let blankEntry () =
-            error "INVALID_SCHEMA" name (sprintf "field %s must not contain blank entries" name)
-
-        let repeated () =
-            error "INVALID_SCHEMA" name (sprintf "field %s must not repeat an entry" name)
-
-        let distinct () =
-            let listed = items ()
-            let unique = List.length listed = (listed |> Set.ofList |> Set.count)
-
-            match unique with
-            | true -> Ok listed
-            | false -> repeated ()
-
-        match isArray value, List.exists isBlank (items ()) with
-        | false, _ -> error "INVALID_SCHEMA" name (sprintf "field %s must be an array" name)
-        | true, true -> blankEntry ()
-        | true, false -> distinct ()
+        match isArray value with
+        | false -> error "INVALID_SCHEMA" name (sprintf "field %s must be an array" name)
+        | true -> unbox<obj array> value |> stringEntries name

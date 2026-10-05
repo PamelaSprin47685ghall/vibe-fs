@@ -50,3 +50,8 @@ module Bind =
         store.TryCurrent currentKey
         |> Option.map (fun current -> Integrator.tryState current inquiryId)
         |> Option.defaultValue (Ok None)
+
+    let tryTrace (store: IEventStore) (inquiryId: InquiryId) : Result<EventEnvelope list option, CurrentError> =
+        store.TryCurrent currentKey
+        |> Option.map (fun current -> Integrator.tryTrace current inquiryId)
+        |> Option.defaultValue (Ok None)

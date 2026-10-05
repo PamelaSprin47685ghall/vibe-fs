@@ -12,8 +12,10 @@
     <Compile Include="Sphinx/V2/Persistence/Surface.fsi"/><Compile Include="Sphinx/V2/Persistence/Surface.fs"/>
     <Compile Include="Sphinx/V2/Persistence/Export.fsi"/><Compile Include="Sphinx/V2/Persistence/Export.fs"/>
     <Compile Include="Sphinx/V2/Composition/Bind.fsi"/><Compile Include="Sphinx/V2/Composition/Bind.fs"/>
-    <Compile Include="Sphinx/V2/ServeEntry.fsi"/><Compile Include="Sphinx/V2/ServeEntry.fs"/>
+    <Compile Include="Sphinx/V2/Composition/Commands.fsi"/><Compile Include="Sphinx/V2/Composition/Commands.fs"/>
+    <Compile Include="Sphinx/V2/Wire/Surface.fsi"/><Compile Include="Sphinx/V2/Wire/Surface.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Mcp/Server.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Server.fs"/>
+    <Compile Include="Sphinx/V2/ServeEntry.fsi"/><Compile Include="Sphinx/V2/ServeEntry.fs"/>
     <Compile Include="Sphinx/V2/Hosts/OpenCode/Adapter.fsi"/><Compile Include="Sphinx/V2/Hosts/OpenCode/Adapter.fs"/>
     <Compile Include="Sphinx/V2/Hosts/OpenCode/Surface.fsi"/><Compile Include="Sphinx/V2/Hosts/OpenCode/Surface.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Provider/Adapter.fsi"/><Compile Include="Sphinx/V2/Hosts/Provider/Adapter.fs"/>

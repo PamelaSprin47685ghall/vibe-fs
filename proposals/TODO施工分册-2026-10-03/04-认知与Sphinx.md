@@ -179,11 +179,41 @@
 
 2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。下一主线仍是N06-A唯一command owner的真实创建/读取，然后完成B；不能把Core守门当用户已获得答案。
 
+2026-10-05 N06-A有限验收完成：gen142正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall；前后freshness一致，group65775 accepted=true、17.144ms，exit1仅pending。真实SDK/JS创建、内容绑定原receipt、native查询/accepted trace与新OS进程重开已证。唯一Integrator.Current成对保存accepted state/envelope；查询不得再走History读取。启动拒绝、disposed、非法identity/list与合法特殊资源名的reserve绑定均有正式回归。[验收记录](../archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)明确未证边界。下一主线N06-B，完整036两个TODO、T406/T411/GAP-219保留。f0ead CI实质超时813/818、2 active/3 queued，另见[完整receipt](../archive/2026-10-05/baselines/f0ead-ci/receipt.txt)，选集不代替全仓。
+
 **入口与判断。** [WHAT](../../requirements/sphinx-v2/WHAT.md)、[SUPERSEDES](../../requirements/sphinx-v2/SUPERSEDES.md)、[README](../../requirements/sphinx-v2/tests/README.md)、[MCP Server](../../src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Server.fs)、[OpenCode Adapter](../../src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Adapter.fs)、[Runtime Driver](../../src/Wanxiangshu/Sphinx/V2/Runtime/Driver.fs)、[Wire Surface](../../src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs)。GAP-219/222；D01/D02；W5。
 
-创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`的新实现替代：七工具独立解码/typed拒绝，cancel有canonical准入/落盘，Persistence有canonical batch、冷重开和原子拒绝入口。GAP-219现在PARTIAL。start/work_next/work_submit/goal_amend仍明确unsupported，export traceUnavailable，现存inquiry status的JSON正向出口仍待证。OpenCode可dispatch/request-cancel，但ReadStatus仍Unknown，ReadResult/Reconcile因port缺读取能力拒绝；不能称状态/结果已能观察。先保留本批真实SDK协议与持久化基础证明，不重复造第二份decoder/store；从真实driver、读取DTO/trace及物理能力owner开始，继续下面的完整dispatch、worker结果、accepted renderer、取消/恢复与外部结果交付。
+创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`替代；N06-A又完成真实start/status/export，JS模板成功与traceUnavailable已删除。work_next/work_submit/goal_amend仍unsupported。OpenCode adapter的owner仍从InquiryId错误构造，ReadStatus仍Unknown、ReadResult/Reconcile仍因所持port缺读取能力拒绝；实际Host另有snapshot API，尚未组合到adapter。GAP-219仍PARTIAL。从下面B的真实物理绑定与唯一driver继续，不重复造decoder/store或把Capabilities()声明当派发证明。
 
-### 实施顺序与每步产物
+### N06-B 接手卡：先让运行事实可恢复，再接真实执行
+
+本卡取代下方完整义务索引中的开工顺序。A已验收，不重做创建/读取。B0—B6均待施工；此次只读调查不算交付，也不授权用空delta或测试Surface冒充生产执行。
+
+| 子包 | 状态 | 本包退出条件 |
+| --- | --- | --- |
+| B0 canonical派发事实 | 待施工，下一件事 | 合法intent/receipt真正进入唯一Current，坏引用与冲突拒绝，原子批次/冷重开通过；不宣称实际Host派发 |
+| B1 实际Host绑定 | 待施工，依赖B0 | 真owner SessionId、family parent、terminal订阅、public prompt与实际receipt可观察；禁止InquiryId冒充SessionId |
+| B2 executable profile | 待施工，可并行只读设计 | 实际plugin/schema/ABI lock、prompt、model/provider授权与资源绑定；一个有限profile可真实规划与渲染 |
+| B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
+| B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |
+| B5 accepted renderer答案 | 待施工，依赖B3/B4 | 实际renderer结果先accepted，再AnswerCommitted；公开正文和来源可取、停止标签诚实 |
+| B6 公开闭环验收 | 待施工，依赖B0—B5 | 017/036实际入口闭环、新OS冷重开、034实际Host证据，局部/受控/实际Host分别结算 |
+
+**B0，一次独立提交先闭合canonical派发事实。** 先读sphinx WHAT003/007/009/010/019及Core Events/State/Reducer、BodyDto/Codec。当前DispatchRequested/DispatchReceiptRecorded在Reducer中为Ok state，PhysicalBindings没有生产写入；不能将append receipt当作已恢复运行事实。先通过公开Persistence Surface写合法intent和receipt并读取Current，取得旧实现binding为空的正式红例。然后按真实body契约检查work、当前attempt/fence、已接受intent，保存intent与真实physicalRef/receipt；same identity不同receipt拒绝。错误引用、错attempt/fence/intent、冲突receipt、batch后项失败无前缀Current、冷重开与删派生cache独立覆盖。需要保存的新事实只能进入同一Current，不从export trace再fold。仅结算Core接纳与恢复，不关闭034实际Host或010完整receipt丢失对账。
+
+**B1，实际Host调用的第一条合法路径。** 先读sphinx WHAT010/023/034、session-ontology WHAT006、delegation WHAT007及真实Sessions.SendPrompt。Adapter目前把InquiryId转成SessionId，且没有terminal订阅就SendPrompt；真实Host会以listener-before-send拒绝。由真实Host入口注入typed owner SessionId，独立MCP的执行上下文由composition明确供应，缺能力仍具名拒绝；不能用createdBy/configHash替代物理身份。遵循真实family root压平和标准Engineer的authority/委托owner。先订阅再send，订阅由同一effect owner持有至真实terminal/Dispose；仅public envelope进入prompt，private ticket留Host侧。receipt、physical message、child session与provider run分型保存，acceptance-unknown不重发。先让owner SessionId与InquiryId故意不同击红，再观察真实parent、prompt、订阅顺序和实际Host返回；能力字符串不算派发证据。Provider adapter现用HostForkRunLifecycleSurface.create(receipt string)制造无关联pending cell，必须清理，消费真实执行owner，不能走这条捷径。
+
+**B2，先选一个真实可执行profile。** 现Registry/ExecutablePlugin只有声明，Plan/Render主要是验证器；不把存在类型当已接线。供应真实canonical schema文档/hash、executable/ABI lock、版本化prompt、model/provider授权、实际资源与executionMode。材料须由真实读取证据供应，纯插件输入须有原Goal，不把缺目标塞成空Graph。首条有限链做实际规划→成稿，实际计划集合含有真实成本的answer.now；Unestimated保持缺估值，不给默认收益。question/probe全面覆盖留E，有限profile范围写入验收记录。
+
+**B3，公开命令与唯一effect调度。** Commands接共享claim/submit，MCP/JS/原生入口只解码和调用。先定WHAT012的ticketHash/scope真实来源、公开字段和持久匹配；当前submit DTO只含attempt/fence等，不足以称完整局部准入。claim持久lease；BudgetReserved+DispatchRequested同批接受后才能派发，真实append拒绝的Host观察器必须为零。Driver当前Hash="empty"、plugin="unbound"和空interpretation提议全部退出此路径；缺真实schema、上下文或授权时具体拒绝。先定公共类型，再调调用方和正式反例，不在各adapter另造driver。
+
+**B4，ReadResult前置从原N06-C移入B。** 实际Host已有ISessionSnapshotPort.GetMessages，组合到最窄读取能力，核对actual child、physical user message、唯一provider run、work token、attempt与实际schema；idle只表示通知。第一事务保原响应、ResultAccepted和InterpretationPending；第二事务locked Observe形成真实Graph/Work delta与applied/failed。当前InterpretationApplied/Failed为no-op，会让pending永不完成，必须以Current和冷重开红例落实。usage缺失保reservation，不填零；plugin失败后只重做纯解释，不另买模型响应。完整receipt丢失/unknown对账仍留C，先前受控port不升级成实际Host恢复。
+
+**B5，真实renderer到公开持久答案。** renderer work来自实际规划并保留成稿资源，输出通过真实schema和Render.validate。先成为accepted observation，再提交exact resultObservationId的AnswerCommitted，复用已完成Core来源守门。答案正文从这份结果取得，不把ref、排名数组或固定文本当答案。先证明未提交/拒绝renderer不能完成，再证明实际成功与独立重开；只声称实际停止证据支持的标签。
+
+**B6，最后接公开验收。** 017从start→claim→真实授权工作→submit→Observe→renderer→AnswerCommitted→公开正文，不能直接append完成事实；至少两个目标及不同command可区分。036核对共享Commands、跨入口和新OS进程读回；真实lease/model观察器先有正向对照，再证明status/export零effect。034另取得实际Host receipt与真实terminal，取消请求、abort返回和idle不冒充drained。Core、受控端口和实际Host的证明各自记账，C/D的完整乱序、usage、恢复、取消与late result继续保留。每个子包交付立即同步本表、总计划、逐项T状态与证据，不能到B6才回填。
+
+### 全包实施义务索引（开工顺序以上方接手卡为准）
 
 1. **Sphinx 合同封口。** 对 36 条现行 WHAT 与 SUPERSEDES 建逐条矩阵。重点是旧算法合格条件/退化、标准 Engineer、全链取消、旧 inquiry 明确拒绝；未承接的规则先进入现行 WHAT。不得恢复旧价格公式、四阶段接口或旧 SessionStore。
 2. **唯一 durable Runtime 外壳。** 先读已有 Contracts/Ports/Admission/Core/Integrator，确定 command admission→canonical atomic batch→Current publication→effect dispatch 的唯一所有者。MCP/OpenCode/JS 都调用它，adapter 不判下一阶段、不持第二份 Current。复用现有真实 store，不创造仅供测试的 runtime。

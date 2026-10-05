@@ -123,10 +123,11 @@ module Projection =
     /// Semantic projection: excludes physical session ids, transport cursors and
     /// wall-clock timestamps, so it can claim Host-independence (C-11, C-12).
     val semanticProjection: InquiryState -> SemanticProjection
+    val semanticView: InquiryState -> obj
     val semanticHash: InquiryState -> string
 
     /// Covers every materialized field, including the physical bindings recovery needs.
     val stateHash: InquiryState -> string
 
-    /// Covers the accepted canonical envelopes in their exact order.
+    /// Covers parsed canonical envelope objects in their exact order, without log LF.
     val traceHash: string list -> string

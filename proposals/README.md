@@ -1,6 +1,6 @@
 # 计划与提案入口
 
-2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：T386当前读取、Sphinx核心答案来源及T388有限原字节/工具后缀修复已验收；gen137正式223/223、1454/0，真实Host integration1/0。下一主线N06-A真实创建/读取，N04-C可独立推进；N00先量化Linux单016成本。不能重新按下列旧S03“下一步”或已完成卡排工，整体GAP与完整Runtime/Long Stroke/发布边界保持。证据见[最新归档](archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)。
+2026-10-05 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A真实创建/读取有限验收完成，gen142正式73/73、437/0；T386、Core答案来源与T388既有证据保留。下一件事N06-B0落实canonical派发intent/receipt，再接B1真实Host会话/terminal与B2—B6实际profile、结果和答案；N04-C可独立推进，N00先量化Linux单016成本。不能重新按下列旧S03“下一步”或已完成卡排工，完整Sphinx/GAP/Long Stroke/发布边界保持。[最新归档](archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)与[f0ead完整CI receipt](archive/2026-10-05/baselines/f0ead-ci/receipt.txt)分开记账。
 
 S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 

@@ -69,10 +69,6 @@ module Tool =
     /// 尚未接通 Runtime 操作的拒绝，不把局部 body 解码当作持久化往返证明。
     val unsupported: tool: string -> ToolRefusal
 
-    /// The refusal export returns: this adapter reads published state, so it cannot
-    /// enumerate accepted envelopes and therefore cannot state a truthful trace hash.
-    val traceUnavailable: tool: string -> ToolRefusal
-
     /// The refusal fields, read through the module rather than through a compiled
     /// record layout, so a test asserts the contract instead of the representation.
     val refusalCode: ToolRefusal -> string

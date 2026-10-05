@@ -3,6 +3,7 @@
     <WanxiangshuCompileShard>sphinx-v2-core</WanxiangshuCompileShard><WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>sphinx-v2-core</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <Compile Include="Sphinx/V2/Core/Ids.fsi"/><Compile Include="Sphinx/V2/Core/Ids.fs"/>
     <Compile Include="Sphinx/V2/Core/Envelope.fsi"/><Compile Include="Sphinx/V2/Core/Envelope.fs"/>
     <Compile Include="Sphinx/V2/Core/Goal.fsi"/><Compile Include="Sphinx/V2/Core/Goal.fs"/>
@@ -54,6 +55,5 @@
     <Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fs"/>
     <Compile Include="Sphinx/V2/Wire/Decode.fsi"/><Compile Include="Sphinx/V2/Wire/Decode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Encode.fsi"/><Compile Include="Sphinx/V2/Wire/Encode.fs"/>
-    <Compile Include="Sphinx/V2/Wire/Surface.fsi"/><Compile Include="Sphinx/V2/Wire/Surface.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Mcp/Tool.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Tool.fs"/>
   </ItemGroup></Project>

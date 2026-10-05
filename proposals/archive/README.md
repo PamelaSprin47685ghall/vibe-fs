@@ -1,5 +1,7 @@
 # 历史计划与施工记录
 
+[Sphinx持久创建与读取](2026-10-05/Sphinx持久创建与读取-2026-10-05.md)记录N06-A真实SDK/JS持久创建、内容绑定receipt、唯一Current的accepted trace/native DTO、三哈希与新OS进程冷重开。gen142正式73/73、437/0，公开输入缺陷红绿与原始失败完整保留；036两个TODO、Host/renderer/首个答案及GAP-219仍缺。下一主线按现行总计划N06-B接手卡，不重复施工A。另收[f0ead CI原artifact](2026-10-05/baselines/f0ead-ci/receipt.txt)，813/818截断不是pending-only。
+
 [原始材料载体与后缀重放](2026-10-05/原始材料载体与后缀重放-2026-10-05.md)记录N05-B/T388有限修复：原UTF-8材料、exact durable工具呈现、None身份与capture副本。gen137正式223/223、1454/0及实际Host integration1/0已验收，旧失败原样保存；native Partial、legacy/user、完整Long Stroke与整体GAP保留。后续从现行总计划N06-A及N00成本调查接续。
 
 [失败候选与已提交前缀](2026-10-05/失败候选与已提交前缀-2026-10-05.md)记录N03真实retry Failed及错误settlement变异、rebase/reanchor四组合和第二Blogger producer前提。T292/T298已验收，native56/0及gen127正式137选集通过，GAP-106其它义务保留。N04首个实际只读原工程与生命周期证据从[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)接续。
