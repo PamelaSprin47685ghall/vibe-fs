@@ -1,14 +1,16 @@
 # 04：认知材料、诊断、制度学习与 Sphinx
 
+新排期以[总计划 N06/N07](../TODO施工总计划-2026-10-03.md)为准：Sphinx先真实创建/读取，再首个持久答案与结果、资源、取消恢复；制度学习先统一canonical Rulebook和原子BIRTH，再私有机制提炼及有限语义验收。二者可与S03并行准备，不等待所有基础设施债务清零。现有MCP解码、机械BIRTH及下述015交付不重复施工。
+
 2026-10-05 当前状态：cognitive/015 注册投递切片已验收完成。原 physical、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证；实际安装版两次 POST、exact chronicle completed、随后 SDK 历史及 journal 清洁已证。晚到实际 HTTP 错误旧版退出成功的正式红例已修；初始化清理受保护、Host/server 停止及 callbacks 排空后判决。最终完整 integration 21/0、无 skip/TODO，原 project 5030ms 超时及旧无 completed 屏障证据仍保留。以[本批附件](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)为准，GAP-077 其他语义 PARTIAL，不重复旧 lease 调查。
 
 返回[总计划](../TODO施工总计划-2026-10-03.md)。基线 `8cf51cc84`；本分册覆盖 11 个有 TODO 的包、80 个运行时 TODO。每行文件号对应 `requirements/<包>/tests/NNN.test.mjs`；完整标题和理由在[逐项清单](05-逐项清单.md)。本文描述待做工作，不是已执行证明。
 
 共同开工条件：读现行 WHAT 与测试 README，按总计划区分 A—F 类；修改生产前立正式反例；用本包已有真实入口；共享 Rulebook、MarkerText、journal 或 Host run 契约先由一人定边界。表中“变异”是候选验证手段，只在隔离候选副本使用，不改共享 dist、不拿测试内自建状态机充当生产。
 
-`b7768f478`实施增量见[记录](../archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。Blogger inline文本已迁双语资源，015已有真实canonical journal/lease上的direct maybeInject五例；下一步接registered transform/provider并比较两个真实请求的历史，磁盘不写不能替代它。制度学习已有caller candidate的机械检查、Born facts和纯revision重评；003/005的语义TODO保留，不将非空字段当抽象能力。
+`b7768f478`实施增量见[记录](../archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。该历史阶段只有资源化/direct maybeInject，后续registered transform和两个真实请求的历史隔离已经完成，见本页当前状态。制度学习已有caller candidate机械检查、Born facts与纯revision重评；003虽已没有原TODO，私有机制提炼与输入能力隔离的规范余债仍须核对，不能将非空字段当抽象能力。
 
-制度学习继续施工时依次做：按WHAT003只给Enhancer经验和canonical live rulebook，并立raw command/path/timestamp不得永久化的真实反例；按005证明trigger、negative/distinction、语义去重和长期注意力成本，拒绝不合格候选；在生产提交口引入真实expected revision判决，以两个并发调用和悬置Append证明冲突零部分效果；按008一次提交Born、Disposition及必要Deferred事实，在每个物理提交失败切点核对Current、磁盘、冻结收据和重试；最后把Born接入同一Blogger prompt/chronicle索引并重开核对。现在Born→Committed二追加会半落地，重试可能改为ABSORB/DISCARD，不能当作已解决前提。保留原表剩余义务，已完成机械基础不重复施工。
+制度学习后续按N07执行：先明确唯一live Rulebook、完整双语revision与life冻结，再在生产提交口引入expected revision和Born/Disposition/必要Deferred事实同批提交；以并发、物理失败与冷重开证明零半状态。接着证明celebrate闭合后恰一次resurface，最后实现只接经验和canonical Rulebook的私有Enhancer与有限语义验收。现在Born→Committed二追加会半落地，私有liveRules也不等于Blogger/chronicle已经消费，均须真实接线。现行WHAT008已经规定必要事实同批，不再等待旧D12二选一审批。
 
 ## action-affordance
 
@@ -52,7 +54,7 @@
 | 010 | 首次、后续、重启、压缩后请求分别捕获 lifecycle 材料 | 该出现时出现、历史重放冻结、正常后续不重复教育；系统提示职责保持 |
 | 011 | 运行中更新 mission/运行材料后捕获下次真实请求 | 变化进入消息通道，不伪造用户授权或替换 Role Law；检查 authority 根及历史字节 |
 | 012 | Manager 接收可核对证据与相互矛盾评价，完成实际评审轨迹；检查真实 provider 输入是否泄露隐藏 Reviewer、双重确认或 barrier | 结论可追溯当前证据，缺证据不照搬隐藏过程；泄露本身也须拒绝，不能只查有没有扩权；与 relay-assessment 共用输入场景，独立记录有限语义判断 |
-| 015，补充 | 资源化与真实 journal/lease 上的五项直接 maybeInject 观察已完成；接续补正式注册 Host、历史与后续请求 | 保留白名单内/外和重复 transform 断言；直接捕获实际 provider 字节，证明同一 occurrence、另一 session 和后续请求的历史边界。GAP-077 不因没有运行时 TODO 而遗漏 |
+| 015，保持回归 | registered R1—R6、原physical身份、两次真实provider POST及completed后历史隔离已完成；晚到HTTP错误和清理也已正式证明，integration21/0 | 保留白名单、去重、缺physical不借session模型、canonical投影保持原physical、另一session隔离、缺committed lease拒绝与真实终态回归，不再列为新工单；其他认知语义/GAP余债按N07和001—012逐条推进 |
 
 **衔接。** 若所有接缝只覆盖纯 prompt 组装，先扩展已有正式 Host fixture 的请求捕获，再做语义审阅；不要在测试里组装一份“正确请求”后自证。013/016 等 README 人审余项随 GAP-076 补查，不虚增 TODO 统计。
 

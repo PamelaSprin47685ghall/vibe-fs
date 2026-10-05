@@ -12,6 +12,8 @@
 
 ## 台账
 
+2026-10-05排期更新：[总计划N00—N09](../proposals/TODO施工总计划-2026-10-03.md)。6a282ecfc全仓CI818/818、4303pass/0fail、105skip、396TODO，退出1仅pending；此前超时仍保留。先同步新增upstream，再并行推进Grounding/前缀证明、真实只读执行、Sphinx与原子制度学习。本次只更新计划和证据，不改变任何GAP状态；既有九项完成切片不重复认领，下面旧批记录不作为当前排期。
+
 2026-10-05 当前接续见[目录所有权与生产接线](../proposals/archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)：六 namespace owner、PP-011/T335、grounding B/T387 和 cognitive/015 注册投递切片验收完成，gen116 正式 80/80、772/0；cf6fb31e8 Linux 818/818、4292/0，仅 pending exit1。真实 completed 后 SDK/journal 隔离和晚到 HTTP 错误回归完整 integration 21/0。先期静默/就绪失败保留，不据新成功定位其唯一原因。GAP-077 的旧“physical lease 不落地”推断被原 physical/投影 id 混用反例修正。T418/T419 的全过程只读/FD/ABA/同候选 actual verify 及整体 GAP 其他义务继续 PARTIAL。
 
 | GAP | 包 | 命题 | 缺口 | 状态 | 现状承载 | 补法计划 | Owner |

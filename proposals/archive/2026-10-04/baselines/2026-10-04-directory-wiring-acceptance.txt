@@ -215,3 +215,11 @@ does not make incomplete run pass). Build/static gates passed; full release
 stopped without authoritative unit result. NOT pending-only and not replaced by
 generation121 local80. Raw:vibe-fs-846-ci.log. New pushed input CI has its own
 identity/result; do not infer all818 from related80 or prior cf6fullunit pass.
+
+Follow-up read for next-stage planning,2026-10-05 Asia/Singapore:
+Linux CI6a282ecfc,run37221260164 completed818/818,4303pass/0fail/105skip/396TODO,
+222.71s wall/353.83s testtime. Group2881 accepted=true,8.191ms. Exit1 solely
+pending proof; release stopped at unit,not an integration/e2e/package pass.
+Raw:vibe-fs-6a2-ci.log. This supersedes the earlier unknown state of this CI,
+not the historical846physical cap or earlier failures. Next plan uses this
+baseline and separately records upstream e7a60a769 as fetched but not merged.
