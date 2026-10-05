@@ -23,8 +23,8 @@ module PromptPhysicalAcceptance =
     let private callbacks: Dictionary<string, PhysicalUserMessageId -> unit> =
         Dictionary<string, PhysicalUserMessageId -> unit>()
 
-    let private waiters: Dictionary<string, TaskCompletionSource<PromptPhysicalOutcome>> =
-        Dictionary<string, TaskCompletionSource<PromptPhysicalOutcome>>()
+    let private waiters: Dictionary<string, ResizeArray<TaskCompletionSource<PromptPhysicalOutcome>>> =
+        Dictionary<string, ResizeArray<TaskCompletionSource<PromptPhysicalOutcome>>>()
 
     let private trySetResult (tcs: TaskCompletionSource<'T>) (value: 'T) =
         try
@@ -50,22 +50,53 @@ module PromptPhysicalAcceptance =
     let register (promptKey: PromptKey) (callback: PhysicalUserMessageId -> unit) =
         lock gate (fun () -> callbacks.[PromptKey.value promptKey] <- callback)
 
-    let cancel (promptKey: PromptKey) =
+    let private takeWaiters (promptKey: PromptKey) =
+        match waiters.TryGetValue(PromptKey.value promptKey) with
+        | true, pending ->
+            waiters.Remove(PromptKey.value promptKey) |> ignore
+            pending.ToArray()
+        | false, _ -> [||]
+
+    let private removeWaiter
+        (promptKey: PromptKey)
+        (pending: ResizeArray<TaskCompletionSource<PromptPhysicalOutcome>>)
+        (waiter: TaskCompletionSource<PromptPhysicalOutcome>)
+        =
+        let index =
+            pending.FindIndex(fun current -> System.Object.ReferenceEquals(current, waiter))
+
+        if index >= 0 then
+            pending.RemoveAt index
+
+        if index >= 0 && pending.Count = 0 then
+            waiters.Remove(PromptKey.value promptKey) |> ignore
+
+    let private releaseWaiter (promptKey: PromptKey) (waiter: TaskCompletionSource<PromptPhysicalOutcome>) =
         lock gate (fun () ->
-            callbacks.Remove(PromptKey.value promptKey) |> ignore
+            match waiters.TryGetValue(PromptKey.value promptKey) with
+            | true, pending -> removeWaiter promptKey pending waiter
+            | false, _ -> ())
 
-            let waiterOpt =
-                match waiters.TryGetValue(PromptKey.value promptKey) with
-                | true, tcs ->
-                    waiters.Remove(PromptKey.value promptKey) |> ignore
-                    Some tcs
-                | false, _ -> None
+    let private completeWaiters (pending: TaskCompletionSource<PromptPhysicalOutcome> array) outcome =
+        for waiter in pending do
+            trySetResult waiter outcome |> ignore
 
-            waiterOpt
-            |> Option.iter (fun tcs -> trySetResult tcs (PromptPhysicalOutcome.Rejected "Cancelled") |> ignore))
+    let private confirmationOutcome (result: obj) =
+        if unbox<bool> (result?ok) then
+            Some(unbox<PromptPhysicalOutcome> (result?v))
+        else
+            None
+
+    let cancel (promptKey: PromptKey) =
+        let pending =
+            lock gate (fun () ->
+                callbacks.Remove(PromptKey.value promptKey) |> ignore
+                takeWaiters promptKey)
+
+        completeWaiters pending (PromptPhysicalOutcome.Rejected "Cancelled")
 
     let accepted (promptKey: PromptKey) (physicalUserMessageId: PhysicalUserMessageId) =
-        let callback, waiter =
+        let callback, pending =
             lock gate (fun () ->
                 let cb =
                     match callbacks.TryGetValue(PromptKey.value promptKey) with
@@ -74,47 +105,35 @@ module PromptPhysicalAcceptance =
                         Some pending
                     | false, _ -> None
 
-                let w =
-                    match waiters.TryGetValue(PromptKey.value promptKey) with
-                    | true, tcs ->
-                        waiters.Remove(PromptKey.value promptKey) |> ignore
-                        Some tcs
-                    | false, _ -> None
+                cb, takeWaiters promptKey)
 
-                cb, w)
-
-        callback |> Option.iter (fun notify -> notify physicalUserMessageId)
-
-        waiter
-        |> Option.iter (fun tcs ->
-            trySetResult tcs (PromptPhysicalOutcome.Accepted physicalUserMessageId)
-            |> ignore)
+        try
+            callback |> Option.iter (fun notify -> notify physicalUserMessageId)
+        finally
+            completeWaiters pending (PromptPhysicalOutcome.Accepted physicalUserMessageId)
 
     let rejected (promptKey: PromptKey) (reason: string) =
-        let waiter =
+        let pending =
             lock gate (fun () ->
                 callbacks.Remove(PromptKey.value promptKey) |> ignore
+                takeWaiters promptKey)
 
-                match waiters.TryGetValue(PromptKey.value promptKey) with
-                | true, tcs ->
-                    waiters.Remove(PromptKey.value promptKey) |> ignore
-                    Some tcs
-                | false, _ -> None)
-
-        waiter
-        |> Option.iter (fun tcs -> trySetResult tcs (PromptPhysicalOutcome.Rejected reason) |> ignore)
+        completeWaiters pending (PromptPhysicalOutcome.Rejected reason)
 
     let awaitConfirmation (promptKey: PromptKey) (timeoutMs: int option) : Task<PromptPhysicalOutcome option> =
-        let (tcs: TaskCompletionSource<PromptPhysicalOutcome>) =
-            lock gate (fun () ->
+        let waiter =
+            TaskCompletionSource<PromptPhysicalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        lock gate (fun () ->
+            let pending =
                 match waiters.TryGetValue(PromptKey.value promptKey) with
                 | true, existing -> existing
                 | false, _ ->
-                    let created =
-                        TaskCompletionSource<PromptPhysicalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
+                    let created = ResizeArray<TaskCompletionSource<PromptPhysicalOutcome>>()
                     waiters.[PromptKey.value promptKey] <- created
-                    created)
+                    created
+
+            pending.Add waiter)
 
         let ms =
             match timeoutMs with
@@ -122,11 +141,10 @@ module PromptPhysicalAcceptance =
             | None -> admissionTimeoutFromEnvironment ()
 
         task {
-            let! (res: obj) = raceTimeout tcs.Task ms
+            try
+                let! (res: obj) = raceTimeout waiter.Task ms
 
-            if unbox<bool> (res?ok) then
-                return Some(unbox<PromptPhysicalOutcome> (res?v))
-            else
-                cancel promptKey
-                return None
+                return confirmationOutcome res
+            finally
+                releaseWaiter promptKey waiter
         }

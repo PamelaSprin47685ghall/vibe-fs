@@ -53,6 +53,8 @@ module DispatchSurface =
 
     val deliverDetachedVerdict: listener: obj -> kind: string -> reason: string -> Task<obj>
 
+    val awaitPhysicalConfirmation: promptKey: string -> timeoutMs: int -> Task<obj>
+
     val sendManagedAssignment:
         port: obj ->
         handle: JournalHandle ->

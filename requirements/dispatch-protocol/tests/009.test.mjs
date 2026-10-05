@@ -8,8 +8,10 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
-import { withJournal, hostPort } from './support/authority.mjs'
+import {
+  withJournal, hostPort, prepareAcceptanceObserver, sendWithAcceptanceObserver,
+  acceptObservedPhysical, acceptanceObservation,
+} from './support/authority.mjs'
 
 const capturingPort = (captured, outcome = () => dispatch.admittedWithReceipt('accepted-007')) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -336,53 +338,35 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_owned_settled_late_deliver
   }
 })
 
-const prepareAcceptanceObserver = async (handle, path, label) => {
-  const session = `d0-${path}-${label}`
-  const owner = await acceptOwner(handle, `owner-${session}`)
-  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
-  assert.equal(issued.ok, true, issued.error)
-  if (path === 'root') return { session, seed: issued.value, profile: null }
-  const root = await dispatch.sendAgentOwnerRoot(
-    hostPort(async () => dispatch.admittedWithReceipt(`bootstrap-${session}`)),
-    handle, session, 'bootstrap this exact child', issued.value,
-  )
-  assert.equal(root.ok, true, root.error)
-  const accepted = await dispatch.acceptManagedPromptClaim(
-    handle, session, `bootstrap-physical-${session}`, root.key, 'engineer',
-  )
-  assert.equal(accepted.ok, true, accepted.error)
-  const profile = dispatch.projectionObservation(handle, session).activeLogicalRun
-  assert.equal(profile.session, session)
-  assert.equal(dispatch.pendingClaimCount(handle, session), 0)
-  return { session, seed: issued.value, profile }
-}
-
-const sendWithAcceptanceObserver = (path, port, handle, context, onAccepted) => path === 'root'
-  ? dispatch.sendAgentOwnerRootWithAcceptance(
-      port, handle, context.session, 'observe the real detached acceptance',
-      context.seed, 'Detached', onAccepted,
-    )
-  : dispatch.sendContinuationWithAcceptance(
-      port, handle, context.session, 'observe the real detached successor',
-      'DegenerationGuard', context.profile, 'Detached', onAccepted,
-    )
-
-const acceptObservedPhysical = (handle, context, key, physical) => dispatch.acceptManagedPromptClaim(
-  handle, context.session, physical, key, 'engineer',
-)
-
-const acceptanceObservation = (handle, context, physical) => ({
-  physical,
-  pending: dispatch.pendingClaimCount(handle, context.session),
-  accepted: executionStatus.query(handle, context.session, physical).accepted,
-})
-
 const deliverHostVerdict = async (options, kind, reason = null) => {
   assert.equal(typeof options.DetachedListener, 'function')
   assert.deepEqual(await dispatch.deliverDetachedVerdict(options.DetachedListener, kind, reason), { delivered: true })
 }
 
 for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-009] definite refusal of a detached ${path} still cancels all confirmation waits for the abandoned key`, async () => {
+    await withJournal(`a2-refusal-wait-${path}`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'refusal-waiters')
+      const seen = []
+      let options
+      const sent = await sendWithAcceptanceObserver(path,
+        hostPort(async (_session, _text, supplied) => {
+          options = supplied
+          return dispatch.admittedWithReceipt('refusal-waiters-receipt')
+        }), handle, context, physical => seen.push(physical),
+      )
+      assert.equal(sent.ok, true, sent.error)
+      const first = dispatch.awaitPhysicalConfirmation(sent.key, 1000)
+      const second = dispatch.awaitPhysicalConfirmation(sent.key, 1000)
+      await deliverHostVerdict(options, 'Refused', 'Host proves this request was never sent')
+      assert.deepEqual(await first, { kind: 'Rejected', physical: null, reason: 'Cancelled' })
+      assert.deepEqual(await second, { kind: 'Rejected', physical: null, reason: 'Cancelled' })
+      assert.equal(dispatch.pendingClaimCount(handle, context.session), 0)
+      assert.equal((await acceptObservedPhysical(handle, context, sent.key, `invalid-${context.session}`)).ok, false)
+      assert.deepEqual(seen, [])
+    })
+  })
+
   test(`WHAT[dispatch-protocol-009] detached ${path} returns while SDK is unresolved and observes actual managed acceptance`, async () => {
     await withJournal(`d0-${path}-pending-sdk`, async handle => {
       const context = await prepareAcceptanceObserver(handle, path, 'pending-sdk')

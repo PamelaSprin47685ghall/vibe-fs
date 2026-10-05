@@ -1,6 +1,6 @@
 # 计划与提案入口
 
-2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A、B2-0、014成本oracle和A2-D0均已有限验收。D0为gen159全静态、238/238、1178/0，后续gen161 clean build同范围复验通过，skip/TODO另记；[D0记录](archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)保留全部红绿。下一件事先按[A2卡](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)第9节冻结source/观察资源合同，补三类successor归属，再接真实Host/profile/结果/答案；不重复Detached注册条件。N00最新[198e CI](archive/2026-10-05/baselines/198e-ci/receipt.txt)是794/821排空、两项活动、25排队的总预算超时，016未启动、无权威汇总；整体GAP与全仓失败保持。旧3bde/f136/45e413、排序退化红灯及墙钟失败均保留，不能按下列旧S03“下一步”排工。
+2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A、B2-0、014成本oracle及A2-D0/D1均已有限验收。D0的gen162相关238/238、1178/0复验与[D1](archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)的旧业务6红、gen165定向36/0均保留，skip/TODO另记。下一包按[A2卡第11节](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)先装配同一owner的真实恢复夹具（managed acceptance、隔离ModelRouting、实际Host scope及shared stop fence），再冻结lease/source、并行三producer、最后删宽匹配；脚本retry不能验收来源。Sphinx实际Host/profile/结果/答案依赖此完整A2。N00最新[6b CI](archive/2026-10-05/baselines/6b-ci/receipt.txt)已821/821排空、4577pass/0fail、116skip/390TODO，原预算内285.43秒；退出1仅pending proof，完整发布仍未通过。此证书不消除历史198e/3bde/f136的真实总预算超时，不能据环境成本变化宣称性能修复。排序退化红灯及墙钟失败均保留，不能按下列旧S03“下一步”排工。
 
 S03 最新入口见[编译目录身份与清理](archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)：第二批9909/gen110已18/18排空、429/0/6skip/2TODO、groupaccepted=true。新Fable parent/root同库存置换正式击红，私有dev/ino边界检查拒绝foreign消费/发布/cleanup，失败保Error/null与cleanup cause。新批验收待附件；其它owner、TOCTOU/ABA、完整FD、runtime readonly、actualverify和T418/T419均保留。
 

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as identity from '../../../../dist/Participant/Persona/Surface.js'
 import * as journal from '../../../../dist/Persistence/Journal/Surface.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as authority from '../../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as executionStatus from '../../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 
 const rootSelection = () => {
   const resolved = identity.resolveParticipantIdentityAtRoot('manager')
@@ -49,3 +51,55 @@ export const acceptOwner = async (handle, session = 'authority-owner') => {
 }
 
 export const hostPort = (send) => ({ SubscribeTerminal: () => ({ Dispose() {} }), SendPrompt: send })
+
+export const journalBytes = directory => {
+  const events = join(directory, 'wanxiang', 'events')
+  const names = readdirSync(events).filter(name => name.endsWith('.ndjson')).sort()
+  assert.ok(names.length > 0, 'the real journal must contain event files')
+  return names.map(name => {
+    const bytes = readFileSync(join(events, name))
+    assert.ok(bytes.length > 0, 'the actual claim journal must not be empty')
+    return { name, bytes }
+  })
+}
+
+export const prepareAcceptanceObserver = async (handle, path, label) => {
+  const session = `d0-${path}-${label}`
+  const owner = await acceptOwner(handle, `owner-${session}`)
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(issued.ok, true, issued.error)
+  if (path === 'root') return { session, seed: issued.value, profile: null }
+  const root = await dispatch.sendAgentOwnerRoot(
+    hostPort(async () => dispatch.admittedWithReceipt(`bootstrap-${session}`)),
+    handle, session, 'bootstrap this exact child', issued.value,
+  )
+  assert.equal(root.ok, true, root.error)
+  const accepted = await dispatch.acceptManagedPromptClaim(
+    handle, session, `bootstrap-physical-${session}`, root.key, 'engineer',
+  )
+  assert.equal(accepted.ok, true, accepted.error)
+  const profile = dispatch.projectionObservation(handle, session).activeLogicalRun
+  assert.equal(profile.session, session)
+  assert.equal(dispatch.pendingClaimCount(handle, session), 0)
+  return { session, seed: issued.value, profile }
+}
+
+export const sendWithAcceptanceObserver = (path, port, handle, context, onAccepted) => path === 'root'
+  ? dispatch.sendAgentOwnerRootWithAcceptance(
+      port, handle, context.session, 'observe the real detached acceptance',
+      context.seed, 'Detached', onAccepted,
+    )
+  : dispatch.sendContinuationWithAcceptance(
+      port, handle, context.session, 'observe the real detached successor',
+      'DegenerationGuard', context.profile, 'Detached', onAccepted,
+    )
+
+export const acceptObservedPhysical = (handle, context, key, physical) => dispatch.acceptManagedPromptClaim(
+  handle, context.session, physical, key, 'engineer',
+)
+
+export const acceptanceObservation = (handle, context, physical) => ({
+  physical,
+  pending: dispatch.pendingClaimCount(handle, context.session),
+  accepted: executionStatus.query(handle, context.session, physical).accepted,
+})

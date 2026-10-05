@@ -409,6 +409,29 @@ module DispatchSurface =
             return box {| delivered = true |}
         }
 
+    let awaitPhysicalConfirmation (promptKey: string) (timeoutMs: int) : Task<obj> =
+        task {
+            let! outcome = PromptPhysicalAcceptance.awaitConfirmation (PromptKey.create promptKey) (Some timeoutMs)
+
+            return
+                match outcome with
+                | Some(PromptPhysicalOutcome.Accepted physical) ->
+                    box
+                        {| kind = "Accepted"
+                           physical = PhysicalUserMessageId.value physical
+                           reason = null |}
+                | Some(PromptPhysicalOutcome.Rejected reason) ->
+                    box
+                        {| kind = "Rejected"
+                           physical = null
+                           reason = reason |}
+                | None ->
+                    box
+                        {| kind = "Unknown"
+                           physical = null
+                           reason = null |}
+        }
+
     /// Continuation may only attach to the target's own active Logical Run
     /// (interaction-authority-017). This Surface always holds a JournalHandle, so
     /// the journal-less branch HostSessionNudge must handle cannot occur here;

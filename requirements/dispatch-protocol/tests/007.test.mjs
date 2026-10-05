@@ -3,6 +3,79 @@ import assertObserved from 'node:assert/strict'
 import * as syncObserved from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as dispatchObserved from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withSyncRuntime as withObservedRuntime } from '../../delegation/tests/support/sync-runtime.mjs'
+import {
+  withJournal, hostPort, journalBytes, prepareAcceptanceObserver, sendWithAcceptanceObserver,
+  acceptObservedPhysical, acceptanceObservation,
+} from './support/authority.mjs'
+
+for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-007] one detached ${path} confirmation timeout leaves another waiter and the real acceptance observer intact`, async t => {
+    await withJournal(`a2-wait-${path}`, async (handle, _reopen, directory) => {
+      const context = await prepareAcceptanceObserver(handle, path, 'wait-isolation')
+      const seen = []
+      let sends = 0
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort(() => { sends += 1; return sdk }),
+          handle, context, physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assertObserved.equal(sent.ok, true, sent.error)
+        const before = dispatchObserved.projectionObservation(handle, context.session)
+        const bytes = journalBytes(directory)
+        t.mock.timers.enable({ apis: ['setTimeout'] })
+        const long = dispatchObserved.awaitPhysicalConfirmation(sent.key, 1000)
+        const short = dispatchObserved.awaitPhysicalConfirmation(sent.key, 10)
+        t.mock.timers.tick(10)
+        assertObserved.deepEqual(await short, { kind: 'Unknown', physical: null, reason: null })
+        assertObserved.deepEqual(dispatchObserved.projectionObservation(handle, context.session), before)
+        assertObserved.deepEqual(journalBytes(directory), bytes)
+        const physical = `confirmed-${context.session}`
+        assertObserved.equal((await acceptObservedPhysical(handle, context, sent.key, physical)).ok, true)
+        assertObserved.deepEqual(await long, { kind: 'Accepted', physical, reason: null })
+        assertObserved.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+        assertObserved.equal(sends, 1)
+      } finally { release(dispatchObserved.admittedWithReceipt('wait-isolation-receipt')) }
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-007] detached ${path} remains observable after both existing confirmation waiters time out`, async t => {
+    await withJournal(`a2-wait-empty-${path}`, async (handle, _reopen, directory) => {
+      const context = await prepareAcceptanceObserver(handle, path, 'all-waiters-expire')
+      const seen = []
+      let sends = 0
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort(() => { sends += 1; return sdk }),
+          handle, context, physical => seen.push(acceptanceObservation(handle, context, physical)),
+        )
+        assertObserved.equal(sent.ok, true, sent.error)
+        const before = dispatchObserved.projectionObservation(handle, context.session)
+        const bytes = journalBytes(directory)
+        t.mock.timers.enable({ apis: ['setTimeout'] })
+        const first = dispatchObserved.awaitPhysicalConfirmation(sent.key, 10)
+        const second = dispatchObserved.awaitPhysicalConfirmation(sent.key, 20)
+        t.mock.timers.tick(10)
+        const firstResult = await first
+        t.mock.timers.tick(10)
+        const secondResult = await second
+        assertObserved.deepEqual(dispatchObserved.projectionObservation(handle, context.session), before)
+        assertObserved.deepEqual(journalBytes(directory), bytes)
+        const later = dispatchObserved.awaitPhysicalConfirmation(sent.key, 1000)
+        const physical = `late-confirmed-${context.session}`
+        assertObserved.equal((await acceptObservedPhysical(handle, context, sent.key, physical)).ok, true)
+        assertObserved.deepEqual(await later, { kind: 'Accepted', physical, reason: null })
+        assertObserved.deepEqual(firstResult, { kind: 'Unknown', physical: null, reason: null })
+        assertObserved.deepEqual(secondResult, { kind: 'Unknown', physical: null, reason: null })
+        assertObserved.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+        assertObserved.equal(sends, 1)
+      } finally { release(dispatchObserved.admittedWithReceipt('all-waiters-expire-receipt')) }
+    })
+  })
+}
 
 for (const [kind, outcome, admissionKind, claimKind] of [
   ['AcceptanceUnknown', () => dispatchObserved.acceptanceUnknown('SAME-NATIVE-REASON'), 'Unconfirmed', 'Pending'],

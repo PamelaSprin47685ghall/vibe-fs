@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-06 最新N00证书见[6b原始CI](../archive/2026-10-05/baselines/6b-ci/receipt.txt)：实际merge1c90280a，原预算/双worker下821/821排空、4577pass/0fail、116skip/390TODO，285.43秒；format/check/build通过，发布因pending proof退出1。016真实完整Linux成本67.209秒，201个工具全回收。本次host和输入不同，不能把成本下降记成已实现的性能修复；下方d599、33dc等超时仍是历史实质失败，其旧“下一步”不得盖过总计划当前顺序。
+
 2026-10-05 当前状态：N00 非续期诊断、N05-A/T386 当前读取及 Sphinx 核心答案来源守门前置已交付；N05-B/T388 自动Grounding原材料与工具后缀有限范围已验收。gen137正式223/223排空、1454pass/0fail、21skip、87TODO，仅pending exit1；真实Host integration1/0、无skip/TODO。正文保真不复原native read已丢失的字节，native仍PartialFile；legacy/user、完整插件Long Stroke、T406 Runtime/profile/公开入口及新头全仓CI另验。见[最新记录](../archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
 
 N00仍未整体验收：d5992761e CI的完整artifact已保存，016第797个准入、283.833s启动，原300s截断817/818，无权威汇总。实际活动叶是self-modifying npm CLI的prepare，尚未spawn；此前工具均退出并排空。这个输入证明晚准入后预算耗尽，不把last-verdict nonexec、5秒静默或未执行的SDK组当成原因。单016本地原预算286/0、14skip、2TODO、150.759s完整排空，只是Darwin观测。下一步先量化Linux单016全成本，再决定独立组的负载分界；不得缓存变异归档或复用prepared owner。历史33dc失败仍未唯一归因，952秒IdleSleep样本不解释Linux；预算和worker不变。见[完整unit日志](../archive/2026-10-05/baselines/vibe-fs-n00-d599-ci-unit.log)。
