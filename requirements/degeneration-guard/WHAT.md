@@ -29,6 +29,8 @@ Half-life 固定为 `256` 个 `o200k_base` token，不由排版推导。每次 b
 
 每次 provider attempt 使用 fresh detector；attempt 结束、guard 中断或 session 销毁时丢弃，禁止跨 attempt 复用。
 
+因 `TooRepetitive` 或 `TooRandom` 认领 guard 中断时，必须在同一原子边界将该 session 的算法 scratch 恢复为 `LoopDetector.create()` 的完整初始状态：weighted count 回到仓库先验、`Step = 0`、`LastSeenTokenStep` 为空。后续新输出从此重新统计，不依赖 Host 另行调用 reset；已截断 exact run 的迟到 delta 不得污染新统计。此重置只涉及算法 scratch，不得清除 armed anomaly、interruptAttempts 或 active owned-work；其身份、单次性与排空仍遵守 [007]—[009]。
+
 ## [007] 只中断当前 attempt
 
 命中任一异常且满足 [010] 时，guard 原子记录进程内异常并调用 Host `InterruptAttempt`。同一 attempt 至多中断一次；abort 返回前不得发送 continuation。

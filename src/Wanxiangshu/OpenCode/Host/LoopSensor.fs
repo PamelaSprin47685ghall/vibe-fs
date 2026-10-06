@@ -145,6 +145,7 @@ type LoopSensor
                 runs.Add providerRun |> ignore
                 armed.[key] <- (kind, providerRun)
                 activeInterrupts.[key] <- (providerRun, publicTask, publicTask)
+                detectors.[key] <- LoopDetector.create ()
                 true)
 
     /// Narrow physical exception boundary: only the abort effect may throw.
@@ -381,13 +382,24 @@ type LoopSensor
             detectors.[key] <- created
             created
 
-    member private this.Evaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
+    member private this.TryEvaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation option =
         lock gate (fun () ->
             let key = keyOf delta.SessionId
-            let detector = this.DetectorFor delta.SessionId
-            let updated, evaluation = LoopDetector.pushText detector delta.Delta
-            detectors.[key] <- updated
-            evaluation)
+
+            // 已截断 run 的迟到 delta 不能写入新的算法 scratch。
+            let alreadyInterrupted =
+                match delta.MessageId, interruptAttempts.TryGetValue key with
+                | Some messageId, (true, runs) -> runs.Contains(ProviderRunIdentity.create messageId)
+                | None, _
+                | Some _, (false, _) -> false
+
+            if armed.ContainsKey key || alreadyInterrupted then
+                None
+            else
+                let detector = this.DetectorFor delta.SessionId
+                let updated, evaluation = LoopDetector.pushText detector delta.Delta
+                detectors.[key] <- updated
+                Some evaluation)
 
     member private this.InterruptForEvaluation(delta: LoopEventCodec.TextDelta, evaluation: LoopDetector.Evaluation) =
         // An anomaly requires its exact provider run: without a message id the
@@ -399,13 +411,11 @@ type LoopSensor
         | _ -> ()
 
     member private this.ObserveEligible(delta: LoopEventCodec.TextDelta) =
-        let evaluation = this.Evaluate delta
-        this.InterruptForEvaluation(delta, evaluation)
+        this.TryEvaluate delta
+        |> Option.iter (fun evaluation -> this.InterruptForEvaluation(delta, evaluation))
 
     member private this.ObserveOwned(delta: LoopEventCodec.TextDelta) =
-        let alreadyArmed = lock gate (fun () -> armed.ContainsKey(keyOf delta.SessionId))
-
-        if isOwned delta.SessionId && not alreadyArmed then
+        if isOwned delta.SessionId then
             this.ObserveEligible delta
 
     /// Raw stream edge. Non-text/reasoning events fail closed in LoopEventCodec.
