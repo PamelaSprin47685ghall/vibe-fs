@@ -8,7 +8,7 @@ import test from 'node:test'
 const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
 const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
-const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA } = await import('../../../scripts/lib/build-state.mjs')
+const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs, computeDigest } = await import('../../../scripts/lib/build-state.mjs')
 const { resetOutputDirectory } = await import('../../../scripts/lib/owner-compile.mjs')
 const { runBuild } = await import('../../../scripts/build.mjs')
 
@@ -119,6 +119,243 @@ test('WHAT[distribution-005] release output reset physically removes stale artif
 
     assert.equal(existsSync(stale), false)
     assert.equal(existsSync(output), true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+const { checkOutputsValid, determineBuildDecision, stagedBackupDirFor, stageDistForFullRebuild, restoreStagedDist, recoverStaleStagedDist } = await import('../../../scripts/build.mjs')
+const { execFileSync } = await import('node:child_process')
+
+const toolchainIdentity = () => {
+  let dotnetVer = 'unknown'
+  let fableVer = 'unknown'
+  try {
+    dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  try {
+    fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  return `dotnet ${dotnetVer} / fable ${fableVer}`
+}
+
+const writeOrphanScenario = (root) => {
+  spawnSync('git', ['-C', root, 'init'])
+  mkdirSync(join(root, 'src', 'Wanxiangshu'), { recursive: true })
+  const distDir = join(root, 'dist')
+  const orphan = join(distDir, 'Orphan', 'Legacy.js')
+  mkdirSync(join(distDir, 'Orphan'), { recursive: true })
+  writeFileSync(orphan, 'export const legacy = 1\n', 'utf8')
+  return { distDir, orphan }
+}
+
+test('WHAT[distribution-005] full rebuild staged swap clears orphans, restores prior dist on failure, and settles stale backups', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-orphan-staged-'))
+  try {
+    const { distDir, orphan } = writeOrphanScenario(root)
+    const backupDir = stagedBackupDirFor(distDir)
+
+    const resetOrphan = () => {
+      rmSync(distDir, { recursive: true, force: true })
+      mkdirSync(join(distDir, 'Orphan'), { recursive: true })
+      writeFileSync(orphan, 'export const legacy = 1\n', 'utf8')
+    }
+
+    // Stage: the prior dist (orphan included) moves aside and the compile
+    // step sees a blank dist, so orphaned outputs cannot survive a
+    // successful full rebuild into the next manifest snapshot.
+    stageDistForFullRebuild(distDir)
+    assert.equal(existsSync(orphan), false, 'staged full rebuild must compile into a blank dist')
+    assert.equal(existsSync(join(backupDir, 'Orphan', 'Legacy.js')), true, 'prior dist must be recoverable at the staged backup location')
+
+    // Restore (failed rebuild): half-built outputs are dropped and the prior
+    // dist — orphan included — comes back intact. The end-to-end
+    // compile-failure path through runBuild is owned by structured-workflow-012.
+    writeFileSync(join(distDir, 'Halfbuilt.js'), 'export const half = 1\n', 'utf8')
+    restoreStagedDist(distDir, backupDir)
+    assert.equal(existsSync(orphan), true, 'failed full rebuild must restore the prior dist')
+    assert.equal(existsSync(join(distDir, 'Halfbuilt.js')), false, 'half-built outputs must be dropped on restore')
+    assert.equal(existsSync(backupDir), false, 'restore must consume the staged backup')
+
+    // Recover, interrupted-build residue: dist with committed content is
+    // authoritative and the stale backup is dropped.
+    resetOrphan()
+    stageDistForFullRebuild(distDir)
+    writeFileSync(join(distDir, 'Fresh.js'), 'export const fresh = 1\n', 'utf8')
+    writeManifest({ root, manifest: { schema: MANIFEST_SCHEMA, generation: 2, outputs: collectOutputs(distDir) } })
+    const committedManifestBytes = readFileSync(join(root, '.fable-build/build-manifest.json'))
+    recoverStaleStagedDist(distDir)
+    assert.deepEqual(readdirSync(distDir), ['Fresh.js'])
+    assert.equal(readFileSync(join(distDir, 'Fresh.js'), 'utf8'), 'export const fresh = 1\n', 'committed bytes must stay authoritative')
+    assert.equal(existsSync(backupDir), false, 'stale backup must be dropped when dist has committed content')
+    assert.deepEqual(readFileSync(join(root, '.fable-build/build-manifest.json')), committedManifestBytes)
+
+    // Recover, missing dist: the stale backup is the last known-good dist
+    // and is restored.
+    resetOrphan()
+    stageDistForFullRebuild(distDir)
+    rmSync(distDir, { recursive: true, force: true })
+    recoverStaleStagedDist(distDir)
+    assert.equal(existsSync(orphan), true, 'missing dist must be restored from the stale backup')
+    assert.equal(existsSync(backupDir), false, 'recovery must consume the stale backup')
+
+    // Wiring: runBuild settles stale backups on entry. The manifest below
+    // matches the restored dist exactly, so the build is a no-op and the
+    // only dist mutation available is the entry-time stale recovery.
+    resetOrphan()
+    stageDistForFullRebuild(distDir)
+    writeFileSync(join(distDir, 'Uncommitted.js'), 'export const incomplete = true\n', 'utf8')
+    const compilerInputs = collectCompilerInputs(root, null)
+    const generatedInputs = collectGeneratedInputs(root)
+    const artifactInputs = collectArtifactInputs(root)
+    writeManifest({
+      root,
+      manifest: {
+        schema: MANIFEST_SCHEMA,
+        generation: 1,
+        compiler: {
+          toolIdentity: toolchainIdentity(),
+          inputDigest: computeDigest(compilerInputs),
+          inputs: compilerInputs,
+        },
+        generated: { inputDigest: computeDigest(generatedInputs) },
+        artifacts: { inputDigest: computeDigest(artifactInputs) },
+        outputs: collectOutputs(backupDir),
+      },
+    })
+    const result = await runBuild({ targetRoot: root })
+    assert.equal(result.mode, 'no-op')
+    assert.equal(existsSync(orphan), true, 'entry recovery must restore the prior dist before the no-op decision')
+    assert.equal(existsSync(join(distDir, 'Uncommitted.js')), false)
+    assert.equal(existsSync(backupDir), false, 'runBuild must consume the stale backup on entry')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[distribution-005] staged recovery restores committed bytes after process exit with uncommitted partial output', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-recovery-exit-'))
+  const distDir = join(root, 'dist')
+  const manifestPath = join(root, '.fable-build/build-manifest.json')
+  const baseline = new Map([
+    ['A.js', 'export const a = "last-known-good A"\n'],
+    ['B.js', 'export const b = "last-known-good B"\n'],
+  ])
+  try {
+    mkdirSync(distDir)
+    for (const [name, bytes] of baseline) writeFileSync(join(distDir, name), bytes)
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      generation: 7,
+      compiler: { toolIdentity: 'controlled-toolchain', inputs: [], inputDigest: 'compiler' },
+      generated: { inputDigest: 'generated' },
+      artifacts: { inputDigest: 'artifacts' },
+      outputs: collectOutputs(distDir),
+    }
+    writeManifest({ root, manifest })
+    const manifestBytes = readFileSync(manifestPath)
+    assert.equal(checkOutputsValid(manifest, distDir), true)
+
+    // Exercise a real process exit after staging and partial target emission;
+    // this is the recovery boundary, not a Fable-internal crash injection.
+    const buildModule = new URL('../../../scripts/build.mjs', import.meta.url).href
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { writeFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { stageDistForFullRebuild } from ${JSON.stringify(buildModule)}
+      const dist = process.argv[1]
+      stageDistForFullRebuild(dist)
+      writeFileSync(join(dist, 'A.js'), 'export const a = "UNCOMMITTED"\\n')
+      process.exit(23)
+    `, distDir], { encoding: 'utf8' })
+    assert.equal(child.error, undefined)
+    assert.equal(child.status, 23, child.stderr)
+    assert.equal(child.signal, null)
+    assert.deepEqual(readdirSync(distDir), ['A.js'])
+    assert.equal(checkOutputsValid(manifest, distDir), false)
+    assert.equal(checkOutputsValid(manifest, stagedBackupDirFor(distDir)), true)
+    assert.deepEqual(readFileSync(manifestPath), manifestBytes)
+
+    recoverStaleStagedDist(distDir)
+
+    assert.deepEqual(readdirSync(distDir).sort(), [...baseline.keys()].sort())
+    for (const [name, bytes] of baseline) assert.equal(readFileSync(join(distDir, name), 'utf8'), bytes)
+    assert.equal(existsSync(stagedBackupDirFor(distDir)), false)
+    assert.deepEqual(readFileSync(manifestPath), manifestBytes)
+    const decision = determineBuildDecision({
+      existingManifest: readManifest({ root }),
+      resolvedRoot: root,
+      targetDist: distDir,
+      compilerInputs: [],
+      compilerInputDigest: 'compiler',
+      generatedInputDigest: 'generated',
+      artifactInputDigest: 'artifacts',
+      currentToolchain: 'controlled-toolchain',
+    })
+    assert.equal(decision.mode, 'no-op')
+    assert.equal(decision.outputsValid, true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[distribution-005] staged recovery rejects unavailable manifest evidence and incomplete output identities', async t => {
+  for (const scenario of ['missing manifest', 'corrupt manifest', 'unsupported schema', 'empty outputs', 'missing output', 'extra output', 'changed bytes']) {
+    await t.test('WHAT[distribution-005] restores backup for ' + scenario, () => {
+      const root = mkdtempSync(join(tmpdir(), 'wanxiang-recovery-evidence-'))
+      const distDir = join(root, 'dist')
+      const manifestPath = join(root, '.fable-build/build-manifest.json')
+      try {
+        mkdirSync(distDir)
+        writeFileSync(join(distDir, 'A.js'), 'export const a = 1\n')
+        writeFileSync(join(distDir, 'B.js'), 'export const b = 2\n')
+        writeManifest({ root, manifest: { schema: MANIFEST_SCHEMA, generation: 1, outputs: collectOutputs(distDir) } })
+        stageDistForFullRebuild(distDir)
+        writeFileSync(join(distDir, 'A.js'), 'export const a = 9\n')
+        writeFileSync(join(distDir, 'B.js'), 'export const b = 2\n')
+        const manifest = { schema: MANIFEST_SCHEMA, generation: 2, outputs: collectOutputs(distDir) }
+        writeManifest({ root, manifest })
+        if (scenario === 'missing manifest') rmSync(manifestPath)
+        if (scenario === 'corrupt manifest') writeFileSync(manifestPath, '{ invalid json')
+        if (scenario === 'unsupported schema') writeManifest({ root, manifest: { ...manifest, schema: 'unsupported' } })
+        if (scenario === 'empty outputs') writeManifest({ root, manifest: { ...manifest, outputs: {} } })
+        if (scenario === 'missing output') rmSync(join(distDir, 'B.js'))
+        if (scenario === 'extra output') writeFileSync(join(distDir, 'Extra.js'), 'export const extra = 3\n')
+        if (scenario === 'changed bytes') writeFileSync(join(distDir, 'A.js'), 'export const a = 8\n')
+        const manifestBytes = existsSync(manifestPath) ? readFileSync(manifestPath) : null
+
+        recoverStaleStagedDist(distDir)
+
+        assert.deepEqual(readdirSync(distDir).sort(), ['A.js', 'B.js'])
+        assert.equal(readFileSync(join(distDir, 'A.js'), 'utf8'), 'export const a = 1\n')
+        assert.equal(readFileSync(join(distDir, 'B.js'), 'utf8'), 'export const b = 2\n')
+        assert.equal(existsSync(stagedBackupDirFor(distDir)), false)
+        assert.deepEqual(existsSync(manifestPath) ? readFileSync(manifestPath) : null, manifestBytes)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+  }
+})
+
+test('WHAT[distribution-005] focused rebuild without compiler changes keeps dist intact', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-orphan-focused-'))
+  try {
+    const { orphan } = writeOrphanScenario(root)
+
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      generation: 1,
+      compiler: { toolIdentity: toolchainIdentity(), inputDigest: 'recorded', inputs: [] },
+      generated: { inputDigest: 'recorded' },
+      artifacts: { inputDigest: 'recorded' },
+      outputs: collectOutputs(join(root, 'dist')),
+    }
+    writeManifest({ root, manifest })
+
+    await assert.rejects(runBuild({ targetRoot: root }))
+
+    assert.equal(existsSync(orphan), true, 'focused rebuild must not clear dist outputs')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

@@ -12,8 +12,9 @@ gen190 完整 Sphinx+delegation 为52/52排空、328pass/0fail/35TODO；全 Fabl
 
 先做两项独立前置，再开放首次派发：
 
-- **U0：真实提交与释放后的 Unknown。** 物理 append 已开始后，Current commit 或 native Release 出错都不能称未写入。catch 必须覆盖完整锁任务，保原 request、prepared envelopes、失败阶段与 cause。先以真实 append/fsync、Commit、Release 后注错取得业务红；全部 AppendError 消费者按类型接续。此包不提供首次派发许可。
-- **017 成本观察。** 用实际 filesystem 调用记录测正常 append，正规 activation 后清零，增加旧历史仍不读取旧 event bytes、不重 fold；保 incoming 写入和合法 cold 结果正控。手工加原 ReloadLocal 应使成本例变红。不能用 wall 阈值或源码 token 代替行为证明。
+- **U0：真实提交与释放后的 Unknown。** 物理 append 已开始后，Current commit 或 native Release 出错都不能称未写入。catch 必须覆盖完整锁任务，保原 request、prepared envelopes、失败阶段与 cause。先以真实 append/fsync、Commit、Release 后注错取得业务红；全部 AppendError 消费者按类型接续。[完整只读接手卡](../archive/2026-10-06/sphinx-host-owner/vibe-fs-u0-unknown-contract-next-20261006.txt)列实际forward-then-throw、Commit原closure观察口前提和consumer降型点；它是源码因果，尚未取得U0业务红。duplicate/no-op释放失败不得猜新写未知或旧事实未提交，RuntimeStarted未知也不能误称同次business已尝试；generic锁helper仍有payload/Git消费者，保持边界。此包不提供首次派发许可。
+- **017-I0：已激活 append 的 I/O，有限验收完成。** 正式017新增8/128条真实历史、独立meter/cold进程，原activation读取正控后清零；正常append零旧事件内容读取、零Git访问/子进程，真实新writer写入252字节且fsync，完整事件/head与cold链相等。原gen197 native4/0；手工在原Append加ReloadLocal，gen198正式2/2失败，写入及cold正控在成本断言之前仍成立；已逐字节还原，gen199/200正式正常4/0，最终输入收据见本次合并记录。[原记录](../archive/2026-10-06/sphinx-host-owner/append-io/)保实际PID与计数。此包不证明内存中的历史fold、payload成本或完整首次接纳；WHAT017整体不关闭。
+- **017-I1：历史fold成本仍待证明。** 沿原canonical积分规则取得真实、可归因的成本观察；没有公开观察能力前不能用自建fold计数、wall阈值、源码token或未捕获调用的“零”补证。不得把I0升级为不重fold的证明。
 - **fresh authority。** 优先考虑锁内拒绝 stale、锁外正规刷新，但仍须把唯一 Current 与已验证 physical read-set/retention cut 绑定。现 Git/stat cache 没有这枚能力；metadata 相同只可作线索，不能授予许可。缺 witness 时保持具体拒绝，不以第二 registry 补洞。
 
 旧 unified-store-gate 对 ReloadLocal 直接调用 replay 的源码形状检查不是产品前提。若改 canonical 刷新，须以所有 production Current、heads、accepted trace 的冷重放等价及 retention/cut 反例替换该旧证明；不单删 gate，也不为了 regex 另造 API。

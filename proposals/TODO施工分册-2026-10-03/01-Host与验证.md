@@ -1,8 +1,14 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-最新[101 CI收据](../archive/2026-10-06/baselines/101-ci/vibe-fs-101-ci-receipt.txt)：actual merge69d6d807，format/check/build通过，原300000ms截断792/821、006/009活动、27queued，无outer权威summary。791完整同PID成本样本保自身CPU/时钟，2missing/1invalid不补值；010/016未准入。outer3116 accepted=true/8.232ms，本次无termination/orphan行，仅是该输入的观测。历史[4f0](../archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)的ps ETIMEDOUT/GitHub回收两个node仍保留；两输入无可执行diff，不据host差异推CPU/IO因果。预算/worker/tier保持。
+最新[075源CI收据](../archive/2026-10-06/baselines/075-ci/vibe-fs-075-ci-origin-receipt.txt)：actual source075，format/check/build通过，原300000ms截断775/824、structured012/014活动、47queued，无outer汇总，另有grounding006历史断言失败；006/010/016未准入。outer3112 accepted=true/13.886ms，不是新的upstream合并PR证书。[与101共同771完整worker成本](../archive/2026-10-06/baselines/075-ci/vibe-fs-ci075-101-cost-comparison-20261006.txt)为自身CPU+23.706s、parent窗口+22.301s，增量分散，输入/host不同且未含工具CPU/IO，不能归唯一原因。build在unit预算之外，最后活动文件也不是定位结果。预算/worker/tier保持。
+
+历史[101 CI收据](../archive/2026-10-06/baselines/101-ci/vibe-fs-101-ci-receipt.txt)：actual merge69d6d807，原300000ms截断792/821、006/009活动、27queued，无outer权威summary。791完整同PID成本样本，2missing/1invalid不补值；010/016未准入。outer3116 accepted=true/8.232ms，本次无termination/orphan行，仅属该输入。历史[4f0](../archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)的ps ETIMEDOUT/GitHub回收两个node仍保留。
 
 **M2-E0-F0 原错误传播已有限验收。** 两个实际native场景先取得成功ps snapshot，再在freeze-confirmation/descendant-drain触发真正/bin/ps错误，旧公开caller丢原Error对象，2业务红。保存原对象为failure.cause后定向3/3、相邻15/15，gen190完整006为52/0、无skip/TODO；全Fable/check/Fantomas及fresh前后一致。两原红的tool/monitor原本自然排空、foreign存活、HOME已清，故不能称资源回收缺陷已修；未改回收算法、默认ps次数、预算或verdict。partial库存移交仍为源码线索，下一步先定真实creation owner的terminal/lease能力，不杀未知PID、不再补已有inner finally。[有限源收据](../archive/2026-10-06/sphinx-host-owner/source-receipt.txt)保原红与剩余边界。
+
+**M2-E0-F1 已知monitor排空，后续有限修复。** gen197原120选集两例保cause却见caller捕获时monitor仍活；增强夹具真实核自有lineage后暂停monitor，旧实现确定2业务红。成功snapshot须即时保留已有group集合，capture/drain失败后在同一原deadline内继续观察这些组，再抛原Error；不猜新PID、不补杀未知group。终止路径新增一次真实initial snapshot，正常成功路径不变。原单fault严格tool/monitor空、foreign活、HOME释放与双cause分支分别验收，最终输入证书见[合并续接](../archive/2026-10-06/Upstream增量与施工续接-2026-10-06.md)。未知inventory、持续ps不可用和历史4f0整体义务仍保留；F0原自然排空证据不升级为F1证明。
+
+gen200正式006/010为56/0、group accepted=true。产品119文件选集另在36drained/10active/73queued触发原5秒静默，capture第一查询已见原deadline过期，随后kill EPERM、group accepted=false，无权威summary；后续实际ps仅证明该组及已记录worker当时已空。直接修改边界9/9、239/0、14skip/2TODO是独立定向证明，不给119发证。下一metadata准备卡只建议三个原ps查询合成同次真实PID/PPID/PGID快照，须保父链与缺项拒绝；未实施，不承诺首次1000ms就绪，也不修另外两个时序夹具前提。最终输入、原失败与新头CI见[收据](../archive/2026-10-06/upstream-24c/final-receipt.txt)。
 
 **M3-A0 四个预取消npm夹具已减负并验收。** Error/null×bootstrap/archive不再做三次无用完整npm准备；真实missing paths、未分配parent、actual loopback server和完整device/inode/mode/bytes库存证明先取消、零effect。所有held/positive/version/namespace原oracle与production helper保留，无活owner复用或输入缓存。gen190正式016为285pass/0fail/20skip/2TODO、1/1排空、156.23s wall；201actual工具均有spawn/exit/group-drained/monitor-close，受控SIGKILL和非零退出不称业务成功。Local Darwin且与另一选集并行，101中016仍queued，不能声称Linux/CI时间收益。[完整016收据](../archive/2026-10-06/sphinx-host-owner/vibe-fs-016-preaborted-gen190-receipt-20261006.txt)。
 

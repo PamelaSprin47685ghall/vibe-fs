@@ -44,6 +44,8 @@ const CANCEL_ARGUMENTS = {
   program: 'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
   contract: CONTRACT_TOKEN,
 };
+const EXECUTOR_THROW_SENTINEL = 'T180-EXECUTOR-THROW-SENTINEL';
+const EXECUTOR_THROW_MESSAGE = 'T180-EXECUTOR-THROW: intentional executor rejection';
 
 // ── Collector setup ──────────────────────────────────────────────────────────
 
@@ -285,6 +287,35 @@ const provider = await startHttpServer(async (request, response) => {
         .find((call) => call.id === 'call_js_cancel_1');
       publish({ kind: 'manager.cancellation.history', value: cancelled?.function?.arguments ?? null });
     }
+
+    // Executor rejection call (T180): the canary plugin wraps the js-manager
+    // executor to reject this specific program before it runs. The Host must
+    // materialize the rejection as a durable error tool part without invoking
+    // tool.execute.after, and the follow-up request must still carry the
+    // original wire arguments.
+    if (stage === 8) {
+      const call = {
+        name: 'js-manager',
+        argsStr: JSON.stringify({
+          program: `class Js extends JsProgram { async run() { return '${EXECUTOR_THROW_SENTINEL}'; } }`,
+          contract: CONTRACT_TOKEN,
+        }),
+      };
+      sendSSE(response, buildToolCallChunks('call_exec_throw_1', call.name, call.argsStr, 45));
+      return;
+    }
+
+    if (stage === 9) {
+      const thrown = (body.messages ?? []).flatMap((message) => (message.tool_calls ?? []))
+        .find((call) => call.id === 'call_exec_throw_1');
+      const thrownArguments = thrown ? JSON.parse(thrown.function?.arguments ?? '{}') : null;
+      publish({ kind: 'manager.executorThrow.history', value: {
+        observed: thrown !== undefined,
+        contract: thrownArguments?.contract ?? null,
+      } });
+      sendSSE(response, buildTextChunks('resp_exec_throw_done', 'CANARY_EXECUTOR_THROW_DONE', 50));
+      return;
+    }
     sendSSE(response, buildTextChunks(`resp_stage_${stage}`, 'CANARY_OK', 40));
     return;
   }
@@ -442,6 +473,35 @@ try {
   assert.deepEqual(cancellationArguments, CANCEL_ARGUMENTS);
   assert.deepEqual(Object.keys(cancellationArguments), Object.keys(CANCEL_ARGUMENTS));
 
+  await createManagerSession();
+  // 4. Executor rejection path (T180): the plugin wrapper rejects the executor
+  // before it runs; the Host materializes the error and must NOT invoke after.
+  const msg6 = 'msg_canary_prompt_6';
+  await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg6, 'TRIGGER_EXECUTOR_THROW'), 200);
+  const throwBeforeObs = await waitFor(
+    ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_exec_throw_1',
+  );
+  assert.equal(throwBeforeObs.value.sessionID, sessionID);
+  assert.equal(throwBeforeObs.value.physicalUserMessageID, msg6);
+  const executorThrowingObs = await waitFor(
+    ({ kind, value }) => kind === 'tool.executor.throwing' && value?.callID === 'call_exec_throw_1',
+  );
+  const throwTerminal = await waitFor(
+    ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_exec_throw_1',
+  );
+  await waitForTurnSettled(msg6);
+  const throwHistoryObs = await waitFor(
+    ({ kind }) => kind === 'manager.executorThrow.history',
+  );
+
+  // The Host boundary contract for the executor rejection path: after is
+  // never invoked. A settled turn (idle + assistant stop) plus a grace window
+  // separates "never called" from "called before settle"; a future Host that
+  // starts invoking after on this path turns this red (WHAT[019] canary).
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const throwAfterObserved = observations.some(({ kind, value }) =>
+    kind === 'tool.execute.after.observed' && value?.callID === 'call_exec_throw_1');
+
   // ── Verification & Assertions against Fixture ───────────────────────────────
 
   // Check definition observations
@@ -505,6 +565,28 @@ try {
   assert.match(errorTerminal.value.output, /FILE_NOT_FOUND|nonexistent-missing-file|does not exist/);
   calls.executorError.failureOutputObserved = true;
   assert.equal(calls.cancellation.status, 'error');
+
+  // Executor rejection assertions (T180 / WHAT[019] Host boundary canary)
+  assert.equal(throwBeforeObs.value.postContractInArgs, false, 'executorThrow before must hide contract');
+  assert.equal(throwAfterObserved, false, 'executor rejection path must not invoke tool.execute.after');
+  assert.equal(throwTerminal.value.status, 'error', 'executor rejection must materialize durable status error');
+  assert.ok(
+    /T180-EXECUTOR-THROW/.test(JSON.stringify(throwTerminal.value.error ?? '')),
+    'durable error must carry the executor rejection text',
+  );
+  assert.equal(throwTerminal.value.contractRetained, true, 'executorThrow durable input must retain contract');
+  assert.equal(throwHistoryObs.value.observed, true, 'follow-up wire request must carry the thrown call history');
+  assert.equal(throwHistoryObs.value.contract, CONTRACT_TOKEN, 'executorThrow wire arguments must preserve contract');
+  calls.executorThrow = {
+    afterInvoked: throwAfterObserved,
+    executorRejected: executorThrowingObs.value.message === EXECUTOR_THROW_MESSAGE,
+    inMemoryArgsStripped: executorThrowingObs.value.contractInArgs === false,
+    status: throwTerminal.value.status,
+    durableErrorCarriesRejection: /T180-EXECUTOR-THROW/.test(JSON.stringify(throwTerminal.value.error ?? '')),
+    durableInputRetainsContract: throwTerminal.value.contractRetained,
+    originalDurableInput: throwTerminal.value.originalInput,
+    wireHistoryPreservesContract: throwHistoryObs.value.contract === CONTRACT_TOKEN,
+  };
 
   // ── Output Final Summary Artifact ──────────────────────────────────────────
 

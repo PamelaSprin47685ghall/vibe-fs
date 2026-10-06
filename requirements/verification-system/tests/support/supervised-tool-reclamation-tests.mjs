@@ -42,6 +42,7 @@ export function registerSupervisedToolReclamationTests() {
     { phase: null, title: 'silence termination reclaims an actual detached tool and its descendant while preserving the caller\'s foreign group' },
     { phase: 'freeze-confirmation', title: 'native freeze inspection failure preserves its original cause and drains known owned resources while retaining a foreign group' },
     { phase: 'descendant-drain', title: 'native drain inspection failure preserves its original cause and drains captured owned resources while retaining a foreign group' },
+    { phase: 'freeze-confirmation', cleanupFailure: true, title: 'native double inspection failure preserves both original causes and reports incomplete owned cleanup' },
   ]
   for (const scenario of scenarios) registerReclamationTest(scenario)
 }
@@ -100,14 +101,26 @@ import { superviseNodeTest } from ${JSON.stringify(supervisorUrl)}
 ${processRows.toString()}
 const PROCESS_TREE_TIMEOUT_MS = ${PROCESS_TREE_TIMEOUT_MS}
 const failingPhase = ${JSON.stringify(scenario.phase)}
+const failCleanupInspection = ${scenario.cleanupFailure === true}
 const inspections = []
 let inspectionFailure
+let cleanupInspectionFailure
+let heldMonitor
 function inspectProcessTree({ phase, timeout }) {
   if (phase === failingPhase && !inspectionFailure) {
     try {
       return execFileSync('/bin/ps', ['-eo', 'invalid_verification_column='], { encoding: 'utf8', timeout })
     } catch (error) {
       inspectionFailure = error
+      inspections.push({ phase, failed: true, status: error.status, pid: error.pid })
+      throw error
+    }
+  }
+  if (phase === 'failure-drain' && failCleanupInspection && !cleanupInspectionFailure) {
+    try {
+      return execFileSync('/bin/ps', ['-eo', 'invalid_cleanup_column='], { encoding: 'utf8', timeout })
+    } catch (error) {
+      cleanupInspectionFailure = error
       inspections.push({ phase, failed: true, status: error.status, pid: error.pid })
       throw error
     }
@@ -119,7 +132,31 @@ function inspectProcessTree({ phase, timeout }) {
     if (!fields) throw new Error('Invalid actual process record during the inspection fixture')
     return { pid: Number(fields[1]), parent: Number(fields[2]), pgid: Number(fields[3]), state: fields[4] }
   })
-  inspections.push({ phase, failed: false, rows: rows.filter(row => [tool.pid, tool.childPid, tool.monitorPid].includes(row.pid)) })
+  const observation = { phase, failed: false, rows: rows.filter(row => [tool.pid, tool.childPid, tool.monitorPid].includes(row.pid)) }
+  if (phase === 'initial-capture') {
+    const suite = JSON.parse(fs.readFileSync(${JSON.stringify(path.join(directory, 'suite.json'))}, 'utf8'))
+    const monitor = rows.find(row => row.pid === tool.monitorPid && row.pgid === tool.monitorPgid)
+    const ownedTool = rows.find(row => row.pid === tool.pid && row.parent === tool.monitorPid && row.pgid === tool.pgid)
+    if (!monitor || !ownedTool) throw new Error('Cannot hold a monitor without its current owned tool lineage')
+    const lineage = []
+    let ancestor = monitor
+    while (ancestor && !lineage.includes(ancestor.pid)) {
+      lineage.push(ancestor.pid)
+      if (ancestor.pid === suite.innerPid) break
+      ancestor = rows.find(row => row.pid === ancestor.parent)
+    }
+    if (lineage.at(-1) !== suite.innerPid) throw new Error('The monitor is not descended from the actual owned inner runner')
+    process.kill(monitor.pid, 'SIGSTOP')
+    heldMonitor = { pid: monitor.pid, pgid: monitor.pgid, innerPid: suite.innerPid, lineage }
+  }
+  if (phase === 'failure-drain' && heldMonitor) {
+    const monitor = rows.find(row => row.pid === heldMonitor.pid && row.pgid === heldMonitor.pgid)
+    if (!monitor || !/^[Tt]/.test(monitor.state)) throw new Error('The owned monitor was not observed paused at recovery admission')
+    observation.resumedMonitor = { ...monitor }
+    process.kill(monitor.pid, 'SIGCONT')
+    heldMonitor = null
+  }
+  inspections.push(observation)
   return output
 }
 function containsFailure(error, target, seen = new Set()) {
@@ -167,6 +204,8 @@ try {
       failure: { name: error?.name, message: error?.message },
       inspections,
       nativeErrorPreserved: inspectionFailure ? containsFailure(error, inspectionFailure) : null,
+      nativeCleanupErrorPreserved: cleanupInspectionFailure ? containsFailure(error, cleanupInspectionFailure) : null,
+      nativeErrorsDistinct: cleanupInspectionFailure ? inspectionFailure !== cleanupInspectionFailure : null,
       tool, foreign: identity,
       toolMembers: rows.filter(row => row.pgid === tool.pgid && !/^[ZX]/.test(row.state)),
       monitorMembers: rows.filter(row => row.pgid === tool.monitorPgid && !/^[ZX]/.test(row.state)),
@@ -230,13 +269,33 @@ if (originalFailure) throw originalFailure.error
         if (scenario.phase === 'descendant-drain') {
           assert.ok(caught.inspections.some(inspection => inspection.phase === 'freeze-confirmation' && !inspection.failed), 'Capture completed its real frozen-group inspection before the drain failure')
         }
+      }
+      if (scenario.cleanupFailure) {
+        const failedCleanup = caught.inspections.find(inspection => inspection.phase === 'failure-drain' && inspection.failed)
+        assert.ok(failedCleanup, 'Cleanup reached a second actual failing native ps invocation')
+        assert.equal(failedCleanup.status, 1)
+        assert.ok(failedCleanup.pid > 0)
+        assert.deepEqual({
+          primaryPreserved: caught.nativeErrorPreserved,
+          cleanupPreserved: caught.nativeCleanupErrorPreserved,
+          distinctOriginals: caught.nativeErrorsDistinct,
+        }, { primaryPreserved: true, cleanupPreserved: true, distinctOriginals: true }, output)
+        assert.ok(caught.monitorMembers.some(row => row.pid === caught.tool.monitorPid && row.pgid === caught.tool.monitorPgid && /^[Tt]/.test(row.state)), 'The observed monitor remains paused; cleanup is explicitly incomplete at caller rejection')
+        assert.deepEqual(caught.toolMembers.map(row => row.pid).sort((a, b) => a - b), [caught.tool.pid, caught.tool.childPid].sort((a, b) => a - b), 'The known tool and descendant remain live while their owned monitor is paused')
+        assert.equal(caught.inspections.some(inspection => inspection.resumedMonitor), false)
+      } else if (scenario.phase !== null) {
         assert.deepEqual({
           nativeErrorPreserved: caught.nativeErrorPreserved,
           toolMembers: caught.toolMembers,
           monitorMembers: caught.monitorMembers,
         }, { nativeErrorPreserved: true, toolMembers: [], monitorMembers: [] }, output)
+        const released = caught.inspections.find(inspection => inspection.phase === 'failure-drain' && inspection.resumedMonitor)
+        assert.ok(released, 'Recovery observed the held owned monitor before allowing its natural cleanup')
+        assert.equal(released.resumedMonitor.pid, caught.tool.monitorPid)
+        assert.equal(released.resumedMonitor.pgid, caught.tool.monitorPgid)
+        assert.match(released.resumedMonitor.state, /^[Tt]/)
       }
-      assert.deepEqual(caught.toolMembers, [], `The actual detached tool group must already be empty when its caller catches failure\n${output}`)
+      if (!scenario.cleanupFailure) assert.deepEqual(caught.toolMembers, [], `The actual detached tool group must already be empty when its caller catches failure\n${output}`)
       assert.deepEqual(JSON.parse(fs.readFileSync(cleanupPath, 'utf8')).live, [])
     } catch (error) {
       failure = { error }
@@ -258,6 +317,7 @@ if (originalFailure) throw originalFailure.error
           const identity = JSON.parse(fs.readFileSync(markerPath, 'utf8'))
           await reclaimCapturedGroup(identity)
           if (identity.monitorPid) await reclaimCapturedGroup({ pid: identity.monitorPid, pgid: identity.monitorPgid })
+          assert.deepEqual(processRows().filter(row => [identity.pgid, identity.monitorPgid].includes(row.pgid) && !/^[ZX]/.test(row.state)), [], 'Final fixture cleanup must drain the exact captured owned groups')
         } catch (error) {
           cleanupErrors.push(error)
         }

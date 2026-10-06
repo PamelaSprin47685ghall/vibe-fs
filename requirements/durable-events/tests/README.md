@@ -4,6 +4,8 @@
 
 WHAT 是验收依据；本目录说明当前证据，不额外规定实现。
 
+2026-10-06的017-I0新增真实activated append I/O记录：8/128条历史经原EventStore生成，独立meter进程在实际activation后清零，独立cold进程核完整事件与head。正常append零旧事件内容读取、零Git filesystem/CLI与子进程，真实252 UTF-8字节写入和fsync；未知fd/内容结果拒绝作为零证据。实际ReloadLocal变异使两成本例正式失败，写入和cold正控仍成立；已逐字节还原。[合并与复验记录](../../../proposals/archive/2026-10-06/Upstream增量与施工续接-2026-10-06.md)及[原始记录](../../../proposals/archive/2026-10-06/sphinx-host-owner/append-io/)区分此有限I/O证据与未证的内存历史fold、payload和first admission成本，WHAT017整体不关闭。
+
 001—018 主要驱动实际 canonical codec、EventStore、Journal、payload、Git Hook 和 Integrator：包括字节身份、损坏拒绝、提交门禁、提交前后 Current、并发分支、retention、合并顺序及物理操作计数。临时目录与受控故障用于隔离被测执行；正常 dispose/reopen 不是进程崩溃证明。
 
 019 让 Structural、Strength、Casebook、JsTransaction 的实际事实改变 Current，并重开同一磁盘历史核对；Journal 也实际追加后重开。反例经 WorkspaceEventStore 的 programWithoutRegistration 观察口在各自临时目录逐一移除真实 hostProgram 注册：移除 Strength/Casebook/JsTransaction 时 live fact 仍按已知词汇落盘，但对应业务 Current 缺失（decision 为 null、case 为 null、pending 为空），保留注册的 Structural head 不受牵连；移除 Structural/Journal 时构造被 CanonicalIntegrator 的 base-rule 前置检查整体拒绝，测试如实断言该 fail-closed 形态而非伪称缺失 Current。同文件静态 gate 有合规/违规样例，只覆盖所识别的形式。

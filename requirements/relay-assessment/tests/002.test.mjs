@@ -70,6 +70,7 @@ test('WHAT[relay-assessment-002] cross-iteration replay of another iteration ass
 })
 
 const {withReview, scores: reviewScores} = await import('./support/plugin.mjs')
+const {withSuccessor} = await import('../../relay-context-projection/tests/support/cut.mjs')
 
 test('WHAT[relay-assessment-002] actual tool exact replay returns the accepted result', async () => {
   await withReview(async ({execute, hooks, session}) => {
@@ -143,13 +144,21 @@ test('WHAT[relay-assessment-002] same input under a new call id is already-submi
   })
 })
 
-test('WHAT[relay-assessment-002] cross-incumbency replay of a retired review call is rejected', {todo: 'requires a real retirement-chain fixture to open the next incumbency before replaying the retired call; the fold-level AssessmentReplayToolCall gate is in place'}, async () => {
-  await withReview(async ({execute, hooks, session}) => {
+test('WHAT[relay-assessment-002] cross-incumbency replay of a retired review call is rejected', async () => {
+  await withSuccessor(async ({execute, hooks, session}) => {
     const input = reviewScores('REVISE')
-    const first = await execute(input)
-    assert.match(first, /recorded = true/)
-    // TODO: retire this incumbency through the real suicide chain, open the next
-    // incumbency, then replay the retired call; the fold-level seen-tool-call gate
-    // must reject the append and the accepted assessment must stay unchanged.
+    // withSuccessor already recorded this exact call in the first incumbency and
+    // drove the real suicide retirement chain; the successor manager prompt is the
+    // owner-dispatched gate, so the next incumbency is open in AuditPending.
+    const retired = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.match(retired, /recorded = false/)
+    // The gate binds the retired call id, not the successor's review right: a fresh
+    // call id in the next incumbency records its own independent assessment.
+    const successor = await execute(input, {call: 'review-call-2', run: 'review-run-2'})
+    assert.match(successor, /recorded = true/)
+    // With the successor assessment accepted, the retired call id still cannot
+    // replay: it never becomes an idempotent hit on the successor's result.
+    const replayed = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
+    assert.match(replayed, /recorded = false/)
   })
 })

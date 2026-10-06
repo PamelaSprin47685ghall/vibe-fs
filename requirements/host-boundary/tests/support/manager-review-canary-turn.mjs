@@ -9,6 +9,7 @@ export function managerReviewStage(body) {
   const prompts = new Map([
     ['READ_SAMPLE', [1, 2, 'call_read_norm_1']],
     ['TRIGGER_ERROR', [4, 5, 'call_read_err_1']],
+    ['TRIGGER_EXECUTOR_THROW', [8, 9, 'call_exec_throw_1']],
     ['TRIGGER_CANCEL', [6, 6, null]],
     ['VERIFY_CANCEL_HISTORY', [7, 7, null]],
   ]);

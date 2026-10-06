@@ -8,6 +8,7 @@ import test from 'node:test'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import * as grounding from '../../../dist/Requirement/Grounding/Surface.js'
 import * as host from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-delivery-'))
@@ -412,7 +413,35 @@ test('WHAT[requirement-grounding-006] historical material observations retain th
     const events = join(dir, 'wanxiang', 'events')
     mkdirSync(events, { recursive: true })
     const frozen = legacy.map(JSON.stringify).join('\n') + '\n'
-    writeFileSync(join(events, 'legacy-writer.ndjson'), frozen)
+    const writerFile = join(events, 'legacy-writer.ndjson')
+    writeFileSync(writerFile, frozen)
+    const activity = {
+      id: 'd'.repeat(40),
+      stream: 'grounding-fixture/activity',
+      type: 'JobRequested',
+      parents: [],
+      payload: {},
+      payloadRefs: [],
+    }
+    // This isolated fixture owns the writer. A real non-Journal append keeps its
+    // complete historical prefix retained under durable-convergence-011.
+    const writer = eventStore.create(dir, 'legacy-writer')
+    try {
+      const appended = await eventStore.append(writer, [activity])
+      assert.equal(appended.ok, true, JSON.stringify(appended.error))
+      assert.deepEqual(appended.cuts, [])
+      assert.deepEqual(eventStore.read(writer, activity.id), activity)
+      assert.equal(eventStore.head(writer, activity.stream), activity.id)
+    } finally {
+      eventStore.dispose(writer)
+    }
+    const retained = readFileSync(writerFile)
+    const prefix = Buffer.from(frozen)
+    assert.deepEqual(retained.subarray(0, prefix.length), prefix, 'new activity must preserve every historical byte')
+    const tail = retained.subarray(prefix.length).toString('utf8').trim().split('\n').map(JSON.parse)
+    assert.equal(tail.length, 1)
+    assert.equal(tail[0].event_id, activity.id)
+    assert.equal(tail[0].event_type, activity.type)
     opened = await host.createJournal(dir)
     assert.equal(opened.ok, true, opened.error)
     assert.equal(host.groundedIdentities(opened.journal, 'legacy').length, 1)
@@ -422,7 +451,7 @@ test('WHAT[requirement-grounding-006] historical material observations retain th
     const output = projected.value.at(-1).parts[0].state.output
     assert.equal(output.includes('requirement_source_path = "requirements/alpha/WHAT.md"'), false)
     assert.ok(output.includes('requirement_source_path = "requirements/alpha/WHY.md"'))
-    assert.equal(readFileSync(join(events, 'legacy-writer.ndjson'), 'utf8'), frozen, 'replay must not rewrite historical observations')
+    assert.deepEqual(readFileSync(writerFile), retained, 'replay must not rewrite historical observations or new activity')
     assert.equal(readFacts(dir).length, 0, 'old observations are not reclassified as newly proven explicit reads')
   } finally {
     if (opened?.ok) host.disposeJournal(opened.journal)

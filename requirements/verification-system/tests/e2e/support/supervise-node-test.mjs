@@ -88,22 +88,7 @@ function processRecords(deadline, phase, inspect = inspectProcesses) {
   }).filter(record => !/^[ZX]/.test(record.state))
 }
 
-async function captureFrozenDescendantGroups(pgid, deadline, inspect) {
-  if (inspect) processRecords(deadline, 'initial-capture', inspect)
-  try {
-    process.kill(-pgid, 'SIGSTOP')
-  } catch (error) {
-    if (error.code === 'ESRCH') return []
-    throw error
-  }
-  let records
-  while (true) {
-    records = processRecords(deadline, 'freeze-confirmation', inspect)
-    const owned = records.filter(record => record.group === pgid)
-    if (owned.every(record => /^[Tt]/.test(record.state))) break
-    if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
-    await delay(5)
-  }
+function rememberDescendantGroups(pgid, records, groups) {
   const descendants = new Set(records.filter(record => record.group === pgid).map(record => record.pid))
   let added
   do {
@@ -115,19 +100,48 @@ async function captureFrozenDescendantGroups(pgid, deadline, inspect) {
       }
     }
   } while (added)
-  return [...new Set(records.filter(record => descendants.has(record.pid) && record.group !== pgid).map(record => record.group))]
+  for (const record of records) {
+    if (descendants.has(record.pid) && record.group !== pgid) groups.add(record.group)
+  }
 }
 
-async function awaitObservedGroups(groups, deadline, inspect) {
-  if (groups.length === 0) return
+async function captureFrozenDescendantGroups(pgid, deadline, inspect, groups) {
+  rememberDescendantGroups(pgid, processRecords(deadline, 'initial-capture', inspect), groups)
+  try {
+    process.kill(-pgid, 'SIGSTOP')
+  } catch (error) {
+    if (error.code === 'ESRCH') return
+    throw error
+  }
   while (true) {
-    const survivors = processRecords(deadline, 'descendant-drain', inspect).filter(record => groups.includes(record.group))
+    const records = processRecords(deadline, 'freeze-confirmation', inspect)
+    rememberDescendantGroups(pgid, records, groups)
+    const owned = records.filter(record => record.group === pgid)
+    if (owned.every(record => /^[Tt]/.test(record.state))) return
+    if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
+    await delay(5)
+  }
+}
+
+async function awaitObservedGroups(groups, deadline, inspect, phase = 'descendant-drain') {
+  if (groups.size === 0) return
+  while (true) {
+    const survivors = processRecords(deadline, phase, inspect).filter(record => groups.has(record.group))
     if (survivors.length === 0) return
     if (Date.now() >= deadline) {
       throw new Error(`Observed descendant groups did not drain: ${survivors.map(record => `${record.pid}/${record.group}`).join(', ')}`)
     }
     await delay(10)
   }
+}
+
+async function failAfterObservedCleanup(error, groups, deadline, inspect) {
+  try {
+    await awaitObservedGroups(groups, deadline, inspect, 'failure-drain')
+  } catch (cleanupError) {
+    throw new AggregateError([error, cleanupError], 'Owned termination and remaining group observation failed', { cause: error })
+  }
+  throw error
 }
 
 async function verifyExitedGroup(pgid, logPrefix) {
@@ -273,17 +287,29 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       }, SIGKILL_GRACE_MS)
     }
     termination = (async () => {
-      let groups = []
+      const groups = new Set()
+      let captureFailure
       try {
-        if (child?.pid) groups = await captureFrozenDescendantGroups(child.pid, deadline, inspectProcessTree)
+        if (child?.pid) await captureFrozenDescendantGroups(child.pid, deadline, inspectProcessTree, groups)
+      } catch (error) {
+        captureFailure = { error }
       } finally {
         try {
           if (child?.pid) process.kill(-child.pid, 'SIGKILL')
         } catch (error) {
-          if (error.code !== 'ESRCH') throw error
+          if (error.code !== 'ESRCH') {
+            captureFailure = { error: captureFailure
+              ? new AggregateError([captureFailure.error, error], 'Owned capture and inner termination failed', { cause: captureFailure.error })
+              : error }
+          }
         }
       }
-      await awaitObservedGroups(groups, deadline, inspectProcessTree)
+      if (captureFailure) await failAfterObservedCleanup(captureFailure.error, groups, deadline, inspectProcessTree)
+      try {
+        await awaitObservedGroups(groups, deadline, inspectProcessTree)
+      } catch (error) {
+        await failAfterObservedCleanup(error, groups, deadline, inspectProcessTree)
+      }
     })().catch(error => {
       terminationFailure = error
       runnerError = { message: `Could not complete owned runner termination: ${error.message}` }
