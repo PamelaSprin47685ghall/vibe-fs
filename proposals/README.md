@@ -1,5 +1,7 @@
 # 计划与提案入口
 
+最新全仓CI以[4f0原始收据](archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)为准：format/check/build通过，原300秒截断791/821、006/008活动、28queued、无summary；ps终止查询超时及GitHub两个orphan清理单列，外组accepted不证明全部detached资源排空。M1实际worker pre-import已收，缺exit仍明确missing；下一N00先正式复现查询失败的清理边界，再按真实成本确定因果实验，不改预算/worker。下方1eb为前一输入证书。
+
 2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始。本轮A2-R0/R1/R2已落实真实恢复夹具、effect前lease/source交接和三producer20场景，旧宽匹配删除；相邻Unknown Root清理另按正式反例验收。[本轮记录](archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)保留红绿及最终证书。下一产品入口是[08真实Host接手卡](TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)，不重复装配或重做D0/D1；Sphinx实际Host/profile/结果/答案仍未闭合。
 
 N04-C3有限验收完成：gen170真实Darwin11/11，正式4/4文件312/0、17skip/2TODO，生产helper未改。C-R0四调查产物与actual同UID detach能力已归档，C-R1/C-R2真实Darwin13/13有限验收完成，见[执行契约](N04真实只读Fable执行契约-2026-10-05.md)；FD/backing/ABA及N08不借此关闭。N00最新[1eb CI](archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)为原300秒真实截断，793/821排空、006/010活动、26queued、无summary；format/check/build及outer group通过。旧[ccfc完整排空](archive/2026-10-05/baselines/ccfc-ci/receipt.txt)、[a15真实超时](archive/2026-10-05/baselines/a15-ci/receipt.txt)和[6b完整排空](archive/2026-10-05/baselines/6b-ci/receipt.txt)分别保留。跨host/输入无CPU/IO因果证据，接续M1—M3诊断与有依据的优化，不缩预算或测试。

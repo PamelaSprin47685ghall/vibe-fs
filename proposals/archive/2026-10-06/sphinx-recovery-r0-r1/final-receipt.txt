@@ -37,3 +37,5 @@ Not closed: complete delegation-025/T111/GAP-153, GAP-123 durable five-kind clos
 N00 M1 diagnostics are non-renewal only; local M2 cannot infer child-tool CPU or Linux timeout cause. N04 native capability evidence is separate and does not prove FD/backing/ABA/full-candidate verification.
 
 The raw red, failed setup/build and intermediate certificates are preserved separately; no failed input is replaced by this green input. This text/raw-log certificate is excluded from the generated requirement corpus, avoiding circular digest changes.
+
+Subsequent final documentation/CI archive input: documentation-closeout-receipt.txt, generation186, same246/1290/0 with28skip/137TODO. This generation185 source certificate remains unchanged in scope; the separate closeout binds the later documentation input.

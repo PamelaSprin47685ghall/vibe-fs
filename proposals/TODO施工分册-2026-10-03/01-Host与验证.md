@@ -1,6 +1,10 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-本轮最新完整CI取证是[1eb CI真实截断](../archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)，优先于下方ccfc旧输入状态：实际merge38141ff83，原300秒仅793/821排空，006/010活动、26排队，无权威summary；format/check/build通过，group3068 accepted=true。006在286.771秒准入，010在299.968秒准入，016仍queued。两输入无可执行diff、host不同；共同793项增加146.350 worker-seconds，不由此推断CPU/IO或最后叶为原因。N00-M1-A已补真实worker身份/CPU的非续期诊断，M2本地有限调查见[记录](../archive/2026-10-06/验证成本有限调查-2026-10-06.md)：006实际worker约17秒、CPU约0.45秒，不含子工具CPU，不能据此判空等或CI根因。下一步收新头Linux CI的同一诊断和016完整工具阶段，再决定因果实验；原预算、并发、完整测试保留。
+本轮最新是[4f0 CI收据](../archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)：实际merge5782bcb9，format/check/build通过；原300秒截断791/821，006/008活动、28queued、无权威summary。M1收到实际worker14560/15119 pre-import但exit missing；010/016仍queued，不能编CPU窗口或工具排空。终止时ps ETIMEDOUT，outergroup3077 accepted=true之后GitHub仍回收两个node。下一N00-M2-E0先正式复现控制查询失败的owner清理边界；既有inner group finally已执行，不能用外组证书代detached资源或盲杀未知PID。下段1eb/ccfc属于历史输入，预算/worker/tier保持。
+
+M2-E0接手依据见[只读清理审计](../archive/2026-10-06/sphinx-recovery-r0-r1/vibe-fs-4f0-cleanup-source-audit-20261006.txt)，不是新业务红。现日志仅有message、无stack/phase，两个orphan也缺lineage，不能断定此次失败是哪一阶段。先复用006真实descendant/tool与foreign正控，分别在一次成功snapshot后令后续capture查询失败、完整capture后令inspection查询失败；记录原错误、实际已知owner排空和foreign不动。尚未稳定取得的身份不得推成kill权限，预算/worker不变；生产修复必须等正式公开反例与真实owner边界确认，不再补已有inner finally。
+
+历史[1eb CI真实截断](../archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)优先于更旧ccfc输入：实际merge38141ff83，原300秒仅793/821排空，006/010活动、26排队，无权威summary；format/check/build通过，group3068 accepted=true。006在286.771秒准入，010在299.968秒准入，016仍queued。两输入无可执行diff、host不同；共同793项增加146.350 worker-seconds，不由此推断CPU/IO或最后叶为原因。N00-M1-A已补真实worker身份/CPU的非续期诊断，本地有限调查见[记录](../archive/2026-10-06/验证成本有限调查-2026-10-06.md)：006约17秒、自身CPU约0.45秒，不含子工具，不能判空等或CI根因。新4f0的Linux样本及清理边界按上段接续，016仍没有实际工具阶段；预算、并发、完整测试保留。
 
 历史ccfc证据见[原始CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)：实际merge67c80a46，原300秒/双worker下821/821排空、4585pass/0fail、119skip/390TODO，296.38秒wall；format/check/build通过，outer group2817 accepted=true、8.676ms。unit约297秒退出1仅pending，没有本次outer超时。016占用68.604秒，201个工具各有完整关闭/排空身份；三项新Darwin native在Linux unit均skip。M0审计完成；后续M1—M3按上段当前证据接续，不把墙钟减CPU叫IO，也不改预算或worker。
 

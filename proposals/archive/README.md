@@ -1,5 +1,7 @@
 # 历史计划与施工记录
 
+[4f0原始CI收据](2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)保存新头实际merge5782bcb9的完整ZIP/job/stages及M1成本记录：原300秒791/821截断、006/008活动、28queued，无summary；format/check/build通过。ps终止查询超时、外组accepted与GitHub两个orphan清理分别保留，不补detached排空或完整计数。下方1eb与ccfc不被新记录覆盖。
+
 [Sphinx真实恢复与资源前置](2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)记录三producer真实红→20矩阵绿、Send/Fork lease/source、Unknown Root/序号与Manager实际清理出口，以及gen184相关246/246、1290/0、28skip/137TODO。下一施工指向08真实Host卡，整体025/Fork/Host不关闭。[应用层旧终端调查](2026-10-06/Sphinx应用层旧终端调查-2026-10-06.md)仅保只读线索；[成本有限调查](2026-10-06/验证成本有限调查-2026-10-06.md)区分worker自身CPU与子工具/CI未知。另有[N04挂载扰动有限验收](2026-10-06/N04挂载扰动有限验收-2026-10-06.md)：20实际namespace操作与有效变异红灯、actual detach后拒consumer成功、foreign保留及native13/13，FD/backing/ABA和完整候选仍未证。
 
 [1eb原始CI收据](2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)与原artifact/job/stage、merge/host及成本对齐保留原300秒真实截断，793/821、006/010活动、26queued、无summary。ccfc旧pending-only证书没有被覆盖；不借成本差造CPU/IO因果。N04[物理能力材料](2026-10-06/n04-physical-capabilities/vibe-fs-n04-c-r0-conclusions-2026-10-06.md)记录C-R0调查和实际同UID nonforce detach前提，有限namespace证据不升级为全过程immutable。

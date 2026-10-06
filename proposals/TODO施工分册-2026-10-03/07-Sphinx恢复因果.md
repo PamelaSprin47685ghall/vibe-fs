@@ -131,7 +131,7 @@ popIfAcceptanceMatches现跨await后调用TryPopExactCall，以对象身份核�
 - PhysicalLandings.PayloadDigest：retry gate digest 携带 failed ProviderRun 是真实线索，但没有现成完整 predecessor lookup；DegenerationGuard 当前只有普通 text hash，更不包含这一因果轴。不要在 SyncDelegate 私自解析 opaque payload string 造新的协议。
 - PromptKey 存在 / Submitted receipt / RetryVerdict.Dispatched：均不等于 actual PhysicalAccepted，也不等于它属于新 call。
 
-目前未发现一个现成统一 owner 接口能无修改地解决三个 producer。共同底层 SendContinuationWithDigestAttempt 已有 actual acceptance callback，但上游有上表的 source 丢失和 wrapper 丢失；必须修这些因果交接。
+本轮前调查未发现一个现成统一 owner 接口能无修改地解决三个 producer。共同底层已有actual acceptance callback，但当时上游有上表的source/wrapper丢失；本轮R1/R2已按具体call与原episode接通这些交接，保留本节作红例依据。
 
 ## 8. 本轮已执行顺序摘要（回归依据，不作新认领队列）
 

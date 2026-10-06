@@ -183,7 +183,7 @@
 
 ## sphinx-v2
 
-2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。其后N06-A/B0已经有限验收，当前从A2-R0接续B，不重新施工创建/读取，也不能把Core守门当用户已获得答案。
+2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。其后N06-A/B0及本轮A2-R0/R1/R2已有限验收，当前从08卡接B1-H0，不重新施工创建/读取，也不能把Core守门当用户已获得答案。
 
 2026-10-05 N06-A有限验收完成：gen142正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall；前后freshness一致，group65775 accepted=true、17.144ms，exit1仅pending。真实SDK/JS创建、内容绑定原receipt、native查询/accepted trace与新OS进程重开已证。唯一Integrator.Current成对保存accepted state/envelope；查询不得再走History读取。启动拒绝、disposed、非法identity/list与合法特殊资源名的reserve绑定均有正式回归。[验收记录](../archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)明确未证边界。下一主线N06-B，完整036两个TODO、T406/T411/GAP-219保留。f0ead CI实质超时813/818、2 active/3 queued，另见[完整receipt](../archive/2026-10-05/baselines/f0ead-ci/receipt.txt)，选集不代替全仓。
 

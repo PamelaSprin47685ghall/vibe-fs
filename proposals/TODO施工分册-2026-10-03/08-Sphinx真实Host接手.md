@@ -32,6 +32,8 @@
 
 调用链：原Host实际context → 共享Commands/effect owner只读Current → 持久BudgetReserved+DispatchRequested（已有B0）→ 原SyncDelegateRuntime.InvokeObservedPrepared(actualOwner,actualCharge,public-only LlmFacing.Document) → actual Admission/Completion → canonical batch保存真实binding。PrivateTicket不进入Document；同intent已存在或结局unknown不能无证据再次Invoke。
 
+**两道门的时点必须分开。** 原 `Workflow.acquireAndRun` 先 `Attached.GetOrCreate`，可能已实际创建 child，之后才执行 `PrepareProviderPrompt`；最终发送阶段才核 owner seed。因此实际owner核验、accepted intent与其预留检查必须在 `InvokeObservedPrepared` **之前**完成，不能藏进prompt producer。最终提示快照及intent→actual child/PromptKey的可await持久关联则属于最终render后、SendPrompt前的第二道门；unit诊断callback不能替代它。源码核对见[最小接缝审计](../archive/2026-10-06/sphinx-recovery-r0-r1/vibe-fs-b1-h0-next-audit-20261006.txt)，尚未实现或正式验收。
+
 先定义有限的 native receipt schema文档与真实hash。Binding载荷精确保 actual childSessionId、PromptKey、原闭合HostOutcome、actual physical/root。`PhysicalRef`采用已定义的实际物理定位身份，不能填transport receipt或InquiryId。ProviderRun只有Completion取得后才能写，不能从receipt造。Accepted正常路由可保存Receipt/Running；Unconfirmed不得包装为已接纳或failed，预留仍保留。
 
 建议局部文件边界：
@@ -43,7 +45,7 @@
 
 正式正反验收：
 
-- 正控：实际owner与InquiryId不同、owner自己为nested session；原Host观察到真实family parent、Engineer、model=None、PromptKey metadata、原订阅在send前。合法call实际physical与formal terminal完成，binding原字节cold reopen可读。
+- 正控：实际owner与InquiryId不同、owner自己为nested session；ListChildren用其真实family root，CreateChild的parent仍是该nested owner，不能把二者混同。原Host观察Engineer、model=None、PromptKey metadata、原订阅在send前；合法call实际physical与formal terminal完成，binding原字节cold reopen可读。
 - 反控：owner缺失/无active authority/wrong owner在claim和Host前拒绝；private ticket含独特秘密字节，实际Host最终prompt完全不含该字节；不能只测独立formatter。
 - 原生产反例：旧Adapter确实以InquiryId当owner、拼接private ticket；新thin fixture必须调用旧production path取得业务失败。仅缺新API/import报错是能力证据，不能记业务红。
 - Native Submitted receipt仅作transport证据；Unknown保actual key/Pending且不再send；NotDispatched/Refused/Unconfirmed/Accepted分型，无假physical。receipt落盘拒绝保原intent且不再次创建/发送。
@@ -51,6 +53,8 @@
 - 两次复用同delegate，原A terminal/old恢复successor不能完成B，B自身actual successor仍可完成；继承本轮A2生产回归，不重新用scriptRetry冒充。
 
 停止条件：没有真实 owner、profile/schema、原runtime/Host能力就具体拒绝；新接口只有声明不能把034 TODO删掉；受控端口和实际安装版Host分别结算。B1-H0可先只验证fresh正常binding与Unknown不重发，不宣称完整cancel/receipt-loss recovery。
+
+夹具先补真正的Host recording port：现SyncDelegate Surface只公开key/origin，未公开最终prompt/options，而且明确拒绝CreateSiblingSession。直接叠用它会让旧Adapter先因夹具拒绝而停下，取不到owner/private-ticket业务红。新窄装配须让旧Sibling路径和新实际runtime路径均能运行，捕获真实最终发送、parent与订阅，不复制PromptKey或acceptance算法。034最小闭环为两个旧业务红（nested owner、private ticket）及Submitted→真实managed ingress→exact terminal→cold binding正控；010另证真实append拒绝时Create/Send都为零，并用成功append使计数非零。Unknown/丢receipt必须保守零再发；实际lookup尚无时具体报告RecoveryIncomplete，完整恢复仍待第二道门。
 
 ## 4. 现 Observed API 尚不足的两个具体前置
 
