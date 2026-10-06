@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+新到d821 PR原完整CI：824/824、4734/1、122skip/389TODO、262.38s wall，format/check/build通过，outer2812 accepted8.133ms。唯一006:431的`sent.sent > 3`准备断言失败；invalid诊断已观察、nested300ms静默正常拒绝，具体count未打印。N00下一核原callback发送/启动与该窗口前提，不削弱断言、不加ready续期或预算、不碰运气重跑；source d821与最终docs头2bbb待实际完整结果。[原unit](../archive/2026-10-06/baselines/d821-ci/vibe-fs-d821-ci-upstream-unit.log)保留，下一步以总计划首节为准。下段89a是此前归档输入。
+
 最新[89a CI](../archive/2026-10-06/baselines/89a-ci/vibe-fs-89a-ci-receipt.txt)是实质截断：actual PR28f98966/source89a同tree，format/check/build通过；原300秒只764/824、760/824，无全仓summary。两边唯一已完成失败为Host026旧Snapshot直接归属断言，grounding012均exit0；verification006/010/016仍queued。Host026/SW012按真实Snapshot边界修正后，gen210授权native产品176/176、1096/0、29skip/74TODO，仅pending；022真实flat独立7/0。[本批记录](../archive/2026-10-06/Journal合同与初次捕获-2026-10-06.md)。旧743的owned observation到期与六未绑定orphan仍保留，2b完整成本只属历史输入。
 
 **npm setup完整016及初次capture有限验收。** 原public install真实held ci业务红→Error/null native2/0，原completed/terminal/close及删除前groups/foreign oracle保留。gen210完整006/010/016为3/3、348/1、19skip/2TODO，016实际worker exit0；唯一失败在旧probe双故障foreign准备，尚未触发setup。改原child IPC readiness、保原3000ms并核marker/PID/原ps、error/close/stderr后，gen211完整006/010为61/0、无skip/TODO、25.35s wall，group58401 accepted18.358ms；fresh前后一致。最终七capture场景通过：原ps失败后在原deadline恢复实际冻结父链、排空已知groups仍抛原Error；double/missing-root明确拒绝不完整。原红/变异、ESRCH native未立及unknown/预算耗尽边界见本批记录；gen206失败和foreign旧失败的唯一原因不追认。
