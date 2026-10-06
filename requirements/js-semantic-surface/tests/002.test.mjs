@@ -58,3 +58,73 @@ test('WHAT[js-semantic-surface-002] ordinary data enumeration and standard funct
   ].join('\n'))
   assert.deepEqual(hits(root), [])
 })
+
+test('WHAT[js-semantic-surface-002] native fixture fields and standard object spread are not runtime representation access', async t => {
+  const nativeCases = [
+    ['plain DTO', ['const data = { fields: { attempt: 2 } }', ['export const value = data.', 'fields'].join('')]],
+    ['object spread', ['const fields = { attempt: 2 }', 'export const value = { ...fields }']],
+    ['static fixture loop', [
+      'const scenarios = [{ name: "first", fields: { attempt: 2 } }, { name: "second", fields: { workId: "other" } }]',
+      'for (const scenario of scenarios) {',
+      ['  const read = async () => ({ ...scenario.', 'fields })'].join(''),
+      '  await read()',
+      '}',
+    ]],
+  ]
+  for (const [name, source] of nativeCases) {
+    await t.test('WHAT[js-semantic-surface-002] accepts ' + name + ' through the actual gate', t => {
+      const { root, write } = createWorkspaceFixture(t)
+      write('requirements/consumer/tests/001.test.mjs', source.join('\n'))
+      assert.deepEqual(hits(root), [])
+      assert.equal(runBoundaryGate({ root }), 0)
+    })
+  }
+})
+
+test('WHAT[js-semantic-surface-002] imported runtime and unproved fields receivers remain forbidden', async t => {
+  const fieldRead = receiver => ['export const value = ', receiver, '.', 'fields'].join('')
+  const runtimeCases = [
+    ['imported namespace', [importSource(SURFACE_MANIFEST[0].module), fieldRead('api')]],
+    ['imported result', [importSource(SURFACE_MANIFEST[0].module), 'const data = api.read()', fieldRead('data')]],
+    ['unknown parameter', [['export const read = value => value.', 'fields'].join('')]],
+    ['shadowed native name', ['const data = { fields: [] }', ['export function read(data) { return data.', 'fields }'].join('')]],
+    ['mixed fixture array', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }, api.read()]',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
+    ['mutated fixture array', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }]',
+      'scenarios.push(api.read())',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
+    ['aliased runtime insertion', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }]',
+      'const alias = scenarios',
+      'alias[0] = api.read()',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
+    ['escaped fixture container', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }]',
+      'api.replaceWithRuntimeValue(scenarios)',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
+    ['computed runtime access', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const data = api.read()',
+      'export const value = data["fields"]',
+    ]],
+  ]
+  for (const [name, source] of runtimeCases) {
+    await t.test('WHAT[js-semantic-surface-002] rejects ' + name + ' at the representation boundary', t => {
+      const { root, write } = createWorkspaceFixture(t)
+      write('requirements/consumer/tests/001.test.mjs', source.join('\n'))
+      const found = hits(root)
+      assert.equal(found.filter(hit => hit.rule === 'du-shape').length, 1)
+      assert.equal(runBoundaryGate({ root }), 1)
+    })
+  }
+})

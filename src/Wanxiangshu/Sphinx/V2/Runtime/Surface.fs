@@ -13,6 +13,74 @@ open Wanxiangshu.Sphinx.V2.Plugins
 /// estimates participate; their rank decides, never their id order.
 module Surface =
 
+    let private registryManifestOf (value: obj) : PluginManifest =
+        let schemas: obj array = value?schemas
+
+        { Id = unbox<string> value?id
+          Release = unbox<string> value?release
+          ImplementationHash = unbox<string> value?implementationHash
+          AbiHash = unbox<string> value?abiHash
+          Capabilities = unbox<string array> value?capabilities |> Set.ofArray
+          Dependencies = unbox<string array> value?dependencies |> Set.ofArray
+          Schemas =
+            schemas
+            |> Array.map (fun schema ->
+                unbox<string> schema?name,
+                { Id = unbox<string> schema?id
+                  Hash = unbox<string> schema?hash })
+            |> Map.ofArray }
+
+    let private registryInspectionOnly _ : PluginResult<'value> =
+        Error
+            { Code = "unbound-surface-operation"
+              Message = "registry inspection does not provide executable plugin operations" }
+
+    let private registryDeclarationOf (value: obj) : LockedPlugin =
+        { Manifest = registryManifestOf value?manifest
+          Execute =
+            { Manifest = registryManifestOf value?executableManifest
+              Initialize = registryInspectionOnly
+              Observe = fun _ _ -> registryInspectionOnly ()
+              Propose = registryInspectionOnly
+              Refine = fun _ _ -> registryInspectionOnly () } }
+
+    let private registryLockView (entry: PluginLockEntry) : obj =
+        createObj
+            [ "id", box entry.Id
+              "release", box entry.Release
+              "implementationHash", box entry.ImplementationHash
+              "abiHash", box entry.AbiHash
+              "capabilities", entry.Capabilities |> Set.toArray |> box
+              "dependencies", entry.Dependencies |> Set.toArray |> box
+              "schemas",
+              entry.Schemas
+              |> Map.toArray
+              |> Array.map (fun (name, schema) ->
+                  createObj [ "name", box name; "id", box schema.Id; "hash", box schema.Hash ])
+              |> box ]
+
+    let inspectRegistryBinding (declarations: obj array) : obj =
+        declarations
+        |> Array.toList
+        |> List.map registryDeclarationOf
+        |> Registry.bind
+        |> function
+            | Error fault ->
+                createObj
+                    [ "ok", box false
+                      "error", createObj [ "code", box fault.Code; "message", box fault.Message ] ]
+            | Ok bound ->
+                createObj
+                    [ "ok", box true
+                      "value",
+                      createObj
+                          [ "ordered",
+                            bound
+                            |> List.map (Registry.toLockEntry >> registryLockView)
+                            |> List.toArray
+                            |> box
+                            "lock", Registry.lockOf bound |> List.map registryLockView |> List.toArray |> box ] ]
+
     let private contributionKind =
         function
         | "model-estimate" -> ContributionKind.ModelEstimate("model-estimate", "surface")

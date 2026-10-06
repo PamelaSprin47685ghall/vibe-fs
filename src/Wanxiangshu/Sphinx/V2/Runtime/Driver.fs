@@ -39,12 +39,12 @@ module Driver =
     let private hasPendingInterpretation (state: InquiryState) : bool =
         state.Interpretations
         |> Map.toList
-        |> List.exists (fun (_, record) -> record.Status = "pending")
+        |> List.exists (fun (_, record) -> record.Outcome.IsNone)
 
     let private pendingInterpretationCount (state: InquiryState) : int =
         state.Interpretations
         |> Map.toList
-        |> List.filter (fun (_, record) -> record.Status = "pending")
+        |> List.filter (fun (_, record) -> record.Outcome.IsNone)
         |> List.length
 
     let private openRounds (state: InquiryState) : RoundRecord list =
@@ -101,19 +101,6 @@ module Driver =
               Hash = "empty" }
           CanonicalPayload = "{}" }
 
-    let private interpretationEvents (state: InquiryState) : InquiryEventBody list =
-        state.Interpretations
-        |> Map.toList
-        |> List.filter (fun (_, record) -> record.Status = "pending")
-        |> List.map (fun (key, record) ->
-            InquiryEventBody.InterpretationApplied
-                { ObservationId = record.ObservationId
-                  InterpretationId = key
-                  PluginRef = record.PluginRef |> Option.defaultValue "unbound"
-                  Delta = record |> fun _ -> emptyEnvelope () })
-
-    /// The state carries typed records, so an interpretation's typed payload is
-    /// reconstructed from the record rather than re-read from bytes.
     let private reservationEvents (state: InquiryState) (specs: WorkSpec list) : InquiryEventBody list =
         specs
         |> List.map (fun spec ->
@@ -147,11 +134,9 @@ module Driver =
                   NextState = WorkState.Leased item.Spec.Fence
                   PhysicalRef = None })
 
-    /// One advance: interpret what is pending, close what is finished, reserve and
-    /// dispatch what is ready. Each stage appends to the same batch, so the transition
-    /// is atomic.
+    /// Observe supplies interpretation facts. Until then, only genuine round closings
+    /// can advance; paid work must wait for the pending interpretation.
     let private advanceActive (state: InquiryState) : AdvancePlan =
-        let interpretations = interpretationEvents state
         let closings = closeCompletedRounds state
 
         let refinable = hasPendingInterpretation state
@@ -159,9 +144,8 @@ module Driver =
         let ready = dispatchable state
 
         let events =
-            interpretations
-            @ closings
-            @ (if List.isEmpty interpretations && List.isEmpty closings then
+            closings
+            @ (if not refinable && List.isEmpty closings then
                    reservationEvents state (ready |> List.map (fun item -> item.Spec))
                    @ leaseEvents ready
                    @ dispatchEvents state ready
@@ -182,7 +166,7 @@ module Driver =
                 | Some _ -> AdvanceOutcome.AwaitingResults(openRounds state |> List.length)
                 | None -> AdvanceOutcome.NoRunnalbeWork "no dispatchable work"
 
-            match hasPendingInterpretation state, pending > 0, List.isEmpty ready with
+            match refinable, pending > 0, List.isEmpty ready with
             | true, _, _ -> refinableOutcome ()
             | false, true, _ -> awaitingOutcome ()
             | false, false, false -> awaitingOutcome ()

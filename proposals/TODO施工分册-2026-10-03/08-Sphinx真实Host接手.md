@@ -1,6 +1,35 @@
-# N06-B1：actual Host 接线的下一有限工作包（只读接手卡）
+# N06-B1：真实 Host 接手与首次接纳施工卡
 
-2026-10-06，下一产品施工入口；本卡B1-H0尚未实施或验收。前置A2的R0/R1/R2、本地Fork资源与相邻Unknown Root清理已取得gen184相关246/246、1290/0有限证据，28skip/137TODO仍保留，见[正式记录](../archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。本卡不得把源码已出现的方法写成Sphinx已具备公开执行或首个答案。
+2026-10-06，B1-H0a 的原 owner、公有提示和 observed execution 已有限验收；下一主线是 **H0b 的 canonical 原子首次接纳能力**，随后接 effect 前持久绑定。本卡优先于历史 H0 顺序。前置 A2 不重复施工；完整034、公开执行与首个答案仍未完成。
+
+## 0. 已完成与下一认领
+
+H0a 先取得旧 Adapter 的三个正式业务红：InquiryId 被当作 owner、private label map 到达实际 SendPrompt、无 active authority 的 owner 创建并发送。现在借用原 SyncDelegateRuntime，在 Invoke 前核验实际 owner，只送 public instruction；返回原 Admission/Completion。独立 Provider 假完成 cell 与无人消费的 receipt/status facade 已退出。受控删除前置检查仍会抓到实际 child 创建，拒绝 oracle 在 admission 后取证。
+
+gen190 完整 Sphinx+delegation 为52/52排空、328pass/0fail/35TODO；全 Fable/check/Fantomas 通过。原红、变异、freshness 与有限边界见[源验收收据](../archive/2026-10-06/sphinx-host-owner/source-receipt.txt)。这是调用原生产运行时的受控 Host port，尚无 installed Host、canonical receipt 落盘或公开 Sphinx 工具链证据；034 TODO 保留。
+
+**H0b 先定存储合同，不能直接给 Adapter 加锁取绿。** `Append Ok` 且 `Cuts=[]` 也可能表示重复命令或 no-op，并不授予新的模型调用。Append 内持锁却不刷新 Current；现 RefreshCurrent 是完整读取/校验/replay，不能偷偷塞进每次 guarded append 违反 durable-events017 的成本合同。[深入接手卡](../archive/2026-10-06/sphinx-host-owner/vibe-fs-h0b-store-owned-next-card-20261006.txt)取代[初次审计](../archive/2026-10-06/sphinx-host-owner/vibe-fs-b1-h0b-fresh-capability-audit-20261006.txt)的施工顺序，并保留二者源码身份。
+
+先做两项独立前置，再开放首次派发：
+
+- **U0：真实提交与释放后的 Unknown。** 物理 append 已开始后，Current commit 或 native Release 出错都不能称未写入。catch 必须覆盖完整锁任务，保原 request、prepared envelopes、失败阶段与 cause。先以真实 append/fsync、Commit、Release 后注错取得业务红；全部 AppendError 消费者按类型接续。此包不提供首次派发许可。
+- **017 成本观察。** 用实际 filesystem 调用记录测正常 append，正规 activation 后清零，增加旧历史仍不读取旧 event bytes、不重 fold；保 incoming 写入和合法 cold 结果正控。手工加原 ReloadLocal 应使成本例变红。不能用 wall 阈值或源码 token 代替行为证明。
+- **fresh authority。** 优先考虑锁内拒绝 stale、锁外正规刷新，但仍须把唯一 Current 与已验证 physical read-set/retention cut 绑定。现 Git/stat cache 没有这枚能力；metadata 相同只可作线索，不能授予许可。缺 witness 时保持具体拒绝，不以第二 registry 补洞。
+
+旧 unified-store-gate 对 ReloadLocal 直接调用 replay 的源码形状检查不是产品前提。若改 canonical 刷新，须以所有 production Current、heads、accepted trace 的冷重放等价及 retention/cut 反例替换该旧证明；不单删 gate，也不为了 regex 另造 API。
+
+按以下顺序认领：
+
+1. 原 EventStore owner 先冻结“持实际 canonical 锁读新事实→纯准入→append→发布唯一 Current→返回确属本次 fresh acceptance”的合同。exact duplicate 独立返回，不能给它新的 spend witness。不同 handle、不同 OS process 必须共享同一所有权，Adapter-local semaphore 不足。
+2. 明确新字节增量与检查点前提，沿原 canonical storage 实现；不另建 Sphinx log/registry、不在每次派发全扫历史、不改变既有 fork/cut/idempotence。
+3. 先在010用两个真实 writer、再用两个 OS process 的 readiness barrier 证明：同 intent 不同 command 只能一次 fresh；exact replay、stale handle、CommitUnknown、cut 与冷 Pending 均零 Create/Send。有成功实际调用的非零正控。
+4. 原锁释放后才调用 Host。Host pending 时另一 writer 的合法 append 必须仍可完成，不把磁盘锁持到网络/terminal。
+5. 有 fresh witness 后，composition 才能在 Invoke 前核对实际 owner、exact Request、当前预留与请求身份。既有 Request 且 Receipt=None 具体报 RecoveryIncomplete，零盲重发。
+6. 另定第二道门：原最终 handoff/render 之后，SendPrompt 之前，可 await 保存 exact child、PromptKey、最终 UTF-8 字节与同次 handoff 证据。unit 诊断 callback 不充当 durable barrier。
+7. actual Admission 才映射 receipt；其落盘失败保留已发生的物理证据，不改称 NotDispatched、不另发送。Running 需要真实相应事实，不能由 receipt 名称隐式推出。
+8. 每个子包独立红绿、正式 requirement 验收并更新状态；两道门、installed Host 与完整034分别记账。不能用 H0a 证书关闭它们。
+
+纯 Interpretation 状态账 B4-O0a 和原Registry有限守门 B2-P0a 已分别验收；[交付收据](../archive/2026-10-06/sphinx-interpretation/final-receipt.txt)保存最终静态收束与输入。真实 Observe/模型执行仍依上述 H0b→B2→B3→B4 顺序接通。
 
 ## 1. 已有可复用的真实 owner
 
@@ -11,17 +40,17 @@
 - `src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs:Host.SnapshotOpt` 可提供真实 `ISessionSnapshotPort.GetMessages`；`Host/SessionSnapshot.fsi` 的 message/provider-parent/PromptKey/tool-part 字段和 `locateToolCall` 的 Missing/Ambiguous拒绝可以复用，不能从 idle 推答案。
 - `Sphinx/V2/Composition/Bind` 与 `Persistence/Integrator` 已是共享 canonical store / 唯一 Current，不重新扫描或折叠历史。
 
-## 2. 现有 Adapter 的真实缺口
+## 2. 已退出的旧 Adapter 与仍缺的公开入口
 
-`Sphinx/V2/Hosts/OpenCode/Adapter.fs` 当前只持 `ISessionHostPort`，以 `SessionId.create(InquiryId.value inquiryId)` 猜 owner；CreateSiblingSession 后直接 SendPrompt，没有其自己持有的原 terminal subscription；将 publicEnvelope 与 privateTicket拼接给 worker；Agent/Metadata/Tools均 None。ReadStatus是Unknown、ReadResult/Reconcile具名拒绝。`Hosts/OpenCode/Surface.capabilities` 只测试这些声明。
+旧 Adapter 从 InquiryId 猜 owner、直接 Sibling SendPrompt、拼接 privateTicket 的路径已删除。当前 OpenCodeHostPort 内部接原 SyncDelegateRuntime 与 typed owner/DispatchRequestedBody，能力只声明 dispatch；034通过实际 recording/managed ingress/exact terminal 验证交接，不再只有能力声明。
 
-`Sphinx/V2/Hosts/Provider/Adapter.fs` 接纳 receipt后用 `HostForkRunLifecycleSurface.create(box receipt)` 新造一个与 actual execution不相连的 pending cell；不能作为真正完成 observer。两条死路径应在其接线包一起清理，而不是保留成 fallback。
+旧 Hosts/Provider/Adapter 的无关联 pending cell 已按无消费者的注册图移除；原 Plugins.ProviderAdapter 用量分类与 Fork lifecycle owner 保留，各自承担原职责。
 
 全仓未有叫 `DispatchAdapter` / `ExecutionObserver` 的已实现模块；04分册这些词是职责规划。也没有生产 Sphinx工具调用原 SyncDelegate observed API的消费者。StaticTools的 sphinx权限名称不等于工具注册。Commands现在只持Store/AuthorizedStartConfiguration；createdBy/authorizationRef/configHash均不是物理 owner SessionId。work_next/work_submit仍 unsupported。
 
-## 3. 推荐下一提交：B1-H0，只闭真实 owner 与 observed execution 交接
+## 3. H0a 的有限合同与 H0b 后续接线
 
-先冻结接口，再改 Adapter及调用方；不把B1-H0叫完整034或首个答案。
+以下是 H0b 后续生产入口的完整合同；H0a 只证明原 owner/public prompt/observed 交接，不含已落盘 DispatchRecord 的新派发许可。先冻结接口，再改调用方；不把有限交接叫完整034或首个答案。
 
 输入必须包含：
 
@@ -38,7 +67,7 @@
 
 建议局部文件边界：
 
-- 单人 owns `Hosts/OpenCode/Adapter.fs/.fsi`、`Hosts/Provider/Adapter.fs/.fsi` 与必要的共同 execution contract；如果旧ProviderAdapter仍无消费者，按实际注册图退出，不能恢复未关联cell。
+- 单人 owns `Hosts/OpenCode/Adapter.fs/.fsi` 与必要的共同 execution contract；旧 `Hosts/Provider/Adapter` 已按无消费者注册图退出，不能恢复未关联cell。
 - 同人或串行交接 owns `Composition/Commands.fs/.fsi`、`Runtime/Ports.fs/.fsi` 的真实执行能力与receipt映射。原store/Current不增副本。
 - 最后串行 wiring `OpenCode/Plugin` 的实际工具factory/Scope依赖及Sphinx owner shard。公共contract先冻结；实际工具注册文件需按现 registry确认，而非凭StaticTools猜。
 - 测试用窄 `Hosts/OpenCode/Surface.fs/.fsi` 只装配原owner、调用实际Adapter；`requirements/sphinx-v2/tests/034.test.mjs`只用WHAT034；effect前append拒绝归010，MCP/JS共同调用归036，各文件唯一对应WHAT。
@@ -52,9 +81,9 @@
 - status/export在同handle有真正dispatch与正向模型观察后，查询前后journal/Hostsend/lease/model次数均不变；不是用永远零counter自证。
 - 两次复用同delegate，原A terminal/old恢复successor不能完成B，B自身actual successor仍可完成；继承本轮A2生产回归，不重新用scriptRetry冒充。
 
-停止条件：没有真实 owner、profile/schema、原runtime/Host能力就具体拒绝；新接口只有声明不能把034 TODO删掉；受控端口和实际安装版Host分别结算。B1-H0可先只验证fresh正常binding与Unknown不重发，不宣称完整cancel/receipt-loss recovery。
+停止条件：没有真实 owner、profile/schema、原runtime/Host能力就具体拒绝；新接口只有声明不能把034 TODO删掉；受控端口和实际安装版Host分别结算。H0a 尚未保存 canonical binding，同 intent/冷重开零再发由 H0b 新入口正式证明，不能由一次 Unconfirmed 的单次调用推得。
 
-夹具先补真正的Host recording port：现SyncDelegate Surface只公开key/origin，未公开最终prompt/options，而且明确拒绝CreateSiblingSession。直接叠用它会让旧Adapter先因夹具拒绝而停下，取不到owner/private-ticket业务红。新窄装配须让旧Sibling路径和新实际runtime路径均能运行，捕获真实最终发送、parent与订阅，不复制PromptKey或acceptance算法。034最小闭环为两个旧业务红（nested owner、private ticket）及Submitted→真实managed ingress→exact terminal→cold binding正控；010另证真实append拒绝时Create/Send都为零，并用成功append使计数非零。Unknown/丢receipt必须保守零再发；实际lookup尚无时具体报告RecoveryIncomplete，完整恢复仍待第二道门。
+H0a 已补原 SyncDelegate 的窄 Host recording 装配：旧 Sibling 路径允许运行，记录原最终发送、parent、metadata 与实际订阅数，未复制 PromptKey/acceptance 算法。023证实际公私分离；034证 nested owner、未授权零effect、Submitted 等待真实 managed ingress、exact terminal 与三类非接纳证据。cold canonical binding、010实际 append 拒绝零effect、Unknown/丢 receipt 零再发仍待 H0b，不升级现有单次 fixture。
 
 ## 4. 现 Observed API 尚不足的两个具体前置
 
@@ -72,11 +101,11 @@ Runtime.fs `sendDelegatePromptCore` 会在原prepareProviderPrompt之后，执�
 
 ## 5. B1之后的最短首答案链
 
-- B2-P0：只选一个有限真实可执行profile，冻结canonical schema文档/ImplementationHash/ABI/prompt版本、原Goal正文与可核对material内容、授权/实际资源、Delegated模式。现Registry是锁定工具，Inquiry Plan/Render是validator，没有可用的完整profile实现。原PluginContext只带GoalRevision但不带Goal正文，不能只给空Graph让插件猜任务。规划含真实成本的answer.now，Unestimated保持缺值。
-- B3-C0：共享Commands先定WHAT012 `ticketHash/scopeId` 的真实来源和公开dto/持久匹配（现WorkSubmitArgs缺这两项），再接claim、submit、唯一driver的合法有限步骤；BudgetReserved+DispatchRequested同batch提交后才effect，拒绝零Host。Driver `Hash="empty"`、`plugin="unbound"`和空interpretation不得进入该路径。
-- B4-O0：actual Completion/HostSnapshot核exactchild+physical+providerRun+worktoken+attempt+schema；原canonical结果先保存ResultAccepted+InterpretationPending，locked Observe再产生真实delta并完成pending。Core目前 InterpretationApplied/Failed no-op须先修真正转移，失败仅重解释，不另买响应。无usage保留预留，不填零。
+- B2-P0：P0a只修原Registry枚举/完整manifest一致性，不代表真实profile。P0b先冻结原Goal/constraints/material内容的纯上下文和durable lock；再选有限真实可执行profile，核canonical schema文档/ImplementationHash/ABI/prompt、授权/实际资源、Delegated模式。Plan/Render仍是validator，现PluginContext只带GoalRevision，不能给空Graph让插件猜任务。规划含真实成本的answer.now，Unestimated保持缺值。
+- B3-C0：共享Commands先定WHAT012 `ticketHash/scopeId` 的真实来源和公开dto/持久匹配（现WorkSubmitArgs缺这两项），再接claim、submit、唯一driver的合法有限步骤；BudgetReserved+DispatchRequested同batch提交后才effect，拒绝零Host。旧unbound/empty解释合成已退出；原派发模板 `Hash="empty"` 仍须接真实schema/profile，不得进入公开effect路径。
+- B4-O0：actual Completion/HostSnapshot核exactchild+physical+providerRun+worktoken+attempt+schema；原canonical结果先保存ResultAccepted+InterpretationPending，locked Observe再产生真实delta并完成pending。O0a已让Core保存完整Applied/Failed、拒绝冲突并可冷恢复；真实Observe尚未接通。失败只在显式新派生inquiry重解释，不另买响应。无usage保留预留，不填零。
 - B5/B6：真实renderer work结果accepted后由已完成Core守门提交exact resultObservationId的AnswerCommitted，公开取实际正文；017从真正start/claim/submit入口闭环，036跨SDK/JS+新OS进程cold reopen。至少两个不同原目标，不直接append答案/固定文本冒充profile。全链取消/late usage/乱序/receipt-loss恢复另按C/D完成，不升级有限证明。
 
 ## 6. 当前状态与认领边界
 
-04、07与总计划已同步本轮真实R0/R2 red/green、lease/Fork及Unknown Root相邻清理的有限证据。D0/D1和R0/R1/R2不重复认领；07保留实施顺序作为回归依据。下一产品入口是本卡B1-H0；没有effect前持久关联、最终可见字节与真实Host binding证据，不能提前关闭整个B1/GAP。
+04、07与总计划保留 R0/R2、lease/Fork 与 Unknown Root 有限证据；本卡 H0a 原 owner/observed 交接已完成。下一产品入口为第0节 H0b 原子首次接纳合同及两道持久门，先认领 U0/017 独立前置；B4-O0a 的有限状态账验收与真实 Observe 分开记账。没有 effect 前关联、最终可见字节与 canonical Host binding 证据，整个 B1/GAP 保持未闭合。

@@ -73,9 +73,7 @@ type ObservationProjection =
 
 type InterpretationProjection =
     { Key: string
-      Status: string
-      InterpretationId: string option
-      Plugin: string option }
+      Outcome: InterpretationOutcome option }
 
 type RoundProjection =
     { Round: string

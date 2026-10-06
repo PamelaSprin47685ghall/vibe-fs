@@ -1326,8 +1326,6 @@ Sphinx/V2/Hosts/Mcp/Server.fsi
 Sphinx/V2/Hosts/Mcp/Server.fs
 Sphinx/V2/Hosts/OpenCode/Adapter.fsi
 Sphinx/V2/Hosts/OpenCode/Adapter.fs
-Sphinx/V2/Hosts/OpenCode/Surface.fsi
-Sphinx/V2/Hosts/OpenCode/Surface.fs
 Sphinx/V2/ServeEntry.fsi
 Sphinx/V2/ServeEntry.fs
 Strength/IntegrationRules.fsi
@@ -1344,6 +1342,8 @@ Execution/Delegation/Fork/OpenCode/ToolSurface.fsi
 Execution/Delegation/Fork/OpenCode/ToolSurface.fs
 Execution/Delegation/SyncDelegate/Surface.fsi
 Execution/Delegation/SyncDelegate/Surface.fs
+Sphinx/V2/Hosts/OpenCode/Surface.fsi
+Sphinx/V2/Hosts/OpenCode/Surface.fs
 Repository/Knowledge/Casebook/Surface.fsi
 Repository/Knowledge/Casebook/Surface.fs
 Repository/Knowledge/Casebook/IndexSurface.fsi
@@ -1490,8 +1490,6 @@ Context/Trace/SemanticTraceSurface.fsi
 Context/Trace/SemanticTraceSurface.fs
 Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fsi
 Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs
-Sphinx/V2/Hosts/Provider/Adapter.fsi
-Sphinx/V2/Hosts/Provider/Adapter.fs
 Change/Host/Surface.fsi
 Change/Host/Surface.fs
 Foundation/OutcomeSurface.fsi

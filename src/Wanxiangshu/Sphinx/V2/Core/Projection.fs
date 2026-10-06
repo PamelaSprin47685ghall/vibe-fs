@@ -103,9 +103,7 @@ type ObservationProjection =
 
 type InterpretationProjection =
     { Key: string
-      Status: string
-      InterpretationId: string option
-      Plugin: string option }
+      Outcome: InterpretationOutcome option }
 
 type RoundProjection =
     { Round: string
@@ -297,11 +295,7 @@ module Projection =
             state.Interpretations
             |> Map.toList
             |> List.sortBy fst
-            |> List.map (fun (key, record) ->
-                { Key = key
-                  Status = record.Status
-                  InterpretationId = record.InterpretationId
-                  Plugin = record.PluginRef })
+            |> List.map (fun (key, record) -> { Key = key; Outcome = record.Outcome })
           Rounds =
             state.Rounds
             |> Map.toList
@@ -347,6 +341,26 @@ module Projection =
                         "revision", box (string amendment.Revision)
                         "addedConstraints", strings amendment.AddedConstraints
                         "replacedText", optional box amendment.ReplacedText ]) ]
+
+    let private interpretationView (value: InterpretationProjection) =
+        let fields =
+            match value.Outcome with
+            | None -> [ "status", box "pending"; "interpretationId", null; "plugin", null ]
+            | Some(InterpretationOutcome.Applied applied) ->
+                [ "status", box "applied"
+                  "interpretationId", box applied.InterpretationId
+                  "plugin", box applied.PluginRef
+                  "delta",
+                  record
+                      [ "schema", record [ "id", box applied.Delta.Schema.Id; "hash", box applied.Delta.Schema.Hash ]
+                        "canonicalPayload", box applied.Delta.CanonicalPayload ] ]
+            | Some(InterpretationOutcome.Failed failed) ->
+                [ "status", box "failed"
+                  "interpretationId", box failed.InterpretationId
+                  "plugin", box failed.PluginRef
+                  "reason", box failed.Reason ]
+
+        record (("key", box value.Key) :: fields)
 
     let semanticView (state: InquiryState) : obj =
         let projection = semanticProjection state
@@ -421,14 +435,7 @@ module Projection =
                         "schemaId", box observation.SchemaId
                         "schemaHash", box observation.SchemaHash
                         "result", box observation.Result ])
-              "interpretations",
-              projection.Interpretations
-              |> items (fun interpretation ->
-                  record
-                      [ "key", box interpretation.Key
-                        "status", box interpretation.Status
-                        "interpretationId", optional box interpretation.InterpretationId
-                        "plugin", optional box interpretation.Plugin ])
+              "interpretations", items interpretationView projection.Interpretations
               "rounds",
               projection.Rounds
               |> items (fun round ->

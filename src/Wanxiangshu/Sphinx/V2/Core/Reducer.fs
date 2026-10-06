@@ -726,9 +726,21 @@ module Reducer =
         : Result<InquiryState, CoreError> =
         let id = ObservationId.value body.ObservationId
 
-        if state.Interpretations |> Map.containsKey id then
-            Ok state
-        else
+        match
+            state.Observations |> Map.tryFind id,
+            state.Work |> Map.containsKey body.WorkId,
+            state.Interpretations |> Map.tryFind id
+        with
+        | None, _, _ -> Error(coreError "unknown-observation" (sprintf "observation %s is not accepted" id))
+        | Some _, false, _ ->
+            Error(coreError "unknown-work" (sprintf "work %s does not exist" (WorkId.value body.WorkId)))
+        | Some observation, _, _ when observation.WorkId <> body.WorkId ->
+            Error(coreError "interpretation-work-mismatch" "interpretation work does not match its observation")
+        | Some observation, _, _ when observation.Attempt <> body.Attempt ->
+            Error(coreError "interpretation-attempt-mismatch" "interpretation attempt does not match its observation")
+        | _, _, Some prior when prior.WorkId = body.WorkId && prior.Attempt = body.Attempt -> Ok state
+        | _, _, Some _ -> Error(coreError "interpretation-conflict" "interpretation pending identity changed")
+        | _, _, None ->
             Ok
                 { state with
                     Interpretations =
@@ -738,10 +750,27 @@ module Reducer =
                             { ObservationId = body.ObservationId
                               WorkId = body.WorkId
                               Attempt = body.Attempt
-                              InterpretationId = None
-                              PluginRef = None
-                              Status = "pending"
-                              Reason = None } }
+                              Outcome = None } }
+
+    let private applyInterpretationOutcome
+        (state: InquiryState)
+        (observationId: ObservationId)
+        (outcome: InterpretationOutcome)
+        : Result<InquiryState, CoreError> =
+        let id = ObservationId.value observationId
+
+        match state.Interpretations |> Map.tryFind id with
+        | None ->
+            Error(
+                coreError "missing-interpretation-pending" (sprintf "observation %s has no pending interpretation" id)
+            )
+        | Some { Outcome = Some prior } when prior = outcome -> Ok state
+        | Some { Outcome = Some _ } ->
+            Error(coreError "interpretation-conflict" "interpretation outcome differs from the recorded result")
+        | Some record ->
+            Ok
+                { state with
+                    Interpretations = state.Interpretations |> Map.add id { record with Outcome = Some outcome } }
 
     /// A graph patch is applied, not merely noted. Core checks producer identity,
     /// endpoint existence and revision sanity; it never judges whether the relation is
@@ -854,8 +883,10 @@ module Reducer =
         | InquiryEventBody.HostTerminalRecorded _ -> Ok state
         | InquiryEventBody.ResultAccepted acceptedBody -> applyResultAccepted state acceptedBody
         | InquiryEventBody.InterpretationPending pending -> applyInterpretation state pending
-        | InquiryEventBody.InterpretationApplied _ -> Ok state
-        | InquiryEventBody.InterpretationFailed _ -> Ok state
+        | InquiryEventBody.InterpretationApplied applied ->
+            applyInterpretationOutcome state applied.ObservationId (InterpretationOutcome.Applied applied)
+        | InquiryEventBody.InterpretationFailed failed ->
+            applyInterpretationOutcome state failed.ObservationId (InterpretationOutcome.Failed failed)
         | InquiryEventBody.GraphPatched patched -> applyGraphPatched state patched
         | InquiryEventBody.DecisionRecorded _ -> Ok state
         | InquiryEventBody.AnswerPrepared _ -> Ok state

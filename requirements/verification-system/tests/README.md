@@ -62,6 +62,10 @@ Node/npm 回归按实际声明的 transitive 依赖选缺库叶，不将某个 n
 
 ## [006] 的测试用例与证明范围
 
+2026-10-06 F0以真正native ps snapshot/error取得两业务红：公开caller丢原Error。现保原对象到failure.cause，定向3/3、相邻15/15，gen190完整006为52pass/0fail、无skip/TODO。两原红资源本已自然排空，不能称owned reclaim修复；仅显式inspection seam增加initial observation，默认回收/预算/worker/verdict不变。[源收据](../../../proposals/archive/2026-10-06/sphinx-host-owner/source-receipt.txt)。
+
+同输入正式016为285/0/20skip/2TODO、156.23s wall、201actual工具各有完整终止/排空/monitor-close。四预取消Error/null用例改用真实零请求、缺输入、未分配parent和精确库存的轻量fixture，删除三次无用完整npm准备；其它原oracle和生产取消检查保持。只证明此有限减负和原边界，不声明Linux/CI savings或只读候选全链。[016收据](../../../proposals/archive/2026-10-06/sphinx-host-owner/vibe-fs-016-preaborted-gen190-receipt-20261006.txt)。
+
 | 目标与观察 | 用例证明 |
 |---|---|
 | 首次进展前没有活动 | 从监测开始计时，达到静默限值后诊断并结束 |

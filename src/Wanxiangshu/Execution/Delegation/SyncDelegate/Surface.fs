@@ -179,6 +179,19 @@ module SyncDelegateSurface =
                     waiters.Add(key, waiter)
                     waiter.Task
 
+    type private RecordedPrompt =
+        { SessionId: SessionId
+          Index: int
+          Text: string
+          Options: OpenCodePromptOptions
+          ListenerCount: int }
+
+    type private RecordedCreation =
+        { Parent: SessionId
+          PhysicalParent: SessionId option
+          SessionId: SessionId
+          Options: OpenCodeChildOptions }
+
     type private Harness
         (
             journal: AgentJournal,
@@ -258,6 +271,10 @@ module SyncDelegateSurface =
         let listedFamilies = ResizeArray<string>()
         let createRequests = ResizeArray<string * string option * string option>()
         let parents = Dictionary<SessionId, SessionId>()
+        let recordedPrompts = ResizeArray<RecordedPrompt>()
+        let recordedSiblings = ResizeArray<RecordedCreation>()
+        let recordedChildren = ResizeArray<RecordedCreation>()
+        let isHostRecording = observationMode = Some "host-recording"
 
         let prompted =
             TaskCompletionSource<SessionId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -325,8 +342,57 @@ module SyncDelegateSurface =
             if registration.Live then
                 registration.Listener sessionId outcome
 
+        let registerCreatedChild parent child =
+            children.Add child
+            parents[child] <- parent
+
+            let ready =
+                childCountWaiters
+                |> Seq.filter (fun (target, _) -> children.Count >= target)
+                |> Seq.toList
+
+            for registration in ready do
+                childCountWaiters.Remove registration |> ignore
+
+                registration
+                |> snd
+                |> fun waiter -> AsyncSupport.trySetResult waiter () |> ignore
+
+        let listenerCount sessionId =
+            match listeners.TryGetValue(SessionId.value sessionId) with
+            | true, registrations ->
+                registrations
+                |> Seq.filter (fun registration -> registration.Live)
+                |> Seq.length
+            | false, _ -> 0
+
+        let recordPrompt sessionId prompt options =
+            if isHostRecording then
+                recordedPrompts.Add
+                    { SessionId = sessionId
+                      Index = (acceptancesOf (SessionId.value sessionId)).Count
+                      Text = prompt
+                      Options = options
+                      ListenerCount = listenerCount sessionId }
+
+        let recordMetadata sessionId (options: OpenCodePromptOptions) =
+            match options.Metadata with
+            | None when isHostRecording -> ()
+            | _ ->
+                let origin: string = options.Metadata.Value?wanxiangshu_origin
+                let promptKey: string = options.Metadata.Value?wanxiangshu_prompt_key
+                originsOf (SessionId.value sessionId) |> fun values -> values.Add origin
+
+                keysOf (SessionId.value sessionId)
+                |> fun values -> values.Add(PromptKey.create promptKey)
+
         member _.ListedFamilies = listedFamilies.ToArray()
         member _.CreateRequests = createRequests.ToArray()
+        member _.IsHostRecording = isHostRecording
+        member _.RecordedPrompts = recordedPrompts.ToArray()
+        member _.RecordedSiblings = recordedSiblings.ToArray()
+        member _.RecordedChildren = recordedChildren.ToArray()
+        member _.RecordedPromptCount = recordedPrompts.Count
 
         member _.ParentFor(child: SessionId) =
             match parents.TryGetValue child with
@@ -420,14 +486,10 @@ module SyncDelegateSurface =
             member _.SubscribeFutureTerminal(sessionId, listener) = subscribe sessionId listener
 
             member _.SendPrompt(sessionId, prompt, options) =
+                recordPrompt sessionId prompt options
                 readiness.Mark(sessionId, prompt)
                 AsyncSupport.trySetResult prompted sessionId |> ignore
-                let origin: string = options.Metadata.Value?wanxiangshu_origin
-                let promptKey: string = options.Metadata.Value?wanxiangshu_prompt_key
-                originsOf (SessionId.value sessionId) |> fun values -> values.Add origin
-
-                keysOf (SessionId.value sessionId)
-                |> fun values -> values.Add(PromptKey.create promptKey)
+                recordMetadata sessionId options
 
                 let acceptance =
                     TaskCompletionSource<SendOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -440,8 +502,21 @@ module SyncDelegateSurface =
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
 
-            member _.CreateSiblingSession(_, _, _) =
-                Task.FromResult(Error "sibling creation is outside a managed delegation")
+            member _.CreateSiblingSession(owner, physicalParent, options) =
+                if isHostRecording then
+                    let child =
+                        SessionId.create (sprintf "%s-sibling-%d" (SessionId.value owner) (children.Count + 1))
+
+                    recordedSiblings.Add
+                        { Parent = owner
+                          PhysicalParent = physicalParent
+                          SessionId = child
+                          Options = options }
+
+                    registerCreatedChild owner child
+                    Task.FromResult(Ok child)
+                else
+                    Task.FromResult(Error "sibling creation is outside a managed delegation")
 
             member _.TryGetParentSession _ = Task.FromResult(Ok None)
 
@@ -451,23 +526,18 @@ module SyncDelegateSurface =
                 let child =
                     match observationMode with
                     | Some "other-scope" -> SessionId.create "host-child-created-exact-scope"
-                    | Some _ -> SessionId.create "host-child-created"
+                    | Some mode when mode <> "host-recording" -> SessionId.create "host-child-created"
+                    | Some _
                     | None -> SessionId.create (sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
 
-                children.Add child
-                parents[child] <- parent
+                if isHostRecording then
+                    recordedChildren.Add
+                        { Parent = parent
+                          PhysicalParent = None
+                          SessionId = child
+                          Options = options }
 
-                let ready =
-                    childCountWaiters
-                    |> Seq.filter (fun (target, _) -> children.Count >= target)
-                    |> Seq.toList
-
-                for registration in ready do
-                    childCountWaiters.Remove registration |> ignore
-
-                    registration
-                    |> snd
-                    |> fun waiter -> AsyncSupport.trySetResult waiter () |> ignore
+                registerCreatedChild parent child
 
                 Task.FromResult(Ok child)
 
@@ -476,6 +546,7 @@ module SyncDelegateSurface =
 
                 match observationMode with
                 | Some "query-error" -> Task.FromResult(Error "controlled ListChildren rejection")
+                | Some "host-recording" -> Task.FromResult(Ok [])
                 | Some mode ->
                     let descriptor id title agent =
                         { SessionId = SessionId.create id
@@ -848,6 +919,96 @@ module SyncDelegateSurface =
         match ownerAdmissions owners with
         | Ok admissions -> createWithAdmissions directory None RetryHarnessMode.Scripted admissions
         | Error error -> raise (ArgumentException error)
+
+    let createForHostRecording (directory: string) (owners: obj) : Task<obj> =
+        match ownerAdmissions owners with
+        | Ok admissions -> createWithAdmissions directory (Some "host-recording") RetryHarnessMode.Scripted admissions
+        | Error error -> raise (ArgumentException error)
+
+    let private hostRecordingHarness value =
+        let harness = unbox<Harness> value
+
+        if not harness.Sessions.IsHostRecording then
+            invalidArg "value" "Host recording requires its owned runtime harness"
+
+        harness
+
+    let internal withHostRuntime
+        (value: obj)
+        (useRuntime: SyncDelegateRuntime -> ISessionHostPort -> 'result)
+        : 'result =
+        let harness = hostRecordingHarness value
+        useRuntime harness.Runtime (harness.Sessions :> ISessionHostPort)
+
+    let private recordedModel (model: OpencodeModel) =
+        box
+            {| providerID = model.providerID
+               modelID = model.modelID
+               variant = model.variant |> Option.map box |> Option.defaultValue null |}
+
+    let private recordedTools (tools: Map<string, bool>) =
+        tools
+        |> Map.toArray
+        |> Array.map (fun (name, enabled) -> box {| name = name; enabled = enabled |})
+        |> box
+
+    let private recordedPromptView (recorded: RecordedPrompt) =
+        let options = recorded.Options
+
+        box
+            {| sessionId = SessionId.value recorded.SessionId
+               index = recorded.Index
+               text = recorded.Text
+               agent = options.Agent |> Option.map box |> Option.defaultValue null
+               model = options.Model |> Option.map recordedModel |> Option.defaultValue null
+               tools = options.Tools |> Option.map recordedTools |> Option.defaultValue null
+               metadata = options.Metadata |> Option.defaultValue null
+               listenerCount = recorded.ListenerCount |}
+
+    let recordingSnapshot (value: obj) : obj =
+        let harness = hostRecordingHarness value
+
+        let sibling (recorded: RecordedCreation) =
+            box
+                {| ownerSessionId = SessionId.value recorded.Parent
+                   physicalParentId =
+                    recorded.PhysicalParent
+                    |> Option.map (SessionId.value >> box)
+                    |> Option.defaultValue null
+                   sessionId = SessionId.value recorded.SessionId
+                   title = recorded.Options.Title |> Option.map box |> Option.defaultValue null
+                   agent = recorded.Options.Agent |> Option.map box |> Option.defaultValue null |}
+
+        let child (recorded: RecordedCreation) =
+            box
+                {| parentSessionId = SessionId.value recorded.Parent
+                   sessionId = SessionId.value recorded.SessionId
+                   title = recorded.Options.Title |> Option.map box |> Option.defaultValue null
+                   agent = recorded.Options.Agent |> Option.map box |> Option.defaultValue null |}
+
+        box
+            {| prompts = harness.Sessions.RecordedPrompts |> Array.map recordedPromptView
+               createSibling = harness.Sessions.RecordedSiblings |> Array.map sibling
+               createChild = harness.Sessions.RecordedChildren |> Array.map child
+               listedFamilies = harness.Sessions.ListedFamilies |}
+
+    let awaitRecordingPromptCount (value: obj) (count: int) : Task =
+        let harness = hostRecordingHarness value
+
+        let rec wait observed =
+            task {
+                if harness.Sessions.RecordedPromptCount >= count then
+                    return ()
+                else
+                    let! next = harness.Readiness.WaitForRevisionAfter observed
+                    return! wait next
+            }
+
+        wait harness.Readiness.Revision :> Task
+
+    let returnRecordingPromptOutcome (value: obj) (session: string) (index: int) (outcome: obj) : bool =
+        let harness = hostRecordingHarness value
+        harness.Sessions.ReturnPromptOutcome(SessionId.create session, index, unbox<SendOutcome> outcome)
 
     let createForProviderRecovery (directory: string) (owners: obj) : Task<obj> =
         match ownerAdmissions owners with

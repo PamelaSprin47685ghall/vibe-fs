@@ -1,6 +1,10 @@
 # sphinx-v2 测试证明范围
 
-2026-10-06 A2-D0仅完成现SyncDelegate下层Detached通知前置，Sphinx尚未消费它。gen159相关238/238、1178/0；随后gen161 clean build去掉两份无源码旧本地产物、828模块闭包通过，同范围仍1178/0。[A2活动卡](../../../proposals/TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)已细化registration lease、等待/异常、exact source和三producer的冻结顺序，均未施工；034/GAP-219不由通知能力或本地绿色关闭。
+2026-10-06 B4-O0a有限状态账：006/007/019/021经过原prepare/append/唯一Current，证明完整Applied/Failed、引用先建后用、terminal exact replay、冲突batch原子拒绝、原raw/work/reservation保留及冷恢复；delta/schema和reason进入完整native/semantic hash，Core不解释opaque delta。原gen190真实sealed fixture中Pending-only原样恢复，旧no-op outcome明确post-state-mismatch cut，writer字节不改。Driver纯提议不再伪造unbound/empty解释，Pending阻止购买；实际记录Applied后仍有非零Ready提议正控，未调用Host/Observe。gen191旧实现29业务失败，gen193定向64/0/1TODO；完整021仍保留。Registry009/015另以原bind/lockOf证明拓扑枚举去重和完整declared/Execute manifest一致性，12旧业务失败；不执行capability、不证明真实artifact/ABI/schemaDoc或durable profile lock。gen195相关87/87、652/0/11skip/43TODO；[交付收据](../../../proposals/archive/2026-10-06/sphinx-interpretation/final-receipt.txt)保静态收束与最终输入，[记录](../../../proposals/archive/2026-10-06/Sphinx交接与解释状态账-2026-10-06.md)保有限边界。
+
+2026-10-06 H0a有限交接：023捕获原Adapter真实最终SendPrompt，公开question保留、private独特label-map字节不泄露；034以原SyncDelegateRuntime验证实际nested owner/family/Engineer/key与先订阅后send，无active authority在Invoke前拒绝且零child/send。Submitted仍等actual managed ingress，Completion仅认exact physical/root terminal，Retryable/Fatal/Unknown保原分型和key，不造physical。旧路径3业务红，删除early guard变异另抓到late实际child创建；gen190完整Sphinx+delegation52/52、328/0/35TODO。[源收据](../../../proposals/archive/2026-10-06/sphinx-host-owner/source-receipt.txt)保输入身份与原始结果。此为受控Host port，不证明installedHost、canonical首次接纳/receipt落盘、冷重开零再发、cancel或公开答案；023/034整体TODO保留，下一H0b。
+
+2026-10-06 A2-D0证书仅覆盖现SyncDelegate下层Detached通知前置。gen159相关238/238、1178/0；随后gen161 clean build去掉两份无源码旧本地产物、828模块闭包通过，同范围仍1178/0。其后D1/R0/R1/R2的等待隔离、registration lease、exact source与三producer已分别有限验收，当前接手以[A2活动卡](../../../proposals/TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)和[08卡](../../../proposals/TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)为准；034/GAP-219不由通知能力或本地绿色关闭。
 
 2026-10-05 B2-0有限守门：002/029通过真实ContributionKind→EstimateKind→Decision证明Unestimated即使带Rank/Location也不可用、空集合不宣称数值比较、ordinal/provisional保持原种类，旧rank0约定保留。gen151已有正式业务红灯，gen154相关宽选集225/225、1125/0；最后静态等价调整的交付复验另见[本批记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。这不是实际profile/model绑定或完整规划/renderer证明；002/029整体TODO、B1—B6与GAP-219保持。
 
@@ -29,7 +33,7 @@ MCP启动继续必需`SPHINX_COMMON_DIR`。可选`SPHINX_START_CONFIG`是显式J
 - `013/029`：给定候选与估值后的实际选择；不证明计划生成、Agenda、依赖成功或渲染预算已贯通。
 - `014/023/025/026`：实际数值和协议函数的局部正反例；不把后验归一、标签拒绝、票型解码或数值稳定当作完整实验与保证传播。Bayes新增不完整/非法likelihood和零partition反例。
 - `018/036` 的局部测试：直接调用 `Tool.fsi` 声明的七个 parser 与 refusal accessor，使用真实 `Tool_decode*` / `Tool_refusal*` 具名导出。018 保留 Worker 夹带目标、预算、证书、事件变动的具名拒绝及合法结果正例。036 验证闭合工具名、各自必需字段、goal amendment 授权字段、读取模式，以及 status/export 对明确附带命令或变动字段的 ingress 拒绝；不把 commandId/workId/attempt 等孤立身份字段当作写动作，不定义所有未知键一律拒绝。**parser 成功或拒绝都不证明真实读取零副作用**：lease、model call、business mutation 的 Runtime 证据仍是 TODO。
-- `034`：取消分类为「等待终止」而非「已取消」；attempt/fence/schema 引用非法或缺失即按字段拒绝，不默认、不取整、不从兄弟字段回填。新增 `Hosts/OpenCode/Surface.{fsi,fs}` 只调用真实 `OpenCodeHostPort.Capabilities()`，将 F# list 转为原生数组，不暴露 Adapter 对象图。正向断言 dispatch/request-cancel 存在，空集不能假绿；负向断言不宣称 session port 无法观测的读取。这里仅证明能力声明，不证明派发、abort、实际 receipt、真实 child 终态等待或迟到结果隔离，也不证明 schema hash 已匹配真实内容。
+- `034`：取消分类为「等待终止」而非「已取消」；attempt/fence/schema 引用非法或缺失即按字段拒绝，不默认、不取整、不从兄弟字段回填。当前 OpenCodeHostPort 只声明 dispatch。H0a 已通过原runtime受控Host port证明原owner/实际发送、managed ingress和exact child终态，不再仅是能力声明；实际installedHost、canonical binding、取消、读取/对账及迟到结果全链仍未证明，也不证明schema hash已匹配真实内容。
 - `011`：新增真实durable command的内容绑定receipt和跨后续revision、新writer重放；worker结果的work/attempt/fence幂等仍为TODO。`012/022`的同轮乱序与measurement/intervention也保留TODO，没有用无关分类器填补。
 - `019`：调用正式Persistence Surface和实际EventStore，核对原子多body batch、父链、单batch revision、post-state fingerprint、未知body的durable semantic cut、identity collision、合法并发heads及冷重开；30种body实际经过编码、append和新writer回放。测试准备明确的领域输入，不创建第二fold，不把Surface准备的InquiryCreated当作真实MCP start已接通。
 

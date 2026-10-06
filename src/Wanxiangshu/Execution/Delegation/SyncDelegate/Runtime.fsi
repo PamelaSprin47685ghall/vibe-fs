@@ -98,6 +98,8 @@ type SyncDelegateRuntime =
         ?isCancelled: (unit -> bool) ->
             Task<Result<string, string>>
 
+    member ValidateObservedOwner: ownerSessionId: SessionId -> Result<unit, string>
+
     member InvokeObservedPrepared:
         ownerSessionId: SessionId *
         charge: string *

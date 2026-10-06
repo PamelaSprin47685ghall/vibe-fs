@@ -11,7 +11,7 @@ import test from 'node:test'
 import { Header } from 'tar'
 import { createNpmInstallFixture } from './support/npm-install-fixture.mjs'
 import { registerNodeToolCandidateTests } from './support/node-tool-candidate-tests.mjs'
-import { registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
+import { createAbortedNpmAdmissionFixture, registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
 import { assertParentReplacementInvalidatesVerification } from './support/parent-replacement.mjs'
 import { repositoryNpmInstallTest } from './support/repository-npm-install-tests.mjs'
 import { registerDotnetSdkTests, repositoryDotnetSdkTest } from './support/dotnet-sdk-tests.mjs'
@@ -405,17 +405,17 @@ test('WHAT[verification-system-016] npm installation admits only the selected No
 })
 
 test('WHAT[verification-system-016] npm installation already aborted admission preserves Error and null reasons before reading missing source files', async (t) => {
-  const fixture = await createNpmInstallFixture()
+  const fixture = await createAbortedNpmAdmissionFixture()
   try {
+    fixture.assertUnchanged()
     for (const reason of [new Error('cancelled before npm admission'), null]) {
       await t.test(`WHAT[verification-system-016] npm installation already aborted with ${reason === null ? 'null' : 'Error'}`, async () => {
         const controller = new AbortController()
         controller.abort(reason)
-        const [outcome] = await Promise.allSettled([installDependencies({ ...fixture.options, sourceRoot: path.join(fixture.root, 'missing-source'), signal: controller.signal })])
+        const [outcome] = await Promise.allSettled([installDependencies({ ...fixture.options, signal: controller.signal })])
         assert.equal(outcome.status, 'rejected')
         assert.equal(outcome.reason, reason)
-        assert.deepEqual(fixture.requests, [])
-        assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+        fixture.assertUnchanged()
       })
     }
   } finally {

@@ -1795,7 +1795,7 @@ const isEnvironmentKeys = (node) => node?.type === 'CallExpression'
   && node.callee?.object?.name === 'Object' && node.callee?.property?.name === 'keys'
   && node.arguments[0]?.object?.name === 'process' && node.arguments[0]?.property?.name === 'env'
 
-const mangledLookupLines = (source) => {
+const mangledLookupLines = (source, syntax) => {
   const lines = new Set()
   const visit = (node, environmentNames = new Set()) => {
     if (!node || typeof node !== 'object') return
@@ -1822,15 +1822,140 @@ const mangledLookupLines = (source) => {
       else if (value && typeof value === 'object') visit(value, environmentNames)
     }
   }
-  try {
-    visit(parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true }))
-  } catch {
+  if (syntax) visit(syntax)
+  else {
     source.split('\n').forEach((line, index) => { if (B_MANGLED_LOOKUP.test(line)) lines.add(index + 1) })
   }
   return lines
 }
 
-const C1_DU_SHAPE = /\.cases\(\)|\.fields\b|\.tag\b/
+const syntaxChildren = node => Object.values(node).flatMap(value =>
+  Array.isArray(value) ? value.filter(child => child?.type) : value?.type ? [value] : [])
+
+const bindingNames = pattern => {
+  if (!pattern) return []
+  if (pattern.type === 'Identifier') return [pattern.name]
+  if (pattern.type === 'Property') return bindingNames(pattern.value)
+  if (pattern.type === 'AssignmentPattern') return bindingNames(pattern.left)
+  return syntaxChildren(pattern).flatMap(bindingNames)
+}
+
+const receiverName = node => {
+  if (node?.type === 'Identifier') return node.name
+  if (node?.type === 'MemberExpression') return receiverName(node.object)
+  return null
+}
+
+// A literal container ceases to be a proof once it can be changed or escape
+// through an alias/call. Name collisions conservatively retain the rejection.
+const escapedDataNames = syntax => {
+  const names = new Set()
+  const mark = node => {
+    const name = receiverName(node)
+    if (name) names.add(name)
+  }
+  const visit = node => {
+    if (node.type === 'AssignmentExpression') mark(node.left)
+    if (node.type === 'UpdateExpression') mark(node.argument)
+    if (node.type === 'VariableDeclarator' && (node.init?.type === 'Identifier' || node.init?.computed)) mark(node.init)
+    if (node.type === 'ReturnStatement' && node.argument?.type === 'Identifier') mark(node.argument)
+    if (node.type === 'Property') mark(node.value)
+    if (node.type === 'ArrayExpression') node.elements.forEach(mark)
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      if (node.callee.type === 'MemberExpression') mark(node.callee.object)
+      node.arguments.forEach(argument => { if (argument.type === 'Identifier') mark(argument) })
+    }
+    if (node.type === 'ExportSpecifier') mark(node.local)
+    syntaxChildren(node).forEach(visit)
+  }
+  visit(syntax)
+  return names
+}
+
+const isLiteralData = node => {
+  if (!node) return false
+  if (node.type === 'Literal') return true
+  if (node.type === 'ArrayExpression') return node.elements.every(isLiteralData)
+  if (node.type !== 'ObjectExpression') return false
+  return node.properties.every(property => property.type === 'Property'
+    && property.kind === 'init' && !property.method && !property.computed
+    && isLiteralData(property.value))
+}
+
+const fieldsAccessLines = (source, syntax) => {
+  const lines = new Set()
+  if (!syntax) {
+    source.split('\n').forEach((line, index) => { if (/\.fields\b/.test(line)) lines.add(index + 1) })
+    return lines
+  }
+  const escaped = escapedDataNames(syntax)
+  const values = (node, bindings) => node?.type === 'Identifier'
+    ? escaped.has(node.name) ? [] : bindings.get(node.name) ?? []
+    : node ? [node] : []
+  const nativeObject = (node, bindings) => {
+    const candidates = values(node, bindings)
+    return candidates.length > 0 && candidates.every(value => value.type === 'ObjectExpression' && isLiteralData(value))
+  }
+  const bindUnknown = (bindings, pattern) => bindingNames(pattern).forEach(name => bindings.set(name, []))
+  const visit = (node, bindings) => {
+    if (node.type === 'Program' || node.type === 'BlockStatement') {
+      const local = new Map(bindings)
+      for (const statement of node.body) {
+        if (statement.type === 'VariableDeclaration') statement.declarations.forEach(declaration => bindUnknown(local, declaration.id))
+        if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') bindUnknown(local, statement.id)
+      }
+      node.body.forEach(statement => visit(statement, local))
+      return
+    }
+    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) {
+      const local = new Map(bindings)
+      node.params.forEach(parameter => bindUnknown(local, parameter))
+      bindUnknown(local, node.id)
+      syntaxChildren(node).forEach(child => visit(child, local))
+      return
+    }
+    if (node.type === 'VariableDeclaration') {
+      for (const declaration of node.declarations) {
+        visit(declaration.id, bindings)
+        if (declaration.init) visit(declaration.init, bindings)
+        bindUnknown(bindings, declaration.id)
+        if (node.kind === 'const' && declaration.id.type === 'Identifier' && isLiteralData(declaration.init)) {
+          bindings.set(declaration.id.name, [declaration.init])
+        }
+      }
+      return
+    }
+    if (node.type === 'ForOfStatement') {
+      visit(node.right, bindings)
+      const local = new Map(bindings)
+      const declaration = node.left.declarations?.[0]
+      bindUnknown(local, declaration?.id ?? node.left)
+      visit(declaration?.id ?? node.left, local)
+      const candidates = values(node.right, bindings)
+      const array = candidates.length === 1 ? candidates[0] : null
+      if (node.left.kind === 'const' && declaration?.id.type === 'Identifier'
+        && array?.type === 'ArrayExpression' && isLiteralData(array)) {
+        local.set(declaration.id.name, array.elements)
+      }
+      visit(node.body, local)
+      return
+    }
+    if (node.type === 'CatchClause') {
+      const local = new Map(bindings)
+      bindUnknown(local, node.param)
+      visit(node.body, local)
+      return
+    }
+    if (node.type === 'MemberExpression'
+      && (node.computed ? node.property.value === 'fields' : node.property.name === 'fields')
+      && !nativeObject(node.object, bindings)) lines.add(node.loc.start.line)
+    syntaxChildren(node).forEach(child => visit(child, bindings))
+  }
+  visit(syntax, new Map())
+  return lines
+}
+
+const C1_DU_SHAPE = /\.cases\(\)|\.tag\b/
 const C2_FSHARP = /\bFSharp(?:List|Map|Set|Option|Result)\b/
 const C3_FABLE_MODULES = /fable_modules/
 // Ordinary JavaScript `.bind(...)` is not the legacy Fable helper; bare calls remain forbidden.
@@ -1873,14 +1998,22 @@ export const scanFile = (absPath, relPath) => {
   const source = readFileSync(absPath, 'utf8')
   const lines = source.split('\n')
   const moduleNames = moduleBindingNames(source)
-  const mangledLines = mangledLookupLines(source)
+  let syntax
+  try {
+    syntax = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true })
+  } catch {
+    syntax = null
+  }
+  const mangledLines = mangledLookupLines(source, syntax)
+  const fieldsLines = fieldsAccessLines(source, syntax)
   const hits = []
   for (let i = 0; i < lines.length; i++) {
     const text = lines[i]
     for (const [rule, re] of RULES) {
       if (rule === 'export-discovery') {
         if (isModuleDiscovery(text, moduleNames)) hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
-      } else if (rule === 'mangled-lookup' ? mangledLines.has(i + 1) : re.test(text)) {
+      } else if (rule === 'mangled-lookup' ? mangledLines.has(i + 1)
+        : rule === 'du-shape' ? fieldsLines.has(i + 1) || re.test(text) : re.test(text)) {
         hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
       }
     }

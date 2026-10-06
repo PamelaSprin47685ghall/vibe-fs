@@ -221,23 +221,20 @@ type SyncDelegateRuntime
     let issueCurrentOwnerIdentitySeed
         (ownerSessionId: SessionId)
         (childAgent: string)
-        : Task<Result<PromptAuthority.IdentitySeed, string>> =
-        let issued =
-            match
-                PromptAuthorityProjectionQueries.activeProfile
-                    ownerSessionId
-                    (AgentJournal.snapshot journal).AgentProjections
-            with
-            | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
-            | Some ownerProfile ->
-                PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
-                |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
-                |> Result.bind (fun seed ->
-                    PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
-                    |> Result.mapError (sprintf "Invalid owner identity witness: %A")
-                    |> Result.map (fun _ -> seed))
-
-        Task.FromResult issued
+        : Result<PromptAuthority.IdentitySeed, string> =
+        match
+            PromptAuthorityProjectionQueries.activeProfile
+                ownerSessionId
+                (AgentJournal.snapshot journal).AgentProjections
+        with
+        | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
+        | Some ownerProfile ->
+            PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
+            |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
+            |> Result.bind (fun seed ->
+                PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
+                |> Result.mapError (sprintf "Invalid owner identity witness: %A")
+                |> Result.map (fun _ -> seed))
 
     /// A delegate session with no active physical execution has nothing to
     /// settle. One that has one gets its exact physical binding fenced before
@@ -793,6 +790,11 @@ type SyncDelegateRuntime
                     | Some text when not (String.IsNullOrWhiteSpace text) -> Ok text
                     | _ -> Error "Completed delegation did not supply a formal response")
         }
+
+    member _.ValidateObservedOwner(ownerSessionId: SessionId) : Result<unit, string> =
+        journal.RefreshCurrent()
+        |> Result.bind (fun () -> issueCurrentOwnerIdentitySeed ownerSessionId "engineer")
+        |> Result.map ignore
 
     member _.InvokeObservedPrepared
         (

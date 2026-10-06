@@ -7,6 +7,7 @@ import * as Ordinal from '../../../dist/Sphinx/V2/Plugins/Ordinal/Surface.js'
 import * as Bayes from '../../../dist/Sphinx/V2/Plugins/Bayes/Surface.js'
 import * as AStar from '../../../dist/Sphinx/V2/Plugins/AStar/Surface.js'
 import * as Mcts from '../../../dist/Sphinx/V2/Plugins/Mcts/Surface.js'
+import {Host, admittedWithReceipt, withHost, hostRequest} from './host-support.mjs'
 
 const ok = (result) => {
   assert.equal(Core.isOk(result), true)
@@ -77,6 +78,19 @@ test('WHAT[sphinx-v2-023] a label outside the presented set is refused', () => {
     Ordinal.isError(Ordinal.labelsWithin(Ordinal.stringSetOf(['item_1']), response, Ordinal.stringSetOf(['item_2']))),
     true,
   )
+})
+
+test('WHAT[sphinx-v2-023] private label map bytes never enter the actual Host prompt', async () => {
+  await withHost(async probe => {
+    const execution = Host.startDispatch(probe, 'inquiry-is-not-owner', hostRequest())
+    await Host.awaitHostPrompts(probe, 1)
+    const prompt = Host.hostRecording(probe).prompts[0]
+    assert.equal(Host.returnHostOutcome(probe, prompt.sessionId, prompt.index, admittedWithReceipt('actual-transport-receipt')), true)
+    assert.equal((await Host.confirmHostPhysical(probe, prompt.index, 'actual-private-test-physical')).ok, true)
+    await Host.dispatchAdmission(execution)
+    assert.ok(prompt.text.includes('visible question'), 'the public question reaches the real SendPrompt boundary')
+    assert.equal(prompt.text.includes('PRIVATE-AUTHOR-7d31'), false, 'host-private author mapping must stay private')
+  })
 })
 
 // WHAT[sphinx-v2-004]: the Bayes posterior is computed over declared factors and

@@ -80,7 +80,7 @@ export const withStore = async action => {
     store.dispose(handle)
     handles.delete(handle)
   }
-  try { return await action({ open, close }) }
+  try { return await action({ open, close, commonDir }) }
   finally {
     for (const handle of handles) store.dispose(handle)
     rmSync(root, { recursive: true, force: true })

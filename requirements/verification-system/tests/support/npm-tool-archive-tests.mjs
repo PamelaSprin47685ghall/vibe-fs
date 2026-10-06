@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import http from 'node:http'
+import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { create } from 'tar'
@@ -9,6 +11,82 @@ import { createNpmInstallFixture } from './npm-install-fixture.mjs'
 import { fixturePhase } from './fixture-phase.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+
+export async function createAbortedNpmAdmissionFixture() {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'verification-aborted-npm-')))
+  const requests = []
+  const sockets = new Set()
+  const server = http.createServer((request, response) => {
+    requests.push({ method: request.method, path: request.url })
+    response.writeHead(500).end('An already aborted operation cannot request the registry')
+  })
+  server.on('connection', socket => {
+    sockets.add(socket)
+    socket.once('close', () => sockets.delete(socket))
+  })
+  const inventory = () => {
+    const entries = []
+    const visit = relative => {
+      const file = path.join(root, relative)
+      const stat = fs.lstatSync(file)
+      const entry = { path: relative, device: stat.dev, inode: stat.ino, mode: stat.mode & 0o777 }
+      if (stat.isDirectory()) {
+        entries.push({ ...entry, type: 'Directory' })
+        for (const name of fs.readdirSync(file).sort()) visit(relative === '.' ? name : `${relative}/${name}`)
+      } else if (stat.isFile()) {
+        entries.push({ ...entry, type: 'File', bytes: fs.readFileSync(file).toString('hex') })
+      } else if (stat.isSymbolicLink()) {
+        entries.push({ ...entry, type: 'SymbolicLink', target: fs.readlinkSync(file) })
+      } else {
+        throw new Error(`Unexpected admission fixture member: ${relative}`)
+      }
+    }
+    visit('.')
+    return entries
+  }
+  const parentDirectory = path.join(root, 'unallocated-candidates')
+  try {
+    fs.writeFileSync(path.join(root, 'caller-owned-input.txt'), 'caller bytes\r\n\0中文 😀  \n', { mode: 0o640 })
+    const before = inventory()
+    await new Promise((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    return {
+      root,
+      options: {
+        sourceRoot: path.join(root, 'missing-source'),
+        parentDirectory,
+        nodeExecutable: path.join(root, 'missing-node'),
+        npmCli: path.join(root, 'missing-npm-cli.js'),
+        nodeSha256: '0'.repeat(64),
+        npmCliSha256: '0'.repeat(64),
+        toolArchive: { archivePath: path.join(root, 'missing-tools.tar'), archiveSha256: '0'.repeat(64) },
+        expectedNpmVersion: '0.0.0',
+        registry: `http://127.0.0.1:${server.address().port}`,
+      },
+      assertUnchanged() {
+        assert.deepEqual(requests, [], 'Already aborted admission cannot request the actual registry')
+        assert.equal(fs.existsSync(parentDirectory), false, 'Already aborted admission cannot allocate its candidate parent')
+        assert.deepEqual(inventory(), before, 'Already aborted admission preserves the exact private root identity and every member')
+      },
+      async dispose() {
+        for (const socket of sockets) socket.destroy()
+        try {
+          await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true })
+        }
+      },
+    }
+  } catch (error) {
+    for (const socket of sockets) socket.destroy()
+    if (server.listening) await new Promise(resolve => server.close(resolve))
+    fs.rmSync(root, { recursive: true, force: true })
+    throw error
+  }
+}
+
 const installFromArchive = async options => {
   fixturePhase('npm:archive-install-enter', { archivePath: options.toolArchive.archivePath })
   try {
@@ -366,15 +444,15 @@ export function registerNpmToolArchiveTests() {
     }
     for (const reason of [new Error('cancelled before tool archive installation'), null]) {
       await t.test(`WHAT[verification-system-016] npm tool archive already aborted preserves ${reason === null ? 'null' : 'Error'} before reading missing source or archive`, async () => {
-        const fixture = await createNpmInstallFixture()
+        const fixture = await createAbortedNpmAdmissionFixture()
         try {
+          fixture.assertUnchanged()
           const controller = new AbortController()
           controller.abort(reason)
-          const [outcome] = await Promise.allSettled([installFromArchive({ sourceRoot: path.join(fixture.root, 'missing-source'), parentDirectory: fixture.parentDirectory, toolArchive: { archivePath: path.join(fixture.root, 'missing-tools.tar'), archiveSha256: '0'.repeat(64) }, expectedNpmVersion: fixture.options.expectedNpmVersion, signal: controller.signal })])
+          const [outcome] = await Promise.allSettled([installFromArchive({ ...fixture.options, signal: controller.signal })])
           assert.equal(outcome.status, 'rejected')
           assert.equal(outcome.reason, reason)
-          assert.deepEqual(fixture.requests, [])
-          assert.deepEqual(fs.readdirSync(fixture.parentDirectory), [])
+          fixture.assertUnchanged()
         } finally {
           await fixture.dispose()
         }

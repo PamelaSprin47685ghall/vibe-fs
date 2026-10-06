@@ -44,11 +44,12 @@ module Registry =
         let byId =
             plugins |> List.map (fun plugin -> plugin.Manifest.Id, plugin) |> Map.ofList
 
-        let rec visit (id: string) (visiting: Set<string>) (acc: LockedPlugin list) =
+        let rec visit (id: string) (visiting: Set<string>) (completed: Set<string>, acc: LockedPlugin list) =
             match byId |> Map.tryFind id with
-            | None -> Ok acc
+            | None -> Ok(completed, acc)
             | Some plugin when visiting |> Set.contains id ->
                 error "plugin-cycle" (sprintf "plugin dependency cycle at %s" id)
+            | Some _ when completed |> Set.contains id -> Ok(completed, acc)
             | Some plugin ->
                 let deeper = Set.add id visiting
 
@@ -57,14 +58,14 @@ module Registry =
                 |> List.sort
                 |> List.fold
                     (fun state dep -> state |> Result.bind (fun collected -> visit dep deeper collected))
-                    (Ok acc)
-                |> Result.map (fun collected -> plugin :: collected)
+                    (Ok(completed, acc))
+                |> Result.map (fun (finished, collected) -> Set.add id finished, plugin :: collected)
 
         plugins
         |> List.map (fun plugin -> plugin.Manifest.Id)
         |> List.sort
-        |> List.fold (fun state id -> state |> Result.bind (fun acc -> visit id Set.empty acc)) (Ok [])
-        |> Result.map List.rev
+        |> List.fold (fun state id -> state |> Result.bind (fun acc -> visit id Set.empty acc)) (Ok(Set.empty, []))
+        |> Result.map (snd >> List.rev)
 
     /// Bind manifests to executables. A declared capability with no executable behind it
     /// fails here, at startup, rather than at the moment of dispatch.
@@ -90,13 +91,16 @@ module Registry =
     let bind (plugins: LockedPlugin list) : Result<LockedPlugin list, RegistryError> =
         let manifestError () =
             plugins
-            |> List.map (fun plugin -> PluginContract.validateManifest plugin.Manifest)
-            |> List.tryPick (fun outcome ->
-                match outcome with
+            |> List.tryPick (fun plugin ->
+                match PluginContract.validateManifest plugin.Manifest with
                 | Error fault ->
                     Some
                         { Code = fault.Code
                           Message = fault.Message }
+                | Ok _ when plugin.Manifest <> plugin.Execute.Manifest ->
+                    Some
+                        { Code = "plugin-manifest-mismatch"
+                          Message = sprintf "declared and executable manifests differ for plugin %s" plugin.Manifest.Id }
                 | Ok _ -> None)
 
         let dependencyProblem () =

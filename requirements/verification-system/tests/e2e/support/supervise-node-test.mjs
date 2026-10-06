@@ -72,12 +72,14 @@ function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
   })
 }
 
-function processRecords(deadline) {
+function inspectProcesses({ timeout }) {
+  return execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8', timeout })
+}
+
+function processRecords(deadline, phase, inspect = inspectProcesses) {
   const remaining = deadline - Date.now()
   if (remaining <= 0) throw new Error('Owned termination observation deadline expired')
-  const output = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], {
-    encoding: 'utf8', timeout: Math.min(PROCESS_TREE_TIMEOUT_MS, remaining),
-  })
+  const output = inspect({ phase, timeout: Math.min(PROCESS_TREE_TIMEOUT_MS, remaining) })
   if (!output.trim()) throw new Error('process inspection returned no records')
   return output.trim().split('\n').map(line => {
     const fields = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
@@ -86,7 +88,8 @@ function processRecords(deadline) {
   }).filter(record => !/^[ZX]/.test(record.state))
 }
 
-async function captureFrozenDescendantGroups(pgid, deadline) {
+async function captureFrozenDescendantGroups(pgid, deadline, inspect) {
+  if (inspect) processRecords(deadline, 'initial-capture', inspect)
   try {
     process.kill(-pgid, 'SIGSTOP')
   } catch (error) {
@@ -95,7 +98,7 @@ async function captureFrozenDescendantGroups(pgid, deadline) {
   }
   let records
   while (true) {
-    records = processRecords(deadline)
+    records = processRecords(deadline, 'freeze-confirmation', inspect)
     const owned = records.filter(record => record.group === pgid)
     if (owned.every(record => /^[Tt]/.test(record.state))) break
     if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
@@ -115,10 +118,10 @@ async function captureFrozenDescendantGroups(pgid, deadline) {
   return [...new Set(records.filter(record => descendants.has(record.pid) && record.group !== pgid).map(record => record.group))]
 }
 
-async function awaitObservedGroups(groups, deadline) {
+async function awaitObservedGroups(groups, deadline, inspect) {
   if (groups.length === 0) return
   while (true) {
-    const survivors = processRecords(deadline).filter(record => groups.includes(record.group))
+    const survivors = processRecords(deadline, 'descendant-drain', inspect).filter(record => groups.includes(record.group))
     if (survivors.length === 0) return
     if (Date.now() >= deadline) {
       throw new Error(`Observed descendant groups did not drain: ${survivors.map(record => `${record.pid}/${record.group}`).join(', ')}`)
@@ -166,6 +169,7 @@ async function verifyExitedGroup(pgid, logPrefix) {
  *   env?: NodeJS.ProcessEnv,
  *   logPrefix?: string,
  *   inner?: string,
+ *   inspectProcessTree?: (request: { phase: string, timeout: number }) => string,
  * }} opts
  * @returns {Promise<void>}
  */
@@ -176,6 +180,7 @@ export async function superviseNodeTest({
   env = process.env,
   logPrefix = 'runner',
   inner = NODE_TEST_INNER,
+  inspectProcessTree,
   // When true, suite failures throw instead of process.exit, so a parent
   // orchestrator (integration/run.mjs) can print its own group-level line
   // and continue to its final summary. Default false: existing callers
@@ -197,7 +202,7 @@ export async function superviseNodeTest({
   let result
   let failure
   try {
-    result = await superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome })
+    result = await superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree })
   } catch (error) {
     failure = { error }
   } finally {
@@ -217,9 +222,12 @@ export async function superviseNodeTest({
   return result
 }
 
-async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome }) {
+async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree }) {
+  let terminationFailure = null
   const fail = (code = 1) => {
-    throw Object.assign(new Error(`${logPrefix}: supervised suite failed (exit ${code})`), { exitCode: code })
+    throw Object.assign(new Error(`${logPrefix}: supervised suite failed (exit ${code})`, {
+      cause: terminationFailure ?? undefined,
+    }), { exitCode: code })
   }
 
   console.error(`${logPrefix}: ${files.length} test file(s), ${silenceMs}ms verdict-silence window`)
@@ -267,7 +275,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     termination = (async () => {
       let groups = []
       try {
-        if (child?.pid) groups = await captureFrozenDescendantGroups(child.pid, deadline)
+        if (child?.pid) groups = await captureFrozenDescendantGroups(child.pid, deadline, inspectProcessTree)
       } finally {
         try {
           if (child?.pid) process.kill(-child.pid, 'SIGKILL')
@@ -275,8 +283,9 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
           if (error.code !== 'ESRCH') throw error
         }
       }
-      await awaitObservedGroups(groups, deadline)
+      await awaitObservedGroups(groups, deadline, inspectProcessTree)
     })().catch(error => {
+      terminationFailure = error
       runnerError = { message: `Could not complete owned runner termination: ${error.message}` }
       console.error(`${logPrefix}: ${runnerError.message}`)
     })

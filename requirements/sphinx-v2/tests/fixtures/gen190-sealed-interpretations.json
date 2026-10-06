@@ -1,0 +1,899 @@
+{
+  "generation": 190,
+  "head": "101ff8d3522e20e0875e8c9507ba2722472ce66e",
+  "freshness": {
+    "generation": 190,
+    "compilerInputDigest": "94becf38ef47b1ebb4ac3bd801697c3c72805deea595b26458969918959d920e",
+    "generatedInputDigest": "7e1e436680aaebd7854d037e7812a3b7d15d1ac0e547713b8e481ad4d95d014a",
+    "artifactInputDigest": "845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c"
+  },
+  "manifestSha256": "0042d1ace2f8f511b0dd21d8e7cfdd4f460154b06be29ad31ec7f50f68e67299",
+  "scenarios": [
+    {
+      "name": "pending",
+      "inquiry": "legacy-interpretation-pending",
+      "events": [
+        {
+          "id": "ev6638715530347df77a7b0bf36e1d83fcc4ef3b70ee1d0469a199b6b6398ac563",
+          "parents": [],
+          "payload": {
+            "schemaVersion": "2",
+            "inquiry": "legacy-interpretation-pending",
+            "previousRevision": "0",
+            "previousHead": null,
+            "revision": "0",
+            "commandId": "first-transaction",
+            "commandFingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+            "postStateFingerprint": "d2d8905d0f40790c18a85965091a9bfd18a564d9b97252b8c0dc3a79f588f0fb",
+            "events": [
+              {
+                "case": "InquiryCreated",
+                "payload": {
+                  "goal": {
+                    "goalId": "goal-1",
+                    "revision": "0",
+                    "originalText": "实际旧 seal 捕获",
+                    "constraints": [],
+                    "materialRefs": [
+                      "artifact-not-a-payload-hash"
+                    ],
+                    "authorizationRef": "user-authorized",
+                    "createdBy": "user",
+                    "amendments": []
+                  },
+                  "resourceSpecs": [
+                    {
+                      "name": "calls",
+                      "kind": {
+                        "case": "Consumed",
+                        "unitName": "call"
+                      },
+                      "authorizedLimit": 10
+                    }
+                  ],
+                  "profileRef": "proof-profile",
+                  "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                  "renderReserve": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkPlanned",
+                "payload": {
+                  "work": [
+                    {
+                      "id": "interpretation-work",
+                      "attempt": 1,
+                      "fence": "interpretation-work:1:logical",
+                      "roundId": null,
+                      "planId": "plan-1",
+                      "producer": "proof-producer",
+                      "capability": "render",
+                      "input": {
+                        "schema": {
+                          "id": "response@2",
+                          "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                        },
+                        "canonicalPayload": "{}"
+                      },
+                      "outputSchema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "dependencies": [],
+                      "conflictKeys": [],
+                      "physicalRef": null,
+                      "reserved": [
+                        {
+                          "key": "calls",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkAttemptTransitioned",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "fromState": "Planned",
+                  "nextState": {
+                    "case": "Running",
+                    "fence": "interpretation-work:1:logical",
+                    "physicalRef": "old-fixture-physical"
+                  },
+                  "physicalRef": "old-fixture-physical"
+                }
+              },
+              {
+                "case": "ResultAccepted",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "observationId": "interpretation-observation",
+                  "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+                  "resultSchema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "clusterId": "cluster-1"
+                }
+              },
+              {
+                "case": "InterpretationPending",
+                "payload": {
+                  "observationId": "interpretation-observation",
+                  "workId": "interpretation-work",
+                  "attempt": 1
+                }
+              }
+            ]
+          },
+          "payloadRefs": [],
+          "stream": "sphinx-v2/legacy-interpretation-pending",
+          "type": "sphinx/v2-transition@2"
+        }
+      ],
+      "state": {
+        "id": "legacy-interpretation-pending",
+        "apiVersion": "2",
+        "revision": "0",
+        "eventHead": "ev6638715530347df77a7b0bf36e1d83fcc4ef3b70ee1d0469a199b6b6398ac563",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "实际旧 seal 捕获",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "interpretation-work",
+            "value": {
+              "spec": {
+                "id": "interpretation-work",
+                "attempt": 1,
+                "fence": "interpretation-work:1:logical",
+                "roundId": null,
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": "old-fixture-physical",
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Succeeded",
+                "attempt": 1
+              }
+            }
+          }
+        ],
+        "reservations": [],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "fence": "interpretation-work:1:logical",
+              "observationId": "interpretation-observation",
+              "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+              "resultSchema": {
+                "id": "response@2",
+                "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+              },
+              "clusterId": "cluster-1"
+            }
+          }
+        ],
+        "interpretations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "observationId": "interpretation-observation",
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "interpretationId": null,
+              "pluginRef": null,
+              "status": "pending",
+              "reason": null
+            }
+          }
+        ],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "first-transaction",
+            "value": {
+              "fingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+              "revision": "0",
+              "eventId": "ev6638715530347df77a7b0bf36e1d83fcc4ef3b70ee1d0469a199b6b6398ac563"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      },
+      "stateHash": "d2d8905d0f40790c18a85965091a9bfd18a564d9b97252b8c0dc3a79f588f0fb",
+      "writerBytesBase64": "eyJldmVudF9pZCI6ImV2NjYzODcxNTUzMDM0N2RmNzdhN2IwYmYzNmUxZDgzZmNjNGVmM2I3MGVlMWQwNDY5YTE5OWI2YjYzOThhYzU2MyIsImV2ZW50X3R5cGUiOiJzcGhpbngvdjItdHJhbnNpdGlvbkAyIiwicGFyZW50cyI6W10sInBheWxvYWQiOnsiY29tbWFuZEZpbmdlcnByaW50IjoiNjJmY2U2YmZiNjU1YTNhODNiOTlkZWUyMDJkZTAyMDM0ZjFmOGRjZTJjZTdmMDhmNGRlMWNjMTU0YTNlZDIyMyIsImNvbW1hbmRJZCI6ImZpcnN0LXRyYW5zYWN0aW9uIiwiZXZlbnRzIjpbeyJjYXNlIjoiSW5xdWlyeUNyZWF0ZWQiLCJwYXlsb2FkIjp7ImNvbmZpZ0hhc2giOiJhOWZhNTIzZGJmOWM0NDMwMWNkZWU1YmQxYWU0MDkyYzc0ZjRlYmNjMzAyZDc1YzQxMjRkMjg4MjZlYTAxZDI5IiwiZ29hbCI6eyJhbWVuZG1lbnRzIjpbXSwiYXV0aG9yaXphdGlvblJlZiI6InVzZXItYXV0aG9yaXplZCIsImNvbnN0cmFpbnRzIjpbXSwiY3JlYXRlZEJ5IjoidXNlciIsImdvYWxJZCI6ImdvYWwtMSIsIm1hdGVyaWFsUmVmcyI6WyJhcnRpZmFjdC1ub3QtYS1wYXlsb2FkLWhhc2giXSwib3JpZ2luYWxUZXh0Ijoi5a6e6ZmF5penIHNlYWwg5o2V6I63IiwicmV2aXNpb24iOiIwIn0sInByb2ZpbGVSZWYiOiJwcm9vZi1wcm9maWxlIiwicmVuZGVyUmVzZXJ2ZSI6W3sia2V5IjoiY2FsbHMiLCJ2YWx1ZSI6MX1dLCJyZXNvdXJjZVNwZWNzIjpbeyJhdXRob3JpemVkTGltaXQiOjEwLCJraW5kIjp7ImNhc2UiOiJDb25zdW1lZCIsInVuaXROYW1lIjoiY2FsbCJ9LCJuYW1lIjoiY2FsbHMifV19fSx7ImNhc2UiOiJXb3JrUGxhbm5lZCIsInBheWxvYWQiOnsid29yayI6W3siYXR0ZW1wdCI6MSwiY2FwYWJpbGl0eSI6InJlbmRlciIsImNvbmZsaWN0S2V5cyI6W10sImRlcGVuZGVuY2llcyI6W10sImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJpZCI6ImludGVycHJldGF0aW9uLXdvcmsiLCJpbnB1dCI6eyJjYW5vbmljYWxQYXlsb2FkIjoie30iLCJzY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifX0sIm91dHB1dFNjaGVtYSI6eyJoYXNoIjoiYTJjNzk5MjYyYTNjZTNjMTllZjVjZGQ5ODNiZjNkMTJiNDNhYjNjNDI2MjI3MDkxYjkwOWRjYjcwNTQ3MzhjMCIsImlkIjoicmVzcG9uc2VAMiJ9LCJwaHlzaWNhbFJlZiI6bnVsbCwicGxhbklkIjoicGxhbi0xIiwicHJvZHVjZXIiOiJwcm9vZi1wcm9kdWNlciIsInJlc2VydmVkIjpbeyJrZXkiOiJjYWxscyIsInZhbHVlIjoxfV0sInJvdW5kSWQiOm51bGx9XX19LHsiY2FzZSI6IldvcmtBdHRlbXB0VHJhbnNpdGlvbmVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJmZW5jZSI6ImludGVycHJldGF0aW9uLXdvcms6MTpsb2dpY2FsIiwiZnJvbVN0YXRlIjoiUGxhbm5lZCIsIm5leHRTdGF0ZSI6eyJjYXNlIjoiUnVubmluZyIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJwaHlzaWNhbFJlZiI6Im9sZC1maXh0dXJlLXBoeXNpY2FsIn0sInBoeXNpY2FsUmVmIjoib2xkLWZpeHR1cmUtcGh5c2ljYWwiLCJ3b3JrSWQiOiJpbnRlcnByZXRhdGlvbi13b3JrIn19LHsiY2FzZSI6IlJlc3VsdEFjY2VwdGVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJjYW5vbmljYWxSZXN1bHQiOiJ7XCJhbnN3ZXJcIjpcIuWOn+Wni+WbnuetlFxcclxcbuS/neeVmVwifSIsImNsdXN0ZXJJZCI6ImNsdXN0ZXItMSIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJvYnNlcnZhdGlvbklkIjoiaW50ZXJwcmV0YXRpb24tb2JzZXJ2YXRpb24iLCJyZXN1bHRTY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifSwid29ya0lkIjoiaW50ZXJwcmV0YXRpb24td29yayJ9fSx7ImNhc2UiOiJJbnRlcnByZXRhdGlvblBlbmRpbmciLCJwYXlsb2FkIjp7ImF0dGVtcHQiOjEsIm9ic2VydmF0aW9uSWQiOiJpbnRlcnByZXRhdGlvbi1vYnNlcnZhdGlvbiIsIndvcmtJZCI6ImludGVycHJldGF0aW9uLXdvcmsifX1dLCJpbnF1aXJ5IjoibGVnYWN5LWludGVycHJldGF0aW9uLXBlbmRpbmciLCJwb3N0U3RhdGVGaW5nZXJwcmludCI6ImQyZDg5MDVkMGY0MDc5MGMxOGE4NTk2NTA5MWE5YmZkMThhNTY0ZDliOTcyNTJiOGMwZGMzYTc5ZjU4OGYwZmIiLCJwcmV2aW91c0hlYWQiOm51bGwsInByZXZpb3VzUmV2aXNpb24iOiIwIiwicmV2aXNpb24iOiIwIiwic2NoZW1hVmVyc2lvbiI6IjIifSwicGF5bG9hZF9yZWZzIjpbXSwic3RyZWFtX2lkIjoic3BoaW54LXYyL2xlZ2FjeS1pbnRlcnByZXRhdGlvbi1wZW5kaW5nIn0K",
+      "writerBytesSha256": "fbe2c70a119809f3e0ce4aa5af88b2223c0f31343868e96fa07db0c8d2554700"
+    },
+    {
+      "name": "applied-noop",
+      "inquiry": "legacy-interpretation-applied-noop",
+      "events": [
+        {
+          "id": "ev7eac4b7d1225fa1e73ccb798236d88bcbf60809590532cb42158ad6d0e382fb6",
+          "parents": [],
+          "payload": {
+            "schemaVersion": "2",
+            "inquiry": "legacy-interpretation-applied-noop",
+            "previousRevision": "0",
+            "previousHead": null,
+            "revision": "0",
+            "commandId": "first-transaction",
+            "commandFingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+            "postStateFingerprint": "93b2a2a86d6cb7a36b08813b93a1cc6846ff7b305f3345e8e08da95f758efb43",
+            "events": [
+              {
+                "case": "InquiryCreated",
+                "payload": {
+                  "goal": {
+                    "goalId": "goal-1",
+                    "revision": "0",
+                    "originalText": "实际旧 seal 捕获",
+                    "constraints": [],
+                    "materialRefs": [
+                      "artifact-not-a-payload-hash"
+                    ],
+                    "authorizationRef": "user-authorized",
+                    "createdBy": "user",
+                    "amendments": []
+                  },
+                  "resourceSpecs": [
+                    {
+                      "name": "calls",
+                      "kind": {
+                        "case": "Consumed",
+                        "unitName": "call"
+                      },
+                      "authorizedLimit": 10
+                    }
+                  ],
+                  "profileRef": "proof-profile",
+                  "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                  "renderReserve": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkPlanned",
+                "payload": {
+                  "work": [
+                    {
+                      "id": "interpretation-work",
+                      "attempt": 1,
+                      "fence": "interpretation-work:1:logical",
+                      "roundId": null,
+                      "planId": "plan-1",
+                      "producer": "proof-producer",
+                      "capability": "render",
+                      "input": {
+                        "schema": {
+                          "id": "response@2",
+                          "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                        },
+                        "canonicalPayload": "{}"
+                      },
+                      "outputSchema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "dependencies": [],
+                      "conflictKeys": [],
+                      "physicalRef": null,
+                      "reserved": [
+                        {
+                          "key": "calls",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkAttemptTransitioned",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "fromState": "Planned",
+                  "nextState": {
+                    "case": "Running",
+                    "fence": "interpretation-work:1:logical",
+                    "physicalRef": "old-fixture-physical"
+                  },
+                  "physicalRef": "old-fixture-physical"
+                }
+              },
+              {
+                "case": "ResultAccepted",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "observationId": "interpretation-observation",
+                  "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+                  "resultSchema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "clusterId": "cluster-1"
+                }
+              },
+              {
+                "case": "InterpretationPending",
+                "payload": {
+                  "observationId": "interpretation-observation",
+                  "workId": "interpretation-work",
+                  "attempt": 1
+                }
+              }
+            ]
+          },
+          "payloadRefs": [],
+          "stream": "sphinx-v2/legacy-interpretation-applied-noop",
+          "type": "sphinx/v2-transition@2"
+        },
+        {
+          "id": "evf0ba0b67c4714a1c41c9fdb08ffe18bf9ca04d1774b0c9b101c86934d643b404",
+          "parents": [
+            "ev7eac4b7d1225fa1e73ccb798236d88bcbf60809590532cb42158ad6d0e382fb6"
+          ],
+          "payload": {
+            "schemaVersion": "2",
+            "inquiry": "legacy-interpretation-applied-noop",
+            "previousRevision": "0",
+            "previousHead": "ev7eac4b7d1225fa1e73ccb798236d88bcbf60809590532cb42158ad6d0e382fb6",
+            "revision": "1",
+            "commandId": "old-outcome",
+            "commandFingerprint": "f0e3ff22947f7b12a59d62abea17730a087d52c8ffbf6847266c7cc668bd635b",
+            "postStateFingerprint": "2fcb765fe03e81bc02ccaff143fec2226ae300250c7371418c0bec72cbffce2d",
+            "events": [
+              {
+                "case": "InterpretationApplied",
+                "payload": {
+                  "observationId": "interpretation-observation",
+                  "interpretationId": "interpretation-receipt",
+                  "pluginRef": "proof-plugin@old",
+                  "delta": {
+                    "schema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "canonicalPayload": "{\"fact\":\"opaque interpreted payload\"}"
+                  }
+                }
+              }
+            ]
+          },
+          "payloadRefs": [],
+          "stream": "sphinx-v2/legacy-interpretation-applied-noop",
+          "type": "sphinx/v2-transition@2"
+        }
+      ],
+      "state": {
+        "id": "legacy-interpretation-applied-noop",
+        "apiVersion": "2",
+        "revision": "1",
+        "eventHead": "evf0ba0b67c4714a1c41c9fdb08ffe18bf9ca04d1774b0c9b101c86934d643b404",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "实际旧 seal 捕获",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "interpretation-work",
+            "value": {
+              "spec": {
+                "id": "interpretation-work",
+                "attempt": 1,
+                "fence": "interpretation-work:1:logical",
+                "roundId": null,
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": "old-fixture-physical",
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Succeeded",
+                "attempt": 1
+              }
+            }
+          }
+        ],
+        "reservations": [],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "fence": "interpretation-work:1:logical",
+              "observationId": "interpretation-observation",
+              "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+              "resultSchema": {
+                "id": "response@2",
+                "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+              },
+              "clusterId": "cluster-1"
+            }
+          }
+        ],
+        "interpretations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "observationId": "interpretation-observation",
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "interpretationId": null,
+              "pluginRef": null,
+              "status": "pending",
+              "reason": null
+            }
+          }
+        ],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "first-transaction",
+            "value": {
+              "fingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+              "revision": "0",
+              "eventId": "ev7eac4b7d1225fa1e73ccb798236d88bcbf60809590532cb42158ad6d0e382fb6"
+            }
+          },
+          {
+            "key": "old-outcome",
+            "value": {
+              "fingerprint": "f0e3ff22947f7b12a59d62abea17730a087d52c8ffbf6847266c7cc668bd635b",
+              "revision": "1",
+              "eventId": "evf0ba0b67c4714a1c41c9fdb08ffe18bf9ca04d1774b0c9b101c86934d643b404"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      },
+      "stateHash": "2fcb765fe03e81bc02ccaff143fec2226ae300250c7371418c0bec72cbffce2d",
+      "writerBytesBase64": "eyJldmVudF9pZCI6ImV2N2VhYzRiN2QxMjI1ZmExZTczY2NiNzk4MjM2ZDg4YmNiZjYwODA5NTkwNTMyY2I0MjE1OGFkNmQwZTM4MmZiNiIsImV2ZW50X3R5cGUiOiJzcGhpbngvdjItdHJhbnNpdGlvbkAyIiwicGFyZW50cyI6W10sInBheWxvYWQiOnsiY29tbWFuZEZpbmdlcnByaW50IjoiNjJmY2U2YmZiNjU1YTNhODNiOTlkZWUyMDJkZTAyMDM0ZjFmOGRjZTJjZTdmMDhmNGRlMWNjMTU0YTNlZDIyMyIsImNvbW1hbmRJZCI6ImZpcnN0LXRyYW5zYWN0aW9uIiwiZXZlbnRzIjpbeyJjYXNlIjoiSW5xdWlyeUNyZWF0ZWQiLCJwYXlsb2FkIjp7ImNvbmZpZ0hhc2giOiJhOWZhNTIzZGJmOWM0NDMwMWNkZWU1YmQxYWU0MDkyYzc0ZjRlYmNjMzAyZDc1YzQxMjRkMjg4MjZlYTAxZDI5IiwiZ29hbCI6eyJhbWVuZG1lbnRzIjpbXSwiYXV0aG9yaXphdGlvblJlZiI6InVzZXItYXV0aG9yaXplZCIsImNvbnN0cmFpbnRzIjpbXSwiY3JlYXRlZEJ5IjoidXNlciIsImdvYWxJZCI6ImdvYWwtMSIsIm1hdGVyaWFsUmVmcyI6WyJhcnRpZmFjdC1ub3QtYS1wYXlsb2FkLWhhc2giXSwib3JpZ2luYWxUZXh0Ijoi5a6e6ZmF5penIHNlYWwg5o2V6I63IiwicmV2aXNpb24iOiIwIn0sInByb2ZpbGVSZWYiOiJwcm9vZi1wcm9maWxlIiwicmVuZGVyUmVzZXJ2ZSI6W3sia2V5IjoiY2FsbHMiLCJ2YWx1ZSI6MX1dLCJyZXNvdXJjZVNwZWNzIjpbeyJhdXRob3JpemVkTGltaXQiOjEwLCJraW5kIjp7ImNhc2UiOiJDb25zdW1lZCIsInVuaXROYW1lIjoiY2FsbCJ9LCJuYW1lIjoiY2FsbHMifV19fSx7ImNhc2UiOiJXb3JrUGxhbm5lZCIsInBheWxvYWQiOnsid29yayI6W3siYXR0ZW1wdCI6MSwiY2FwYWJpbGl0eSI6InJlbmRlciIsImNvbmZsaWN0S2V5cyI6W10sImRlcGVuZGVuY2llcyI6W10sImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJpZCI6ImludGVycHJldGF0aW9uLXdvcmsiLCJpbnB1dCI6eyJjYW5vbmljYWxQYXlsb2FkIjoie30iLCJzY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifX0sIm91dHB1dFNjaGVtYSI6eyJoYXNoIjoiYTJjNzk5MjYyYTNjZTNjMTllZjVjZGQ5ODNiZjNkMTJiNDNhYjNjNDI2MjI3MDkxYjkwOWRjYjcwNTQ3MzhjMCIsImlkIjoicmVzcG9uc2VAMiJ9LCJwaHlzaWNhbFJlZiI6bnVsbCwicGxhbklkIjoicGxhbi0xIiwicHJvZHVjZXIiOiJwcm9vZi1wcm9kdWNlciIsInJlc2VydmVkIjpbeyJrZXkiOiJjYWxscyIsInZhbHVlIjoxfV0sInJvdW5kSWQiOm51bGx9XX19LHsiY2FzZSI6IldvcmtBdHRlbXB0VHJhbnNpdGlvbmVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJmZW5jZSI6ImludGVycHJldGF0aW9uLXdvcms6MTpsb2dpY2FsIiwiZnJvbVN0YXRlIjoiUGxhbm5lZCIsIm5leHRTdGF0ZSI6eyJjYXNlIjoiUnVubmluZyIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJwaHlzaWNhbFJlZiI6Im9sZC1maXh0dXJlLXBoeXNpY2FsIn0sInBoeXNpY2FsUmVmIjoib2xkLWZpeHR1cmUtcGh5c2ljYWwiLCJ3b3JrSWQiOiJpbnRlcnByZXRhdGlvbi13b3JrIn19LHsiY2FzZSI6IlJlc3VsdEFjY2VwdGVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJjYW5vbmljYWxSZXN1bHQiOiJ7XCJhbnN3ZXJcIjpcIuWOn+Wni+WbnuetlFxcclxcbuS/neeVmVwifSIsImNsdXN0ZXJJZCI6ImNsdXN0ZXItMSIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJvYnNlcnZhdGlvbklkIjoiaW50ZXJwcmV0YXRpb24tb2JzZXJ2YXRpb24iLCJyZXN1bHRTY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifSwid29ya0lkIjoiaW50ZXJwcmV0YXRpb24td29yayJ9fSx7ImNhc2UiOiJJbnRlcnByZXRhdGlvblBlbmRpbmciLCJwYXlsb2FkIjp7ImF0dGVtcHQiOjEsIm9ic2VydmF0aW9uSWQiOiJpbnRlcnByZXRhdGlvbi1vYnNlcnZhdGlvbiIsIndvcmtJZCI6ImludGVycHJldGF0aW9uLXdvcmsifX1dLCJpbnF1aXJ5IjoibGVnYWN5LWludGVycHJldGF0aW9uLWFwcGxpZWQtbm9vcCIsInBvc3RTdGF0ZUZpbmdlcnByaW50IjoiOTNiMmEyYTg2ZDZjYjdhMzZiMDg4MTNiOTNhMWNjNjg0NmZmN2IzMDVmMzM0NWU4ZTA4ZGE5NWY3NThlZmI0MyIsInByZXZpb3VzSGVhZCI6bnVsbCwicHJldmlvdXNSZXZpc2lvbiI6IjAiLCJyZXZpc2lvbiI6IjAiLCJzY2hlbWFWZXJzaW9uIjoiMiJ9LCJwYXlsb2FkX3JlZnMiOltdLCJzdHJlYW1faWQiOiJzcGhpbngtdjIvbGVnYWN5LWludGVycHJldGF0aW9uLWFwcGxpZWQtbm9vcCJ9CnsiZXZlbnRfaWQiOiJldmYwYmEwYjY3YzQ3MTRhMWM0MWM5ZmRiMDhmZmUxOGJmOWNhMDRkMTc3NGIwYzliMTAxYzg2OTM0ZDY0M2I0MDQiLCJldmVudF90eXBlIjoic3BoaW54L3YyLXRyYW5zaXRpb25AMiIsInBhcmVudHMiOlsiZXY3ZWFjNGI3ZDEyMjVmYTFlNzNjY2I3OTgyMzZkODhiY2JmNjA4MDk1OTA1MzJjYjQyMTU4YWQ2ZDBlMzgyZmI2Il0sInBheWxvYWQiOnsiY29tbWFuZEZpbmdlcnByaW50IjoiZjBlM2ZmMjI5NDdmN2IxMmE1OWQ2MmFiZWExNzczMGEwODdkNTJjOGZmYmY2ODQ3MjY2YzdjYzY2OGJkNjM1YiIsImNvbW1hbmRJZCI6Im9sZC1vdXRjb21lIiwiZXZlbnRzIjpbeyJjYXNlIjoiSW50ZXJwcmV0YXRpb25BcHBsaWVkIiwicGF5bG9hZCI6eyJkZWx0YSI6eyJjYW5vbmljYWxQYXlsb2FkIjoie1wiZmFjdFwiOlwib3BhcXVlIGludGVycHJldGVkIHBheWxvYWRcIn0iLCJzY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifX0sImludGVycHJldGF0aW9uSWQiOiJpbnRlcnByZXRhdGlvbi1yZWNlaXB0Iiwib2JzZXJ2YXRpb25JZCI6ImludGVycHJldGF0aW9uLW9ic2VydmF0aW9uIiwicGx1Z2luUmVmIjoicHJvb2YtcGx1Z2luQG9sZCJ9fV0sImlucXVpcnkiOiJsZWdhY3ktaW50ZXJwcmV0YXRpb24tYXBwbGllZC1ub29wIiwicG9zdFN0YXRlRmluZ2VycHJpbnQiOiIyZmNiNzY1ZmUwM2U4MWJjMDJjY2FmZjE0M2ZlYzIyMjZhZTMwMDI1MGM3MzcxNDE4YzBiZWM3MmNiZmZjZTJkIiwicHJldmlvdXNIZWFkIjoiZXY3ZWFjNGI3ZDEyMjVmYTFlNzNjY2I3OTgyMzZkODhiY2JmNjA4MDk1OTA1MzJjYjQyMTU4YWQ2ZDBlMzgyZmI2IiwicHJldmlvdXNSZXZpc2lvbiI6IjAiLCJyZXZpc2lvbiI6IjEiLCJzY2hlbWFWZXJzaW9uIjoiMiJ9LCJwYXlsb2FkX3JlZnMiOltdLCJzdHJlYW1faWQiOiJzcGhpbngtdjIvbGVnYWN5LWludGVycHJldGF0aW9uLWFwcGxpZWQtbm9vcCJ9Cg==",
+      "writerBytesSha256": "7d72d1e515aa1e52fdb453fabc22678fc02d9e043020fdb4c63c3b02c72e50fc"
+    },
+    {
+      "name": "failed-noop",
+      "inquiry": "legacy-interpretation-failed-noop",
+      "events": [
+        {
+          "id": "ev2ab969e04d3f5fd4c62dca003a03ee0a112463d7683735bd13c47efb05af793a",
+          "parents": [],
+          "payload": {
+            "schemaVersion": "2",
+            "inquiry": "legacy-interpretation-failed-noop",
+            "previousRevision": "0",
+            "previousHead": null,
+            "revision": "0",
+            "commandId": "first-transaction",
+            "commandFingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+            "postStateFingerprint": "fef030d86b2d8bbad42787796f252a7f53d7c830b39edf399a5c7c96daf4fc66",
+            "events": [
+              {
+                "case": "InquiryCreated",
+                "payload": {
+                  "goal": {
+                    "goalId": "goal-1",
+                    "revision": "0",
+                    "originalText": "实际旧 seal 捕获",
+                    "constraints": [],
+                    "materialRefs": [
+                      "artifact-not-a-payload-hash"
+                    ],
+                    "authorizationRef": "user-authorized",
+                    "createdBy": "user",
+                    "amendments": []
+                  },
+                  "resourceSpecs": [
+                    {
+                      "name": "calls",
+                      "kind": {
+                        "case": "Consumed",
+                        "unitName": "call"
+                      },
+                      "authorizedLimit": 10
+                    }
+                  ],
+                  "profileRef": "proof-profile",
+                  "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                  "renderReserve": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkPlanned",
+                "payload": {
+                  "work": [
+                    {
+                      "id": "interpretation-work",
+                      "attempt": 1,
+                      "fence": "interpretation-work:1:logical",
+                      "roundId": null,
+                      "planId": "plan-1",
+                      "producer": "proof-producer",
+                      "capability": "render",
+                      "input": {
+                        "schema": {
+                          "id": "response@2",
+                          "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                        },
+                        "canonicalPayload": "{}"
+                      },
+                      "outputSchema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "dependencies": [],
+                      "conflictKeys": [],
+                      "physicalRef": null,
+                      "reserved": [
+                        {
+                          "key": "calls",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "case": "WorkAttemptTransitioned",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "fromState": "Planned",
+                  "nextState": {
+                    "case": "Running",
+                    "fence": "interpretation-work:1:logical",
+                    "physicalRef": "old-fixture-physical"
+                  },
+                  "physicalRef": "old-fixture-physical"
+                }
+              },
+              {
+                "case": "ResultAccepted",
+                "payload": {
+                  "workId": "interpretation-work",
+                  "attempt": 1,
+                  "fence": "interpretation-work:1:logical",
+                  "observationId": "interpretation-observation",
+                  "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+                  "resultSchema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "clusterId": "cluster-1"
+                }
+              },
+              {
+                "case": "InterpretationPending",
+                "payload": {
+                  "observationId": "interpretation-observation",
+                  "workId": "interpretation-work",
+                  "attempt": 1
+                }
+              }
+            ]
+          },
+          "payloadRefs": [],
+          "stream": "sphinx-v2/legacy-interpretation-failed-noop",
+          "type": "sphinx/v2-transition@2"
+        },
+        {
+          "id": "ev6a1e99086062864ebeac3f84305dbb12adcd8ff1ab5512a4f359ef5247562901",
+          "parents": [
+            "ev2ab969e04d3f5fd4c62dca003a03ee0a112463d7683735bd13c47efb05af793a"
+          ],
+          "payload": {
+            "schemaVersion": "2",
+            "inquiry": "legacy-interpretation-failed-noop",
+            "previousRevision": "0",
+            "previousHead": "ev2ab969e04d3f5fd4c62dca003a03ee0a112463d7683735bd13c47efb05af793a",
+            "revision": "1",
+            "commandId": "old-outcome",
+            "commandFingerprint": "f0e3ff22947f7b12a59d62abea17730a087d52c8ffbf6847266c7cc668bd635b",
+            "postStateFingerprint": "c90ac7ae0fb9750f9f4dde126a386082f3dfec5de4d198a574e19b56c152fa58",
+            "events": [
+              {
+                "case": "InterpretationFailed",
+                "payload": {
+                  "observationId": "interpretation-observation",
+                  "interpretationId": "interpretation-receipt",
+                  "pluginRef": "proof-plugin@old",
+                  "reason": "真实旧解释异常\r\n原样保留"
+                }
+              }
+            ]
+          },
+          "payloadRefs": [],
+          "stream": "sphinx-v2/legacy-interpretation-failed-noop",
+          "type": "sphinx/v2-transition@2"
+        }
+      ],
+      "state": {
+        "id": "legacy-interpretation-failed-noop",
+        "apiVersion": "2",
+        "revision": "1",
+        "eventHead": "ev6a1e99086062864ebeac3f84305dbb12adcd8ff1ab5512a4f359ef5247562901",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "实际旧 seal 捕获",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "interpretation-work",
+            "value": {
+              "spec": {
+                "id": "interpretation-work",
+                "attempt": 1,
+                "fence": "interpretation-work:1:logical",
+                "roundId": null,
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": "old-fixture-physical",
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Succeeded",
+                "attempt": 1
+              }
+            }
+          }
+        ],
+        "reservations": [],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "fence": "interpretation-work:1:logical",
+              "observationId": "interpretation-observation",
+              "canonicalResult": "{\"answer\":\"原始回答\\r\\n保留\"}",
+              "resultSchema": {
+                "id": "response@2",
+                "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+              },
+              "clusterId": "cluster-1"
+            }
+          }
+        ],
+        "interpretations": [
+          {
+            "key": "interpretation-observation",
+            "value": {
+              "observationId": "interpretation-observation",
+              "workId": "interpretation-work",
+              "attempt": 1,
+              "interpretationId": null,
+              "pluginRef": null,
+              "status": "pending",
+              "reason": null
+            }
+          }
+        ],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "first-transaction",
+            "value": {
+              "fingerprint": "62fce6bfb655a3a83b99dee202de02034f1f8dce2ce7f08f4de1cc154a3ed223",
+              "revision": "0",
+              "eventId": "ev2ab969e04d3f5fd4c62dca003a03ee0a112463d7683735bd13c47efb05af793a"
+            }
+          },
+          {
+            "key": "old-outcome",
+            "value": {
+              "fingerprint": "f0e3ff22947f7b12a59d62abea17730a087d52c8ffbf6847266c7cc668bd635b",
+              "revision": "1",
+              "eventId": "ev6a1e99086062864ebeac3f84305dbb12adcd8ff1ab5512a4f359ef5247562901"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      },
+      "stateHash": "c90ac7ae0fb9750f9f4dde126a386082f3dfec5de4d198a574e19b56c152fa58",
+      "writerBytesBase64": "eyJldmVudF9pZCI6ImV2MmFiOTY5ZTA0ZDNmNWZkNGM2MmRjYTAwM2EwM2VlMGExMTI0NjNkNzY4MzczNWJkMTNjNDdlZmIwNWFmNzkzYSIsImV2ZW50X3R5cGUiOiJzcGhpbngvdjItdHJhbnNpdGlvbkAyIiwicGFyZW50cyI6W10sInBheWxvYWQiOnsiY29tbWFuZEZpbmdlcnByaW50IjoiNjJmY2U2YmZiNjU1YTNhODNiOTlkZWUyMDJkZTAyMDM0ZjFmOGRjZTJjZTdmMDhmNGRlMWNjMTU0YTNlZDIyMyIsImNvbW1hbmRJZCI6ImZpcnN0LXRyYW5zYWN0aW9uIiwiZXZlbnRzIjpbeyJjYXNlIjoiSW5xdWlyeUNyZWF0ZWQiLCJwYXlsb2FkIjp7ImNvbmZpZ0hhc2giOiJhOWZhNTIzZGJmOWM0NDMwMWNkZWU1YmQxYWU0MDkyYzc0ZjRlYmNjMzAyZDc1YzQxMjRkMjg4MjZlYTAxZDI5IiwiZ29hbCI6eyJhbWVuZG1lbnRzIjpbXSwiYXV0aG9yaXphdGlvblJlZiI6InVzZXItYXV0aG9yaXplZCIsImNvbnN0cmFpbnRzIjpbXSwiY3JlYXRlZEJ5IjoidXNlciIsImdvYWxJZCI6ImdvYWwtMSIsIm1hdGVyaWFsUmVmcyI6WyJhcnRpZmFjdC1ub3QtYS1wYXlsb2FkLWhhc2giXSwib3JpZ2luYWxUZXh0Ijoi5a6e6ZmF5penIHNlYWwg5o2V6I63IiwicmV2aXNpb24iOiIwIn0sInByb2ZpbGVSZWYiOiJwcm9vZi1wcm9maWxlIiwicmVuZGVyUmVzZXJ2ZSI6W3sia2V5IjoiY2FsbHMiLCJ2YWx1ZSI6MX1dLCJyZXNvdXJjZVNwZWNzIjpbeyJhdXRob3JpemVkTGltaXQiOjEwLCJraW5kIjp7ImNhc2UiOiJDb25zdW1lZCIsInVuaXROYW1lIjoiY2FsbCJ9LCJuYW1lIjoiY2FsbHMifV19fSx7ImNhc2UiOiJXb3JrUGxhbm5lZCIsInBheWxvYWQiOnsid29yayI6W3siYXR0ZW1wdCI6MSwiY2FwYWJpbGl0eSI6InJlbmRlciIsImNvbmZsaWN0S2V5cyI6W10sImRlcGVuZGVuY2llcyI6W10sImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJpZCI6ImludGVycHJldGF0aW9uLXdvcmsiLCJpbnB1dCI6eyJjYW5vbmljYWxQYXlsb2FkIjoie30iLCJzY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifX0sIm91dHB1dFNjaGVtYSI6eyJoYXNoIjoiYTJjNzk5MjYyYTNjZTNjMTllZjVjZGQ5ODNiZjNkMTJiNDNhYjNjNDI2MjI3MDkxYjkwOWRjYjcwNTQ3MzhjMCIsImlkIjoicmVzcG9uc2VAMiJ9LCJwaHlzaWNhbFJlZiI6bnVsbCwicGxhbklkIjoicGxhbi0xIiwicHJvZHVjZXIiOiJwcm9vZi1wcm9kdWNlciIsInJlc2VydmVkIjpbeyJrZXkiOiJjYWxscyIsInZhbHVlIjoxfV0sInJvdW5kSWQiOm51bGx9XX19LHsiY2FzZSI6IldvcmtBdHRlbXB0VHJhbnNpdGlvbmVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJmZW5jZSI6ImludGVycHJldGF0aW9uLXdvcms6MTpsb2dpY2FsIiwiZnJvbVN0YXRlIjoiUGxhbm5lZCIsIm5leHRTdGF0ZSI6eyJjYXNlIjoiUnVubmluZyIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJwaHlzaWNhbFJlZiI6Im9sZC1maXh0dXJlLXBoeXNpY2FsIn0sInBoeXNpY2FsUmVmIjoib2xkLWZpeHR1cmUtcGh5c2ljYWwiLCJ3b3JrSWQiOiJpbnRlcnByZXRhdGlvbi13b3JrIn19LHsiY2FzZSI6IlJlc3VsdEFjY2VwdGVkIiwicGF5bG9hZCI6eyJhdHRlbXB0IjoxLCJjYW5vbmljYWxSZXN1bHQiOiJ7XCJhbnN3ZXJcIjpcIuWOn+Wni+WbnuetlFxcclxcbuS/neeVmVwifSIsImNsdXN0ZXJJZCI6ImNsdXN0ZXItMSIsImZlbmNlIjoiaW50ZXJwcmV0YXRpb24td29yazoxOmxvZ2ljYWwiLCJvYnNlcnZhdGlvbklkIjoiaW50ZXJwcmV0YXRpb24tb2JzZXJ2YXRpb24iLCJyZXN1bHRTY2hlbWEiOnsiaGFzaCI6ImEyYzc5OTI2MmEzY2UzYzE5ZWY1Y2RkOTgzYmYzZDEyYjQzYWIzYzQyNjIyNzA5MWI5MDlkY2I3MDU0NzM4YzAiLCJpZCI6InJlc3BvbnNlQDIifSwid29ya0lkIjoiaW50ZXJwcmV0YXRpb24td29yayJ9fSx7ImNhc2UiOiJJbnRlcnByZXRhdGlvblBlbmRpbmciLCJwYXlsb2FkIjp7ImF0dGVtcHQiOjEsIm9ic2VydmF0aW9uSWQiOiJpbnRlcnByZXRhdGlvbi1vYnNlcnZhdGlvbiIsIndvcmtJZCI6ImludGVycHJldGF0aW9uLXdvcmsifX1dLCJpbnF1aXJ5IjoibGVnYWN5LWludGVycHJldGF0aW9uLWZhaWxlZC1ub29wIiwicG9zdFN0YXRlRmluZ2VycHJpbnQiOiJmZWYwMzBkODZiMmQ4YmJhZDQyNzg3Nzk2ZjI1MmE3ZjUzZDdjODMwYjM5ZWRmMzk5YTVjN2M5NmRhZjRmYzY2IiwicHJldmlvdXNIZWFkIjpudWxsLCJwcmV2aW91c1JldmlzaW9uIjoiMCIsInJldmlzaW9uIjoiMCIsInNjaGVtYVZlcnNpb24iOiIyIn0sInBheWxvYWRfcmVmcyI6W10sInN0cmVhbV9pZCI6InNwaGlueC12Mi9sZWdhY3ktaW50ZXJwcmV0YXRpb24tZmFpbGVkLW5vb3AifQp7ImV2ZW50X2lkIjoiZXY2YTFlOTkwODYwNjI4NjRlYmVhYzNmODQzMDVkYmIxMmFkY2Q4ZmYxYWI1NTEyYTRmMzU5ZWY1MjQ3NTYyOTAxIiwiZXZlbnRfdHlwZSI6InNwaGlueC92Mi10cmFuc2l0aW9uQDIiLCJwYXJlbnRzIjpbImV2MmFiOTY5ZTA0ZDNmNWZkNGM2MmRjYTAwM2EwM2VlMGExMTI0NjNkNzY4MzczNWJkMTNjNDdlZmIwNWFmNzkzYSJdLCJwYXlsb2FkIjp7ImNvbW1hbmRGaW5nZXJwcmludCI6ImYwZTNmZjIyOTQ3ZjdiMTJhNTlkNjJhYmVhMTc3MzBhMDg3ZDUyYzhmZmJmNjg0NzI2NmM3Y2M2NjhiZDYzNWIiLCJjb21tYW5kSWQiOiJvbGQtb3V0Y29tZSIsImV2ZW50cyI6W3siY2FzZSI6IkludGVycHJldGF0aW9uRmFpbGVkIiwicGF5bG9hZCI6eyJpbnRlcnByZXRhdGlvbklkIjoiaW50ZXJwcmV0YXRpb24tcmVjZWlwdCIsIm9ic2VydmF0aW9uSWQiOiJpbnRlcnByZXRhdGlvbi1vYnNlcnZhdGlvbiIsInBsdWdpblJlZiI6InByb29mLXBsdWdpbkBvbGQiLCJyZWFzb24iOiLnnJ/lrp7ml6fop6Pph4rlvILluLhcclxu5Y6f5qC35L+d55WZIn19XSwiaW5xdWlyeSI6ImxlZ2FjeS1pbnRlcnByZXRhdGlvbi1mYWlsZWQtbm9vcCIsInBvc3RTdGF0ZUZpbmdlcnByaW50IjoiYzkwYWM3YWUwZmI5NzUwZjlmNGRkZTEyNmEzODYwODJmM2RmZWM1ZGU0ZDE5OGE1NzRlMTliNTZjMTUyZmE1OCIsInByZXZpb3VzSGVhZCI6ImV2MmFiOTY5ZTA0ZDNmNWZkNGM2MmRjYTAwM2EwM2VlMGExMTI0NjNkNzY4MzczNWJkMTNjNDdlZmIwNWFmNzkzYSIsInByZXZpb3VzUmV2aXNpb24iOiIwIiwicmV2aXNpb24iOiIxIiwic2NoZW1hVmVyc2lvbiI6IjIifSwicGF5bG9hZF9yZWZzIjpbXSwic3RyZWFtX2lkIjoic3BoaW54LXYyL2xlZ2FjeS1pbnRlcnByZXRhdGlvbi1mYWlsZWQtbm9vcCJ9Cg==",
+      "writerBytesSha256": "d04f9efc6053405b95ca74dfcd9d0f258e23daf26e53894292dd38595aa66146"
+    }
+  ]
+}

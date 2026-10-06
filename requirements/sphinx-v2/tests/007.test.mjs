@@ -4,6 +4,12 @@ import {
   store, persistence, digest, body, envelope, createdBody, work, transition,
   batch, append, current, mustOk, withStore,
 } from './persistence-support.mjs'
+import {
+  interpretationInquiry, interpretationPending, interpretationApplied,
+  interpretationFailed, interpretationRunningBodies, interpretationSeedBodies,
+  rawObservation, interpretationRecord, pendingInterpretationRecord,
+  expectInterpretationRefusal,
+} from './interpretation-support.mjs'
 
 const inquiry = 'dispatch-round-inquiry'
 const workId = 'round-work'
@@ -107,4 +113,103 @@ test('WHAT[sphinx-v2-007] DispatchRequested before RoundOpened is refused withou
     close(writer)
     assert.deepEqual(current(open(), inquiry), unchanged)
   })
+})
+
+test('WHAT[sphinx-v2-007] InterpretationPending requires an accepted observation and its exact work and attempt', async t => {
+  const invalid = [
+    { name: 'missing observation', fields: { observationId: 'missing-observation' }, message: /observation/i },
+    { name: 'missing work', fields: { workId: 'missing-work' }, message: /work/i },
+    { name: 'different existing work', fields: { workId: 'other-work' }, message: /work/i },
+    { name: 'different attempt', fields: { attempt: 2 }, message: /attempt/i },
+  ]
+  for (const scenario of invalid) {
+    await t.test('WHAT[sphinx-v2-007] refuses a pending interpretation with ' + scenario.name, async () => {
+      await withStore(async ({ open, close, commonDir }) => {
+        const writer = open()
+        const previous = await append(writer, batch(interpretationInquiry, 'accepted-without-pending', [
+          ...interpretationRunningBodies(), rawObservation,
+          body('WorkPlanned', { work: [{ ...work('other-work'), roundId: null }] }),
+        ]))
+        const before = current(writer, interpretationInquiry)
+        assert.deepEqual(mustOk(before).interpretations, [])
+        expectInterpretationRefusal(writer, previous, [
+          body('CancelRequested', { reason: 'this valid prefix must remain private' }),
+          body('InterpretationPending', { ...interpretationPending.payload, ...scenario.fields }),
+        ], commonDir, scenario.message)
+        close(writer)
+        assert.deepEqual(current(open(), interpretationInquiry), before)
+      })
+    })
+  }
+})
+
+test('WHAT[sphinx-v2-007] Applied and Failed require an explicitly recorded Pending rather than creating one', async t => {
+  for (const outcome of [interpretationApplied, interpretationFailed]) {
+    await t.test('WHAT[sphinx-v2-007] refuses ' + outcome.case + ' without pending', async () => {
+      await withStore(async ({ open, close, commonDir }) => {
+        const writer = open()
+        const previous = await append(writer, batch(interpretationInquiry, 'accepted-without-pending', [
+          ...interpretationRunningBodies(), rawObservation,
+        ]))
+        const before = current(writer, interpretationInquiry)
+        expectInterpretationRefusal(writer, previous, [
+          body('CancelRequested', { reason: 'do not publish this prefix' }), outcome,
+        ], commonDir, /interpretation|pending/i)
+        assert.deepEqual(mustOk(current(writer, interpretationInquiry)).interpretations, [])
+        close(writer)
+        assert.deepEqual(current(open(), interpretationInquiry), before)
+      })
+    })
+  }
+})
+
+test('WHAT[sphinx-v2-007] ResultAccepted before Pending supplies the reference in one atomic batch without placeholders', async () => {
+  await withStore(async ({ open, close }) => {
+    const writer = open()
+    const previous = await append(writer, batch(interpretationInquiry, 'running-work', interpretationRunningBodies()))
+    const accepted = await append(writer, batch(interpretationInquiry, 'accept-then-pending', [
+      rawObservation, interpretationPending,
+    ], previous))
+    const live = current(writer, interpretationInquiry)
+    assert.deepEqual(interpretationRecord(live), pendingInterpretationRecord)
+    assert.deepEqual(mustOk(live).observations, [{ key: rawObservation.payload.observationId, value: rawObservation.payload }])
+    assert.deepEqual(store.read(writer, accepted.id).payload.events, [rawObservation, interpretationPending])
+    close(writer)
+    assert.deepEqual(current(open(), interpretationInquiry), live)
+  })
+})
+
+test('WHAT[sphinx-v2-007] Pending before ResultAccepted refuses the whole batch instead of reordering facts', async () => {
+  await withStore(async ({ open, close, commonDir }) => {
+    const writer = open()
+    const previous = await append(writer, batch(interpretationInquiry, 'running-work', interpretationRunningBodies()))
+    const before = current(writer, interpretationInquiry)
+    expectInterpretationRefusal(writer, previous, [interpretationPending, rawObservation], commonDir, /observation/i)
+    assert.deepEqual(mustOk(current(writer, interpretationInquiry)).observations, [])
+    assert.deepEqual(mustOk(current(writer, interpretationInquiry)).interpretations, [])
+    close(writer)
+    assert.deepEqual(current(open(), interpretationInquiry), before)
+  })
+})
+
+test('WHAT[sphinx-v2-007] an existing Pending identity cannot silently change its work or attempt', async t => {
+  for (const [name, fields] of [['work', { workId: 'other-work' }], ['attempt', { attempt: 2 }]]) {
+    await t.test('WHAT[sphinx-v2-007] refuses a changed pending ' + name + ' without replacing its original reference', async () => {
+      await withStore(async ({ open, close, commonDir }) => {
+        const writer = open()
+        const previous = await append(writer, batch(interpretationInquiry, 'pending-observation', [
+          ...interpretationSeedBodies(),
+          body('WorkPlanned', { work: [{ ...work('other-work'), roundId: null }] }),
+        ]))
+        const before = current(writer, interpretationInquiry)
+        expectInterpretationRefusal(writer, previous, [
+          body('CancelRequested', { reason: 'the invalid suffix must reject this prefix' }),
+          body('InterpretationPending', { ...interpretationPending.payload, ...fields }),
+        ], commonDir, /interpretation|pending|work|attempt/i)
+        assert.deepEqual(interpretationRecord(current(writer, interpretationInquiry)), pendingInterpretationRecord)
+        close(writer)
+        assert.deepEqual(current(open(), interpretationInquiry), before)
+      })
+    })
+  }
 })

@@ -183,13 +183,13 @@
 
 ## sphinx-v2
 
-2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。其后N06-A/B0及本轮A2-R0/R1/R2已有限验收，当前从08卡接B1-H0，不重新施工创建/读取，也不能把Core守门当用户已获得答案。
+2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。其后N06-A/B0及A2/H0a已有限验收，当前从08卡接B1-H0b，不重新施工创建/读取，也不能把Core守门当用户已获得答案。
 
 2026-10-05 N06-A有限验收完成：gen142正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall；前后freshness一致，group65775 accepted=true、17.144ms，exit1仅pending。真实SDK/JS创建、内容绑定原receipt、native查询/accepted trace与新OS进程重开已证。唯一Integrator.Current成对保存accepted state/envelope；查询不得再走History读取。启动拒绝、disposed、非法identity/list与合法特殊资源名的reserve绑定均有正式回归。[验收记录](../archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)明确未证边界。下一主线N06-B，完整036两个TODO、T406/T411/GAP-219保留。f0ead CI实质超时813/818、2 active/3 queued，另见[完整receipt](../archive/2026-10-05/baselines/f0ead-ci/receipt.txt)，选集不代替全仓。
 
 **入口与判断。** [WHAT](../../requirements/sphinx-v2/WHAT.md)、[SUPERSEDES](../../requirements/sphinx-v2/SUPERSEDES.md)、[README](../../requirements/sphinx-v2/tests/README.md)、[MCP Server](../../src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Server.fs)、[OpenCode Adapter](../../src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Adapter.fs)、[Runtime Driver](../../src/Wanxiangshu/Sphinx/V2/Runtime/Driver.fs)、[Wire Surface](../../src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs)。GAP-219/222；D01/D02；W5。
 
-创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`替代；N06-A又完成真实start/status/export，JS模板成功与traceUnavailable已删除。work_next/work_submit/goal_amend仍unsupported。OpenCode adapter的owner仍从InquiryId错误构造，ReadStatus仍Unknown、ReadResult/Reconcile仍因所持port缺读取能力拒绝；实际Host另有snapshot API，尚未组合到adapter。GAP-219仍PARTIAL。从下面B的真实物理绑定与唯一driver继续，不重复造decoder/store或把Capabilities()声明当派发证明。
+创建计划时“MCP handler忽略参数”的诊断已被上游替代；N06-A完成真实start/status/export，work_next/work_submit/goal_amend仍unsupported。H0a已删除InquiryId猜owner、公私拼接与独立Provider假完成路径，借原SyncDelegateRuntime返回实际Admission/Completion；ReadStatus/ReadResult/Reconcile/cancel不宣称能力。受控Host port验收不等于installed Host或canonical binding；实际snapshot API仍待组合。GAP-219保持PARTIAL，下一H0b原子首次接纳与两道持久门，不重复decoder/store或已证owner交接。
 
 ### N06-B 接手卡：先让运行事实可恢复，再接真实执行
 
@@ -204,25 +204,25 @@ A2-D1的确认等待隔离与通知异常也已有限完成，见[正式记录](
 | 子包 | 状态 | 本包退出条件 |
 | --- | --- | --- |
 | B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
-| B1 实际Host绑定 | B1-A/A2有限包已实现；真实Host待施工 | typed Admission/Completion及三producer具体call归属已接通。接08卡B1-H0：真owner/family/public prompt、原Observed执行、真实binding；effect前intent关联与最终可见字节先明确。034不关闭 |
+| B1 实际Host绑定 | A/A2/H0a有限验收完成；接H0b | gen190 Sphinx+delegation52/52、328/0/35TODO；三原业务红与early-guard变异有效。真实owner/family/public prompt、原observed/physical/exactterminal已证；canonical首次接纳、effect前binding、cold零重发与installedHost未证，034保留 |
 | B1-A2-D0 | 通知前置有限验收完成 | Detached支持已有actual acceptance callback且不新增等待；gen159全静态和238/238、1178/0。D0不代证来源/资源，本轮R1/R2另验；Host绑定和034不关闭 |
 | B1-A2-D1 | 确认等待/抛错有限验收完成 | 六个正式业务红后独立TCS、按调用资源清理、finally广播真实Accepted；gen165定向36/0，gen166相关238/238、1186/0，全静态通过。lease、call归属、同步Host异常由本轮R1另验；真实Host和034仍未闭合 |
 | B1-A2-R0/R1/R2 | 真恢复/资源/source有限包已实现 | 真实PluginScope/LoopSensor及三producer实际不同physical；typed source与每注册opaque lease，Send effect前交接、Fork Closed零effect；20矩阵通过后删宽匹配。最终验收及Unknown Root相邻修复见本轮记录，整体025/GAP-153/Host仍保留 |
-| B2 executable profile | B2-0有限验收完成；完整profile待施工 | Unestimated带rank仍不可用，空集合不称数值比较，ordinal/provisional由真实Decision保种类；gen151正式红、最终gen155宽绿与全静态通过，原rank0保持。完整schema/plugin/ABI lock、prompt、授权/资源与Goal/material另接，不关闭002/029整体TODO |
+| B2 executable profile | B2-0/P0a有限验收完成；完整profile待施工 | 估值守门保持；P0a在原Registry补拓扑去重及declared/Execute完整manifest一致性，gen194的12业务失败被正式回归消除。真实artifact/ABI/schemaDoc核验、durable lock、prompt、授权/资源与Goal/material另接，不关闭002/029/015整体义务 |
 | B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
-| B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |
+| B4 实际结果与两事务解释 | O0a纯状态账有限验收完成；真实Observe待施工 | 完整Applied/Failed推进pending，冲突原子拒绝、terminal不重置、冷重开及旧seal处理已证明；实际Host结果/locked Observe/Graph delta仍未接通，021整体TODO保留 |
 | B5 accepted renderer答案 | 待施工，依赖B3/B4 | 实际renderer结果先accepted，再AnswerCommitted；公开正文和来源可取、停止标签诚实 |
 | B6 公开闭环验收 | 待施工，依赖B0—B5 | 017/036实际入口闭环、新OS冷重开、034实际Host证据，局部/受控/实际Host分别结算 |
 
 **B0，已验收的有限边界。** 原no-op路径已退出：DispatchRequested保完整Work/publicEnvelope/privateTicket，Receipt保完整intent/work/attempt/fence/physicalRef/native envelope，内部只有Dispatches一个map。fresh派发要求当前Ready/同fence Leased、完整Spec、真实成功依赖、已存在Some round及本work持久预留；None独立work允许。同intent exact replay先于fresh守门，同identity改内容拒绝；receipt同时核对Spec及Running物理引用。native字段仍叫physicalBindings，空值字节保持原seal；实际gen143旧创建/未派发work原样恢复，缺round旧派发和错误aggregate预留分别durable cut，原历史不删不重封。004/007/010/019/020覆盖正式Persistence/Current、原子批次、冷重开及hash。真实Host来源、副作用前append失败与receipt丢失对账、usage/容量完整义务保留，T401/T402/034不关闭。
 
-**B1，实际Host调用的第一条合法路径。** 按08卡B1-H0冻结窄合同：实际HostToolContext的typed owner、唯一Current的已持久Request与原PluginScope持有的Observed runtime。旧Adapter的InquiryId→SessionId、无订阅直接send、private ticket拼入prompt及Provider无关联pending cell仍须清理，不能把现存类型当已接通。effect前intent→actual child/PromptKey尚无可await持久钩子，Receipt=None不证明未发；冷重开未知明确RecoveryIncomplete、零再发。实际最终prompt在原handoff之后render，不能hash前期public JSON就称实际可见字节。原owner供应这些能力后，用actual owner≠InquiryId、nested family、private独特字节、原生Admission/Completion和冷重开正式验收；新API缺失不称业务红。完整034与receipt-loss恢复另记。
+**B1，H0a有限交接已证，下一H0b。** actual owner≠InquiryId、nested family/public-only最终prompt、原订阅和Admission/Completion已由原生产runtime的受控Host port证明，旧错路径已退出；[源收据](../archive/2026-10-06/sphinx-host-owner/source-receipt.txt)保三原红和guard变异。H0b先定原EventStore跨handle/process atomic fresh acceptance：Append Ok可能是exact duplicate，不能发新的spend witness；不把全history Refresh塞入锁内。然后才接Invoke前Current/预留门和原handoff后SendPrompt前的可await child/key/finalbytes门。Receipt=None不证明未发，冷重开零盲重发必须由新实际入口验收。完整034/installedHost/receipt-loss恢复另记；[08卡](08-Sphinx真实Host接手.md)逐步列前置与正式反例。
 
-**B2，先选一个真实可执行profile。** 现Registry/ExecutablePlugin只有声明，Plan/Render主要是验证器；不把存在类型当已接线。供应真实canonical schema文档/hash、executable/ABI lock、版本化prompt、model/provider授权、实际资源与executionMode。材料须由真实读取证据供应，纯插件输入须有原Goal，不把缺目标塞成空Graph。首条有限链做实际规划→成稿，实际计划集合含有真实成本的answer.now；Unestimated保持缺估值，不给默认收益。question/probe全面覆盖留E，有限profile范围写入验收记录。
+**B2，先选一个真实可执行profile。** P0a已修原Registry共享依赖重复枚举与outer/Execute完整manifest漂移；009/015的thin API只观察原bind/lockOf，不执行capability，不声称真实artifact/ABI已核验。duplicate-ID政策与durable PluginLockEntry载体仍未建立，不能借fixture装配称完整profile。现Plan/Render主要是验证器，PluginContext没有原Goal正文/constraints/materialRefs及内容；接手设计见[调查卡](../archive/2026-10-06/sphinx-registry/vibe-fs-b2-p0-profile-audit-20261006.txt)。下一P0b先冻结纯插件上下文和持久lock，再供应canonical schema文档/hash、真实executable/ABI、版本化prompt、授权、实际资源与executionMode。首条有限链做实际规划→成稿，计划集合含有真实成本的answer.now；Unestimated保持缺值。question/probe全面覆盖留E，有限profile范围写入验收记录。
 
-**B3，公开命令与唯一effect调度。** Commands接共享claim/submit，MCP/JS/原生入口只解码和调用。先定WHAT012的ticketHash/scope真实来源、公开字段和持久匹配；当前submit DTO只含attempt/fence等，不足以称完整局部准入。claim持久lease；BudgetReserved+DispatchRequested同批接受后才能派发，真实append拒绝的Host观察器必须为零。Driver当前Hash="empty"、plugin="unbound"和空interpretation提议全部退出此路径；缺真实schema、上下文或授权时具体拒绝。先定公共类型，再调调用方和正式反例，不在各adapter另造driver。
+**B3，公开命令与唯一effect调度。** Commands接共享claim/submit，MCP/JS/原生入口只解码和调用。先定WHAT012的ticketHash/scope真实来源、公开字段和持久匹配；当前submit DTO只含attempt/fence等，不足以称完整局部准入。claim持久lease；BudgetReserved+DispatchRequested同批接受后才能派发，真实append拒绝的Host观察器必须为零。O0a已删除Driver伪造的unbound/empty InterpretationApplied，并阻止pending时继续购买；原dispatch模板Hash="empty"仍须在真实schema/profile接线时退出，不能由纯提议正控称生产派发可用。缺真实schema、上下文或授权时具体拒绝。先定公共类型，再调调用方和正式反例，不在各adapter另造driver。
 
-**B4，ReadResult前置从原N06-C移入B。** 实际Host已有ISessionSnapshotPort.GetMessages，组合到最窄读取能力，核对actual child、physical user message、唯一provider run、work token、attempt与实际schema；idle只表示通知。第一事务保原响应、ResultAccepted和InterpretationPending；第二事务locked Observe形成真实Graph/Work delta与applied/failed。当前InterpretationApplied/Failed为no-op，会让pending永不完成，必须以Current和冷重开红例落实。usage缺失保reservation，不填零；plugin失败后只重做纯解释，不另买模型响应。完整receipt丢失/unknown对账仍留C，先前受控port不升级成实际Host恢复。
+**B4，ReadResult前置从原N06-C移入B。** 实际Host已有ISessionSnapshotPort.GetMessages，组合到最窄读取能力，核对actual child、physical user message、唯一provider run、work token、attempt与实际schema；idle只表示通知。O0a已经修复Applied/Failed no-op：Core保存完整outcome，只允许合法Pending转移，exact replay保terminal，变化或相反结果拒绝；native/semantic hash保完整delta或reason。gen191旧实现29业务失败，gen193定向64/0/1TODO；相邻扫描器误报另包修复，gen195相关87/87、652/0/11skip/43TODO，最终静态收束与输入见[收据](../archive/2026-10-06/sphinx-interpretation/final-receipt.txt)。真实第一事务的Host响应、第二事务的locked Observe和Graph delta仍待接通；Core只保存opaque delta，不解释图。usage缺失保reservation，不填零；plugin失败后仅在显式新派生inquiry以新实现重解释，不另买模型响应。完整receipt丢失/unknown对账仍留C，受控port不升级成实际Host恢复。
 
 **B5，真实renderer到公开持久答案。** renderer work来自实际规划并保留成稿资源，输出通过真实schema和Render.validate。先成为accepted observation，再提交exact resultObservationId的AnswerCommitted，复用已完成Core来源守门。答案正文从这份结果取得，不把ref、排名数组或固定文本当答案。先证明未提交/拒绝renderer不能完成，再证明实际成功与独立重开；只声称实际停止证据支持的标签。
 

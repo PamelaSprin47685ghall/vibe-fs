@@ -26,14 +26,16 @@ type RoundRecord =
       Closed: bool
       Outcome: string option }
 
+[<RequireQualifiedAccess>]
+type InterpretationOutcome =
+    | Applied of InterpretationAppliedBody
+    | Failed of InterpretationFailedBody
+
 type InterpretationRecord =
     { ObservationId: ObservationId
       WorkId: WorkId
       Attempt: Attempt
-      InterpretationId: string option
-      PluginRef: string option
-      Status: string
-      Reason: string option }
+      Outcome: InterpretationOutcome option }
 
 /// A reservation keyed by work identity. A tuple key would work in F# but not as a
 /// canonical hash participant, and this record is hashed.

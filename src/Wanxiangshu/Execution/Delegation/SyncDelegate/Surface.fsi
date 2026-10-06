@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open System.Threading.Tasks
+open Wanxiangshu.OpenCode
 
 /// Delegation-owned opaque runtime harness. Host sessions, journal writers,
 /// attached-session state and completion turns never cross into JS; callers
@@ -10,6 +11,16 @@ module SyncDelegateSurface =
     /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
     /// Every owner must first be admitted as an explicit durable HumanRoot.
     val create: directory: string -> owners: obj -> Task<obj>
+
+    /// Recording at the controlled Host boundary; this does not install an SDK.
+    val createForHostRecording: directory: string -> owners: obj -> Task<obj>
+
+    val internal withHostRuntime:
+        value: obj -> useRuntime: (SyncDelegateRuntime -> ISessionHostPort -> 'result) -> 'result
+
+    val recordingSnapshot: value: obj -> obj
+    val awaitRecordingPromptCount: value: obj -> count: int -> Task
+    val returnRecordingPromptOutcome: value: obj -> session: string -> index: int -> outcome: obj -> bool
 
     /// Same canonical journal and Host port, using the production provider
     /// recovery workflow and a real Blogger scope. Model routing reads the

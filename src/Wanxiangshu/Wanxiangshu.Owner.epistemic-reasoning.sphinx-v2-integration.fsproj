@@ -18,5 +18,4 @@
     <Compile Include="Sphinx/V2/ServeEntry.fsi"/><Compile Include="Sphinx/V2/ServeEntry.fs"/>
     <Compile Include="Sphinx/V2/Hosts/OpenCode/Adapter.fsi"/><Compile Include="Sphinx/V2/Hosts/OpenCode/Adapter.fs"/>
     <Compile Include="Sphinx/V2/Hosts/OpenCode/Surface.fsi"/><Compile Include="Sphinx/V2/Hosts/OpenCode/Surface.fs"/>
-    <Compile Include="Sphinx/V2/Hosts/Provider/Adapter.fsi"/><Compile Include="Sphinx/V2/Hosts/Provider/Adapter.fs"/>
   </ItemGroup></Project>
