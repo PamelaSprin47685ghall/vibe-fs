@@ -37,7 +37,6 @@ await superviseNodeTest({
   env: {
     ...process.env,
     WXS_TIER_INTEGRATION: '1',
-    WXS_ACCEPT_TODO: '1',
   },
 })
 

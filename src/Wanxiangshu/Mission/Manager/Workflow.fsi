@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
@@ -36,7 +35,6 @@ module ManagerWorkflow =
         workspaceDirectory: string option ->
         sessionIdTextOpt: string option ->
         providerRunIdOpt: ProviderRunIdentity option ->
-        reopenAcceptedForSuccessor: (RoadView -> RetirementSummary -> bool) ->
             Task<unit>
 
     val maybeDeliverLoop:

@@ -83,20 +83,13 @@ module RelayNarrativeTransform =
             || (afterCut && acceptedRequest)
         | _ -> false
 
-    /// Whether the request currently being transformed is the successor of the
-    /// road's latest retirement: a fresh external physical request (a new
-    /// authority root the road has not consumed, the claimed manager-loop gate
-    /// continuation, or a post-cut message admitted into ChatExecutions).
-    /// Single source of truth for successor identity — the stale-attempt
-    /// classification and the Accepted-road re-open gate both derive from it
-    /// (relay-retirement-008).
-    let isCurrentRequestSuccessor
+    let private isSuccessorRequest
         journal
         sessionId
         (road: RoadView)
         (retirement: RetirementSummary)
         acceptedRequest
-        (messages: obj list)
+        messages
         =
         let currentUser =
             messages
@@ -137,7 +130,7 @@ module RelayNarrativeTransform =
     let private staleRetirement journal sessionId (road: RoadView) acceptedRequest messages =
         road.LatestRetirement
         |> Option.filter (fun retirement ->
-            not (isCurrentRequestSuccessor journal sessionId road retirement acceptedRequest messages))
+            not (isSuccessorRequest journal sessionId road retirement acceptedRequest messages))
 
     // The provider view keeps the full physical history after a retirement:
     // the next iteration sees every prior message, the retirement tool call

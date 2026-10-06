@@ -45,8 +45,6 @@ import {
   retireCompanionForDeletion,
   INVESTIGATION_OUTLOOK_MARKERS,
   matchInvestigationOutlookMarker,
-  awaitNamedFact,
-  waitFactShape,
 } from './e2e/support/long-stroke-oracles.mjs'
 import { factPayloads } from './e2e/support/journal-observer.js'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
@@ -209,6 +207,7 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   assert.ok(sessionID, `${lane} session creation failed: ${JSON.stringify(created)}`)
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID)
   bindLaneSession(scenario.provider, sessionID, lane)
+
   const turn = scenario.turn.start(sessionID)
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
     body: {
@@ -218,16 +217,15 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   })
   assert.ok(response.ok, `${lane} prompt failed: ${JSON.stringify(response.data)}`)
   await turn.awaitTerminal()
-  return sessionID
 }
 
 const preFlowCanaries = async (scenario) => {
   await CUSTOMS.bindManagerLoopSequence(scenario)
-  const strengthOwnerSessionId = await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'manager')
+  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'manager')
 
   assert.equal(
     scenario.provider.matchCount('strength-canary-replica.0'),
-    2,
+    1,
     `Strength dry-run must physically start its Replica without blocking the owner. Host stderr tail:\n${scenario.host.stderrLog.slice(-4000)}`,
   )
 
@@ -251,19 +249,6 @@ const preFlowCanaries = async (scenario) => {
   for (const id of ['humanroot-loop.0', 'humanroot-loop.1', 'manager-reopened-loop.0', 'manager-reopened-loop.1']) {
     await scenario.provider.waitForExpectationAttempt(id, 1, WAIT_FACT_WINDOW_MS)
   }
-
-  // The strength-canary owner is itself a manager session: after its declared
-  // js-manager rounds settle, the manager workflow's idle assess guidance drives
-  // it through one audit → Accepted retirement on its own road. Await that
-  // retirement so the preflow's global relay-fact budget below is deterministic
-  // (the owner contributes one opening/assessment/retirement alongside the
-  // humanroot canary's two).
-  await awaitNamedFact(
-    scenario.host.workDir,
-    waitFactShape('RetirementCommitted', { eq: 1, session: strengthOwnerSessionId }),
-    { timeoutMs: WAIT_FACT_WINDOW_MS },
-  )
-
   await assertHumanRootManagerLoop(scenario, humanrootSessionId)
 
   const linkedBlogger = factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')

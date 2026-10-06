@@ -557,9 +557,12 @@ module PluginTransforms =
           ApplyRelayProjection =
             fun sidOpt outObj ->
                 task {
-                    let messages = outObj |> ProviderWireDecode.messagesFromTransformOutput
+                    do! ManagerWorkflow.ensureManagerRoadOpened journal workspaceDirectory sidOpt None
 
-                    let physicalUserMessageId = messages |> ProviderWireCapture.lastUserMessageId
+                    let physicalUserMessageId =
+                        outObj
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
 
                     // External human messages and internal recovery/guard continuations
                     // admitted into ChatExecutions belong to this active iteration.
@@ -574,40 +577,6 @@ module PluginTransforms =
                             |> ChatExecutionProjection.byKey key
                             |> Option.isSome
                         | _ -> false
-
-                    // MANAGER-LOOP-005: an Accepted-retired road re-opens only when the
-                    // request being transformed is a genuine successor (fresh external
-                    // physical request / claimed loop gate / post-cut admitted message).
-                    // Residual wire activity of the retired iteration (post-suicide provider
-                    // steps, idle continuations) must never re-open a finished loop.
-                    let reopenAcceptedForSuccessor
-                        (road: Wanxiangshu.Mission.Relay.RoadView)
-                        (retirement: Wanxiangshu.Mission.Relay.RetirementSummary)
-                        =
-                        match journal, sidOpt with
-                        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
-                            let lastUserOrigin =
-                                messages |> List.tryLast |> Option.bind ProviderWireDecode.promptOriginOfMessage
-
-                            let gateResult =
-                                RelayNarrativeTransform.isCurrentRequestSuccessor
-                                    durable
-                                    (SessionId.create sessionId)
-                                    road
-                                    retirement
-                                    acceptedSuccessorRequest
-                                    messages
-
-                            gateResult
-                        | _ -> false
-
-                    do!
-                        ManagerWorkflow.ensureManagerRoadOpened
-                            journal
-                            workspaceDirectory
-                            sidOpt
-                            None
-                            reopenAcceptedForSuccessor
 
                     return!
                         RelayNarrativeTransform.apply
@@ -636,24 +605,11 @@ module PluginTransforms =
 
                                                 return
                                                     interruption
-                                                    |> Result.defaultWith (fun (error: string) ->
-                                                        if
-                                                            error.Contains(
-                                                                "MANAGED-SESSION-016",
-                                                                StringComparison.Ordinal
-                                                            )
-                                                        then
-                                                            // The 016 guard is right: a fresh successor
-                                                            // root owns the session and no old-term abort
-                                                            // may be re-issued after successor dispatch
-                                                            // (relay-retirement-008). The stale request is
-                                                            // already cleared, so the refusal stands.
-                                                            ()
-                                                        else
-                                                            invalidOp (
-                                                                "MANAGER-LOOP-004: retired attempt interrupt failed: "
-                                                                + error
-                                                            ))
+                                                    |> Result.defaultWith (fun error ->
+                                                        invalidOp (
+                                                            "MANAGER-LOOP-004: retired attempt interrupt failed: "
+                                                            + error
+                                                        ))
                                         })
                                     sid)
                             sidOpt

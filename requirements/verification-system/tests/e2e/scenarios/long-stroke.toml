@@ -174,14 +174,12 @@ must = [
   "engineer-resolve.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
   "orch.2",
-  # DELEGATE 14.5: the delegation turns must be physically reached. The
-  # canary owner/replica pair runs in the preflow; the recovery pair in-flow,
-  # with its replica consuming the same shared declaration's step 0.
-  "strength-canary-owner.0",
-  "strength-canary-owner.1",
-  "strength-canary-owner.2",
+  # DELEGATE 14.5: the four delegation turns must be physically reached. The
+  # canary owner/replica pair runs in the preflow; the recovery pair in-flow.
+  "strength-canary-owner",
   "strength-canary-replica",
   "strength-recovery-owner",
+  "strength-recovery-replica",
 ]
 
 flow = [
@@ -683,7 +681,7 @@ tools = ["write"]
 [[turn]]
 id = "blogger"
 internal = true
-user = "# Call the chronicle tool exactly once now"
+user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
@@ -1171,12 +1169,12 @@ optional = true
 # purpose='readonly-delegate' 选中 Predictor 池模型 test/test-model-b；owner 仍
 # 走角色池 test/test-model，角色与参与者身份不变。
 #
-# 腿1 预算耗尽自然截断 + 腿4 恢复：preflow 的 strength-canary-owner
-# 由 014.test.mjs preFlowCanaries 创建驱动，其同伴物理交付数由该文件
-# matchCount('strength-canary-replica.0') === 2 钉住（bootstrap + 一次
-# continuation，均以 read 工具调用回应；N+1 请求被 transform 预算门拒绝，
-# 同伴以 provider-request-budget-reached 退休）。材料经 Prepared → Promoted
-# 回传 owner 的后续请求。
+# 腿1 正常完成 + 腿2 提前结束 + 腿3 自然截断：preflow 的 strength-canary-owner
+# 由 014.test.mjs preFlowCanaries 创建驱动，其同伴 bootstrap 交付数由该文件
+# matchCount('strength-canary-replica.0') === 1 钉住。budget=2：同伴第 1 轮读
+# large_probe.txt（工具既有截断由宿主掌握；帧只保存实际返回字节，marker 在头部，
+# 截断也存活），第 2 轮以纯文本提前结束；材料经 Prepared → Promoted 回传 owner
+# 的后续请求。
 # 腿4 恢复：主流程新建 strength-recovery-owner，其续行步挂 provider-error 500
 # retryable（Host 自重试，PAR-019）。Requested 在同一 transform 的 capture 阶段、
 # 故障前已落盘；Prepared 候选在重试交付上原样重渲染，不重跑只读工具
@@ -1184,10 +1182,9 @@ optional = true
 #
 # internal=true 的回合（两个 owner 的提示词由测试代码组装、同伴的镜像提示由生产
 # 组装）不参加 dead-edge 检查，也不进 expectSatisfied——其交付由 waitFact 事实
-# 屏障、preflow matchCount 与自定义 oracle 从持久事实与公开 wire 证明。同伴镜像
-# 以生产的 readonly-investigation 指令收尾（最后一条 user 消息），工具面是
-# js-predictor 参与者面；owner 条目要求 js-manager，同伴禁止之，靠 tools 门禁
-# 与不同前缀双重区分。
+# 屏障、preflow matchCount 与自定义 oracle 从持久事实与公开 wire 证明。owner 与
+# 同伴条目共享同一 user 前缀（同伴镜像的最后一条 user 消息就是 owner 提示词），
+# 靠 tools 门禁区分：owner 要求 js-manager，同伴禁止之。
 #
 # owner 角色是 manager（014 preFlow 与 flow 的 createSession 均以 manager 建会话）：
 # 委托 capture 要求 root owner work，而顶层 manager API 会话是本世界唯一的
@@ -1241,35 +1238,24 @@ tools = ["js-manager"]
   [[turn.step]]
   respond = { type = "text", text = "Companion survey received; the publish can proceed." }
 
-  # The owner idles after its terminal answer, so the Host injects the
-  # wait-cost calibration frame as a fresh user turn and the session takes
-  # one more provider round. Optional: the injection is wall-clock paced,
-  # so a run that never idles long enough simply skips it.
-  [[turn.step]]
-  optional = true
-  respond = { type = "text", text = "Calibration acknowledged; no further work is needed." }
-
-# The companion for both readonly-delegation decisions. Its outbound body is
-# the frozen owner mirror closed by the production readonly-investigation
-# instruction (delegation/readonly-investigation resource,
-# Strength/Replica/Runtime.fs), and its participant tool face is exactly
-# js-predictor (StrengthReplicaTools.exactReadonlyHostToolMap). Every physical
-# round — the bootstrap and each withContinuationTurn re-render — closes on a
-# fresh readonly user turn, so every delivery lands on step 0 of this one
-# declaration: the preflow canary spends its budget of 2 (bootstrap + one
-# continuation, both answered with the read tool-call; the N+1 request is
-# refused at the transform gate and the replica retires
-# provider-request-budget-reached); the in-flow recovery replica (budget 1)
-# consumes the same step 0 exactly once.
+# The companion for that decision. Its outbound body is the frozen owner
+# mirror, whose last user message is the owner prompt — so the bootstrap
+# delivery is step 0, exactly the delivery 014.test.mjs pins.
 [[turn]]
 id = "strength-canary-replica"
 internal = true
-user = "Continue the current task's read-only investigation"
-tools = ["js-predictor"]
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+tools = ["read"]
 forbiddenTools = ["js-manager"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", estimated_readonly_rounds = 0 } }
+
+  # Second admitted round: the companion ends itself in prose (early end,
+  # WHAT[speculative-investigation-003]/[005]); the round was already counted
+  # at admission and the completed first batch is the material.
+  [[turn.step]]
+  respond = { type = "text", text = "Read-only survey complete; returning the gathered evidence." }
 
 [[turn]]
 id = "strength-recovery-owner-title"
@@ -1302,15 +1288,18 @@ tools = ["js-manager"]
   [[turn.step]]
   respond = { type = "text", text = "Recovered delegation consumed; continuing the road." }
 
-# The recovery decision's companion shares this exact provider contract: the
-# same production readonly-instruction close, the same js-predictor face, the
-# same first-round read. estimated_readonly_rounds 1 means its bootstrap is
-# the only admitted round and the N+1 outbound request is refused at the
-# transform gate before any physical send — so the recovery leg consumes the
-# same declaration's step 0 exactly once and never reaches step 1. The two
-# decisions are told apart by their durable DelegationBound facts and the
-# per-session request counts bindDelegationReplicas pins, never by prompt
-# text (the production mirror is byte-identical for both).
+# The recovery decision's companion: estimated_readonly_rounds 1, so its bootstrap is the only
+# admitted round and the N+1 outbound request is refused at the transform gate
+# before any physical send — exactly one delivery of this entry.
+[[turn]]
+id = "strength-recovery-replica"
+internal = true
+user = "STRENGTH_RECOVERY: resume the readonly delegation after a provider failure."
+tools = ["read"]
+forbiddenTools = ["js-manager"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "large_probe.txt", estimated_readonly_rounds = 0 } }
 
 # Candidate frames render into the owner's request before the target assistant
 # output (WHAT[speculative-investigation-008]) — a mid-conversation insertion
@@ -1328,16 +1317,12 @@ step = 1
 reason = "prefix-probe"
 optional = true
 
-# Safety net for the companion lane: each next admitted round re-renders the
-# mirror plus completed batches and closes with a fresh readonly-instruction
-# user turn (withContinuationTurn), so the bootstrap instruction moves from
-# the middle of the wire to its tail — a non-append-only reshape the scenario
-# must admit. The fixed parts (system prompt, js-predictor tool set) stay
-# put, which is what prefix-probe checks; optional so a future host
-# projection that appends instead is admitted rather than fatal.
+# Safety net for the companion lane: mirror rows re-render identically each
+# round and completed batches append, so the seal should hold; optional so a
+# future ID-relocation change is admitted rather than fatal.
 [[epoch]]
 turn = "strength-canary-replica"
-step = 0
+step = 1
 reason = "prefix-probe"
 optional = true
 

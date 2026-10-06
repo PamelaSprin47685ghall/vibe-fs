@@ -38,6 +38,6 @@ export const withSuccessor = async body => withReview(async context => {
     },
     parts: [],
   })
-  const apply = (messages, acceptedRequest = false) => projection.apply(runtime.journal, session, acceptedRequest, messages)
+  const apply = (messages, acceptedHuman = false) => projection.apply(runtime.journal, session, acceptedHuman, messages)
   await body({...context, history, gate, apply})
 })

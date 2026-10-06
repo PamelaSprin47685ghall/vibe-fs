@@ -6,12 +6,6 @@ open System.Collections.Generic
 type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     let gate = obj ()
     let lifecycleBySession = Dictionary<string, ExecutionCapacityLifecycle>()
-    // DSL-MUTABLE: resource — committed lifecycles a newer admitted physical
-    // replaced on the same session. The superseded generation's in-flight
-    // tool-result round still owns provider steps and exact committed-lease
-    // reads through its replaced lease until the exact physical releases.
-    let supersededCommittedLifecycles =
-        Dictionary<string * string, ExecutionCapacityLifecycle>()
     // DSL-MUTABLE: resource
     let mutable nextLeaseId = CapacityLeaseId.initial
     let mutable nextFence = CapacityFence.initial
@@ -73,30 +67,6 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
     let beginRelease lifecycle lease release evidence =
         apply lifecycle evidence |> finishRelease lease release
 
-    /// Detached release decision for a superseded generation's remembered
-    /// lifecycle: the transition is computed and recorded, but never written
-    /// back into `lifecycleBySession` — that slot belongs to the successor
-    /// lease the replacement already issued.
-    let decideDetached lifecycle evidence =
-        match ExecutionCapacityLifecycle.decide (Some lifecycle) evidence with
-        | ExecutionCapacityDecision.Transitioned next -> ExecutionCapacityDecision.Transitioned next
-        | decision -> decision
-
-    let finishReleaseDetached lease release =
-        function
-        | ExecutionCapacityDecision.Transitioned releasing ->
-            decideDetached releasing (ExecutionCapacityEvidence.CompleteRelease(lease, release))
-        | decision -> decision
-
-    let beginReleaseDetached lifecycle lease release evidence =
-        decideDetached lifecycle evidence |> finishReleaseDetached lease release
-
-    let supersededPhysicalDecision physicalUserMessageId lifecycle =
-        let lease = ExecutionCapacityLifecycle.leaseOf lifecycle
-
-        ExecutionCapacityEvidence.BeginPhysicalCompletion lease
-        |> beginReleaseDetached lifecycle lease ExecutionCapacityRelease.PhysicalCompletion
-
     let sameIssue
         (identity: ExecutionAdmissionExactIdentity)
         (capacityCredit: CapacityCreditId)
@@ -117,33 +87,6 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
 
         match ExecutionCapacityLifecycle.decide None (ExecutionCapacityEvidence.Acquire lease) with
         | ExecutionCapacityDecision.Transitioned pending ->
-            // A committed lifecycle replaced by a newer physical stays readable:
-            // the superseded generation's in-flight round still owns provider
-            // steps and exact committed-lease reads until its exact terminal
-            // releases it. Pending or releasing predecessors hold no in-flight
-            // round and are simply replaced.
-            (match lifecycleBySession.TryGetValue identity.SessionId with
-             | true, ExecutionCapacityLifecycle.Committed oldLease when
-                 oldLease.Identity.PhysicalUserMessageId <> identity.PhysicalUserMessageId
-                 ->
-                 // A session admits a newer physical while an older committed
-                 // lease still owns an in-flight round: remember the older
-                 // lease so its continuation can finish. Any even-older
-                 // superseded entry for this session is now unreachable (its
-                 // round was already superseded twice), so drop it to bound
-                 // the dictionary to one entry per session.
-                 let staleKeys =
-                     supersededCommittedLifecycles.Keys
-                     |> Seq.filter (fun (sid, _) -> sid = identity.SessionId)
-                     |> Seq.toList
-
-                 staleKeys
-                 |> List.iter (fun k -> supersededCommittedLifecycles.Remove(k) |> ignore)
-
-                 supersededCommittedLifecycles.[(identity.SessionId, oldLease.Identity.PhysicalUserMessageId)] <-
-                     ExecutionCapacityLifecycle.Committed oldLease
-             | _ -> ())
-
             lifecycleBySession.[identity.SessionId] <- pending
             lease
         | _ -> invalidOp "execution-model-routing: free capacity owner rejected acquire"
@@ -176,25 +119,8 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
             (ExecutionCapacityLifecycle.leaseOf lifecycle).Identity.PhysicalUserMessageId = physicalUserMessageId
             ->
             physicalDecision physicalUserMessageId lifecycle
-        | true, _
-        | false, _ ->
-            // The exact terminal of a superseded in-flight generation settles
-            // its remembered committed lifecycle. The dictionary entry is
-            // intentionally retained: the superseded generation's in-flight
-            // tool-result continuation (continue.1) still needs to read the
-            // committed lease via TryReadCommittedLease until its own round
-            // truly terminates. The entry is a bounded resource — at most one
-            // per session at a time — and the lifecycle transition is computed
-            // detached (never written back to lifecycleBySession) so the
-            // successor lease's slot is undisturbed.
-            let supersededKey = (sessionId, physicalUserMessageId)
-
-            if supersededCommittedLifecycles.ContainsKey supersededKey then
-                let lifecycle = supersededCommittedLifecycles.[supersededKey]
-
-                supersededPhysicalDecision physicalUserMessageId lifecycle
-            else
-                ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.StaleLease
+        | true, _ -> ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.StaleLease
+        | false, _ -> ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.UnknownLease
 
     member _.Issue(identity: ExecutionAdmissionExactIdentity, capacityCredit: CapacityCreditId) =
         lock gate (fun () -> issueLocked identity capacityCredit)
@@ -229,9 +155,7 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
                 | ExecutionCapacityLifecycle.Released _ -> "Released"))
 
     /// Read-only exact committed lease query; a pending, releasing, released,
-    /// absent or wrong-physical lease is not an executable resource. A
-    /// superseded in-flight generation's remembered committed lease stays
-    /// readable until its exact physical releases.
+    /// absent or wrong-physical lease is not an executable resource.
     member _.TryReadCommittedLease(sessionId: string, physicalUserMessageId: string) =
         lock gate (fun () ->
             match lifecycleBySession.TryGetValue sessionId with
@@ -239,12 +163,4 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
                 lease.Identity.PhysicalUserMessageId = physicalUserMessageId
                 ->
                 Some lease
-            | _ ->
-                let supersededKey = (sessionId, physicalUserMessageId)
-
-                if supersededCommittedLifecycles.ContainsKey supersededKey then
-                    match supersededCommittedLifecycles.[supersededKey] with
-                    | ExecutionCapacityLifecycle.Committed lease -> Some lease
-                    | _ -> None
-                else
-                    None)
+            | _ -> None)
