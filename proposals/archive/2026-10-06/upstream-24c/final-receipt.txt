@@ -90,6 +90,27 @@ Next work, still OPEN
   or repair body-start/backstop premises. No fixed5s empty Blogger wait found by review;
   existing aggregate duration cannot isolate capacity, fsync or import cost.
 - Persistent ps failure/unknown descendant inventory and historical4f0 cleanup remain.
+- Final six-failure cleanup audit: vibe-fs-gen201-failure-audit-20261006.txt.
+  The four held scenarios observed their launchers close and exact inner groups empty;
+  actual caller foreign/known-tool/HOME proof was not reached. Foreign cleanup control
+  completed, but its actual rows/identity receipt was deleted with each directory.
+  Tool marker is written only after monitor/tool spawn, child readiness and three ps
+  queries; finally skips absent marker, then can remove the directory because no cleanup
+  error was recorded. Unregistered detached resources are therefore not certified empty.
+  This is an actual coverage/ownership-handoff gap, not proof of a surviving process.
+  Bootstrap the real creation owner's identity/terminal ability before optional metadata
+  work, retain raw failure/cleanup evidence, and prove preparation-failure cleanup before
+  considering cold readiness. Merely reducing three queries to one does not close this.
+  Ordered next construction card: vibe-fs-m2-creation-owner-handoff-next-20261006.txt
+  (W0 identity contract, W1 real positive/fault proof, W2 handoff before optional metadata,
+  W3 setup/monitor target without renewal bypass, W4 formal delivery and remaining gaps).
+- Public-phase measurement card: vibe-fs-ce015-public-phase-next-card-20261006.txt;
+  raw JSON bytes preserved under vibe-fs-ce015-public-phase-cost-raw-20261006.txt, so no
+  new JSON input is introduced. Five exact worker identity pairs from200 to201 have
+  slightly lower own CPU but2.935-4.702s greater worker wall; parent-span residual
+  increment is only25.7-325.4ms. This does not isolate CPU/IO/machine cause or prove pipe
+  overhead. Different9/11/120 selections are not a controlled A/B, worker CPU excludes
+  children, and197 Blogger business-red is not the same behavior.
 - M2 unused lazy journal handle candidate is only investigated, not implemented or
   certified as CI CPU cause; baseline075-ci contains the scoped cost/next-measurement cards.
 
@@ -109,3 +130,28 @@ Evidence
 - ../sphinx-host-owner/append-io contains original017 actual measurement and gen198 mutant.
 - ../baselines/075-ci contains original CI ZIP/job/stages/SHA and actual checkout receipts.
 - hashes-20261006.txt records archived file SHA256; it excludes itself.
+
+Final CI-driven metadata repair, generation202
+- The actual a8 upstream PR run37446580381 failed. Checkout43b2da32d1593aad7b1279b61a66d2d7ce431de1
+  has parents24c+a8 and the same treefc2751e9072ce8a3d79f7491551f3e57889bc708 as sourcea8.
+  Original format9.3/check5.9/build65.8 passed; unit300000ms cut823/824 drained, only016
+  active,0 queued, no authoritative full summary. Outer actualgroup2831 accepted8.088ms.
+  006/010 actual workers exited0. 016 admitted at265.920s and has no exit;31 observed
+  five-phase tool chains completed, not a complete016/all-detached certificate.
+- Actual requirement-system017 business failure: Host032:1503 TODO title had two anchors,
+  WHAT[host-boundary-032] and WHAT[019], but exactly one corresponding anchor is required.
+  Original red in ci-a8/vibe-fs-a8-ci-assertion-failure.txt, original entire ZIP SHA256
+  ee98a5b7261fd9355a1c54838a8312d7471696464d1f18dab8a7876f7ae1c6f5.
+- Manual one-line title repair changes only the cross-reference to ordinary clause019.
+  Original ownWHAT032, TODO/behavior/other assertions and canary semantics are unchanged.
+  This closes only the invalid-title defect, not Host032 or GAP210/release/CI throughput.
+- Final generation202 build exited0, then formal requirement-system0171/1 completed,
+  2pass/0fail,2.69s wall, group6851 accepted72.498ms, CLI exit0.
+  compilerInputDigest f725436a4b981903090543c286ee187b3b49d53e5a337c621a076cbf754f3efc
+  generatedInputDigest 341c05383ec1508bf56456a9412344033b66da1ffd7aaaafa9567c2d29410e7d
+  artifactInputDigest 845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c
+- New follow-up input has no new whole-product/CI certificate. Gen201 sixfail and gen200
+  wide cutoff remain open observations; no rerun was used to hide them. ci-a8 receipt is
+  authority only for its actual checkout, not this later title/evidence commit.
+- Current plan pointers lead to this receipt and the creation-owner/public-phase/U0 cards;
+  no entire TODO/GAP is closed by a title-only repair. New head CI remains independently pending.
