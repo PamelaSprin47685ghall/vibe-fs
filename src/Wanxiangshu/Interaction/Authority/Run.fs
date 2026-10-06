@@ -148,13 +148,11 @@ module PromptAuthorityRun =
                 { projection with
                     LastAuthorityProfile = Some canonical
                     ActiveLogicalRun = Some canonical
-                    PendingClaims = Map.empty
+                    PendingClaims =
+                        projection.PendingClaims
+                        |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
                     AcceptedContinuationIds = Map.empty
-                    // PROMPT-011: ClaimSequence counts within one Logical Run, so a new
-                    // root restarts the count. This is also what bounds the map
-                    // (PERSIST-008) — it grows with distinct payloads in one run, not
-                    // with session lifetime.
-                    ClaimSequences = Map.empty })
+                    ClaimSequences = PromptAuthority.rootClaimSequences canonical.SessionId projection })
 
     /// Close exactly the active Logical Run named by durable terminal evidence.
     /// Run-scoped continuation resources are discarded; LastAuthorityProfile is
@@ -173,9 +171,11 @@ module PromptAuthorityRun =
             Ok
                 { projection with
                     ActiveLogicalRun = None
-                    PendingClaims = Map.empty
+                    PendingClaims =
+                        projection.PendingClaims
+                        |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
                     AcceptedContinuationIds = Map.empty
-                    ClaimSequences = Map.empty }
+                    ClaimSequences = PromptAuthority.rootClaimSequences active.SessionId projection }
         | None when projection.LastAuthorityProfile |> Option.exists sameRun -> Ok projection
         | Some active ->
             Error(
@@ -213,7 +213,12 @@ module PromptAuthorityRun =
         { projection with
             PendingClaims = Map.add claim.PromptKey claim projection.PendingClaims
             ClaimSequences =
-                Map.add scope (PromptAuthority.nextClaimSequence scope projection) projection.ClaimSequences }
+                Map.add
+                    scope
+                    { SessionId = claim.SessionId
+                      LogicalRunId = claim.LogicalRunId
+                      Count = PromptAuthority.nextClaimSequence scope projection }
+                    projection.ClaimSequences }
 
     let private acceptedContinuationEvidence
         (physicalMessageId: PhysicalUserMessageId)

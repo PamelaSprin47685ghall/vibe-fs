@@ -19,6 +19,7 @@ module OrdinaryTurnWorkflow =
         journal: AgentJournal option ->
         observation: TurnObservationJournalPort option ->
         context: ReconciledTurnContext ->
+        observer: ContinuationAcceptanceObserver option ->
             Task
 
     val observe:
@@ -33,4 +34,5 @@ module OrdinaryTurnWorkflow =
         abortCause: AbortCause ->
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
+        observer: ContinuationAcceptanceObserver option ->
             Task

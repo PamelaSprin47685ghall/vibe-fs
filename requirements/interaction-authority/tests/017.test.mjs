@@ -85,6 +85,8 @@ test('WHAT[interaction-authority-017] dispatcher delivers a continuation to a ta
     })
     const root = await dispatch.sendAgentOwnerRootAwait(port, handle, 'active-target', 'bounded assignment', seed.value)
     assert.equal(root.ok, true, root.error)
+    const rootClaim = dispatch.projectionObservation(handle, 'active-target').pendingClaims.find(claim => claim.promptKey === root.key)
+    assert.ok(rootClaim)
     const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'active-target', root.key, 'physical-root-active')
     assert.equal(accepted.ok, true, accepted.error)
     const continuation = await dispatch.sendContinuation(port, handle, 'active-target', 'continue same work', 'ManagerGuard', accepted.profile, 'Await')
@@ -92,6 +94,8 @@ test('WHAT[interaction-authority-017] dispatcher delivers a continuation to a ta
     // rejected everything would satisfy the test above and lose real work.
     assert.equal(continuation.ok, true, continuation.error)
     assert.deepEqual(sentKeys, [root.key, continuation.key])
+    const continuationClaim = dispatch.projectionObservation(handle, 'active-target').pendingClaims.find(claim => claim.promptKey === continuation.key)
+    assert.ok(continuationClaim)
     // PROMPT-002/004: a transport receipt is only `Submitted`; the claim leaves
     // the pending map only when a real physical message id resolves it, same as
     // the root claim was resolved by acceptAgentOwnerRoot above.
@@ -99,11 +103,12 @@ test('WHAT[interaction-authority-017] dispatcher delivers a continuation to a ta
     assert.equal(landed.ok, true, landed.error)
     const observation = dispatch.projectionObservation(handle, 'active-target')
     assert.equal(observation.pendingClaims.length, 0)
-    // PROMPT-011: ClaimSequences count within one logical run, and accepting
-    // the root (registerAuthority) restarts the count, so the durable
-    // projection keeps only the continuation's scope, at sequence 1.
-    assert.equal(observation.claimSequences.length, 1)
-    assert.equal(observation.claimSequences[0].count, 1)
+    // The unlanded Root scope belongs to the session; only the continuation
+    // counter belongs to the active logical run.
+    const rootScope = authority.claimScopeDigest('active-target', null, { kind: 'AuthorityRoot', label: 'AgentOwnerRoot' }, rootClaim.payloadDigest)
+    const continuationScope = authority.claimScopeDigest('active-target', accepted.profile.logicalRun, authority.originForContinuation('ManagerGuard'), continuationClaim.payloadDigest)
+    assert.notEqual(rootScope, continuationScope)
+    assert.deepEqual(new Map(observation.claimSequences.map(({ scope, count }) => [scope, count])), new Map([[rootScope, 1], [continuationScope, 1]]))
   })
 })
 

@@ -1,6 +1,8 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-06最新N00证据见[ccfc原始CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)：实际merge67c80a46，原300秒/双worker下821/821排空、4585pass/0fail、119skip/390TODO，296.38秒wall；format/check/build通过，outer group2817 accepted=true、8.676ms。unit约297秒退出1仅pending，没有本次outer超时。016占用68.604秒，201个工具各有完整关闭/排空身份；三项新Darwin native在Linux unit均skip。M0审计完成；接续总计划N00-M1—M3的worker/transport/tool成本诊断、因果隔离和有限优化，不把墙钟减CPU叫IO，也不改预算或worker。
+本轮最新完整CI取证是[1eb CI真实截断](../archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)，优先于下方ccfc旧输入状态：实际merge38141ff83，原300秒仅793/821排空，006/010活动、26排队，无权威summary；format/check/build通过，group3068 accepted=true。006在286.771秒准入，010在299.968秒准入，016仍queued。两输入无可执行diff、host不同；共同793项增加146.350 worker-seconds，不由此推断CPU/IO或最后叶为原因。N00-M1-A已补真实worker身份/CPU的非续期诊断，M2本地有限调查见[记录](../archive/2026-10-06/验证成本有限调查-2026-10-06.md)：006实际worker约17秒、CPU约0.45秒，不含子工具CPU，不能据此判空等或CI根因。下一步收新头Linux CI的同一诊断和016完整工具阶段，再决定因果实验；原预算、并发、完整测试保留。
+
+历史ccfc证据见[原始CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)：实际merge67c80a46，原300秒/双worker下821/821排空、4585pass/0fail、119skip/390TODO，296.38秒wall；format/check/build通过，outer group2817 accepted=true、8.676ms。unit约297秒退出1仅pending，没有本次outer超时。016占用68.604秒，201个工具各有完整关闭/排空身份；三项新Darwin native在Linux unit均skip。M0审计完成；后续M1—M3按上段当前证据接续，不把墙钟减CPU叫IO，也不改预算或worker。
 
 历史[a15](../archive/2026-10-05/baselines/a15-ci/receipt.txt)仍是794/821、006/011活动、25排队、无summary的真实截断；[6b](../archive/2026-10-05/baselines/6b-ci/receipt.txt)仍是821/821、4577/0仅pending。ccfc较a15共同794项减145.632 worker-seconds，较6b完整821项增19.939；host和输入不同，无CPU/IO因果，不因新排空宣布吞吐稳定或抹掉旧失败。下方旧“下一步”不得盖过总计划当前队列。
 

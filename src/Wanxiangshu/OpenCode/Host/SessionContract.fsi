@@ -3,6 +3,16 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+type ProviderAttemptSource =
+    { SessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      ProviderRun: ProviderRunIdentity }
+
+type ContinuationAcceptanceObserver =
+    { Notify: PhysicalUserMessageId -> unit
+      AttachDisposable: System.IDisposable -> unit }
+
 [<RequireQualifiedAccess>]
 type DegenerationKind =
     | TooRepetitive
@@ -17,7 +27,7 @@ type ILoopSensor =
     abstract Observe: raw: obj -> unit
 
     abstract ConsumeAbortCause:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option ->
+        source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->
             System.Threading.Tasks.Task<AbortCause>
 
     abstract DropSession: sessionId: SessionId -> unit

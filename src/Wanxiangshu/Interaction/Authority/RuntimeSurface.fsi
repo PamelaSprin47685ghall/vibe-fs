@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Interaction.Authority
 
 module RuntimeSurface =
+    val internal projectionOf: value: obj -> PromptAuthority.PromptAuthorityProjection
+    val internal projectionToJs: projection: PromptAuthority.PromptAuthorityProjection -> obj
     val empty: obj
     val issueInheritedIdentitySeed: childName: string -> ownerProfile: obj -> obj
     val validateInheritedIdentitySeedAgainstActiveOwner: ownerProfile: obj -> seedValue: obj -> obj

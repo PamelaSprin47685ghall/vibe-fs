@@ -85,6 +85,11 @@ module PromptAuthority =
           PayloadDigest: string
           PhysicalUserMessageId: PhysicalUserMessageId }
 
+    type ClaimSequenceCounter =
+        { SessionId: SessionId
+          LogicalRunId: LogicalRunId option
+          Count: int }
+
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
           ActiveLogicalRun: AuthorityExecutionProfile option
@@ -92,7 +97,7 @@ module PromptAuthority =
           AcceptedDispatches: Map<string, AcceptedDispatch>
           PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
           AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
-          ClaimSequences: Map<string, int> }
+          ClaimSequences: Map<string, ClaimSequenceCounter> }
 
     val empty: PromptAuthorityProjection
     val acceptedDispatchKey: sessionId: SessionId -> payloadDigest: string -> string
@@ -127,6 +132,9 @@ module PromptAuthority =
             string
 
     val nextClaimSequence: scope: string -> projection: PromptAuthorityProjection -> int
+
+    val rootClaimSequences:
+        sessionId: SessionId -> projection: PromptAuthorityProjection -> Map<string, ClaimSequenceCounter>
 
     val derivePromptKey:
         sha256: (string -> string) ->

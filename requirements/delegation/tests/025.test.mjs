@@ -4,6 +4,38 @@ import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.j
 import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
+import { runRecoveryProcess } from './support/recovery-process.mjs'
+import { runGuardRecoveryProcess } from './support/guard-recovery-process.mjs'
+import { runRepairRecoveryProcess } from './support/repair-recovery-process.mjs'
+
+test('WHAT[delegation-025] an invocation completes from its own genuinely accepted production retry successor', async t => {
+  const receipt = await runRecoveryProcess('own-retry', t.signal, message => t.diagnostic(message))
+  assert.notEqual(receipt.retryPrompt.promptKey, receipt.initialPrompt.promptKey)
+  assert.notEqual(receipt.successor.physicalUserMessageId, receipt.initial.physicalUserMessageId)
+  assert.equal(receipt.successor.authorityRootUserMessageId, receipt.initial.authorityRootUserMessageId)
+  assert.equal(receipt.result.value.physicalUserMessageId, receipt.successor.physicalUserMessageId)
+  assert.equal(receipt.result.value.formalText, 'RECOVERY-FORMAL-ANSWER')
+  assert.equal(receipt.promptCount, 2)
+  assert.equal(receipt.childCount, 1)
+})
+
+for (const scenario of ['old-retry', 'fallback-old-retry', 'late-retry', 'fallback-late-retry']) {
+  test(`WHAT[delegation-025] ${scenario} cannot deliver an earlier genuinely accepted retry to a reused same-root invocation`, async t => {
+    await runRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
+  })
+}
+
+for (const scenario of ['own-guard', 'old-guard', 'fallback-old-guard', 'late-guard', 'fallback-late-guard']) {
+  test(`WHAT[delegation-025] production ${scenario} preserves invocation-owned accepted successors`, async t => {
+    await runGuardRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
+  })
+}
+
+for (const scenario of ['own-missing', 'own-incomplete', 'old-missing', 'old-incomplete', 'late-missing', 'late-incomplete', 'fallback-old-missing', 'fallback-old-incomplete', 'fallback-late-missing', 'fallback-late-incomplete']) {
+  test(`WHAT[delegation-025] production repair ${scenario} preserves invocation-owned accepted successors`, async t => {
+    await runRepairRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
+  })
+}
 
 test('WHAT[delegation-025] late failure from a previous root cannot settle a reused sync call', async () => {
   const owner = 'owner-failure-causality'

@@ -1,10 +1,12 @@
 # delegation 测试与证明范围
 
-2026-10-06 A2-D1有限修复底层确认资源：gen163六个真实业务红后，gen165定向004/007/009为36pass/0fail、1TODO；独立TCS、超时只释放自己，callback抛错仍广播exact Accepted并传播原异常。证据在[dispatch记录](../../../proposals/archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)，不是025来源证明。下一包按07卡第11节先装配真恢复fixture（同一managed owner、隔离ModelRouting、实际Host scope/shared stop fence），再接lease与具体call source；下段旧“先冻结source”的顺序由此细化。
+2026-10-06 A2-R0/R1/R2有限验收完成：025以实际PluginScope/LoopSensor、同一managed owner和隔离配置驱动retry、guard及两类repair，四种恢复各五场景共20项通过；旧/晚successor的16个业务红已修。typed source在effect前交给具体call，actual PhysicalAccepted才登记其successor；旧same-root+历史kind宽匹配已删除。每次注册有独立opaque lease，关闭只释放该call资源；相邻Unknown Root和Fork边界另取证。gen184相关246/246、1290pass/0fail、28skip/137TODO，原预算及并发保留，见[正式记录](../../../proposals/archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。实际安装版Host、物理终止/OS crash、完整025/T111/GAP-153及Sphinx答案仍未闭合；下一施工从[08接手卡](../../../proposals/TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)开始。
 
-2026-10-06 A2-D0仅完成底层Detached acceptance通知前置：两发送入口注册已有callback，gen157六业务红后gen159相关238/238、1178/0。该证据在dispatch/009，见[记录](../../../proposals/archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)；没有让SyncDelegate retry/repair/guard获得具体call source。下一步按A2卡冻结source与本地观察资源合同，025/T111整体仍未闭合。
+历史A2-D1证据：gen163六个真实业务红后，gen165定向004/007/009为36pass/0fail、1TODO；独立TCS、超时只释放自己，callback抛错仍广播exact Accepted并传播原异常。见[dispatch记录](../../../proposals/archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)。D1本身不是025来源证明，本轮R0/R1/R2另取证，不重复施工底层确认。
 
-2026-10-05 N06-B1-A只结算现有SyncDelegate的typed观察：真实native send/key、持久physical/root、普通正式响应与原checkpoint，receipt-only仍待physical、原生Unknown/Refused不按文案猜测、真Promise异常及本地订阅释放。025新增错root/旧physical/重复fallback和observed preparation误发四个独立正式业务红；修后gen154相关225/225、1125/0，最终静态复验见[本批记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。恢复retry/repair/guard仅凭same-root+kind仍缺当前assignment归属，[A2接手卡](../../../proposals/TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)尚未取得真正successor业务red；025/T111/GAP-153不关闭。Dispose只证明本地等待和订阅，不冒充物理abort/drain；Sphinx实际调用未接入。
+历史A2-D0证据：两发送入口注册已有callback，gen157六业务红后gen159相关238/238、1178/0，见[记录](../../../proposals/archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)。D0当时没有给三producer提供具体call source，现由上段新证据接续。
+
+历史N06-B1-A只结算SyncDelegate的typed观察：真实native send/key、持久physical/root、普通正式响应与原checkpoint，receipt-only仍待physical、原生Unknown/Refused不按文案猜测、真Promise异常及本地订阅释放。025四个独立正式业务红后gen154相关225/225、1125/0，见[记录](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)。当时的same-root+kind归属缺口已由本轮有限矩阵修补；本地Dispose仍不冒充物理abort/drain，Sphinx实际调用未接入。
 
 e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际证明取消期新assignment零放置/发送、固定DevOps原回调仍能结算、取消失败后全部两个owner订阅清理、同步异常后可重新取消以及重开不新建child；025/026与加载恢复沿实际scoped owner运行。TODO、OS crash与永久丢失替换不由这些断言代证；汇总和原始失败见[同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。
 

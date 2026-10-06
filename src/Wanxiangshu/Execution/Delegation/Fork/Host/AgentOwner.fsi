@@ -23,5 +23,5 @@ module HostForkAgentOwner =
         identitySeed: PromptAuthority.IdentitySeed ->
         directory: string option ->
         prompt: string ->
-        onAccepted: (PhysicalUserMessageId -> unit) ->
+        onAccepted: ContinuationAcceptanceObserver ->
             Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>

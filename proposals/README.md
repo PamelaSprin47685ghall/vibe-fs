@@ -1,10 +1,10 @@
 # 计划与提案入口
 
-2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始：N06-A/B0、B1-A、B2-0、014成本oracle及A2-D0/D1均已有限验收；D1最终gen166相关238/238、1186pass/0fail、28skip/129TODO。[D1记录](archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)保留旧业务6红与剩余边界。下一包按[A2卡第11节](TODO施工分册-2026-10-03/07-Sphinx恢复因果.md)先装配同一owner的真实恢复夹具（managed acceptance、隔离ModelRouting、实际Host scope及shared stop fence），再冻结lease/source、并行三producer、最后删宽匹配；脚本retry不能验收来源。Sphinx实际Host/profile/结果/答案依赖此完整A2。
+2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始。本轮A2-R0/R1/R2已落实真实恢复夹具、effect前lease/source交接和三producer20场景，旧宽匹配删除；相邻Unknown Root清理另按正式反例验收。[本轮记录](archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)保留红绿及最终证书。下一产品入口是[08真实Host接手卡](TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)，不重复装配或重做D0/D1；Sphinx实际Host/profile/结果/答案仍未闭合。
 
-N04-C3有限验收完成：gen170真实Darwin11/11，正式4/4文件312/0、17skip/2TODO，生产helper未改，见[执行契约](N04真实只读Fable执行契约-2026-10-05.md)。后续C-R0交消费闭包、actor能力、正式探针及逐格结论，C-R1/C-R2可独立有限验收；FD/backing/ABA及N08不借此关闭。N00最新[ccfc CI](archive/2026-10-05/baselines/ccfc-ci/receipt.txt)已821/821、4585/0、119skip/390TODO，约297秒，失败仅pending；format/check/build通过。历史[a15真实超时](archive/2026-10-05/baselines/a15-ci/receipt.txt)和[6b完整排空](archive/2026-10-05/baselines/6b-ci/receipt.txt)分别保留。跨host/输入无CPU/IO因果证据，接续M1—M3诊断与有依据的优化，不缩预算或测试。
+N04-C3有限验收完成：gen170真实Darwin11/11，正式4/4文件312/0、17skip/2TODO，生产helper未改。C-R0四调查产物与actual同UID detach能力已归档，C-R1/C-R2真实Darwin13/13有限验收完成，见[执行契约](N04真实只读Fable执行契约-2026-10-05.md)；FD/backing/ABA及N08不借此关闭。N00最新[1eb CI](archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)为原300秒真实截断，793/821排空、006/010活动、26queued、无summary；format/check/build及outer group通过。旧[ccfc完整排空](archive/2026-10-05/baselines/ccfc-ci/receipt.txt)、[a15真实超时](archive/2026-10-05/baselines/a15-ci/receipt.txt)和[6b完整排空](archive/2026-10-05/baselines/6b-ci/receipt.txt)分别保留。跨host/输入无CPU/IO因果证据，接续M1—M3诊断与有依据的优化，不缩预算或测试。
 
-本次是计划更新，未改生产/测试代码、未关闭新TODO/GAP。当前主线A2-R0→R1→R2→Sphinx真实答案；N00成本与N04能力调查并行。N07可在空闲owner上独立准备canonical Rulebook，原子BIRTH先核真实磁盘事务，不以list Append推定崩溃原子性。详见[当前施工队列](TODO施工总计划-2026-10-03.md#当前施工队列)及04分册。下列历史“下一步”全部只供追溯，不用于认领。
+1eb规划后已开工，upstream fetch无增量。当前主线接B1-H0→Sphinx真实答案；N00-M1及本地M2有限调查已交付，先收新头CI；N04-C-R1/C-R2 native13/13，FD/backing/ABA仍未证。N07可独立准备canonical Rulebook，原子BIRTH先核真实磁盘事务，不以list Append推定崩溃原子性。详见[当前施工队列](TODO施工总计划-2026-10-03.md#当前施工队列)及04/08分册。下列历史“下一步”只供追溯，不用于认领。
 
 <details>
 <summary>历史同步与S03增量（不作当前排班）</summary>

@@ -7,7 +7,7 @@ import { decode, encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_bas
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import * as loopSensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
 import * as providerLanguage from '../../../dist/Participant/Provider/LanguageSurface.js'
-import { deferred } from './support/stream.mjs'
+import { abortSource, deferred } from './support/stream.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -77,7 +77,7 @@ test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continu
   loopSensor.observe(sensor, loopSensor.textDelta('ses_next', repetitiveText(), 'msg_next_1'))
   await loopSensor.activeTask(sensor, 'ses_next', 'msg_next_1')
   assert.deepEqual(aborts, ['ses_next'])
-  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, abortSource('ses_next', 'msg_next_1')), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
@@ -97,7 +97,7 @@ test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continu
   loopSensor.observe(sensor, loopSensor.textDelta('ses_next', repetitiveText(), 'msg_next_2'))
   await loopSensor.activeTask(sensor, 'ses_next', 'msg_next_2')
   assert.deepEqual(aborts, ['ses_next', 'ses_next'])
-  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_next', 'msg_next_2'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, abortSource('ses_next', 'msg_next_2')), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
@@ -130,7 +130,7 @@ test('WHAT[degeneration-guard-009] LOOP_014_active_interrupt_tracked_in_owned_wo
   const ownedInterrupt = loopSensor.activeTask(sensor, 'ses_work', 'msg_work_1')
   assert.notEqual(ownedInterrupt, null)
   await ownedInterrupt
-  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_work', 'msg_work_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, abortSource('ses_work', 'msg_work_1')), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
@@ -154,7 +154,7 @@ test('WHAT[degeneration-guard-009] LOOP_018_diagnostics_name_kind_not_side', asy
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_diag', repetitiveText(), 'msg_diag_1'))
   await loopSensor.activeTask(sensor, 'ses_diag', 'msg_diag_1')
-  await loopSensor.consumeAbortCause(sensor, 'ses_diag', 'msg_diag_1')
+  await loopSensor.consumeAbortCause(sensor, abortSource('ses_diag', 'msg_diag_1'))
   await loopSensor.activeTask(sensor, 'ses_diag', 'msg_diag_1')
 
   assert.ok(diagnostics.length > 0, 'guard reports its effects as diagnostics')
@@ -223,7 +223,7 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
 
   // The reconciled TurnAborted consumes the armed anomaly, which is what starts
   // the guard's own continuation (degeneration-guard-009).
-  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_1'), {
+  assert.deepEqual(await loopSensor.consumeAbortCause(sensor, abortSource('ses_retry', 'msg_retry_1')), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
@@ -255,7 +255,7 @@ test('WHAT[degeneration-guard-009] LOOP_019_failed_continuation_send_is_reported
   assert.notEqual(secondInterrupt, null, 'the sensor must still interrupt after a failed continuation')
   await secondInterrupt
   assert.deepEqual(
-    await loopSensor.consumeAbortCause(sensor, 'ses_retry', 'msg_retry_2'),
+    await loopSensor.consumeAbortCause(sensor, abortSource('ses_retry', 'msg_retry_2')),
     { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' },
     'the second repetition carries its own cause instead of reusing the stale one',
   )

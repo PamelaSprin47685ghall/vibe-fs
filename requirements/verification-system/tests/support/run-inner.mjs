@@ -30,6 +30,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
 import { createRunState, applyEvent, summarize } from './test-run-state.mjs'
+import { createWorkerCostObserver } from './worker-cost-observation.mjs'
 
 import { parseConcurrency } from '../../../../scripts/lib/concurrency-cap.mjs'
 
@@ -99,7 +100,7 @@ export function bindTestEntry(event, entryFile) {
 
 export async function runTestFiles({
   files, concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY),
-  send = (message) => process.send?.(message), stdout = process.stdout, stderr = process.stderr,
+  send = (message, callback) => process.send?.(message, callback), stdout = process.stdout, stderr = process.stderr,
 }) {
   const fileLimit = parseConcurrency(concurrency)
   const workerCount = Math.min(files.length,
@@ -136,9 +137,21 @@ export async function runTestFiles({
   const runFile = async (file) => {
     const controller = new AbortController()
     active.add(controller)
+    const costs = createWorkerCostObserver({
+      entryFile: resolve(file), parentPid: process.pid,
+      enabled: process.env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
+    })
+    let reportedCosts = null
+    const reportCosts = (snapshot = costs.snapshot()) => {
+      const current = JSON.stringify(snapshot)
+      if (current === reportedCosts) return
+      reportedCosts = current
+      try { send({ type: 'runner:worker-cost', data: snapshot }, () => {}) } catch {}
+    }
     try {
       const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal, execArgv })
       send({ type: 'runner:file-start', data: { entryFile: resolve(file), pid: process.pid, parentPid: process.ppid } })
+      reportCosts()
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
       const attribute = (event) => {
@@ -150,6 +163,10 @@ export async function runTestFiles({
           if (errors.size > 0) return
           try {
             const event = attribute({ type, data })
+            if (type === 'test:stdout') {
+              costs.observe(event)
+              reportCosts()
+            }
             applyEvent(runState, event)
             send({ type, data: {
               name: data?.name, file: data?.file, entryFile: event.data.entryFile,
@@ -169,6 +186,7 @@ export async function runTestFiles({
         }
       } catch (error) { reportError(error) }
       const completion = await drained
+      reportCosts(costs.finish())
       if (!completion.drained) reportError(completion.error)
       else send({ type: 'runner:file-drained', data: { entryFile: resolve(file) } })
     } finally { active.delete(controller) }

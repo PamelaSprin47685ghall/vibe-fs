@@ -247,7 +247,7 @@ module DispatchSurface =
     /// claim/persist/send semantics remain PromptDispatcher.Runtime.
     let private sendAgentOwnerRootWithMode
         (awaitMode: PromptDispatcher.AwaitMode)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        (onAccepted: ContinuationAcceptanceObserver option)
         (port: obj)
         (handle: JournalHandle)
         (session: string)
@@ -386,15 +386,25 @@ module DispatchSurface =
         (identitySeed: obj)
         (awaitMode: string)
         (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
         : Task<obj> =
-        sendAgentOwnerRootWithMode
-            (awaitModeOf awaitMode)
-            (Some(PhysicalUserMessageId.value >> onAccepted))
-            port
-            handle
-            session
-            text
-            identitySeed
+        let observer: ContinuationAcceptanceObserver =
+            { Notify = PhysicalUserMessageId.value >> onAccepted
+              AttachDisposable = box >> attachRegistration }
+
+        sendAgentOwnerRootWithMode (awaitModeOf awaitMode) (Some observer) port handle session text identitySeed
+
+    let sendAgentOwnerRootWithAcceptanceRegistration
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        sendAgentOwnerRootWithAcceptance port handle session text identitySeed awaitMode onAccepted attachRegistration
 
     let deliverDetachedVerdict (listener: obj) (kind: string) (reason: string) : Task<obj> =
         let verdict =
@@ -431,6 +441,16 @@ module DispatchSurface =
                            physical = null
                            reason = null |}
         }
+
+    let preparePhysicalAcceptanceObserver (onAccepted: string -> unit) : obj =
+        box (fun (physical: PhysicalUserMessageId) -> onAccepted (PhysicalUserMessageId.value physical))
+
+    let registerPhysicalAcceptanceObserver (promptKey: string) (observer: obj) : obj =
+        PromptPhysicalAcceptance.register (PromptKey.create promptKey) (unbox<PhysicalUserMessageId -> unit> observer)
+        |> box
+
+    let disposePhysicalAcceptanceObserver (registration: obj) : unit =
+        (unbox<IDisposable> registration).Dispose()
 
     /// Continuation may only attach to the target's own active Logical Run
     /// (interaction-authority-017). This Surface always holds a JournalHandle, so
@@ -479,7 +499,7 @@ module DispatchSurface =
         (continuation: string)
         (profile: obj)
         (awaitMode: string)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        (onAccepted: ContinuationAcceptanceObserver option)
         : Task<obj> =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
@@ -565,8 +585,26 @@ module DispatchSurface =
         (profile: obj)
         (awaitMode: string)
         (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
         : Task<obj> =
-        sendContinuationWithObserver
+        let observer: ContinuationAcceptanceObserver =
+            { Notify = PhysicalUserMessageId.value >> onAccepted
+              AttachDisposable = box >> attachRegistration }
+
+        sendContinuationWithObserver port handle session text continuation profile awaitMode (Some observer)
+
+    let sendContinuationWithAcceptanceRegistration
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        sendContinuationWithAcceptance
             port
             handle
             session
@@ -574,7 +612,8 @@ module DispatchSurface =
             continuation
             profile
             awaitMode
-            (Some(PhysicalUserMessageId.value >> onAccepted))
+            onAccepted
+            attachRegistration
 
     let sendGateNudgesConcurrently
         (port: obj)
@@ -1028,7 +1067,21 @@ module DispatchSurface =
                claimSequences =
                 projection.ClaimSequences
                 |> Map.toArray
-                |> Array.map (fun (scope, count) -> box {| scope = scope; count = count |}) |}
+                |> Array.map (fun (scope, counter) ->
+                    box
+                        {| scope = scope
+                           session = SessionId.value counter.SessionId
+                           logicalRun =
+                            counter.LogicalRunId
+                            |> Option.map LogicalRunId.value
+                            |> Option.defaultValue null
+                           count = counter.Count |}) |}
+
+    let closeCompletedHumanRootManager (projection: obj) : obj =
+        projection
+        |> RuntimeSurface.projectionOf
+        |> PromptAuthorityLedger.closeCompletedHumanRootManager
+        |> RuntimeSurface.projectionToJs
 
     let private watermarkText (value: obj) =
         if isNull value then "" else string value

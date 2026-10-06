@@ -52,6 +52,15 @@ module TurnWorkflow =
             if syncDelegateHandled then
                 return ()
 
+            let acceptanceFor (current: ReconciledTurnContext) =
+                syncDelegate
+                |> Option.bind (fun runtime ->
+                    runtime.BindContinuationAcceptance
+                        { SessionId = current.Turn.SessionId
+                          PhysicalUserMessageId = current.Turn.PhysicalUserMessageId
+                          AuthorityRootUserMessageId = current.Turn.AuthorityRootUserMessageId
+                          ProviderRun = current.Turn.ProviderRun })
+
             let observeIdleOrdinary current =
                 OrdinaryTurnWorkflow.observeIdle
                     quiescence
@@ -61,6 +70,7 @@ module TurnWorkflow =
                     journal
                     observation
                     current
+                    (acceptanceFor current)
 
             let observeIdleDelivery () : Task =
                 task {
@@ -83,6 +93,7 @@ module TurnWorkflow =
                     abortCause
                     quiescence
                     current
+                    (acceptanceFor current)
 
             let observeObservation () : Task =
                 task {

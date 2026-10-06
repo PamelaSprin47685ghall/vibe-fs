@@ -8,6 +8,20 @@ import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface
 import * as authority from '../../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as executionStatus from '../../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 
+const acceptanceResources = new WeakMap()
+
+export const ownAcceptanceRegistration = (handle, registration) => {
+  const resources = acceptanceResources.get(handle)
+  assert.ok(resources, 'the real journal fixture owns its acceptance registrations')
+  resources.add(registration)
+}
+
+const closeAcceptanceResources = handle => {
+  const resources = acceptanceResources.get(handle)
+  for (const registration of resources ?? []) dispatch.disposePhysicalAcceptanceObserver(registration)
+  acceptanceResources.delete(handle)
+}
+
 const rootSelection = () => {
   const resolved = identity.resolveParticipantIdentityAtRoot('manager')
   assert.equal(resolved.ok, true, resolved.error)
@@ -30,16 +44,21 @@ export const withJournal = async (label, action) => {
     const result = await journal.JournalSurface_bootWithWriterId(directory, `writer-${label}-${incarnation}`, `runtime-${label}-${incarnation}`, 4242, '2026-09-26T00:00:00Z')
     assert.equal(result.ok, true, JSON.stringify(result.error))
     handle = result.journal
+    acceptanceResources.set(handle, new Set())
     return handle
   }
   const reopen = async () => {
+    closeAcceptanceResources(handle)
     journal.JournalSurface_dispose(handle)
     handle = null
     return open()
   }
   try { return await action(await open(), reopen, directory) }
   finally {
-    if (handle) journal.JournalSurface_dispose(handle)
+    if (handle) {
+      closeAcceptanceResources(handle)
+      journal.JournalSurface_dispose(handle)
+    }
     rmSync(directory, { recursive: true, force: true })
   }
 }
@@ -88,10 +107,12 @@ export const sendWithAcceptanceObserver = (path, port, handle, context, onAccept
   ? dispatch.sendAgentOwnerRootWithAcceptance(
       port, handle, context.session, 'observe the real detached acceptance',
       context.seed, 'Detached', onAccepted,
+      registration => ownAcceptanceRegistration(handle, registration),
     )
   : dispatch.sendContinuationWithAcceptance(
       port, handle, context.session, 'observe the real detached successor',
       'DegenerationGuard', context.profile, 'Detached', onAccepted,
+      registration => ownAcceptanceRegistration(handle, registration),
     )
 
 export const acceptObservedPhysical = (handle, context, key, physical) => dispatch.acceptManagedPromptClaim(

@@ -126,6 +126,14 @@ module PromptDispatcher =
             terminalProviderRun: ProviderRunIdentity ->
                 PhysicalUserMessageId option
 
+        member ObserveGateNudgeAcceptance:
+            profile: PromptAuthority.AuthorityExecutionProfile ->
+            continuation: PromptAuthority.ContinuationKind ->
+            gateKind: string ->
+            terminalProviderRun: ProviderRunIdentity ->
+            observer: ContinuationAcceptanceObserver ->
+                unit
+
         member RepairAlreadyClaimed:
             profile: PromptAuthority.AuthorityExecutionProfile ->
             requestId: BloggerRequestId ->

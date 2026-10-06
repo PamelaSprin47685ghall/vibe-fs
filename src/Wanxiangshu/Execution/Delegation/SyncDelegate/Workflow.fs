@@ -138,7 +138,7 @@ module internal SyncDelegateWorkflow =
             | Some(FreshAuthorityRoot root) -> TerminalStop.belongsTo root stop
             | Some(ExistingAuthorityContinuation _)
             | None -> false)
-        |> Option.bind (fun _ -> store.TryPopCallByDelegate delegateSession)
+        |> Option.bind store.TryPopExactCall
         |> Option.iter (fun current -> store.FailCall(current, message))
 
     let private onTerminalOutcome

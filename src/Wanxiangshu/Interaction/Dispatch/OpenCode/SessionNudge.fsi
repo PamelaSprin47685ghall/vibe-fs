@@ -30,7 +30,7 @@ module HostSessionNudge =
         directory: string option ->
         journal: AgentJournal option ->
         awaitMode: PromptDispatcher.AwaitMode ->
-        onAccepted: (PhysicalUserMessageId -> unit) option ->
+        onAccepted: ContinuationAcceptanceObserver option ->
             Task<Result<PromptKey, string>>
 
     val sendContinuation:
@@ -53,6 +53,19 @@ module HostSessionNudge =
         journal: AgentJournal option ->
         gateKind: string ->
         terminalProviderRun: ProviderRunIdentity ->
+            Task<GateContinuationOutcome>
+
+    val trySendGateContinuationObserved:
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        sessionId: SessionId ->
+        prompt: string ->
+        continuation: PromptAuthority.ContinuationKind ->
+        directory: string option ->
+        journal: AgentJournal option ->
+        gateKind: string ->
+        terminalProviderRun: ProviderRunIdentity ->
+        observer: ContinuationAcceptanceObserver option ->
             Task<GateContinuationOutcome>
 
     val trySendGateContinuationPhysical:
@@ -130,6 +143,20 @@ module HostSessionNudge =
         journal: AgentJournal option ->
         repairKind: string ->
         terminalProviderRun: ProviderRunIdentity ->
+            Task<IdleContinuationOutcome>
+
+    val trySendIdleGateRepairObserved:
+        quiescence: ISessionQuiescenceGate ->
+        permit: QuiescencePermit ->
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        sessionId: SessionId ->
+        prompt: string ->
+        directory: string option ->
+        journal: AgentJournal option ->
+        repairKind: string ->
+        terminalProviderRun: ProviderRunIdentity ->
+        observer: ContinuationAcceptanceObserver option ->
             Task<IdleContinuationOutcome>
 
     val trySendIdleInteractionRepair:

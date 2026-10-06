@@ -2,6 +2,8 @@
 
 规则以 WHAT 为准。本目录区分调度事实、Host 证据、准入交接与执行结果，不把“函数存在”当作没有旁路的证明。
 
+2026-10-06新增有限证据：007验证每次callback注册的独立lease、同步Host异常/Unknown只释放本次资源、effect前交接及旧Unknown A不撤销B；006/007验证fresh Root与exact close保留LogicalRunId=None的Pending和已消费序号，清理Some continuation，包含合法Some("\0absent")反例。序号记录携带typed session/run所有权，不再从编码前缀推断；真实Manager Ledger出口复用同一exact close，非Manager/AgentOwner为对照。007的测试时钟在创建实际确认计时器前开启，保留原deadline与断言。gen184相关246/246、1290pass/0fail、28skip/137TODO，见[记录](../../../proposals/archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。这是本地资源与相邻authority清理证明，不是完整GAP-123 durable closure、真实Host或OS crash证明。下列D0/D1的未证项是各自历史证书边界，本轮新增范围由本段另结算。
+
 - 001 实际 owner-root/continuation 在 Host 端观察注册好的 claim；全体合成消息来源仍需逐一验证。
 - 002/005/006 有真实生产 projection、sequence、hash 输入与兼容解码。005 单独改变六个组成要素；它以注入 hash 观察确定性输入，未声称穷尽哈希碰撞或跨进程故障。
 - 002 新增实际 `ManagerWorkflow.observeIdle` 发送链：有效许可只发送一次并被消费；旧 idle 调度暂停后，新 Human 入场撤销许可，恢复旧调度只追加 exact claim 的 `Abandoned(SupersededBeforePhysicalSend)`，SDK 发送为零。隔离副本恢复旧发送函数时，两条行为断言均失败。此接缝调用生产 owner 与受控 Host port，不是安装版 Host 或 OS 重启证明。

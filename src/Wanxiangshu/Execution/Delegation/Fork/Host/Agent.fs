@@ -130,14 +130,19 @@ module HostForkAgent =
         : Task<Result<ForkResult, string>> =
         task {
             let! sent =
-                HostForkAgentOwner.sendFirstPromptObserved
-                    runtime.Sessions
-                    runtime.Journal
-                    childId
-                    identitySeed
-                    (runtime.DirectoryOf agentId)
-                    enrichedPrompt
-                    (fun _ -> ())
+                runtime.ObservePromptSend(
+                    agentId,
+                    ignore,
+                    fun observer ->
+                        HostForkAgentOwner.sendFirstPromptObserved
+                            runtime.Sessions
+                            runtime.Journal
+                            childId
+                            identitySeed
+                            (runtime.DirectoryOf agentId)
+                            enrichedPrompt
+                            observer
+                )
 
             match sent with
             | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
@@ -521,14 +526,19 @@ module HostForkAgent =
                 let enrichedPrompt = defaultArg renderedPrompt prompt
 
                 let! sent =
-                    HostForkAgentOwner.sendFirstPromptObserved
-                        runtime.Sessions
-                        runtime.Journal
-                        childId
-                        identitySeed
-                        (runtime.DirectoryOf agentId)
-                        enrichedPrompt
-                        (fun _ -> ())
+                    runtime.ObservePromptSend(
+                        agentId,
+                        ignore,
+                        fun observer ->
+                            HostForkAgentOwner.sendFirstPromptObserved
+                                runtime.Sessions
+                                runtime.Journal
+                                childId
+                                identitySeed
+                                (runtime.DirectoryOf agentId)
+                                enrichedPrompt
+                                observer
+                    )
 
                 return interpretDevOpsFirstSent runtime agentId childId role agentName preparedHandoff sent
         }

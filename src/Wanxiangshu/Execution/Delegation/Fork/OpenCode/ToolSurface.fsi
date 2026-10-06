@@ -42,6 +42,11 @@ module ForkToolSurface =
     val acceptNextPrompt: value: obj -> unit
     val terminalListenerCount: value: obj -> int
     val prompt: value: obj -> index: int -> obj
+    val captureChildPromptSender: value: obj -> owner: string -> byname: string -> onAccepted: (string -> unit) -> obj
+    val sendCapturedChildPrompt: captured: obj -> text: string -> Task<obj>
+    val promptEvidence: value: obj -> index: int -> obj
+    val confirmPromptPhysical: value: obj -> index: int -> physicalMessageId: string -> Task<obj>
+    val physicalAcceptanceObservation: value: obj -> index: int -> physicalMessageId: string -> obj
     val nextPromptAcceptanceUnknown: value: obj -> reason: string -> unit
     val nextPromptAdmittedWithReceipt: value: obj -> receipt: string -> unit
     val cancelOwnerChildren: value: obj -> owner: string -> Task

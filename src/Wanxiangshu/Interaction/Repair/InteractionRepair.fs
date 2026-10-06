@@ -24,6 +24,25 @@ open Wanxiangshu.Persistence.Journal
 /// time → zero physical prompt, zero claim, zero terminal.
 module InteractionRepairWorkflow =
 
+    let private observeAdmittedRepairAcceptance
+        (journal: AgentJournal option)
+        (sourceProfile: PromptAuthority.AuthorityExecutionProfile option)
+        (repairKind: string)
+        (providerRun: ProviderRunIdentity)
+        (observer: ContinuationAcceptanceObserver option)
+        =
+        match journal, sourceProfile, observer with
+        | Some durable, Some profile, Some owner ->
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+
+            dispatcher.ObserveGateNudgeAcceptance
+                profile
+                PromptAuthority.ContinuationKind.InteractionRepair
+                repairKind
+                providerRun
+                owner
+        | _ -> ()
+
     /// Generic interaction nudges are gate reminders, gated on a fresh idle permit
     /// (HOST-004). The same terminal occasion is idempotent; a fresh terminal while
     /// the interaction gate remains unsatisfied earns another reminder.
@@ -44,51 +63,62 @@ module InteractionRepairWorkflow =
         (turn: ReconciledTurn)
         (prompt: string)
         (repairKind: string)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         task {
-            let! outcome =
-                HostSessionNudge.trySendIdleGateRepair
-                    quiescence
-                    permit
-                    sessionPort
-                    rootWorkspace
-                    turn.SessionId
-                    prompt
-                    turn.Directory
-                    journal
-                    repairKind
-                    turn.ProviderRun
+            let sourceProfile = HostSessionNudge.tryActiveProfile journal turn.SessionId
 
-            match outcome with
-            | HostSessionNudge.IdleContinuationOutcome.Sent _
-            | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected _
-            | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
-            | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
-            | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
-                Diagnostic.emit
-                    "interaction-gate-nudge-not-sent"
-                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
-            | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                // Journal/authority/transport failures are Wanxiangshu invariant
-                // failures, not model behavior. In production fatal kills the
-                // process; the terminal signal keeps node:test fail-closed too.
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(
-                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId ("WANXIANGSHU_FATAL: " + error)
-                    ))
-                |> ignore
+            if
+                sourceProfile
+                |> Option.exists (fun profile -> profile.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId)
+            then
+                return ()
+            else
+                let! outcome =
+                    HostSessionNudge.trySendIdleGateRepairObserved
+                        quiescence
+                        permit
+                        sessionPort
+                        rootWorkspace
+                        turn.SessionId
+                        prompt
+                        turn.Directory
+                        journal
+                        repairKind
+                        turn.ProviderRun
+                        observer
 
-                // sendRepair already staged rejection as the terminal effect:
-                // fail-closed means neither a swallowed error nor a second
-                // process exit. The emitted record keeps the full error for
-                // wire-side forensics while the run survives for recovery.
-                // (The Failed terminal on the own turn IS the settlement
-                // receipt — abandoning the process after it would orphan any
-                // intact retries and fabricate a transport-level crash.)
-                Diagnostic.emit
-                    "interaction-repair-infrastructure-failed"
-                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
+                match outcome with
+                | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted ->
+                    observeAdmittedRepairAcceptance journal sourceProfile repairKind turn.ProviderRun observer
+                | HostSessionNudge.IdleContinuationOutcome.Sent _
+                | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected _
+                | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
+                | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
+                    Diagnostic.emit
+                        "interaction-gate-nudge-not-sent"
+                        [ "session_id", SessionId.value turn.SessionId; "result", error ]
+                | HostSessionNudge.IdleContinuationOutcome.Failed error ->
+                    // Journal/authority/transport failures are Wanxiangshu invariant
+                    // failures, not model behavior. In production fatal kills the
+                    // process; the terminal signal keeps node:test fail-closed too.
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (TerminalOutcome.Failed(
+                            TerminalStop.forAuthority turn.AuthorityRootUserMessageId ("WANXIANGSHU_FATAL: " + error)
+                        ))
+                    |> ignore
+
+                    // sendRepair already staged rejection as the terminal effect:
+                    // fail-closed means neither a swallowed error nor a second
+                    // process exit. The emitted record keeps the full error for
+                    // wire-side forensics while the run survives for recovery.
+                    // (The Failed terminal on the own turn IS the settlement
+                    // receipt — abandoning the process after it would orphan any
+                    // intact retries and fabricate a transport-level crash.)
+                    Diagnostic.emit
+                        "interaction-repair-infrastructure-failed"
+                        [ "session_id", SessionId.value turn.SessionId; "result", error ]
         }
         :> Task
 
@@ -102,11 +132,22 @@ module InteractionRepairWorkflow =
         (journal: AgentJournal option)
         (prompt: string)
         (repairKind: string)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         match context.Quiescence with
         | None -> AsyncSupport.completedTask ()
         | Some permit ->
-            sendRepair quiescence permit sessionPort rootWorkspace eventPort journal context.Turn prompt repairKind
+            sendRepair
+                quiescence
+                permit
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                context.Turn
+                prompt
+                repairKind
+                observer
 
     let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
@@ -127,6 +168,7 @@ module InteractionRepairWorkflow =
         (journal: AgentJournal option)
         (prompt: string)
         (repairKind: string)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         let turn = context.Turn
 
@@ -137,7 +179,7 @@ module InteractionRepairWorkflow =
                 turn.Outcome
         with
         | CompletedTurnClassifier.RepairDefectDecision.RequestRepair ->
-            trySendIdleRepair quiescence context sessionPort rootWorkspace eventPort journal prompt repairKind
+            trySendIdleRepair quiescence context sessionPort rootWorkspace eventPort journal prompt repairKind observer
         | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal
         | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> AsyncSupport.completedTask ()
 
@@ -299,6 +341,7 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (observation: TurnObservationJournalPort option)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         let fissionReplaced =
             match observation with
@@ -319,6 +362,7 @@ module InteractionRepairWorkflow =
                 journal
                 (ProviderProse.documentFor context.Turn.SessionId RuntimeNudge.MissingClosingReport Map.empty)
                 "missing-final-report"
+                observer
 
     /// Incomplete in-progress interaction: classify then idle-repair, unless the
     /// exact request is still owned by an unsettled ProviderRetryAttempt.
@@ -330,6 +374,7 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (observation: TurnObservationJournalPort option)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         let turn = context.Turn
 
@@ -352,5 +397,6 @@ module InteractionRepairWorkflow =
                 journal
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.InteractionContinue Map.empty)
                 "interaction-repair"
+                observer
         else
             AsyncSupport.completedTask ()

@@ -80,7 +80,7 @@ module HostSessionNudge =
         (directory: string option)
         (journal: AgentJournal option)
         (awaitMode: PromptDispatcher.AwaitMode)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        (onAccepted: ContinuationAcceptanceObserver option)
         : Task<Result<PromptKey, string>> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
@@ -144,7 +144,7 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (gateKind: string)
         (terminalProviderRun: ProviderRunIdentity)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        (onAccepted: ContinuationAcceptanceObserver option)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<GateContinuationOutcome> =
@@ -170,7 +170,7 @@ module HostSessionNudge =
 
     /// Gate reminder for a terminal-driven protocol that is not idle-derived.
     /// Durable dedupe is exact `(gate kind, ProviderRunIdentity)` only.
-    let trySendGateContinuation
+    let trySendGateContinuationObserved
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
@@ -180,6 +180,7 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (gateKind: string)
         (terminalProviderRun: ProviderRunIdentity)
+        (observer: ContinuationAcceptanceObserver option)
         : Task<GateContinuationOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
@@ -198,10 +199,33 @@ module HostSessionNudge =
                         journal
                         gateKind
                         terminalProviderRun
-                        None
+                        observer
                         durable
                         profile
         }
+
+    let trySendGateContinuation
+        sessionPort
+        rootWorkspace
+        sessionId
+        prompt
+        continuation
+        directory
+        journal
+        gateKind
+        terminalProviderRun
+        =
+        trySendGateContinuationObserved
+            sessionPort
+            rootWorkspace
+            sessionId
+            prompt
+            continuation
+            directory
+            journal
+            gateKind
+            terminalProviderRun
+            None
 
     let private sendGateContinuationPhysicalWithProfile
         (sessionPort: ISessionHostPort)
@@ -238,12 +262,20 @@ module HostSessionNudge =
             | GateContinuationOutcome.Retired -> Task.FromResult(Error "gate nudge target is retired")
             | GateContinuationOutcome.Failed error -> Task.FromResult(Error error)
 
-        match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
-        | Some physical -> Task.FromResult(Ok physical)
-        | None when rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun ->
-            Task.FromResult(Error "gate nudge is pending physical acceptance")
-        | None ->
+        let sendFreshGateContinuation () =
             task {
+                let registrations = ResizeArray<IDisposable>()
+
+                use owner =
+                    { new IDisposable with
+                        member _.Dispose() =
+                            for registration in registrations do
+                                registration.Dispose() }
+
+                let observer =
+                    { Notify = (fun physical -> AsyncSupport.trySetResult acceptedPhysical physical |> ignore)
+                      AttachDisposable = registrations.Add }
+
                 let! outcome =
                     sendGateContinuationWithProfile
                         sessionPort
@@ -255,12 +287,18 @@ module HostSessionNudge =
                         journal
                         gateKind
                         terminalProviderRun
-                        (Some(fun physical -> AsyncSupport.trySetResult acceptedPhysical physical |> ignore))
+                        (Some observer)
                         durable
                         profile
 
                 return! physicalResult outcome
             }
+
+        match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
+        | Some physical -> Task.FromResult(Ok physical)
+        | None when rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun ->
+            Task.FromResult(Error "gate nudge is pending physical acceptance")
+        | None -> sendFreshGateContinuation ()
 
     let trySendGateContinuationPhysical
         (sessionPort: ISessionHostPort)
@@ -433,6 +471,7 @@ module HostSessionNudge =
         (gateKind: string)
         (terminalProviderRun: ProviderRunIdentity)
         (awaitMode: PromptDispatcher.AwaitMode)
+        (observer: ContinuationAcceptanceObserver option)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
@@ -452,9 +491,10 @@ module HostSessionNudge =
                 (liveDirectory rootWorkspace directory)
                 awaitMode
                 physicalAdmission
+                observer
             |> TaskValue.map (gateIdleOutcome releaseAdmission)
 
-    let trySendGateContinuationWithAdmission
+    let private trySendGateContinuationWithAdmissionObserved
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionPort: ISessionHostPort)
@@ -467,6 +507,7 @@ module HostSessionNudge =
         (gateKind: string)
         (terminalProviderRun: ProviderRunIdentity)
         (awaitMode: PromptDispatcher.AwaitMode)
+        (observer: ContinuationAcceptanceObserver option)
         : Task<IdleContinuationOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
@@ -488,9 +529,39 @@ module HostSessionNudge =
                         gateKind
                         terminalProviderRun
                         awaitMode
+                        observer
                         durable
                         profile
         }
+
+    let trySendGateContinuationWithAdmission
+        physicalAdmission
+        releaseAdmission
+        sessionPort
+        rootWorkspace
+        sessionId
+        prompt
+        continuation
+        directory
+        journal
+        gateKind
+        terminalProviderRun
+        awaitMode
+        =
+        trySendGateContinuationWithAdmissionObserved
+            physicalAdmission
+            releaseAdmission
+            sessionPort
+            rootWorkspace
+            sessionId
+            prompt
+            continuation
+            directory
+            journal
+            gateKind
+            terminalProviderRun
+            awaitMode
+            None
 
     /// Shared gate-nudge transport: only duplicate observation of the same exact
     /// terminal is suppressed. A fresh terminal remains eligible while the gate
@@ -526,7 +597,7 @@ module HostSessionNudge =
     /// Ordinary interaction nudges are gate reminders, not a finite repair
     /// budget: duplicate delivery of one terminal is idempotent, while every
     /// fresh terminal may remind again until the gate is satisfied.
-    let trySendIdleGateRepair
+    let trySendIdleGateRepairObserved
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
@@ -537,10 +608,11 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (repairKind: string)
         (terminalProviderRun: ProviderRunIdentity)
+        (observer: ContinuationAcceptanceObserver option)
         : Task<IdleContinuationOutcome> =
-        trySendIdleGateContinuation
-            quiescence
-            permit
+        trySendGateContinuationWithAdmissionObserved
+            (fun () -> quiescence.TryConsume permit)
+            (fun () -> quiescence.TryRelease permit)
             sessionPort
             rootWorkspace
             sessionId
@@ -551,6 +623,32 @@ module HostSessionNudge =
             repairKind
             terminalProviderRun
             PromptDispatcher.AwaitMode.Await
+            observer
+
+    let trySendIdleGateRepair
+        quiescence
+        permit
+        sessionPort
+        rootWorkspace
+        sessionId
+        prompt
+        directory
+        journal
+        repairKind
+        terminalProviderRun
+        =
+        trySendIdleGateRepairObserved
+            quiescence
+            permit
+            sessionPort
+            rootWorkspace
+            sessionId
+            prompt
+            directory
+            journal
+            repairKind
+            terminalProviderRun
+            None
 
     /// Blogger-request + terminal-scoped idle interaction repair. This narrower
     /// occasion identity distinguishes same-terminal re-entry from a new bad

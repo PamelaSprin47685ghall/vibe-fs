@@ -60,7 +60,12 @@ module internal SyncDelegatePhysicalIdentity =
 /// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
 /// or the episode was superseded); `Error reason` folds it as terminal.
 type SyncDelegateRetryPort =
-    { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
+    { Retry:
+        ReconciledTurn
+            -> ContinuationAcceptanceObserver option
+            -> Wanxiangshu.Execution.Failure.ExecutionFailure
+            -> string
+            -> Task<Result<unit, string>> }
 
 /// Job-owned helpers for the delegation-031 settle path. Module scope keeps the
 /// member body flat while still seeing store/race primitives.
@@ -129,6 +134,15 @@ type SyncDelegateRuntime
     let noteDelegateAnswer = defaultArg onDelegateAnswer (fun _ _ -> ())
     let cleanupDelegateDraft = defaultArg onDelegateCleanup (fun _ -> ())
     let projectWorkRecord = workRecordFor
+
+    let bindContinuationAcceptance (source: ProviderAttemptSource) =
+        store.TryPeekCallByDelegate source.SessionId
+        |> Option.filter (fun call ->
+            call.AcceptedAuthorityRoot = Some source.AuthorityRootUserMessageId
+            && call.Acceptance.Owns source.PhysicalUserMessageId)
+        |> Option.map (fun call ->
+            { Notify = (fun physical -> call.Acceptance.Accept(physical, ignore))
+              AttachDisposable = call.Acceptance.AttachDisposable })
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -325,10 +339,14 @@ type SyncDelegateRuntime
             do! requireLiveCall ()
 
             let accept physical root scope =
-                call.AcceptedPhysical <- Some physical
-                call.AcceptedAuthorityRoot <- Some root
-                call.TerminalFailureScope <- Some scope
-                AsyncSupport.trySetResult call.AcceptedRoot root |> ignore
+                call.Acceptance.Accept(
+                    physical,
+                    fun () ->
+                        call.AcceptedPhysical <- Some physical
+                        call.AcceptedAuthorityRoot <- Some root
+                        call.TerminalFailureScope <- Some scope
+                        AsyncSupport.trySetResult call.AdmissionRoot (Some root) |> ignore
+                )
 
             let activeDelegateProfile =
                 PromptAuthorityProjectionQueries.activeProfile
@@ -350,9 +368,12 @@ type SyncDelegateRuntime
                         identitySeed
                         directory
                         PromptDispatcher.AwaitMode.Await
-                        (Some(fun physical ->
-                            let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
-                            accept physical root (FreshAuthorityRoot root)))
+                        (Some
+                            { Notify =
+                                fun physical ->
+                                    let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
+                                    accept physical root (FreshAuthorityRoot root)
+                              AttachDisposable = call.Acceptance.AttachDisposable })
                         onSendObserved
                         tools
 
@@ -382,8 +403,14 @@ type SyncDelegateRuntime
                         profile
                         directory
                         PromptDispatcher.AwaitMode.Await
-                        (Some(fun physical ->
-                            accept physical profile.AuthorityRootUserMessageId (ExistingAuthorityContinuation physical)))
+                        (Some
+                            { Notify =
+                                fun physical ->
+                                    accept
+                                        physical
+                                        profile.AuthorityRootUserMessageId
+                                        (ExistingAuthorityContinuation physical)
+                              AttachDisposable = call.Acceptance.AttachDisposable })
                         onSendObserved
                         tools
 
@@ -393,8 +420,11 @@ type SyncDelegateRuntime
                     Error
                         "sync delegate rejected: attached delegate active authority does not match its exact owner identity"
 
-            let! _ = call.AcceptedRoot.Task |> TaskResultCE.ofTask
-            return prepared
+            let! admissionRoot = call.AdmissionRoot.Task |> TaskResultCE.ofTask
+
+            match admissionRoot with
+            | Some _ -> return prepared
+            | None -> return! Error "sync delegate call closed before physical admission"
         }
 
     let sendObservedDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
@@ -544,31 +574,11 @@ type SyncDelegateRuntime
                 return finishCompletedCall turn call workRecord
         }
 
-    /// delegation-025 causal identity: a turn belongs to this invocation iff its
-    /// physical is the exact accepted prompt of this call, or it is a
-    /// ProviderRetryAttempt continuation of the same accepted authority root
-    /// (the retry attempts the decorator dispatched for this call).
+    /// Actual acceptance observers bind attempts to the concrete invocation
+    /// before transport. Session-wide continuation categories carry no call ownership.
     let belongsToCall (call: SyncDelegateCall) (turn: ReconciledTurn) =
-        let sameAcceptedPhysical =
-            match call.AcceptedPhysical with
-            | Some physical -> physical = turn.PhysicalUserMessageId
-            | None -> false
-
-        let isSameAuthorityContinuation =
-            match call.AcceptedAuthorityRoot with
-            | Some root when root = turn.AuthorityRootUserMessageId ->
-                (AgentJournal.snapshot journal).AgentProjections
-                |> PromptAuthorityProjectionQueries.projectionFor turn.SessionId
-                |> Option.bind (fun authority ->
-                    Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
-                |> Option.exists (function
-                    | PromptAuthority.ContinuationKind.ProviderRetryAttempt
-                    | PromptAuthority.ContinuationKind.DegenerationGuard
-                    | PromptAuthority.ContinuationKind.InteractionRepair -> true
-                    | _ -> false)
-            | _ -> false
-
-        sameAcceptedPhysical || isSameAuthorityContinuation
+        call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
+        && call.Acceptance.Owns turn.PhysicalUserMessageId
 
     let popIfAcceptanceMatches
         (store: SyncDelegateCallStore)
@@ -576,11 +586,11 @@ type SyncDelegateRuntime
         (call: SyncDelegateCall)
         : Task<SyncDelegateCall option> =
         task {
-            let! expectedRoot = call.AcceptedRoot.Task
+            let! expectedRoot = call.AdmissionRoot.Task
 
             return
-                if expectedRoot = turn.AuthorityRootUserMessageId && belongsToCall call turn then
-                    store.TryPopCallByDelegate turn.SessionId
+                if expectedRoot = Some turn.AuthorityRootUserMessageId && belongsToCall call turn then
+                    store.TryPopExactCall call
                 else
                     None
         }
@@ -629,7 +639,13 @@ type SyncDelegateRuntime
 
     and settleFailedAttempt (turn: ReconciledTurn) (failure: ExecutionFailure) error (call: SyncDelegateCall) =
         task {
-            match! retry turn failure error with
+            let source =
+                { SessionId = turn.SessionId
+                  PhysicalUserMessageId = turn.PhysicalUserMessageId
+                  AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                  ProviderRun = turn.ProviderRun }
+
+            match! retry turn (bindContinuationAcceptance source) failure error with
             | Ok() -> return true
             | Error reason -> return! failMatchingTerminalCall turn reason call
         }
@@ -644,6 +660,9 @@ type SyncDelegateRuntime
         }
 
     member _.Attached: IAttachedSessionPort = attached
+
+    member _.BindContinuationAcceptance(source: ProviderAttemptSource) : ContinuationAcceptanceObserver option =
+        bindContinuationAcceptance source
 
     member _.ObserveProviderToolCall
         (ownerSessionId: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, callId: ToolCallId)
@@ -880,7 +899,7 @@ type SyncDelegateRuntime
         |> Option.filter (fun call ->
             call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
             && belongsToCall call turn)
-        |> Option.bind (fun _ -> store.TryPopCallByDelegate turn.SessionId)
+        |> Option.bind store.TryPopExactCall
         |> Option.map (fun call -> SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn)
         |> Option.defaultValue false
 
@@ -889,8 +908,8 @@ type SyncDelegateRuntime
         | None -> Task.FromResult false
         | Some call ->
             task {
-                let! _ = call.AcceptedRoot.Task
-                return true
+                let! root = call.AdmissionRoot.Task
+                return root.IsSome
             }
 
     member _.CancelSession(sessionId: SessionId) : unit =

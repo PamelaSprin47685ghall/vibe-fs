@@ -4,6 +4,7 @@
 
 ## 当前证据
 
+- 2026-10-06的018新增捕获原ForkRuntime的正式边界：Closed后新send零Host effect、零claim；Unknown A后新Unknown B使用各自实际key，本地scope关闭不Abandon、不撤销B或无关确认者，B的真实Accepted仍能结算。冷重放保durable Active，Unknown Root Pending由相邻authority修复保留。gen184相关246/246、1290pass/0fail、28skip/137TODO，见[记录](../../../proposals/archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。不证明相同fullText重试必复用原key/零重发，不证明物理abort/drain、OS crash或Fork全部GAP。
 - 001/005 调用真实 AttachedSessionRuntime：同 owner 重用、保持绑定的 agent、显式移除后重新创建。005 还用同一个实际 owner 验证不同 scope 隔离、同键并发仅创建一次，以及不同 typed Role 的绑定可分别重用和移除。后者证明准入后的资源键，不授予 Coder/Inspector 活跃身份；[delegation 007](../../delegation/tests/007.test.mjs) 和 [participant-identity 010](../../participant-identity/tests/010.test.mjs) 另证旧角色活跃准入被拒。`retainBinding=false` 表示主动 Remove，不能证明系统检测到永久丢失。
 - 002/003/011 调用真实 satellite owner，端口提供 association 与 Host 观察，验证单次创建、确切复用、拒绝冲突和替换结果。端口数组不是一个共同的顺序日志；没有真实 journal 重启或首 prompt 悬置证明。
 - 004/009/014 包含同步委托与部分真实 journal。006—010/015 保留 fold、codec、视图和属性测试；GAP-132 另补真实 fork/resume 与 canonical work 消费/重开断言，范围见下文，不等同于实际父取消或 OS 进程恢复。

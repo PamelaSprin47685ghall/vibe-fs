@@ -10,12 +10,14 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
@@ -34,6 +36,11 @@ module ForkToolSurface =
     type private TerminalSubscription =
         { Listener: TerminalCompletionListener }
 
+    type private RecordedPrompt =
+        { SessionId: SessionId
+          Text: string
+          Options: SessionPromptOptions }
+
     type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>) =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
@@ -42,6 +49,7 @@ module ForkToolSurface =
         let mutable preAcceptedPrompts = 0
         let listeners = Dictionary<string, ResizeArray<TerminalSubscription>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
+        let recordedPrompts = Dictionary<string, ResizeArray<RecordedPrompt>>()
 
         let promptWaiters =
             Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
@@ -236,6 +244,11 @@ module ForkToolSurface =
             | true, values when index >= 0 && index < values.Count -> Some values[index]
             | _ -> None
 
+        member _.RecordedPrompt(sessionId: SessionId, index: int) =
+            match recordedPrompts.TryGetValue(SessionId.value sessionId) with
+            | true, values when index >= 0 && index < values.Count -> Some values[index]
+            | _ -> None
+
         member _.LatestAuthorityRoot(sessionId: SessionId) =
             match physicalRoots.TryGetValue(SessionId.value sessionId) with
             | true, values when values.Count > 0 -> Some values[values.Count - 1]
@@ -255,10 +268,24 @@ module ForkToolSurface =
             member _.SubscribeTerminal(sessionId, listener) = subscribe sessionId listener
             member _.SubscribeFutureTerminal(sessionId, listener) = subscribe sessionId listener
 
-            member _.SendPrompt(sessionId, text, _) =
+            member _.SendPrompt(sessionId, text, options) =
                 latestPromptedSession <- Some sessionId
                 let key = SessionId.value sessionId
                 historyOf prompts key |> fun values -> values.Add text
+
+                let recorded =
+                    match recordedPrompts.TryGetValue key with
+                    | true, values -> values
+                    | false, _ ->
+                        let values = ResizeArray<RecordedPrompt>()
+                        recordedPrompts[key] <- values
+                        values
+
+                recorded.Add
+                    { SessionId = sessionId
+                      Text = text
+                      Options = options }
+
                 releasePromptWaiters key
                 releaseEmittedWaiters ()
 
@@ -341,6 +368,14 @@ module ForkToolSurface =
         member _.Dispose() =
             (scope :> IDisposable).Dispose()
             (journal :> IDisposable).Dispose()
+
+    type private CapturedChildPromptSender =
+        { Runtime: HostForkRuntime
+          AgentId: string
+          ChildId: SessionId
+          Role: Role
+          IdentitySeed: PromptAuthority.IdentitySeed
+          OnAccepted: string -> unit }
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
@@ -540,6 +575,73 @@ module ForkToolSurface =
           PromptText = None
           AttachAbort = fun _ -> fun () -> () }
 
+    let captureChildPromptSender (value: obj) (owner: string) (byname: string) (onAccepted: string -> unit) : obj =
+        let harness = unbox<ForkHarness> value
+
+        let runtime =
+            harness.Scope.RuntimeFor(managerContext harness owner)
+            |> Result.defaultWith invalidOp
+
+        let binding =
+            AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+            |> HandleProjection.tryFindByByname byname
+            |> Option.defaultWith (fun () -> invalidOp "Captured Fork sender requires an existing named child")
+
+        let agentId =
+            HandleId.tryAgent binding.Handle
+            |> Option.map AgentHandleId.value
+            |> Option.defaultWith (fun () -> invalidOp "Captured Fork sender requires an agent handle")
+
+        let seed =
+            HostForkRunLifecycle.issueCurrentOwnerIdentitySeed
+                (Some harness.Journal)
+                (harness.OwnerSession owner)
+                binding.TargetAgent
+            |> Result.defaultWith invalidOp
+
+        box
+            { Runtime = runtime
+              AgentId = agentId
+              ChildId = binding.ChildSessionId
+              Role = binding.CanonicalRole
+              IdentitySeed = seed
+              OnAccepted = onAccepted }
+
+    let sendCapturedChildPrompt (captured: obj) (text: string) : Task<obj> =
+        task {
+            let sender = unbox<CapturedChildPromptSender> captured
+
+            let! outcome =
+                sender.Runtime.SendChildPrompt
+                    sender.AgentId
+                    sender.ChildId
+                    sender.Role
+                    sender.IdentitySeed
+                    text
+                    (PhysicalUserMessageId.value >> sender.OnAccepted)
+
+            return
+                match outcome with
+                | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(physical, root) ->
+                    box
+                        {| kind = "Accepted"
+                           physicalUserMessageId = PhysicalUserMessageId.value physical
+                           authorityRoot = AuthorityRootUserMessageId.value root
+                           reason = null |}
+                | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain reason ->
+                    box
+                        {| kind = "AcceptanceUncertain"
+                           physicalUserMessageId = null
+                           authorityRoot = null
+                           reason = reason |}
+                | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected reason ->
+                    box
+                        {| kind = "Rejected"
+                           physicalUserMessageId = null
+                           authorityRoot = null
+                           reason = reason |}
+        }
+
     let executeManagerFork
         (value: obj)
         (toolModule: obj)
@@ -676,6 +778,103 @@ module ForkToolSurface =
         |> Option.bind (fun childId -> harness.Sessions.Prompt(childId, index))
         |> Option.map box
         |> Option.defaultValue null
+
+    let private recordedPrompt (harness: ForkHarness) index =
+        harness.Sessions.LatestChild
+        |> Option.bind (fun childId -> harness.Sessions.RecordedPrompt(childId, index))
+        |> Option.defaultWith (fun () -> invalidArg "index" "No actual Host prompt exists at this index")
+
+    let private recordedPromptKey (recorded: RecordedPrompt) =
+        let metadata =
+            recorded.Options.Metadata
+            |> Option.defaultWith (fun () -> invalidOp "Actual managed Host prompt has no correlation metadata")
+
+        let value: obj = metadata?(PromptMetadataCodec.PromptKeyField)
+        let isString: bool = emitJsExpr value "typeof $0 === 'string'"
+
+        if not isString || String.IsNullOrWhiteSpace(unbox<string> value) then
+            invalidOp "Actual managed Host prompt has no valid PromptKey"
+
+        PromptKey.create (unbox<string> value)
+
+    let promptEvidence (value: obj) (index: int) : obj =
+        let recorded = recordedPrompt (unbox<ForkHarness> value) index
+
+        box
+            {| sessionId = SessionId.value recorded.SessionId
+               text = recorded.Text
+               promptKey = PromptKey.value (recordedPromptKey recorded)
+               agent = recorded.Options.Agent |> Option.toObj |}
+
+    let confirmPromptPhysical (value: obj) (index: int) (physicalMessageId: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let recorded = recordedPrompt harness index
+
+            let decision =
+                PromptIngress.resolveDecision
+                    (Some harness.Journal)
+                    { SessionId = Some recorded.SessionId
+                      PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+                      InvalidIdentityCarrier = None
+                      ExplicitAgent = recorded.Options.Agent
+                      PromptKey = Some(recordedPromptKey recorded)
+                      IsHostCompaction = false
+                      IsHostSynthetic = false
+                      Text = None }
+
+            let! accepted =
+                (PromptDispatcher.forPrompts (PromptJournalAdapter.create harness.Journal))
+                    .AcceptManagedChatIntent
+                    decision
+
+            return
+                match accepted with
+                | Ok witness ->
+                    let evidence = ManagedChatAcceptanceWitness.evidence witness
+
+                    box
+                        {| ok = true
+                           error = null
+                           sessionId = SessionId.value evidence.SessionId
+                           physicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = sprintf "%A" error
+                           sessionId = null
+                           physicalUserMessageId = null |}
+        }
+
+    let physicalAcceptanceObservation (value: obj) (index: int) (physicalMessageId: string) : obj =
+        let harness = unbox<ForkHarness> value
+        let recorded = recordedPrompt harness index
+        let snapshot = (AgentJournal.snapshot harness.Journal).AgentProjections
+        let physical = PhysicalUserMessageId.create physicalMessageId
+        let promptKey = recordedPromptKey recorded
+
+        let pending =
+            (PromptDispatcher.forPrompts (PromptJournalAdapter.create harness.Journal))
+                .PendingClaim(recorded.SessionId, promptKey)
+                .IsSome
+
+        let landing =
+            PromptAuthorityProjectionQueries.physicalLanding recorded.SessionId physical snapshot
+            |> Option.filter (fun accepted -> accepted.PromptKey = promptKey)
+
+        let managed =
+            snapshot.ChatExecutions
+            |> ChatExecutionProjection.byKey
+                { SessionId = recorded.SessionId
+                  PhysicalUserMessageId = physical }
+
+        box
+            {| pending = pending
+               landedPhysical =
+                landing
+                |> Option.map (fun accepted -> PhysicalUserMessageId.value accepted.PhysicalUserMessageId)
+                |> Option.toObj
+               managedAccepted = managed.IsSome |}
 
     let nextPromptAcceptanceUnknown (value: obj) (reason: string) =
         let harness = unbox<ForkHarness> value

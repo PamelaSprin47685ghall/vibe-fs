@@ -1,5 +1,8 @@
 import { setImmediate } from 'node:timers/promises'
 import { beforeEach } from 'node:test'
+import { installWorkerCostObservation } from './worker-cost-observation.mjs'
+
+installWorkerCostObservation()
 
 // The previous verdict exists only after its afterEach hooks have finished.
 // Yield before starting the next leaf so synchronous work cannot hold that verdict.

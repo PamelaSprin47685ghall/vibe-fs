@@ -1,5 +1,9 @@
 # 历史计划与施工记录
 
+[Sphinx真实恢复与资源前置](2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)记录三producer真实红→20矩阵绿、Send/Fork lease/source、Unknown Root/序号与Manager实际清理出口，以及gen184相关246/246、1290/0、28skip/137TODO。下一施工指向08真实Host卡，整体025/Fork/Host不关闭。[应用层旧终端调查](2026-10-06/Sphinx应用层旧终端调查-2026-10-06.md)仅保只读线索；[成本有限调查](2026-10-06/验证成本有限调查-2026-10-06.md)区分worker自身CPU与子工具/CI未知。另有[N04挂载扰动有限验收](2026-10-06/N04挂载扰动有限验收-2026-10-06.md)：20实际namespace操作与有效变异红灯、actual detach后拒consumer成功、foreign保留及native13/13，FD/backing/ABA和完整候选仍未证。
+
+[1eb原始CI收据](2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)与原artifact/job/stage、merge/host及成本对齐保留原300秒真实截断，793/821、006/010活动、26queued、无summary。ccfc旧pending-only证书没有被覆盖；不借成本差造CPU/IO因果。N04[物理能力材料](2026-10-06/n04-physical-capabilities/vibe-fs-n04-c-r0-conclusions-2026-10-06.md)记录C-R0调查和实际同UID nonforce detach前提，有限namespace证据不升级为全过程immutable。
+
 [Sphinx派发事实与资源预留](2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)记录N06-B0完整canonical intent/receipt、逐work预留、round/身份/冲突守门、实际旧seal与冷恢复。gen149目标23/23、230/0已证；宽选集75/75仍有014性能失败，不冒称全绿。下一步B1-A现有SyncDelegate的typed接纳/终态观察与独立B2-0；实际Host/profile/答案整体未完成。[45e413 CI原artifact](2026-10-05/baselines/45e413-ci/receipt.txt)已820/820排空，唯一J11旧断言在本批修复待新头CI，不能沿用f0ead作为最新失败。
 
 [Sphinx持久创建与读取](2026-10-05/Sphinx持久创建与读取-2026-10-05.md)记录N06-A真实SDK/JS持久创建、内容绑定receipt、唯一Current的accepted trace/native DTO、三哈希与新OS进程冷重开。gen142正式73/73、437/0，公开输入缺陷红绿与原始失败完整保留；036两个TODO、Host/renderer/首个答案及GAP-219仍缺。下一主线按现行总计划N06-B接手卡，不重复施工A。另收[f0ead CI原artifact](2026-10-05/baselines/f0ead-ci/receipt.txt)，813/818截断不是pending-only。

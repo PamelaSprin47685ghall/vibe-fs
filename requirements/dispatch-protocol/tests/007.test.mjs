@@ -2,11 +2,398 @@ import test from 'node:test'
 import assertObserved from 'node:assert/strict'
 import * as syncObserved from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as dispatchObserved from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as authorityObserved from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import { rootFor as authorityOwnerRoot } from '../../interaction-authority/tests/support/authority.mjs'
 import { withSyncRuntime as withObservedRuntime } from '../../delegation/tests/support/sync-runtime.mjs'
 import {
   withJournal, hostPort, journalBytes, prepareAcceptanceObserver, sendWithAcceptanceObserver,
   acceptObservedPhysical, acceptanceObservation,
+  ownAcceptanceRegistration,
 } from './support/authority.mjs'
+
+const registerLease = (key, observer) => {
+  const lease = dispatchObserved.registerPhysicalAcceptanceObserver(key, observer)
+  assertObserved.ok(lease !== null && lease !== undefined,
+    'the production registration owner must return an opaque lease; the old unit return lacks this new capability')
+  return lease
+}
+
+const withLeaseClaim = (path, label, action) => withJournal(`lease-${path}-${label}`, async (handle, _reopen, directory) => {
+  const context = await prepareAcceptanceObserver(handle, path, `lease-${label}`)
+  let options
+  let release
+  let sends = 0
+  const sdk = new Promise(resolve => { release = resolve })
+  try {
+    const sent = await sendWithAcceptanceObserver(path,
+      hostPort((_session, _text, supplied) => { options = supplied; sends += 1; return sdk }),
+      handle, context, () => {},
+    )
+    assertObserved.equal(sent.ok, true, sent.error)
+    await action({ handle, context, directory, key: sent.key, options, sends: () => sends })
+  } finally {
+    if (options && dispatchObserved.pendingClaimCount(handle, context.session) > 0) {
+      await dispatchObserved.deliverDetachedVerdict(options.DetachedListener, 'Refused', 'lease fixture released its unaccepted Host request')
+    }
+    release(dispatchObserved.admittedWithReceipt('lease-fixture-sdk-result'))
+  }
+})
+
+const sendWithRegistration = (path, port, handle, context, onAccepted, attachRegistration) => path === 'root'
+  ? dispatchObserved.sendAgentOwnerRootWithAcceptanceRegistration(
+      port, handle, context.session, 'attach root acceptance before Host effect',
+      context.seed, 'Detached', onAccepted, attachRegistration,
+    )
+  : dispatchObserved.sendContinuationWithAcceptanceRegistration(
+      port, handle, context.session, 'attach continuation acceptance before Host effect',
+      'DegenerationGuard', context.profile, 'Detached', onAccepted, attachRegistration,
+    )
+
+test('WHAT[dispatch-protocol-007] accepting another real root preserves an earlier native Unknown root claim through cold reopen', async () => {
+  await withJournal('unknown-root-independent-acceptance', async (handle, reopen, directory) => {
+    const context = await prepareAcceptanceObserver(handle, 'root', 'independent-unknown-root')
+    const sent = []
+    const port = hostPort((session, text, options) => {
+      sent.push({ session, text, key: options.Metadata.wanxiangshu_prompt_key })
+      return Promise.resolve(dispatchObserved.acceptanceUnknown('the native Host cannot prove this root landed'))
+    })
+    const first = await dispatchObserved.sendAgentOwnerRootAwait(
+      port, handle, context.session, 'Original independent Unknown root A', context.seed,
+    )
+    const second = await dispatchObserved.sendAgentOwnerRootAwait(
+      port, handle, context.session, 'Another independent Unknown root B', context.seed,
+    )
+    for (const result of [first, second]) {
+      assertObserved.equal(result.ok, false)
+      assertObserved.match(result.error, /Acceptance unknown/i)
+    }
+    assertObserved.equal(sent.length, 2)
+    assertObserved.notEqual(sent[0].key, sent[1].key)
+    assertObserved.deepEqual(sent.map(item => item.session), [context.session, context.session])
+    const before = dispatchObserved.projectionObservation(handle, context.session)
+    assertObserved.equal(before.activeLogicalRun, null)
+    assertObserved.equal(before.pendingClaims.length, 2)
+    const original = before.pendingClaims.find(claim => claim.promptKey === sent[0].key)
+    assertObserved.ok(original, 'the original Host metadata key names its actual durable claim')
+    assertObserved.equal(original.origin, 'AgentOwnerRoot')
+    assertObserved.equal(original.logicalRun, null, 'the unlanded root does not belong to a closed prior run')
+    assertObserved.equal(original.authorityRoot, null)
+    assertObserved.equal(original.receipt, null)
+
+    const physical = 'accepted-independent-root-B'
+    const accepted = await acceptObservedPhysical(handle, context, sent[1].key, physical)
+    assertObserved.equal(accepted.ok, true, accepted.error)
+    const after = dispatchObserved.projectionObservation(handle, context.session)
+    assertObserved.equal(after.activeLogicalRun.authorityRoot, physical)
+    assertObserved.equal(after.activeLogicalRun.session, context.session)
+    assertObserved.equal(after.pendingClaims.some(claim => claim.promptKey === sent[1].key), false)
+    assertObserved.deepEqual(after.pendingClaims.find(claim => claim.promptKey === sent[0].key), original,
+      'new authority acceptance cannot silently abandon another root whose native physical outcome is still unknown')
+    const bytes = journalBytes(directory)
+    assertObserved.equal(dispatchObserved.pendingClaimCount(handle, context.session), 1)
+    assertObserved.deepEqual(journalBytes(directory), bytes, 'independent claim queries append no facts')
+
+    const cold = await reopen()
+    const recovered = dispatchObserved.projectionObservation(cold, context.session)
+    assertObserved.deepEqual(recovered.pendingClaims, [original])
+    assertObserved.deepEqual(recovered.activeLogicalRun, after.activeLogicalRun)
+    const recoveredBytes = journalBytes(directory)
+    assertObserved.equal(dispatchObserved.pendingClaimCount(cold, context.session), 1)
+    assertObserved.deepEqual(journalBytes(directory), recoveredBytes, 'cold claim queries do not reconcile Unknown into abandonment')
+    assertObserved.equal(sent.length, 2, 'neither acceptance nor cold recovery sends the original Unknown key again')
+  })
+})
+
+test('WHAT[dispatch-protocol-007] the pure authority owner preserves an unlanded root when establishing and closing another exact run', () => {
+  const hash = input => `authority-owner-hash(${input})`
+  const session = 'pure-unknown-root-child'
+  const issued = authorityObserved.issueInheritedIdentitySeed('engineer',
+    authorityOwnerRoot('manager', 'pure-unknown-root-owner', 'pure-unknown-root-parent'))
+  assertObserved.equal(issued.ok, true, issued.error)
+  const origin = { kind: 'AuthorityRoot', label: 'AgentOwnerRoot' }
+  const firstScope = authorityObserved.claimScopeDigest(session, null, origin, 'unknown-root-A')
+  const firstKey = authorityObserved.derivePromptKey(hash, session, null, null, origin, 'unknown-root-A', 1)
+  const secondKey = authorityObserved.derivePromptKey(hash, session, null, null, origin, 'accepted-root-B', 1)
+  const first = authorityObserved.claimAgentOwnerRoot(firstKey, session, 'unknown-root-A', issued.value)
+  const second = authorityObserved.claimAgentOwnerRoot(secondKey, session, 'accepted-root-B', issued.value)
+  assertObserved.equal(first.ok, true, first.error)
+  assertObserved.equal(second.ok, true, second.error)
+  let state = authorityObserved.registerClaim(first.value, authorityObserved.empty)
+  state = authorityObserved.registerClaim(second.value, state)
+  state = authorityObserved.acceptClaim(secondKey, 'pure-physical-root-B', state)
+  const built = authorityObserved.createAuthorityRoot(hash, 'pure-runtime', session,
+    'AgentOwnerRoot', 'pure-physical-root-B', issued.value)
+  assertObserved.equal(built.ok, true, built.error)
+  const root = built.value
+  state = authorityObserved.registerAuthority(root, state)
+  assertObserved.deepEqual(state.pendingClaims, [first.value],
+    'establishing B cannot classify A logicalRun=None as a closed prior run')
+  assertObserved.equal(authorityObserved.nextClaimSequence(firstScope, state), 2)
+
+  const continuationOrigin = authorityObserved.originForContinuation('DegenerationGuard')
+  const continuationScope = authorityObserved.claimScopeDigest(session, root.logicalRun, continuationOrigin, 'B-continuation')
+  const landedKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
+    continuationOrigin, 'B-continuation', 1)
+  const pendingKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
+    continuationOrigin, 'B-continuation', 2)
+  state = authorityObserved.registerClaim(
+    authorityObserved.claimContinuation(landedKey, session, 'DegenerationGuard', root, 'B-continuation'), state)
+  state = authorityObserved.acceptClaim(landedKey, 'pure-physical-B-continuation', state)
+  state = authorityObserved.registerClaim(
+    authorityObserved.claimContinuation(pendingKey, session, 'DegenerationGuard', root, 'B-continuation'), state)
+  assertObserved.equal(authorityObserved.nextClaimSequence(continuationScope, state), 3)
+  assertObserved.equal(authorityObserved.resolveKnownOrigin('pure-physical-B-continuation', landedKey, false, state), 'Continuation')
+
+  // This calls the pure close owner; it does not supply a durable lifecycle witness.
+  const closed = authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, state)
+  assertObserved.equal(closed.ok, true, closed.error)
+  assertObserved.equal(closed.value.activeLogicalRun, null)
+  assertObserved.deepEqual(closed.value.pendingClaims, [first.value])
+  assertObserved.equal(authorityObserved.nextClaimSequence(firstScope, closed.value), 2)
+  assertObserved.equal(authorityObserved.nextClaimSequence(continuationScope, closed.value), 1)
+  assertObserved.deepEqual(closed.value.acceptedContinuations, [])
+  assertObserved.equal(authorityObserved.resolveKnownOrigin('', firstKey, false, closed.value), 'AuthorityRoot')
+  assertObserved.equal(authorityObserved.resolveKnownOrigin('pure-physical-B-continuation', landedKey, false, closed.value), 'UnknownOrigin')
+  assertObserved.equal(closed.value.physicalLandings.find(landing => landing.physical === 'pure-physical-root-B').promptKey, secondKey)
+  assertObserved.equal(closed.value.physicalLandings.find(landing => landing.physical === 'pure-physical-B-continuation').promptKey, landedKey)
+  assertObserved.deepEqual(authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, closed.value).value, closed.value)
+})
+
+test('WHAT[dispatch-protocol-007] the pure Manager Ledger close preserves unknown roots and consumed None scopes while clearing only Manager run resources', () => {
+  const hash = input => `manager-ledger-hash(${input})`
+  const rootOrigin = { kind: 'AuthorityRoot', label: 'AgentOwnerRoot' }
+  for (const [kind, participant] of [['HumanRoot', 'engineer'], ['AgentOwnerRoot', 'engineer'], ['HumanRoot', 'manager']]) {
+    const session = `ledger-${kind}-${participant}`
+    const issued = authorityObserved.issueInheritedIdentitySeed('engineer',
+      authorityOwnerRoot('manager', `ledger-owner-physical-${session}`, `ledger-owner-${session}`))
+    assertObserved.equal(issued.ok, true, issued.error)
+    const rootKey = (payload, sequence) => authorityObserved.derivePromptKey(
+      hash, session, null, null, rootOrigin, payload, sequence)
+    const unknownKey = rootKey('unknown-root', 1)
+    const acceptedKey = rootKey('consumed-root-payload', 1)
+    const abandonedKey = rootKey('consumed-root-payload', 2)
+    const unknown = authorityObserved.claimAgentOwnerRoot(unknownKey, session, 'unknown-root', issued.value)
+    const accepted = authorityObserved.claimAgentOwnerRoot(acceptedKey, session, 'consumed-root-payload', issued.value)
+    const abandoned = authorityObserved.claimAgentOwnerRoot(abandonedKey, session, 'consumed-root-payload', issued.value)
+    for (const claim of [unknown, accepted, abandoned]) assertObserved.equal(claim.ok, true, claim.error)
+    let state = authorityObserved.registerClaim(unknown.value, authorityObserved.empty)
+    state = authorityObserved.registerClaim(accepted.value, state)
+    state = authorityObserved.acceptClaim(acceptedKey, `ledger-old-root-physical-${session}`, state)
+    state = authorityObserved.registerClaim(abandoned.value, state)
+    state = authorityObserved.abandonClaim(abandonedKey, state)
+    const root = kind === 'HumanRoot'
+      ? authorityOwnerRoot(participant, `ledger-active-root-${session}`, session)
+      : authorityObserved.createAuthorityRoot(hash, 'ledger-runtime', session,
+          kind, `ledger-active-root-${session}`, issued.value).value
+    assertObserved.ok(root)
+    state = authorityObserved.registerAuthority(root, state)
+    const unknownScope = authorityObserved.claimScopeDigest(session, null, rootOrigin, 'unknown-root')
+    const consumedScope = authorityObserved.claimScopeDigest(session, null, rootOrigin, 'consumed-root-payload')
+    assertObserved.deepEqual(state.pendingClaims, [unknown.value])
+    assertObserved.equal(authorityObserved.nextClaimSequence(unknownScope, state), 2)
+    assertObserved.equal(authorityObserved.nextClaimSequence(consumedScope, state), 3,
+      'the accepted and abandoned same-payload acts consumed this scope without leaving a Pending claim')
+
+    const continuationOrigin = authorityObserved.originForContinuation('ManagerGuard')
+    const pendingScope = authorityObserved.claimScopeDigest(session, root.logicalRun, continuationOrigin, 'pending-run-continuation')
+    const acceptedScope = authorityObserved.claimScopeDigest(session, root.logicalRun, continuationOrigin, 'accepted-run-continuation')
+    const pendingKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
+      continuationOrigin, 'pending-run-continuation', 1)
+    const continuationKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
+      continuationOrigin, 'accepted-run-continuation', 1)
+    state = authorityObserved.registerClaim(authorityObserved.claimContinuation(
+      pendingKey, session, 'ManagerGuard', root, 'pending-run-continuation'), state)
+    state = authorityObserved.registerClaim(authorityObserved.claimContinuation(
+      continuationKey, session, 'ManagerGuard', root, 'accepted-run-continuation'), state)
+    const continuationPhysical = `ledger-continuation-physical-${session}`
+    state = authorityObserved.acceptClaim(continuationKey, continuationPhysical, state)
+    assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, state), 2)
+    assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, state), 2)
+
+    // This exercises the actual pure Ledger owner, not a durable RetirementCommitted witness.
+    const closed = dispatchObserved.closeCompletedHumanRootManager(state)
+    if (kind !== 'HumanRoot' || participant !== 'manager') {
+      assertObserved.deepEqual(closed, state, `${kind}/${participant} is outside the Manager Ledger close contract`)
+      continue
+    }
+    assertObserved.equal(closed.activeLogicalRun, null)
+    assertObserved.deepEqual(closed.lastAuthorityProfile, root)
+    assertObserved.deepEqual(closed.pendingClaims, [unknown.value])
+    assertObserved.equal(authorityObserved.nextClaimSequence(unknownScope, closed), 2)
+    assertObserved.equal(authorityObserved.nextClaimSequence(consumedScope, closed), 3)
+    assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, closed), 1)
+    assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, closed), 1)
+    assertObserved.deepEqual(closed.acceptedContinuations, [])
+    assertObserved.deepEqual(closed.physicalLandings, state.physicalLandings)
+    assertObserved.deepEqual(closed.acceptedDispatches, state.acceptedDispatches)
+    assertObserved.equal(authorityObserved.resolveKnownOrigin('', unknownKey, false, closed), 'AuthorityRoot')
+    assertObserved.equal(authorityObserved.resolveKnownOrigin(continuationPhysical, continuationKey, false, closed), 'UnknownOrigin')
+    assertObserved.deepEqual(dispatchObserved.closeCompletedHumanRootManager(closed), closed)
+  }
+})
+
+for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-007] the real ${path} sender hands its exact local registration to the caller before entering the Host effect`, async () => {
+    await withJournal(`handoff-${path}`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'effect-before-attach')
+      const registrations = []
+      const seen = []
+      let atHost
+      let options
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithRegistration(path,
+          hostPort((_session, _text, supplied) => {
+            options = supplied
+            atHost = registrations.length
+            return sdk
+          }), handle, context, physical => seen.push(physical), registration => {
+            registrations.push(registration)
+            dispatchObserved.disposePhysicalAcceptanceObserver(registration)
+          },
+        )
+        assertObserved.equal(sent.ok, true, sent.error)
+        const physical = `handoff-physical-${context.session}`
+        assertObserved.equal((await acceptObservedPhysical(handle, context, sent.key, physical)).ok, true)
+        assertObserved.equal(atHost, 1, 'new handoff capability: the caller must own and may release the registration before Host SendPrompt begins')
+        assertObserved.equal(registrations.length, 1)
+        assertObserved.deepEqual(seen, [], 'release of the real sender registration prevents later notification')
+        dispatchObserved.disposePhysicalAcceptanceObserver(registrations[0])
+      } finally {
+        if (options && dispatchObserved.pendingClaimCount(handle, context.session) > 0) {
+          await dispatchObserved.deliverDetachedVerdict(options.DetachedListener, 'Refused', 'handoff fixture released its unaccepted request')
+        }
+        release(dispatchObserved.admittedWithReceipt('handoff-fixture-sdk-result'))
+      }
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-007] a real Await ${path} native Unknown result cannot reject another caller's waiter or alter its durable Pending claim`, async t => {
+    await withJournal(`sender-unknown-${path}`, async (handle, _reopen, directory) => {
+      const context = await prepareAcceptanceObserver(handle, path, 'await-unknown-other-waiter')
+      const seen = []
+      let other
+      let key
+      let before
+      let bytes
+      t.mock.timers.enable({ apis: ['setTimeout'] })
+      const port = hostPort((_session, _text, options) => {
+        key = options.Metadata.wanxiangshu_prompt_key
+        before = dispatchObserved.projectionObservation(handle, context.session)
+        bytes = journalBytes(directory)
+        other = dispatchObserved.awaitPhysicalConfirmation(key, 50)
+        return Promise.resolve(dispatchObserved.acceptanceUnknown('actual native Host outcome remains unknown'))
+      })
+      const sent = path === 'root'
+        ? await dispatchObserved.sendAgentOwnerRootWithAcceptance(
+            port, handle, context.session, 'Await unknown root keeps independent waiter', context.seed,
+            'Await', physical => seen.push(physical),
+            registration => ownAcceptanceRegistration(handle, registration),
+          )
+        : await dispatchObserved.sendContinuationWithAcceptance(
+            port, handle, context.session, 'Await unknown successor keeps independent waiter',
+            'DegenerationGuard', context.profile, 'Await', physical => seen.push(physical),
+            registration => ownAcceptanceRegistration(handle, registration),
+          )
+      assertObserved.equal(sent.ok, false)
+      assertObserved.match(sent.error, /Acceptance unknown/)
+      assertObserved.equal(dispatchObserved.pendingClaimCount(handle, context.session), 1)
+      assertObserved.deepEqual(dispatchObserved.projectionObservation(handle, context.session), before)
+      assertObserved.deepEqual(journalBytes(directory), bytes, 'Unknown adds neither Abandoned nor another durable fact')
+      const physical = `await-unknown-physical-${context.session}`
+      assertObserved.equal((await acceptObservedPhysical(handle, context, key, physical)).ok, true)
+      t.mock.timers.tick(50)
+      assertObserved.deepEqual(await other, { kind: 'Accepted', physical, reason: null },
+        'a sender returning Unknown owns only its local callback, not another caller\'s confirmation waiter')
+      assertObserved.deepEqual(seen, [], 'the ended Await send releases its own callback')
+    })
+  })
+}
+
+for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-007] repeated registration of the same ${path} callback gives independent leases and an old release preserves the current observer`, async () => {
+    await withLeaseClaim(path, 'same-callback', async ({ handle, context, key, sends }) => {
+      const seen = []
+      const observer = dispatchObserved.preparePhysicalAcceptanceObserver(physical => seen.push(acceptanceObservation(handle, context, physical)))
+      const first = registerLease(key, observer)
+      const second = registerLease(key, observer)
+      assertObserved.notEqual(first, second, 'every register of the exact same typed callback has a new opaque identity')
+      dispatchObserved.disposePhysicalAcceptanceObserver(first)
+      const physical = `lease-same-callback-${context.session}`
+      assertObserved.equal((await acceptObservedPhysical(handle, context, key, physical)).ok, true)
+      assertObserved.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+      assertObserved.equal(sends(), 1)
+      dispatchObserved.disposePhysicalAcceptanceObserver(second)
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-007] disposing an old ${path} lease twice cannot remove a different later observer`, async () => {
+    await withLeaseClaim(path, 'replacement', async ({ handle, context, key }) => {
+      const oldSeen = []
+      const currentSeen = []
+      const first = registerLease(key, dispatchObserved.preparePhysicalAcceptanceObserver(physical => oldSeen.push(physical)))
+      const second = registerLease(key, dispatchObserved.preparePhysicalAcceptanceObserver(physical => currentSeen.push(physical)))
+      assertObserved.notEqual(first, second)
+      dispatchObserved.disposePhysicalAcceptanceObserver(first)
+      dispatchObserved.disposePhysicalAcceptanceObserver(first)
+      const physical = `lease-replacement-${context.session}`
+      assertObserved.equal((await acceptObservedPhysical(handle, context, key, physical)).ok, true)
+      assertObserved.deepEqual(oldSeen, [])
+      assertObserved.deepEqual(currentSeen, [physical])
+      dispatchObserved.disposePhysicalAcceptanceObserver(second)
+      dispatchObserved.disposePhysicalAcceptanceObserver(second)
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-007] releasing a local ${path} lease after Host Unknown preserves durable Pending bytes and other actual confirmation waiters`, async t => {
+    await withLeaseClaim(path, 'unknown-release', async ({ handle, context, directory, key, options, sends }) => {
+      const seen = []
+      const lease = registerLease(key, dispatchObserved.preparePhysicalAcceptanceObserver(physical => seen.push(physical)))
+      assertObserved.deepEqual(await dispatchObserved.deliverDetachedVerdict(options.DetachedListener, 'OutcomeUnknown', 'actual Host outcome is unknown'), { delivered: true })
+      const projection = dispatchObserved.projectionObservation(handle, context.session)
+      const bytes = journalBytes(directory)
+      assertObserved.equal(dispatchObserved.pendingClaimCount(handle, context.session), 1)
+      t.mock.timers.enable({ apis: ['setTimeout'] })
+      const first = dispatchObserved.awaitPhysicalConfirmation(key, 50)
+      const second = dispatchObserved.awaitPhysicalConfirmation(key, 50)
+      dispatchObserved.disposePhysicalAcceptanceObserver(lease)
+      dispatchObserved.disposePhysicalAcceptanceObserver(lease)
+      assertObserved.deepEqual(dispatchObserved.projectionObservation(handle, context.session), projection)
+      assertObserved.deepEqual(journalBytes(directory), bytes, 'local release appends neither Abandoned nor any other durable fact')
+      assertObserved.equal(dispatchObserved.pendingClaimCount(handle, context.session), 1)
+      const physical = `lease-unknown-release-${context.session}`
+      assertObserved.equal((await acceptObservedPhysical(handle, context, key, physical)).ok, true)
+      t.mock.timers.tick(50)
+      assertObserved.deepEqual(await first, { kind: 'Accepted', physical, reason: null })
+      assertObserved.deepEqual(await second, { kind: 'Accepted', physical, reason: null })
+      assertObserved.deepEqual(seen, [], 'a released callback is not notified by subsequent actual acceptance')
+      assertObserved.equal(sends(), 1)
+    })
+  })
+
+  test(`WHAT[dispatch-protocol-007] a current ${path} lease callback exception preserves actual Accepted for every independent waiter`, async t => {
+    await withLeaseClaim(path, 'throwing-observer', async ({ handle, context, key }) => {
+      const error = new Error(`leased-observer-exception-${context.session}`)
+      const seen = []
+      const lease = registerLease(key, dispatchObserved.preparePhysicalAcceptanceObserver(physical => {
+        seen.push(acceptanceObservation(handle, context, physical))
+        throw error
+      }))
+      t.mock.timers.enable({ apis: ['setTimeout'] })
+      const first = dispatchObserved.awaitPhysicalConfirmation(key, 50)
+      const second = dispatchObserved.awaitPhysicalConfirmation(key, 50)
+      const physical = `lease-throwing-observer-${context.session}`
+      await assertObserved.rejects(acceptObservedPhysical(handle, context, key, physical), actual => actual === error)
+      assertObserved.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+      t.mock.timers.tick(50)
+      assertObserved.deepEqual(await first, { kind: 'Accepted', physical, reason: null })
+      assertObserved.deepEqual(await second, { kind: 'Accepted', physical, reason: null })
+      dispatchObserved.disposePhysicalAcceptanceObserver(lease)
+      dispatchObserved.disposePhysicalAcceptanceObserver(lease)
+    })
+  })
+}
 
 for (const path of ['root', 'continuation']) {
   test(`WHAT[dispatch-protocol-007] one detached ${path} confirmation timeout leaves another waiter and the real acceptance observer intact`, async t => {

@@ -22,7 +22,12 @@ module internal SyncDelegatePhysicalIdentity =
 /// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
 /// or the episode was superseded); `Error reason` folds it as terminal.
 type SyncDelegateRetryPort =
-    { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
+    { Retry:
+        ReconciledTurn
+            -> ContinuationAcceptanceObserver option
+            -> Wanxiangshu.Execution.Failure.ExecutionFailure
+            -> string
+            -> Task<Result<unit, string>> }
 
 type SyncDelegateRuntime =
     new:
@@ -48,6 +53,7 @@ type SyncDelegateRuntime =
             SyncDelegateRuntime
 
     member Attached: IAttachedSessionPort
+    member BindContinuationAcceptance: source: ProviderAttemptSource -> ContinuationAcceptanceObserver option
 
     member ObserveProviderToolCall:
         ownerSessionId: SessionId * providerRun: ProviderRunIdentity * role: SyncDelegateRole * callId: ToolCallId ->

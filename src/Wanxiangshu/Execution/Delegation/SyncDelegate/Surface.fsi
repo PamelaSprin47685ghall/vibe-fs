@@ -11,6 +11,31 @@ module SyncDelegateSurface =
     /// Every owner must first be admitted as an explicit durable HumanRoot.
     val create: directory: string -> owners: obj -> Task<obj>
 
+    /// Same canonical journal and Host port, using the production provider
+    /// recovery workflow and a real Blogger scope. Model routing reads the
+    /// calling process's already-isolated configuration.
+    val createForProviderRecovery: directory: string -> owners: obj -> Task<obj>
+
+    val createForGuardRecovery: directory: string -> owners: obj -> Task<obj>
+    val closeRecovery: value: obj -> Task
+    val closeGuardRecovery: value: obj -> Task
+    val observeGuardDelta: value: obj -> raw: obj -> unit
+    val awaitGuardInterrupt: value: obj -> session: string -> providerRun: string -> Task
+
+    val observeExactGuardAbort:
+        value: obj -> session: string -> physical: string -> authorityRoot: string -> providerRun: string -> Task
+
+    val observeRepairTurn:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        finish: string ->
+        delivery: string ->
+        idleEvidence: bool ->
+            Task
+
     /// managed-session-lifecycle-001: drive SyncDelegateRuntime's production child
     /// observation into AttachedSessionRuntime against controlled Host callbacks.
     val managedChildReconciliationScenario: directory: string -> mode: string -> Task<obj>
@@ -40,6 +65,18 @@ module SyncDelegateSurface =
     val confirmPromptPhysical:
         value: obj -> owner: string -> role: string -> index: int -> physical: string -> Task<bool>
 
+    /// Real managed ingress from a captured PromptKey, including durable
+    /// ChatExecution Accepted. Returns only the native witness observation.
+    val confirmManagedPromptPhysical:
+        value: obj -> owner: string -> role: string -> index: int -> physical: string -> Task<obj>
+
+    /// Controlled exact-stop capability for this harness's own children. This
+    /// does not install or prove the real Host terminal subscription.
+    val observeProviderFailureStop: value: obj -> session: string -> providerRun: string -> bool
+
+    /// Cardinality of the process-shared production stop fence, not call state.
+    val recoveryStopSnapshot: value: obj -> obj
+
     val promptIdentity: value: obj -> owner: string -> role: string -> index: int -> obj
     val promptClaimState: value: obj -> owner: string -> role: string -> index: int -> obj
     val terminalListenerCount: value: obj -> int
@@ -62,6 +99,15 @@ module SyncDelegateSurface =
         providerRun: string ->
         formalText: string ->
             bool
+
+    val observeExactProviderFailure:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        reason: string ->
+            Task<bool>
 
     /// Settle the current managed child through the real HandleTurn path.
     val settleWithAuthorityRoot:

@@ -8,7 +8,12 @@ type LoopSensor =
     new:
         isOwned: (SessionId -> bool) *
         abortSession: (SessionId -> Task<Result<unit, string>>) *
-        continueSession: (SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>) *
+        continueSession:
+            (ProviderAttemptSource
+                -> DegenerationKind
+                -> string option
+                -> ContinuationAcceptanceObserver option
+                -> Task<Result<unit, string>>) *
         emitDiagnostic: (string -> (string * string) list -> unit) *
         ?runOwnedWork: ((unit -> Task) -> Task) ->
             LoopSensor
@@ -16,7 +21,8 @@ type LoopSensor =
     member Observe: raw: obj -> unit
 
     member ConsumeAbortCause:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> Task<AbortCause>
+        source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->
+            Task<AbortCause>
 
     member DropSession: sessionId: SessionId -> unit
     member ResetDetector: sessionId: SessionId -> unit
@@ -32,6 +38,11 @@ module LoopSensor =
         ownedSessions: HashSet<string> ->
         sessionParents: Dictionary<string, string> ->
         abortSession: (SessionId -> Task<Result<unit, string>>) ->
-        continueSession: (SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>) ->
+        continueSession:
+            (ProviderAttemptSource
+                -> DegenerationKind
+                -> string option
+                -> ContinuationAcceptanceObserver option
+                -> Task<Result<unit, string>>) ->
         emitDiagnostic: (string -> (string * string) list -> unit) ->
             LoopSensor

@@ -259,36 +259,7 @@ module HostSignalBootstrap =
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
-            let continueFn =
-                fun (sessionId: SessionId) (kind: DegenerationKind) (directory: string option) ->
-                    task {
-                        let prompt =
-                            ProviderProse.documentFor sessionId (LoopSensor.continuationPath kind) Map.empty
-
-                        let! outcome =
-                            HostSessionNudge.sendContinuationResult
-                                sessionPort
-                                rootWorkspace
-                                sessionId
-                                prompt
-                                PromptAuthority.ContinuationKind.DegenerationGuard
-                                directory
-                                journal
-                                PromptDispatcher.AwaitMode.Detached
-                                None
-
-                        return outcome |> Result.map ignore
-                    }
-
-            let loopSensor =
-                LoopSensor.create
-                    scope.Sessions.OwnedSessions
-                    scope.Sessions.SessionParents
-                    sessionPort.InterruptAttempt
-                    continueFn
-                    Diagnostic.emit
-
-            scope.AttachLoopSensor loopSensor
+            HostTurnObserver.attachLoopSensor sessionPort rootWorkspace journal scope Diagnostic.emit
 
             let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =
                 journal

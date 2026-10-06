@@ -7,22 +7,27 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Companion.Blogger.OpenCode
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
@@ -31,6 +36,11 @@ open Wanxiangshu.Persistence.Journal
 /// observe only invocation promises and child identities.
 [<RequireQualifiedAccess>]
 module SyncDelegateSurface =
+    [<RequireQualifiedAccess>]
+    type private RetryHarnessMode =
+        | Scripted
+        | ProviderRecovery
+
     /// Test-side plug of the retry decorator: the harness records each verdict
     /// request so a landing test can prove a transient failure stayed child-local
     /// (delegation-023) before only the terminal verdict failed the call.
@@ -178,8 +188,14 @@ module SyncDelegateSurface =
             sessions: SessionPort,
             readiness: PromptReadiness,
             children: ResizeArray<SessionId>,
-            retryScript: RetryScript
+            retryScript: RetryScript,
+            plugin: PluginRuntimeScope option,
+            gate: SessionQuiescenceGate,
+            rootWorkspace: IRootWorkspaceReader,
+            eventPort: IEventObservationPort
         ) =
+        let nudgeSent = HashSet<string>()
+        let joinGuardNudges = HashSet<string>()
         member _.Journal = journal
         member _.Dispatcher = dispatcher
         member _.Runtime = runtime
@@ -188,13 +204,43 @@ module SyncDelegateSurface =
         member _.Readiness = readiness
         member _.Children = children
         member _.RetryScript = retryScript
+        member _.UsesProviderRecovery = plugin.IsSome
+        member _.Plugin = plugin
+        member _.Gate = gate
+        member _.RootWorkspace = rootWorkspace
+        member _.EventPort = eventPort
+        member _.NudgeSent = nudgeSent
+        member _.JoinGuardNudges = joinGuardNudges
         member _.OwnerSession(owner: string) = SessionId.create owner
 
         member _.Dispose() =
             runtime.Dispose()
+
+            plugin
+            |> Option.iter (fun scope ->
+                children |> Seq.iter ProviderAttemptStopFence.shared.Revoke
+                scope.Dispose())
+
             sessions.ClosePendingSends()
             (scope :> IDisposable).Dispose()
             (journal :> IDisposable).Dispose()
+
+        member _.CloseRecovery() : Task =
+            task {
+                runtime.Dispose()
+                children |> Seq.iter ProviderAttemptStopFence.shared.Revoke
+                sessions.ClosePendingSends()
+
+                try
+                    match plugin with
+                    | Some owner ->
+                        children |> Seq.iter owner.LoopSensor.DropSession
+                        do! owner.DisposeAsync()
+                    | None -> ()
+                finally
+                    (scope :> IDisposable).Dispose()
+                    (journal :> IDisposable).Dispose()
+            }
 
     and private SessionPort
         (children: ResizeArray<SessionId>, readiness: PromptReadiness, observationMode: string option) =
@@ -211,6 +257,7 @@ module SyncDelegateSurface =
         let acceptedPhysical = Dictionary<string, ResizeArray<PhysicalUserMessageId>>()
         let listedFamilies = ResizeArray<string>()
         let createRequests = ResizeArray<string * string option * string option>()
+        let parents = Dictionary<SessionId, SessionId>()
 
         let prompted =
             TaskCompletionSource<SessionId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -280,6 +327,11 @@ module SyncDelegateSurface =
 
         member _.ListedFamilies = listedFamilies.ToArray()
         member _.CreateRequests = createRequests.ToArray()
+
+        member _.ParentFor(child: SessionId) =
+            match parents.TryGetValue child with
+            | true, parent -> Some parent
+            | false, _ -> None
 
         member _.TerminalListenerCount =
             listeners.Values |> Seq.sumBy (fun registrations -> registrations.Count)
@@ -403,6 +455,7 @@ module SyncDelegateSurface =
                     | None -> SessionId.create (sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
 
                 children.Add child
+                parents[child] <- parent
 
                 let ready =
                     childCountWaiters
@@ -635,7 +688,12 @@ module SyncDelegateSurface =
             (journal :> IDisposable).Dispose()
             raise (InvalidOperationException error)
 
-    let private createWithAdmissions (directory: string) (observationMode: string option) admissions : Task<obj> =
+    let private createWithAdmissions
+        (directory: string)
+        (observationMode: string option)
+        (retryMode: RetryHarnessMode)
+        admissions
+        : Task<obj> =
         task {
             let! journal = createJournal directory
             let dispatcher = PromptDispatcher.Runtime(PromptJournalAdapter.create journal)
@@ -649,7 +707,25 @@ module SyncDelegateSurface =
             let sessionPort = SessionPort(children, readiness, observationMode)
             let sessions = sessionPort :> ISessionHostPort
             let attached = new AttachedSessionRuntime()
-            let gate = new SessionQuiescenceGate()
+
+            let plugin =
+                match retryMode with
+                | RetryHarnessMode.Scripted -> None
+                | RetryHarnessMode.ProviderRecovery -> Some(new PluginRuntimeScope(Some journal, (fun _ -> false)))
+
+            let gate =
+                match plugin with
+                | Some owner -> owner.Sessions.Quiescence
+                | None -> new SessionQuiescenceGate()
+
+            let eventPort = new Events.HostEventPort() :> IEventObservationPort
+
+            plugin
+            |> Option.iter (fun owner ->
+                eventPort.SubscribeFutureTerminalListener(fun session outcome -> sessionPort.Notify(session, outcome))
+                |> Some
+                |> owner.TrackSubscription)
+
             let waitObserver = CausalWaitRuntime().Observer
 
             let workRecordFor (sessionId: SessionId) (range: XTraceRange) (providerRun: ProviderRunIdentity) =
@@ -670,6 +746,35 @@ module SyncDelegateSurface =
 
             let retryScript = RetryScript()
 
+            let rootWorkspace =
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = Some directory }
+
+            let retryPort: SyncDelegateRetryPort =
+                match plugin with
+                | None -> { Retry = fun _ _ _ error -> Task.FromResult(retryScript.Next error) }
+                | Some owner ->
+                    { Retry =
+                        fun turn observer failure error ->
+                            task {
+                                let! verdict =
+                                    ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure
+                                        sessions
+                                        rootWorkspace
+                                        owner.BloggerRuntimeHost
+                                        journal
+                                        turn
+                                        observer
+                                        failure
+                                        error
+
+                                return
+                                    match verdict with
+                                    | RetryVerdict.Dispatched
+                                    | RetryVerdict.Superseded -> Ok()
+                                    | RetryVerdict.Terminal reason -> Error reason
+                            } }
+
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
@@ -678,20 +783,32 @@ module SyncDelegateSurface =
                     dispatcher,
                     journal,
                     (attached :> IAttachedSessionPort),
-                    (fun _ _ -> ()),
+                    (fun child _ ->
+                        plugin
+                        |> Option.iter (fun owner ->
+                            match sessionPort.ParentFor child with
+                            | Some parent ->
+                                owner.Sessions.OwnedSessions.Add(SessionId.value child) |> ignore
+                                owner.Sessions.SessionParents[SessionId.value child] <- SessionId.value parent
+                            | None -> raise (InvalidOperationException "managed child has no Host parent"))),
                     gate,
                     workRecordFor,
                     handoffPort,
-                    { Retry = fun _ _ error -> Task.FromResult(retryScript.Next error) },
+                    retryPort,
                     workspaceDirectory = directory
                 )
+
+            plugin |> Option.iter (fun owner -> owner.AttachSyncDelegateRuntime runtime)
+
+            plugin
+            |> Option.iter (fun owner ->
+                HostTurnObserver.attachLoopSensor sessions rootWorkspace (Some journal) owner (fun _ _ -> ()))
 
             let scope =
                 new ToolRuntimeScope(
                     sessions,
                     waitObserver,
-                    { new IRootWorkspaceReader with
-                        member _.TryRead() = Some directory },
+                    rootWorkspace,
                     Some journal,
                     Some directory,
                     Dictionary<string, string>(),
@@ -706,19 +823,65 @@ module SyncDelegateSurface =
                     workRecordCapability = workRecordCapability
                 )
 
-            return box (Harness(journal, dispatcher, runtime, scope, sessionPort, readiness, children, retryScript))
+            return
+                box (
+                    Harness(
+                        journal,
+                        dispatcher,
+                        runtime,
+                        scope,
+                        sessionPort,
+                        readiness,
+                        children,
+                        retryScript,
+                        plugin,
+                        gate,
+                        rootWorkspace,
+                        eventPort
+                    )
+                )
         }
 
     /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
     /// Every owner must first be admitted as an explicit durable HumanRoot.
     let create (directory: string) (owners: obj) : Task<obj> =
         match ownerAdmissions owners with
-        | Ok admissions -> createWithAdmissions directory None admissions
+        | Ok admissions -> createWithAdmissions directory None RetryHarnessMode.Scripted admissions
         | Error error -> raise (ArgumentException error)
+
+    let createForProviderRecovery (directory: string) (owners: obj) : Task<obj> =
+        match ownerAdmissions owners with
+        | Error error -> raise (ArgumentException error)
+        | Ok admissions ->
+            task {
+                do! ModelRouting.initialize ()
+                return! createWithAdmissions directory None RetryHarnessMode.ProviderRecovery admissions
+            }
+
+    let createForGuardRecovery (directory: string) (owners: obj) : Task<obj> =
+        createForProviderRecovery directory owners
+
+    let closeRecovery (value: obj) : Task = (unbox<Harness> value).CloseRecovery()
+
+    let closeGuardRecovery (value: obj) : Task = closeRecovery value
+
+    let observeGuardDelta (value: obj) (raw: obj) : unit =
+        (unbox<Harness> value).Plugin.Value.LoopSensor.Observe raw
+
+    let awaitGuardInterrupt (value: obj) session providerRun : Task =
+        match
+            (unbox<Harness> value)
+                .Plugin.Value.LoopSensor.ActiveInterruptTask(
+                    SessionId.create session,
+                    ProviderRunIdentity.create providerRun
+                )
+        with
+        | Some running -> running
+        | None -> raise (InvalidOperationException "no guard interrupt exists for the exact provider run")
 
     let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
         match ownerAdmissionFor "managed-child-reconciliation" "manager" with
-        | Ok admission -> createWithAdmissions directory observationMode [ admission ]
+        | Ok admission -> createWithAdmissions directory observationMode RetryHarnessMode.Scripted [ admission ]
         | Error error -> raise (InvalidOperationException error)
 
     /// managed-session-lifecycle-001: drive SyncDelegateRuntime's production child
@@ -1058,6 +1221,85 @@ module SyncDelegateSurface =
                     return true
         }
 
+    let confirmManagedPromptPhysical (value: obj) owner role index (physical: string) : Task<obj> =
+        task {
+            let harness = unbox<Harness> value
+
+            match requestedPrompt harness owner role index with
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "Prompt is not captured by this managed child" |}
+            | Some _ when String.IsNullOrWhiteSpace physical ->
+                return
+                    box
+                        {| ok = false
+                           error = "Physical user message id must be non-empty" |}
+            | Some(child, key) ->
+                let physicalId = PhysicalUserMessageId.create physical
+
+                let message: ChatAdmissionIntent.DecodedMessage =
+                    { SessionId = Some child
+                      PhysicalUserMessageId = Some physicalId
+                      InvalidIdentityCarrier = None
+                      ExplicitAgent = None
+                      PromptKey = Some key
+                      IsHostCompaction = false
+                      IsHostSynthetic = false
+                      Text = None }
+
+                let decision = PromptIngress.resolveDecision (Some harness.Journal) message
+                let! accepted = harness.Dispatcher.AcceptManagedChatIntent decision
+
+                match accepted with
+                | Error error ->
+                    return
+                        box
+                            {| ok = false
+                               error = sprintf "%A" error |}
+                | Ok witness ->
+                    let evidence = ManagedChatAcceptanceWitness.evidence witness
+                    harness.Sessions.RecordPhysical(child, evidence.PhysicalUserMessageId)
+
+                    return
+                        box
+                            {| ok = true
+                               sessionId = SessionId.value evidence.SessionId
+                               physicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
+                               authorityRootUserMessageId =
+                                AuthorityRootUserMessageId.value evidence.AuthorityRootUserMessageId
+                               logicalRunId = LogicalRunId.value evidence.LogicalRunId
+                               origin = PromptAuthority.originLabel evidence.Origin
+                               participant = AcceptedChatExecutionEvidence.participant evidence
+                               role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole evidence) |}
+        }
+
+    let observeProviderFailureStop (value: obj) (session: string) (providerRun: string) : bool =
+        let harness = unbox<Harness> value
+
+        let child =
+            harness.Children |> Seq.tryFind (fun child -> SessionId.value child = session)
+
+        match harness.UsesProviderRecovery, child with
+        | true, Some child when not (String.IsNullOrWhiteSpace providerRun) ->
+            ProviderAttemptStopFence.shared.Observe(child, ProviderRunIdentity.create providerRun)
+            true
+        | _ -> false
+
+    let recoveryStopSnapshot (value: obj) : obj =
+        let harness = unbox<Harness> value
+
+        if not harness.UsesProviderRecovery then
+            invalidArg "value" "Provider recovery requires its owned runtime harness"
+
+        let snapshot = ProviderAttemptStopFence.shared.Snapshot()
+
+        box
+            {| stopped = snapshot.Stopped
+               waiting = snapshot.Waiting
+               denied = snapshot.Denied |}
+
     let terminalListenerCount (value: obj) : int =
         (unbox<Harness> value).Sessions.TerminalListenerCount
 
@@ -1154,6 +1396,112 @@ module SyncDelegateSurface =
             exactTerminalTurn session physical authorityRoot providerRun [| MessagePart.Text formalText |]
 
         harness.Runtime.SettleCompletedFromTurn turn
+
+    let observeExactProviderFailure (value: obj) session physical authorityRoot providerRun reason : Task<bool> =
+        let harness = unbox<Harness> value
+
+        let turn =
+            { exactTerminalTurn session physical authorityRoot providerRun [||] with
+                Outcome = ReconcileProgram.TurnFailed reason }
+
+        handleTurn harness turn.SessionId (Some ExecutionFailure.ProviderTransient) turn
+
+    let private observeRecoveryTurn (harness: Harness) abortCause context : Task =
+        let owner = harness.Plugin |> Option.get
+
+        TurnWorkflow.observe
+            (harness.Sessions :> ISessionHostPort)
+            harness.RootWorkspace
+            harness.EventPort
+            (Some harness.Journal)
+            owner.BloggerRuntimeHost
+            (Some harness.Runtime)
+            harness.NudgeSent
+            harness.JoinGuardNudges
+            (fun _ -> false)
+            abortCause
+            (harness.Gate :> ISessionQuiescenceGate)
+            context
+
+    let observeExactGuardAbort (value: obj) session physical authorityRoot providerRun : Task =
+        let harness = unbox<Harness> value
+
+        let context: ReconciledTurnContext =
+            { Turn =
+                { exactTerminalTurn session physical authorityRoot providerRun [||] with
+                    Directory = harness.RootWorkspace.TryRead()
+                    Outcome = ReconcileProgram.TurnAborted "guard interrupt" }
+              Failure = None
+              Quiescence = None
+              Delivery = ReconciledTurnDelivery.Observation }
+
+        HostTurnObserver.observe
+            (observeRecoveryTurn harness)
+            (harness.Sessions :> ISessionHostPort)
+            harness.RootWorkspace
+            harness.EventPort
+            (Some harness.Journal)
+            None
+            None
+            harness.Plugin.Value
+            context
+
+    let observeRepairTurn
+        (value: obj)
+        session
+        physical
+        authorityRoot
+        providerRun
+        (finish: string)
+        delivery
+        idleEvidence
+        : Task =
+        let harness = unbox<Harness> value
+        let sessionId = SessionId.create session
+        let physicalId = PhysicalUserMessageId.create physical
+
+        let assistant: SessionMessage =
+            { Id = providerRun
+              Role = "assistant"
+              Agent = Some "engineer"
+              Finish = if isNullish (box finish) then None else Some finish
+              ErrorName = None
+              Model = None
+              ParentId = Some physical
+              CreatedAt = None
+              Completed = finish = "length"
+              IsCompaction = false
+              PromptKey = None
+              Parts = [||]
+              PartIds = [||]
+              ToolParts = [||] }
+
+        let permit =
+            if idleEvidence then
+                harness.Gate.ObservePhysicalUserMessage(sessionId, physicalId)
+                harness.Gate.BeginProviderAttempt sessionId
+                Some(harness.Gate.ObserveIdle sessionId)
+            else
+                None
+
+        let context: ReconciledTurnContext =
+            { Turn =
+                CompletedTurnClassifier.buildTurn
+                    sessionId
+                    physicalId
+                    (AuthorityRootUserMessageId.create authorityRoot)
+                    assistant
+                    (Some Role.Engineer)
+                    (harness.RootWorkspace.TryRead())
+              Failure = None
+              Quiescence = permit
+              Delivery =
+                match delivery with
+                | "observation" -> ReconciledTurnDelivery.Observation
+                | "idle" -> ReconciledTurnDelivery.IdleRevisit
+                | _ -> raise (ArgumentException "unknown repair delivery") }
+
+        observeRecoveryTurn harness AbortCause.External context
 
     let private settleReadyChild
         (harness: Harness)

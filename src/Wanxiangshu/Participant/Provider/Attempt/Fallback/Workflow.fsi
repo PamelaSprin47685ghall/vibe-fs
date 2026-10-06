@@ -49,6 +49,7 @@ module ProviderRecoveryWorkflow =
         scope: IBloggerRuntimeHost ->
         durable: AgentJournal ->
         turn: ReconciledTurn ->
+        observer: ContinuationAcceptanceObserver option ->
         failure: ExecutionFailure ->
         error: string ->
             Task<RetryVerdict>

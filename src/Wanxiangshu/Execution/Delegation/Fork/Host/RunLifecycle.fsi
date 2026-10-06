@@ -37,7 +37,7 @@ module HostForkRunLifecycle =
         identitySeed: PromptAuthority.IdentitySeed ->
         directory: string option ->
         prompt: string ->
-        onAccepted: (PhysicalUserMessageId -> unit) ->
+        onAccepted: ContinuationAcceptanceObserver ->
             Task<AgentOwnerDispatchOutcome>
 
     val sendChildPrompt:
@@ -48,7 +48,7 @@ module HostForkRunLifecycle =
         identitySeed: PromptAuthority.IdentitySeed ->
         directory: string option ->
         prompt: string ->
-        onAccepted: (PhysicalUserMessageId -> unit) ->
+        onAccepted: ContinuationAcceptanceObserver ->
             Task<AgentOwnerDispatchOutcome>
 
     val childPromptSender:
@@ -61,7 +61,7 @@ module HostForkRunLifecycle =
         _role: Role ->
         identitySeed: PromptAuthority.IdentitySeed ->
         prompt: string ->
-        onAccepted: (PhysicalUserMessageId -> unit) ->
+        onAccepted: ContinuationAcceptanceObserver ->
             Task<AgentOwnerDispatchOutcome>
 
     val complete:

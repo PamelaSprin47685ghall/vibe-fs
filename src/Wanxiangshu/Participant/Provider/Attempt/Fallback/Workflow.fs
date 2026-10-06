@@ -244,6 +244,38 @@ module ProviderRecoveryWorkflow =
             (recoveryGateKind authorization)
             authorization.ProviderRun
 
+    let private observeRecoveryAcceptance
+        (durable: AgentJournal)
+        (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
+        (observer: ContinuationAcceptanceObserver option)
+        =
+        match HostSessionNudge.tryActiveProfile (Some durable) turn.SessionId, observer with
+        | Some profile, Some observer when profile.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId ->
+            (PromptDispatcher.forPrompts (PromptJournalAdapter.create durable))
+                .ObserveGateNudgeAcceptance
+                profile
+                PromptAuthority.ContinuationKind.ProviderRetryAttempt
+                (recoveryGateKind authorization)
+                authorization.ProviderRun
+                observer
+        | _ -> ()
+
+    let private observeWorkContinuation
+        (durable: AgentJournal)
+        (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
+        (observer: ContinuationAcceptanceObserver option)
+        (error: string)
+        =
+        function
+        | HostSessionNudge.GateContinuationOutcome.Sent _
+        | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted ->
+            observeRecoveryAcceptance durable turn authorization observer
+            RetryVerdict.Dispatched
+        | HostSessionNudge.GateContinuationOutcome.Retired -> RetryVerdict.Superseded
+        | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
+
     let private bloggerPromptKey =
         function
         | HostSessionNudge.GateContinuationOutcome.Sent key -> Ok(Some key)
@@ -484,6 +516,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (observer: ContinuationAcceptanceObserver option)
         (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
@@ -491,15 +524,23 @@ module ProviderRecoveryWorkflow =
         task {
             do! awaitRecoveryMaterial scope durable turn.SessionId
 
-            let! continuation =
-                sendRecoveryContinuation sessionPort rootWorkspace turn durable authorization continuationPrompt
+            match HostSessionNudge.tryActiveProfile (Some durable) turn.SessionId with
+            | Some profile when profile.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId ->
+                let! continuation =
+                    HostSessionNudge.trySendGateContinuationObserved
+                        sessionPort
+                        rootWorkspace
+                        turn.SessionId
+                        continuationPrompt
+                        PromptAuthority.ContinuationKind.ProviderRetryAttempt
+                        turn.Directory
+                        (Some durable)
+                        (recoveryGateKind authorization)
+                        authorization.ProviderRun
+                        observer
 
-            return
-                match continuation with
-                | HostSessionNudge.GateContinuationOutcome.Sent _
-                | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> RetryVerdict.Dispatched
-                | HostSessionNudge.GateContinuationOutcome.Retired -> RetryVerdict.Superseded
-                | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
+                return observeWorkContinuation durable turn authorization observer error continuation
+            | _ -> return RetryVerdict.Superseded
         }
 
     /// provider-attempt-recovery-021: the two durable facts the recovery target settlement consumes.
@@ -552,11 +593,15 @@ module ProviderRecoveryWorkflow =
         (scope: IBloggerRuntimeHost)
         (continuationPrompt: string)
         (failureReason: string)
+        (observer: ContinuationAcceptanceObserver option)
         (authorization: ProviderRecoveryAuthorization)
         (input: RetryAttempt)
         : Task<RetryVerdict> =
         task {
             let admitted = recoveryAlreadyAdmitted durable input.Turn authorization
+
+            if admitted then
+                observeRecoveryAcceptance durable input.Turn authorization observer
 
             // provider-attempt-recovery-021: only a licensed, not-yet-dispatched redispatch settles
             // the failed target; the witness and the durable prompt claim each
@@ -594,6 +639,7 @@ module ProviderRecoveryWorkflow =
                         durable
                         scope
                         input.Turn
+                        observer
                         authorization
                         continuationPrompt
                         failureReason
@@ -731,7 +777,7 @@ module ProviderRecoveryWorkflow =
                 Retry.attempt
                     { Admit = fun authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
                       Redispatch =
-                        redispatchAfterFailure sessionPort rootWorkspace durable scope continuationPrompt error }
+                        redispatchAfterFailure sessionPort rootWorkspace durable scope continuationPrompt error None }
                     { Turn = turn
                       Failure = failure
                       OwnerSession = ownerSessionId
@@ -794,6 +840,7 @@ module ProviderRecoveryWorkflow =
         (scope: IBloggerRuntimeHost)
         (durable: AgentJournal)
         (turn: ReconciledTurn)
+        (observer: ContinuationAcceptanceObserver option)
         (failure: ExecutionFailure)
         (error: string)
         : Task<RetryVerdict> =
@@ -835,7 +882,8 @@ module ProviderRecoveryWorkflow =
                                 durable
                                 scope
                                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
-                                error }
+                                error
+                                observer }
                         { Turn = turn
                           Failure = failure
                           OwnerSession = ownerSessionId

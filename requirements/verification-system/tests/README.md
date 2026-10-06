@@ -1,5 +1,7 @@
 # verification-system 测试说明
 
+最新N00证据为[1eb CI](../../../proposals/archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)：实际merge38141ff83，format/check/build通过，原300秒真实截断，793/821排空、006/010活动、26queued、无summary，group3068 accepted=true。010只有31.581ms名义余量且未观察body/PID，016未启动；不由last verdict认定故障，也不补造0fail或工具回收。下方ccfc的pending-only是旧输入证书。M1-A将补actual worker pre-import/exit身份与CPU累计观测；不把墙钟差叫IO，不改变判决续期、预算或并发。
+
 2026-10-06 N04-C3：正式016新增三个Darwin native integration case，先等实际Node consumer读只读member并exit73、实际进程组排空，再让action返回成功或抛原Error/null。scope必须拒绝同consumerError，或以原cause和精确两项errors聚合；每例同时验证原字节、PID ESRCH、四owner完整dev/ino/mode/size/bytes及清单恢复。gen167真实3/0；丢弃consumer失败变异0/3，null回退变异2/1，实际资源恢复先通过，生产helper已恢复原SHA256。最终固定输入的小物理和正式unit收据见[执行契约](../../../proposals/N04真实只读Fable执行契约-2026-10-05.md)。native定向运行不冒称完整integration orchestrator，默认unit的native skip不算通过；T418/T419/GAP-055及FD/backing/ABA/actualverify保持未闭合。
 
 N00最新[ccfc CI](../../../proposals/archive/2026-10-05/baselines/ccfc-ci/receipt.txt)实际merge67c80a46，format/check/build通过；unit完整821/821、4585pass/0fail、119skip/390TODO，296.38秒wall，退出1仅pending，group2817 accepted=true、8.676ms。016的201个工具均有完整关闭/排空身份；新增三项Darwin native在此Linux unit为skip。历史[a15](../../../proposals/archive/2026-10-05/baselines/a15-ci/receipt.txt)的原300秒截断仍保留。跨输入/host没有CPU/IO因果证据；按[总计划N00](../../../proposals/TODO施工总计划-2026-10-03.md)继续诊断，不按最后判决归因或改预算/worker。本次只更新证据与计划，未改运行器或测试代码。

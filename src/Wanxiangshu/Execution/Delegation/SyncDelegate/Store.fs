@@ -6,6 +6,56 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+type private CallAcceptanceState =
+    | Open of ResizeArray<IDisposable> * HashSet<PhysicalUserMessageId>
+    | Closed
+
+type internal SyncDelegateCallAcceptance(admissionRoot: TaskCompletionSource<AuthorityRootUserMessageId option>) =
+    let gate = obj ()
+    // DSL-MUTABLE: resource — one call owns its registrations and actual accepted physical identities.
+    let mutable state =
+        Open(ResizeArray<IDisposable>(), HashSet<PhysicalUserMessageId>())
+
+    member _.AttachDisposable(registration: IDisposable) =
+        let release =
+            lock gate (fun () ->
+                match state with
+                | Closed -> true
+                | Open(resources, _) ->
+                    resources.Add registration
+                    false)
+
+        if release then
+            registration.Dispose()
+
+    member _.Accept(physical: PhysicalUserMessageId, notify: unit -> unit) =
+        lock gate (fun () ->
+            match state with
+            | Closed -> ()
+            | Open(_, accepted) ->
+                accepted.Add physical |> ignore
+                notify ())
+
+    member _.Owns(physical: PhysicalUserMessageId) =
+        lock gate (fun () ->
+            match state with
+            | Closed -> false
+            | Open(_, accepted) -> accepted.Contains physical)
+
+    member _.Close() =
+        let resources =
+            lock gate (fun () ->
+                match state with
+                | Closed -> [||]
+                | Open(resources, _) ->
+                    state <- Closed
+                    resources.ToArray())
+
+        AsyncSupport.trySetResult admissionRoot None |> ignore
+
+        for resource in resources do
+            resource.Dispose()
+
 /// Authority evidence capable of failing one in-flight managed assignment.
 type internal SyncDelegateTerminalFailureScope =
     | FreshAuthorityRoot of AuthorityRootUserMessageId
@@ -22,7 +72,8 @@ and internal SyncDelegateCall =
         Delegate: SessionId
         Agent: string
         Invocations: SyncDelegateInvocation list
-        AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
+        AdmissionRoot: TaskCompletionSource<AuthorityRootUserMessageId option>
+        Acceptance: SyncDelegateCallAcceptance
         /// Exact physical prompt of this invocation's accepted attempt; retry
         /// attempts of the same call are its ProviderRetryAttempt continuations.
         mutable AcceptedPhysical: PhysicalUserMessageId option
@@ -286,10 +337,16 @@ module private SyncDelegateStoreOps =
         =
         let stillOwned =
             lock gate (fun () ->
-                activeBatches.Remove activeKey |> ignore
+                match activeBatches.TryGetValue activeKey with
+                | true, current when Object.ReferenceEquals(current, call.Invocations) ->
+                    activeBatches.Remove activeKey |> ignore
+                | _ -> ()
+
                 let removed = tryRemoveOwnerCall callsByOwnerScope ownerKey call
                 removeDelegateIfCurrent callsByDelegate delegateKey call
                 removed)
+
+        call.Acceptance.Close()
 
         if stillOwned then
             failIfOwned ()
@@ -363,10 +420,24 @@ type internal SyncDelegateCallStore() as this =
             | true, call ->
                 callsByDelegate.Remove delegateKey |> ignore
                 removeOwnerCall callsByOwnerScope (scopeKey call.OwnerScope) call
+                call.Acceptance.Close()
                 Some call
             | false, _ -> None)
 
+    member _.TryPopExactCall(call: SyncDelegateCall) : SyncDelegateCall option =
+        lock gate (fun () ->
+            let delegateKey = sessionKey call.Delegate
+
+            match callsByDelegate.TryGetValue delegateKey with
+            | true, current when Object.ReferenceEquals(current, call) ->
+                callsByDelegate.Remove delegateKey |> ignore
+                removeOwnerCall callsByOwnerScope (scopeKey call.OwnerScope) call
+                call.Acceptance.Close()
+                Some call
+            | _ -> None)
+
     member _.FailCall(call: SyncDelegateCall, error: string) =
+        call.Acceptance.Close()
         AsyncSupport.trySetResult call.Answer (Error error) |> ignore
 
     member _.Admit(invocation: SyncDelegateInvocation) : SyncDelegateAdmission =
@@ -435,8 +506,8 @@ type internal SyncDelegateCallStore() as this =
                 let answer =
                     TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                let acceptedRoot =
-                    TaskCompletionSource<AuthorityRootUserMessageId>(
+                let admissionRoot =
+                    TaskCompletionSource<AuthorityRootUserMessageId option>(
                         TaskCreationOptions.RunContinuationsAsynchronously
                     )
 
@@ -447,7 +518,8 @@ type internal SyncDelegateCallStore() as this =
                       Delegate = delegateSession
                       Agent = agent
                       Invocations = invocations
-                      AcceptedRoot = acceptedRoot
+                      AdmissionRoot = admissionRoot
+                      Acceptance = SyncDelegateCallAcceptance(admissionRoot)
                       AcceptedPhysical = None
                       AcceptedAuthorityRoot = None
                       TerminalFailureScope = None

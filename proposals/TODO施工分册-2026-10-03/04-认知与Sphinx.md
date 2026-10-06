@@ -1,6 +1,6 @@
 # 04：认知材料、诊断、制度学习与 Sphinx
 
-新排期以[总计划 N06/N07](../TODO施工总计划-2026-10-03.md)为准：Sphinx创建/读取及B0已有限验收，现在先做A2-R0→R1→R2，再接真实Host/profile/首个持久答案，最后扩结果、资源和取消恢复；制度学习先统一canonical Rulebook和原子BIRTH，再私有机制提炼及有限语义验收。二者可与S03并行准备，不等待所有基础设施债务清零。现有MCP解码、机械BIRTH及下述015交付不重复施工。
+新排期以[总计划 N06/N07](../TODO施工总计划-2026-10-03.md)为准：Sphinx创建/读取、B0及A2-R0/R1/R2已有限验收，接[08卡](08-Sphinx真实Host接手.md)的真实Host/profile/首个持久答案，最后扩结果、资源和取消恢复；制度学习先统一canonical Rulebook和原子BIRTH，再私有机制提炼及有限语义验收。二者可与S03并行准备，不等待所有基础设施债务清零。现有MCP解码、机械BIRTH及下述015交付不重复施工。
 
 2026-10-05 当前状态：cognitive/015 注册投递切片已验收完成。原 physical、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证；实际安装版两次 POST、exact chronicle completed、随后 SDK 历史及 journal 清洁已证。晚到实际 HTTP 错误旧版退出成功的正式红例已修；初始化清理受保护、Host/server 停止及 callbacks 排空后判决。最终完整 integration 21/0、无 skip/TODO，原 project 5030ms 超时及旧无 completed 屏障证据仍保留。以[本批附件](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)为准，GAP-077 其他语义 PARTIAL，不重复旧 lease 调查。
 
@@ -195,18 +195,19 @@
 
 本卡取代下方完整义务索引中的开工顺序。A和B0有限验收已完成，不重做创建/读取及canonical派发接纳。[B0记录](../archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)保留派发红绿与旧宽选集014墙钟失败；[观察与估值记录](../archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)另记gen153四业务红、真实sort变异与最终gen155全静态及正式225/225、1125/0。B1-A/B2-0有限验收完成；B1—B6整体未完成，不用空delta或测试Surface冒充生产执行。
 
-B1-A的普通terminal有限观察完成后，必须先做[B1-A2恢复因果接手卡](07-Sphinx恢复因果.md)，再接Sphinx实际Host。现same-root+continuation-kind没有assignment归属；retry、repair、guard三类producer都需在effect前绑定具体call，并从真正PhysicalAccepted回传successor。只修一类、按时间排除旧id或仅匹配初始physical都不够。该缺口已完成源码调查，尚无真正successor fixture的正式业务红灯，不记作修复。
+B1-A之后的[B1-A2恢复因果包](07-Sphinx恢复因果.md)已落实：gen179四种恢复的16个旧/晚successor业务红，gen180三producer20个实际场景通过，effect前具体call绑定和actual PhysicalAccepted通知已接通，root+历史kind宽匹配删除。相邻Unknown Root清理另按正式反例验收，最终证书见[本轮记录](../archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。不能把这批有限证据称完整025/Fork/Host闭合；下一施工转[08真实Host接手卡](08-Sphinx真实Host接手.md)。
 
-A2-D0通知前置已有限完成，见[正式记录](../archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)：gen157六个真实callback-empty红灯，gen159相关238/238、1178/0。Detached注册通知与Await等待分开，callback读到真实managed Accepted；call归属和registration Dispose仍未证，抛错已由下述D1覆盖。下一包先R0真实恢复夹具，再R1观察资源/source合同，不能用D0代替三个producer的正反矩阵。
+A2-D0通知前置已有限完成，见[正式记录](../archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)：gen157六个callback-empty红灯，gen159相关238/238、1178/0。Detached注册通知与Await等待分开，callback读到真实managed Accepted。D0本身不证明来源/Dispose；本轮R1/R2对这些另取sender/Fork及三producer证据，不借旧证书销项。
 
-A2-D1的确认等待隔离与通知异常也已有限完成，见[正式记录](../archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)：gen163六业务红、gen165正式3/3、36/0、1TODO，最终gen166相关238/238、1186/0、28skip/129TODO，全静态及Fable通过；独立TCS与callback finally保exact Accepted。下一包以07卡第11节新顺序为准，先准备真恢复夹具，再施工lease/source和三producer，不能把当前脚本retry算真正positive。
+A2-D1的确认等待隔离与通知异常也已有限完成，见[正式记录](../archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)：gen163六业务红、gen165定向36/0，gen166相关238/238、1186/0、28skip/129TODO，全静态/Fable通过；独立TCS与callback finally保exact Accepted。本轮lease/source与真恢复另行验收，不重复施工D1，也不把脚本retry称真实正控。
 
 | 子包 | 状态 | 本包退出条件 |
 | --- | --- | --- |
 | B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
-| B1 实际Host绑定 | B1-A有限验收完成；A2待施工 | typed Admission/Completion保原生carrier/key、持久physical/root、普通formal terminal与原checkpoint；四真实业务红后修fallback身份/单次结算和observed准备误发。最终gen155全静态及225/225、1125/0通过。先补A2的retry/repair/guard归属，再接真owner/family/public prompt与Sphinx持久绑定；034不关闭 |
-| B1-A2-D0 | 通知前置有限验收完成 | Detached支持已有actual acceptance callback且不新增等待；gen159全静态和238/238、1178/0。其余A2来源/资源合同仍待，Host绑定和034不关闭 |
-| B1-A2-D1 | 确认等待/抛错有限验收完成 | 六个正式业务红后独立TCS、按调用资源清理、finally广播真实Accepted；gen165定向36/0，gen166相关238/238、1186/0，全静态通过。callback lease、call归属、同步Host异常和真实Host未证，034不关闭 |
+| B1 实际Host绑定 | B1-A/A2有限包已实现；真实Host待施工 | typed Admission/Completion及三producer具体call归属已接通。接08卡B1-H0：真owner/family/public prompt、原Observed执行、真实binding；effect前intent关联与最终可见字节先明确。034不关闭 |
+| B1-A2-D0 | 通知前置有限验收完成 | Detached支持已有actual acceptance callback且不新增等待；gen159全静态和238/238、1178/0。D0不代证来源/资源，本轮R1/R2另验；Host绑定和034不关闭 |
+| B1-A2-D1 | 确认等待/抛错有限验收完成 | 六个正式业务红后独立TCS、按调用资源清理、finally广播真实Accepted；gen165定向36/0，gen166相关238/238、1186/0，全静态通过。lease、call归属、同步Host异常由本轮R1另验；真实Host和034仍未闭合 |
+| B1-A2-R0/R1/R2 | 真恢复/资源/source有限包已实现 | 真实PluginScope/LoopSensor及三producer实际不同physical；typed source与每注册opaque lease，Send effect前交接、Fork Closed零effect；20矩阵通过后删宽匹配。最终验收及Unknown Root相邻修复见本轮记录，整体025/GAP-153/Host仍保留 |
 | B2 executable profile | B2-0有限验收完成；完整profile待施工 | Unestimated带rank仍不可用，空集合不称数值比较，ordinal/provisional由真实Decision保种类；gen151正式红、最终gen155宽绿与全静态通过，原rank0保持。完整schema/plugin/ABI lock、prompt、授权/资源与Goal/material另接，不关闭002/029整体TODO |
 | B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
 | B4 实际结果与两事务解释 | 待施工，B完成前必做 | 唯一实际结果保存，locked Observe产生真实delta，applied/failed推进pending，失败不重调模型 |
@@ -215,7 +216,7 @@ A2-D1的确认等待隔离与通知异常也已有限完成，见[正式记录](
 
 **B0，已验收的有限边界。** 原no-op路径已退出：DispatchRequested保完整Work/publicEnvelope/privateTicket，Receipt保完整intent/work/attempt/fence/physicalRef/native envelope，内部只有Dispatches一个map。fresh派发要求当前Ready/同fence Leased、完整Spec、真实成功依赖、已存在Some round及本work持久预留；None独立work允许。同intent exact replay先于fresh守门，同identity改内容拒绝；receipt同时核对Spec及Running物理引用。native字段仍叫physicalBindings，空值字节保持原seal；实际gen143旧创建/未派发work原样恢复，缺round旧派发和错误aggregate预留分别durable cut，原历史不删不重封。004/007/010/019/020覆盖正式Persistence/Current、原子批次、冷重开及hash。真实Host来源、副作用前append失败与receipt丢失对账、usage/容量完整义务保留，T401/T402/034不关闭。
 
-**B1，实际Host调用的第一条合法路径。** 先读sphinx WHAT010/023/034、session-ontology WHAT006、delegation WHAT007及真实Sessions.SendPrompt。Adapter目前把InquiryId转成SessionId，且没有terminal订阅就SendPrompt；真实Host会以listener-before-send拒绝。由真实Host入口注入typed owner SessionId，独立MCP的执行上下文由composition明确供应，缺能力仍具名拒绝；不能用createdBy/configHash替代物理身份。遵循真实family root压平和标准Engineer的authority/委托owner。先订阅再send，订阅由同一effect owner持有至真实terminal/Dispose；仅public envelope进入prompt，private ticket留Host侧。receipt、physical message、child session与provider run分型保存，acceptance-unknown不重发。先让owner SessionId与InquiryId故意不同击红，再观察真实parent、prompt、订阅顺序和实际Host返回；能力字符串不算派发证据。Provider adapter现用HostForkRunLifecycleSurface.create(receipt string)制造无关联pending cell，必须清理，消费真实执行owner，不能走这条捷径。
+**B1，实际Host调用的第一条合法路径。** 按08卡B1-H0冻结窄合同：实际HostToolContext的typed owner、唯一Current的已持久Request与原PluginScope持有的Observed runtime。旧Adapter的InquiryId→SessionId、无订阅直接send、private ticket拼入prompt及Provider无关联pending cell仍须清理，不能把现存类型当已接通。effect前intent→actual child/PromptKey尚无可await持久钩子，Receipt=None不证明未发；冷重开未知明确RecoveryIncomplete、零再发。实际最终prompt在原handoff之后render，不能hash前期public JSON就称实际可见字节。原owner供应这些能力后，用actual owner≠InquiryId、nested family、private独特字节、原生Admission/Completion和冷重开正式验收；新API缺失不称业务红。完整034与receipt-loss恢复另记。
 
 **B2，先选一个真实可执行profile。** 现Registry/ExecutablePlugin只有声明，Plan/Render主要是验证器；不把存在类型当已接线。供应真实canonical schema文档/hash、executable/ABI lock、版本化prompt、model/provider授权、实际资源与executionMode。材料须由真实读取证据供应，纯插件输入须有原Goal，不把缺目标塞成空Graph。首条有限链做实际规划→成稿，实际计划集合含有真实成本的answer.now；Unestimated保持缺估值，不给默认收益。question/probe全面覆盖留E，有限profile范围写入验收记录。
 

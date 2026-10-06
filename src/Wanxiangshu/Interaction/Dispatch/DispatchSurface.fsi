@@ -10,6 +10,7 @@ open Wanxiangshu.Persistence.Journal
 /// constructors, send observations, and claim counts are plain values.
 [<RequireQualifiedAccess>]
 module DispatchSurface =
+    val closeCompletedHumanRootManager: projection: obj -> obj
     val internal sessionPort: port: obj -> ISessionHostPort
     val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
@@ -49,11 +50,31 @@ module DispatchSurface =
         identitySeed: obj ->
         awaitMode: string ->
         onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
             Task<obj>
 
     val deliverDetachedVerdict: listener: obj -> kind: string -> reason: string -> Task<obj>
 
+    val sendAgentOwnerRootWithAcceptanceRegistration:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        identitySeed: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
     val awaitPhysicalConfirmation: promptKey: string -> timeoutMs: int -> Task<obj>
+
+    /// Preserve one opaque typed callback across independent registrations.
+    val preparePhysicalAcceptanceObserver: onAccepted: (string -> unit) -> obj
+
+    /// Return the production owner's opaque registration resource unchanged.
+    val registerPhysicalAcceptanceObserver: promptKey: string -> observer: obj -> obj
+
+    val disposePhysicalAcceptanceObserver: registration: obj -> unit
 
     val sendManagedAssignment:
         port: obj ->
@@ -83,6 +104,19 @@ module DispatchSurface =
         profile: obj ->
         awaitMode: string ->
         onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
+    val sendContinuationWithAcceptanceRegistration:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
             Task<obj>
 
     val sendGateNudgesConcurrently:

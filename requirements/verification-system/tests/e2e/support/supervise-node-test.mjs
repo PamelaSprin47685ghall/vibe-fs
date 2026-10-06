@@ -17,6 +17,7 @@ import { Watchdog } from './watchdog.js'
 import { PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, SUITE_BACKSTOP_MS } from './time-budget.js'
 import { classifyVerdict } from '../../support/verdict-feed.mjs'
 import { isFileCompletionEvent, testEntryFile } from '../../support/test-run-state.mjs'
+import { validateWorkerCostSnapshot } from '../../support/worker-cost-observation.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
 
@@ -224,13 +225,22 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   console.error(`${logPrefix}: ${files.length} test file(s), ${silenceMs}ms verdict-silence window`)
 
   // Absolute paths: test:complete reports absolute `data.file`.
-  const outstanding = new Set(files.map((file) => resolve(file)))
+  const plannedFiles = new Set(files.map((file) => resolve(file)))
+  const outstanding = new Set(plannedFiles)
   const fileWaits = createFileWaitTracker(files)
+  const workerCosts = new Map()
+  const workerCost = file => workerCosts.get(file) ?? {
+    version: 1, entryFile: file, enabled: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
+    pid: null, preImport: null, exit: null, interval: null,
+    status: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS === '0' ? 'disabled' : 'missing',
+    reason: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS === '0' ? 'Worker diagnostics disabled' : 'Worker cost snapshot not received',
+  }
   const reportFileWaits = () => {
     const waits = fileWaits.snapshot()
     console.error(`${logPrefix}: file streams: ${waits.drained.length} drained, ${waits.active.length} active, ${waits.queued.length} queued`)
     for (const { file, lastVerdict, lastStart } of waits.active) {
       console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
+      console.error(`${logPrefix}: worker cost ${JSON.stringify(workerCost(file))}`)
       if (lastStart) console.error(`${logPrefix}: last runtime test start ${JSON.stringify(lastStart)}`)
     }
     if (waits.queued.length > 0) {
@@ -325,6 +335,30 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
 
   const startedAt = performance.now()
   child.on('message', (event) => {
+    if (event?.type === 'runner:worker-cost') {
+      const file = event.data?.entryFile
+      if (typeof file !== 'string' || !plannedFiles.has(resolve(file)) || file !== resolve(file)) {
+        console.error(`${logPrefix}: worker cost unavailable: unplanned entry`)
+        return
+      }
+      try {
+        const observed = validateWorkerCostSnapshot(event.data, {
+          entryFile: file, parentPid: child.pid, enabled: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
+        })
+        const previous = workerCosts.get(file)
+        if (previous?.status === 'invalid') return
+        if (previous?.preImport && JSON.stringify(previous.preImport) !== JSON.stringify(observed.preImport) ||
+            previous?.exit && JSON.stringify(previous.exit) !== JSON.stringify(observed.exit)) {
+          throw new TypeError('Worker cost snapshot replaced an earlier observation')
+        }
+        workerCosts.set(file, observed)
+      } catch {
+        workerCosts.set(file, { version: 1, entryFile: file, enabled: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
+          pid: null, preImport: null, exit: null, interval: null,
+          status: 'invalid', reason: 'Worker cost snapshot failed validation' })
+      }
+      return
+    }
     if (event?.type === 'runner:summary') {
       runnerSummary = event?.data
       return
@@ -347,6 +381,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     }
     if (event?.type === 'runner:file-start' || event?.type === 'runner:file-drained') {
       console.error(`${logPrefix}: file lifecycle ${JSON.stringify({ ...event.data, type: event.type, elapsedMs: performance.now() - startedAt })}`)
+      if (event.type === 'runner:file-drained') console.error(`${logPrefix}: worker cost ${JSON.stringify(workerCost(resolve(event.data.entryFile)))}`)
     }
     if (isFileCompletionEvent(event)) {
       outstanding.delete(resolve(testEntryFile(event)))

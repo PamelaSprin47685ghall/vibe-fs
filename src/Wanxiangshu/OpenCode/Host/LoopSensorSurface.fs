@@ -85,15 +85,24 @@ module LoopSensorSurface =
                 return resultOf result
             }
 
-    let private continueOf (value: obj) : SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>> =
+    let private continueOf
+        (value: obj)
+        : ProviderAttemptSource
+              -> DegenerationKind
+              -> string option
+              -> ContinuationAcceptanceObserver option
+              -> Task<Result<unit, string>>
+        =
         if not (isFunction value) then
             invalidArg "options" "LoopSensorSurface.create requires a continue callback"
 
-        fun sessionId kind _directory ->
+        fun source kind _directory _observer ->
             task {
                 let! result =
                     unbox<Task<obj>> (
-                        asPromise (apply2 value (box (SessionId.value sessionId)) (box (LoopSensor.kindName kind)))
+                        asPromise (
+                            apply2 value (box (SessionId.value source.SessionId)) (box (LoopSensor.kindName kind))
+                        )
                     )
 
                 return resultOf result
@@ -123,11 +132,26 @@ module LoopSensorSurface =
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
-    let consumeAbortCause (sensor: obj) (session: string) (run: string) : Task<obj> =
+    let private sourceField (source: obj) field =
+        let value = property source field
+        let isString: bool = emitJsExpr value "typeof $0 === 'string'"
+
+        if not isString || String.IsNullOrWhiteSpace(unbox<string> value) then
+            invalidArg "source" (sprintf "LoopSensorSurface.consumeAbortCause requires %s" field)
+
+        unbox<string> value
+
+    let private sourceOf (source: obj) : ProviderAttemptSource =
+        { SessionId = sourceField source "sessionId" |> SessionId.create
+          PhysicalUserMessageId = sourceField source "physicalUserMessageId" |> PhysicalUserMessageId.create
+          AuthorityRootUserMessageId =
+            sourceField source "authorityRootUserMessageId"
+            |> AuthorityRootUserMessageId.create
+          ProviderRun = sourceField source "providerRun" |> ProviderRunIdentity.create }
+
+    let consumeAbortCause (sensor: obj) (source: obj) : Task<obj> =
         task {
-            let! cause =
-                (sensor :?> SensorHandle)
-                    .Sensor.ConsumeAbortCause(SessionId.create session, ProviderRunIdentity.create run, None)
+            let! cause = (sensor :?> SensorHandle).Sensor.ConsumeAbortCause(sourceOf source, None, None)
 
             return
                 match cause with

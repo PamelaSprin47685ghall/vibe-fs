@@ -3,7 +3,7 @@ import test from 'node:test'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 import * as detector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { awaitOwned, chaoticText, createSensor, rawDelta } from './support/stream.mjs'
+import { abortSource, awaitOwned, chaoticText, createSensor, rawDelta } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-001] a finite repeated token stream crosses the lower envelope', () => {
   assert.equal(encode(' retry').length, 1)
@@ -33,7 +33,7 @@ test('WHAT[degeneration-guard-001] a finite diverse stream produces TooRandom an
   const handle = createSensor({ owned: ['session'], abort: () => {}, continue: (...args) => continuations.push(args) })
   sensor.observe(handle, rawDelta('session', 'thinking', text, 'run'))
   await awaitOwned(handle, 'session', 'run')
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRandom' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'DegenerationGuard', anomaly: 'TooRandom' })
   await sensor.activeTask(handle, 'session', 'run')
   assert.deepEqual(continuations, [['session', 'TooRandom']])
 })

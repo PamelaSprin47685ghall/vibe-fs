@@ -148,6 +148,35 @@ module PromptDispatcher =
                 ManagedChatAcceptanceError.IntentRejected("Continuation managed intent requires an active logical run")
             )
 
+    let private tryPendingGateNudgeKey
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (origin: PromptAuthority.PromptOrigin)
+        (digest: string)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : PromptKey option =
+        let pending =
+            projection.PendingClaims
+            |> Map.toList
+            |> List.filter (fun (_, claim) ->
+                claim.SessionId = profile.SessionId
+                && claim.LogicalRunId = Some profile.LogicalRunId
+                && claim.AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
+                && claim.Origin = origin
+                && claim.PayloadDigest = digest)
+
+        match pending with
+        | [ key, _ ] -> Some key
+        | _ -> None
+
+    let private attachPhysicalAcceptanceObserver (observer: ContinuationAcceptanceObserver) (key: PromptKey) =
+        let registration = PromptPhysicalAcceptance.register key observer.Notify
+
+        try
+            observer.AttachDisposable registration
+        with error ->
+            registration.Dispose()
+            raise error
+
     /// PROMPT-007: whether the caller waits for PhysicalAccepted.
     ///
     /// Detached = fire-and-forget: claim, authority, persist, idempotence and error
@@ -681,6 +710,34 @@ module PromptDispatcher =
                 gateKind
                 terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
+
+        member this.ObserveGateNudgeAcceptance
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            (observer: ContinuationAcceptanceObserver)
+            : unit =
+            let projection = this.ProjectionFor profile.SessionId
+            let digest = PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun
+            let origin = PromptAuthority.PromptOrigin.Continuation continuation
+
+            let accepted =
+                projection.AcceptedDispatches
+                |> Map.tryFind (PromptAuthority.acceptedDispatchKey profile.SessionId digest)
+                |> Option.filter (fun landing ->
+                    landing.SessionId = profile.SessionId
+                    && landing.Origin = origin
+                    && landing.PayloadDigest = digest
+                    && Map.tryFind landing.PhysicalUserMessageId projection.PhysicalLandings = Some landing
+                    && Map.tryFind landing.PhysicalUserMessageId projection.AcceptedContinuationIds = Some continuation)
+
+            match projection.ActiveLogicalRun, accepted with
+            | Some active, Some landing when active = profile -> observer.Notify landing.PhysicalUserMessageId
+            | Some active, None when active = profile ->
+                tryPendingGateNudgeKey profile origin digest projection
+                |> Option.iter (attachPhysicalAcceptanceObserver observer)
+            | _ -> ()
 
         /// provider-attempt-recovery-008: has this Blogger request + terminal occasion already spent its one interaction repair.
         ///

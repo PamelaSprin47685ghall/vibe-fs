@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { awaitOwned, createSensor, repetitiveText } from './support/stream.mjs'
+import { abortSource, awaitOwned, createSensor, repetitiveText } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-010] supplied eligibility rejects one session and admits a positive control', async () => {
   const aborts = []
@@ -9,7 +9,7 @@ test('WHAT[degeneration-guard-010] supplied eligibility rejects one session and 
   sensor.observe(handle, sensor.textDelta('stranger', repetitiveText(), 'run'))
   assert.deepEqual(aborts, [])
   assert.equal(sensor.activeTask(handle, 'stranger', 'run'), null)
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'stranger', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('stranger', 'run')), { cause: 'External' })
   sensor.observe(handle, sensor.textDelta('owned', repetitiveText(), 'run'))
   await awaitOwned(handle, 'owned', 'run')
   assert.deepEqual(aborts, ['owned'])

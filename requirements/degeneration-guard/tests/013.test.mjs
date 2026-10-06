@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { awaitOwned, repetitiveText } from './support/stream.mjs'
+import { abortSource, awaitOwned, repetitiveText } from './support/stream.mjs'
 
 const execute = async (diagnosticThrows, continuationFails) => {
   const trace = []
@@ -20,9 +20,9 @@ const execute = async (diagnosticThrows, continuationFails) => {
   })
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   await awaitOwned(handle, 'session', 'run')
-  trace.push(['cause', await sensor.consumeAbortCause(handle, 'session', 'run')])
+  trace.push(['cause', await sensor.consumeAbortCause(handle, abortSource('session', 'run'))])
   await sensor.activeTask(handle, 'session', 'run')
-  trace.push(['duplicate', await sensor.consumeAbortCause(handle, 'session', 'run')])
+  trace.push(['duplicate', await sensor.consumeAbortCause(handle, abortSource('session', 'run'))])
   trace.push(['remaining', sensor.activeTask(handle, 'session', 'run')])
   assert.ok(diagnostics.length > 0)
   return { trace, diagnostics }
