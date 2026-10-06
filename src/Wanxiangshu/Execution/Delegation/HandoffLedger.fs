@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading
@@ -10,7 +11,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

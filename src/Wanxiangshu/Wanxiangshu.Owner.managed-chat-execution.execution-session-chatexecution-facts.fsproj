@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-parallel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

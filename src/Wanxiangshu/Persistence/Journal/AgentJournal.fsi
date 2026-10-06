@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading
 open System.Threading.Tasks
@@ -8,7 +9,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation
 
 type JournalChange =

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -7,7 +8,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 
 /// Journal operations for the relay lifecycle, plus the retired obligation-ledger
 /// read boundary.

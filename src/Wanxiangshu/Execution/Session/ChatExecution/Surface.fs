@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -10,7 +11,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal

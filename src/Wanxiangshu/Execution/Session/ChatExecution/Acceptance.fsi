@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
@@ -112,4 +112,4 @@ module ManagedChatProviderLifecycle =
             Task<Result<ManagedChatTerminalWitness, ManagedChatProviderLifecycleError>>
 
 module JournalAppendOutcome =
-    val toExecutionFailure: Wanxiangshu.Foundation.JournalAppendFailure -> ExecutionFailure
+    val toExecutionFailure: JournalAppendFailure -> ExecutionFailure

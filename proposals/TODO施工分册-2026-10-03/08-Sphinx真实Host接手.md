@@ -12,7 +12,9 @@ gen190 完整 Sphinx+delegation 为52/52排空、328pass/0fail/35TODO；全 Fabl
 
 先做两项独立前置，再开放首次派发：
 
-- **U0-JC：Snapshot 编译边界有限验收完成。** 原plan排除红与原实际flat Fable边界红→native5/0；gen206 Fable/check通过，相关正式7/7、37/0、4skip/4TODO仅pending。只提取原Snapshot.fs/fsi project，依Identity/Message/OpencodeTypes，恢复66→51；完整HostPort仍依原private accepted witness，不改源/API或66上限。022真实编译默认unit仍skip，独立native证书不能冒称整个integration。见[本批记录](../archive/2026-10-06/Snapshot边界与历史夹具-2026-10-06.md)。Journal结果迁归未实施：Foundation.Outcome(runtime-platform)不可反依EventStore result(persistence)；完整载荷应留纯append-result，Journal failure/poison/commit归durable journal合同，51实际源/31项目按[迁归清单](../archive/2026-10-06/sphinx-u0-preconditions/vibe-fs-u0-closure-and-journal-migration-audit-20261006.txt)原子调整，不靠循环/伪subsystem。下一J0先完成合法结果归属，再同包迁Store与实际consumer，Unknown整体仍待。
+- **U0-JC：Snapshot 编译边界有限验收完成。** 原plan排除红与原实际flat Fable边界红→native5/0；gen206正式7/7、37/0、4skip/4TODO。只提取原Snapshot.fs/fsi project，依Identity/Message/OpencodeTypes，恢复66→51；完整HostPort保原private accepted witness，不改源/API或66上限。89a CI暴露Host026旧直接归属断言，本轮SW012另暴露旧HostPort inclusion；两者按实际Snapshot边界修正，gen210产品176/176、1096/0，原pending保留。022独立真实flat六叶加父7/0，unit integration仍skip；见[新记录](../archive/2026-10-06/Journal合同与初次捕获-2026-10-06.md)。
+- **U0-J0-L0：Journal结果类型归属有限验收完成。** 四个原类型与六段原诊断移至Persistence/Journal/Outcome，Foundation.Outcome只留中性运行结果；纯合同仅依Identity与残余Foundation Outcome。51源/31工程原子迁引用，case顺序、payload、公开分类及canonical codec未改，未留旧alias。Journal闭包7fs，Snapshot5、recovery51、完整Host39，各ratchet不变；gen210正式产品绿及022真实正反编译见本批记录。此项只是合法归属，不实施Release/Commit新case、不授fresh派发权。
+- **U0-C0：下一有限前置，尚未实施。** 按[纯append-result接手卡](../archive/2026-10-06/journal-outcome-contract/vibe-fs-u0-c0-append-result-locality-card-20261006.txt)，只改三个工程声明：原StoreTypes.fs/fsi唯一编译owner改为纯结果工程，原Port/Handle仍归原port合同；清理Model与Port未使用的Foundation Outcome引用。F#源、namespace、API、compile-order及19个port消费者不改，不能先添加尚未使用的Journal→新结果边。先补022实际plan排除反例，再用同一真实IEventStore probe证明原Port能编译而纯结果不能，另证明纯结果正控；要求真实flat Fable及相邻023/028、公开007/008分类回归。只读模拟Model7→3、Port10→6不是验收证书。此包闭合后才进入下面U0-A0类型与Store/consumer原子迁移。
 - **U0 原生 Release 两业务红已取得，仍未实施 typed outcome。** 原Node22/原Store下，fresh先证明真实append/fsync、完整字节、live Current/head及独立cold；exact duplicate则证明零新append/fsync且字节原封。两者都原生删除实际own lock后抛同一Error，旧Task直接reject，typed settlement oracle失败；normal正控通过。[原始收据](../archive/2026-10-06/sphinx-u0-preconditions/vibe-fs-u0-native-release-receipt-20261006.txt)及source/dist SHA保完整身份。这是native pending证据，未注册正式006，不冒称formal green。新[合同卡](../archive/2026-10-06/sphinx-u0-preconditions/vibe-fs-u0-contract-red-audit-20261006.txt)明确 fresh Unknown、duplicate/no-op无新写释放失败、原StorageInvalid与Release双因果、exact request/prepared/phase/cause；先完成JC，再原子迁Store与实际consumer。fsync/CurrentCommit/双故障/坏尾行和全部consumer仍待正式红绿。
 - **U0：真实提交与释放后的 Unknown，待完整实现。** 物理 append 已开始后，Current commit 或 native Release 出错都不能称未写入。catch 必须覆盖完整锁任务，保原 request、prepared envelopes、失败阶段与 cause。Release两项native业务红见上项；append/fsync/Commit及双因果仍待正式证明。[历史只读接手卡](../archive/2026-10-06/sphinx-host-owner/vibe-fs-u0-unknown-contract-next-20261006.txt)保当时源码因果，现实施依据由新合同卡和JC卡接续。全部 AppendError 消费者须按类型迁归，不能把Store局部新case再字符串化后记闭合。duplicate/no-op释放失败不得猜新写未知或旧事实未提交，RuntimeStarted未知也不能误称同次business已尝试；generic锁helper仍有payload/Git消费者，保持边界。此包不提供首次派发许可。
 - **017-I0：已激活 append 的 I/O，有限验收完成。** 正式017新增8/128条真实历史、独立meter/cold进程，原activation读取正控后清零；正常append零旧事件内容读取、零Git访问/子进程，真实新writer写入252字节且fsync，完整事件/head与cold链相等。原gen197 native4/0；手工在原Append加ReloadLocal，gen198正式2/2失败，写入及cold正控在成本断言之前仍成立；已逐字节还原，gen199/200正式正常4/0，最终输入收据见本次合并记录。[原记录](../archive/2026-10-06/sphinx-host-owner/append-io/)保实际PID与计数。此包不证明内存中的历史fold、payload成本或完整首次接纳；WHAT017整体不关闭。
@@ -23,14 +25,15 @@ gen190 完整 Sphinx+delegation 为52/52排空、328pass/0fail/35TODO；全 Fabl
 
 按以下顺序认领：
 
-1. 原 EventStore owner 先冻结“持实际 canonical 锁读新事实→纯准入→append→发布唯一 Current→返回确属本次 fresh acceptance”的合同。exact duplicate 独立返回，不能给它新的 spend witness。不同 handle、不同 OS process 必须共享同一所有权，Adapter-local semaphore 不足。
-2. 明确新字节增量与检查点前提，沿原 canonical storage 实现；不另建 Sphinx log/registry、不在每次派发全扫历史、不改变既有 fork/cut/idempotence。
-3. 先在010用两个真实 writer、再用两个 OS process 的 readiness barrier 证明：同 intent 不同 command 只能一次 fresh；exact replay、stale handle、CommitUnknown、cut 与冷 Pending 均零 Create/Send。有成功实际调用的非零正控。
-4. 原锁释放后才调用 Host。Host pending 时另一 writer 的合法 append 必须仍可完成，不把磁盘锁持到网络/terminal。
-5. 有 fresh witness 后，composition 才能在 Invoke 前核对实际 owner、exact Request、当前预留与请求身份。既有 Request 且 Receipt=None 具体报 RecoveryIncomplete，零盲重发。
-6. 另定第二道门：原最终 handoff/render 之后，SendPrompt 之前，可 await 保存 exact child、PromptKey、最终 UTF-8 字节与同次 handoff 证据。unit 诊断 callback 不充当 durable barrier。
-7. actual Admission 才映射 receipt；其落盘失败保留已发生的物理证据，不改称 NotDispatched、不另发送。Running 需要真实相应事实，不能由 receipt 名称隐式推出。
-8. 每个子包独立红绿、正式 requirement 验收并更新状态；两道门、installed Host 与完整034分别记账。不能用 H0a 证书关闭它们。
+1. 先完成C0，再认领U0-A0：冻结exact request/prepared envelopes/物理失败阶段/原cause合同；先将现有Release两native业务红注册正式006，再补append/fsync/CurrentCommit/StorageInvalid+Release双故障。随后同包迁原Store、writer、AgentJournal和实际消费者，不能把新typed cause又字符串化。fresh unknown、duplicate/no-op无新写释放失败及RuntimeStarted未知分别裁决；含semantic cuts的Unknown须交原fatal owner，不沿旧WriteUnknown丢cut。该批不接Host effect。
+2. U0有限验收后，原EventStore owner冻结“持实际 canonical 锁读新事实→纯准入→append→发布唯一 Current→返回确属本次 fresh acceptance”的合同。exact duplicate 独立返回，不能给它新的 spend witness。不同 handle、不同 OS process 必须共享同一所有权，Adapter-local semaphore 不足。不能跳过C0/U0或把本轮类型迁归当作首次接纳完成。
+3. 明确新字节增量与检查点前提，沿原 canonical storage 实现；不另建 Sphinx log/registry、不在每次派发全扫历史、不改变既有 fork/cut/idempotence。
+4. 先在010用两个真实 writer、再用两个 OS process 的 readiness barrier 证明：同 intent 不同 command 只能一次 fresh；exact replay、stale handle、CommitUnknown、cut 与冷 Pending 均零 Create/Send。有成功实际调用的非零正控。
+5. 原锁释放后才调用 Host。Host pending 时另一 writer 的合法 append 必须仍可完成，不把磁盘锁持到网络/terminal。
+6. 有 fresh witness 后，composition 才能在 Invoke 前核对实际 owner、exact Request、当前预留与请求身份。既有 Request 且 Receipt=None 具体报 RecoveryIncomplete，零盲重发。
+7. 另定第二道门：原最终 handoff/render 之后，SendPrompt 之前，可 await 保存 exact child、PromptKey、最终 UTF-8 字节与同次 handoff 证据。unit 诊断 callback 不充当 durable barrier。
+8. actual Admission 才映射 receipt；其落盘失败保留已发生的物理证据，不改称 NotDispatched、不另发送。Running 需要真实相应事实，不能由 receipt 名称隐式推出。
+9. 每个子包独立红绿、正式 requirement 验收并更新状态；两道门、installed Host 与完整034分别记账。不能用 H0a 证书关闭它们。
 
 纯 Interpretation 状态账 B4-O0a 和原Registry有限守门 B2-P0a 已分别验收；[交付收据](../archive/2026-10-06/sphinx-interpretation/final-receipt.txt)保存最终静态收束与输入。真实 Observe/模型执行仍依上述 H0b→B2→B3→B4 顺序接通。
 

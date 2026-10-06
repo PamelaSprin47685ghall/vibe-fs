@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -7,7 +8,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 
@@ -141,12 +141,10 @@ module JournalAppendOutcome =
 
     let toExecutionFailure =
         function
-        | Wanxiangshu.Foundation.JournalAppendFailure.WriterUnavailable _ ->
+        | JournalAppendFailure.WriterUnavailable _ ->
             ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-        | Wanxiangshu.Foundation.JournalAppendFailure.FactRejected _ ->
-            ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | Wanxiangshu.Foundation.JournalAppendFailure.WriteUnknown _ ->
-            ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | JournalAppendFailure.FactRejected _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+        | JournalAppendFailure.WriteUnknown _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptance =

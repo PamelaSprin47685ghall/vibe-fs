@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Enforcer.Guidance
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -9,7 +10,6 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Outcome
 
 /// Opaque JS owner for Main tip-guidance delivery. Journal handles and typed
 /// facts stay inside this boundary; tests provide only semantic ids and

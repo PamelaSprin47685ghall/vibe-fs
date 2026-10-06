@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Verification
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Process
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Composition.Durable

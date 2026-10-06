@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 #nowarn "3511"
 
 open System

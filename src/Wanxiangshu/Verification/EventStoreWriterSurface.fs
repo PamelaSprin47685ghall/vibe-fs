@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Verification
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion

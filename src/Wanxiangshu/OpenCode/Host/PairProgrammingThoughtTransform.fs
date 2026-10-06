@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks

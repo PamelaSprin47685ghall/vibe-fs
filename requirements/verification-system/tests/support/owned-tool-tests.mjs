@@ -89,18 +89,43 @@ function registerProbeSetupFailureTest(failCleanup) {
     let monitorClosed
     let forwarded = false
     try {
+      const foreignDeadline = Date.now() + 3000
       foreign = spawn(process.execPath, ['--input-type=module', '-e', `
 import fs from 'node:fs'
 fs.watch(${JSON.stringify(directory)}, () => {})
 fs.writeFileSync(${JSON.stringify(`${foreignMarker}.tmp`)}, JSON.stringify({ pid: process.pid }))
 fs.renameSync(${JSON.stringify(`${foreignMarker}.tmp`)}, ${JSON.stringify(foreignMarker)})
-`], { detached: true, stdio: 'ignore' })
+process.send({ type: 'foreign-ready', pid: process.pid })
+`], { detached: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
       foreignClosed = new Promise((resolve, reject) => {
         foreign.once('close', (code, signal) => resolve({ code, signal }))
         foreign.once('error', reject)
       })
-      const foreignIdentity = awaitMarker(foreignMarker)
+      let foreignStderr = ''
+      foreign.stderr.setEncoding('utf8').on('data', chunk => { foreignStderr += chunk })
+      const foreignIdentity = await new Promise((resolve, reject) => {
+        const finish = (error, identity) => {
+          clearTimeout(timer)
+          foreign.off('message', ready)
+          foreign.off('error', failed)
+          foreign.off('close', closed)
+          if (error) reject(error)
+          else resolve(identity)
+        }
+        const ready = message => {
+          if (message?.type !== 'foreign-ready' || message.pid !== foreign.pid) {
+            finish(new Error(`Foreign fixture supplied invalid readiness: ${JSON.stringify(message)}`))
+          } else finish(null, { pid: message.pid })
+        }
+        const failed = error => finish(new Error(`Foreign fixture could not start: ${foreignStderr}`, { cause: error }))
+        const closed = (code, signal) => finish(new Error(`Foreign fixture exited before readiness (${code ?? signal}): ${foreignStderr}`))
+        const timer = setTimeout(() => finish(new Error(`Foreign fixture ${foreign.pid} did not report readiness within 3000ms: ${foreignStderr}`)), Math.max(0, foreignDeadline - Date.now()))
+        foreign.once('message', ready)
+        foreign.once('error', failed)
+        foreign.once('close', closed)
+      })
       assert.equal(foreignIdentity.pid, foreign.pid)
+      assert.deepEqual(JSON.parse(fs.readFileSync(foreignMarker, 'utf8')), foreignIdentity, 'The original foreign child published its marker before readiness')
       const foreignRow = liveProcessRows().find(row => row.pid === foreign.pid)
       assert.ok(foreignRow)
       assert.equal(foreignRow.pgid, foreign.pid)

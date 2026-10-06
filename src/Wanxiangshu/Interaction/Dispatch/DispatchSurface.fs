@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop

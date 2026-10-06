@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks

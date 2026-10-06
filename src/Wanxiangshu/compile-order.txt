@@ -198,6 +198,8 @@ Execution/Session/Attachment/AttachmentLeaseCore.fsi
 Execution/Session/Attachment/AttachmentLeaseCore.fs
 Foundation/Outcome.fsi
 Foundation/Outcome.fs
+Persistence/Journal/Outcome.fsi
+Persistence/Journal/Outcome.fs
 Execution/Delegation/SyncDelegate/Model.fsi
 Execution/Delegation/SyncDelegate/Model.fs
 Execution/Delegation/HandoffIdentity.fsi

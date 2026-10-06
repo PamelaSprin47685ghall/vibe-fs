@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Verification
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading
 open System.Threading.Tasks

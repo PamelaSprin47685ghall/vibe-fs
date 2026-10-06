@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode.Host
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -7,7 +8,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Persistence.Journal
 

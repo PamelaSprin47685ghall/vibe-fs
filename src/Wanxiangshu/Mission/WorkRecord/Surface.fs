@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.WorkRecord
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -9,7 +10,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation.Identity
 
 /// JS-native WorkRecord owner for durable semantic fixtures and projections.

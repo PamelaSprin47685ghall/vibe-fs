@@ -105,22 +105,38 @@ function rememberDescendantGroups(pgid, records, groups) {
   }
 }
 
-async function captureFrozenDescendantGroups(pgid, deadline, inspect, groups) {
-  rememberDescendantGroups(pgid, processRecords(deadline, 'initial-capture', inspect), groups)
+async function freezeAndCaptureDescendantGroups(pgid, deadline, inspect, groups) {
   try {
     process.kill(-pgid, 'SIGSTOP')
   } catch (error) {
-    if (error.code === 'ESRCH') return
+    if (error.code === 'ESRCH') throw new Error('The owned inner group disappeared before frozen descendant capture', { cause: error })
     throw error
   }
   while (true) {
     const records = processRecords(deadline, 'freeze-confirmation', inspect)
     rememberDescendantGroups(pgid, records, groups)
     const owned = records.filter(record => record.group === pgid)
+    if (owned.length === 0) throw new Error('The owned inner group was absent from the frozen descendant snapshot')
     if (owned.every(record => /^[Tt]/.test(record.state))) return
     if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
     await delay(5)
   }
+}
+
+async function captureFrozenDescendantGroups(pgid, deadline, inspect, groups) {
+  let initialFailure
+  try {
+    rememberDescendantGroups(pgid, processRecords(deadline, 'initial-capture', inspect), groups)
+  } catch (error) {
+    initialFailure = { error }
+  }
+  try {
+    await freezeAndCaptureDescendantGroups(pgid, deadline, inspect, groups)
+  } catch (error) {
+    if (initialFailure) throw new AggregateError([initialFailure.error, error], 'Initial and frozen descendant capture failed', { cause: initialFailure.error })
+    throw error
+  }
+  if (initialFailure) throw initialFailure.error
 }
 
 async function awaitObservedGroups(groups, deadline, inspect, phase = 'descendant-drain') {

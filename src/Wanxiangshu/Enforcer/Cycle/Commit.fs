@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Enforcer.Cycle
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Composition.Durable
 open System.Threading.Tasks

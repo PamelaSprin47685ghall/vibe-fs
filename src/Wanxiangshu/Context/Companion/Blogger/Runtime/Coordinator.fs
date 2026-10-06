@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance

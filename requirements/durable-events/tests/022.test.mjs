@@ -86,6 +86,7 @@ const FOCUSED_RUNTIME_SHARDS = [
 const EXTENDED_CONTRACT_LOCALITIES = [
   'interaction-authority-fold',
   'execution-session-syncdelegaterole',
+  'journal-outcome-contract',
 ]
 
 const EXTENDED_FOCUSED_RUNTIME_LOCALITIES = [
@@ -231,6 +232,26 @@ test('WHAT[durable-events-022] declared EventStore compile plans stay within sou
       `${shard} extended focused-runtime closure exceeds 185 production sources`,
     )
   }
+})
+
+test('WHAT[durable-events-022] Journal outcome contract excludes the store capability and physical journal', () => {
+  const { project, plan } = planShard('journal-outcome-contract')
+  assert.equal(project.subsystem, 'persistence')
+  const sources = productionSources(plan)
+  assert.ok(sources.includes('Persistence/Journal/Outcome.fs'))
+  for (const source of [
+    'Persistence/EventStore/Port.fs',
+    'Persistence/EventStore/Store.fs',
+    'Persistence/EventStore/ProcessEventLog.fs',
+    'Persistence/Journal/Writer.fs',
+    'Persistence/Journal/EventStoreJournalWriter.fs',
+    'Persistence/Journal/AgentJournal.fs',
+    'OpenCode/Host/SessionHostPort.fs',
+  ]) {
+    assert.ok(!sources.includes(source), `Journal outcome contract must not compile ${source}`)
+  }
+  const foundation = planShard('outcome').plan
+  assert.ok(!productionSources(foundation).includes('Persistence/Journal/Outcome.fs'))
 })
 
 // B4 compile isolation for durable-events-022: the durable-events-023 probe
@@ -443,7 +464,7 @@ integrationTest('WHAT[durable-events-022] real Fable compiles the journal observ
   }
 })
 
-integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile excludes full Host admission and preserves its private witness owner', async (t) => {
+integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserves bounded Journal outcomes and the private Host witness owner', async (t) => {
   const { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname, relative } = await import('node:path')
@@ -471,6 +492,27 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile exclude
     '               (prior: ChatExecutionKey)',
     '               (replacement: ManagedChatAcceptanceWitness) =',
     '        port.InterruptSupersededAttempt(prior, replacement)',
+    '',
+  ].join('\n')
+
+  const JOURNAL_OUTCOME_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Persistence.Journal.JournalOutcome',
+    'module ProbeJournalOutcome =',
+    '    let eventId = EventId.create "contract-probe"',
+    '    let outcomes: CommitResult<int> list =',
+    '        [ Committed 1; Rejected(eventId, "cut");',
+    '          NotAttempted(eventId, WriterClosing);',
+    '          CommitUnknown(eventId, WriteFailed "write") ]',
+    '    let failures =',
+    '        [ WriteUnknown(eventId, WriteFailed "write");',
+    '          WriteUnknown(eventId, FlushFailed "flush");',
+    '          WriterUnavailable(eventId, WriterPoisoned "first");',
+    '          WriterUnavailable(eventId, WriterClosing);',
+    '          WriterUnavailable(eventId, WriterDisposed);',
+    '          FactRejected(eventId, { Fact = "fact"; Reason = "cut" }) ]',
+    '    let diagnostics = failures |> List.map JournalAppendFailure.describe',
     '',
   ].join('\n')
 
@@ -528,6 +570,19 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile exclude
     await t.test('WHAT[durable-events-022] standalone Snapshot contract compiles its real read capability', async () => {
       const result = await compileProbe('host-session-snapshot-contract', SNAPSHOT_PROBE)
       assert.equal(result.ok, true, `the standalone Snapshot contract must compile without full Host admission\n${result.stdout}\n${result.stderr}`)
+    })
+
+    await t.test('WHAT[durable-events-022] standalone Journal outcome contract compiles every original result and diagnostic case', async () => {
+      const result = await compileProbe('journal-outcome-contract', JOURNAL_OUTCOME_PROBE)
+      assert.equal(result.ok, true, `the pure Journal contract must retain its original typed results\n${result.stdout}\n${result.stderr}`)
+    })
+
+    await t.test('WHAT[durable-events-022] standalone Journal outcome contract rejects the original full Host acceptance probe', async () => {
+      const result = await compileProbe('journal-outcome-contract', HOST_ACCEPTANCE_PROBE)
+      assert.equal(result.ok, false, 'the pure Journal result contract must reject the identical full Host acceptance capability')
+      const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
+      assert.match(rejection, /IExternalInputSupersessionPort|ManagedChatAcceptanceWitness|ChatExecution/)
+      assert.match(rejection, /is not defined/)
     })
   } finally {
     for (const copyRoot of copies) rmSync(copyRoot, { recursive: true, force: true })

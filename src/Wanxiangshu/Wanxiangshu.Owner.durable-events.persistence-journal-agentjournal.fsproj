@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
 <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

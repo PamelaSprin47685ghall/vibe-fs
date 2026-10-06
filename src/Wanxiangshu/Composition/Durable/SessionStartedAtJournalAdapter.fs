@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable

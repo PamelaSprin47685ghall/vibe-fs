@@ -188,9 +188,24 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
       'OpenCode/Host/SessionContract.fs',
       'OpenCode/Host/SessionHostPort.fs',
       'OpenCode/Host/SessionRuntimeOwner.fs',
-      'OpenCode/Host/SessionSnapshot.fs',
     ].sort(),
   )
+
+  const snapshotContract = requireShard('host-session-snapshot-contract')
+  assert.deepEqual(snapshotContract.compile, ['OpenCode/Host/SessionSnapshot.fs'])
+  const snapshotOwner = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Host/SessionSnapshot.fs'))
+  assert.equal(snapshotOwner.projectPath, snapshotContract.path, 'Snapshot has its own unique contract owner')
+  assert.equal(snapshotContract.subsystem, 'provider')
+  const snapshotSources = productionSources(planShard('host-session-snapshot-contract').plan)
+  for (const unrelated of [
+    'OpenCode/Host/SessionContract.fs',
+    'OpenCode/Host/SessionHostPort.fs',
+    'OpenCode/Host/SessionRuntimeOwner.fs',
+    'Execution/Session/ChatExecution/Acceptance.fs',
+    'Execution/Session/ChatExecution/Settlement.fs',
+  ]) {
+    assert.ok(!snapshotSources.includes(unrelated), `Snapshot read contract must not acquire ${unrelated}`)
+  }
 
   const diagnosticsRuntime = requireShard('host-diagnostics-runtime')
   assert.ok(diagnosticsRuntime.compile.includes('OpenCode/Host/HookPolicy.fs'))

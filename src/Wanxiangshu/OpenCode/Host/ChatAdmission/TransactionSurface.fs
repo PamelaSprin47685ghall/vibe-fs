@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -9,7 +10,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona

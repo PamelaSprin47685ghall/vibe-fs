@@ -1223,10 +1223,9 @@ test('WHAT[structured-workflow-012] production focused closure carries upstream 
   )
 })
 
-test('WHAT[structured-workflow-012] focused Controller compilation includes the exact ChatExecution contract used by SessionHostPort', () => {
+test('WHAT[structured-workflow-012] focused Controller compilation includes Snapshot recovery without private Host admission contracts', () => {
   const controllerFs = join(SOURCE_ROOT, 'Execution/Delegation/Handle/Controller.fs')
-  const sessionPortFsi = join(SOURCE_ROOT, 'OpenCode/Host/SessionHostPort.fsi')
-  const sessionPortFs = join(SOURCE_ROOT, 'OpenCode/Host/SessionHostPort.fs')
+  const recoveryFs = join(SOURCE_ROOT, 'Execution/Delegation/ChildRecoveryWorkflow.fs')
   const plan = planImpactCompile({
     changedPaths: [controllerFs],
     projectDirectory: SOURCE_ROOT,
@@ -1235,17 +1234,20 @@ test('WHAT[structured-workflow-012] focused Controller compilation includes the 
 
   assert.equal(plan.mode, 'focused', `a Controller implementation change must stay focused, got ${plan.mode} (${plan.reason})`)
   assert.ok(plan.compileItems.includes(controllerFs))
-  assert.ok(plan.compileItems.includes(sessionPortFsi) && plan.compileItems.includes(sessionPortFs))
-  for (const name of ['Facts', 'Acceptance']) {
+  assert.ok(plan.compileItems.includes(recoveryFs))
+  for (const extension of ['fsi', 'fs']) {
+    const snapshot = join(SOURCE_ROOT, `OpenCode/Host/SessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include SessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.indexOf(snapshot) < plan.compileItems.indexOf(recoveryFs), 'Snapshot must precede its recovery consumer in canonical order')
+  }
+  for (const path of ['OpenCode/Host/SessionHostPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
     for (const extension of ['fsi', 'fs']) {
-      const contract = join(SOURCE_ROOT, `Execution/Session/ChatExecution/${name}.${extension}`)
-      assert.ok(plan.compileItems.includes(contract), `focused Controller compilation must include the production ${name}.${extension} contract consumed by SessionHostPort`)
-      assert.ok(plan.compileItems.indexOf(contract) < plan.compileItems.indexOf(sessionPortFsi), `${name}.${extension} must precede the SessionHostPort signature in canonical order`)
+      assert.equal(plan.compileItems.includes(join(SOURCE_ROOT, `${path}.${extension}`)), false, `Snapshot recovery must not import ${path}.${extension}`)
     }
   }
 })
 
-integrationTest('WHAT[structured-workflow-012] real Fable compiles a focused Controller change with its declared SessionHostPort contracts', async () => {
+integrationTest('WHAT[structured-workflow-012] real Fable compiles a focused Controller change with its declared Snapshot contracts', async () => {
   const { compileIncremental } = await import('../../../scripts/lib/owner-compile.mjs')
   const owned = mkdtempSync(join(tmpdir(), 'wanxiangshu-controller-focused-'))
   try {

@@ -1,8 +1,8 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-最新[743 CI](../archive/2026-10-06/baselines/743-ci/vibe-fs-743-ci-receipt.txt)是实质失败：actual PR c8e34f400/source743同tree/input，format/check/build通过；原300秒只744/824、792/824，无全仓summary。两边grounding012真失败已定位固定writer超24h；source另owned descendant observation到期与六node orphan，lineage未绑定，outer accepted=true不覆盖它们。016两边仍queued；下段2b完整成本只属历史输入，不是本次证书。
+最新[89a CI](../archive/2026-10-06/baselines/89a-ci/vibe-fs-89a-ci-receipt.txt)是实质截断：actual PR28f98966/source89a同tree，format/check/build通过；原300秒只764/824、760/824，无全仓summary。两边唯一已完成失败为Host026旧Snapshot直接归属断言，grounding012均exit0；verification006/010/016仍queued。Host026/SW012按真实Snapshot边界修正后，gen210授权native产品176/176、1096/0、29skip/74TODO，仅pending；022真实flat独立7/0。[本批记录](../archive/2026-10-06/Journal合同与初次捕获-2026-10-06.md)。旧743的owned observation到期与六未绑定orphan仍保留，2b完整成本只属历史输入。
 
-**npm setup已实现、native有限验收，完整016仍待。** 原public install已启动真实held ci后setEncoding抛Error会先删输出、caller时owner仍活；先接原completed、捕获setup后stop并等原terminal/close，Error/null native2/0，删除目录前groups空及foreign存活入oracle。gen206联合8文件却7drained/1active016、7919ms静默与initial ps ETIMEDOUT，无summary；两新叶已pass不替代完整016。独立Snapshot/grounding选集7/7、37/0、4skip/4TODO仅pending；[本批记录](../archive/2026-10-06/Snapshot边界与历史夹具-2026-10-06.md)。下一有限初次capture恢复父链须先真实红，仍保原cause/deadline，未知库存与持续ps故障另记；不靠调预算重跑。
+**npm setup完整016及初次capture有限验收。** 原public install真实held ci业务红→Error/null native2/0，原completed/terminal/close及删除前groups/foreign oracle保留。gen210完整006/010/016为3/3、348/1、19skip/2TODO，016实际worker exit0；唯一失败在旧probe双故障foreign准备，尚未触发setup。改原child IPC readiness、保原3000ms并核marker/PID/原ps、error/close/stderr后，gen211完整006/010为61/0、无skip/TODO、25.35s wall，group58401 accepted18.358ms；fresh前后一致。最终七capture场景通过：原ps失败后在原deadline恢复实际冻结父链、排空已知groups仍抛原Error；double/missing-root明确拒绝不完整。原红/变异、ESRCH native未立及unknown/预算耗尽边界见本批记录；gen206失败和foreign旧失败的唯一原因不追认。
 
 最新[2b84 PR CI收据](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-2b84-ci-upstream-receipt.txt)与[source收据](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-2b84-ci-origin-receipt.txt)：actual PR merge a49091541、source2b84dfa86，tree/input相同；两边824/824、4726pass/0fail、121skip/389TODO，退出1仅pending-proof。format/check/build通过；PR255.57s/source261.73s wall，原预算/worker保持。016 actual worker16025约60.37s/60.30s，各201条工具链完整排空；outer各自2822 accepted=true/7.727ms与8.813ms（不同host）。这两张证书不消除a8真实300秒截断和local gen201六个006失败，也不证明未知库存或稳定吞吐。完整成本、原日志及ZIP均在同目录；[016下一卡](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-016-next-owner-measurement-card-20261006.txt)先细量原capture owner各阶段，不把不同变异工具的归档成本叫可缓存重复。
 
@@ -50,7 +50,7 @@ fileWaits诊断已有正式红绿；历史72e83 CI仍仅817/818、无authoritati
 
 本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。VS-016的T418/T419与GAP-055仍PARTIAL，源码/依赖/工具准备不等于实际同候选verify或只读执行；DIST-001/005/007不能假定同候选快照已可用。最新上游取舍见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
 
-本地focused编译新证据：Controller使用SessionHostPort的ChatExecutionKey/ManagedChatAcceptanceWitness时，`host-session-contract`缺`execution-session-chatexecution-facts`真实边；SW012 production-plan正式红0通过/1失败，单边修正后定向2项通过。独立Controller闭包112→132个fs/fsi，fs计数由56→66（此前48→56另有8个source增长），facts shard分组带入10个typed ChatExecution合同及既有支持模块fs，不含具体Host/文件/网络适配器，单边不新授capability；028 recovery反增长ratchet据实66，其余预算未超，WHAT185及禁止实现source断言不变。统一正式构建/受影响套件仍待验收；SDK只调查未实施，S03其余边界保持PARTIAL，详情见590同步记录。
+历史focused编译证据：Controller恢复曾经传递依赖SessionHostPort，故当时须补ChatExecution真实边，闭包56→66fs。此段只属590输入，不能继续要求当前recovery引入完整Host。当前Snapshot已独立唯一owner、recovery51fs，SW012明确Snapshot与实际ChildRecoveryWorkflow顺序并排除HostPort/Acceptance/Settlement；gen210授权native176回归通过，66 ratchet保持。原红和旧增长记录保留，SDK/同候选actual verify的当前状态以首节与总计划为准。
 
 ## 使用这份分册
 

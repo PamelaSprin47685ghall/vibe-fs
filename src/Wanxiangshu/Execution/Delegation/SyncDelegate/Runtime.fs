@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Enforcer.Guidance
@@ -560,8 +561,8 @@ type SyncDelegateRuntime
             // child physically finished but the evidence did not commit:
             // deliver the earned completion from the turn's own parts (neither
             // forgotten nor re-executed); the checkpoint stays pending-evidence.
-            | Error(XTraceCaptureError.StorageAppendFailed(Wanxiangshu.Foundation.JournalAppendFailure.WriterUnavailable _))
-            | Error(XTraceCaptureError.StorageAppendFailed(Wanxiangshu.Foundation.JournalAppendFailure.WriteUnknown _)) ->
+            | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriterUnavailable _))
+            | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _)) ->
                 return finishCompletedCallFromTurn turn call
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)

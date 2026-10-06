@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Enforcer.Guidance
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
