@@ -57,7 +57,10 @@ module SessionExecutionBinding =
     /// EMR-010 / host-boundary-008: enter the provider step of the physical
     /// message this request answers. A message with no durable `Accepted` is not
     /// a managed execution and is left alone; one that was accepted must hold a
-    /// committed lease for that exact key or fail closed.
+    /// committed lease for that exact key or fail closed. A superseded
+    /// generation's in-flight tool-result continuation still resolves its
+    /// committed lease through ModelRouting.enterProviderStep (resolveSupersededStep),
+    /// so it enters here like any live execution.
     let private enterBoundProviderStep
         (durable: AgentJournal option)
         (sessionId: SessionId)
@@ -75,8 +78,9 @@ module SessionExecutionBinding =
             ModelRouting.enterProviderStep sessionId physicalUserMessageId visibleRuns requestKey
 
         match isManagedExecution durable key, ModelRouting.tryReadExecution key with
-        | false, _ -> Task.FromResult(())
+        | false, _ -> Task.FromResult()
         | true, Some _ -> enterCommittedStep ()
+        | true, None when ModelRouting.wasExecutionSuperseded key -> enterCommittedStep ()
         | true, None ->
             raise (
                 InvalidOperationException(

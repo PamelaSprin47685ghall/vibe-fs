@@ -205,7 +205,7 @@ module ManagerWorkflow =
             road.LatestRetirement
             |> Option.filter (isAcceptedWithValidCertificate road)
             |> Option.map (fun retirement ->
-                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+                durable, sessionId, roadId, road, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
         | _ -> None
 
     let private loopContextFor (durable: AgentJournal) sidText =
@@ -264,14 +264,28 @@ module ManagerWorkflow =
             Some(durable, sessionId, opening.RoadId, fullTransaction)
         | RetirementOutcome.Continue -> None
 
-    let private decideLoopOpening journal (workspaceDirectory: string option) sessionIdTextOpt =
+    /// MANAGER-LOOP-005: an Accepted-retired road re-opens only for a genuine
+    /// successor request — a fresh external physical request classified by
+    /// `RelayNarrativeTransform.isCurrentRequestSuccessor`. The re-open must
+    /// never fire for the retired iteration's own residual wire activity
+    /// (post-suicide provider steps, idle continuations): those are stale
+    /// attempts, and un-gated re-opening turns a finished manager loop into an
+    /// assess/review/retire infinite loop (relay-retirement-008).
+    let private decideLoopOpening
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        sessionIdTextOpt
+        (isSuccessorRequest: RoadView -> RetirementSummary -> bool)
+        =
         sessionIdTextOpt
         |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
         |> Option.bind (fun sessionIdText ->
             journal
             |> Option.bind (fun durable ->
                 match tryAcceptedRoadContext durable sessionIdText with
-                | Some(_, sessionId, roadId, authorityRevision, retirement, true) ->
+                | Some(_, sessionId, roadId, road, authorityRevision, retirement, true) when
+                    isSuccessorRequest road retirement
+                    ->
                     tryBuildAcceptedOpening durable workspaceDirectory sessionId roadId authorityRevision retirement
                 | _ -> None))
 
@@ -302,8 +316,13 @@ module ManagerWorkflow =
             Some(durable, sessionId, opening.RoadId, opening.Transaction)
         | _ -> None
 
-    let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
-        match decideLoopOpening journal workspaceDirectory sessionIdTextOpt with
+    let private decideOpeningAction
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        sessionIdTextOpt
+        (isSuccessorRequest: RoadView -> RetirementSummary -> bool)
+        =
+        match decideLoopOpening journal workspaceDirectory sessionIdTextOpt isSuccessorRequest with
         | Some action -> Some action
         | None ->
             sessionIdTextOpt
@@ -319,9 +338,10 @@ module ManagerWorkflow =
         (workspaceDirectory: string option)
         (sessionIdTextOpt: string option)
         (providerRunIdOpt: ProviderRunIdentity option)
+        (reopenAcceptedForSuccessor: RoadView -> RetirementSummary -> bool)
         : Task<unit> =
         task {
-            match decideOpeningAction journal workspaceDirectory sessionIdTextOpt with
+            match decideOpeningAction journal workspaceDirectory sessionIdTextOpt reopenAcceptedForSuccessor with
             | None -> return ()
             | Some(durable, sessionId, roadId, transaction) ->
                 do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId transaction

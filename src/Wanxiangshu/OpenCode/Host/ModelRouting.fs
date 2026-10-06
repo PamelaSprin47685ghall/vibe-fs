@@ -1306,26 +1306,39 @@ module ModelRouting =
         let enterProviderStepLocked sessionId physicalUserMessageId fence (requestKey: string option) =
             ensureHealthy ()
 
-            match activeBySession.TryGetValue sessionId with
-            | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
+            let stepOfExactLease (target: ModelRoutingTarget) (role: Role) (purpose: ModelExecutionPurpose) =
                 capacity.EnterStep(
                     sessionId,
                     physicalUserMessageId,
-                    lease.Target,
+                    target,
                     fence,
-                    (fun running -> exactTargetAvailable lease.RoutingRole lease.Target running lease.Purpose),
+                    (fun running -> exactTargetAvailable role target running purpose),
                     ?requestKey = requestKey
                 )
-            | _ ->
-                failedTask<unit> (
-                    InvalidOperationException(
-                        sprintf
-                            "execution-model-routing: provider step %s/%s has no active execution binding"
-                            sessionId
-                            physicalUserMessageId
+
+            let resolveSupersededStep () =
+                match admissionOwner.TryReadCommittedLease(sessionId, physicalUserMessageId) with
+                | Some lease ->
+                    let purpose =
+                        staleLeasePurpose sessionId physicalUserMessageId
+                        |> Option.defaultValue ModelExecutionPurpose.Normal
+
+                    stepOfExactLease lease.Identity.Target lease.Identity.Role purpose
+                | None ->
+                    failedTask<unit> (
+                        InvalidOperationException(
+                            sprintf
+                                "execution-model-routing: provider step %s/%s has no active execution binding"
+                                sessionId
+                                physicalUserMessageId
+                        )
                     )
-                )
-                :> Task
+                    :> Task
+
+            match activeBySession.TryGetValue sessionId with
+            | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
+                stepOfExactLease lease.Target lease.RoutingRole lease.Purpose
+            | _ -> resolveSupersededStep ()
 
         let drainIfHealthy () =
             if fatalError.IsNone then

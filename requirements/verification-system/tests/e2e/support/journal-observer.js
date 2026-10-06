@@ -608,6 +608,45 @@ export const countFactCase = (workDirOrLines, caseName) => {
   return factPayloads(workDirOrLines, caseName).length;
 };
 
+/**
+ * Payloads of the named fact case restricted to one session's journal stream.
+ * The global `factPayloads` count is fine while a scenario drives one road at a
+ * time, but the Long Stroke preflow runs the strength-canary owner and the
+ * humanroot canary concurrently on the same journal: both open relay roads and
+ * commit retirements, so a global count cannot tell whose iteration it saw.
+ * The session's stream id is the durable identity (`stream_id` on the raw
+ * envelope, `journal/session/<sessionId>`).
+ */
+export function factPayloadsForSession(workDirOrLines, caseName, sessionId) {
+  const lines = typeof workDirOrLines === 'string' ? journalEventLines(workDirOrLines) : workDirOrLines;
+  const stream = `journal/session/${sessionId}`;
+  const found = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) {
+      if (typeof value[0] === 'string' && value[0] === caseName) found.push(value[1]);
+      for (const item of value) walk(item);
+    } else if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) walk(child);
+    }
+  };
+  for (const line of lines) {
+    const envelope =
+      typeof line === 'string'
+        ? journalEnvelopeFromEventText(line)
+        : line && typeof line === 'object'
+          ? line.payload && typeof line.payload === 'object'
+            ? line.payload
+            : line
+          : null;
+    const belongs =
+      typeof line === 'string'
+        ? line.includes(`"stream_id":"${stream}"`)
+        : line?.stream_id === stream;
+    if (envelope && belongs) walk(envelope.Fact);
+  }
+  return found;
+}
+
 const digFactLabel = (fact) => {
   if (typeof fact === 'string') return fact;
   if (!Array.isArray(fact) || typeof fact[0] !== 'string') return null;

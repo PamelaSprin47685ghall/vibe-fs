@@ -25,6 +25,7 @@ import {
   countFactCase,
   journalEventLines,
   factPayloads,
+  factPayloadsForSession,
 } from './journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
@@ -104,8 +105,16 @@ export async function awaitNamedFact(workDir, waitFact, { timeoutMs = WAIT_FACT_
   const cmp =
     waitFact.eq !== undefined ? (n) => n === need : (n) => n >= need;
 
+  // A session-scoped wait counts only that session's journal stream: concurrent
+  // preflow canaries (strength owner + humanroot) both commit relay facts, so
+  // the global count cannot tell whose iteration it saw.
+  const countOf = () =>
+    waitFact.session !== undefined
+      ? { named: factPayloadsForSession(workDir, name, waitFact.session).length, renew: 0 }
+      : readJournal(workDir, name, renewOn);
+
   const deadline = Date.now() + timeoutMs;
-  let observed = readJournal(workDir, name, renewOn);
+  let observed = countOf();
 
   if (waitFact.eq !== undefined && observed.named > need) {
     assert.fail(
@@ -128,7 +137,7 @@ export async function awaitNamedFact(workDir, waitFact, { timeoutMs = WAIT_FACT_
       const timer = setTimeout(finish, Math.min(remaining, FACT_WAKE_GUARD_MS));
     });
 
-    const next = readJournal(workDir, name, renewOn);
+    const next = countOf();
     if (waitFact.eq !== undefined && next.named > need) {
       assert.fail(
         `waitFact ${name} overshot eq ${need} (got ${next.named}); use gte when the producer can race past the exact count`,
@@ -406,7 +415,12 @@ export async function bindManagerLoopSequence(scenario) {
   const joinOwnedWork = () => ({ type: 'tool-call', tool: 'join', args: {} });
  // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
  // Later responses are selected by the new incarnation's audit delivery count.
+ // The audit counter tracks ONLY the main-spine Manager session: the preflow
+ // canaries (strength owner + humanroot) also consume the internal
+ // manager-reopened-loop family on their own roads, and their deliveries must
+ // not shift the main spine's iteration ladder (candidate → repair → final).
   let latestManagerAuditAttempt = 0;
+  let mainManagerSessionId = null;
   let managerAssumptionDelivered = false;
   let initialWorkJoined = false;
   let repairWorkJoined = false;
@@ -414,15 +428,25 @@ export async function bindManagerLoopSequence(scenario) {
   const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     const { entry, attempt } = selection ?? {};
+    const sessionId = context?.sessionId ?? null;
     if (entry?.id === 'manager-loop.0') {
-      latestManagerAuditAttempt = Math.max(latestManagerAuditAttempt, attempt);
-      if (attempt > 1) entry.respond = attempt === 3 ? repairAudit() : candidatePerfect();
-    } else if (entry?.turnId === 'manager-reopened-loop' && (entry.step === 0 || entry.id === 'manager-reopened-loop.0')) {
-      latestManagerAuditAttempt = Math.max(latestManagerAuditAttempt + 1, attempt ?? 1);
-      const n = latestManagerAuditAttempt;
-      if (n > 1) {
-        entry.respond = n === 3 ? repairAudit() : candidatePerfect();
+      if (mainManagerSessionId === null && typeof sessionId === 'string' && sessionId !== '') {
+        mainManagerSessionId = sessionId;
       }
+      if (sessionId === mainManagerSessionId) {
+        latestManagerAuditAttempt = Math.max(latestManagerAuditAttempt, attempt);
+        if (attempt > 1) entry.respond = attempt === 3 ? repairAudit() : candidatePerfect();
+      }
+    } else if (entry?.turnId === 'manager-reopened-loop' && (entry.step === 0 || entry.id === 'manager-reopened-loop.0')) {
+      if (sessionId === mainManagerSessionId) {
+        latestManagerAuditAttempt += 1;
+        const n = latestManagerAuditAttempt;
+        if (n > 1) {
+          entry.respond = n === 3 ? repairAudit() : candidatePerfect();
+        }
+      }
+      // Preflow canary sessions keep the declared perfect audit: their loops
+      // close Accepted on their own roads and never reach the main ladder.
     } else if (entry?.id === 'manager-loop.1') {
       entry.respond = latestManagerAuditAttempt === 1
         ? initialLoopAction
@@ -768,10 +792,14 @@ export const ADVERSITY_ORACLES = Object.freeze({
 export const HUMANROOT_MANAGER_LOOP_CANARY_PROMPT =
   'HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.';
 
+// Preflow relay-fact budget: the humanroot canary contributes two full loop
+// iterations (opening + assessment + retirement each), and the concurrent
+// strength-canary owner — also a manager session — contributes one
+// opening/assessment/retirement through its idle assess guidance.
 export const HUMANROOT_CANARY_DELTAS = Object.freeze({
-  assessments: 2,
-  retirements: 2,
-  incumbencyOpenings: 2,
+  assessments: 3,
+  retirements: 3,
+  incumbencyOpenings: 3,
 });
 
 // ── pure-loop helpers ─────────────────
@@ -928,9 +956,12 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   assert.ok(typeof sessionId === 'string' && sessionId.length > 0, `${label}: canary session id required`);
   const workDir = scenario.host.workDir;
 
-  await awaitNamedFact(workDir, waitFactShape('AssessmentCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
-  await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
-  await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  // Session-scoped counts: the preflow strength-canary owner commits relay
+  // facts on its own concurrent road, so the global journal cannot answer
+  // "how many iterations did THIS canary session open".
+  await awaitNamedFact(workDir, waitFactShape('AssessmentCommitted', { eq: 2, session: sessionId }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2, session: sessionId }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2, session: sessionId }), { timeoutMs: WAIT_FACT_WINDOW_MS });
 
  // The authority-turn family answers the initial iteration only: once the successor
  // carries the owner-controlled assess resource as its last user message, the
@@ -947,13 +978,17 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
     1,
     `${label}: authority-turn close must be delivered once (Continue retirement)`,
   );
+  // Session-scoped match counts: the concurrent strength-canary owner is also a
+  // manager session; its own idle manager-assess delivery answers the same
+  // assess-resource prose, so the global count cannot attribute the successor
+  // iteration to THIS canary session.
   assert.equal(
-    scenario.provider.matchCount('manager-reopened-loop.0'),
+    scenario.provider.matchCount('manager-reopened-loop.0', sessionId),
     1,
     `${label}: successor iteration audit must be delivered once (perfect → Accepted)`,
   );
   assert.equal(
-    scenario.provider.matchCount('manager-reopened-loop.1'),
+    scenario.provider.matchCount('manager-reopened-loop.1', sessionId),
     1,
     `${label}: successor iteration close must be delivered once (Accepted retirement)`,
   );
@@ -1008,11 +1043,12 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
 
  // Durable loop behavior: two openings (initial + one after Continue), one
  // Continue retirement followed by one Accepted; positive counts prove the loop.
-  const openings = factPayloads(workDir, 'IncumbencyOpened');
+ // Session-scoped: the concurrent strength-canary owner opens its own road.
+  const openings = factPayloadsForSession(workDir, 'IncumbencyOpened', sessionId);
   assert.equal(openings.length, 2, `${label}: canary road must open exactly two iterations (got ${openings.length})`);
   const openedIds = incumbencyIdsIn(openings);
   assert.equal(openedIds.length, 2, `${label}: iterations must carry distinct incumbencies (got ${JSON.stringify(openedIds)})`);
-  const canaryRetirements = factPayloads(workDir, 'RetirementCommitted');
+  const canaryRetirements = factPayloadsForSession(workDir, 'RetirementCommitted', sessionId);
   assert.equal(
     canaryRetirements.length,
     2,
