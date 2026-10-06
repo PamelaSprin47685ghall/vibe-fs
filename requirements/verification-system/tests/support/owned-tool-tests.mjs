@@ -1,9 +1,60 @@
 import assert from 'node:assert/strict'
+import { ChildProcess, execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { Readable } from 'node:stream'
+import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { spawnOwnedVerificationTool } from '../../../../scripts/lib/verification-owned-tool.mjs'
+import { runVerificationToolProbe } from '../../../../scripts/lib/verification-tool-probe.mjs'
+
+function liveProcessRows() {
+  return execFileSync('/bin/ps', ['-eo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8', timeout: 1000 })
+    .trim().split('\n').map(line => {
+      const fields = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
+      assert.ok(fields, `Invalid native process row: ${line}`)
+      return { pid: Number(fields[1]), parentPid: Number(fields[2]), pgid: Number(fields[3]), state: fields[4] }
+    }).filter(row => !/^[ZX]/.test(row.state))
+}
+
+function awaitMarker(marker) {
+  return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `
+import fs from 'node:fs'
+import path from 'node:path'
+const marker = process.argv[1]
+let settled = false
+const watcher = fs.watch(path.dirname(marker), check)
+const deadline = setTimeout(() => { watcher.close(); throw new Error('Actual tool did not publish its identity') }, 3000)
+function check() {
+  if (settled || !fs.existsSync(marker)) return
+  const value = fs.readFileSync(marker, 'utf8')
+  settled = true
+  clearTimeout(deadline)
+  watcher.close()
+  process.stdout.write(value)
+}
+check()
+`, marker], { encoding: 'utf8', timeout: 4000 }))
+}
+
+async function reclaimObservedProcesses(identities) {
+  for (const identity of identities) {
+    const rows = liveProcessRows()
+    const current = rows.find(row => row.pid === identity.pid)
+    if (current) {
+      assert.equal(current.pgid, identity.pgid, 'Only the actual captured process group can be reclaimed')
+      try { process.kill(-identity.pgid, 'SIGKILL') }
+      catch (error) { if (error.code !== 'ESRCH') throw error }
+    }
+  }
+  const deadline = Date.now() + 1000
+  while (liveProcessRows().some(row => identities.some(identity => row.pgid === identity.pgid))) {
+    if (Date.now() >= deadline) throw new Error('Captured native groups survived final cleanup')
+    await delay(10)
+  }
+}
 
 async function captureTool(executable, argv, options) {
   const owner = spawnOwnedVerificationTool(executable, argv, options)
@@ -15,7 +66,144 @@ async function captureTool(executable, argv, options) {
   return { ...outcome, stdout, stderr, monitorPid: owner.child.pid }
 }
 
+function registerProbeSetupFailureTest(failCleanup) {
+  test(failCleanup
+    ? 'WHAT[verification-system-006] probe consumer setup and native cleanup failure preserve both causes after actual owner settlement'
+    : 'WHAT[verification-system-006] probe consumer setup failure settles its already running native owner before rejection', {
+    skip: process.platform !== 'linux' && process.platform !== 'darwin',
+  }, async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'owned-tool-setup-'))
+    const selectedMarker = path.join(directory, 'selected.json')
+    const foreignMarker = path.join(directory, 'foreign.json')
+    const cleanupMarker = path.join(directory, 'cleanup-error.json')
+    const originalSetEncoding = Readable.prototype.setEncoding
+    const originalEmit = ChildProcess.prototype.emit
+    const setupError = new Error('Actual forwarded stream setup failed')
+    const identities = []
+    let foreign
+    let foreignClosed
+    let selected
+    let monitor
+    let monitorDrained
+    let terminal
+    let monitorClosed
+    let forwarded = false
+    try {
+      foreign = spawn(process.execPath, ['--input-type=module', '-e', `
+import fs from 'node:fs'
+fs.watch(${JSON.stringify(directory)}, () => {})
+fs.writeFileSync(${JSON.stringify(`${foreignMarker}.tmp`)}, JSON.stringify({ pid: process.pid }))
+fs.renameSync(${JSON.stringify(`${foreignMarker}.tmp`)}, ${JSON.stringify(foreignMarker)})
+`], { detached: true, stdio: 'ignore' })
+      foreignClosed = new Promise((resolve, reject) => {
+        foreign.once('close', (code, signal) => resolve({ code, signal }))
+        foreign.once('error', reject)
+      })
+      const foreignIdentity = awaitMarker(foreignMarker)
+      assert.equal(foreignIdentity.pid, foreign.pid)
+      const foreignRow = liveProcessRows().find(row => row.pid === foreign.pid)
+      assert.ok(foreignRow)
+      assert.equal(foreignRow.pgid, foreign.pid)
+      identities.push(foreignRow)
+
+      ChildProcess.prototype.emit = function (event, ...args) {
+        if (event === 'spawn' && this.spawnargs[1] === fileURLToPath(new URL('../../../../scripts/lib/verification-tool-monitor.mjs', import.meta.url))) {
+          monitor = this
+          monitorDrained = new Promise(resolve => this.once('close', resolve))
+        }
+        if (this.pid === selected?.monitorPid) {
+          if (event === 'message' && args[0]?.type === 'verification-tool-terminal') terminal = args[0]
+          if (event === 'close') monitorClosed = { code: args[0], signal: args[1] }
+        }
+        return Reflect.apply(originalEmit, this, [event, ...args])
+      }
+      Readable.prototype.setEncoding = function (...args) {
+        Reflect.apply(originalSetEncoding, this, args)
+        Readable.prototype.setEncoding = originalSetEncoding
+        forwarded = true
+        selected = awaitMarker(selectedMarker)
+        const rows = liveProcessRows()
+        const tool = rows.find(row => row.pid === selected.pid && row.parentPid === selected.monitorPid)
+        const monitorRow = rows.find(row => row.pid === selected.monitorPid && row.parentPid === process.pid)
+        assert.ok(tool, 'The selected tool is actually running before setup throws')
+        assert.ok(monitorRow, 'Its actual creation owner monitor is running before setup throws')
+        assert.equal(tool.pgid, tool.pid)
+        assert.equal(monitorRow.pgid, monitorRow.pid)
+        assert.notEqual(tool.pgid, foreignRow.pgid)
+        assert.notEqual(monitorRow.pgid, foreignRow.pgid)
+        identities.push(tool, monitorRow)
+        throw setupError
+      }
+      const program = `import fs from 'node:fs'
+fs.watch(${JSON.stringify(directory)}, () => {})
+fs.writeFileSync(${JSON.stringify(`${selectedMarker}.tmp`)}, JSON.stringify({ pid: process.pid, monitorPid: process.ppid }))
+fs.renameSync(${JSON.stringify(`${selectedMarker}.tmp`)}, ${JSON.stringify(selectedMarker)})
+`
+      const env = { ...process.env }
+      if (failCleanup) {
+        const preload = path.join(directory, 'native-cleanup-failure.mjs')
+        fs.writeFileSync(preload, `import fs from 'node:fs'
+import childProcess from 'node:child_process'
+import { syncBuiltinESMExports } from 'node:module'
+const nativeExec = childProcess.execFileSync
+childProcess.execFileSync = function (executable, argv, options) {
+  if (executable !== '/bin/ps' || argv.join(' ') !== '-eo pid=,pgid=,stat=') return Reflect.apply(nativeExec, this, [executable, argv, options])
+  try {
+    return Reflect.apply(nativeExec, this, [executable, ['-eo', 'invalid_setup_cleanup_column='], options])
+  } catch (error) {
+    fs.writeFileSync(${JSON.stringify(cleanupMarker)}, JSON.stringify({ name: error.name, message: error.message, pid: error.pid, status: error.status }))
+    throw error
+  }
+}
+syncBuiltinESMExports()
+`)
+        env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ''} --import=${preload}`.trim()
+      }
+      let rejected
+      try {
+        await runVerificationToolProbe(process.execPath, ['--input-type=module', '-e', program], { cwd: directory, env })
+      } catch (error) {
+        rejected = error
+      }
+      assert.equal(forwarded, true)
+      let terminalFailures = []
+      if (failCleanup) {
+        const nativeFailure = JSON.parse(fs.readFileSync(cleanupMarker, 'utf8'))
+        assert.ok(nativeFailure.pid > 0, 'Cleanup reached an actual native ps process')
+        assert.equal(nativeFailure.status, 1)
+        assert.match(nativeFailure.message, /invalid_setup_cleanup_column/)
+        assert.ok(rejected instanceof AggregateError)
+        assert.equal(rejected.cause, setupError)
+        assert.equal(rejected.errors.length, 2)
+        assert.equal(rejected.errors[0], setupError)
+        assert.notEqual(rejected.errors[1], setupError)
+        assert.equal(rejected.errors[1].name, nativeFailure.name)
+        assert.equal(rejected.errors[1].message, nativeFailure.message)
+        terminalFailures = [{ name: nativeFailure.name, message: nativeFailure.message }]
+      } else {
+        assert.equal(rejected, setupError, 'The original synchronous setup Error remains the public rejection')
+      }
+      const rows = liveProcessRows()
+      assert.ok(rows.some(row => row.pid === foreign.pid && row.pgid === foreignRow.pgid), 'The unrelated caller-owned process remains alive')
+      const groups = identities.filter(identity => identity.pid !== foreign.pid).map(identity => identity.pgid)
+      assert.deepEqual(rows.filter(row => groups.includes(row.pgid)), [], 'Owned tool and monitor groups must already be empty at rejection')
+      assert.deepEqual(terminal, { type: 'verification-tool-terminal', version: 1, exitCode: null, signal: 'SIGKILL', failures: terminalFailures })
+      assert.deepEqual(monitorClosed, { code: 0, signal: null })
+    } finally {
+      Readable.prototype.setEncoding = originalSetEncoding
+      ChildProcess.prototype.emit = originalEmit
+      if (monitor && monitor.exitCode === null && monitor.signalCode === null) monitor.stdin.destroy()
+      if (foreign && foreign.exitCode === null && foreign.signalCode === null && !identities.some(identity => identity.pid === foreign.pid)) foreign.kill('SIGKILL')
+      await reclaimObservedProcesses(identities)
+      if (monitorDrained) await monitorDrained
+      if (foreignClosed) await foreignClosed
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
 export function registerOwnedToolTests() {
+  for (const failCleanup of [false, true]) registerProbeSetupFailureTest(failCleanup)
   test('WHAT[verification-system-006] owned tool monitoring preserves actual terminals and rejects missing control evidence', {
     skip: process.platform !== 'linux' && process.platform !== 'darwin',
   }, async t => {
