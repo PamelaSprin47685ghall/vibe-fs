@@ -193,7 +193,7 @@ flow = [
   # the root session idle strictly after that baseline.
   { armIdle = { id = "orch.2" } },
   { armIdle = { id = "engineer.2" } },
-  { armIdle = { id = "manager-interrupt.0" } },
+  { armIdle = { id = "continue.1" } },
 
   # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
   # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
@@ -228,10 +228,10 @@ flow = [
   # event before injecting the external user message, or the wake is correctly dropped.
   { custom = "awaitManagerJoinRunning" },
   { prompt = { agent = "manager", text = "Interrupt the active join.", releaseHeldChildAfterAccepted = true }, session = "child", timeoutMs = 60000 },
-  { wait = "manager-interrupt.0", timeoutMs = 60000 },
+  { wait = "continue.1", timeoutMs = 60000 },
   { wait = "engineer.2", timeoutMs = 60000 },
   { awaitIdle = { after = "engineer.2" }, timeoutMs = 60000 },
-  { awaitIdle = { after = "manager-interrupt.0" }, timeoutMs = 60000 },
+  { awaitIdle = { after = "continue.1" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
 
   # Bounded current-action cursors are verified by durable retirement and the
