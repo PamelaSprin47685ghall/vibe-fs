@@ -412,7 +412,13 @@ export const acceptAuthorityRoot = async (runtime, sessionId, agent, physicalMes
  * active run. The dispatch lands on its own physical message id, distinct
  * from the transform frontier user message, mirroring 017 where root,
  * dispatch and transform identities stay separate. Call the returned
- * `dispose` (e.g. via t.after) when the owning test ends.
+ * `dispose` (e.g. via t.after) when the owning test ends: it first releases
+ * the live flight through `releaseCurrentRequest` (the canonical
+ * exact-requestId release entry, PluginScope.fs) and then disposes the
+ * scope. Surface `dispose` alone only drains scope episodes and by design
+ * never touches the process-shared BloggerFlights registry, so skipping the
+ * release would leave the flight live and let step 11 project the canonical
+ * view over the wire frontier (the 015 R-series zero-injection root cause).
  */
 export const claimBloggerRequest = async ({
   runtime,
@@ -430,6 +436,18 @@ export const claimBloggerRequest = async ({
     bloggerRuntimeSurface.dispose(scope)
     throw new Error(`claimCurrentRequest(${bloggerSession}, ${requestId}) returned ${claim}`)
   }
+  const dispose = () => {
+    // releaseCurrentRequest is the canonical flight release entry (exact
+    // requestId match, PluginScope.fs); surface dispose only drains scope
+    // episodes (parked/pendingOffer) and by design never wipes the
+    // process-shared BloggerFlights registry, so skipping the release would
+    // leave the live flight replacing the wire frontier at step 11.
+    const release = bloggerRuntimeSurface.releaseCurrentRequest(scope, bloggerSession, requestId)
+    if (release !== 'Released') {
+      throw new Error(`releaseCurrentRequest(${bloggerSession}, ${requestId}) returned ${release}`)
+    }
+    bloggerRuntimeSurface.dispose(scope)
+  }
   try {
     const promptKey = await bloggerOwnership.ownRequest({
       handle: runtime.journal,
@@ -440,8 +458,11 @@ export const claimBloggerRequest = async ({
       request,
       physical: dispatchPhysical,
     })
-    return { scope, request, promptKey, dispose: () => bloggerRuntimeSurface.dispose(scope) }
+    return { scope, request, promptKey, dispose }
   } catch (error) {
+    // Failure-path cleanup is best effort: the original error stays the
+    // reported failure, so an unexpected release outcome is not re-thrown.
+    bloggerRuntimeSurface.releaseCurrentRequest(scope, bloggerSession, requestId)
     bloggerRuntimeSurface.dispose(scope)
     throw error
   }
