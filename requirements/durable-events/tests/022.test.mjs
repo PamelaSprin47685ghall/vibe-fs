@@ -442,3 +442,98 @@ integrationTest('WHAT[durable-events-022] real Fable compiles the journal observ
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
+
+integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile excludes full Host admission and preserves its private witness owner', async (t) => {
+  const { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname, relative } = await import('node:path')
+  const { materializeOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-snapshot-boundary-'))
+  const copies = []
+  const sourceDigests = new Map()
+
+  const SNAPSHOT_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.OpenCode',
+    'module ProbeSnapshotConsumer =',
+    '    let read (port: ISessionSnapshotPort) (session: SessionId) =',
+    '        port.GetMessages(session)',
+    '',
+  ].join('\n')
+
+  const HOST_ACCEPTANCE_PROBE = [
+    'namespace Wanxiangshu.Probe',
+    'open Wanxiangshu.OpenCode',
+    'open Wanxiangshu.Execution.Session.ChatExecution',
+    'module ProbeHostAcceptance =',
+    '    let retire (port: IExternalInputSupersessionPort)',
+    '               (prior: ChatExecutionKey)',
+    '               (replacement: ManagedChatAcceptanceWitness) =',
+    '        port.InterruptSupersededAttempt(prior, replacement)',
+    '',
+  ].join('\n')
+
+  const digestOf = (file) => ({
+    hash: createHash('sha256').update(readFileSync(file)).digest('hex'),
+    mtime: statSync(file).mtimeMs,
+  })
+
+  const compileProbe = async (shard, probeSource) => {
+    const { project, plan } = planShard(shard)
+    const copyRoot = mkdtempSync(join(tmpdir(), 'wxs-snapshot-input-'))
+    copies.push(copyRoot)
+    const items = plan.compileItems.map((file) => {
+      if (!sourceDigests.has(file)) sourceDigests.set(file, digestOf(file))
+      const destination = join(copyRoot, 'src', relative(SOURCE_ROOT, file))
+      mkdirSync(dirname(destination), { recursive: true })
+      cpSync(file, destination)
+      return destination
+    })
+    const probe = join(copyRoot, 'probe.fs')
+    writeFileSync(probe, probeSource)
+    const isolatedPlan = { ...plan, compileItems: [...items, probe] }
+    const flat = materializeOwnerCompile(isolatedPlan, { scratchRoot })
+    const flatXml = readFileSync(flat.projectPath, 'utf8')
+    assert.ok(!flatXml.includes('<ProjectReference'), `${shard} must compile one flat project`)
+    assert.equal((flatXml.match(/<Compile Include=/g) ?? []).length, isolatedPlan.compileItems.length)
+    return compileOwnerProject({
+      projectPath: project.projectPath,
+      aggregatePath: null,
+      scratchRoot,
+      stdio: 'pipe',
+      compilePlan: isolatedPlan,
+    })
+  }
+
+  try {
+    await t.test('WHAT[durable-events-022] full Host contract compiles with the original private acceptance witness', async () => {
+      const result = await compileProbe('host-session-contract', HOST_ACCEPTANCE_PROBE)
+      assert.equal(result.ok, true, `the full Host owner must retain its real acceptance witness\n${result.stdout}\n${result.stderr}`)
+    })
+
+    await t.test('WHAT[durable-events-022] actual recovery compiles with only its Snapshot read capability', async () => {
+      const result = await compileProbe('delegation-recovery-runtime', SNAPSHOT_PROBE)
+      assert.equal(result.ok, true, `actual recovery must retain the Snapshot read capability\n${result.stdout}\n${result.stderr}`)
+    })
+
+    await t.test('WHAT[durable-events-022] actual recovery rejects the identical full Host acceptance probe', async () => {
+      const result = await compileProbe('delegation-recovery-runtime', HOST_ACCEPTANCE_PROBE)
+      assert.equal(result.ok, false, 'the identical full Host acceptance probe must fail in the actual recovery closure')
+      const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
+      assert.match(rejection, /IExternalInputSupersessionPort|ManagedChatAcceptanceWitness|ChatExecution/)
+      assert.match(rejection, /is not defined/, 'the real boundary must reject the Host symbol, not probe syntax or the toolchain')
+    })
+
+    await t.test('WHAT[durable-events-022] standalone Snapshot contract compiles its real read capability', async () => {
+      const result = await compileProbe('host-session-snapshot-contract', SNAPSHOT_PROBE)
+      assert.equal(result.ok, true, `the standalone Snapshot contract must compile without full Host admission\n${result.stdout}\n${result.stderr}`)
+    })
+  } finally {
+    for (const copyRoot of copies) rmSync(copyRoot, { recursive: true, force: true })
+    rmSync(scratchRoot, { recursive: true, force: true })
+    for (const [file, digest] of sourceDigests) {
+      assert.deepEqual(digestOf(file), digest, `${file} must retain its original bytes and mtime`)
+    }
+  }
+})

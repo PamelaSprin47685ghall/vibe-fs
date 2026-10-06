@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -9,6 +9,8 @@ import { integrationTest } from '../../verification-system/tests/support/tier-ga
 import * as grounding from '../../../dist/Requirement/Grounding/Surface.js'
 import * as host from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
+import * as retention from '../../../dist/Persistence/EventStore/RetentionSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-delivery-'))
@@ -410,11 +412,15 @@ test('WHAT[requirement-grounding-006] historical material observations retain th
       .split('\n').filter(Boolean).map(JSON.parse)
     assert.equal(legacy[1].payload.Fact[1][1][0], 'RequirementGroundingMaterialObserved')
     legacy[1].payload.Fact[1][1][1].Observation.Workspace = realpathSync(dir)
-    const events = join(dir, 'wanxiang', 'events')
-    mkdirSync(events, { recursive: true })
     const frozen = legacy.map(JSON.stringify).join('\n') + '\n'
-    const writerFile = join(events, 'legacy-writer.ndjson')
-    writeFileSync(writerFile, frozen)
+    const historicalEvents = legacy.map(event => {
+      const decoded = eventCodec.decode(JSON.stringify(event) + '\n')
+      assert.equal(decoded.ok, true, JSON.stringify(decoded.error))
+      return decoded.event
+    })
+    const writerId = randomUUID()
+    const writerFile = join(dir, 'wanxiang', 'events', writerId + '.ndjson')
+    assert.equal(existsSync(writerFile), false, 'this process creates a new physical fixture writer')
     const activity = {
       id: 'd'.repeat(40),
       stream: 'grounding-fixture/activity',
@@ -423,10 +429,14 @@ test('WHAT[requirement-grounding-006] historical material observations retain th
       payload: {},
       payloadRefs: [],
     }
-    // This isolated fixture owns the writer. A real non-Journal append keeps its
-    // complete historical prefix retained under durable-convergence-011.
-    const writer = eventStore.create(dir, 'legacy-writer')
+    // The current fixture owns this fresh writer; it never resumes the sealed old producer.
+    const writer = eventStore.create(dir, writerId)
     try {
+      const appendedHistory = await eventStore.append(writer, historicalEvents)
+      assert.equal(appendedHistory.ok, true, JSON.stringify(appendedHistory.error))
+      assert.deepEqual(appendedHistory.cuts, [])
+      assert.deepEqual(readFileSync(writerFile), Buffer.from(frozen))
+      for (const event of historicalEvents) assert.deepEqual(eventStore.read(writer, event.id), event)
       const appended = await eventStore.append(writer, [activity])
       assert.equal(appended.ok, true, JSON.stringify(appended.error))
       assert.deepEqual(appended.cuts, [])
@@ -442,6 +452,7 @@ test('WHAT[requirement-grounding-006] historical material observations retain th
     assert.equal(tail.length, 1)
     assert.equal(tail[0].event_id, activity.id)
     assert.equal(tail[0].event_type, activity.type)
+    assert.deepEqual(retention.retainedWriterIdsAt(dir, Date.now()), [writerId], 'cold boot receives a nonempty retained historical fixture')
     opened = await host.createJournal(dir)
     assert.equal(opened.ok, true, opened.error)
     assert.equal(host.groundedIdentities(opened.journal, 'legacy').length, 1)

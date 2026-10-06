@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as host from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
+import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as retention from '../../../dist/Persistence/EventStore/RetentionSurface.js'
 
 const originalWhat = '\uFEFFwhat-v1\r\n\rbare CR\0中文 😀  \r\nlast  '
 const originalCarrier = body => `${body}\n\nrequirement_source_path = "requirements/alpha/WHAT.md"\n`
@@ -34,16 +38,47 @@ test('WHAT[requirement-grounding-012] a legacy inline carrier is restored verbat
   try {
     const receipt = JSON.parse(readFileSync(new URL('./support/012-legacy-cursor-receipt.json', import.meta.url), 'utf8'))
     assert.equal(existsSync(receipt.originalWorkspace), false, 'the actual old producer workspace has been removed')
-    const events = join(dir, 'wanxiang', 'events')
-    mkdirSync(events, { recursive: true })
-    writeFileSync(join(events, 'legacy.ndjson'), readFileSync(new URL('./support/012-legacy-cursor-occurrence.ndjson', import.meta.url)))
+    const historicalBytes = readFileSync(new URL('./support/012-legacy-cursor-occurrence.ndjson', import.meta.url))
+    const historicalEvents = historicalBytes.toString('utf8').trimEnd().split('\n').map(line => {
+      const decoded = eventCodec.decode(line + '\n')
+      assert.equal(decoded.ok, true, JSON.stringify(decoded.error))
+      return decoded.event
+    })
+    assert.equal(historicalEvents.length, 3)
+    const writerId = randomUUID()
+    const writerFile = join(dir, 'wanxiang', 'events', writerId + '.ndjson')
+    assert.equal(existsSync(writerFile), false, 'this process creates a new physical fixture writer')
+    const activity = { id: randomUUID(), stream: 'grounding-fixture/activity', type: 'JobRequested', parents: [], payload: {}, payloadRefs: [] }
+    const writer = eventStore.create(dir, writerId)
+    try {
+      // The current fixture owns this fresh writer; it never resumes the sealed old producer.
+      const appendedHistory = await eventStore.append(writer, historicalEvents)
+      assert.equal(appendedHistory.ok, true, JSON.stringify(appendedHistory.error))
+      assert.deepEqual(appendedHistory.cuts, [])
+      assert.deepEqual(readFileSync(writerFile), historicalBytes, 'the real append preserves the actual old canonical bytes')
+      for (const event of historicalEvents) assert.deepEqual(eventStore.read(writer, event.id), event)
+      const appendedActivity = await eventStore.append(writer, [activity])
+      assert.equal(appendedActivity.ok, true, JSON.stringify(appendedActivity.error))
+      assert.deepEqual(appendedActivity.cuts, [])
+      assert.deepEqual(eventStore.read(writer, activity.id), activity)
+      assert.equal(eventStore.head(writer, activity.stream), activity.id)
+    } finally {
+      eventStore.dispose(writer)
+    }
+    const retained = readFileSync(writerFile)
+    assert.deepEqual(retained.subarray(0, historicalBytes.length), historicalBytes)
+    assert.equal(retained.subarray(historicalBytes.length).toString('utf8'), eventCodec.encode(activity), 'only the current owner activity extends the old bytes')
+    assert.deepEqual(retention.retainedWriterIdsAt(dir, Date.now()), [writerId], 'cold boot receives a nonempty retained historical fixture')
     rmSync(join(dir, 'requirements', 'alpha', 'WHAT.md'))
     opened = await host.createJournal(dir)
+    assert.equal(opened.ok, true, opened.error)
+    assert.equal(host.groundedIdentities(opened.journal, receipt.sessionID).length, 1)
     const replay = await host.projectWithJournal(opened.journal, receipt.sessionID, receipt.raw)
     assert.equal(replay.ok, true)
     assert.deepEqual(replay.value, receipt.projected, 'the actual old producer carrier survives the real codec and cold replay unchanged')
     assert.ok(replay.value[0].parts[0].state.output.includes(host.cursorSeparator + '# genuine-old-body'))
     assert.equal(replay.value[0].parts[0].state.output.includes(originalCarrier(receipt.originalBody)), false, 'old facts are not upgraded to the new carrier')
+    assert.deepEqual(readFileSync(writerFile), retained, 'cold replay never modifies the closed fixture writer')
   } finally {
     if (opened) host.disposeJournal(opened.journal)
     cleanup()

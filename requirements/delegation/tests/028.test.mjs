@@ -143,6 +143,21 @@ test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and re
   }
 })
 
+test('WHAT[delegation-028] recovery Snapshot consumer excludes full Host admission capabilities', () => {
+  const { sources } = inspectShard('delegation-recovery-runtime')
+  assert.ok(sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
+  assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'))
+  for (const forbidden of [
+    'OpenCode/Host/SessionContract.fs',
+    'OpenCode/Host/SessionHostPort.fs',
+    'OpenCode/Host/SessionRuntimeOwner.fs',
+    'Execution/Session/ChatExecution/Acceptance.fs',
+    'Execution/Session/ChatExecution/Settlement.fs',
+  ]) {
+    assert.ok(!sources.includes(forbidden), `Snapshot recovery closure must not contain ${forbidden}`)
+  }
+})
+
 test('WHAT[delegation-028] current compile plans meet declared budgets and source-placement audit', () => {
   // W5 cutover: the aggregate fsproj is gone. Count total .fs from the
   // compile-order manifest — the canonical declaration of what the build

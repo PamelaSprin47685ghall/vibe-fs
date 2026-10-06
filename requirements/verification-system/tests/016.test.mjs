@@ -10,6 +10,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { Header } from 'tar'
 import { createNpmInstallFixture } from './support/npm-install-fixture.mjs'
+import { registerNpmInstallSetupTests } from './support/npm-install-setup-tests.mjs'
 import { registerNodeToolCandidateTests } from './support/node-tool-candidate-tests.mjs'
 import { createAbortedNpmAdmissionFixture, registerNpmToolArchiveTests } from './support/npm-tool-archive-tests.mjs'
 import { assertParentReplacementInvalidatesVerification } from './support/parent-replacement.mjs'
@@ -31,6 +32,7 @@ registerReadonlyInputTests()
 registerArchiveNamespaceTests()
 registerNodeToolCandidateTests()
 registerNpmToolArchiveTests()
+registerNpmInstallSetupTests()
 registerDotnetSdkTests()
 registerDotnetToolRestoreTests()
 registerNugetProjectTests()

@@ -102,35 +102,6 @@ function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
       failure ??= { error: signal.reason }
       owned.stop()
     }
-    signal?.addEventListener('abort', abort, { once: true })
-    if (signal?.aborted) abort()
-    child.on('error', error => { failure ??= { error } })
-    child.stdout.setEncoding('utf8').on('data', chunk => {
-      stdout = (stdout + chunk).slice(-65536)
-      try {
-        output?.write(chunk)
-      } catch (error) {
-        failure ??= { error }
-        owned.stop()
-      }
-    })
-    child.stdout.on('error', error => {
-      failure ??= { error }
-      owned.stop()
-    })
-    child.stderr.setEncoding('utf8').on('data', chunk => {
-      stderr = (stderr + chunk).slice(-65536)
-      try {
-        output?.write(chunk)
-      } catch (error) {
-        failure ??= { error }
-        owned.stop()
-      }
-    })
-    child.stderr.on('error', error => {
-      failure ??= { error }
-      owned.stop()
-    })
     const complete = ({ exitCode, signal: exitSignal, failure: cleanupFailure }) => {
       signal?.removeEventListener('abort', abort)
       if (failure) {
@@ -145,6 +116,40 @@ function runBootstrap(nodeExecutable, argv, { cwd, env, signal, output }) {
       exitCode: null, signal: null,
       failure: new Error('Owned npm completion failed', { cause: error }),
     }))
+    try {
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) abort()
+      child.on('error', error => { failure ??= { error } })
+      child.stdout.setEncoding('utf8').on('data', chunk => {
+        stdout = (stdout + chunk).slice(-65536)
+        try {
+          output?.write(chunk)
+        } catch (error) {
+          failure ??= { error }
+          owned.stop()
+        }
+      })
+      child.stdout.on('error', error => {
+        failure ??= { error }
+        owned.stop()
+      })
+      child.stderr.setEncoding('utf8').on('data', chunk => {
+        stderr = (stderr + chunk).slice(-65536)
+        try {
+          output?.write(chunk)
+        } catch (error) {
+          failure ??= { error }
+          owned.stop()
+        }
+      })
+      child.stderr.on('error', error => {
+        failure ??= { error }
+        owned.stop()
+      })
+    } catch (error) {
+      failure ??= { error }
+      owned.stop()
+    }
   })
 }
 
