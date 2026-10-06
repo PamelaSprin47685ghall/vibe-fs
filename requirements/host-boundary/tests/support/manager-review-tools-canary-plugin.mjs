@@ -11,7 +11,9 @@
  *   - schema decoration with contract (type, enum, required)
  *   - before: args reference identity and unchanged business arguments
  *   - after: original argument values, object identity and key order
- *   - 3 terminal states: normal, executor throw (missing file), cancellation (long task + abort)
+ *   - 4 terminal states: normal, business error (missing file), executor
+ *     rejection (T180: wrapped executor rejects before running), cancellation
+ *     (long task + abort)
  *   - durable ToolPart in Host message store preserving contract input
  */
 
@@ -36,6 +38,8 @@ const productionPluginPath =
   || process.env.WANXIANGSHU_E2E_MAGIC_TODO_HOST_CANARY_PLUGIN
   || (fs.existsSync(defaultProductionPluginPath) ? defaultProductionPluginPath : null);
 
+const EXECUTOR_THROW_SENTINEL = 'T180-EXECUTOR-THROW-SENTINEL';
+const EXECUTOR_THROW_MESSAGE = 'T180-EXECUTOR-THROW: intentional executor rejection';
 const REVIEW_TOOLS = Object.freeze(['js-manager']);
 const CONTROL_TOOLS = Object.freeze(['read', 'grep', 'glob', 'js-engineer', 'js-devops']);
 
@@ -127,6 +131,30 @@ export default {
 
     return {
       ...hooks,
+
+      tool: {
+        ...(hooks.tool ?? {}),
+        'js-manager': {
+          ...(hooks.tool?.['js-manager'] ?? {}),
+          // T180 executorThrow canary: when the provider-authored program
+          // carries the throw sentinel, this wrapper rejects before the real
+          // executor runs. before/after stay production-owned so the canary
+          // observes exactly what the Host does around a rejecting executor.
+          execute: async (args, context) => {
+            if (typeof args?.program === 'string' && args.program.includes(EXECUTOR_THROW_SENTINEL)) {
+              await emit('tool.executor.throwing', {
+                sessionID: context?.sessionID ?? context?.session?.sessionID ?? null,
+                callID: context?.callID ?? null,
+                contractInArgs: args !== null && typeof args === 'object' && 'contract' in args,
+                message: EXECUTOR_THROW_MESSAGE,
+              });
+              throw new Error(EXECUTOR_THROW_MESSAGE);
+            }
+            const originalExecutor = hooks.tool?.['js-manager']?.execute;
+            return await originalExecutor.call(hooks.tool?.['js-manager'], args, context);
+          },
+        },
+      },
 
       'chat.message': async (hookInput, hookOutput) => {
         const value = { sessionID: hookInput?.sessionID, messageID: hookInput?.messageID ?? hookOutput?.message?.id };

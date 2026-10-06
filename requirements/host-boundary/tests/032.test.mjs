@@ -1476,7 +1476,31 @@ test('WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidde
   }
 })
 
-test.todo('WHAT[host-boundary-032] installed Host executor exception restores original arguments without a manually invoked after callback')
+// T180 probe conclusion (installed OpenCode 1.18.29, real three-round
+// observation): when a tool executor rejects (js-manager execute wrapped to
+// reject), the Host never invokes tool.execute.after (observed sequence:
+// before.observed → executor.throwing → sessionIdle, after absent for the
+// whole 25s window). The Host materializes the exception as a durable tool
+// part with terminal status="error" and state.error carrying the rejection
+// text, with no session.error and no process crash; the turn settles
+// normally. Three-layer picture: the durable layer keeps the original input
+// (contract intact — the Host persistence layer and the plugin-side in-memory
+// args are not the same reference); the follow-up wire request keeps the
+// original tool_call arguments (contract intact); the in-memory args object
+// stays stripped and is never restored (the C44 same-source restore contract
+// is absent on this path — a Host physical boundary: WHAT[018] forbids
+// patching the Host, and with after never invoked there is no remaining
+// consumer of the stripped object). The WHAT[host-boundary-019] executorThrow
+// canary scenario (run-manager-review-tools-canary.mjs) contracts this
+// boundary: (a) after is not invoked, (b) the durable part terminal state is
+// status=error with the rejection text, (c) the follow-up wire request
+// preserves the contract in tool_call arguments. A future Host that starts
+// invoking after on the throw path turns that canary red and reopens this
+// record. This stays a todo rather than a formal case because every
+// automatable assertion already lives in the canary; the remaining narrow
+// face (C44 in-memory restore absent on the throw path) cannot be made green
+// from the plugin side and is kept here as the T180 record anchor.
+test.todo('WHAT[host-boundary-032] installed Host executor throw path: after not invoked, durable error materialized, wire contract preserved (Host physical boundary contracted by the WHAT[019] executorThrow canary; narrow face: C44 in-memory restore absent on the throw path)')
 
 test('WHAT[host-boundary-032] C47_interrupted_field_deletion_restores_arguments_and_rethrows_the_original_error', async () => {
   setPredictorState('configured')
@@ -1623,6 +1647,43 @@ integrationTest(
     }
     assert.equal(stdoutSummary.calls.cancellation.providerHistoryObserved, true)
     assert.equal(stdoutSummary.calls.executorError.failureOutputObserved, true)
+    // T180 executorThrow (WHAT[019] Host boundary canary): on the executor
+    // rejection path the installed Host must not invoke after, must
+    // materialize the durable tool part as status=error carrying the
+    // rejection text, and the follow-up wire request must preserve the
+    // review contract in tool_call arguments. Red here means the Host
+    // boundary changed — re-evaluate the T180 todo record above.
+    assert.equal(
+      stdoutSummary.calls.executorThrow.afterInvoked,
+      false,
+      'executorThrow: Host must not invoke tool.execute.after on the executor rejection path',
+    )
+    assert.equal(stdoutSummary.calls.executorThrow.executorRejected, true)
+    assert.equal(
+      stdoutSummary.calls.executorThrow.status,
+      'error',
+      'executorThrow: durable tool part must materialize status error',
+    )
+    assert.equal(
+      stdoutSummary.calls.executorThrow.durableErrorCarriesRejection,
+      true,
+      'executorThrow: durable error must carry the executor rejection text',
+    )
+    assert.equal(
+      stdoutSummary.calls.executorThrow.durableInputRetainsContract,
+      true,
+      'executorThrow: durable input must retain the review contract',
+    )
+    assert.equal(
+      stdoutSummary.calls.executorThrow.wireHistoryPreservesContract,
+      true,
+      'executorThrow: follow-up wire tool_call arguments must preserve the review contract',
+    )
+    assert.equal(
+      stdoutSummary.calls.executorThrow.inMemoryArgsStripped,
+      true,
+      'executorThrow: in-memory args stay stripped on the throw path (C44 restore absent, Host boundary)',
+    )
   },
 )
 
