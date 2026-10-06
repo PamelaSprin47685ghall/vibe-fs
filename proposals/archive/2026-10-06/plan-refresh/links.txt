@@ -1,0 +1,3 @@
+Changed Markdown files: 9
+Local link targets checked: 984
+Missing: []

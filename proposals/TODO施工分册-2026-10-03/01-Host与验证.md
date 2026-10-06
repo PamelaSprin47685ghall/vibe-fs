@@ -1,6 +1,8 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-06 最新N00证据见[a15原始CI](../archive/2026-10-05/baselines/a15-ci/receipt.txt)：实际merge08ba7bb7，原300秒/双worker下794/821排空、006/011活动、25排队，无权威summary；format/check/build通过，outer group3076 accepted=true、10.290ms。006准入仅余13.802秒，011仅余0.076秒；没有内部工具phase证据，不宣称每个工具已回收。与6b共同794文件成本增163.730 worker-seconds，790项变慢、中位比1.403，D1三文件合计仅增1.646秒。输入及host不同，缺CPU/IO因果，下一步先分析全局实际执行成本，不删测试或扩预算。[6b完整821/821、4577/0仅pending](../archive/2026-10-05/baselines/6b-ci/receipt.txt)仍是该输入的证书；其016完整67.209秒/201工具回收不代替本次截断。下方历史超时与旧“下一步”不得盖过总计划当前顺序。
+2026-10-06最新N00证据见[ccfc原始CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)：实际merge67c80a46，原300秒/双worker下821/821排空、4585pass/0fail、119skip/390TODO，296.38秒wall；format/check/build通过，outer group2817 accepted=true、8.676ms。unit约297秒退出1仅pending，没有本次outer超时。016占用68.604秒，201个工具各有完整关闭/排空身份；三项新Darwin native在Linux unit均skip。M0审计完成；接续总计划N00-M1—M3的worker/transport/tool成本诊断、因果隔离和有限优化，不把墙钟减CPU叫IO，也不改预算或worker。
+
+历史[a15](../archive/2026-10-05/baselines/a15-ci/receipt.txt)仍是794/821、006/011活动、25排队、无summary的真实截断；[6b](../archive/2026-10-05/baselines/6b-ci/receipt.txt)仍是821/821、4577/0仅pending。ccfc较a15共同794项减145.632 worker-seconds，较6b完整821项增19.939；host和输入不同，无CPU/IO因果，不因新排空宣布吞吐稳定或抹掉旧失败。下方旧“下一步”不得盖过总计划当前队列。
 
 N04-C3只补现有scope的独立消费者失败证明：真实exit73后action正常返回仍拒绝，Error/null精确AggregateError；两份受控变异有效，生产helper恢复原SHA256。[执行契约的新接续](../N04真实只读Fable执行契约-2026-10-05.md)要求先调查FD/backing/祖先路径ABA的实际强制能力，再做暂停consumer的mounted路径矩阵及foreign资源拒绝；最终小物理、正式unit与各项证明分别记账。N04-C/N08/T418/T419和GAP-055仍未闭合。
 

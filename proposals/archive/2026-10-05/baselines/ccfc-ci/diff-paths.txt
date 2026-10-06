@@ -1,0 +1,2 @@
+requirements/verification-system/tests/README.md
+requirements/verification-system/tests/support/readonly-input-tests.mjs

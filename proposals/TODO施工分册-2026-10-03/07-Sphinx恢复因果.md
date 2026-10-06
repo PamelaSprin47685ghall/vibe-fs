@@ -68,7 +68,7 @@ terminal 判断最终只认该 call 的实际 accepted attempts 和已接受 roo
 
 原 SendClaimedContinuation 和 SendAgentOwnerRootCore 只在 `AwaitMode.Await, Some callback` 时注册，Detached 的 callback 被忽略。D0 已把 register 与 confirmation waiter 分开：Some callback 在两种模式都于 Host 调用前注册，waiter 仍仅属于 Await root；实际通知点仍由 canonical managed acceptance 持久成功后拥有。gen157 六个真实业务红、gen159 八个新用例及相关238文件复绿证明这个有限能力。不要重复施工此条件。
 
-D0 证明 SDK 未决时早返回、OwnedSettled 不构成落地、Unknown 保 Pending 后实际接纳通知，以及既有明确 Refused 后原 key 拒绝晚接纳；不证明 SDK 分类、回调抛错、取消、Dispose 或内存 subscription 释放。尤其 `PhysicalAcceptance.accepted` 先移除 callback/waiter 再调用 callback：若 callback 抛错，Await waiter 后续结算可能丢失。这是相邻源码线索，未取得正式反例，D0 没有增加吞错或 fatal 政策。
+D0证明SDK未决时早返回、OwnedSettled不构成落地、Unknown保Pending后实际接纳通知，以及明确Refused后原key拒绝晚接纳。其后D1已用正式业务红灯修复共享waiter timeout和callback抛错阻止等待者结算；最终gen166相关238/238、1186/0。callback原异常传播，finally仍结算真实Accepted。SDK分类、registration lease、call来源及其Dispose仍未证；不要按本节旧线索重做D1。
 
 具体 call 接线前先冻结观察资源合同。现 register 返回 unit、每 key 单 callback，journal Dispose 不释放它；call 完成后捕获旧对象可避免污染新 call，但不能据此宣称资源已释放。若扩展已有 registration lease，释放须核对同一个 registration 的所有权，只解除本地观察，不将 Unknown 写成 Abandoned，也不取消其它 owner 的等待。不要另造执行 registry 或恢复状态机；正式取消/释放反例按实际合同补齐后单独结算。
 
@@ -90,7 +90,7 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 
 现 SyncDelegateSurface.dispatchRetryAttempt 只 `Readiness.Mark(child, "provider-retry-attempt")`，scriptRetry 只脚本化 decorator verdict。这两个入口没有 retry Claimed / Submitted / PhysicalAccepted，没有新 retry physical，不能拿它们证明 A2。
 
-现 Harness 已保存构造实际 Runtime 的原 dispatcher，且 SessionPort 保存 prompt native metadata 的 actual PromptKey。这些资源足够扩展一个有限 facade：走实际 producer/send owner，再由实际 dispatcher 接受 retry/repair/guard physical。禁止直接塞 AcceptedContinuationIds 或伪造 observed terminal。
+现Harness保存原dispatcher，SessionPort捕获actual PromptKey，但还不足以直接扩展出合法恢复链：真实PluginBloggerScope、隔离ModelRouting配置、与生产同一shared stop fence仍须装配。按第11节R0复用原owner，不复制恢复判断；先走实际producer/send，再由原dispatcher接纳真实physical。禁止直接塞AcceptedContinuationIds或伪造observed terminal。
 
 建议先在 delegation 的 025 正式文件增加因果用例；若接手时另一个 owner 仍修改025，由一个 owner 手工合并。031只放它自己要求的 frontier/单次交付证明。每个 NNN 文件的测试标题必须且只能使用对应唯一 WHAT 锚点；跨条款关系写 README 和本卡，不在一个标题并列025/031。D0 gen158 的 requirement-system/017 正式失败已证明这一门禁，随后只改标题复绿，业务断言未动。测试名称直接描述旧 successor 与新 work，不声称覆盖整个 requirement。
 
@@ -124,11 +124,11 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 
 目前未发现一个现成统一 owner 接口能无修改地解决三个 producer。共同底层 SendContinuationWithDigestAttempt 已有 actual acceptance callback，但上游有上表的 source 丢失和 wrapper 丢失；必须修这些因果交接。
 
-## 8. 可原子推进的实施顺序
+## 8. 当前实施顺序摘要（以第11节详细接手卡为准）
 
-1. D0 已完成，不重复改 Detached 注册条件。先冻结具体 call observer、source key、successor evidence 与本地观察资源释放合同；核对当前 active WHAT023/025/026/031、dispatch physical acceptance 和 guard exact-run 规则。不得新增 retry 预算或 rank 等政策。
-2. 手工增加窄 public fixture，证明它真的产生 Claimed→Submitted→PhysicalAccepted、原 PromptKey 和不同 physical。写上述 business red，旧业务实现下正式失败；保存 build generation、freshness 和排空证据。
-3. 增加 call 本地 accepted attempts 和 exact source 绑定；同步三个 producer 的 observer 交接，包括 Detached、AlreadyAdmitted/Pending 和晚 callback。删除 root+kind 推定分支。
+1. D0/D1已完成有限验收。先做R0，补同owner/config/shared fence的真实恢复夹具，取得合法successor正控，再取得第6节归属业务红灯；保存generation、freshness及排空证据。缺API/配置不是业务红。
+2. R1由一人冻结具体call observer、source key、successor evidence与本地registration lease合同；核对active WHAT023/025/026/031及guard exact-run规则，迁移Send和Fork真实调用方，不新增retry预算或rank政策。
+3. R2在合同冻结后接三个producer，包括Detached、AlreadyAdmitted/Pending和晚callback。每路完整正反矩阵成立后才删除root+kind推定分支，不能以只认initial physical取绿。
 4. 跑 delegation 对应 023/025/031 与实际新增跨包边界的 dispatch、interaction repair、degeneration guard 定向套件。保持 runner 原预算，不通过放大 timeout/改变 worker 数掩盖问题。
 5. 更新施工计划：只标 A2 矩阵证明的范围。Host 接线、真实 provider 端到端、所有恢复/取消/冷恢复的总体 TODO 仍按实际剩余边界记录。提交前确认没有 draft 或额外生成物进入仓库。
 
@@ -148,14 +148,14 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 - src/Wanxiangshu/Interaction/Authority/Model.fs、Run.fs、ProjectionQueries.fs（actual accepted landing）
 - src/Wanxiangshu/OpenCode/Host/ModelRouting.fs（exact run lookup 的所有权与清理边界）
 
-最初记录于2026-10-05 gen152冻结期间；D0在gen159有限验收。下一批按这里冻结归属与资源合同、取得真正 successor 的业务红灯，再实施三类 producer 的因果交接。
+最初记录于2026-10-05 gen152冻结期间；D0在gen159、D1在gen166有限验收。下一批从第11节R0开始，再进入R1/R2；本文件不改变现行WHAT。
 
 ## 9. D0之后的接口冻结与分包（198e8251e只读复核）
 
-本节是下一批指引，尚未实现、未取得正式红绿，不能另销TODO。按依赖串行冻结公共类型，再分工修改独立producer；不要三人同时猜低层签名。
+本节保留接口调查明细；第2项等待/异常已由D1有限完成，其余未施工。排期由第11节R0→R1→R2替代，先取得真实夹具，再串行冻结公共类型、分工修改独立producer；不要三人同时猜低层签名。
 
 1. **先定资源合同。** register的三个真实owner是Send root、Send claimed continuation和Fork/Host/RunLifecycle的Unknown reattach。下一包可在现PhysicalAcceptance模块内为每次注册返回opaque lease，每次都有不同token，即使callback实例相同也不能共用身份；Dispose只compare-remove自己的callback，幂等、不碰waiter、不写journal、不调用Abandon。不要新建registry。Sender必须在Host effect之前把实际lease交给具体call scope，不能在Detached返回时用`use`释放。Fork reattach必须同时迁移，不能留下按全keycancel清其它owner的路径。
-2. **单独核实等待与通知异常。** 现awaitConfirmation共享每key TCS，但每caller有独立timeout，任一timeout会全keycancel；现accepted先移除callback/waiter再调用callback，异常能阻止waiter结算。这两项目前只有源码证据。先用薄公开接缝制造真实行为红：短waiter timeout后长waiter和observer仍能由实际ingress结算；callback抛错时durable accepted不倒退、另owner waiter仍得到exact physical。确认等待和callback registration是不同资源，不能把lease.Dispose写成cancel waiter。异常处置依原owner合同，不伪造Refused，也不在Surface吞错充成功。
+2. **等待与通知异常：D1有限验收完成。** 每invocation独立TCS，短waiter timeout不取消长waiter或observer；callback原异常传播而finally仍给等待者exact physical。gen163六业务红、gen165定向36/0、gen166相关1186/0保留正式证据。这一等待资源与callback registration仍分开，后续lease.Dispose不得取消waiter、改journal或伪造Refused；不重复施工已修问题。
 3. **再定低层source载体。** 原生四字段为SessionId、source PhysicalUserMessageId、source AuthorityRootUserMessageId、source ProviderRunIdentity。Guard的SessionContract处于低层，只依Foundation.Identity的source record和窄opaque handoff；不得反向引用高层SyncDelegate/Dispatch、偷渡完整ReconciledTurn或obj。类型名和签名在此冻结后才改fsi，不把本节候选当成现存API。
 4. **冻结exact occasion读取。** Dispatch owner从原projection返回未准入、原key Pending、原key actually Accepted的原生证据，accepted核对精确PhysicalLandings。保留RunGateNudgeOnce的single-flight；不自行解析payload或另建flight。retry的recoveryAlreadyAdmitted会在redispatchAfterFailure提前返回Superseded，只改fresh sendRecoveryContinuation会漏接这条路。同key不证明同call；缺原call证据时明确未确认，不转移给新call、不重发。
 5. **接具体call binder及retry。** source在effect前核对所有权，返回只捕获该具体call的observer；实际accepted才加入它的attempt集合。lease Attach和call Close由同一个owner排序，已结束后Attach立即释放；accepted已取出callback时退订不能撤回在途通知，closure仍核对自己的call/resource存活。随后一次下传RetryPort、PluginSessionWiring、ProviderRecoveryWorkflow、SessionNudge，fresh与AlreadyAdmitted两路共同验收。
@@ -167,7 +167,7 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 
 ## 10. D1完成：确认等待资源与通知异常
 
-[D1正式记录](../archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)保留gen163旧业务6个正式红灯和gen165修复后的3/3、36pass/0fail、1TODO。每invocation独立TCS；timeout只释放自己，真实accepted/rejected/cancel按原key取固定snapshot广播。callback异常原样传播，finally仍给等待者exact Accepted。007采用long先注册、short后注册及journal原字节不变，避免FIFO清理取巧；004核对原异常对象与已经落盘的managed Accepted；009保留双waiter明确拒绝正控。
+[D1正式记录](../archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)保留gen163旧业务6个正式红灯、gen165修复后的3/3、36pass/0fail、1TODO，以及最终gen166相关238/238、1186pass/0fail、28skip/129TODO。每invocation独立TCS；timeout只释放自己，真实accepted/rejected/cancel按原key取固定snapshot广播。callback异常原样传播，finally仍给等待者exact Accepted。007采用long先注册、short后注册及journal原字节不变，避免FIFO清理取巧；004核对原异常对象与已经落盘的managed Accepted；009保留双waiter明确拒绝正控。
 
 第9节第2步已在上述有限范围完成，不再重做共享TCS timeout或callback finally。registration仍返回unit，原Send/Fork部分Unknown清理仍按全keycancel；本包没有实现lease或修改call来源，不能把这些范围合并销项。
 
@@ -184,11 +184,15 @@ popIfAcceptanceMatches 当前先捕获 call、await AcceptedRoot，再按 delega
 5. **实际retry路径。** retry port调用ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure，经原HostSessionNudge、SendGateNudge和RunGateNudgeOnce产生真实claim/send；不能换普通SendContinuation。Host port捕获原PromptKey，receipt不授予physical；真实ingress再接受不同physical。脚本Dispatched/dispatchRetryAttempt readiness只保原脚本测试，不算本包正控。
 6. **冻结R0证据。** 正控需actual accepted initial+不同successor，重放相同失败episode必须保原key与单次send；Pending/Accepted的AlreadyAdmitted都要保留。先把新API缺失/配置前置与实际行为失败分开。只有这个夹具能稳定产生真生产trace后，才写下一步来源归属红灯。
 
+**R0交付边界。** 先提交能力装配与原生产retry正控，附原key、不同physical、实际许可/stop和资源回收证据。随后新增025归属反例时，重新捕获并冻结完整输入，在新generation取得业务红；不能沿用上一提交的freshness身份。permission相关测试分别归provider-attempt-recovery的003/014/022，call因果归delegation/025，各标题只用所属WHAT。idle及错误run不能授权发送；同失败episode的Pending/Accepted重入仍一key一send。受控exact-stop只能说明受控边界，不能关闭真实Host的GAP-139。
+
 ### R1：冻结窄合同与资源owner（公共文件只给一人）
 
 已核现有DAG：host-boundary/host-session-contract的OpenCode/Host/SessionContract.fs/.fsi在Identity之后、Dispatch/LoopSensor/SyncDelegate/retry/repair之前；这些消费者已引用它。建议在这个既有owner放immutable ProviderAttemptSource（SessionId、source PhysicalUserMessageId、source AuthorityRootUserMessageId、source ProviderRunIdentity）与独立ContinuationAcceptanceObserver（Notify与同步AttachDisposable）。这是建议合同，尚无这些API；不要误写成已实现。不要放Foundation万能类型、完整ReconciledTurn、obj或高层SyncDelegate类型，不新增ProjectReference环。
 
 先定register每次新opaque token及Dispose compare-remove，再同步迁移Send两处和Fork reattach。call原资源作用域同步Attach、Close只释放自己；关闭后Attach立即Dispose。callback取出后不可撤回，必须核对捕获的具体call仍存活。D1 waiter是另一资源，不让lease碰它，也不以call-local释放调用Abandon。明确拒绝仍由原业务owner全key清理。
+
+**R1正式验收。** 旧lease不能移除后注册者，同一个callback重新注册也有新token；重复Dispose无副作用。释放仅本地观察，Pending与journal原字节不变，其他waiter仍由真实Accepted完成。call关闭后Attach立即释放；已取出的旧A callback不能更新复用child的新B。必须观察实际sender在Host effect前交出lease，只有接口返回IDisposable不算通过。
 
 ### R2：三producer因果接线与正式矩阵（R0/R1之后）
 
