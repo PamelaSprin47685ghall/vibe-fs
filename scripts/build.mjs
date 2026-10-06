@@ -375,6 +375,57 @@ export function determineBuildDecision({
   }
 }
 
+// ── Full Rebuild Staged Swap ─────────────────────────────────────────────────
+
+export function stagedBackupDirFor(targetDist) {
+  return path.join(path.dirname(targetDist), '.fable-build', 'dist.staged-backup')
+}
+
+// Move the current dist aside (same-filesystem rename) so a full rebuild
+// compiles into a blank dist: outputs whose sources were removed cannot
+// survive into the next manifest snapshot, while the prior dist stays
+// recoverable until the rebuild commits.
+export function stageDistForFullRebuild(targetDist) {
+  const backupDir = stagedBackupDirFor(targetDist)
+  if (fs.existsSync(backupDir)) {
+    fs.rmSync(backupDir, { recursive: true, force: true })
+  }
+  if (fs.existsSync(targetDist)) {
+    fs.mkdirSync(path.dirname(backupDir), { recursive: true })
+    fs.renameSync(targetDist, backupDir)
+  }
+  fs.mkdirSync(targetDist, { recursive: true })
+  return backupDir
+}
+
+// A failed full rebuild must leave the prior dist intact (fail-safe,
+// structured-workflow-012): drop the half-built dist and rename the staged
+// backup back into place. Without a backup (dist was already missing before
+// staging), dropping the half-built dist restores the prior state.
+export function restoreStagedDist(targetDist, backupDir) {
+  fs.rmSync(targetDist, { recursive: true, force: true })
+  if (fs.existsSync(backupDir)) {
+    fs.renameSync(backupDir, targetDist)
+  }
+}
+
+// A previously interrupted build may have left a staged backup behind. When
+// dist exists with content, the interrupted build had committed, so dist is
+// authoritative and the stale backup is dropped; otherwise the backup is the
+// last known-good dist and is restored.
+export function recoverStaleStagedDist(targetDist) {
+  const backupDir = stagedBackupDirFor(targetDist)
+  if (!fs.existsSync(backupDir)) return
+  const distHasContent =
+    fs.existsSync(targetDist) && fs.readdirSync(targetDist).length > 0
+  if (distHasContent) {
+    fs.rmSync(backupDir, { recursive: true, force: true })
+  } else {
+    fs.rmSync(targetDist, { recursive: true, force: true })
+    fs.renameSync(backupDir, targetDist)
+  }
+}
+
 // ── Run Build Orchestrator ───────────────────────────────────────────────────
 
 export async function runBuild({
@@ -388,7 +439,14 @@ export async function runBuild({
   const mutex = new CrossProcessMutex(lockFile, 'build lock')
   await mutex.acquire()
 
+  let stagedBackupDir = null
+  let buildCommitted = false
+
   try {
+    // A previously interrupted full rebuild may have left a staged backup
+    // behind; settle it before reading any build state.
+    recoverStaleStagedDist(targetDist)
+
     const existingManifest = readManifest({ root: resolvedRoot })
 
     const compilerInputs = collectCompilerInputs(resolvedRoot, null)
@@ -445,6 +503,11 @@ export async function runBuild({
       logInfo(`compiled clean impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
     } else if (buildMode === 'full') {
       logInfo('Compiling F# (full)...')
+      // Full mode rebuilds from a blank slate via a staged swap: the prior
+      // dist is renamed aside so outputs whose sources were removed (orphaned
+      // JS) cannot survive into the next manifest snapshot, while a failed
+      // rebuild restores the prior dist (structured-workflow-012 fail-safe).
+      stagedBackupDir = stageDistForFullRebuild(targetDist)
       compileResult = await compileIncremental({
         changedPaths: changedCompilerPaths.length > 0
           ? changedCompilerPaths
@@ -530,6 +593,7 @@ export async function runBuild({
     }
 
     writeManifest({ root: resolvedRoot, manifest: newManifest })
+    buildCommitted = true
     logInfo(`build ok (generation ${nextGeneration})`)
     ensureHostSnapshotDisabled()
 
@@ -540,6 +604,17 @@ export async function runBuild({
       reused: false,
     }
   } finally {
+    if (stagedBackupDir) {
+      try {
+        if (buildCommitted) {
+          fs.rmSync(stagedBackupDir, { recursive: true, force: true })
+        } else {
+          restoreStagedDist(targetDist, stagedBackupDir)
+        }
+      } catch (swapErr) {
+        logInfo(`warning: staged dist swap finalize failed: ${swapErr.message}`)
+      }
+    }
     mutex.release()
   }
 }
