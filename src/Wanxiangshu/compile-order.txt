@@ -1324,6 +1324,8 @@ Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Composition/Bind.fs
 Sphinx/V2/Composition/Commands.fsi
 Sphinx/V2/Composition/Commands.fs
+Sphinx/V2/Composition/SettlementSurface.fsi
+Sphinx/V2/Composition/SettlementSurface.fs
 Sphinx/V2/Wire/Surface.fsi
 Sphinx/V2/Wire/Surface.fs
 Sphinx/V2/Hosts/Mcp/Server.fsi

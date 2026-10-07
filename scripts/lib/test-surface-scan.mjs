@@ -570,6 +570,15 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Composition/SettlementSurface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-009', 'SPHINX-V2-019', 'SPHINX-V2-036', 'DURABLE-EVENTS-024'],
+    lawOwners: { 'DURABLE-EVENTS-024': 'durable-events' },
+    source: 'src/Wanxiangshu/Sphinx/V2/Composition/SettlementSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Sphinx/V2/Wire/Surface.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-009', 'SPHINX-V2-011', 'SPHINX-V2-020', 'SPHINX-V2-033', 'SPHINX-V2-036'],

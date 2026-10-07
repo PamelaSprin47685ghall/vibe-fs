@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[U0-A1-S1](../U0-A1-Sphinx结算传播-2026-10-07.md)原Commands callback/同incident guard已有限验收：gen255相关29/29、329pass/0fail/0skip/15TODO，仅pending。五场景保原incident/evidence、真实结算先后、重复零callback/owned I/O及独立cold；已有生产保护满足，未造第二runtime。下一独立K1先正式证明Casebook Refresh/Access吞错，再接mandatory owner；S2真正Wire/MCP物理fatal及完整024保留。下面S0的“下一S1”为历史顺序，不再重复认领。
+
 最新[U0-A1-S0](../U0-A1-Sphinx结算传播-2026-10-07.md)实际Store防御前提有限完成：gen252相关29/29、324pass/0fail/0skip/15TODO，仅pending。四分支保真实Sphinx rule、bad fact/cut-tail、Release Unknown原载体及独立cold；生产已有保护，本包只补测试。下一S1原Commands callback/重复incident guard，再S2真正Wire/MCP物理fatal。S0不关闭合法encoder自然cut、committed-cuts消费或H0b fresh acceptance。
 
 最新[upstream48a0bf426合并](../archive/2026-10-07/Upstream忙碌指导合并-2026-10-07.md)已有限验收：gen233产品2049/0、实际flat28/0、安装版Host六场景所在native13/13。新的可见输入/exact lease交接合同不授予Sphinx fresh witness；U0-A1/H0b及完整034边界保持，下方gen230与旧前置记录只属其原输入。
