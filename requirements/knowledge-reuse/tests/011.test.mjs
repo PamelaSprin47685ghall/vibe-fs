@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 import { sandbox, createCase, deferred, casebook, eventStore, parse } from './support/casebook.mjs'
 import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
@@ -278,6 +281,136 @@ test('WHAT[knowledge-reuse-011] an active workspace flight rejects a different a
     if (secondStore) eventStore.dispose(secondStore)
     if (secondBase) eventStore.dispose(secondBase)
     local.close()
+  }
+})
+
+test('WHAT[knowledge-reuse-011] two required owners on one workspace store share the original settled cut rejection and one callback', async t => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-shared-cut-')))
+  mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+  const reached = deferred()
+  const release = deferred()
+  const observations = []
+  const leftIncidents = []
+  const rightIncidents = []
+  let handle
+  let shared
+  let left
+  let right
+  try {
+    handle = eventStore.create(directory, 'setup')
+    const identity = 'shared-cut-two-owners'
+    const { baseline, shelfmark } = await createCase({ dir: directory, store: handle }, identity)
+    const before = await casebook.fetchCaseByIdentity(handle, identity)
+    const baselineEntry = JSON.parse(baseline)['subject.txt']
+    assert.equal(baselineEntry.kind, 'Present')
+    const baselineBytes = Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef))
+    assert.equal(baselineBytes.toString('utf8'), 'version-B')
+    const eventsDirectory = join(directory, 'wanxiang', 'events')
+    const setupFile = join(eventsDirectory, 'setup.ndjson')
+    const setupBytes = readFileSync(setupFile)
+    eventStore.dispose(handle)
+    handle = eventStore.create(directory, 'operation')
+    shared = eventStore.createAppendPayloadStore(handle, true, value => observations.push(value))
+    const leftOwner = settlements.createOwner(value => leftIncidents.push(value))
+    const rightOwner = settlements.createOwner(value => rightIncidents.push(value))
+    assert.notStrictEqual(leftOwner, rightOwner)
+    const leftTool = bindOwnedFetch(directory, shared, leftOwner)
+    const rightTool = bindOwnedFetch(directory, shared, rightOwner)
+    writeFileSync(join(directory, 'subject.txt'), 'version-C')
+    const { port, createCalls, programCalls } = scriptedBookkeeperPort()
+    const send = port.SendPrompt
+    port.SendPrompt = async (...args) => {
+      reached.resolve()
+      await release.promise
+      return send(...args)
+    }
+    installBookkeeperRuntime(port, [identity])
+    left = executeFetch(leftTool, shelfmark)
+    await Promise.race([
+      reached.promise,
+      left.then(() => assert.fail('the first actual Bookkeeper must reach its SendPrompt barrier')),
+    ])
+    assert.equal(createCalls.length, 1)
+    assert.equal(programCalls.length, 0)
+    assert.equal(observations.length, 0)
+    right = executeFetch(rightTool, shelfmark)
+    const outcomes = Promise.allSettled([left, right])
+    release.resolve()
+    const [first, second] = await outcomes
+
+    assert.equal(createCalls.length, 1)
+    assert.equal(programCalls.length, 1)
+    assert.equal(observations.length, 1, 'the joined fetches neither retry Refresh nor append Access')
+    assert.deepEqual(observedTypes(observations), ['EngineerCaseRefreshed'])
+    const { originalRequested, append } = observations[0]
+    assert.equal(originalRequested.length, 1)
+    const [original] = originalRequested
+    assert.equal(original.payload.identity, identity)
+    assert.deepEqual(append.requested, [{ ...original, payload: {} }])
+    assert.equal(append.error, null)
+    assert.equal(append.cuts.length, 1)
+    const [cut] = append.cuts
+    assert.equal(cut.rule, 'Casebook')
+    assert.equal(cut.failedEventId, original.id)
+    assert.deepEqual(eventStore.read(handle, original.id), append.requested[0])
+    const cutFact = eventStore.read(handle, cut.cutEventId)
+    assert.equal(cutFact.type, 'ProjectionCutTail')
+    assert.equal(cutFact.payload.rule, 'Casebook')
+    assert.equal(cutFact.payload.failed_event_id, original.id)
+    assert.deepEqual(cutFact.parents, [original.id])
+    assert.equal(leftIncidents.length, 1)
+    assert.deepEqual(rightIncidents, [], 'only the first executing flight owns this settlement callback')
+    assert.equal(first.status, 'rejected')
+    assert.equal(second.status, 'rejected')
+    assert.strictEqual(first.reason, leftIncidents[0])
+    assert.strictEqual(second.reason, leftIncidents[0], 'the waiter receives the same original incident object')
+    assert.equal(settlements.isIncident(first.reason), true)
+    assert.equal(settlements.isIncident(second.reason), true)
+    const incident = settlements.describeIncident(leftIncidents[0])
+    assert.equal(incident.operation, 'Refresh')
+    assert.equal(incident.caseIdentity, identity)
+    assert.equal(incident.eventId, original.id)
+    assert.deepEqual(incident.cuts, append.cuts)
+    assert.deepEqual(await casebook.fetchCaseByIdentity(handle, identity), before)
+    assert.equal(before.completionFileState, baseline)
+    assert.equal(before.maintenanceFileState, baseline)
+    const operationFile = join(eventsDirectory, 'operation.ndjson')
+    const operationBytes = readFileSync(operationFile)
+    const facts = operationBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse)
+    assert.deepEqual(facts.map(event => event.event_id), [original.id, cut.cutEventId])
+    assert.equal(facts[0].event_type, 'EngineerCaseRefreshed')
+    assert.deepEqual(facts[0].payload, {})
+    assert.equal(facts[1].event_type, 'ProjectionCutTail')
+    assert.deepEqual(readFileSync(setupFile), setupBytes)
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef)), baselineBytes)
+
+    eventStore.dispose(shared)
+    shared = undefined
+    eventStore.dispose(handle)
+    handle = undefined
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const cold = JSON.parse(await runVerificationToolProbe(process.execPath, [
+      fileURLToPath(new URL('./support/cut-cold-child.mjs', import.meta.url)), directory,
+      JSON.stringify({ writer: 'operation', setupBytes: setupBytes.toString('base64'), operationBytes: operationBytes.toString('base64'),
+        failedEventId: original.id, cutEventId: cut.cutEventId, identity,
+        before: { ...before, accessOrder: before.accessOrder.toString(), lastAccessOrder: before.lastAccessOrder.toString() }, baseline,
+        payloadRef: baselineEntry.payloadRef, payloadBytes: baselineBytes.toString('base64') }),
+    ], { cwd: directory, env, signal: t.signal }).catch(error => {
+      if (error.stderr) error.message += '\n' + error.stderr
+      throw error
+    }))
+    assert.notEqual(cold.pid, process.pid)
+    assert.deepEqual({ ...cold.current, accessOrder: BigInt(cold.current.accessOrder), lastAccessOrder: BigInt(cold.current.lastAccessOrder) }, before)
+    assert.deepEqual(readFileSync(setupFile), setupBytes)
+    assert.deepEqual(readFileSync(operationFile), operationBytes)
+  } finally {
+    release.resolve()
+    await Promise.allSettled([left, right])
+    bookkeeper.resetRuntime()
+    if (shared) eventStore.dispose(shared)
+    if (handle) eventStore.dispose(handle)
+    rmSync(directory, { recursive: true, force: true })
   }
 })
 
