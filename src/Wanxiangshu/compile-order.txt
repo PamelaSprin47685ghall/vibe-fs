@@ -1496,6 +1496,8 @@ OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi
 OpenCode/Plugin/SpikePlugin.fs
+OpenCode/Plugin/PluginLifecycleSurface.fsi
+OpenCode/Plugin/PluginLifecycleSurface.fs
 Enforcer/Guidance/TipSurface.fsi
 Enforcer/Guidance/TipSurface.fs
 Mission/WorkRecord/Surface.fsi

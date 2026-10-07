@@ -1,5 +1,20 @@
 # K2-D：SessionDeleted 的实际所有权与接手边界
 
+2026-10-07 从 `523d41de4` 认领的 D0-P 已有限完成。SpikePlugin 只提取一次原装配，public 入口返回同 Hooks；薄 Surface 借同 Scope 的原 SyncDelegateRuntime，不建立第二 runtime。022 正式前提已证 Manager HumanRoot 接纳、attached Engineer 的原 AgentOwnerRoot/seed、实际 SDK prompt、原 transform/provider/turn 完成、非空 WorkRecord，以及同 Journal 的精确 ProviderRun terminal/head、正文和 SHA256；最后才消费原 production draft。fixture 的原 dispose 外加 finally，保证拒绝时也释放额外 terminal/Journal 引用，未改变生产算法。
+
+gen301 有限直接相关完整选集为61/61文件、377pass/0fail/4skip/33TODO（77.97s wall），outer41061 accepted=true/71.037ms，退出1仅pending；独立 native 前提1pass/0fail/0skip/0TODO、5910.435625ms、退出0。完整 Fable、175 Surface/835模块链接、完整check和局部Fantomas通过。四skip均为未启用integration，33TODO原文保留，不计通过。最终文档刷新另验，见同目录交付收据。完整SessionDeleted、Bookkeeper/Capture、身份释放和public tool自然入口均未授予验收。
+
+## 本包失败与验证边界
+
+原件见[本包证据目录](archive/2026-10-07/baselines/session-delete-d0p/)，按SHA256保存，不能删失败只留绿。
+
+- gen299 首次022为4pass/0fail/0skip/1TODO，证明原完成链。随后加durable terminal/payload断言，避免只从fallback正文推断持久结算。
+- gen300 的新工程漏登canonical compile-order，完整check拒绝；195/195选集为1028pass/6fail/7skip/86TODO及2failed containers，213.69s wall。五fail及两container来自清单遗漏，另一个普通fail是Host023监听启动失败；不是产品业务红。补两条compile-order登记后重新Fable构建及check通过。
+- gen301 同195选集在原5000ms静默门禁处截断：155drained/10active/30queued，无权威全局summary，计数unknown；5034ms silent，最后participant-identity010不是故障归因。owned termination的initial/frozen capture又发生原`ps ETIMEDOUT`/deadline失败；outer38640后续accepted=true/127.562ms不撤销此失败，也不证明未知库存已清。另观察到Host023再次普通FAIL。没有扩大预算或重跑大选集取绿。
+- Host023使用独立、无Spike import的installed canary，在进入任何产品hook前未观察到监听输出。当前binary/version/architecture检查没有发现缺失，原场景已回收、当轮完整env及Host PID未留证；原因unknown，不能猜冷启动或CPU竞争，不能改skip或放大启动超时。本包61选集和native结果只作有限前提证据，不替代该失败或195文件验收。
+
+下一有限D0-G按原child/owner SessionDeleted、原Bookkeeper active owner与SDK SendPrompt barrier验证同Scope dispose等待；不消费前提draft，不手工stage/noteAnswer，不借scripted runtime。实际cut链仍需原shared Store的合法受控composition接缝，不能把K2-C手传另一Store冒充真实删除。
+
 2026-10-07从bbd77cdc1只读审计；没有运行删除链验证，也未修改其生产代码。K2-C的原Boot owner/helper物理证明另见[Casebook记录](U0-A1-Casebook消费者-2026-10-07.md)，不能代替本卡。
 
 ## 不同状态归不同 owner
@@ -39,7 +54,7 @@ D0只认领“已接纳的真实删除归档必须被同scope shutdown等待，�
 
 PluginHooks把原SyncDelegateRuntime交给ToolRegistry，但baseSpecs没有Sphinx/同步Engineer consumer，该参数未被工具行为消费。唯一OpenCodeHostPort.Dispatch来自Sphinx OpenCode Surface自建harness，不能借给另一plugin。公开fork属于Road/HostFork，不建立HostSessionDeletion读取的SyncDelegate attached binding；也不能直接stage队列冒充公开工作。
 
-D0下一前提是让SpikePlugin原装配只生成一次原Hooks/Scope，public入口继续返回同Hooks，薄Semantic Surface只借同Scope.SyncDelegateRuntime调用原Engineer并只读原attached ID；delete/finalize/dispose继续走原hooks，不新增wrapper或第二runtime。这属于实现方案，不是要求用户额外审批的新流程；尚未落地/运行，不能预填绿。
+D0-P现已按上述方案有限落地并运行，证据以本卡顶部为准。SpikePlugin原装配只生成一次原Hooks/Scope，public入口继续返回同Hooks；delete/finalize/dispose继续走原hooks，不新增第二runtime。下段是完整删除继续施工的前提，不再指示重复认领D0-P。
 
 即使借用接缝完成，也须先证明原Manager chat admission、原Reconciler完成产生非空WorkRecord、production callbacks产生draft，以及删除时原Bookkeeper仍有active owner。不能用scripted Bookkeeper、手工noteAnswer或profile重绑补前提。薄Surface证明与public插件共用原装配，仍不等于public tool自然触发已接通；这项保留给实际consumer施工。
 

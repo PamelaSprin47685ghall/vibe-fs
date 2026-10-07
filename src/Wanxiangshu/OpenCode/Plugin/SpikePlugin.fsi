@@ -8,4 +8,9 @@ open System.Threading.Tasks
 /// PluginBoot keeps the global initialization order authoritative.
 module SpikePlugin =
 
+    type internal Runtime =
+        { Hooks: obj
+          Scope: PluginRuntimeScope }
+
+    val internal createRuntime: input: obj -> Task<Runtime>
     val initSpikePlugin: input: obj -> Task<obj>

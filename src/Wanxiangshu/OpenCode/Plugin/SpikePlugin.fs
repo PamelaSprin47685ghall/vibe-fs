@@ -11,7 +11,11 @@ open Wanxiangshu.Composition.Turn
 /// PluginBoot keeps the global initialization order authoritative.
 module SpikePlugin =
 
-    let initSpikePlugin (input: obj) : Task<obj> =
+    type internal Runtime =
+        { Hooks: obj
+          Scope: PluginRuntimeScope }
+
+    let internal createRuntime (input: obj) : Task<Runtime> =
         task {
             try
                 let! boot = PluginBoot.create input
@@ -38,11 +42,18 @@ module SpikePlugin =
                 PluginSessionWiring.attach boot host
                 PluginRecoveryWiring.attach boot
                 let transform = PluginTransforms.create boot host
-                return! PluginHooks.create boot host transform
+                let! hooks = PluginHooks.create boot host transform
+                return { Hooks = hooks; Scope = boot.Scope }
             with ex ->
                 // A partially initialized Wanxiangshu instance is not a degraded
                 // mode. OpenCode may otherwise keep running after a plugin-load
                 // rejection with only half the runtime owners installed.
                 Diagnostic.fatal "plugin-initialization-failed" [ "result", ex.Message ]
                 return raise ex
+        }
+
+    let initSpikePlugin (input: obj) : Task<obj> =
+        task {
+            let! runtime = createRuntime input
+            return runtime.Hooks
         }

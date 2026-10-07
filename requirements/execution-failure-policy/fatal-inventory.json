@@ -269,7 +269,7 @@
     {
       "id": "F16",
       "ownerRequirement": "host-boundary",
-      "sourceSymbol": "OpenCode/Plugin/SpikePlugin.fs :: SpikePlugin.initSpikePlugin / catch-all branch",
+      "sourceSymbol": "OpenCode/Plugin/SpikePlugin.fs :: SpikePlugin.createRuntime / catch-all branch (public initSpikePlugin projects the same Hooks)",
       "operation": "plugin-initialization-failed (fixed string; ex.Message payload)",
       "triggerBranch": "Any exception from PluginBoot.create / PluginHostWiring.create / wiring attach / PluginHooks.create during plugin init, then raise ex (harness return path),",
       "inputSource": "Plugin load input object + every resource touched at boot (journal, scope, ports, runtimes, transforms, hooks),",

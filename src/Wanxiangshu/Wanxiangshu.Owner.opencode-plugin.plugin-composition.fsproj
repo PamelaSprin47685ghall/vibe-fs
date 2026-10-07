@@ -137,6 +137,8 @@
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fsi"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fs"/>
+    <Compile Include="OpenCode/Plugin/PluginLifecycleSurface.fsi"/>
+    <Compile Include="OpenCode/Plugin/PluginLifecycleSurface.fs"/>
     <Compile Include="OpenCode/Plugin/Plugin.fsi"/>
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
   </ItemGroup>

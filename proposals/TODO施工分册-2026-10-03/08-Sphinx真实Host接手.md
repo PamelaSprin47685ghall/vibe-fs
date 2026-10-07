@@ -2,7 +2,9 @@
 
 最新[Journal J2](../U0-A1-Journal消费者-2026-10-07.md)原业务四叶有限完成：gen293相关109/109、864pass/0fail/23skip/46TODO，仅pending，native4/0；先合法init再actual business cut，原F01/F38物理退出和独立cold保last-good Current。生产无改，错误oracle原件保留。下一W1/G1有限包，Journal mandatory owner/duplicate另列J3；不授完整024/Host/fresh authority。
 
-最新[Journal J1](../U0-A1-Journal消费者-2026-10-07.md)原初始化四叶有限完成：gen290相关41/41、279pass/0fail/14skip/15TODO，仅pending，native4/0。原F04/F39结算→report/self-SIGKILL与独立cold已证；下一J2业务cut，mandatory owner/duplicate、Boot与完整024保留。D0已核明public tool缺attached同步入口，须借唯一原装配并先证Reconciler/Bookkeeper前提，不能用fork或第二runtime取绿。
+最新[D0-P](../U0-A1-SessionDeleted前提-2026-10-07.md)唯一原装配前提有限完成：gen301有限61/61、377pass/0fail/4skip/33TODO及native1/0，保原Manager/attached Engineer/ProviderRun terminal/payload/production draft。原大195选集155/195静默截断/ownedcapture失败与Host023启动FAIL仍开放；public tool自然入口、完整删除和身份关闭未验收。下一K1-V，再D0-G原删除合法归档/同Scope等待；[J3](../U0-A1-Journal-J3施工卡-2026-10-07.md)另完整原子窗口。下文旧“下一J1/J2”保历史，不重复施工。
+
+最新[Journal J1/J2](../U0-A1-Journal消费者-2026-10-07.md)实际初始化及业务物理证明均有限完成；mandatory owner/duplicate和完整024仍开放。D0已核明public tool缺attached同步入口，不能用fork或第二runtime取绿。
 
 最新[K1-U](../U0-A1-Casebook消费者-2026-10-07.md)Unknown＋Cuts双waiter有限完成，gen288相关41/41、279pass/0fail/4skip/24TODO，仅pending；首owner唯一callback与原incident/error/prepared/cause及独立cold保持，生产无改动。下一Journal J1和D0接缝；不以此授fresh authority或完整Casebook/Host验收。
 

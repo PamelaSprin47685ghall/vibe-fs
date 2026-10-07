@@ -1461,6 +1461,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Plugin/PluginLifecycleSurface.js',
+    owner: 'host-boundary',
+    laws: ['MANAGED-SESSION-LIFECYCLE-022'],
+    lawOwners: { 'MANAGED-SESSION-LIFECYCLE-022': 'managed-session-lifecycle' },
+    source: 'src/Wanxiangshu/OpenCode/Plugin/PluginLifecycleSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Plugin/PluginHostWiringSurface.js',
     owner: 'host-boundary',
     laws: ['KNOWLEDGE-REUSE-013'],
