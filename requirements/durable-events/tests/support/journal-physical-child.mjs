@@ -40,12 +40,15 @@ if (mode === 'cold') {
   }
 } else {
   assert.equal(mode, 'measure')
-  assert.ok(['valid', 'valid-release', 'malformed', 'malformed-release'].includes(scenario))
+  const business = scenario.startsWith('business-')
+  const variant = business ? scenario.slice('business-'.length) : scenario
+  assert.ok(['valid', 'valid-release', 'malformed', 'malformed-release'].includes(variant))
   assert.equal(process.env.WANXIANGSHU_NO_FATAL_EXIT, undefined)
   assert.equal(process.env.NODE_TEST_CONTEXT, undefined)
-  const malformed = scenario.startsWith('malformed')
-  const release = scenario.endsWith('-release')
-  const cause = new Error('original Journal initialization owned Release completed before response failed')
+  const malformed = variant.startsWith('malformed')
+  const release = variant.endsWith('-release')
+  const failureOrdinal = business ? 2 : 1
+  const cause = new Error(`original Journal ${business ? 'business' : 'initialization'} owned Release completed before response failed`)
   const originals = { appendFileSync: fs.appendFileSync, openSync: fs.openSync,
     fsyncSync: fs.fsyncSync, closeSync: fs.closeSync, rmSync: fs.rmSync }
   const descriptors = new Set()
@@ -86,7 +89,7 @@ if (mode === 'cold') {
     if (owned) {
       counts.release += 1
       assert.equal(fs.existsSync(lock), false)
-      if (release && counts.release === 1) {
+      if (release && counts.release === failureOrdinal) {
         counts.injected += 1
         throw cause
       }
@@ -97,12 +100,13 @@ if (mode === 'cold') {
   const handle = store.create(commonDir, writerId)
   let journal
   let observations = 0
-  const port = store.createAppendPayloadStore(handle, malformed, observation => {
+  const observe = observation => {
     observations += 1
     const bytes = fs.readFileSync(sourceFile)
     const facts = bytes.toString('utf8').trimEnd().split('\n').map(JSON.parse).map(dto)
     const error = observation.append.error
     const receipt = { pid: process.pid, parentPid: process.ppid, writerId, scenario, observations,
+      ordinal: observation.append.ordinal,
       initial: journals.observeActualJournal(journal), projection: journals.observeActualJournalProjection(journal),
       originalRequested: observation.originalRequested, requested: observation.append.requested,
       cuts: observation.append.cuts, appendError: error === null ? null : {
@@ -121,7 +125,10 @@ if (mode === 'cold') {
     } finally {
       fs.closeSync(fd)
     }
-  })
+  }
+  const port = business && malformed
+    ? store.createAppendPayloadStoreAt(handle, 2, observe)
+    : store.createAppendPayloadStore(handle, malformed, observe)
   try {
     journal = await journals.openActualJournalWithStore(port, writerId, new Date().toISOString())
     const initial = journals.observeActualJournal(journal)
@@ -137,7 +144,7 @@ if (mode === 'cold') {
       afterSecond = journals.observeActualJournal(journal)
       assert.deepEqual(counts, beforeSecond)
       assert.strictEqual(second.error.cause, cause)
-      assert.equal(second.error.failedEventId, initial.initEventId)
+      assert.equal(second.error.failedEventId, business ? first.error.eventId : initial.initEventId)
     }
     fs.writeFileSync(path.join(root, 'journal-returned.json'), JSON.stringify({ initial, first,
       afterFirst, second, afterSecond, projection: journals.observeActualJournalProjection(journal) },

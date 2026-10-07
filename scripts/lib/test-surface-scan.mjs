@@ -961,7 +961,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007'],
+    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-EVENTS-024', 'DURABLE-CONVERGENCE-007'],
     lawOwners: { 'DURABLE-CONVERGENCE-007': 'durable-convergence' },
     source: 'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
     representation: 'opaque-capability',

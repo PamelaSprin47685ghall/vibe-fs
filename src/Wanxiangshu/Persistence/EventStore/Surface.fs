@@ -334,18 +334,22 @@ module Surface =
 
         EventStoreHandle.Create controlled
 
-    /// Physical boundary probe: alter only payload bytes and forward the real append settlement.
-    let createAppendPayloadStore
-        (baseHandle: EventStoreHandle, malformed: bool, onAppend: obj -> unit)
+    let private createAppendPayloadStoreWhen
+        (baseHandle: EventStoreHandle, alterPayload: int -> bool, onAppend: obj -> unit)
         : EventStoreHandle =
         let store = baseHandle.Store
+        // DSL-MUTABLE: resource — invocation ordinal of this borrowed append port.
+        let mutable ordinal = 0
 
         let observed =
             { new IEventStore with
                 member _.Append events =
                     task {
+                        ordinal <- ordinal + 1
+                        let current = ordinal
+
                         let requested =
-                            if malformed then
+                            if alterPayload current then
                                 events
                                 |> List.map (fun event ->
                                     { event with
@@ -362,7 +366,7 @@ module Surface =
                                         {| originalRequested = events |> List.map envelopeToJs |> List.toArray
                                            append = append |}
                                 ))
-                            1
+                            current
                             requested
                             result
 
@@ -379,6 +383,20 @@ module Surface =
                 member _.ReloadLocal() = store.ReloadLocal() }
 
         EventStoreHandle.Create observed
+
+    /// Physical boundary probe: alter only payload bytes and forward the real append settlement.
+    let createAppendPayloadStore
+        (baseHandle: EventStoreHandle, malformed: bool, onAppend: obj -> unit)
+        : EventStoreHandle =
+        createAppendPayloadStoreWhen (baseHandle, (fun _ -> malformed), onAppend)
+
+    let createAppendPayloadStoreAt
+        (baseHandle: EventStoreHandle, malformedAt: int, onAppend: obj -> unit)
+        : EventStoreHandle =
+        if malformedAt <= 0 then
+            invalidArg "malformedAt" "append ordinal must be positive"
+
+        createAppendPayloadStoreWhen (baseHandle, ((=) malformedAt), onAppend)
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.

@@ -20,6 +20,9 @@ module Surface =
     val createAppendPayloadStore:
         baseHandle: EventStoreHandle * malformed: bool * onAppend: (obj -> unit) -> EventStoreHandle
 
+    val createAppendPayloadStoreAt:
+        baseHandle: EventStoreHandle * malformedAt: int * onAppend: (obj -> unit) -> EventStoreHandle
+
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.
     val dispose: handle: EventStoreHandle -> unit

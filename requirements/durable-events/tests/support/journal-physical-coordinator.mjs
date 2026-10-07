@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 
 const [commonDir, writerId, scenario] = process.argv.slice(2)
 const root = path.dirname(commonDir)
-const fatal = scenario.startsWith('malformed')
+const variant = scenario.startsWith('business-') ? scenario.slice('business-'.length) : scenario
+const fatal = variant.startsWith('malformed')
 const childPath = fileURLToPath(new URL('./journal-physical-child.mjs', import.meta.url))
 const env = { ...process.env }
 delete env.NODE_TEST_CONTEXT

@@ -25,10 +25,10 @@
       "assertedInvariant": "A durable cut-tail makes history recoverable, but does NOT make the current in-memory runtime trustworthy; the exact bug class that produced the cut may already have mutated process-local ownership, caches, or pending tasks,",
       "commitDisposition": "cut-tail already durable by the time the fold reports Rejected; trip is fail-stop AFTER that evidence. Returns Error to the caller as typed FactRejected; the fatal fuse kills the process,",
       "scopeOfEffect": "Whole current process (.fs[:]Owned by sibling slice; do not edit.),",
-      "evidenceType": "Owner slice owns the proof; this inventory row is the index only,",
-      "formalTestId": null,
+      "evidenceType": "J2 actual business committed cut after legal RuntimeStarted: only second payload altered, original Store writes bad fact and cut-tail and settles append/fsync/close/owned Release before original AgentJournal reports once and self-SIGKILLs. Independent OS cold preserves all canonical bytes and last-good initialization Current; success and empty-Cuts Unknown controls retained.",
+      "formalTestId": "requirements/durable-events/tests/024.test.mjs::WHAT[durable-events-024] original AgentJournal business malformed preserves legal initialization before its physical terminal and cold replay",
       "status": "RetainedFuse",
-      "notes": "Semantic fold reject on append — durable cut + Evidence-annotated trip stays. Fable-runtime decisive failure what owner slice owns."
+      "notes": "Finite physical proof, explicit payload-only defense input; mandatory typed capability/duplicate guard and controlled Rejected without actual settlement remain separate durable-events-024 migration work."
     },
     {
       "id": "F02",
@@ -643,10 +643,10 @@
       "assertedInvariant": "Unknown cut bytes must not be reported as a successful business fact or a known-not-written rejection.",
       "commitDisposition": "The typed unknown receipt exists before the retained fuse. No committed revision or waiter wake is published.",
       "scopeOfEffect": "Current process.",
-      "evidenceType": "Typed branch inspection only; actual bad-fact plus unknown-cut fatal child remains durable-events-024 work.",
-      "formalTestId": null,
+      "evidenceType": "J2 actual business CommitUnknown(StoreRelease) after legal RuntimeStarted: only ordinal2 payload altered and owned Release fails after real removal; actual Prepared contains this business bad fact/cut-tail, original cause preserved, append/fsync/close/Release settle before original AgentJournal report once/self-SIGKILL. Independent OS cold preserves source bytes and last-good initialization Current. Ordinary business Unknown retains first business identity/poison and performs no second I/O.",
+      "formalTestId": "requirements/durable-events/tests/024.test.mjs::WHAT[durable-events-024] original AgentJournal business malformed-release preserves legal initialization before its physical terminal and cold replay",
       "status": "RetainedFuse",
-      "notes": "U0 preserves uncertainty at this existing fatal owner; mandatory injected fatal capability and duplicate-incident proof remain open."
+      "notes": "Finite original physical proof completed; mandatory injected typed capability, duplicate-incident guard, dynamic poison at fatal instant, natural encoder cut and Boot/installed Host remain open."
     },
     {
       "id": "F39",
