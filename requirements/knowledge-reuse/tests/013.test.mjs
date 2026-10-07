@@ -12,6 +12,7 @@ import * as index from '../../../dist/Repository/Knowledge/Casebook/IndexSurface
 import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
+import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 import { createCase } from './support/casebook.mjs'
 import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
 
@@ -326,5 +327,170 @@ test('WHAT[knowledge-reuse-013] the native owner requires its capability and rej
   assert.throws(() => settlements.observeIncident(owner, descriptor), /original settled owner/)
   assert.deepEqual(callbacks, [])
 })
+
+for (const malformed of [false, true]) {
+  for (const unknown of [false, true]) {
+    const fate = unknown ? 'CurrentCommitUnknown' : 'committed'
+    test(`WHAT[knowledge-reuse-013] actual Lifecycle Capture ${malformed ? 'controlled malformed payload' : 'valid payload'} ${fate} preserves the original settlement and durable projection`, async t => {
+      const directory = mkdtempSync(join(tmpdir(), 'wxs-casebook-capture-'))
+      mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+      const cause = new Error('original Capture Current commit cause')
+      const observed = []
+      let handle
+      try {
+        handle = eventStore.create(directory, 'setup')
+        const oldIdentity = `prior-Capture-${malformed}-${fate}`
+        const identity = `new-Capture-${malformed}-${fate}`
+        const trace = `logical-trace-${identity}`
+        const question = 'Capture original question'
+        const answer = 'Capture original answer'
+        const { baseline } = await createCase({ dir: directory, store: handle }, oldIdentity)
+        const before = await casebook.fetchCaseByIdentity(handle, oldIdentity)
+        const payloadRef = JSON.parse(baseline)['subject.txt'].payloadRef
+        const payloadBytes = Buffer.from(await eventStore.readPayload(handle, payloadRef))
+        assert.equal(payloadBytes.toString('utf8'), 'version-B')
+        await index.refresh(handle, 256)
+        const beforeIndex = index.tryGet()
+        const eventsDirectory = join(directory, 'wanxiang', 'events')
+        const setupFile = join(eventsDirectory, 'setup.ndjson')
+        const setupBytes = readFileSync(setupFile)
+        eventStore.dispose(handle)
+        handle = undefined
+
+        handle = unknown
+          ? eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
+          : eventStore.create(directory, 'operation')
+        const wrapped = eventStore.createAppendPayloadStore(handle, malformed, value => observed.push(value))
+        const result = await lifecycle.finalizeEngineerCase(
+          wrapped, identity, trace, question, answer, ['subject.txt'], baseline,
+        )
+        assert.equal(observed.length, 1, 'the Capture producer never retries the original append')
+        const { originalRequested, append } = observed[0]
+        assert.equal(originalRequested.length, 1)
+        assert.equal(append.requested.length, 1)
+        const requested = originalRequested[0]
+        assert.equal(requested.type, 'EngineerCaseCaptured')
+        assert.equal(requested.payload.identity, identity)
+        assert.equal(requested.payload.source_trace, trace)
+        assert.equal(requested.payload.q, question)
+        assert.equal(requested.payload.a, answer)
+        assert.deepEqual(requested.payload.related_paths, ['subject.txt'])
+        assert.equal(requested.payload.completion_file_state, baseline)
+        assert.equal(requested.payload.maintenance_file_state, baseline)
+        assert.equal(append.requested[0].id, requested.id)
+        assert.deepEqual(append.requested[0].parents, requested.parents)
+        assert.deepEqual(append.requested[0].payload, malformed ? {} : requested.payload)
+        assert.equal(append.cuts.length, malformed ? 1 : 0)
+        const cut = append.cuts[0]
+        if (malformed) {
+          assert.equal(cut.rule, 'Casebook')
+          assert.equal(cut.failedEventId, requested.id)
+        }
+        if (unknown) {
+          assert.equal(append.error.code, 'CommitUnknown')
+          assert.equal(append.error.phase, 'CurrentCommit')
+          assert.strictEqual(append.error.cause, cause)
+          assert.deepEqual(append.error.cleanupFailures, [])
+          assert.deepEqual(append.error.requested, append.requested)
+          assert.deepEqual(append.error.prepared.cuts, append.cuts)
+          assert.deepEqual(append.error.prepared.durableEvents.map(event => event.id),
+            malformed ? [requested.id, cut.cutEventId] : [requested.id])
+        } else assert.equal(append.error, null)
+
+        if (malformed || unknown) {
+          assert.equal(result.ok, false)
+          assert.equal(result.releasesIdentity, false)
+          assert.equal(result.kind, unknown ? 'unknown' : 'notCommitted')
+          assert.equal(result.code, unknown ? 'CASEBOOK_APPEND_COMMIT_UNKNOWN' : 'CASEBOOK_APPEND_FAILED')
+          assert.equal(result.persistenceFailure.operation, 'Capture')
+          assert.equal(result.persistenceFailure.caseIdentity, identity)
+          assert.equal(result.persistenceFailure.eventId, requested.id)
+          if (unknown) {
+            assert.equal(result.persistenceFailure.isOriginalError(append.originalError), true)
+            assert.strictEqual(result.persistenceFailure.primary.cause, cause)
+            assert.equal(result.persistenceFailure.primary.phase, 'CurrentCommit')
+            assert.deepEqual(result.persistenceFailure.cleanupFailures, [])
+            assert.deepEqual(result.persistenceFailure.requestedEventIds, [requested.id])
+            assert.deepEqual(result.persistenceFailure.preparedEventIds,
+              malformed ? [requested.id, cut.cutEventId] : [requested.id])
+          }
+          assert.deepEqual(index.tryGet(), beforeIndex, 'failed Capture does not publish a new provider index epoch')
+        } else {
+          assert.equal(result.ok, true)
+          assert.equal(result.releasesIdentity, true)
+          assert.equal(result.persistenceFailure, undefined)
+          assert.ok(index.tryGet().epoch > beforeIndex.epoch)
+          assert.ok(index.tryGet().cases.some(entry => entry.question === question))
+        }
+        assert.deepEqual(await casebook.fetchCaseByIdentity(handle, oldIdentity), before)
+        if (malformed || unknown) {
+          assert.equal(await casebook.fetchCaseByIdentity(handle, identity), null,
+            'the failed Capture does not publish a new live Case')
+        }
+        const operationFile = join(eventsDirectory, 'operation.ndjson')
+        const operationBytes = readFileSync(operationFile)
+        const facts = operationBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse)
+        assert.equal(facts.length, malformed ? 2 : 1)
+        assert.equal(facts[0].event_id, requested.id)
+        assert.equal(facts[0].event_type, 'EngineerCaseCaptured')
+        assert.deepEqual(facts[0].payload, append.requested[0].payload)
+        if (malformed) {
+          assert.equal(facts[1].event_id, cut.cutEventId)
+          assert.equal(facts[1].event_type, 'ProjectionCutTail')
+          assert.equal(facts[1].payload.rule, 'Casebook')
+          assert.equal(facts[1].payload.failed_event_id, requested.id)
+          assert.deepEqual(facts[1].parents, [requested.id])
+        }
+        assert.deepEqual(readFileSync(setupFile), setupBytes)
+        eventStore.dispose(handle)
+        handle = undefined
+        handle = eventStore.create(directory, 'cold-reader')
+        assert.deepEqual(await casebook.fetchCaseByIdentity(handle, oldIdentity), before)
+        const current = await casebook.fetchCaseByIdentity(handle, identity)
+        if (malformed) assert.equal(current, null)
+        else {
+          assert.equal(current.identity, identity)
+          assert.equal(current.sourceTrace, trace)
+          assert.equal(current.q, question)
+          assert.equal(current.a, answer)
+          assert.equal(current.completionFileState, baseline)
+          assert.equal(current.maintenanceFileState, baseline)
+        }
+        assert.equal(eventStore.read(handle, requested.id).type, 'EngineerCaseCaptured',
+          'ordinary CurrentCommitUnknown can follow actual durable Capture bytes')
+        assert.deepEqual(Buffer.from(await eventStore.readPayload(handle, payloadRef)), payloadBytes)
+        assert.deepEqual(readFileSync(operationFile), operationBytes)
+        assert.deepEqual(readFileSync(setupFile), setupBytes)
+        assert.deepEqual(readdirSync(eventsDirectory).sort(), ['operation.ndjson', 'setup.ndjson'])
+        if (malformed) {
+          eventStore.dispose(handle)
+          handle = undefined
+          const env = { ...process.env }
+          delete env.NODE_TEST_CONTEXT
+          const cold = JSON.parse(await runVerificationToolProbe(process.execPath, [
+            fileURLToPath(new URL('./support/cut-cold-child.mjs', import.meta.url)), directory,
+            JSON.stringify({ writer: 'operation', setupBytes: setupBytes.toString('base64'),
+              operationBytes: operationBytes.toString('base64'), failedEventId: requested.id,
+              cutEventId: cut.cutEventId, identity: oldIdentity, missingIdentity: identity,
+              before: { ...before, accessOrder: before.accessOrder.toString(), lastAccessOrder: before.lastAccessOrder.toString() },
+              baseline, payloadRef, payloadBytes: payloadBytes.toString('base64') }),
+          ], { cwd: directory, env, signal: t.signal }).catch(error => {
+            if (error.stderr) error.message += '\n' + error.stderr
+            throw error
+          }))
+          assert.notEqual(cold.pid, process.pid)
+          assert.equal(cold.missingIdentity, identity)
+          assert.deepEqual({ ...cold.current, accessOrder: BigInt(cold.current.accessOrder),
+            lastAccessOrder: BigInt(cold.current.lastAccessOrder) }, before)
+          assert.deepEqual(readFileSync(operationFile), operationBytes)
+          assert.deepEqual(readFileSync(setupFile), setupBytes)
+        }
+      } finally {
+        if (handle) eventStore.dispose(handle)
+        rmSync(directory, { recursive: true, force: true })
+      }
+    })
+  }
+}
 
 test.todo('WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before a mandatory injected fuse reports and kills once without modifying its projection')

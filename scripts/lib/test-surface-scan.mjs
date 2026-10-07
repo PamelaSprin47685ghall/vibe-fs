@@ -494,7 +494,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/LifecycleSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
+    laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010', 'KNOWLEDGE-REUSE-013'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

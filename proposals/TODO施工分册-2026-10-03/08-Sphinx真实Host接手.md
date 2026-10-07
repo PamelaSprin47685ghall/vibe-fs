@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[K2-A](../U0-A1-Casebook消费者-2026-10-07.md)Capture原Lifecycle结算前提有限完成，gen276相关41/41、267pass/0fail/4skip/24TODO，仅pending。下一原Host finalization消费者接已有Boot owner；删除registry和physical fatal不由本包代证，H0b存储前提保持。
+
 最新[K1-W](../U0-A1-Casebook消费者-2026-10-07.md)双waiter原committed cut拒绝组合有限完成，gen274相关41/41、263pass/0fail/4skip/24TODO，仅pending。下一独立Capture实际Lifecycle前提，再取Host原consumer业务红；仍不以Casebook局部证明授予H0b authority或完整Host验收。
 
 最新[G0 GateAcquire](../U0-GateAcquire错误分流-2026-10-07.md)仅锁争用等待的有限修复完成：原006三业务红后27/0，gen272相关243/243、1691pass/0fail/35skip/106TODO，仅pending。它不授予fresh authority，也不验收持续争用取消或payload/Git hook独立合同。下一独立补Casebook双waiter原cut拒绝组合；H0b仍依实际消费者和存储合同前提。

@@ -23,6 +23,9 @@ try {
   assert.deepEqual(cutFact.parents, [badFact.id])
   const current = await casebook.fetchCaseByIdentity(handle, request.identity)
   assert.deepEqual(current, before)
+  if (request.missingIdentity !== undefined) {
+    assert.equal(await casebook.fetchCaseByIdentity(handle, request.missingIdentity), null)
+  }
   assert.equal(current.completionFileState, request.baseline)
   assert.equal(current.maintenanceFileState, request.baseline)
   assert.equal(Buffer.from(await eventStore.readPayload(handle, request.payloadRef)).toString('base64'), request.payloadBytes)
@@ -31,7 +34,7 @@ try {
   assert.equal(existsSync(join(directory, 'wanxiang.lock')), false)
   process.stdout.write(JSON.stringify({ pid: process.pid,
     current: { ...current, accessOrder: current.accessOrder.toString(), lastAccessOrder: current.lastAccessOrder.toString() },
-    writerId }) + '\n')
+    writerId, missingIdentity: request.missingIdentity }) + '\n')
 } finally {
   eventStore.dispose(handle)
 }
