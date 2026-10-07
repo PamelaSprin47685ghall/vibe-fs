@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as casebookIndex from '../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 import * as pluginLifecycle from '../../../dist/OpenCode/Plugin/PluginLifecycleSurface.js'
@@ -121,9 +123,9 @@ test('WHAT[managed-session-lifecycle-022] no draft finalizes successfully withou
   }
 })
 
-test('WHAT[managed-session-lifecycle-022] finalize prerequisite uses the original plugin scope for Manager admission, attached Engineer completion and its production draft', async () => {
+const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
   let originalRuntime
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     assert.strictEqual(pluginLifecycle.hooks(originalRuntime), hooks)
     assert.equal(lifecycle.isEnabled(), true)
     const manager = 'd0p-manager'
@@ -237,12 +239,8 @@ test('WHAT[managed-session-lifecycle-022] finalize prerequisite uses the origina
       assert.deepEqual(terminalBody, { ok: true, content: answer })
       assert.equal(terminal.textDigest, createHash('sha256').update(terminalBody.content, 'utf8').digest('hex'))
 
-      // Consume the original draft only after proving completion.
-      assert.deepEqual(pluginLifecycle.takeEngineerDraft(originalRuntime, manager), {
-        sessionId: sent.child,
-        turns: [{ question: charge, answer: result.workRecord }],
-      })
-      assert.equal(pluginLifecycle.takeEngineerDraft(originalRuntime, manager), null)
+      await action({ hooks, directory, createdIds, runtime, originalRuntime, manager, owner, sent,
+        childProfile, charge, answer, result, terminal })
     } finally {
       runtime.client.session.promptAsync = originalPrompt
       // Dispose cancels/drains any pending call before we wait for its settlement.
@@ -254,9 +252,252 @@ test('WHAT[managed-session-lifecycle-022] finalize prerequisite uses the origina
     }
   }, {}, async input => {
     mkdirSync(join(input.directory, '.wanxiang', 'casebook'), { recursive: true })
+    await beforeCreate?.(input.directory)
     originalRuntime = await pluginLifecycle.create(input)
     return pluginLifecycle.hooks(originalRuntime)
   })
+}
+
+test('WHAT[managed-session-lifecycle-022] finalize prerequisite uses the original plugin scope for Manager admission, attached Engineer completion and its production draft', async () => {
+  await withCompletedEngineer(async ({ originalRuntime, manager, sent, charge, result }) => {
+    assert.deepEqual(pluginLifecycle.takeEngineerDraft(originalRuntime, manager), {
+      sessionId: sent.child,
+      turns: [{ question: charge, answer: result.workRecord }],
+    })
+    assert.equal(pluginLifecycle.takeEngineerDraft(originalRuntime, manager), null)
+  })
+})
+
+const d0Deferred = () => {
+  let resolve
+  const promise = new Promise(done => { resolve = done })
+  return { promise, resolve }
+}
+const d0EventFiles = directory => {
+  const events = join(directory, '.git', 'wanxiang', 'events')
+  return Object.fromEntries(readdirSync(events).filter(name => name.endsWith('.ndjson'))
+    .sort().map(name => [name, readFileSync(join(events, name), 'base64')]))
+}
+const d0Facts = files => Object.entries(files).flatMap(([file, encoded]) =>
+  Buffer.from(encoded, 'base64').toString('utf8').trimEnd().split('\n')
+    .filter(Boolean).map(line => ({ file, event: JSON.parse(line) })))
+const d0Json = value => JSON.parse(JSON.stringify(value,
+  (_key, item) => typeof item === 'bigint' ? item.toString() : item))
+
+test('WHAT[managed-session-lifecycle-022] original child and owner deletion archive the completed Engineer and same-scope dispose awaits actual Bookkeeper completion', async () => {
+  const canonicalQuestion = 'D0-G canonical question from the original completed draft'
+  const canonicalAnswer = 'D0-G canonical answer from the original completed draft'
+  const decoyIdentity = 'd0g-prior-decoy'
+  const decoyText = 'D0-G nonempty baseline payload retained across deletion and disposal\n'
+  let decoy
+  await withCompletedEngineer(async context => {
+    const { hooks, directory, createdIds, runtime, originalRuntime, manager, owner, sent,
+      childProfile, charge, answer, result, terminal } = context
+    const beforeCreatedIds = createdIds.slice()
+    const entered = d0Deferred()
+    const release = d0Deferred()
+    const received = d0Deferred()
+    const originalPrompt = runtime.client.session.promptAsync
+    let bookkeeperEntered = 0
+    let disposeObserved
+    let disposalState = 'not-started'
+    let bookkeeperReceipt
+    let programAttempted = false
+    let terminalPublished = false
+    let bookkeeperAssistant
+    runtime.client.session.promptAsync = async function (args) {
+      if (args.body?.agent !== 'bookkeeper') return Reflect.apply(originalPrompt, this, [args])
+      bookkeeperEntered += 1
+      const receipt = { child: args.path.id, args }
+      entered.resolve(receipt)
+      await release.promise
+      try {
+        const response = await Reflect.apply(originalPrompt, this, [args])
+        const messages = (await runtime.client.session.messages({ path: { id: receipt.child } })).data
+        receipt.physical = messages.filter(message => (message.info ?? message).role === 'user').at(-1)
+        received.resolve(receipt)
+        return response
+      } catch (error) {
+        received.resolve({ error })
+        throw error
+      }
+    }
+    const completeBookkeeper = async () => {
+      release.resolve()
+      if (bookkeeperEntered === 0) return
+      bookkeeperReceipt ??= await received.promise
+      if (bookkeeperReceipt.error !== undefined) throw bookkeeperReceipt.error
+      const { child, physical } = bookkeeperReceipt
+      const physicalInfo = physical.info ?? physical
+      if (bookkeeperAssistant === undefined) {
+        bookkeeperAssistant = { info: { id: 'd0g-bookkeeper-assistant', sessionID: child,
+          parentID: physicalInfo.id, role: 'assistant', agent: 'bookkeeper',
+          time: { created: 4 } }, parts: [] }
+        runtime.pushHostMessage(child, bookkeeperAssistant)
+      }
+      const program = `class Js extends JsProgram { async run() {
+        const question = this.question().text();
+        const answer = this.answer().text();
+        if (!question.includes(${JSON.stringify(charge)}) || !answer.includes(${JSON.stringify(answer)}))
+          throw new Error('Bookkeeper did not receive the original completed draft');
+        this.setQuestion(${JSON.stringify(canonicalQuestion)});
+        this.setAnswer(${JSON.stringify(canonicalAnswer)});
+        return { changed: true };
+      } }`
+      try {
+        if (!programAttempted) {
+          programAttempted = true
+          const output = await hooks.tool['js-bookkeeper'].execute({ program }, {
+            sessionID: child, agent: 'bookkeeper', messageID: bookkeeperAssistant.info.id,
+            callID: 'd0g-bookkeeper-program',
+          })
+          assert.equal(typeof output, 'string')
+          bookkeeperAssistant.parts.push({ type: 'tool', tool: 'js-bookkeeper', callID: 'd0g-bookkeeper-program',
+            state: { status: 'completed', input: { program }, output } })
+        }
+      } finally {
+        if (!terminalPublished) {
+          terminalPublished = true
+          bookkeeperAssistant.info.time.completed = 5
+          bookkeeperAssistant.info.finish = 'stop'
+          await hooks.event({ event: { type: 'message.updated', properties: { info: bookkeeperAssistant.info } } })
+        }
+      }
+    }
+    let completedBookkeeper = false
+    try {
+      assert.deepEqual(dispatch.projectionObservation(runtime.journal, sent.child).activeLogicalRun, childProfile)
+      assert.deepEqual(readFileSync(join(directory, '.git', 'wanxiang', 'events', 'd0g-decoy.ndjson')), decoy.bytes)
+      await hooks.event({ event: { type: 'session.deleted',
+        properties: { sessionID: sent.child, parentID: manager } } })
+      assert.equal(pluginLifecycle.attachedEngineer(originalRuntime, manager), null)
+      await hooks.event({ event: { type: 'session.deleted', properties: { sessionID: manager } } })
+      disposalState = 'pending'
+      const disposal = hooks.dispose()
+      disposeObserved = disposal.then(() => { disposalState = 'fulfilled'; return { ok: true } },
+        error => { disposalState = 'rejected'; return { ok: false, error } })
+      const prepared = await Promise.race([
+        entered.promise,
+        disposeObserved.then(outcome => {
+          throw new Error(`original deletion disposal ended before its Bookkeeper SendPrompt: ${outcome.ok ? 'fulfilled' : 'rejected'}`,
+            { cause: outcome.error })
+        }),
+      ])
+      assert.equal(bookkeeperEntered, 1)
+      assert.equal(prepared.args.body.agent, 'bookkeeper')
+      assert.deepEqual(prepared.args.body.tools, { '*': false, 'js-bookkeeper': true })
+      const promptText = prepared.args.body.parts.filter(part => part.type === 'text').map(part => part.text).join('\n')
+      assert.ok(promptText.includes(sent.child))
+      assert.ok(promptText.includes(charge))
+      assert.ok(promptText.includes(answer))
+      assert.ok(promptText.includes('CaseFinalize'))
+      assert.equal(runtime.prompts.some(prompt => prompt.path?.id === prepared.child), false)
+      assert.deepEqual(dispatch.projectionObservation(runtime.journal, sent.child).activeLogicalRun, childProfile)
+      assert.deepEqual(dispatch.projectionObservation(runtime.journal, manager).activeLogicalRun, owner)
+      const beforeFiles = d0EventFiles(directory)
+      const beforeIndex = casebookIndex.tryGet()
+      assert.equal(d0Facts(beforeFiles).filter(({ event }) => event.event_type === 'EngineerCaseCaptured'
+        && event.payload.identity === sent.child).length, 0)
+
+      // A bounded pending control; the isolated owned-drain mutation is separate.
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(disposalState, 'pending')
+      const heldFiles = d0EventFiles(directory)
+      for (const [file, encoded] of Object.entries(beforeFiles)) {
+        const prefix = Buffer.from(encoded, 'base64')
+        assert.equal(Buffer.from(heldFiles[file], 'base64').subarray(0, prefix.length).equals(prefix), true,
+          `${file} retains its original canonical prefix while child cleanup may append`)
+      }
+      assert.equal(heldFiles['d0g-decoy.ndjson'], decoy.bytes.toString('base64'))
+      assert.equal(d0Facts(heldFiles).filter(({ event }) => event.event_type === 'EngineerCaseCaptured'
+        && event.payload.identity === sent.child).length, 0)
+      assert.deepEqual(casebookIndex.tryGet(), beforeIndex)
+      assert.deepEqual(await journal.JournalSurface_readPayload(runtime.journal, terminal.textRef),
+        { ok: true, content: answer })
+      assert.match(decoy.payloadRef, /^[0-9a-f]{64}$/)
+      assert.deepEqual(await journal.JournalSurface_readPayload(runtime.journal, `blobs/${decoy.payloadRef}`),
+        { ok: true, content: decoyText })
+
+      await completeBookkeeper()
+      completedBookkeeper = true
+      const disposed = await disposeObserved
+      assert.equal(disposed.ok, true, disposed.error?.message)
+      assert.equal(disposalState, 'fulfilled')
+      assert.equal(bookkeeperEntered, 1)
+      assert.deepEqual(createdIds.slice(beforeCreatedIds.length), [bookkeeperReceipt.child])
+      assert.deepEqual(createdIds.slice(0, beforeCreatedIds.length), beforeCreatedIds)
+      assert.equal(runtime.prompts.filter(prompt => prompt.body?.agent === 'bookkeeper').length, 1)
+      const afterFiles = d0EventFiles(directory)
+      for (const [file, encoded] of Object.entries(beforeFiles)) {
+        assert.equal(Buffer.from(afterFiles[file], 'base64').subarray(0, Buffer.from(encoded, 'base64').length)
+          .equals(Buffer.from(encoded, 'base64')), true, `${file} retains its original canonical prefix`)
+      }
+      assert.equal(afterFiles['d0g-decoy.ndjson'], decoy.bytes.toString('base64'))
+      const cases = d0Facts(afterFiles).filter(({ event }) => event.event_type === 'EngineerCaseCaptured')
+      assert.equal(cases.length, 2)
+      const captured = cases.find(({ event }) => event.payload.identity === sent.child).event
+      assert.equal(captured.payload.source_trace, sent.child)
+      assert.equal(captured.payload.q, canonicalQuestion)
+      assert.equal(captured.payload.a, canonicalAnswer)
+      assert.deepEqual(captured.payload.related_paths, [])
+      assert.equal(captured.payload.completion_file_state, '{}')
+      assert.equal(captured.payload.maintenance_file_state, '{}')
+      assert.deepEqual(captured.payload.observations, [])
+      assert.deepEqual(captured.parents, [decoy.fact.id])
+      assert.equal(d0Facts(afterFiles).some(({ event }) => event.event_type === 'ProjectionCutTail'), false)
+      const afterIndex = casebookIndex.tryGet()
+      assert.ok(afterIndex.epoch > beforeIndex.epoch)
+      assert.ok(afterIndex.cases.some(entry => entry.question === canonicalQuestion))
+      assert.ok(afterIndex.cases.some(entry => entry.question === decoy.current.q))
+      assert.deepEqual(dispatch.projectionObservation(runtime.journal, sent.child).activeLogicalRun, childProfile)
+      assert.equal(dispatch.projectionObservation(runtime.journal, bookkeeperReceipt.child).activeLogicalRun, null)
+      const request = d0Json({ parentPid: process.pid, files: afterFiles, old: decoy.current,
+        oldEvent: decoy.fact, payloadRef: decoy.payloadRef, payloadBody: decoyText,
+        target: { identity: sent.child, sessionId: sent.child, sourceTrace: sent.child,
+          q: canonicalQuestion, a: canonicalAnswer, relatedPaths: [],
+          completionFileState: '{}', maintenanceFileState: '{}', accessOrder: 1n,
+          lastAccessOrder: 1n, observations: [] }, captureId: captured.event_id })
+      const coldEnv = { ...process.env }
+      delete coldEnv.NODE_TEST_CONTEXT
+      delete coldEnv.WANXIANGSHU_NO_FATAL_EXIT
+      const cold = spawnSync(process.execPath, [fileURLToPath(new URL('./support/deletion-cold-child.mjs', import.meta.url)),
+        join(directory, '.git'), JSON.stringify(request)], { encoding: 'utf8', env: coldEnv })
+      assert.equal(cold.signal, null, cold.stderr)
+      assert.equal(cold.status, 0, cold.stderr)
+      const observation = JSON.parse(cold.stdout.trim())
+      assert.notEqual(observation.pid, process.pid)
+      assert.equal(observation.verified, true)
+      assert.deepEqual(d0EventFiles(directory), afterFiles)
+      assert.deepEqual(readFileSync(join(directory, '.git', 'wanxiang', 'events', 'd0g-decoy.ndjson')), decoy.bytes)
+      assert.ok(result.workRecord.includes(answer))
+    } finally {
+      release.resolve()
+      try {
+        if (bookkeeperEntered > 0 && !completedBookkeeper) await completeBookkeeper()
+      } finally {
+        try {
+          if (disposeObserved) await disposeObserved
+        } finally {
+          runtime.client.session.promptAsync = originalPrompt
+        }
+      }
+    }
+  }, { beforeCreate: async directory => {
+    writeFileSync(join(directory, 'd0g-decoy.txt'), decoyText)
+    const handle = eventStore.create(join(directory, '.git'), 'd0g-decoy')
+    try {
+      const baseline = await casebook.freezeCompletionState(handle, directory, ['d0g-decoy.txt'])
+      assert.equal((await casebook.finalizeEngineerCase(handle, decoyIdentity, 'd0g-decoy-trace',
+        'D0-G prior decoy question', 'D0-G prior decoy answer', ['d0g-decoy.txt'], baseline)).kind, 'finalized')
+      decoy = { current: await casebook.fetchCaseByIdentity(handle, decoyIdentity),
+        fact: eventStore.read(handle, eventStore.head(handle, 'casebook')),
+        payloadRef: JSON.parse(baseline)['d0g-decoy.txt'].payloadRef,
+        bytes: readFileSync(join(directory, '.git', 'wanxiang', 'events', 'd0g-decoy.ndjson')) }
+      assert.equal(Buffer.from(await eventStore.readPayload(handle, decoy.payloadRef)).toString('utf8'), decoyText)
+    } finally {
+      eventStore.dispose(handle)
+    }
+  } })
 })
 
 test.todo('WHAT[managed-session-lifecycle-022] real deletion preserves exact Inspector identity for NotCommitted, Unknown and PhaseConflict; only committed or empty finalization releases it (GAP-133)')

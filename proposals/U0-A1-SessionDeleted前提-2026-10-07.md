@@ -1,5 +1,17 @@
 # K2-D：SessionDeleted 的实际所有权与接手边界
 
+## D0-G：合法删除归档与同 Scope Dispose（有限完成）
+
+2026-10-07 从 `4fd4b6b18` 认领，仅复用 D0-P 的原 Manager/attached Engineer 完成前提，不消费 draft；沿同一原 Hooks 的 child/owner SessionDeleted、原 Bookkeeper active-owner admission 与 SDK SendPrompt barrier，调用实际 js-bookkeeper 和精确 assistant completion，再核实际 Capture/index、非空 decoy 与独立 OS cold。原 D0-P 所有断言保留，小 helper 只交原 Scope 的完成上下文，未新增 Scope、scripted Bookkeeper、手工 stage/noteAnswer 或生产算法。
+
+gen305 原022正式5pass/0fail/0skip/1TODO、1/1排空，outer48072 accepted=true/17.717ms；新叶独立native1/0、1892.056ms、退出0。完整直接相关61/61为379pass/0fail/4skip/33TODO（9.33s wall、55.69s test），outer49491 accepted=true/17.359ms，退出1仅pending。完整Fable及175 Surface/835模块、完整check通过。原child/owner删除确经同Scope Bookkeeper发送barrier、实际js-bookkeeper及精确terminal完成，随后唯一Capture/index发布；独立OS cold核完整旧/新Case、head/heads、非空旧payload、全部canonical bytes及无reader写入。
+
+等待因果另作隔离变异：只移除`StartDisposeAsync`对原ownedWorkDrain的await，保留原stop admission；gen306 Fable通过后，新叶native明确0pass/1fail/0cancel/0skip/0TODO，679.249833ms叶耗时，断言为实际`fulfilled`而非要求的`pending`，正常退出1。已进入真实Bookkeeper barrier，finally沿原工具/terminal排空，没有watchdog或取消冒充红。原Scope文件逐字节恢复、staged diff为空，再gen307重建；相同新叶native1pass/0fail/0skip/0TODO、1153.251625ms、退出0，freshness通过。已有生产保护无需改算法，此变异红仅证明回归oracle，不称原产品业务红。
+
+首轮相关选集误写三个不存在的`opencode-host`包路径，原件为369pass/0fail/2skip/33TODO及3failed containers；按真实`host-boundary`路径修正后才取得上述61/61结论。全部输入、变异、失败/绿日志及manifest见[证据目录](archive/2026-10-07/session-delete-d0g/)，SHA256绑定；最终文档刷新另记收据，不冒充重跑61文件。
+
+完整 cut→后台异常→Dispose 拒绝仍缺原 shared Store 的受控接缝；private Bookkeeper 的 physical retire/回收能力及 SessionOntology/managed004 未验收，不断言 SDK Abort 次数。额外fixture Journal引用使同handle读仍可用，不据此宣称最后writer引用尚未释放；等待因果以隔离变异为准。durable exact identity closure、public tool自然触发、installed Host与完整022/013/GAP继续保留。下一D0-R仅先裁决原shared Store接缝和身份合同，不能直接借另一Store造cut。
+
 2026-10-07 从 `523d41de4` 认领的 D0-P 已有限完成。SpikePlugin 只提取一次原装配，public 入口返回同 Hooks；薄 Surface 借同 Scope 的原 SyncDelegateRuntime，不建立第二 runtime。022 正式前提已证 Manager HumanRoot 接纳、attached Engineer 的原 AgentOwnerRoot/seed、实际 SDK prompt、原 transform/provider/turn 完成、非空 WorkRecord，以及同 Journal 的精确 ProviderRun terminal/head、正文和 SHA256；最后才消费原 production draft。fixture 的原 dispose 外加 finally，保证拒绝时也释放额外 terminal/Journal 引用，未改变生产算法。
 
 gen301 有限直接相关完整选集为61/61文件、377pass/0fail/4skip/33TODO（77.97s wall），outer41061 accepted=true/71.037ms，退出1仅pending；独立 native 前提1pass/0fail/0skip/0TODO、5910.435625ms、退出0。完整 Fable、175 Surface/835模块链接、完整check和局部Fantomas通过。四skip均为未启用integration，33TODO原文保留，不计通过。最终文档刷新另验，见同目录交付收据。完整SessionDeleted、Bookkeeper/Capture、身份释放和public tool自然入口均未授予验收。
@@ -13,7 +25,7 @@ gen301 有限直接相关完整选集为61/61文件、377pass/0fail/4skip/33TODO
 - gen301 同195选集在原5000ms静默门禁处截断：155drained/10active/30queued，无权威全局summary，计数unknown；5034ms silent，最后participant-identity010不是故障归因。owned termination的initial/frozen capture又发生原`ps ETIMEDOUT`/deadline失败；outer38640后续accepted=true/127.562ms不撤销此失败，也不证明未知库存已清。另观察到Host023再次普通FAIL。没有扩大预算或重跑大选集取绿。
 - Host023使用独立、无Spike import的installed canary，在进入任何产品hook前未观察到监听输出。当前binary/version/architecture检查没有发现缺失，原场景已回收、当轮完整env及Host PID未留证；原因unknown，不能猜冷启动或CPU竞争，不能改skip或放大启动超时。本包61选集和native结果只作有限前提证据，不替代该失败或195文件验收。
 
-下一有限D0-G按原child/owner SessionDeleted、原Bookkeeper active owner与SDK SendPrompt barrier验证同Scope dispose等待；不消费前提draft，不手工stage/noteAnswer，不借scripted runtime。实际cut链仍需原shared Store的合法受控composition接缝，不能把K2-C手传另一Store冒充真实删除。
+D0-G已按本卡顶部有限完成，下文旧安排仅保历史，不重复认领。实际cut链仍需原shared Store的合法受控composition接缝，不能把K2-C手传另一Store冒充真实删除。
 
 2026-10-07从bbd77cdc1只读审计；没有运行删除链验证，也未修改其生产代码。K2-C的原Boot owner/helper物理证明另见[Casebook记录](U0-A1-Casebook消费者-2026-10-07.md)，不能代替本卡。
 

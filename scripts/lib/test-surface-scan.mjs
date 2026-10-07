@@ -470,7 +470,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/IndexSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-012'],
+    laws: ['KNOWLEDGE-REUSE-012', 'MANAGED-SESSION-LIFECYCLE-022'],
+    lawOwners: { 'MANAGED-SESSION-LIFECYCLE-022': 'managed-session-lifecycle' },
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs',
     representation: 'json',
     kind: 'pure',
