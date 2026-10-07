@@ -491,10 +491,10 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_imported_history_folds_as
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawnSync } = await import("node:child_process");
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { dirname, join, resolve } = await import("node:path");
-const { fileURLToPath } = await import("node:url");
+const { fileURLToPath, pathToFileURL } = await import("node:url");
 const { default: test } = await import("node:test");
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -526,21 +526,44 @@ const copyBackupWithLegacyDecision = () => {
   return { base, commonDir }
 }
 
-const runMigration = (backup, reportPath, args) =>
-  spawnSync(
+const backupInventory = (directory, prefix = '') =>
+  readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name)).flatMap(entry => {
+    const path = join(directory, entry.name)
+    const name = prefix + entry.name
+    const mode = lstatSync(path).mode
+    if (entry.isDirectory()) return [{ name, mode, kind: 'directory' }, ...backupInventory(path, name + '/')]
+    assert.equal(entry.isFile(), true, 'the legacy backup fixture contains only ordinary files')
+    return [{ name, mode, kind: 'file', bytes: readFileSync(path).toString('base64') }]
+  })
+
+const runMigration = (backup, reportPath, args, entry = resolve(repoRoot, 'scripts/migrate-delegation-history.mjs')) => {
+  const receipt = reportPath + '.loads.ndjson'
+  const before = backupInventory(backup)
+  const launched = spawnSync(
     process.execPath,
-    [resolve(repoRoot, 'scripts/migrate-delegation-history.mjs'), '--backup', backup, '--report', reportPath].concat(args),
-    { cwd: repoRoot, encoding: 'utf8' },
+    ['--import', fileURLToPath(new URL('./support/migration-load-observer.mjs', import.meta.url)),
+      entry, '--backup', backup, '--report', reportPath, ...args],
+    { cwd: repoRoot, encoding: 'utf8', env: { ...process.env, WXS_MIGRATION_LOAD_RECEIPT: receipt } },
   )
+  assert.equal(launched.error, undefined)
+  assert.deepEqual(backupInventory(backup), before, 'all original backup bytes, entries and modes must remain')
+  assert.equal(existsSync(receipt), true, 'a missing observer is not zero business loads')
+  const observations = readFileSync(receipt, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+  assert.deepEqual(observations[0], { phase: 'ready', sequence: 0, pid: launched.pid, entry })
+  assert.deepEqual(observations.at(-1), { phase: 'exit', sequence: observations.length - 1, pid: launched.pid, code: launched.status })
+  assert.ok(observations.every((value, index) => value.pid === launched.pid && value.sequence === index))
+  return { ...launched, loads: observations.filter(value => value.phase === 'actual-next-load-complete').map(value => value.url) }
+}
 
 test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_script_rejects_an_unregistered_input_version', async () => {
   const { base, commonDir } = copyBackupWithLegacyDecision()
   const report = join(base, 'report.json')
   try {
     const run = runMigration(commonDir, report, ['--input-version', 'pre-delegation-v0', '--contract-revision', '1'])
-    assert.notEqual(run.status, 0)
-    assert.match(String(run.stderr), /--input-version 必须是已登记的值: pre-delegation/)
+    assert.equal(run.status, 2)
+    assert.equal(run.stderr, '--input-version 必须是已登记的值: pre-delegation；收到: pre-delegation-v0\n')
     assert.equal(existsSync(report), false, '拒绝后不得写报告')
+    assert.deepEqual(run.loads, [], 'invalid input versions must not load either runtime front door')
   } finally { rmSync(base, { recursive: true, force: true }) }
 })
 
@@ -549,10 +572,10 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_script_reje
   const report = join(base, 'report.json')
   try {
     const run = runMigration(commonDir, report, ['--input-version', 'pre-delegation', '--contract-revision', '2'])
-    assert.notEqual(run.status, 0)
-    assert.match(String(run.stderr), /--contract-revision 必须是已登记的值: 1/)
-    assert.match(String(run.stderr), /OpenCode\/Delegate\.fs:40/)
+    assert.equal(run.status, 2)
+    assert.equal(run.stderr, '--contract-revision 必须是已登记的值: 1（运行时契约修订，见 src/Wanxiangshu/Strength/OpenCode/Delegate.fs:40 的 DelegationContractRevisions.create 1）；收到: 2\n')
     assert.equal(existsSync(report), false, '拒绝后不得写报告')
+    assert.deepEqual(run.loads, [], 'invalid contract revisions must not load either runtime front door')
   } finally { rmSync(base, { recursive: true, force: true }) }
 })
 
@@ -562,6 +585,10 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_registered_version_pa
   try {
     const run = runMigration(commonDir, report, ['--input-version', 'pre-delegation', '--contract-revision', '1'])
     assert.equal(run.status, 0, String(run.stderr))
+    assert.deepEqual(run.loads, [
+      pathToFileURL(resolve(repoRoot, 'dist/Persistence/EventStore/Surface.js')).href,
+      pathToFileURL(resolve(repoRoot, 'dist/Strength/Surface.js')).href,
+    ], 'the same actual observer must see both real runtime front doors on the valid path')
     const parsed = JSON.parse(readFileSync(report, 'utf8'))
     assert.equal(parsed.mode, 'dry-run')
     assert.equal(parsed.inputVersion, 'pre-delegation')
@@ -577,6 +604,22 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_registered_version_pa
       assert.equal(String(fact.tracedStartInclusive), '20')
       assert.equal(String(fact.tracedEndExclusive), '24')
     }
+  } finally { rmSync(base, { recursive: true, force: true }) }
+})
+
+test('WHAT[speculative-investigation-015] invalid version refusal precedes a missing dist runtime', () => {
+  const { base, commonDir } = copyBackupWithLegacyDecision()
+  const scripts = join(base, 'without-dist', 'scripts')
+  mkdirSync(scripts, { recursive: true })
+  const entry = join(scripts, 'migrate-delegation-history.mjs')
+  copyFileSync(resolve(repoRoot, 'scripts/migrate-delegation-history.mjs'), entry)
+  const report = join(base, 'report.json')
+  try {
+    const run = runMigration(commonDir, report, ['--input-version', 'pre-delegation-v0', '--contract-revision', '1'], entry)
+    assert.equal(run.status, 2)
+    assert.equal(run.stderr, '--input-version 必须是已登记的值: pre-delegation；收到: pre-delegation-v0\n')
+    assert.equal(existsSync(report), false)
+    assert.deepEqual(run.loads, [])
   } finally { rmSync(base, { recursive: true, force: true }) }
 })
 
@@ -608,4 +651,3 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_ma
   assert.deepEqual(contractRevisions, [Number(guidanceRevision[1])], '迁移登记的契约修订必须等于运行时指引写给操作者的取值')
 })
 }
-

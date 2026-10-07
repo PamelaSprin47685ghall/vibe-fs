@@ -120,7 +120,7 @@ test('WHAT[capability-enforcement-026] D02_resume_legitimate_existing_readonly_e
   }
 })
 
-test('WHAT[capability-enforcement-026] D04_resume_devops_when_busy_rejected_under_existing_rules', async () => {
+test('WHAT[capability-enforcement-026] D04_review_authorized_busy_devops_receives_guidance_on_the_original_work', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-d04-'))
   const owner = 'manager-devops-d04'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -148,8 +148,10 @@ test('WHAT[capability-enforcement-026] D04_resume_devops_when_busy_rejected_unde
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
     assert.equal(forkTool.promptCount(runtime), 1)
 
-    // 4. DevOps 正在忙碌执行中（尚未 settle），此时 Manager 发起新的不同 charge 派工：
-    // 底层 handleExistingDevOps 识别到 isBusy && !isDuplicate，通过 fromResult 同步返回 PersonCannotTakeCharge 拒绝
+    const original = forkTool.workSnapshot(runtime, owner)
+    const listeners = forkTool.terminalListenerCount(runtime)
+    const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'D04-ORIGINAL-WORK-DONE', 'devops-original-run')
+    forkTool.acceptNextPrompt(runtime)
     const secondResume = await forkTool.executeManagerResume(
       runtime,
       toolModule,
@@ -158,11 +160,16 @@ test('WHAT[capability-enforcement-026] D04_resume_devops_when_busy_rejected_unde
       'devops',
       'DEVOPS-ANOTHER-TASK-WHILE-BUSY',
     )
-    assert.match(
-      secondResume,
-      /cannot take another charge|尚不能再接下另一项托付|cannot take charge|busy|无法承担新的差事/i,
-      'Busy DevOps must be rejected when receiving a different charge',
-    )
+    assert.match(secondResume, /guidance|指导/i)
+    assert.equal(forkTool.promptCount(runtime), 2)
+    assert.match(forkTool.prompt(runtime, 1), /DEVOPS-ANOTHER-TASK-WHILE-BUSY/)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
+    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), original)
+    assert.equal(forkTool.terminalListenerCount(runtime), listeners)
+    assert.equal(forkTool.abortCount(runtime), 0)
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
+    await completeOriginal()
+    assert.match(await forkTool.executeJoin(runtime, owner), /D04-ORIGINAL-WORK-DONE/)
   } finally {
     forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
