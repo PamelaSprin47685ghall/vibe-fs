@@ -16,5 +16,9 @@ Completed work remains part of its history; continuation does not retroactively
 change an earlier result or case source.
 
 Pass the known name (`devops` for the fixed DevOps, or the forked name for an Engineer) and new charge, not calling. Use join or horizon to obtain
-the result. When the participant is busy or acceptance is uncertain, follow
-the returned recovery consequence; do not create a replacement or blindly retry.
+the result. While the participant is busy, the charge is guidance appended to
+its existing work and enters its next LLM request. It does not interrupt the
+current output or tool, replace the task, or start another assignment.
+Once idle, resume can assign the next work on the same road.
+When acceptance is uncertain, follow the returned recovery consequence;
+do not create a replacement or blindly retry.

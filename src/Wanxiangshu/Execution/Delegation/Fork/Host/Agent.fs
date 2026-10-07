@@ -625,6 +625,21 @@ module HostForkAgent =
             | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
         }
 
+    let private appendGuidanceToRun (runtime: HostForkRuntime) (run: PendingHostRun) prompt =
+        task {
+            match HostForkBinding.managedAgent runtime.Journal run.ChildId with
+            | None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" run.AgentId)
+            | Some agent ->
+                let! sent = runtime.SendBusyNudge run.AgentId run.ChildId run.Role agent prompt
+                return sent |> Result.map (fun () -> ForkResult.Nudged run.AgentId)
+        }
+
+    let private activeRun (runtime: HostForkRuntime) agentId =
+        lock runtime.Gate (fun () ->
+            match runtime.PendingRuns.TryGetValue agentId with
+            | true, run -> Some run
+            | false, _ -> None)
+
     type HostForkRuntime with
 
         /// Current durable Authority Root binding for an already-linked child.
@@ -734,11 +749,11 @@ module HostForkAgent =
                         HandleProjection.isAbandoned handle projection)
 
                 let existing = this.ReusableChildOrAdopt agentId
-                let active = lock this.Gate (fun () -> this.PendingRuns.ContainsKey agentId)
+                let active = activeRun this agentId
 
                 match this.IsCancelling, active, abandoned, existing with
                 | true, _, _, _ -> return Error "Parent cancellation is in progress"
-                | false, true, _, _ -> return Error(sprintf "Agent already has an active assignment: %s" agentId)
+                | false, Some run, _, _ -> return! appendGuidanceToRun this run (defaultArg renderedPrompt prompt)
                 | false, _, Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | false, _, _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | false, _, _, Some(childId, wasDormant) ->
@@ -752,4 +767,12 @@ module HostForkAgent =
                             renderedPrompt
                             expectedToolCalls
                             preparedHandoff
+            }
+
+        member this.AppendGuidance(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
+            task {
+                match this.IsCancelling, activeRun this agentId with
+                | true, _ -> return Error "Parent cancellation is in progress"
+                | false, None -> return Error(sprintf "Agent has no active assignment: %s" agentId)
+                | false, Some run -> return! appendGuidanceToRun this run prompt
             }

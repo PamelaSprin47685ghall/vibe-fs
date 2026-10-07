@@ -8,6 +8,7 @@ open System.Threading.Tasks
 module JoinSurface =
     val renderBatch: languageName: string -> items: obj array -> string
     val renderInterrupted: languageName: string -> reason: string -> string
+    val createVisibleInputRegistry: unit -> obj
     val renderForkError: languageName: string -> error: string -> string
     val renderOrchestratorBatch: languageName: string -> verdictNames: string array -> string
     val createJoinProbe: unit -> obj

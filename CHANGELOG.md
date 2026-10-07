@@ -94,6 +94,13 @@
 
 - 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。
 - 新增正式WHAT016反例；不可变候选、同阶段改后恢复及依赖隔离仍待完成，两项TODO保留。见[S03记录](proposals/archive/2026-10-03/S03输入链接边界-2026-10-03.md)。
+
+## Unreleased — 忙碌子任务可随时接收指导
+
+- Manager 的 `resume` 可向忙碌 Engineer 或固定 DevOps 追加 `BusyAgentNudge`，影响下一次 LLM 请求；保留原任务、Root、完成回调和 handoff frontier，不取消、重派或新建任务。删除忙碌拒绝及按旧 charge 文本假装成功的路径，返回明确的指导已发送结果。
+- 用户输入只释放已经开始的 Join，由 Manager 决定后续动作。唤醒移到 Host 保存后的可见回执，重复消息不打断下一次 Join。
+- 同 run 的追加材料先持久接纳，旧 exact lease 保留到新材料实际选入 provider 请求后才交接同一 capacity credit，涵盖旧输出已自然 stop 的窗口；修复真实 Host 中保存前唤醒及提前撤销旧 lease 导致的 EMR-009/010。补充连续提示、owned/borrowed credit 交接与取消、迟到旧回调和原工作冷重放回归，以及安装版 OpenCode 1.18.29 的完整 Join → resume → child 下一次 wire → 原任务完成场景。
+
 ## Unreleased — 用户输入只打断 Join 等待
 
 - 删除 PR #51（`558ed1c75`）引入的外部输入物理中断端口及全部接线。新 user prompt 不再调用 Host abort，当前 LLM 输出与非 Join 工具自然完成，新输入留到下一次 LLM 请求；Join 继续使用独立等待唤醒，不取消 child。

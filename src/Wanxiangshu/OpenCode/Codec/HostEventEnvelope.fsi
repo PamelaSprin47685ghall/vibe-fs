@@ -7,3 +7,4 @@ module HostEventEnvelope =
     val eventTypeOf: raw: obj -> string
     val trySessionId: raw: obj -> SessionId option
     val tryMessageSessionId: rawInput: obj -> SessionId option
+    val tryVisibleUserMessage: rawInput: obj -> (SessionId * PhysicalUserMessageId) option

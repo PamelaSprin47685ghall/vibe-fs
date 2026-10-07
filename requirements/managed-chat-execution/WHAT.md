@@ -10,7 +10,11 @@
 
 ## [003] 固定 transaction order
 
-每个 managed chat 必须遵循 `resolve pre-provider identity → durable Accepted → acquire exact capacity → project into Host → commit → provider effect`。成功路径没有独立的 bind/unbind 步骤：容量所有者持有的 exact lease 取得即为该执行的绑定。Host 实际暴露 ProviderRun 后才可建立 started evidence 并持久 `ProviderStarted`。`Accepted` 落盘确认前禁止获取容量、修改 Host message 或调用 provider；任一步失败不得越过其后继边界，任何边界不得预测或伪造 ProviderRunIdentity。
+普通 managed chat 准入必须遵循 `resolve pre-provider identity → durable Accepted → acquire exact capacity → project into Host → commit → provider effect`。成功路径没有独立的 bind/unbind 步骤：容量所有者持有的 exact lease 取得即为该执行的绑定。Host 实际暴露 ProviderRun 后才可建立 started evidence 并持久 `ProviderStarted`。`Accepted` 落盘确认前禁止获取容量、修改 Host message 或调用 provider；任一步失败不得越过其后继边界，任何边界不得预测或伪造 ProviderRunIdentity。
+
+同一 LogicalRun、authority root 与 IdentitySeed 的 `HumanMessage` / `BusyAgentNudge` 是追加材料，不是新 assignment。存在旧 committed lease 时，先 durable Accepted，再向 Host 投影旧 target；此时不替代旧 lease。Host 实际选择已保存的新材料进入 provider 请求时，准入 owner 从其 exact Accepted evidence 幂等取得 witness，转交原 capacity credit、建立新 exact lease 并结算旧执行，然后才能越过 provider 门禁。已经准备中的旧请求仍使用旧 lease；同一请求包含的较早未启动追加材料精确结算，不另行恢复发送。
+
+追加材料接纳后，由容量 owner 保留旧 opaque lease 对应的 credit，涵盖旧输出已自然终结而新材料尚未进入 provider 的窗口；具体资源交接与清理遵循 execution-model-routing-006。它是已接受材料的本地资源所有权，不是第二份身份绑定或恢复缓存。
 
 ## [004] Accepted 单次建立且 replay 幂等
 
@@ -27,6 +31,8 @@
 ## [007] Pre-provider failure 精确 settlement
 
 `Accepted` 后、`ProviderStarted` 前发生的拒绝、取消、删除、binding 或 Host projection 失败，必须针对 exact key 写入 typed terminal disposition；若已取得容量则在该 terminal 持久化确认后精确归还。该路径不得调用 provider，不得释放或终结同一 session 的其他 execution。
+
+追加材料失败或取消时，只撤销它自己的 continuation credit 保留；旧执行仍在运行则不动其资源。旧执行已终结且再无追加材料拥有该 credit 时，才完成此前延后的归还。
 
 ## [008] Recovery 只在 durability activation 后事件驱动
 

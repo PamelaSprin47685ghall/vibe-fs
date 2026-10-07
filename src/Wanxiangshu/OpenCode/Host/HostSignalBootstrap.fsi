@@ -37,7 +37,8 @@ module HostSignalBootstrap =
           CurrentPhysicalUserMessage: string -> string option
           ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
-          ObserveEvent: obj -> Task<unit> }
+          ObserveEvent: obj -> Task<unit>
+          EnsureVisibleInputAdmission: obj -> Task<unit> }
 
     /// Neutral Strength ports built by plugin composition (`PluginStrengthPorts`)
     /// from the already-held `PluginStrengthScope` and durability handle.

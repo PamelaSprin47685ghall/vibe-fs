@@ -8,6 +8,8 @@ import { ProcessHost } from '../../../verification-system/tests/e2e/support/proc
 import { OPENCODE_BIN, initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js'
 import { stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
+import { renderInterrupted } from '../../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import { coldWorkSnapshot } from '../../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 const capacityOne = process.argv.includes('--capacity-one')
@@ -30,7 +32,9 @@ if (phase === undefined) {
   process.stdout.write(`${JSON.stringify({ opencode: opencodeVersion, capacityOne, results, physicalCleanup: true })}\n`)
   process.exit(0)
 }
-assert.ok(phases.includes(phase))
+assert.ok([...phases, 'GUIDANCE', 'GUIDANCE_STOP'].includes(phase))
+const guidanceMode = phase === 'GUIDANCE' || phase === 'GUIDANCE_STOP'
+const childStops = phase === 'GUIDANCE_STOP'
 const observations = []
 const waiters = new Set()
 const releases = new Map()
@@ -98,6 +102,12 @@ const release = key => {
 let heldStream
 let streamFinished = false
 let activeResponseClosedEarly = false
+let heldChild
+let childFinished = false
+let childSessionID
+let childRequestsBeforeGuidance = 0
+let managerStep = 0
+let humanStep = 0
 const rootID = `msg_root_${phase}`
 const humanID = `msg_human_${phase}`
 const handleProvider = async (request, response) => {
@@ -107,6 +117,55 @@ const handleProvider = async (request, response) => {
   }
   const body = await bodyOf(request)
   const names = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name)
+  const messageID = request.headers['x-wxs-canary-message']
+  if (guidanceMode && names.includes('js-engineer')) {
+    const text = JSON.stringify(body.messages)
+    if (!text.includes('USER_INPUT_GUIDANCE_ONLY')) {
+      const firstRequest = childRequestsBeforeGuidance++ === 0
+      assert.ok(childRequestsBeforeGuidance <= 2, 'a request prepared after visible guidance must include it')
+      childSessionID = request.headers['x-wxs-canary-session']
+      let responseFinished = false
+      response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
+      const [prefix] = buildTextChunks('child', 'CHILD_PREFIX_', 1)
+      response.write(`data: ${JSON.stringify(prefix)}\n\n`)
+      response.once('close', () => {
+        if (!responseFinished) activeResponseClosedEarly = true
+      })
+      const finishChildRequest = () => {
+        assert.equal(response.destroyed, false, 'Manager guidance must not abort the running child')
+        const suffix = { ...prefix, choices: [{ index: 0, delta: { content: 'CHILD_SUFFIX' }, finish_reason: null }] }
+        response.write(`data: ${JSON.stringify(suffix)}\n\n`)
+        if (childStops) {
+          response.write(`data: ${JSON.stringify({ ...prefix, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`)
+        } else {
+          for (const chunk of buildToolCallChunks('child-tool', 'js-engineer', JSON.stringify({
+            program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }',
+          }), 1)) response.write(`data: ${JSON.stringify(chunk)}\n\n`)
+        }
+        childFinished = true
+        responseFinished = true
+        response.end('data: [DONE]\n\n')
+      }
+      heldChild = finishChildRequest
+      publish('child.held', { sessionID: childSessionID, messageID })
+      if (!firstRequest) {
+        const guidance = observations.find(({ kind, value }) =>
+          kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'BusyAgentNudge')
+        assert.ok(guidance, 'only a request already preparing before Host storage may omit new guidance')
+        await waitFor(({ kind, value }) =>
+          kind === 'event.completed' && value.type === 'message.updated'
+          && value.properties.info?.id === guidance.value.messageID && value.properties.info?.role === 'user')
+        finishChildRequest()
+      }
+    } else {
+      assert.ok(text.includes('USER_INPUT_CHILD_WORK'))
+      assert.ok(text.includes('CHILD_PREFIX_CHILD_SUFFIX'))
+      if (!childStops) assert.ok(text.includes('CHILD_TOOL_RESULT'))
+      publish('child.guided.provider', { sessionID: request.headers['x-wxs-canary-session'], messageID })
+      sendSSE(response, buildTextChunks('child-guided', 'CHILD_WORK_DONE', 1))
+    }
+    return
+  }
   if (!names.includes('js-manager')) {
     const chronicle = body.tools?.find(tool => tool.function?.name === 'chronicle')
     if (chronicle) {
@@ -118,7 +177,28 @@ const handleProvider = async (request, response) => {
     } else sendSSE(response, buildTextChunks('auxiliary', 'Auxiliary response.', 1))
     return
   }
-  const messageID = request.headers['x-wxs-canary-message']
+  if (guidanceMode && messageID === rootID) {
+    if (managerStep++ === 0) {
+      sendSSE(response, buildToolCallChunks('fork-child', 'fork', JSON.stringify({
+        calling: 'engineer', name: 'Ada', charge: 'USER_INPUT_CHILD_WORK',
+      }), 1))
+    } else sendSSE(response, buildToolCallChunks('join-child', 'join', '{}', 1))
+    return
+  }
+  if (guidanceMode && messageID === humanID) {
+    assert.ok(JSON.stringify(body.messages).includes('USER_INPUT_HUMAN'))
+    const step = humanStep++
+    if (step === 0) {
+      sendSSE(response, buildToolCallChunks('guide-child', 'resume', JSON.stringify({
+        name: 'Ada', charge: 'USER_INPUT_GUIDANCE_ONLY',
+      }), 1))
+    } else if (step === 1) sendSSE(response, buildToolCallChunks('join-guided-child', 'join', '{}', 1))
+    else {
+      assert.ok(JSON.stringify(body.messages).includes('CHILD_WORK_DONE'))
+      sendSSE(response, buildTextChunks('human', 'HUMAN_ANSWER', 1))
+    }
+    return
+  }
   if (messageID === humanID) {
     assert.ok(JSON.stringify(body.messages).includes('USER_INPUT_HUMAN'), 'the next actual provider request must contain the fresh input')
     assert.ok(JSON.stringify(body.messages).includes(phase === 'STREAMING' ? 'OLD_PREFIX_OLD_SUFFIX' : 'USER_INPUT_HELD_TOOL'), 'the old output/tool result must survive in the next request')
@@ -175,6 +255,24 @@ const prompt = (messageID, text) => ({
   messageID, agent: 'manager', model: { providerID: 'test', modelID: 'test-model' }, parts: [{ type: 'text', text }],
 })
 const results = []
+const waitForManagerJoin = () => new Promise((resolve, reject) => {
+  const snapshot = path.join(workspace, '.wanxiangshu/diagnostics/causal-waits.json')
+  const observe = () => {
+    if (!fs.existsSync(snapshot)) return
+    const waits = JSON.parse(fs.readFileSync(snapshot, 'utf8'))
+    if (waits.active?.some(wait => wait.waitKind === 'agent-join' && JSON.stringify(wait.owner).includes(sessionID))) {
+      clearTimeout(timer)
+      watcher.close()
+      resolve()
+    }
+  }
+  const watcher = fs.watch(workspace, { recursive: true }, observe)
+  const timer = setTimeout(() => {
+    watcher.close()
+    reject(new Error('Manager never entered an active Join wait'))
+  }, 25000)
+  observe()
+})
 try {
   await host.start({
     scenarioDir, providerUrl: `${providerUrl}/v1`,
@@ -194,38 +292,82 @@ export default function route(role, running) {
   sessionID = (await request('POST', '/session', { title: `User input ${phase}` })).id
   const initial = request('POST', `/session/${sessionID}/message`, prompt(rootID, 'USER_INPUT_ROOT'))
   initial.catch(error => publish('fixture.failure', { error: String(error) }))
-  await waitFor(({ kind }) => kind === (phase === 'STREAMING' ? 'stream.held' : 'tool.held'))
-  const human = request('POST', `/session/${sessionID}/message`, prompt(humanID, 'USER_INPUT_HUMAN'))
-  human.catch(error => publish('fixture.failure', { error: String(error) }))
-  await waitFor(({ kind, value }) => kind === (capacityOne ? 'message.received' : 'message.accepted') && value.messageID === humanID)
-  assert.equal(observations.some(({ kind }) => kind === 'host.abort'), false, 'new user input must issue no Host abort')
-  assert.equal(observations.some(({ kind }) => kind === 'human.provider'), false, 'the new request must wait for the current stream/tool to finish')
-  if (phase === 'STREAMING') heldStream()
-  else release('tool')
-  const [answer] = await Promise.all([human, initial])
-  await waitFor(({ kind, value }) => kind === 'event.completed' && value.type === 'message.updated'
-    && value.properties.info.id === answer.info.id && value.properties.info.time?.completed !== undefined)
-  assert.equal(answer.info.parentID, humanID)
-  assert.equal(answer.info.finish, 'stop')
-  assert.equal(answer.info.error, undefined)
-  assert.ok(answer.parts.some(part => part.type === 'text' && part.text === 'HUMAN_ANSWER'))
-  const messages = await request('GET', `/session/${sessionID}/message`)
-  const previous = messages.find(row => row.info.role === 'assistant' && row.info.parentID === rootID)
-  assert.equal(previous.info.error, undefined, 'the old physical assistant must finish normally')
-  assert.ok(previous.info.time.completed !== undefined)
-  if (phase === 'STREAMING') {
-    assert.ok(previous.parts.some(part => part.type === 'text' && part.text === 'OLD_PREFIX_OLD_SUFFIX'))
+  if (guidanceMode) {
+    await waitFor(({ kind }) => kind === 'child.held')
+    await waitForManagerJoin()
+    const human = request('POST', `/session/${sessionID}/message`, prompt(humanID, 'USER_INPUT_HUMAN'))
+    human.catch(error => publish('fixture.failure', { error: String(error) }))
+    const join = await waitFor(({ kind, value }) => kind === 'join.result' && value.sessionID === sessionID)
+    assert.equal(join.value.result, renderInterrupted('english', 'UserMessageArrived'))
+    assert.equal(childFinished, false, 'the user input only releases Manager Join, not the child task')
+    const guidance = await waitFor(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'BusyAgentNudge')
+    assert.equal(observations.filter(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'AgentOwnerRoot').length, 1)
+    assert.equal(observations.some(({ kind, value }) =>
+      kind === 'host.abort' && [sessionID, childSessionID].includes(value.sessionID)), false)
+    heldChild()
+    const [answer] = await Promise.all([human, initial])
+    assert.equal(answer.info.parentID, humanID)
+    assert.equal(answer.info.finish, 'stop')
+    assert.equal(answer.info.error, undefined)
+    assert.ok(answer.parts.some(part => part.type === 'text' && part.text === 'HUMAN_ANSWER'))
+    const followed = await waitFor(({ kind }) => kind === 'child.guided.provider')
+    assert.equal(followed.value.sessionID, childSessionID)
+    assert.equal(followed.value.messageID, guidance.value.messageID)
+    await waitFor(({ kind, value }) => kind === 'event.completed' && value.type === 'message.updated'
+      && value.properties.info.sessionID === childSessionID && value.properties.info.parentID === guidance.value.messageID
+      && value.properties.info.time?.completed !== undefined)
+    const childMessages = await request('GET', `/session/${childSessionID}/message`)
+    const old = childMessages.find(row => row.info.role === 'assistant' && row.info.parentID !== guidance.value.messageID)
+    assert.equal(old.info.error, undefined)
+    assert.equal(old.info.finish, childStops ? 'stop' : 'tool-calls')
+    assert.ok(old.parts.some(part => part.type === 'text' && part.text === 'CHILD_PREFIX_CHILD_SUFFIX'))
+    const completed = childMessages.find(row => row.info.role === 'assistant' && row.info.parentID === guidance.value.messageID)
+    assert.equal(completed.info.error, undefined)
+    assert.ok(completed.parts.some(part => part.type === 'text' && part.text === 'CHILD_WORK_DONE'))
+    assert.equal(activeResponseClosedEarly, false)
+    assert.equal(observations.some(({ kind, value }) =>
+      kind === 'host.abort' && [sessionID, childSessionID].includes(value.sessionID)), false)
+    const commonDirectory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: workspace, encoding: 'utf8' }).trim()
+    const works = await coldWorkSnapshot(commonDirectory, sessionID)
+    assert.equal(works.length, 1, 'guidance must not create another logical work unit')
+    const originalRoot = observations.find(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'AgentOwnerRoot')
+    assert.equal(works[0].root, originalRoot.value.messageID)
+    assert.equal(works[0].lifecycle, 'Retired', 'Manager Join must consume the original completed work')
+    results.push({ phase, joinInterrupted: true, childInterrupted: false, childRoots: 1, guidanceInNextRequest: true, answerParent: answer.info.parentID })
   } else {
-    const tool = previous.parts.find(part => part.type === 'tool' && part.tool === 'js-manager')
-    assert.equal(tool.state.status, 'completed', JSON.stringify(tool))
-    assert.ok(tool.state.output.includes('USER_INPUT_HELD_TOOL'))
+    await waitFor(({ kind }) => kind === (phase === 'STREAMING' ? 'stream.held' : 'tool.held'))
+    const human = request('POST', `/session/${sessionID}/message`, prompt(humanID, 'USER_INPUT_HUMAN'))
+    human.catch(error => publish('fixture.failure', { error: String(error) }))
+    await waitFor(({ kind, value }) => kind === (capacityOne ? 'message.received' : 'message.accepted') && value.messageID === humanID)
+    assert.equal(observations.some(({ kind }) => kind === 'host.abort'), false, 'new user input must issue no Host abort')
+    assert.equal(observations.some(({ kind }) => kind === 'human.provider'), false, 'the new request must wait for the current stream/tool to finish')
+    if (phase === 'STREAMING') heldStream()
+    else release('tool')
+    const [answer] = await Promise.all([human, initial])
+    await waitFor(({ kind, value }) => kind === 'event.completed' && value.type === 'message.updated'
+      && value.properties.info.id === answer.info.id && value.properties.info.time?.completed !== undefined)
+    assert.equal(answer.info.parentID, humanID)
+    assert.equal(answer.info.finish, 'stop')
+    assert.equal(answer.info.error, undefined)
+    assert.ok(answer.parts.some(part => part.type === 'text' && part.text === 'HUMAN_ANSWER'))
+    const messages = await request('GET', `/session/${sessionID}/message`)
+    const previous = messages.find(row => row.info.role === 'assistant' && row.info.parentID === rootID)
+    assert.equal(previous.info.error, undefined, 'the old physical assistant must finish normally')
+    assert.ok(previous.info.time.completed !== undefined)
+    if (phase === 'STREAMING') {
+      assert.ok(previous.parts.some(part => part.type === 'text' && part.text === 'OLD_PREFIX_OLD_SUFFIX'))
+    } else {
+      const tool = previous.parts.find(part => part.type === 'tool' && part.tool === 'js-manager')
+      assert.equal(tool.state.status, 'completed', JSON.stringify(tool))
+      assert.ok(tool.state.output.includes('USER_INPUT_HELD_TOOL'))
+    }
+    assert.equal(activeResponseClosedEarly, false)
+    assert.equal(observations.some(({ kind }) => kind === 'host.abort'), false)
+    results.push({ phase, answerParent: answer.info.parentID, human: humanID, oldFinish: previous.info.finish, interrupted: false })
   }
-  assert.equal(activeResponseClosedEarly, false)
-  assert.equal(observations.some(({ kind }) => kind === 'host.abort'), false)
-  results.push({ phase, answerParent: answer.info.parentID, human: humanID, oldFinish: previous.info.finish, interrupted: false })
 } catch (error) {
   console.error(error)
-  console.error(JSON.stringify({ observations, results }))
+  console.error(JSON.stringify({ observations, results }, null, 2))
   console.error(`Host stdout:\n${host.stdoutLog}\nHost stderr:\n${host.stderrLog}`)
   process.exitCode = 1
 } finally {
@@ -246,6 +388,14 @@ export default function route(role, running) {
   } catch (error) {
     console.error(error)
     process.exitCode = 1
+  }
+  if (process.exitCode) {
+    const logDirectory = path.join(scenarioDir, 'xdg/data/opencode/log')
+    if (fs.existsSync(logDirectory)) {
+      for (const name of fs.readdirSync(logDirectory).filter(name => name.endsWith('.log'))) {
+        console.error(`Host log ${name}:\n${fs.readFileSync(path.join(logDirectory, name), 'utf8')}`)
+      }
+    }
   }
   const cleanups = await Promise.allSettled([stopHttpServer(provider), stopHttpServer(collector)])
   for (const cleanup of cleanups) {

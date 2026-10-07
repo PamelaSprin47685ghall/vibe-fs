@@ -74,6 +74,7 @@ module ChatAdmissionIntent =
         | ExternalRootIntent of ExternalRootEvidence
         | ActiveHumanContinuationIntent of ActiveHumanContinuationEvidence
         | PendingPromptIntent of PendingPromptEvidence
+        | AcceptedInputIntent of AcceptedChatExecutionEvidence
         | HostInternal of HostInternalEvidence
         | Reject of Rejection
 
@@ -82,6 +83,7 @@ module ChatAdmissionIntent =
         | ExternalRoot of ExternalRootEvidence
         | ActiveHumanContinuation of ActiveHumanContinuationEvidence
         | PendingPrompt of PendingPromptEvidence
+        | AcceptedInput of AcceptedChatExecutionEvidence
 
     val tryManaged: decision: Decision -> ManagedIntent option
     val ofManaged: managed: ManagedIntent -> Decision

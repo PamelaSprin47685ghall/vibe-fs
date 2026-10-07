@@ -29,6 +29,7 @@ type internal ChatAdmissionTransactionStep =
 [<RequireQualifiedAccess>]
 type internal ChatAdmissionTransactionOutcome =
     | Settled of ManagedChatAcceptanceWitness
+    | DeferredInput of ManagedChatAcceptanceWitness * ModelRoutingTarget
     | Superseded of ManagedChatAcceptanceWitness
     | CapacityQueueFull of ManagedChatAcceptanceWitness
     | Cancelled of ManagedChatAcceptanceWitness
@@ -66,6 +67,7 @@ type internal ChatAdmissionTransactionError =
     | LeaseTargetBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseTargetProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | HostProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
+    | InputProjectionFailed of exn
     | LeaseCommitFailed of commit: CapacityTransitionOutcome * release: ChatAdmissionReleaseOutcome
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
 
@@ -441,9 +443,24 @@ module internal ChatAdmissionTransaction =
         | Error error ->
             compensate observe ports witness lease ChatExecutionTerminalDisposition.Failed (commitError error)
 
-    let private executeAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) ports managed =
+    let private projectDeferredInput observe ports witness target =
         taskResult {
-            let! witness = acceptAdmission observe ports managed
+            observe ChatAdmissionTransactionStep.ProjectHost
+
+            match
+                modelFromTarget target
+                |> Result.bind (fun model -> effect (fun () -> ports.ProjectHost model))
+            with
+            | Ok() ->
+                observe ChatAdmissionTransactionStep.Settled
+                return ChatAdmissionTransactionOutcome.DeferredInput(witness, target)
+            | Error error ->
+                let! _ = settleWitness observe ports witness ChatExecutionTerminalDisposition.Failed
+                return! Error(ChatAdmissionTransactionError.InputProjectionFailed error)
+        }
+
+    let private executeFreshAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) ports witness =
+        taskResult {
             let! acquisition = acquireAdmission observe ports witness
 
             match acquisition with
@@ -458,9 +475,19 @@ module internal ChatAdmissionTransaction =
                         })
         }
 
+    let private executeAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) tryInputTarget ports managed =
+        taskResult {
+            let! witness = acceptAdmission observe ports managed
+
+            match tryInputTarget witness with
+            | Some target -> return! projectDeferredInput observe ports witness target
+            | None -> return! executeFreshAdmission observe withLeaseOwner ports witness
+        }
+
     let executeWithLeaseOwner
         (observe: ChatAdmissionTransactionStep -> unit)
         (withLeaseOwner: ChatAdmissionLeaseOwner)
+        (tryInputTarget: ManagedChatAcceptanceWitness -> ModelRoutingTarget option)
         (ports: ChatAdmissionTransactionPorts)
         (managed: ChatAdmissionIntent.ManagedIntent)
         : Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>> =
@@ -468,11 +495,11 @@ module internal ChatAdmissionTransaction =
             match resolve observe ports (intentKey managed) with
             | Error error -> return Error error
             | Ok(ExistingOutcome outcome) -> return Ok outcome
-            | Ok AdmissionRequired -> return! executeAdmission observe withLeaseOwner ports managed
+            | Ok AdmissionRequired -> return! executeAdmission observe withLeaseOwner tryInputTarget ports managed
         }
 
     let executeWith observe ports managed =
-        executeWithLeaseOwner observe (fun _ operation -> operation ()) ports managed
+        executeWithLeaseOwner observe (fun _ operation -> operation ()) (fun _ -> None) ports managed
 
     let production
         (journal: AgentJournal)

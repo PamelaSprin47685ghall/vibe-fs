@@ -35,9 +35,6 @@ module ForkTool =
             val AttachSelf: string = "delegation/fork-attach-self"
 
             [<Literal>]
-            val AttachBusy: string = "delegation/fork-attach-busy"
-
-            [<Literal>]
             val NameRequired: string = "tool/fork/name-required"
 
             [<Literal>]
@@ -133,6 +130,9 @@ module ForkTool =
 
             [<Literal>]
             val CallingNotAllowed: string = "tool/resume/calling-not-allowed"
+
+            [<Literal>]
+            val GuidanceSent: string = "tool/resume/guidance-sent"
 
             [<Literal>]
             val AssessmentPendingForDevOps: string = "tool/resume/assessment-pending-for-devops"

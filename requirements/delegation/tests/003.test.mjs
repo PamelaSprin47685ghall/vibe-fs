@@ -192,7 +192,6 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     const resumed = await first
     assert.match(resumed, /devops/)
-    assert.match(resumed, /carries this charge now|现已接下这项托付/i)
 
     // Trigger cancelOwnerChildren
     await forkTool.cancelOwnerChildren(runtime, owner)
@@ -219,7 +218,6 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
     assert.equal(forkTool.acceptPrompt(runtime, 1), true)
     const resumedAfterCancel = await second
     assert.match(resumedAfterCancel, /devops/)
-    assert.match(resumedAfterCancel, /carries this charge now|现已接下这项托付/i)
     const works = forkTool.workSnapshot(runtime, owner)
     assert.equal(works.length, 2)
     const secondWork = works.find(work => work.lifecycle === 'Active')
@@ -246,13 +244,18 @@ test('WHAT[delegation-003] parent cancel preserves the busy fixed DevOps work un
 
     await forkTool.cancelOwnerChildren(runtime, owner)
     assert.deepEqual(forkTool.workSnapshot(runtime, owner), originalWork)
-    forkTool.nextPromptAcceptanceUnknown(runtime, 'a busy fixed DevOps must not receive another assignment')
-    const rejected = await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'devops', 'NEW-CHARGE-WHILE-BUSY')
-    assert.doesNotMatch(rejected, /carries this charge now|现已接下这项托付|uncertain|不确定/i)
-    assert.equal(forkTool.promptCount(runtime), 1, 'busy rejection performs no second Host send')
+    const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'DEVOPS-OLD-WORK-RETURNED', 'devops-busy-run-1')
+    forkTool.acceptNextPrompt(runtime)
+    await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'devops', 'GUIDANCE-WHILE-BUSY')
+    assert.equal(forkTool.promptCount(runtime), 2)
+    assert.match(forkTool.prompt(runtime, 1), /GUIDANCE-WHILE-BUSY/)
+    forkTool.acceptNextPrompt(runtime)
+    await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'devops', 'DEVOPS-ACTIVE-CHARGE')
+    assert.equal(forkTool.promptCount(runtime), 3, 'an independent guidance act is not deduplicated by its text')
+    assert.match(forkTool.prompt(runtime, 2), /DEVOPS-ACTIVE-CHARGE/)
     assert.deepEqual(forkTool.workSnapshot(runtime, owner), originalWork)
 
-    assert.equal(await forkTool.settle(runtime, owner, 'DEVOPS-OLD-WORK-RETURNED', 'devops-busy-run-1'), true)
+    await completeOriginal()
     assert.match(await forkTool.executeJoin(runtime, owner), /DEVOPS-OLD-WORK-RETURNED/)
     assert.equal(forkTool.workSnapshot(runtime, owner)[0].lifecycle, 'Retired')
   } finally {

@@ -40,7 +40,7 @@ type IJoinAttemptRegistry =
     abstract Begin: SessionId * ToolCallId option -> JoinAttemptLease
     /// External user message arrived for a session. Wakes every ACTIVE attempt;
     /// zero active attempts → drop as a join wake (no future latch).
-    abstract SignalUserMessage: SessionId -> unit
+    abstract SignalVisibleUserMessage: SessionId * PhysicalUserMessageId -> unit
     /// Drop active attempts for a deleted session. Does not signal.
     abstract ClearSession: SessionId -> unit
 
@@ -50,6 +50,8 @@ type JoinAttemptRegistry() =
     /// DSL-cross-callback-proof: physical waiter — live JoinAttemptLease wait handles only
     // DSL-MUTABLE: resource — active join attempt registry by session key
     let active = Dictionary<string, ResizeArray<JoinAttemptLease>>()
+    // DSL-MUTABLE: resource — deduplicate visible-message wakes across successive join leases
+    let visibleMessages = Dictionary<string, HashSet<PhysicalUserMessageId>>()
 
     let removeLease (key: string) (list: ResizeArray<JoinAttemptLease>) (lease: JoinAttemptLease) =
         list.Remove lease |> ignore
@@ -95,14 +97,25 @@ type JoinAttemptRegistry() =
 
             lease
 
-        member _.SignalUserMessage(sessionId: SessionId) : unit =
+        member _.SignalVisibleUserMessage(sessionId: SessionId, physicalId: PhysicalUserMessageId) : unit =
             let key = SessionId.value sessionId
+
+            let currentAttempts () =
+                match active.TryGetValue key with
+                | true, list when list.Count > 0 -> list |> Seq.toList
+                | _ -> []
 
             let attempts =
                 lock gate (fun () ->
-                    match active.TryGetValue key with
-                    | true, list when list.Count > 0 -> list |> Seq.toList
-                    | _ -> [])
+                    let seen =
+                        match visibleMessages.TryGetValue key with
+                        | true, seen -> seen
+                        | false, _ ->
+                            let seen = HashSet<PhysicalUserMessageId>()
+                            visibleMessages.[key] <- seen
+                            seen
+
+                    if not (seen.Add physicalId) then [] else currentAttempts ())
 
             // Only the CURRENT active attempts wake; none active → dropped.
             for attempt in attempts do
@@ -110,4 +123,7 @@ type JoinAttemptRegistry() =
 
         member _.ClearSession(sessionId: SessionId) : unit =
             let key = SessionId.value sessionId
-            lock gate (fun () -> active.Remove key |> ignore)
+
+            lock gate (fun () ->
+                active.Remove key |> ignore
+                visibleMessages.Remove key |> ignore)

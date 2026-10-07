@@ -66,7 +66,9 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
 
-准入 owner 仍以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入，容量 owner 的 supersession 只交接旧执行的准入资源，不授予物理中断权。同一 session 的 accept、acquire 与旧执行结算由一个准入 owner 串行处理，容量 pending 的完成等待不阻挡后来的输入入场；旧执行按 `Superseded` policy 精确结算，迟到旧回调不得取消或释放新执行。新输入不逻辑取消根会话、不级联 children；`PendingPromptIntent`、Guard、retry 与 HostInternal 也不得借此中断根会话。原有自动 `InterruptAttempt` 与 `AbortSession` 的根会话禁令保持有效。
+准入 owner 仍以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入。已有同一 run 的活跃租约时，`HumanMessage` 与 `BusyAgentNudge` 先持久接纳并投影已有目标，保留旧 exact lease，供当前输出、工具及已经准备中的请求自然完成；Host 的下一次 provider 边界实际选择可见新输入后，才交接 exact lease 和原 capacity credit，不重新派工或抢占第二份容量。容量 owner 的 supersession 不授予物理中断权。
+
+同一 session 的准入投影与交接由一个 owner 串行处理，容量 pending 的完成等待不阻挡后来的输入入场；旧执行按 `Superseded` policy 精确结算，迟到旧回调不得取消或释放新执行。同次请求已包含、但未单独启动 provider 的较早追加材料也须精确结算，不留下可恢复的悬空执行。新输入不逻辑取消根会话、不级联 children，不自动发起新 mission 或工作记录；原 authority root、LogicalRunId、participant 与 obligation 延续。`PendingPromptIntent`、Guard、retry 与 HostInternal 也不得借此中断根会话，原有自动根会话中断禁令保持有效。
 
 ## [017] 中断必须有后继
 

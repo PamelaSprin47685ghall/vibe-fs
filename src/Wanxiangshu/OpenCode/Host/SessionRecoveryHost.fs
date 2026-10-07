@@ -169,10 +169,11 @@ type SessionRecoveryHost
 
     let release (key: ChatExecutionKey) =
         match ModelRouting.releasePhysicalExecution key.SessionId key.PhysicalUserMessageId with
-        | CapacityTransitionOutcome.Applied
-        | CapacityTransitionOutcome.AlreadyApplied
-        | CapacityTransitionOutcome.StaleFence -> Task.FromResult(()) :> Task
-        | CapacityTransitionOutcome.Conflict ->
+        | PhysicalExecutionReleaseOutcome.HeldForInput
+        | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Applied
+        | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.AlreadyApplied
+        | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.StaleFence -> Task.FromResult(()) :> Task
+        | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Conflict ->
             raise (InvalidOperationException "managed chat recovery exact capacity release was rejected")
 
     let requirePersistence (label: string) (result: Result<'witness, ManagedChatProviderLifecycleError>) =

@@ -1,21 +1,16 @@
 namespace Wanxiangshu.Execution.Delegation.Handle.OpenCode
 
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Interaction.Authority
 
 [<RequireQualifiedAccess>]
 module JoinWake =
 
-    /// EXEC-017: only a real external user material interrupts active joins.
-    /// Plugin-owned continuations and Host compaction are not external-user
-    /// arrivals. The registry itself remains attempt-scoped and drops the wake
-    /// when no attempt is active.
-    let observeChatMessage (registry: IJoinAttemptRegistry) (intent: ChatAdmissionIntent.Decision) =
-        match intent with
-        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> registry.SignalUserMessage evidence.Key.SessionId
-        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-            registry.SignalUserMessage evidence.Key.SessionId
-        | ChatAdmissionIntent.Decision.PendingPromptIntent evidence -> registry.SignalUserMessage evidence.Key.SessionId
-        | ChatAdmissionIntent.Decision.NoManagedExecution _
-        | ChatAdmissionIntent.Decision.HostInternal _
-        | ChatAdmissionIntent.Decision.Reject _ -> ()
+    let observeAcceptedMessage (registry: IJoinAttemptRegistry) (evidence: AcceptedChatExecutionEvidence) =
+        match evidence.Origin with
+        | PromptOrigin.AuthorityRoot _
+        | PromptOrigin.Continuation _ ->
+            registry.SignalVisibleUserMessage(evidence.SessionId, evidence.PhysicalUserMessageId)
+        | PromptOrigin.HostInternal
+        | PromptOrigin.UnknownOrigin -> ()

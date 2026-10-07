@@ -23,6 +23,7 @@ type internal ChatAdmissionTransactionStep =
 [<RequireQualifiedAccess>]
 type internal ChatAdmissionTransactionOutcome =
     | Settled of ManagedChatAcceptanceWitness
+    | DeferredInput of ManagedChatAcceptanceWitness * ModelRoutingTarget
     | Superseded of ManagedChatAcceptanceWitness
     | CapacityQueueFull of ManagedChatAcceptanceWitness
     | Cancelled of ManagedChatAcceptanceWitness
@@ -61,6 +62,7 @@ type internal ChatAdmissionTransactionError =
     | LeaseTargetBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
     | LeaseTargetProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
     | HostProjectionFailed of exn * release: ChatAdmissionReleaseOutcome
+    | InputProjectionFailed of exn
     | LeaseCommitFailed of commit: CapacityTransitionOutcome * release: ChatAdmissionReleaseOutcome
     | LeaseCommitBoundaryFailed of exn * release: ChatAdmissionReleaseOutcome
 
@@ -89,6 +91,7 @@ module internal ChatAdmissionTransaction =
     val executeWithLeaseOwner:
         observe: (ChatAdmissionTransactionStep -> unit) ->
         withLeaseOwner: ChatAdmissionLeaseOwner ->
+        tryInputTarget: (ManagedChatAcceptanceWitness -> ModelRoutingTarget option) ->
         ports: ChatAdmissionTransactionPorts ->
         managed: ChatAdmissionIntent.ManagedIntent ->
             Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>

@@ -51,10 +51,26 @@ test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and thei
     await hooks['chat.message']({ ...input, messageID: fresh.message.id }, fresh)
     assert.deepEqual({ ...fresh.message.model }, { providerID: 'provider', modelID: 'engineer-model', variant: 'none' })
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, input.sessionID, input.messageID), {
+      phase: 'Accepted', disposition: null,
+    })
+    assert.deepEqual(routing.sharedCapacitySnapshot(), replayCapacity,
+      'accepting additional material cannot revoke the lease before the Host selects that material')
+    runtime.pushHostMessage(input.sessionID, {
+      info: {
+        id: 'assistant-fresh-human', sessionID: input.sessionID, parentID: fresh.message.id,
+        role: 'assistant', agent: input.agent, providerID: 'provider', modelID: 'engineer-model',
+        time: { created: 2 },
+      },
+      parts: [],
+    })
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [{ info: fresh.message, parts: [] }],
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, input.sessionID, input.messageID), {
       phase: 'Terminal', disposition: 'Cancelled',
     })
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, input.sessionID, fresh.message.id), {
-      phase: 'Accepted', disposition: null,
+      phase: 'ProviderStarted', disposition: null,
     })
     const currentCapacity = routing.sharedCapacitySnapshot()
     const currentAuthority = dispatch.projectionObservation(runtime.journal, input.sessionID).activeLogicalRun
@@ -70,9 +86,10 @@ test('WHAT[managed-chat-execution-003] concurrent exact chat admissions and thei
       phase: 'Terminal', disposition: 'Cancelled',
     })
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, input.sessionID, fresh.message.id), {
-      phase: 'Accepted', disposition: null,
+      phase: 'ProviderStarted', disposition: null,
     })
-    assert.equal(runtime.prompts.length, 0)
+    assert.equal(runtime.prompts.filter(prompt => prompt.path?.id === input.sessionID).length, 0)
+    assert.ok(runtime.prompts.every(prompt => prompt.body?.agent === 'blogger'))
   })
 })
 

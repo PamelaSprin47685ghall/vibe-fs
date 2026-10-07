@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -299,6 +300,30 @@ module JoinSurface =
                 | ForkError.TerminalMaterializationFailed _ -> "TerminalMaterializationFailed"
 
             box {| kind = "Error"; error = name |}
+
+    let createVisibleInputRegistry () : obj =
+        let registry = JoinAttemptRegistry() :> IJoinAttemptRegistry
+
+        createObj
+            [ "begin"
+              ==> (fun (sessionId: string) ->
+                  let lease = registry.Begin(SessionId.create sessionId, None)
+
+                  createObj
+                      [ "result"
+                        ==> task {
+                            let! reason = lease.Wait
+                            return joinOutcomeObject (Ok(JoinWaitOutcome.Interrupted reason))
+                        }
+                        "deadline" ==> (fun () -> lease.SignalDeadline())
+                        "abort" ==> (fun () -> lease.SignalOperatorAbort())
+                        "dispose" ==> (fun () -> (lease :> IDisposable).Dispose()) ])
+              "signal"
+              ==> (fun (sessionId: string, physicalId: string) ->
+                  registry.SignalVisibleUserMessage(
+                      SessionId.create sessionId,
+                      PhysicalUserMessageId.create physicalId
+                  )) ]
 
     // Production JoinTool.renderJoined releases PTY ownership tracks once a
     // batch is delivered; the probe keeps the same discipline so PtyRuns

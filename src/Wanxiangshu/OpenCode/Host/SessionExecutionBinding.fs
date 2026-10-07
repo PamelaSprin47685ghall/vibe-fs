@@ -7,6 +7,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.ProviderWireDecode
 open Wanxiangshu.OpenCode.ProviderWireCapture
 open Wanxiangshu.Persistence.Journal
@@ -54,8 +55,39 @@ module SessionExecutionBinding =
 
         sprintf "%s:%s:%s" (SessionId.value sessionId) (PhysicalUserMessageId.value physical) sortedRuns
 
-    /// EMR-010 / host-boundary-008: enter the provider step of the physical
-    /// message this request answers. A message with no durable `Accepted` is not
+    let private continuationFromPrevious (durable: AgentJournal) (evidence: AcceptedChatExecutionEvidence) previous =
+        let key: ChatExecutionKey =
+            { SessionId = evidence.SessionId
+              PhysicalUserMessageId = PhysicalUserMessageId.create previous }
+
+        let state =
+            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.byKey key
+
+        match state, ModelRouting.tryReadExecution key with
+        | Some prior, Some lease when
+            key.PhysicalUserMessageId <> evidence.PhysicalUserMessageId
+            && (prior.terminalDisposition.IsNone
+                || (ModelRouting.tryContinuationInput
+                        { SessionId = evidence.SessionId
+                          PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+                    |> Option.exists (fun retained -> retained.Identity.PhysicalUserMessageId = previous)))
+            && prior.acceptedEvidence.LogicalRunId = evidence.LogicalRunId
+            && prior.acceptedEvidence.AuthorityRootUserMessageId = evidence.AuthorityRootUserMessageId
+            && prior.acceptedEvidence.IdentitySeed = evidence.IdentitySeed
+            ->
+            Some lease
+        | _ -> None
+
+    let tryContinuationAdmission (durable: AgentJournal) (evidence: AcceptedChatExecutionEvidence) =
+        match evidence.Origin with
+        | PromptOrigin.Continuation PromptContinuationKind.BusyAgentNudge
+        | PromptOrigin.Continuation PromptContinuationKind.HumanMessage ->
+            ModelRouting.tryActivePhysical (SessionId.value evidence.SessionId)
+            |> Option.bind (continuationFromPrevious durable evidence)
+        | _ -> None
+
+    /// EMR-010 / host-boundary-008: a message with no durable Accepted is not
     /// a managed execution and is left alone; one that was accepted must hold a
     /// committed lease for that exact key or fail closed.
     let private enterBoundProviderStep

@@ -55,6 +55,7 @@ module FissionHostRequestProjection =
             projectVisibility (hasPhysicalParent evidence.Key.SessionId) output
         | ChatAdmissionIntent.Decision.NoManagedExecution _
         | ChatAdmissionIntent.Decision.PendingPromptIntent _
+        | ChatAdmissionIntent.Decision.AcceptedInputIntent _
         | ChatAdmissionIntent.Decision.HostInternal _
         | ChatAdmissionIntent.Decision.Reject _ -> ()
 
@@ -66,6 +67,8 @@ module FissionHostRequestProjection =
         match intent with
         | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
             projectVisibility (hasPhysicalParent evidence.Key.SessionId) output
+        | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+            projectVisibility (hasPhysicalParent evidence.SessionId) output
         | ChatAdmissionIntent.Decision.ExternalRootIntent _
         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _
         | ChatAdmissionIntent.Decision.NoManagedExecution _

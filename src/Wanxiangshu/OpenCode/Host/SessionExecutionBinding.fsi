@@ -12,6 +12,9 @@ module SessionExecutionBinding =
     /// host-boundary-008: durable managed-execution evidence for one exact key.
     val isManagedExecution: durable: AgentJournal option -> key: ChatExecutionKey -> bool
 
+    val internal tryContinuationAdmission:
+        durable: AgentJournal -> evidence: AcceptedChatExecutionEvidence -> ExecutionAdmissionLease option
+
     /// HOST-004: begin the provider step of the physical message this transform
     /// request answers. Durable evidence decides whether a step is entered.
     val beginPhysicalProviderAttemptForTransform:

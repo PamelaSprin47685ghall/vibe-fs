@@ -21,6 +21,10 @@ type internal BorrowingCapacity<'target> =
         sessionId: string * lenderSessionId: string option * route: ('target array -> 'target option) -> 'target option
 
     member AdoptReservation: sessionId: string * physicalUserMessageId: string * target: 'target -> unit
+
+    member ContinueExecution:
+        sessionId: string * previousPhysicalId: string * physicalId: string * target: 'target -> 'target
+
     member ReleaseSession: sessionId: string -> CapacityTransitionOutcome
     member ReleasePhysical: sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome
 

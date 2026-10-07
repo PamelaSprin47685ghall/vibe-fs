@@ -307,6 +307,11 @@ module ModelRoutingSurface =
         | CapacityTransitionOutcome.StaleFence -> box {| kind = "StaleFence" |}
         | CapacityTransitionOutcome.Conflict -> box {| kind = "Conflict" |}
 
+    let private physicalReleaseObject =
+        function
+        | PhysicalExecutionReleaseOutcome.Released outcome -> transitionOutcomeObject outcome
+        | PhysicalExecutionReleaseOutcome.HeldForInput -> box {| kind = "HeldForInput" |}
+
     let private leaseOf token =
         if hasOpaqueLease executionAdmissionLeases token then
             Some(opaqueLeaseValue executionAdmissionLeases token)
@@ -513,7 +518,7 @@ module ModelRoutingSurface =
         ModelRouting.releasePhysicalExecution
             (SessionId.create sessionId)
             (PhysicalUserMessageId.create physicalUserMessageId)
-        |> transitionOutcomeObject
+        |> physicalReleaseObject
 
     /// Load the user-visible scheduler module through the owner boundary. The
     /// returned function is an opaque JS capability and is never introspected by
@@ -596,6 +601,25 @@ module ModelRoutingSurface =
             let! completed = awaitAdmission acquisition
             return acquireAdmissionObject completed
         }
+
+    let continueExecutionAdmission (runtime: obj) (token: obj) (physicalUserMessageId: string) : Task<obj> =
+        task {
+            let previous =
+                leaseOf token
+                |> Option.defaultWith (fun () -> invalidArg "token" "continuation requires an opaque admission lease")
+
+            let! acquisition = (runtimeOf runtime).ContinueExecutionAdmission(previous, physicalUserMessageId)
+
+            return acquireAdmissionObject acquisition
+        }
+
+    let retainContinuationInput (runtime: obj) (token: obj) (physicalUserMessageId: string) : obj =
+        let previous =
+            leaseOf token
+            |> Option.defaultWith (fun () -> invalidArg "token" "input requires an opaque admission lease")
+
+        (runtimeOf runtime).RetainContinuationInput(previous, physicalUserMessageId)
+        |> targetObject
 
     let beginExecutionAdmission
         (runtime: obj)
@@ -778,7 +802,7 @@ module ModelRoutingSurface =
 
     let releasePhysicalExecution (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
         (runtimeOf runtime).ReleasePhysicalExecution(sessionId, physicalUserMessageId)
-        |> transitionOutcomeObject
+        |> physicalReleaseObject
 
     let releaseExecution (runtime: obj) (sessionId: string) : obj =
         (runtimeOf runtime).ReleaseExecution(sessionId) |> transitionOutcomeObject
