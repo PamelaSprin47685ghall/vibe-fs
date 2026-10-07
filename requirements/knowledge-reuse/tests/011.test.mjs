@@ -9,7 +9,7 @@ import { sandbox, createCase, deferred, casebook, eventStore, index, parse } fro
 import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
-import { CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
+import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
 
 test('WHAT[knowledge-reuse-011] overlapping fetches join one actual in-flight maintenance and receive the same result', async () => {
   const local = sandbox()
@@ -456,5 +456,160 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
 
 test('WHAT[knowledge-reuse-011] two required owners on one workspace store share one actual CurrentCommitUnknown cut, original incident and Prepared',
   t => assertSharedCutSettlement(t, true))
+
+test('WHAT[knowledge-reuse-011] two required owners on one workspace store share one actual CurrentCommitUnknown without cuts and retain the stale response', async t => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-shared-unknown-valid-')))
+  mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+  const cause = new Error('original shared legal Refresh Current commit cause')
+  const reached = deferred()
+  const release = deferred()
+  const sourceObservations = []
+  const observations = []
+  const leftIncidents = []
+  const rightIncidents = []
+  let handle
+  let observed
+  let shared
+  let left
+  let right
+  let completed = false
+  try {
+    handle = eventStore.create(directory, 'setup')
+    const identity = 'shared-unknown-without-cuts-two-owners'
+    const { baseline, shelfmark } = await createCase({ dir: directory, store: handle }, identity)
+    const before = await casebook.fetchCaseByIdentity(handle, identity)
+    assert.equal(before.accessOrder, 0n)
+    assert.equal(before.lastAccessOrder, 0n)
+    const baselineEntry = JSON.parse(baseline)['subject.txt']
+    assert.equal(baselineEntry.kind, 'Present')
+    const baselineBytes = Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef))
+    assert.equal(baselineBytes.toString('utf8'), 'version-B')
+    await index.refresh(handle, 256)
+    const beforeIndex = index.tryGet()
+    const eventsDirectory = join(directory, 'wanxiang', 'events')
+    const setupFile = join(eventsDirectory, 'setup.ndjson')
+    const setupBytes = readFileSync(setupFile)
+    eventStore.dispose(handle)
+    handle = eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
+    observed = eventStore.createAppendPayloadStore(handle, false, value => sourceObservations.push(value))
+    shared = eventStore.createAppendPayloadStore(observed, false, value => observations.push(value))
+    const leftOwner = settlements.createOwner(value => leftIncidents.push(value))
+    const rightOwner = settlements.createOwner(value => rightIncidents.push(value))
+    assert.notStrictEqual(leftOwner, rightOwner)
+    const leftTool = bindOwnedFetch(directory, shared, leftOwner)
+    const rightTool = bindOwnedFetch(directory, shared, rightOwner)
+    writeFileSync(join(directory, 'subject.txt'), 'version-C')
+    const { port, createCalls, programCalls } = scriptedBookkeeperPort()
+    const send = port.SendPrompt
+    port.SendPrompt = async (...args) => {
+      reached.resolve()
+      await release.promise
+      return send(...args)
+    }
+    installBookkeeperRuntime(port, [identity])
+    left = executeFetch(leftTool, shelfmark)
+    await Promise.race([
+      reached.promise,
+      left.then(() => assert.fail('the first actual Bookkeeper must reach its SendPrompt barrier')),
+    ])
+    assert.equal(createCalls.length, 1)
+    assert.equal(programCalls.length, 0)
+    assert.equal(observations.length, 0)
+    assert.equal(sourceObservations.length, 0)
+    right = executeFetch(rightTool, shelfmark)
+    const outcomes = Promise.allSettled([left, right])
+    release.resolve()
+    const [first, second] = await outcomes
+
+    assert.equal(createCalls.length, 1)
+    assert.equal(programCalls.length, 1)
+    assert.equal(observations.length, 1, 'joined waiters do not retry Refresh or append Access')
+    assert.equal(sourceObservations.length, 1)
+    assert.deepEqual(observedTypes(observations), ['EngineerCaseRefreshed'])
+    const { originalRequested, append } = observations[0]
+    assert.equal(originalRequested.length, 1)
+    const [original] = originalRequested
+    assert.equal(original.payload.identity, identity)
+    assert.equal(original.payload.q, CANONICAL_Q)
+    assert.equal(original.payload.a, CANONICAL_A)
+    assert.deepEqual(append.requested, originalRequested)
+    assert.equal(append.error.code, 'CommitUnknown')
+    assert.equal(append.error.phase, 'CurrentCommit')
+    assert.strictEqual(append.error.cause, cause)
+    assert.deepEqual(append.error.cleanupFailures, [])
+    assert.deepEqual(append.cuts, [])
+    assert.deepEqual(append.error.prepared.cuts, [])
+    assert.deepEqual(append.error.requested, [original])
+    assert.deepEqual(append.error.prepared.durableEvents, [original])
+    assert.notEqual(append.originalError, null)
+    assert.strictEqual(append.originalError, sourceObservations[0].append.originalError,
+      'both borrowed ports forward the same original Error, including its required Prepared carrier')
+    assert.strictEqual(sourceObservations[0].append.error.cause, cause)
+    assert.deepEqual(sourceObservations[0].append.error.prepared, append.error.prepared)
+    assert.equal(eventStore.read(handle, original.id), null, 'the fault precedes the hot Current commit')
+    assert.equal(first.status, 'fulfilled', first.reason)
+    assert.equal(second.status, 'fulfilled', second.reason)
+    assert.equal(first.value, second.value)
+    assert.equal(parse(first.value).answer, before.a)
+    assert.match(first.value, /Maintenance could not|未能根据所给文件 diff/)
+    assert.deepEqual(leftIncidents, [])
+    assert.deepEqual(rightIncidents, [])
+    assert.deepEqual(index.tryGet(), beforeIndex)
+    assert.deepEqual(await casebook.fetchCaseByIdentity(handle, identity), before)
+    const maintenanceFileState = original.payload.maintenance_file_state
+    assert.notEqual(maintenanceFileState, baseline)
+    const targetEntry = JSON.parse(maintenanceFileState)['subject.txt']
+    assert.equal(targetEntry.kind, 'Present')
+    assert.notEqual(targetEntry.payloadRef, baselineEntry.payloadRef)
+    const targetBytes = Buffer.from(await eventStore.readPayload(handle, targetEntry.payloadRef))
+    assert.equal(targetBytes.toString('utf8'), 'version-C')
+    assert.deepEqual(Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef)), baselineBytes)
+    const operationFile = join(eventsDirectory, 'operation.ndjson')
+    const operationBytes = readFileSync(operationFile)
+    const facts = operationBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse)
+    assert.deepEqual(facts.map(event => event.event_id), [original.id])
+    assert.equal(facts[0].event_type, 'EngineerCaseRefreshed')
+    assert.deepEqual(facts[0].payload, original.payload)
+    assert.deepEqual(facts[0].parents, original.parents)
+    assert.deepEqual(facts[0].payload_refs, original.payloadRefs)
+    assert.deepEqual(readFileSync(setupFile), setupBytes)
+    eventStore.dispose(shared)
+    shared = undefined
+    eventStore.dispose(observed)
+    observed = undefined
+    eventStore.dispose(handle)
+    handle = undefined
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const cold = JSON.parse(await runVerificationToolProbe(process.execPath, [
+      fileURLToPath(new URL('./support/cut-cold-child.mjs', import.meta.url)), directory,
+      JSON.stringify({ writer: 'operation', setupBytes: setupBytes.toString('base64'), operationBytes: operationBytes.toString('base64'),
+        identity, before: { ...before, accessOrder: before.accessOrder.toString(), lastAccessOrder: before.lastAccessOrder.toString() },
+        baseline, payloadRef: baselineEntry.payloadRef, payloadBytes: baselineBytes.toString('base64'),
+        refreshed: { fact: original, maintenanceFileState, targetPayloadRef: targetEntry.payloadRef,
+          targetPayloadBytes: targetBytes.toString('base64') } }),
+    ], { cwd: directory, env, signal: t.signal }).catch(error => {
+      if (error.stderr) error.message += '\n' + error.stderr
+      throw error
+    }))
+    assert.notEqual(cold.pid, process.pid)
+    const expected = { ...before, q: original.payload.q, a: original.payload.a, maintenanceFileState,
+      accessOrder: 1n, lastAccessOrder: 1n }
+    assert.deepEqual({ ...cold.current, accessOrder: BigInt(cold.current.accessOrder), lastAccessOrder: BigInt(cold.current.lastAccessOrder) }, expected)
+    assert.deepEqual(readFileSync(setupFile), setupBytes)
+    assert.deepEqual(readFileSync(operationFile), operationBytes)
+    assert.deepEqual(index.tryGet(), beforeIndex)
+    completed = true
+  } finally {
+    release.resolve()
+    await Promise.allSettled([left, right])
+    bookkeeper.resetRuntime()
+    if (shared) eventStore.dispose(shared)
+    if (observed) eventStore.dispose(observed)
+    if (handle) eventStore.dispose(handle)
+    if (completed) rmSync(directory, { recursive: true, force: true })
+    else t.diagnostic('SHARED_UNKNOWN_WITHOUT_CUTS_EVIDENCE: retained ' + directory)
+  }
+})
 
 test.todo('WHAT[knowledge-reuse-011] GAP-160: real replica branches become DomainConflict and converge through explicit resolution without LWW')
