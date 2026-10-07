@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import * as eventStore from '../../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as fetchSurface from '../../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
+import * as settlements from '../../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
 import * as index from '../../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
 import { parse } from 'smol-toml'
 export { casebook, eventStore, index, parse }
@@ -12,9 +13,10 @@ export const sandbox = ({ enabled = true } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-review-'))
   if (enabled) mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   const store = eventStore.create(dir, 'review-writer')
-  const tool = fetchSurface.contract({ tool: { schema: { string: () => ({}) } } }, dir, store)
+  const owner = settlements.createOwner(() => assert.fail('ordinary Casebook fixture received a semantic-cut incident'))
+  const tool = fetchSurface.contract({ tool: { schema: { string: () => ({}) } } }, dir, store, owner)
   return {
-    dir, store,
+    dir, store, owner,
     fetch: shelfmark => tool.execute({ shelfmark }, { sessionID: 'reader', agent: 'engineer' }),
     close: () => { eventStore.dispose(store); rmSync(dir, { recursive: true, force: true }) },
   }

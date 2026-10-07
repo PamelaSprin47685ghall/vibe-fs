@@ -5,4 +5,4 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 /// and the opaque EventStore capability.
 module CasebookFetchSurface =
 
-    val contract: toolModule: obj -> workspaceRoot: string -> store: obj -> obj
+    val contract: toolModule: obj -> workspaceRoot: string -> store: obj -> owner: obj -> obj

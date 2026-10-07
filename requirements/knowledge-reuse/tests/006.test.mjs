@@ -531,6 +531,8 @@ test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the 
   const { createCase, casebook, eventStore, parse } = await import('./support/casebook.mjs')
   const { installBookkeeperRuntime } = await import('./support/bookkeeper-session-support.mjs')
   const fetchSurface = await import('../../../dist/Repository/Knowledge/Casebook/FetchSurface.js')
+  const settlements = await import('../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js')
+  const owner = settlements.createOwner(() => assert.fail('zero-setter maintenance must not produce a semantic cut'))
   const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
   const directory = mkdtempSync(join(tmpdir(), 'wxs-bookkeeper-zero-setter-'))
   const prompts = []
@@ -566,7 +568,7 @@ test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the 
     },
   }
   const fetch = (shelfmark) => fetchSurface.contract(
-    { tool: { schema: { string: () => ({}) } } }, directory, store,
+    { tool: { schema: { string: () => ({}) } } }, directory, store, owner,
   ).execute({ shelfmark }, { sessionID: 'zero-setter-reader', agent: 'engineer' })
   const expectedDiff = (before, after) => [
     'diff --git a/subject.txt b/subject.txt',

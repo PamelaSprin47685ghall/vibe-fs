@@ -500,9 +500,17 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Repository/Knowledge/Casebook/SettlementSurface.js',
+    owner: 'knowledge-reuse',
+    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-013', 'KNOWLEDGE-REUSE-015', 'KNOWLEDGE-REUSE-016'],
+    source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/SettlementSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Repository/Knowledge/Casebook/FetchSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-015'],
+    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-013', 'KNOWLEDGE-REUSE-015', 'KNOWLEDGE-REUSE-016'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

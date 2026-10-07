@@ -32,6 +32,18 @@ module CasebookAppendFailure =
     val code: failure: CasebookAppendFailure -> string
     val finalizeKind: failure: CasebookAppendFailure -> string
 
+[<Sealed>]
+type CasebookSemanticCutIncident =
+    class
+        inherit System.Exception
+        member Failure: CasebookAppendFailure
+        member Cuts: SemanticCut list
+    end
+
+[<RequireQualifiedAccess>]
+module CasebookSemanticCutIncident =
+    val tryFromSettlement: failure: CasebookAppendFailure -> CasebookSemanticCutIncident option
+
 /// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and

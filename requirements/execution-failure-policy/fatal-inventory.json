@@ -734,6 +734,23 @@
       "notes": "Registration records the retained boundary; it does not complete durable-events-024 or the fatal inventory proof programme."
     },
     {
+      "id": "F44",
+      "ownerRequirement": "knowledge-reuse",
+      "sourceSymbol": "OpenCode/Plugin/PluginBoot.fs :: bindCasebookSemanticCut / CasebookSettlements mandatory binding",
+      "operation": "casebook-semantic-cut",
+      "triggerBranch": "Fetch Refresh or Access returns the original CasebookAppendFailure with a committed or unknown Casebook cut for its exact event.",
+      "inputSource": "Required CasebookSettlementOwner receives a sealed typed incident constructed from the original settled append failure.",
+      "exactIdentity": "Original operation, Case identity, eventId, AppendError, cuts, Prepared and primary/cleanup causes.",
+      "phase": "Real bad fact and ProjectionCutTail settlement precedes owner delivery; ordinary Unknown with empty cuts and unattempted/no-new-write failures cannot enter.",
+      "assertedInvariant": "A settled Casebook cut cannot become a stale/fresh answer. The executing flight has one incident owner; repeat delivery cannot report or kill again.",
+      "commitDisposition": "The original Store result is retained. Owner delivery does not modify Case projection, index epoch, freshness or create a replacement assignment.",
+      "scopeOfEffect": "Current plugin process.",
+      "evidenceType": "Finite actual Store malformed-payload defense plus required Fetch owner and duplicate-incident regression; physical Boot report/kill and installed Host remain separate proof obligations.",
+      "formalTestId": "requirements/knowledge-reuse/tests/013.test.mjs",
+      "status": "RetainedFuse",
+      "notes": "K1 only wires Refresh/Access. Capture/Host deletion, Evict, natural encoder conflicts, actual composition execution and physical fatal child remain open; no complete GAP-160 or durable-events-024 closure."
+    },
+    {
       "id": "T01",
       "ownerRequirement": "obligation-ledger",
       "sourceSymbol": "Mission/Obligation/Todo/MagicTodoMembrane.fs :: MagicTodoHostHooks.requiredText / null-or-missing branch (funnel F12)",
@@ -940,7 +957,7 @@
       "id": "C02",
       "ownerRequirement": "knowledge-reuse",
       "sourceSymbol": "Repository/Knowledge/Casebook/Store.fs :: CasebookStore.appendEvent cut branch (returns Error reason; no fatal inside the store)",
-      "operation": "dynamic (operation string casebook-semantic-cut retired with the dead handler; the cut is an owner-observable Error return)",
+      "operation": "dynamic (store-side optional casebook-semantic-cut handler retired; the original typed Error is consumed by composition F44 for Fetch Refresh/Access)",
       "triggerBranch": "LANDED (sibling PersistenceCuts): the mutable optional fatalTripHandler global + setFatalTripHandler + the Option.iter call site are DELETED. store.Append cut now returns Error reason with no optional fuse.",
       "inputSource": "Casebook store append outcome,",
       "exactIdentity": "eventId + eventType + cut reason,",

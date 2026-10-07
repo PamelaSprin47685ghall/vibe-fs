@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Strength.OpenCode
 
 module PluginBoot =
@@ -22,6 +23,7 @@ module PluginBoot =
             Clock: IClockPort
             Timer: ITimerPort
             StrengthFailFuse: string -> unit
+            CasebookSettlements: CasebookSettlementOwner
             WorkspaceDirectory: string option
             FamilyParent: SessionId -> SessionId option
             /// host-boundary-032 / process-local protocol argument

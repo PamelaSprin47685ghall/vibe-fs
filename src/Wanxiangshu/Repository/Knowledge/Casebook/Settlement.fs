@@ -52,6 +52,29 @@ module CasebookAppendFailure =
         | AppendError.NoNewWriteReleaseFailed _ -> "noNewWriteReleaseFailed"
         | _ -> "notCommitted"
 
+[<Sealed>]
+type CasebookSemanticCutIncident private (failure: CasebookAppendFailure) =
+    inherit
+        System.Exception(sprintf "Casebook semantic cut for %s/%s" failure.CaseIdentity (EventId.value failure.EventId))
+
+    member _.Failure = failure
+    member _.Cuts = AppendError.semanticCuts failure.Error
+
+    static member internal TryFromSettlement(failure: CasebookAppendFailure) =
+        let relevant =
+            AppendError.semanticCuts failure.Error
+            |> List.exists (fun cut -> cut.FailedEventId = failure.EventId && cut.Rule = "Casebook")
+
+        if relevant then
+            Some(CasebookSemanticCutIncident failure)
+        else
+            None
+
+[<RequireQualifiedAccess>]
+module CasebookSemanticCutIncident =
+    let tryFromSettlement failure =
+        CasebookSemanticCutIncident.TryFromSettlement failure
+
 /// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and

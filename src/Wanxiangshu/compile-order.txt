@@ -1410,6 +1410,8 @@ Persistence/Journal/FactCodecSurface.fsi
 Persistence/Journal/FactCodecSurface.fs
 Execution/Delegation/Handle/JournalSurface.fsi
 Execution/Delegation/Handle/JournalSurface.fs
+Repository/Knowledge/Casebook/SettlementOwner.fsi
+Repository/Knowledge/Casebook/SettlementOwner.fs
 Repository/Knowledge/Casebook/Bookkeeper.fsi
 Repository/Knowledge/Casebook/Bookkeeper.fs
 Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fsi
@@ -1422,6 +1424,8 @@ Repository/Knowledge/Casebook/LifecycleSurface.fsi
 Repository/Knowledge/Casebook/LifecycleSurface.fs
 OpenCode/Tools/FetchTool.fsi
 OpenCode/Tools/FetchTool.fs
+Repository/Knowledge/Casebook/SettlementSurface.fsi
+Repository/Knowledge/Casebook/SettlementSurface.fs
 Repository/Knowledge/Casebook/FetchSurface.fsi
 Repository/Knowledge/Casebook/FetchSurface.fs
 Repository/Knowledge/Casebook/OpenCode/Tools.fsi

@@ -34,4 +34,4 @@ module CasebookLifecycleSurface =
 
     val tryFinalize: workspaceRoot: string -> sessionId: string -> Task<obj>
 
-    val touchAccess: workspaceRoot: string -> sessionId: string -> Task<unit>
+    val touchAccess: workspaceRoot: string -> sessionId: string -> Task<obj>

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Repository.Knowledge.Casebook
 
 /// Conditional Casebook read. Provider identity is a public shelfmark; durable
 /// session identity, freshness state and maintenance machinery remain internal.
@@ -31,4 +32,9 @@ module FetchTool =
 
     val admission: ToolAdmission
 
-    val spec: factory: HostToolFactory -> workspaceRoot: string -> store: IEventStore -> ToolSpec
+    val spec:
+        factory: HostToolFactory ->
+        workspaceRoot: string ->
+        store: IEventStore ->
+        owner: CasebookSettlementOwner ->
+            ToolSpec

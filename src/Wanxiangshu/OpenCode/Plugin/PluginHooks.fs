@@ -186,7 +186,8 @@ module PluginHooks =
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
-                        | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
+                        | Some ws ->
+                            CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws boot.CasebookSettlements
                         | None -> []
 
                     let toolRegistration =
