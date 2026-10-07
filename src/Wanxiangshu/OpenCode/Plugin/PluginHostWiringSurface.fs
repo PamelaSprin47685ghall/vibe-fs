@@ -6,6 +6,18 @@ open Wanxiangshu.Repository.Knowledge.Casebook
 
 module PluginHostWiringSurface =
 
+    let createBoot (input: obj) : Task<obj> =
+        task {
+            let! boot = PluginBoot.create input
+            return box boot
+        }
+
+    let bootHasJournal (boot: obj) : bool =
+        (unbox<PluginBoot.Boot> boot).Journal.IsSome
+
+    let disposeBoot (boot: obj) : Task =
+        (unbox<PluginBoot.Boot> boot).Scope.DisposeAsync()
+
     let private describeSettlement (settled: CaseFinalizeSettlement) : obj =
         let commitment, reason =
             match settled.Commitment with
@@ -39,3 +51,6 @@ module PluginHostWiringSurface =
 
             return describeSettlement settled
         }
+
+    let finalizeDraftWithBoot (workspaceRoot: string) (store: obj) (delegateSessionId: string) (boot: obj) : Task<obj> =
+        finalizeDraft workspaceRoot store delegateSessionId (box (unbox<PluginBoot.Boot> boot).CasebookSettlements)

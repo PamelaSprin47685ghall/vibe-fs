@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -682,6 +682,113 @@ for (const fate of ['success', 'CurrentCommitUnknown', 'observer-throws']) {
       bookkeeper.resetRuntime()
       if (handle) eventStore.dispose(handle)
       rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknown']) {
+  test(`WHAT[knowledge-reuse-013] actual Boot owner ${scenario} reports and terminates its own native process only after original Host Capture settlement`, async t => {
+    const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-boot-capture-physical-')))
+    const fatal = scenario.startsWith('malformed')
+    const unknown = scenario.endsWith('-unknown')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    delete env.NODE_OPTIONS
+    delete env.WANXIANGSHU_NO_FATAL_EXIT
+    const probe = async (entry, args) => {
+      try {
+        return JSON.parse(await runVerificationToolProbe(process.execPath, [entry, ...args],
+          { cwd: directory, env, signal: t.signal }))
+      } catch (error) {
+        if (error?.stderr && typeof error.message === 'string') error.message += '\n' + error.stderr
+        throw error
+      }
+    }
+    let completed = false
+    try {
+      assert.equal(typeof hostFinalize.finalizeDraftWithBoot, 'function')
+      const measured = await probe(fileURLToPath(new URL('./support/boot-capture-physical-coordinator.mjs', import.meta.url)),
+        [directory, scenario])
+      assert.notEqual(measured.coordinatorPid, process.pid)
+      assert.notEqual(measured.pid, measured.coordinatorPid)
+      assert.notEqual(measured.pid, process.pid)
+      assert.equal(measured.cleanupRequested, false, 'parent cleanup never supplies fatal evidence')
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, fatal
+        ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+      const receipt = measured.measured
+      assert.equal(receipt.pid, measured.pid)
+      assert.equal(receipt.parentPid, measured.coordinatorPid)
+      assert.equal(receipt.scenario, scenario)
+      const { original, requested, cuts, physical } = receipt
+      assert.equal(original.type, 'EngineerCaseCaptured')
+      assert.equal(original.payload.identity, receipt.identity)
+      assert.equal(original.payload.source_trace, receipt.identity)
+      assert.equal(original.payload.q, CANONICAL_Q)
+      assert.equal(original.payload.a, CANONICAL_A)
+      assert.deepEqual(original.payload.related_paths, ['subject.txt'])
+      assert.equal(original.payload.completion_file_state, receipt.baseline)
+      assert.equal(original.payload.maintenance_file_state, receipt.baseline)
+      assert.deepEqual(requested, [{ ...original, payload: fatal ? {} : original.payload }])
+      assert.deepEqual(physical.facts[0], requested[0])
+      assert.equal(physical.facts.length, fatal ? 2 : 1)
+      assert.deepEqual(physical.counts, { append: 1, fsync: 1, close: 1, release: 1 })
+      assert.equal(physical.lockReleased, true)
+      assert.equal(physical.openDescriptors, 0)
+      assert.equal(existsSync(join(directory, '.git', 'wanxiang.lock')), false)
+      const operationBytes = readFileSync(join(directory, '.git', 'wanxiang', 'events', 'operation.ndjson'), 'base64')
+      assert.deepEqual(physical.files, { ...receipt.beforeFiles, 'operation.ndjson': operationBytes })
+      assert.equal(receipt.bootJournalAvailable, true, 'the actual Boot owns its workspace journal')
+      assert.ok(Object.hasOwn(receipt.beforeFiles, 'setup.ndjson'), 'the prior Case has original canonical bytes')
+      assert.equal(cuts.length, fatal ? 1 : 0)
+      if (unknown) {
+        assert.deepEqual(receipt.appendError, { code: 'CommitUnknown', phase: 'CurrentCommit', causeSame: true,
+          requested, prepared: { durableEvents: physical.facts, cuts }, cleanupFailures: [], priorRejection: null })
+      } else assert.equal(receipt.appendError, null)
+      if (fatal) {
+        const [cut] = cuts
+        assert.equal(cut.rule, 'Casebook')
+        assert.equal(cut.failedEventId, original.id)
+        const cutFact = physical.facts[1]
+        assert.equal(cut.cutEventId, cutFact.id)
+        assert.equal(cutFact.type, 'ProjectionCutTail')
+        assert.equal(cutFact.payload.rule, 'Casebook')
+        assert.equal(cutFact.payload.failed_event_id, original.id)
+        assert.deepEqual(cutFact.parents, [original.id])
+        assert.notEqual(cutFact.stream, original.stream)
+        assert.equal(receipt.indexUnchanged, true)
+        assert.equal(measured.returned, null)
+        assert.equal(measured.reports.length, 1)
+        assert.equal(measured.reports[0].operation, 'casebook-semantic-cut')
+        for (const text of ['Capture', receipt.identity, original.id, cut.cutEventId]) {
+          assert.ok(measured.reports[0].result.includes(text), text)
+        }
+        if (unknown) {
+          assert.ok(measured.reports[0].result.includes('CurrentCommit'))
+          assert.ok(measured.reports[0].result.includes(receipt.causeText))
+        }
+      } else {
+        assert.deepEqual(measured.reports, [])
+        assert.equal(measured.returned.identity, receipt.identity)
+        assert.equal(measured.returned.commitment, unknown ? 'PersistenceFailed' : 'Finalized')
+        assert.equal(measured.returned.releasesIdentity, !unknown)
+        if (unknown) {
+          assert.equal(receipt.indexUnchanged, true)
+          assert.equal(measured.returned.persistenceFailure.primary.phase, 'CurrentCommit')
+        }
+      }
+      const cold = await probe(fileURLToPath(new URL('./support/boot-capture-physical-child.mjs', import.meta.url)),
+        ['cold', directory, scenario, JSON.stringify(receipt)])
+      for (const pid of [process.pid, measured.pid, measured.coordinatorPid]) assert.notEqual(cold.pid, pid)
+      assert.equal(cold.preserved, true)
+      assert.deepEqual(cold.before, receipt.before)
+      assert.equal(cold.current === null, fatal)
+      assert.deepEqual(readdirSync(join(directory, '.git', 'wanxiang', 'events')).sort(), Object.keys(physical.files).sort())
+      t.diagnostic(JSON.stringify({ scenario, nativePid: measured.pid, coldPid: cold.pid,
+        terminal: measured.signal ?? measured.exitCode, originalBootPhysicalAndCold: true }))
+      completed = true
+    } finally {
+      if (completed) rmSync(directory, { recursive: true, force: true })
+      else t.diagnostic('CASEBOOK_BOOT_PHYSICAL_FAILURE_EVIDENCE: retained ' + directory)
     }
   })
 }

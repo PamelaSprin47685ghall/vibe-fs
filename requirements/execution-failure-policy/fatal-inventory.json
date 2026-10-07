@@ -745,10 +745,10 @@
       "assertedInvariant": "A settled Casebook cut cannot become a stale/fresh answer or ordinary Host finalization settlement. The executing flight has one incident owner; repeat delivery cannot report or kill again.",
       "commitDisposition": "The original Store result is retained. Owner delivery does not modify Case projection, index epoch, freshness or create a replacement assignment.",
       "scopeOfEffect": "Current plugin process.",
-      "evidenceType": "Finite actual Store malformed-payload defense, required Fetch owner, joined-waiter/duplicate-incident regression, and original Host finalization helper with real draft/Bookkeeper/Capture plus returning/throwing owners. Physical Boot report/kill and installed Host remain separate proof obligations.",
+      "evidenceType": "Finite actual Store malformed-payload defense, required Fetch owner, joined-waiter/duplicate-incident regression, original Host finalization with returning/throwing owners, and actual PluginBoot owner/native child with real draft/Bookkeeper/Capture. Committed or actual CurrentCommitUnknown cuts report and self-SIGKILL after settled append; valid and empty-cut Unknown return naturally; each has independent OS cold replay.",
       "formalTestId": "requirements/knowledge-reuse/tests/013.test.mjs",
       "status": "RetainedFuse",
-      "notes": "K1 wires Refresh/Access; K2-B also binds the original Host Capture finalizer to the same required Boot owner outside ordinary catches. Full SessionDeleted identity registry/background execution, Evict, natural encoder conflicts and actual Boot physical fatal child remain open; no complete GAP-160 or durable-events-024 closure."
+      "notes": "K1 wires Refresh/Access; K2-B binds original Host Capture to the same required Boot owner outside ordinary catches; K2-C proves finite original Boot physical termination with a real workspace Journal and controlled malformed payload. Full SessionDeleted background/forensic-identity semantics, admitted Engineer work, installed Host, Evict and natural encoder conflicts remain open; duplicate delivery is a separate owner proof, and no complete GAP-160 or durable-events-024 closure is claimed."
     },
     {
       "id": "T01",
