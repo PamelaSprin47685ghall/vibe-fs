@@ -1,5 +1,7 @@
 # K2-D：SessionDeleted 的实际所有权与接手边界
 
+下一D0-R按[独立施工卡](U0-A1-SessionDeleted-D0R施工卡-2026-10-08.md)：首次唯一shared entry的Append装配接缝、四叶实际Capture/cut/Release Unknown及原后台拒绝；本轮仅审计，未实现或预填通过。下文D0-P/G有限完成不再认领。
+
 ## D0-G：合法删除归档与同 Scope Dispose（有限完成）
 
 2026-10-07 从 `4fd4b6b18` 认领，仅复用 D0-P 的原 Manager/attached Engineer 完成前提，不消费 draft；沿同一原 Hooks 的 child/owner SessionDeleted、原 Bookkeeper active-owner admission 与 SDK SendPrompt barrier，调用实际 js-bookkeeper 和精确 assistant completion，再核实际 Capture/index、非空 decoy 与独立 OS cold。原 D0-P 所有断言保留，小 helper 只交原 Scope 的完成上下文，未新增 Scope、scripted Bookkeeper、手工 stage/noteAnswer 或生产算法。
