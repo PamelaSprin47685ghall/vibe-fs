@@ -115,6 +115,12 @@ module ProcessEventLog =
     [<Emit("$0($1, $2)")>]
     let private lockAsync (fn: obj) (path: string) (options: obj) : Task<obj> = jsNative
 
+    [<Emit("($0 != null && $0.code === 'ELOCKED')")>]
+    let private isLockContention (cause: exn) : bool = jsNative
+
+    [<Import("setTimeout", "node:timers/promises")>]
+    let private waitForLockRetry (milliseconds: int) : Task<unit> = jsNative
+
     [<Import("join", "node:path")>]
     let private join2 (a: string) (b: string) : string = jsNative
 
@@ -220,6 +226,40 @@ module ProcessEventLog =
     let isWriterActiveAt nowMs lastActivityMs =
         lastActivityMs >= nowMs - writerRetentionMs
 
+    let private tryAcquireLock (target: string) (options: obj) waitStep : Task<obj option> =
+        task {
+            try
+                let! release = lockAsync lockfile target options
+                return Some release
+            with cause when isLockContention cause ->
+                let delay = min 150.0 (Math.Round(30.0 * Math.Pow(1.1, float waitStep))) |> int
+                do! waitForLockRetry delay
+                return None
+        }
+
+    let private acquireAvailableLock (target: string) : Task<obj> =
+        task {
+            let options =
+                createObj
+                    [ "fs" ==> processAwareFs
+                      "realpath" ==> false
+                      "stale" ==> 5000
+                      "update" ==> 1500
+                      "retries" ==> 0 ]
+
+            // DSL-MUTABLE: resource — this acquisition's physical release capability.
+            let mutable acquired: obj option = None
+            // DSL-MUTABLE: algorithm-scratch — index in the original ten-delay retry cycle.
+            let mutable waitStep = 0
+
+            while acquired.IsNone do
+                let! release = tryAcquireLock target options waitStep
+                acquired <- release
+                waitStep <- (waitStep + 1) % 10
+
+            return acquired.Value
+        }
+
     /// Cross-process physical serialization shared by runtime append and the
     /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
     /// only; it is not durable/domain state and contains no history meaning.
@@ -227,23 +267,7 @@ module ProcessEventLog =
         task {
             let target = wanxiangDirectory commonDir
             ensureDirectory target
-
-            let! release =
-                lockAsync
-                    lockfile
-                    target
-                    (createObj
-                        [ "fs" ==> processAwareFs
-                          "realpath" ==> false
-                          "stale" ==> 5000
-                          "update" ==> 1500
-                          "retries"
-                          ==> createObj
-                                  [ "forever" ==> true
-                                    "minTimeout" ==> 30
-                                    "maxTimeout" ==> 150
-                                    "factor" ==> 1.1 ] ])
-
+            let! release = acquireAvailableLock target
             return new StoreFileGate(release)
         }
 
