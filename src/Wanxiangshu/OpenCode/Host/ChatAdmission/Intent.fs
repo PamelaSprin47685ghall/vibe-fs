@@ -79,6 +79,7 @@ module ChatAdmissionIntent =
         | ExternalRootIntent of ExternalRootEvidence
         | ActiveHumanContinuationIntent of ActiveHumanContinuationEvidence
         | PendingPromptIntent of PendingPromptEvidence
+        | AcceptedInputIntent of AcceptedChatExecutionEvidence
         | HostInternal of HostInternalEvidence
         | Reject of Rejection
 
@@ -87,12 +88,14 @@ module ChatAdmissionIntent =
         | ExternalRoot of ExternalRootEvidence
         | ActiveHumanContinuation of ActiveHumanContinuationEvidence
         | PendingPrompt of PendingPromptEvidence
+        | AcceptedInput of AcceptedChatExecutionEvidence
 
     let tryManaged (decision: Decision) : ManagedIntent option =
         match decision with
         | Decision.ExternalRootIntent evidence -> Some(ManagedIntent.ExternalRoot evidence)
         | Decision.ActiveHumanContinuationIntent evidence -> Some(ManagedIntent.ActiveHumanContinuation evidence)
         | Decision.PendingPromptIntent evidence -> Some(ManagedIntent.PendingPrompt evidence)
+        | Decision.AcceptedInputIntent evidence -> Some(ManagedIntent.AcceptedInput evidence)
         | Decision.NoManagedExecution _
         | Decision.HostInternal _
         | Decision.Reject _ -> None
@@ -102,12 +105,16 @@ module ChatAdmissionIntent =
         | ManagedIntent.ExternalRoot evidence -> Decision.ExternalRootIntent evidence
         | ManagedIntent.ActiveHumanContinuation evidence -> Decision.ActiveHumanContinuationIntent evidence
         | ManagedIntent.PendingPrompt evidence -> Decision.PendingPromptIntent evidence
+        | ManagedIntent.AcceptedInput evidence -> Decision.AcceptedInputIntent evidence
 
     let managedKey (managed: ManagedIntent) : ChatExecutionKey =
         match managed with
         | ManagedIntent.ExternalRoot evidence -> evidence.Key
         | ManagedIntent.ActiveHumanContinuation evidence -> evidence.Key
         | ManagedIntent.PendingPrompt evidence -> evidence.Key
+        | ManagedIntent.AcceptedInput evidence ->
+            { SessionId = evidence.SessionId
+              PhysicalUserMessageId = evidence.PhysicalUserMessageId }
 
     /// Host-internal (compaction / synthetic) classification, shared by
     /// the intent resolver and the read-side Host hooks.

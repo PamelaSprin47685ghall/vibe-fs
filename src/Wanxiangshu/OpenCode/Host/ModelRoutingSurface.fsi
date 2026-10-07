@@ -52,6 +52,8 @@ module ModelRoutingSurface =
         purpose: obj ->
             Task<obj>
 
+    val continueExecutionAdmission: runtime: obj -> token: obj -> physicalUserMessageId: string -> Task<obj>
+    val retainContinuationInput: runtime: obj -> token: obj -> physicalUserMessageId: string -> obj
     val awaitQueuedExecutionAdmission: queueToken: obj -> Task<obj>
     val executionAdmissionTarget: runtime: obj -> token: obj -> obj
     val commitExecutionAdmission: runtime: obj -> token: obj -> observed: obj -> obj

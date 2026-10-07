@@ -76,6 +76,85 @@ test('WHAT[execution-model-routing-006] EMR_006_same_physical_message_retry_reus
 
   assert.deepEqual(seen, [[], ['provider/shared|none']], 'same physical material reuses without a scheduler rerun; the superseding fresh schedule observes the replaced occupancy')
 })
+
+for (const borrowed of [false, true]) {
+for (const completed of [false, true]) {
+test(`WHAT[execution-model-routing-006] WHAT[execution-model-routing-010] guidance transfers the ${borrowed ? 'borrowed' : 'owned'} credit ${completed ? 'after terminal output' : 'after a tool step'} and stale callbacks cannot release its next step`, async () => {
+  let changedPolicy = false
+  const runtime = createRuntime(() => target(changedPolicy ? 'other/new-policy' : 'provider/shared'))
+  if (borrowed) await acquireTarget(runtime, 'lender', 'lender-root', 'manager', 'commissioner')
+  const old = await acquireExecutionAdmission(runtime, 'child', 'child-root', 'engineer', 'Ada', borrowed ? 'lender' : null)
+  const observed = {
+    sessionId: 'child', physicalUserMessageId: 'child-root', role: 'engineer', participant: 'Ada',
+    target: executionAdmissionTarget(runtime, old.lease),
+  }
+  assert.deepEqual(commitExecutionAdmission(runtime, old.lease, observed), { kind: 'Applied' })
+  await enterProviderStep(runtime, 'child', 'child-root', [])
+  assert.deepEqual(routing.retainContinuationInput(runtime, old.lease, 'child-guidance'), observed.target)
+  endProviderStep(runtime, 'child', 'child-root', 'old-provider-run')
+  if (completed) {
+    assert.deepEqual(releasePhysicalExecution(runtime, 'child', 'child-root'), { kind: 'HeldForInput' })
+  }
+  const original = capacitySnapshot(runtime)
+  assert.equal(original.tokens.length, 1)
+  const credit = original.tokens[0].credit
+
+  changedPolicy = true
+  const next = await routing.continueExecutionAdmission(runtime, old.lease, 'child-guidance')
+  const nextObserved = { ...observed, physicalUserMessageId: 'child-guidance' }
+  assert.deepEqual(executionAdmissionTarget(runtime, next.lease), observed.target,
+    'guidance continues the bound model even if the fresh-routing policy changed')
+  assert.deepEqual(commitExecutionAdmission(runtime, next.lease, nextObserved), { kind: 'Applied' })
+  await enterProviderStep(runtime, 'child', 'child-guidance', [])
+  const running = capacitySnapshot(runtime)
+  assert.equal(running.activeCount, 1)
+  assert.equal(running.tokens.length, 1)
+  assert.equal(running.tokens[0].credit, credit)
+  assert.equal(running.custodies.some(custody =>
+    custody.credit === credit && custody.owner.sessionId === 'child'
+    && custody.owner.physicalUserMessageId === 'child-guidance'), true)
+  assert.equal(running.tokens[0].owner.sessionId, borrowed ? 'lender' : 'child')
+
+  endProviderStep(runtime, 'child', 'child-root', 'old-provider-run')
+  routing.releaseExecutionAdmissionBeforeProvider(runtime, old.lease, observed)
+  await assert.rejects(routing.continueExecutionAdmission(runtime, old.lease, 'stale-guidance'))
+  assert.deepEqual(capacitySnapshot(runtime).tokens, running.tokens)
+  assert.equal(capacitySnapshot(runtime).activeCount, 1)
+  endProviderStep(runtime, 'child', 'child-guidance', 'next-provider-run')
+  releasePhysicalExecution(runtime, 'child', 'child-guidance')
+  if (borrowed) releasePhysicalExecution(runtime, 'lender', 'lender-root')
+  assert.deepEqual(snapshotOccupied(runtime), [])
+})
+}
+}
+
+for (const borrowed of [false, true]) {
+test(`WHAT[execution-model-routing-006] cancelling deferred guidance returns the held ${borrowed ? 'borrowed' : 'owned'} credit without retiring its lender`, async () => {
+  const runtime = createRuntime(() => target())
+  if (borrowed) await acquireTarget(runtime, 'lender', 'lender-root', 'manager', 'commissioner')
+  const old = await acquireExecutionAdmission(runtime, 'child', 'child-root', 'engineer', 'Ada', borrowed ? 'lender' : null)
+  const observed = {
+    sessionId: 'child', physicalUserMessageId: 'child-root', role: 'engineer', participant: 'Ada',
+    target: executionAdmissionTarget(runtime, old.lease),
+  }
+  assert.deepEqual(commitExecutionAdmission(runtime, old.lease, observed), { kind: 'Applied' })
+  routing.retainContinuationInput(runtime, old.lease, 'child-guidance')
+  assert.deepEqual(releasePhysicalExecution(runtime, 'child', 'child-root'), { kind: 'HeldForInput' })
+  releasePhysicalExecution(runtime, 'child', 'child-guidance')
+  const released = capacitySnapshot(runtime)
+  assert.equal(released.tokens.length, borrowed ? 1 : 0)
+  assert.equal(released.executions.some(owner => owner.sessionId === 'child'), false)
+  if (borrowed) {
+    await enterProviderStep(runtime, 'lender', 'lender-root', [])
+    assert.equal(capacitySnapshot(runtime).activeCount, 1)
+    assert.equal(capacitySnapshot(runtime).tokens[0].owner.sessionId, 'lender')
+    endProviderStep(runtime, 'lender', 'lender-root', 'lender-after-guidance-cancel')
+    releasePhysicalExecution(runtime, 'lender', 'lender-root')
+  }
+  assert.deepEqual(snapshotOccupied(runtime), [])
+})
+}
+
 test('WHAT[execution-model-routing-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_without_idle', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 

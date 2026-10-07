@@ -280,6 +280,8 @@ module PluginHostInterop =
             ExecutionFailure.LocalInvariant, HookSettlementEvidence.ExactSettlementComplete
         | ChatAdmissionTransactionError.LeaseHandoffFailed(_, settlement) -> handoffFailure settlement
         | ChatAdmissionTransactionError.SupersessionSettlementFailed failure -> supersessionSettlementFailure failure
+        | ChatAdmissionTransactionError.InputProjectionFailed _ ->
+            ExecutionFailure.LocalInvariant, HookSettlementEvidence.ExactSettlementComplete
         | ChatAdmissionTransactionError.LeaseTargetFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetBoundaryFailed(_, release)
         | ChatAdmissionTransactionError.LeaseTargetProjectionFailed(_, release)
@@ -306,7 +308,8 @@ module PluginHostInterop =
             ExecutionFailure.Superseded, DurableExecutionLifecycle.Terminal, HookSettlementEvidence.NoOwnedExecution
         | ChatAdmissionTransactionOutcome.AlreadyTerminal _ ->
             ExecutionFailure.Superseded, DurableExecutionLifecycle.Terminal, HookSettlementEvidence.NoOwnedExecution
-        | ChatAdmissionTransactionOutcome.Settled _ ->
+        | ChatAdmissionTransactionOutcome.Settled _
+        | ChatAdmissionTransactionOutcome.DeferredInput _ ->
             invalidOp "settled chat admission cannot cross the failure membrane"
 
     let private lifecycleAfterFailedTransaction =

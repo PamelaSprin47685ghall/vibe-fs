@@ -27,20 +27,24 @@ export default function route(role, running, previous, purpose) { ... }
 
 `running` 准确反映系统内部实际持有的 provider capacity token 集合。基础 token 总数即为 `running.length`。同一进程内所有 plugin 实例与 worktree 共享该 module-level multiset 真相。显式 lender 的 token 被借用方使用时只计数一次，不得重复计数。
 
-## [004] required execution demand 只在 `chat.message` 物理执行准入产生；`null` = 等待，不是失败
+## [004] 普通 fresh execution demand 在 `chat.message` 准入产生；`null` = 等待，不是失败
 
-发送或排队阶段严禁抢占 model slot，`SendPrompt` 必须保持 `Model=None`。唯一合法的需求准入点是 Host 接收物理 user message 后的 `chat.message` 边界。
+发送或排队阶段严禁抢占 model slot，`SendPrompt` 必须保持 `Model=None`。新 execution 的需求准入点是 Host 接收物理 user message 后的 `chat.message` 边界。同一活跃 run 的 `HumanMessage` / `BusyAgentNudge` 只接纳追加材料，不产生第二份调度需求；其 exact lease 交接遵循 [006] 的可见材料边界。
 若调度器返回 `null`，不调用 provider、不消耗失败预算，demand 进入 pending 队列并在 occupancy 变更时由事件驱动重算。新到达的物理 user message 或会话销毁将取消并取代被 supersede 的旧 pending demand。
 
 ## [005] 模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法
 
 Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token ledger 与借贷仲裁，不拥有任何模型分类、优先级表、容量上限或调度策略。一切关于模型选取与并发限制的逻辑均属于 MJS 策略。
 
-## [006] managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
+## [006] exact lease 与 fresh execution 路由；活跃 run 的追加材料延后交接
 
 物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同一 PhysicalUserMessageId 的执行与重试严格复用已有 target 与 capacity fence，不重新触发调度器，亦严禁在同一 physical 内改变 Role、participant 或切换 agent；同一 SessionId 出现新 PhysicalUserMessageId（fresh physical execution）时原子替代旧租约，并将该 run 不可变的 canonical Role 重新经 MJS 调度器路由至 target（可选择新 target；仅当旧执行仍是当前活跃执行时才将其 target 作为 `previous` 传入供优先续用），但绝不改变 participant identity 或 Role。provider step 结束时必须把实际 lease target 与 exact `ProviderRunIdentity` 绑定；failure settlement 只可原子消费该 witness，禁止从 mutable session-last target 猜测失败 provider。每个 session 最多保留 latest run witness，新 run 自动废除旧 witness。租约不以 SessionId 为单位跨物理执行永久绑定；exact terminal 释放后不存在 session 级 previous 缓存。
 
 成功建立新物理执行的 `Admitted` lease 或 `Queued` demand 才构成原子替代。调度返回 `null` 且 pending queue 已满时，新输入必须以 `CapacityQueueFull` 拒绝，保留旧 exact lease、token 和 pending ownership；不得先退休旧执行后再发现无处排队。队列已满但 scheduler 能立即发放 target 时，仍允许直接入场，不得仅凭队列长度拒绝。
+
+同一 LogicalRun、authority root 与 IdentitySeed 的 `HumanMessage` / `BusyAgentNudge` 若遇到旧活跃 committed lease，属于追加材料而非上述 fresh 调度。`chat.message` 保留旧 lease 并投影其 target；实际 provider transform 选择可见新输入后，才按旧 opaque lease 验证所有权、转交同一 token/借用 credit 并建立新 physical key 的 fresh fence。保持原 role、participant、target、purpose 与 lender，不再调用 scheduler，不另占容量，不提前取消旧请求的 step。旧 exact 结算不能释放新 fence。
+
+durable Accepted 之后、Host projection 之前，容量 owner 以 exact 新输入 key 保留旧 opaque lease 的 credit。旧输出自然终结时若仍有未选入请求的已接纳材料，返回 typed `HeldForInput`，不丢失已投影的模型与借用关系；下一次可见输入准入才交接并撤销本次保留。较晚的未选入材料随同一 credit 更新保留的 opaque handle，不能被较早请求结算掉。投影失败、材料精确终结或作用域关闭均须清理自己的保留；最后一份材料撤销后完成延后的旧资源归还，borrowed credit 不退休 lender。
 
 ## [007] physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
@@ -51,9 +55,11 @@ Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token led
 
 Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求不同 canonical 角色使用互异的物理模型字符串；两者解析至相同 target 属于合法状态 (历史 `fast-`/`deep-` 档亦然)。
 
-## [009] `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
+## [009] managed model 准入与读取分离；dispatch message 保持 model-free
 
 所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 hook（`chat.params`、transform、tool）通过容量所有者的只读查询读取该 exact execution 已提交的租约并与真实观察核对；该查询不得调用 scheduler、不得接管预约、不得发放 fence、不得 commit/release，也不得因读取增加 duplicate/stale/conflict 计数。
+
+[006] 的追加材料在 `chat.message` 只投影旧目标；provider transform 先调用独立的可见输入准入操作，完成 exact lease 交接，再执行上述只读校验。这不是缺失租约的通用回填：没有 exact Accepted evidence、同 run 证明或旧 committed lease 时仍须 fail closed。
 
 ## [010] provider capacity 独立成可抢占 token；只凭显式 lender 借用
 
@@ -72,6 +78,8 @@ Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` d
 2. exact capacity acquire：将 IdentitySeed 确立的 fixed canonical Role 经 MJS scheduler 解析为 ModelTarget（同一 physical execution 复用原 target；acquire 输入同时携带 IdentitySeed 派生的 participant 与可选的 `lenderSessionId`），并以包含 SessionId + PhysicalUserMessageId + fixed Role + Participant + target + fence 的 exact capacity identity 获取 capacity fence；
 3. Host projection：将 target 投影至 Host 消息。
 任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 capacity acquire，或让未接受的发送意图预占容量。此顺序只约束物理消息执行的普通准入；Strength 的非等待预约（reservation）语义按其原所属规范保持，本次修改不扩大、不否决。
+
+[006] 的活跃 run 追加材料不预占新的容量：durable accept 后可投影已经取得的旧 target；新 exact lease 只能在可见材料进入下一次 provider 请求时交接，provider effect 前仍须完成 exact commit 与 durable ProviderStarted。
 
 ## [012] Capacity 是 exact opaque fenced capability
 

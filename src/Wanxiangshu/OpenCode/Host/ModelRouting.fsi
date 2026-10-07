@@ -7,6 +7,11 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+[<RequireQualifiedAccess>]
+type internal PhysicalExecutionReleaseOutcome =
+    | Released of CapacityTransitionOutcome
+    | HeldForInput
+
 module ModelRouting =
     val internal failureOfExecutionAdmissionAcquisition: ExecutionAdmissionAcquisition -> ExecutionFailure option
     val internal seedBoundDevOpsModel: sessionId: SessionId -> value: string -> unit
@@ -57,6 +62,17 @@ module ModelRouting =
         member ExecutionAdmissionTarget:
             lease: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
 
+        member internal ContinueExecutionAdmission:
+            previous: ExecutionAdmissionLease * physicalUserMessageId: string -> Task<ExecutionAdmissionAcquisition>
+
+        member internal RetainContinuationInput:
+            previous: ExecutionAdmissionLease * physicalUserMessageId: string -> ModelRoutingTarget
+
+        member internal TryContinuationInput:
+            sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
+
+        member internal CancelContinuationInput: sessionId: string * physicalUserMessageId: string -> unit
+
         member CommitExecutionAdmission:
             lease: ExecutionAdmissionLease * observed: ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
 
@@ -103,7 +119,7 @@ module ModelRouting =
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome
 
         member internal ReleasePhysicalExecution:
-            sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome
+            sessionId: string * physicalUserMessageId: string -> PhysicalExecutionReleaseOutcome
 
         member CancelPendingExecution: sessionId: string -> CapacityTransitionOutcome
 
@@ -179,6 +195,15 @@ module ModelRouting =
 
     val internal tryReadExecution: key: ChatExecutionKey -> ExecutionAdmissionLease option
 
+    val internal continueExecutionAdmission:
+        previous: ExecutionAdmissionLease -> physicalId: PhysicalUserMessageId -> Task<ExecutionAdmissionAcquisition>
+
+    val internal retainContinuationInput:
+        previous: ExecutionAdmissionLease -> key: ChatExecutionKey -> ModelRoutingTarget
+
+    val internal tryContinuationInput: key: ChatExecutionKey -> ExecutionAdmissionLease option
+    val internal cancelContinuationInput: key: ChatExecutionKey -> unit
+
     val internal wasExecutionSuperseded: key: ChatExecutionKey -> bool
 
     val internal ownsExecutionAdmission: key: ChatExecutionKey -> bool
@@ -196,7 +221,7 @@ module ModelRouting =
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome
 
     val internal releasePhysicalExecution:
-        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> CapacityTransitionOutcome
+        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> PhysicalExecutionReleaseOutcome
 
     val internal observePhysicalResource: key: ChatExecutionKey -> PhysicalResourceObservation
     val internal cancelUnacquiredExecution: sessionId: SessionId -> CapacityTransitionOutcome

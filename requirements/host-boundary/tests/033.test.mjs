@@ -9,9 +9,10 @@ import { withExecutablePlugin } from '../../verification-system/tests/support/pl
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-test('WHAT[host-boundary-033] superseded accepted execution settles before late provider observations and preserves the new execution', async () => {
+for (const origin of ['HumanMessage', 'BusyAgentNudge']) {
+test(`WHAT[host-boundary-033] ${origin} preserves the old lease until the visible input enters its next provider step`, async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
-    const sessionID = 'ses-superseded-observation'
+    const sessionID = `ses-superseded-observation-${origin}`
     const admit = async (messageID, metadata = undefined) => {
       const carrier = metadata === undefined ? {} : { metadata }
       const message = { id: messageID, sessionID, role: 'user', agent: 'engineer', model: {}, ...carrier }
@@ -27,15 +28,58 @@ test('WHAT[host-boundary-033] superseded accepted execution settles before late 
     }, runtime.journal, sessionID, 'controlled input', 'ManagerGuard', profile, 'Await')
     assert.equal(guard.ok, true, guard.error)
     const oldMessage = await admit('msg-old', guard.observation.metadata)
-    const newMessage = await admit('msg-new')
-    const before = routing.sharedCapacitySnapshot()
+    const appendInput = async messageID => {
+      let metadata
+      if (origin === 'BusyAgentNudge') {
+        const guidance = await dispatch.sendContinuation({
+          SubscribeTerminal: () => ({ Dispose() {} }),
+          SendPrompt: async () => dispatch.admittedWithReceipt(`guidance-receipt-${messageID}`),
+        }, runtime.journal, sessionID, 'controlled input', origin, profile, 'Await')
+        assert.equal(guidance.ok, true, guidance.error)
+        metadata = guidance.observation.metadata
+      }
+      return admit(messageID, metadata)
+    }
+    const earlierMessage = await appendInput('msg-earlier')
+    const newMessage = await appendInput('msg-new')
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, oldMessage.id), {
-      phase: 'Terminal', disposition: 'Cancelled',
+      phase: 'Accepted', disposition: null,
     })
     assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, newMessage.id), {
       phase: 'Accepted', disposition: null,
     })
     assert.deepEqual(runtime.abortedIds, [], 'new human input must not interrupt the current Guard output')
+    const beforeVisibility = routing.sharedCapacitySnapshot()
+    await hooks['chat.params']({
+      sessionID, message: oldMessage, agent: 'engineer',
+      model: { providerID: 'provider', id: 'engineer-model', capabilities: {} },
+    }, {})
+    assert.deepEqual(routing.sharedCapacitySnapshot(), beforeVisibility,
+      'an old request already preparing before Host storage still owns its exact lease')
+    runtime.pushHostMessage(sessionID, {
+      info: {
+        id: 'assistant-new', sessionID, parentID: newMessage.id, role: 'assistant',
+        agent: 'engineer', providerID: 'provider', modelID: 'engineer-model', time: { created: 2 },
+      },
+      parts: [],
+    })
+    await hooks['experimental.chat.messages.transform']({}, {
+      messages: [earlierMessage, newMessage].map(info => ({
+        info, parts: [{ type: 'text', text: 'controlled input' }],
+      })),
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, oldMessage.id), {
+      phase: 'Terminal', disposition: 'Cancelled',
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, newMessage.id), {
+      phase: 'ProviderStarted', disposition: null,
+    })
+    assert.deepEqual(recovery.journalExecutionStatus(runtime.journal, sessionID, earlierMessage.id), {
+      phase: 'Terminal', disposition: 'Cancelled',
+    }, 'earlier material in the same request cannot remain a recoverable unstarted execution')
+    const before = routing.sharedCapacitySnapshot()
+    assert.equal(before.tokens.filter(token => token.owner.sessionId === sessionID).length, 1)
+    assert.equal(before.tokens.find(token => token.owner.sessionId === sessionID).owner.physicalUserMessageId, newMessage.id)
     const output = { temperature: 0.123 }
     assert.throws(() => hooks['chat.params']({
       sessionID, message: oldMessage, agent: 'engineer',
@@ -57,11 +101,14 @@ test('WHAT[host-boundary-033] superseded accepted execution settles before late 
       sessionID, message: newMessage, agent: 'engineer',
       model: { providerID: 'provider', id: 'engineer-model', capabilities: {} },
     }, {})
-    assert.equal(runtime.prompts.length, 0, 'late observation must not dispatch a provider retry')
+    assert.equal(runtime.prompts.filter(prompt => prompt.path?.id === sessionID).length, 0,
+      'late observation must not dispatch a provider retry to the superseded execution')
+    assert.ok(runtime.prompts.every(prompt => prompt.body?.agent === 'blogger'))
   })
 })
+}
 
-test('WHAT[host-boundary-033] a later human input replaces queued demand without interrupting the Host', async () => {
+test('WHAT[host-boundary-033] a later human input replaces queued demand with no live lease without interrupting the Host', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
     const sessionID = 'ses-queued-supersession'
     const admit = async (messageID, metadata, targetSession = sessionID) => {
@@ -72,14 +119,6 @@ test('WHAT[host-boundary-033] a later human input replaces queued demand without
       })
       return message
     }
-    await admit('msg-root')
-    const profile = dispatch.projectionObservation(runtime.journal, sessionID).activeLogicalRun
-    const guard = await dispatch.sendContinuation({
-      SubscribeTerminal: () => ({ Dispose() {} }),
-      SendPrompt: async () => dispatch.admittedWithReceipt('queued-guard-receipt'),
-    }, runtime.journal, sessionID, 'controlled input', 'ManagerGuard', profile, 'Await')
-    assert.equal(guard.ok, true, guard.error)
-    await admit('msg-guard', guard.observation.metadata)
     globalThis.__wanxiangshu_test_routing_decision = () => null
     const human = admit('msg-human').then(
       () => ({ accepted: true }),

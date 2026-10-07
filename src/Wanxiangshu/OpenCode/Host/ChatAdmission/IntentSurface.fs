@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Execution.Session.ChatExecution
 
 module ChatAdmissionIntentSurface =
 
@@ -266,6 +267,13 @@ module ChatAdmissionIntentSurface =
             box
                 {| ``case`` = "HostInternal"
                    origin = originName evidence.Origin |}
+        | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+            box
+                {| ``case`` = "AcceptedInputIntent"
+                   sessionId = SessionId.value evidence.SessionId
+                   physicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
+                   origin = originName evidence.Origin
+                   participant = AcceptedChatExecutionEvidence.participant evidence |}
         | ChatAdmissionIntent.Decision.Reject rejection ->
             box
                 {| ``case`` = "Reject"

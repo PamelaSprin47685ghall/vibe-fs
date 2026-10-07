@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 for (const kind of ['Failed', 'Aborted']) {
   test('WHAT[delegation-027] root affinity also rejects old ' + kind + ' without a prepared handoff', async () => {
@@ -23,23 +26,49 @@ for (const kind of ['Failed', 'Aborted']) {
 }
 import { toolModule, withForkRuntime } from './support/fork-runtime.mjs'
 
-test('WHAT[delegation-027] an active road rejects a new charge and becomes reusable after completion before join consumption', async () => {
+test('WHAT[delegation-027] busy guidance preserves the original work and completion before an idle resume starts new work', async () => {
   const owner = 'owner-busy-road'
-  await withForkRuntime(owner, async runtime => {
+  await withForkRuntime(owner, async (runtime, directory) => {
     const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'FIRST')
     await forkTool.awaitPromptCount(runtime, 1)
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await first, /Ada/)
-    const rejected = await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'SECOND-WHILE-BUSY')
-    assert.doesNotMatch(rejected, /carries this charge now|现已接下这项托付/)
-    assert.equal(forkTool.promptCount(runtime), 1)
+    const original = forkTool.workSnapshot(runtime, owner)
+    const listeners = forkTool.terminalListenerCount(runtime)
+    const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'FIRST-DONE', 'first-run')
+    forkTool.acceptNextPrompt(runtime)
+    const guided = await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'GUIDANCE-WHILE-BUSY')
+    assert.equal(forkTool.promptCount(runtime), 2, guided)
+    assert.match(forkTool.prompt(runtime, 1), /GUIDANCE-WHILE-BUSY/)
+    assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
+    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), original)
+    assert.equal(forkTool.terminalListenerCount(runtime), listeners)
+    assert.equal(forkTool.abortCount(runtime), 0)
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-DONE', 'first-run'), true)
+    await completeOriginal()
+    assert.equal(forkTool.workSnapshot(runtime, owner)[0].lifecycle, 'CompletedAwaitingJoin')
     const next = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'SECOND-AFTER-COMPLETION')
-    await forkTool.awaitPromptCount(runtime, 2)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.match(await next, /carries this charge now|现已接下这项托付/)
+    await forkTool.awaitPromptCount(runtime, 3)
+    assert.equal(forkTool.acceptPrompt(runtime, 2), true)
+    await next
     assert.equal(forkTool.childCount(runtime), 1)
+    const works = forkTool.workSnapshot(runtime, owner)
+    assert.equal(works.length, 2)
+    assert.notEqual(works[1].root, original[0].root)
     assert.equal(await forkTool.settle(runtime, owner, 'SECOND-DONE', 'second-run'), true)
+    const joined = await forkTool.executeJoin(runtime, owner)
+    assert.match(joined, /FIRST-DONE/)
+    assert.match(joined, /SECOND-DONE/)
   })
 })
+
+for (const phase of ['GUIDANCE', 'GUIDANCE_STOP']) {
+integrationTest(`WHAT[delegation-027] WHAT[delegation-015] installed Host releases Manager Join and appends guidance after the child ${phase === 'GUIDANCE_STOP' ? 'final output' : 'tool step'}`, () => {
+  const runner = fileURLToPath(new URL('../../host-boundary/tests/support/run-user-input-canary.mjs', import.meta.url))
+  const launched = spawnSync(process.execPath, [runner, '--phase', phase], {
+    encoding: 'utf8', timeout: 120000,
+  })
+  assert.equal(launched.status, 0, `${launched.error ?? ''}\n${launched.stdout}\n${launched.stderr}`)
+  assert.equal(JSON.parse(launched.stdout.trim()).physicalCleanup, true)
+})
+}

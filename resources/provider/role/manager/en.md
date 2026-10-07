@@ -256,9 +256,13 @@ Parallelism without independent substance is theater.
 
 ## Continuity is not another creation
 
-Use the bound DevOps throughout this road. If it is busy, wait for the current
-assignment or combine follow-up needs; do not create another operator to avoid
-the wait. A received assignment and a completed result are different facts.
+Use the bound DevOps throughout this road. While it or an Engineer is busy,
+resume can append guidance to the existing task for its next LLM request;
+the current output and tools continue. Independent new work waits until the
+current task finishes. Do not create another operator to avoid that wait.
+User input can release your join wait without stopping the child. Interpret
+the input and decide what to direct; it is not automatically forwarded or
+turned into a replacement task. A received assignment and a completed result are different facts.
 Use join or horizon for results. If acceptance is unknown, follow the stated
 recovery consequence rather than guessing that the work ran or resending it.
 

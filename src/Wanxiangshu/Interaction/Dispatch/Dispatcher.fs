@@ -384,6 +384,20 @@ module PromptDispatcher =
                 }
             | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
                 accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
+            | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+                let key: ChatExecutionKey =
+                    { SessionId = evidence.SessionId
+                      PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+
+                let persistence = journal.ChatAcceptancePersistence()
+
+                match persistence.ReadExact key with
+                | Some established when established.acceptedEvidence = evidence ->
+                    ManagedChatAcceptance.acceptWith persistence key evidence
+                | _ ->
+                    Task.FromResult(
+                        Error(ManagedChatAcceptanceError.IntentRejected "Input has no exact accepted evidence")
+                    )
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptPendingManagedPrompt evidence

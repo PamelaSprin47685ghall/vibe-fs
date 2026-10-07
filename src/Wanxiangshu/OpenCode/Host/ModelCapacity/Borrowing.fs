@@ -570,6 +570,25 @@ type internal BorrowingCapacity<'target>
 
             moveCreditSource oldKey newKey)
 
+    member _.ContinueExecution(sessionId: string, previousPhysicalId: string, physicalId: string, target: 'target) =
+        lock gate (fun () ->
+            let oldKey = executionKey sessionId (Some previousPhysicalId)
+            let newKey = executionKey sessionId (Some physicalId)
+
+            if
+                ownedTokenByExecution.ContainsKey newKey
+                || creditSourceByExecution.ContainsKey newKey
+            then
+                invalidOp "execution-model-routing: continuation already owns capacity"
+
+            match ownedTokenByExecution.TryGetValue oldKey with
+            | true, tokenId -> adoptOwnedToken oldKey newKey target tokenId
+            | false, _ when creditSourceByExecution.ContainsKey oldKey -> ()
+            | _ -> invalidOp "execution-model-routing: continuation has no previous capacity"
+
+            moveCreditSource oldKey newKey
+            target)
+
     member _.ReleaseSession(sessionId: string) =
         lock gate (fun () ->
             let prefix = sessionId + "\u001f"

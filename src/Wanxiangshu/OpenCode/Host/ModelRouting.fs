@@ -11,6 +11,11 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 
+[<RequireQualifiedAccess>]
+type internal PhysicalExecutionReleaseOutcome =
+    | Released of CapacityTransitionOutcome
+    | HeldForInput
+
 type private ExecutionLease =
     { PhysicalUserMessageId: string option
       Participant: string option
@@ -427,6 +432,8 @@ module ModelRouting =
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
         let activeProviderStepTasks = Dictionary<string, Task>()
+        let continuationInputs = Dictionary<string * string, ExecutionAdmissionLease>()
+        let heldPhysicalReleases = HashSet<string * string>()
         // DSL-MUTABLE: resource — one exact provider-run witness per live session
         let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
         let latestProviderRunBySession = Dictionary<string, string>()
@@ -756,6 +763,16 @@ module ModelRouting =
             retireProviderRunTarget sessionId
             recoveryRetryTargetBySession.Remove sessionId |> ignore
             leasePurposeBySession.Remove sessionId |> ignore
+
+            continuationInputs.Keys
+            |> Seq.filter (fun (inputSession, _) -> inputSession = sessionId)
+            |> Seq.toArray
+            |> Array.iter (fun key -> continuationInputs.Remove key |> ignore)
+
+            heldPhysicalReleases
+            |> Seq.filter (fun (inputSession, _) -> inputSession = sessionId)
+            |> Seq.toArray
+            |> Array.iter (fun key -> heldPhysicalReleases.Remove key |> ignore)
 
             // The exact run->physical relations of this session's retired
             // execution are process-local observations of an execution that no
@@ -1349,7 +1366,25 @@ module ModelRouting =
                  | None -> admissionOwner.ReleasePhysical(sessionId, physicalUserMessageId))
                 |> completePhysicalRelease sessionId physicalUserMessageId)
 
+        let hasContinuationInput (sessionId, physicalId) =
+            continuationInputs.Values
+            |> Seq.exists (fun lease ->
+                lease.Identity.SessionId = sessionId
+                && lease.Identity.PhysicalUserMessageId = physicalId)
+
+        let releaseContinuationInputLocked key =
+            match continuationInputs.TryGetValue key with
+            | true, previous ->
+                continuationInputs.Remove key |> ignore
+                let oldKey = previous.Identity.SessionId, previous.Identity.PhysicalUserMessageId
+
+                if not (hasContinuationInput oldKey) && heldPhysicalReleases.Remove oldKey then
+                    releasePhysicalExecutionLocked oldKey |> ignore
+            | _ -> ()
+
         let cancelPendingPhysicalExecutionLocked (sessionId, physicalUserMessageId) =
+            releaseContinuationInputLocked (sessionId, physicalUserMessageId)
+
             match admissionQueue.TryCurrent sessionId with
             | Some demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
                 admissionQueue.CancelSession sessionId
@@ -1508,6 +1543,92 @@ module ModelRouting =
             | Ok(normSessionId, normPhysicalUserMessageId, normRole, normParticipant) ->
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
                 acquireManagedSafe normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender
+
+        member internal _.RetainContinuationInput(previous: ExecutionAdmissionLease, physicalUserMessageId: string) =
+            lock gate (fun () ->
+                let identity = previous.Identity
+
+                match activeBySession.TryGetValue identity.SessionId, admissionOwner.Target previous with
+                | (true, current), Ok target when
+                    current.PhysicalUserMessageId = Some identity.PhysicalUserMessageId
+                    && current.Participant = Some identity.Participant
+                    && current.Target = target
+                    ->
+                    continuationInputs.[(identity.SessionId, physicalUserMessageId)] <- previous
+                    target
+                | _ -> invalidOp "input no longer owns its previous model lease")
+
+        member internal _.TryContinuationInput(sessionId: string, physicalUserMessageId: string) =
+            lock gate (fun () ->
+                match continuationInputs.TryGetValue((sessionId, physicalUserMessageId)) with
+                | true, previous -> Some previous
+                | _ -> None)
+
+        member internal _.CancelContinuationInput(sessionId: string, physicalUserMessageId: string) =
+            lock gate (fun () -> releaseContinuationInputLocked (sessionId, physicalUserMessageId))
+
+        member internal _.ContinueExecutionAdmission(previous: ExecutionAdmissionLease, physicalUserMessageId: string) =
+            try
+                let acquired =
+                    lock gate (fun () ->
+                        ensureHealthy ()
+                        let identity = previous.Identity
+                        let sessionId = identity.SessionId
+
+                        match activeBySession.TryGetValue sessionId, admissionOwner.Target previous with
+                        | (true, current), Ok target when
+                            current.PhysicalUserMessageId = Some identity.PhysicalUserMessageId
+                            && current.Participant = Some identity.Participant
+                            && current.Target = target
+                            ->
+                            let replacement =
+                                capacity.ContinueExecution(
+                                    sessionId,
+                                    identity.PhysicalUserMessageId,
+                                    physicalUserMessageId,
+                                    target
+                                )
+
+                            supersededPhysical.Add(sessionId, identity.PhysicalUserMessageId) |> ignore
+                            supersedeCurrentDemand sessionId
+
+                            let next =
+                                { current with
+                                    PhysicalUserMessageId = Some physicalUserMessageId }
+
+                            activeBySession.[sessionId] <- next
+                            rememberLeasePurpose sessionId next
+                            drainDemands ()
+
+                            let admission =
+                                issueAdmission
+                                    sessionId
+                                    physicalUserMessageId
+                                    current.RoutingRole
+                                    identity.Participant
+                                    replacement
+
+                            match admission with
+                            | ExecutionAdmissionAcquisition.Admitted lease ->
+                                continuationInputs.Remove((sessionId, physicalUserMessageId)) |> ignore
+                                heldPhysicalReleases.Remove(sessionId, identity.PhysicalUserMessageId) |> ignore
+
+                                continuationInputs.Keys
+                                |> Seq.filter (fun key ->
+                                    let retained = continuationInputs.[key].Identity
+
+                                    retained.SessionId = sessionId
+                                    && retained.PhysicalUserMessageId = identity.PhysicalUserMessageId)
+                                |> Seq.toArray
+                                |> Array.iter (fun key -> continuationInputs.[key] <- lease)
+                            | _ -> ()
+
+                            admission
+                        | _ -> invalidOp "continuation no longer owns its previous model lease")
+
+                Task.FromResult acquired
+            with error ->
+                failedTask<ExecutionAdmissionAcquisition> error
 
         member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
 
@@ -1704,8 +1825,16 @@ module ModelRouting =
                     |> Seq.toArray
                     |> Array.iter (fun run -> providerStepIdentityByRun.Remove run |> ignore))
 
-                releasePhysicalExecutionLocked normKey)
-            |> Option.defaultValue CapacityTransitionOutcome.Conflict
+                lock gate (fun () ->
+                    releaseContinuationInputLocked normKey
+
+                    if hasContinuationInput normKey then
+                        heldPhysicalReleases.Add normKey |> ignore
+                        PhysicalExecutionReleaseOutcome.HeldForInput
+                    else
+                        releasePhysicalExecutionLocked normKey
+                        |> PhysicalExecutionReleaseOutcome.Released))
+            |> Option.defaultValue (PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Conflict)
 
         member _.CancelPendingExecution(sessionId: string) =
             normalizeSessionId sessionId
@@ -1924,6 +2053,34 @@ module ModelRouting =
             )
         | None -> None
 
+    let internal continueExecutionAdmission (previous: ExecutionAdmissionLease) (physicalId: PhysicalUserMessageId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.ContinueExecutionAdmission(previous, PhysicalUserMessageId.value physicalId)
+        | None ->
+            failedTask<ExecutionAdmissionAcquisition> (InvalidOperationException "model-routing runtime is unavailable")
+
+    let internal retainContinuationInput (previous: ExecutionAdmissionLease) (key: ChatExecutionKey) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.RetainContinuationInput(previous, PhysicalUserMessageId.value key.PhysicalUserMessageId)
+        | None -> invalidOp "model-routing runtime is unavailable"
+
+    let internal tryContinuationInput (key: ChatExecutionKey) =
+        lock sharedGate (fun () -> sharedRuntime)
+        |> Option.bind (fun runtime ->
+            runtime.TryContinuationInput(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            ))
+
+    let internal cancelContinuationInput (key: ChatExecutionKey) =
+        lock sharedGate (fun () -> sharedRuntime)
+        |> Option.iter (fun runtime ->
+            runtime.CancelContinuationInput(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            ))
+
     /// Read-only exact committed lease query on the process-shared runtime; an
     /// unloaded runtime observes nothing.
     let internal tryReadExecution (key: ChatExecutionKey) : ExecutionAdmissionLease option =
@@ -2021,7 +2178,7 @@ module ModelRouting =
                 SessionId.value sessionId,
                 PhysicalUserMessageId.value physicalUserMessageId
             )
-        | None -> CapacityTransitionOutcome.AlreadyApplied
+        | None -> PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.AlreadyApplied
 
     let internal observePhysicalResource (key: ChatExecutionKey) =
         let observation held =
@@ -2045,6 +2202,7 @@ module ModelRouting =
             let held =
                 snapshot.Owners |> Array.exists exact
                 || snapshot.Custodies |> Array.exists (fun custody -> exact custody.Owner)
+                || runtime.TryContinuationInput(sessionId, physicalUserMessageId) |> Option.isSome
 
             observation held
 

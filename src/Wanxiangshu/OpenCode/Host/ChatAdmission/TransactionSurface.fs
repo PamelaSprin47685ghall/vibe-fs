@@ -169,6 +169,7 @@ module TransactionSurface =
             box
                 {| kind = "HostProjectionFailed"
                    release = releaseLabel release |}
+        | ChatAdmissionTransactionError.InputProjectionFailed _ -> box {| kind = "InputProjectionFailed" |}
         | ChatAdmissionTransactionError.LeaseCommitFailed(_, release) ->
             box
                 {| kind = "LeaseCommitFailed"
@@ -181,6 +182,7 @@ module TransactionSurface =
     let private outcomeLabel =
         function
         | ChatAdmissionTransactionOutcome.Settled _ -> "Settled"
+        | ChatAdmissionTransactionOutcome.DeferredInput _ -> "DeferredInput"
         | ChatAdmissionTransactionOutcome.Superseded _ -> "Superseded"
         | ChatAdmissionTransactionOutcome.CapacityQueueFull _ -> "CapacityQueueFull"
         | ChatAdmissionTransactionOutcome.Cancelled _ -> "Cancelled"

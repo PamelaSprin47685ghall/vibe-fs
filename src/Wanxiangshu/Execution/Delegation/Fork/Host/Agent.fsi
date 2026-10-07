@@ -15,6 +15,8 @@ module HostForkAgent =
     type HostForkRuntime with
         member BoundManagedAgent: childId: SessionId -> string option
 
+        member AppendGuidance: agentId: string * prompt: string -> Task<Result<ForkResult, string>>
+
         member Fork:
             agentId: string *
             role: Role *

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 open System
-open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Change
@@ -21,10 +20,6 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 /// Manager fork & resume / Orchestrator commission. One typed request backs
 /// every public tool; each tool exposes its own schema; PTY is absent.
 module ForkTool =
-
-    // DSL-MUTABLE: resource — last accepted charge for devops busy idempotence
-    let private lastDevopsCharge: Dictionary<string, string> =
-        Dictionary<string, string>()
 
     [<RequireQualifiedAccess>]
     module Path =
@@ -53,9 +48,6 @@ module ForkTool =
 
             [<Literal>]
             let AttachSelf = "delegation/fork-attach-self"
-
-            [<Literal>]
-            let AttachBusy = "delegation/fork-attach-busy"
 
             [<Literal>]
             let NameRequired = "tool/fork/name-required"
@@ -153,6 +145,9 @@ module ForkTool =
 
             [<Literal>]
             let CallingNotAllowed = "tool/resume/calling-not-allowed"
+
+            [<Literal>]
+            let GuidanceSent = "tool/resume/guidance-sent"
 
             [<Literal>]
             let AssessmentPendingForDevOps = "tool/resume/assessment-pending-for-devops"
@@ -455,8 +450,25 @@ module ForkTool =
         else
             finishNewManagerFork scope runtime context request language handles managed role
 
-    let private reuseWhileActive language =
-        Task.FromResult(consequence (prose language Path.Fork.PersonCannotTakeCharge))
+    let private reuseWhileActive
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        language
+        handles
+        (role: Role)
+        agentId
+        =
+        task {
+            match! resolveAttachment scope handles request with
+            | Error path -> return consequence (prose language path)
+            | Ok attachment ->
+                let! rendered = prepareForkPromptWithRecord scope runtime role request None attachment
+
+                match! runtime.AppendGuidance(agentId, rendered) with
+                | Ok _ -> return successInstruction (namedProse language Path.Resume.GuidanceSent (request.Name.Trim()))
+                | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
+        }
 
     let private commitIdleReuse
         (scope: ToolRuntimeScope)
@@ -539,8 +551,7 @@ module ForkTool =
             lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
         match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
-        | true, _, Role.DevOps -> Task.FromResult(consequence (prose language Path.Fork.PersonCannotTakeCharge))
-        | true, _, _ -> reuseWhileActive language
+        | true, _, role -> reuseWhileActive scope runtime request language handles role agentId
         | false, Some(_, role, _), _ -> reuseWhileAllowed scope runtime context request language handles role agentId
         | false, None, Role.DevOps ->
             reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
@@ -579,38 +590,6 @@ module ForkTool =
         | None, None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
         | None, Some managed -> placeNewManagerFork scope runtime context request language handles managed
 
-    let private checkBusyDuplicate (runtime: HostForkRuntime) (request: Request) (agentId: string) =
-        let isDuplicate =
-            lock runtime.Gate (fun () ->
-                match lastDevopsCharge.TryGetValue agentId with
-                | true, prevCharge -> prevCharge = request.Charge
-                | false, _ -> false)
-
-        Some isDuplicate
-
-    let private updateChargeIfNotBusy (runtime: HostForkRuntime) isBusy agentId charge =
-        if not isBusy then
-            lock runtime.Gate (fun () -> lastDevopsCharge.[agentId] <- charge)
-
-    let private resolveDevopsDuplicateState (runtime: HostForkRuntime) request agentId =
-        let isBusy = lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
-        updateChargeIfNotBusy runtime isBusy agentId request.Charge
-
-        if isBusy then
-            checkBusyDuplicate runtime request agentId
-        else
-            None
-
-    let private tryCheckDevopsDuplicate (runtime: HostForkRuntime) (handle: HandleRecord) (request: Request) =
-        match HandleId.tryAgent handle.Handle with
-        | None -> None
-        | Some handleId -> resolveDevopsDuplicateState runtime request (AgentHandleId.value handleId)
-
-    let private checkExistingDevOpsDuplicate runtime request =
-        function
-        | None -> None
-        | Some handle -> tryCheckDevopsDuplicate runtime handle request
-
     let private executeManagerExistingPerson
         (scope: ToolRuntimeScope)
         (runtime: HostForkRuntime)
@@ -623,19 +602,6 @@ module ForkTool =
         match existingByname with
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
         | Some handle -> executeManagerReusePerson scope runtime context request language handles handle
-
-    let private handleExistingDevOps scope runtime context request language handles existingByname =
-        match checkExistingDevOpsDuplicate runtime request existingByname with
-        | Some true ->
-            Task.FromResult(successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim())))
-        | Some false -> Task.FromResult(consequence (prose language Path.Fork.PersonCannotTakeCharge))
-        | None -> executeManagerExistingPerson scope runtime context request language handles existingByname
-
-    let private executeForkOnRuntime scope request context language handles existingByname isDevOps runtime =
-        if isDevOps then
-            handleExistingDevOps scope runtime context request language handles existingByname
-        else
-            executeManagerExistingPerson scope runtime context request language handles existingByname
 
     let private executeManagerAfterGuards
         (scope: ToolRuntimeScope)
@@ -653,13 +619,7 @@ module ForkTool =
 
             executeManagerNewCalling scope runtime context request language handles existingByname
 
-    let private resumeOnRuntime
-        (scope: ToolRuntimeScope)
-        (request: Request)
-        (context: HostToolContext)
-        language
-        isDevOps
-        =
+    let private resumeOnRuntime (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) language =
         match scope.RuntimeFor context with
         | Error _ -> task { return consequence (prose language Path.Fork.ChargeContextUnavailable) }
         | Ok runtime ->
@@ -668,7 +628,7 @@ module ForkTool =
             let existingByname =
                 handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
 
-            executeForkOnRuntime scope request context language handles existingByname isDevOps runtime
+            executeManagerExistingPerson scope runtime context request language handles existingByname
 
     let private resumeDevOpsAssessmentPending (scope: ToolRuntimeScope) parentSessionId isDevOps =
         if isDevOps then
@@ -704,7 +664,7 @@ module ForkTool =
                 return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
             else
                 do! bindRoadDevOpsIfNeeded scope parentSessionId isDevOps
-                return! resumeOnRuntime scope request context language isDevOps
+                return! resumeOnRuntime scope request context language
         }
 
     let private executeManagerResume (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =

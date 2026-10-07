@@ -15,7 +15,7 @@ type JoinAttemptLease =
 
 type IJoinAttemptRegistry =
     abstract Begin: SessionId * ToolCallId option -> JoinAttemptLease
-    abstract SignalUserMessage: SessionId -> unit
+    abstract SignalVisibleUserMessage: SessionId * PhysicalUserMessageId -> unit
     abstract ClearSession: SessionId -> unit
 
 type JoinAttemptRegistry =

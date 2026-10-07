@@ -53,6 +53,10 @@ module HostSignalBootstrap =
         | Running
         | Finished
 
+    type private ChatAdmissionPurpose =
+        | PublishInput
+        | EnterProviderStep
+
     type private ChatAdmissionFlight =
         { Work: Task<Result<ChatAdmissionTransactionOutcome, ChatAdmissionTransactionError>>
           Outputs: ResizeArray<obj>
@@ -73,7 +77,8 @@ module HostSignalBootstrap =
           CurrentPhysicalUserMessage: string -> string option
           ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
-          ObserveEvent: obj -> Task<unit> }
+          ObserveEvent: obj -> Task<unit>
+          EnsureVisibleInputAdmission: obj -> Task<unit> }
 
     let wire
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
@@ -656,9 +661,7 @@ module HostSignalBootstrap =
                 scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
                 || (durableParentOf sessionId).IsSome
 
-            let continueUnmanagedChatMessage intent =
-                requireDurabilityActivation ()
-                JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+            let continueUnmanagedChatMessage () = requireDurabilityActivation ()
 
 
             let continueManagedChatMessage intent output =
@@ -684,11 +687,37 @@ module HostSignalBootstrap =
                     scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
                     bindContinuationMessage sessionId physicalId
                     registerOwned sessionId
+                | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+                    let sessionId = SessionId.value evidence.SessionId
+                    let physicalId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
+
+                    scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
+                    bindContinuationMessage sessionId physicalId
+                    registerOwned sessionId
                 | _ -> ()
 
                 FissionHostRequestProjection.projectPendingManaged hasPhysicalParent intent output
                 requireDurabilityActivation ()
-                JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+
+            let observeVisibleChatMessage raw =
+                match HostEventEnvelope.tryVisibleUserMessage raw with
+                | None -> ()
+                | Some(sessionId, physicalId) ->
+                    let key =
+                        { SessionId = sessionId
+                          PhysicalUserMessageId = physicalId }
+
+                    resolveProjection sessionId
+                    |> Option.bind (fun projection -> ChatExecutionProjection.byKey key projection.ChatExecutions)
+                    |> Option.filter (fun state ->
+                        state.terminalDisposition.IsNone
+                        && (ModelRouting.ownsExecutionAdmission key
+                            || (journal
+                                |> Option.bind (fun durable ->
+                                    SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence)
+                                |> Option.isSome)))
+                    |> Option.iter (fun state ->
+                        JoinWake.observeAcceptedMessage scope.Sessions.JoinInterrupts state.acceptedEvidence)
 
             let executionKey intent =
                 match intent with
@@ -704,6 +733,10 @@ module HostSignalBootstrap =
                     Some
                         { SessionId = evidence.Key.SessionId
                           PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+                    Some
+                        { SessionId = evidence.SessionId
+                          PhysicalUserMessageId = evidence.PhysicalUserMessageId }
                 | ChatAdmissionIntent.Decision.NoManagedExecution _
                 | ChatAdmissionIntent.Decision.HostInternal _
                 | ChatAdmissionIntent.Decision.Reject _ -> None
@@ -747,8 +780,15 @@ module HostSignalBootstrap =
 
                     projectCommittedAdmission key output
                     continueManagedChatMessage intent output
+                | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
+                    ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel target)
+                    |> Result.defaultWith raise
+
+                    continueManagedChatMessage intent output
                 | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
-                | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
+                | Error error ->
+                    executionKey intent |> Option.iter ModelRouting.cancelContinuationInput
+                    raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
 
             let priorExecutions durable (key: ChatExecutionKey) =
                 (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
@@ -813,7 +853,12 @@ module HostSignalBootstrap =
 
                     outputs
                     |> Seq.filter (fun requestOutput -> not (obj.ReferenceEquals(requestOutput, output)))
-                    |> Seq.iter (projectCommittedAdmission key)
+                    |> Seq.iter (fun extra ->
+                        match result with
+                        | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
+                            ModelRouting.projectHostModel extra (ModelRouting.toOpenCodeModel target)
+                            |> Result.defaultWith raise
+                        | _ -> projectCommittedAdmission key extra)
                 finally
                     phase.Value <- ChatAdmissionFlightPhase.Finished
 
@@ -845,9 +890,33 @@ module HostSignalBootstrap =
                 | ExecutionAdmissionAcquisition.Queued _ -> onQueued ()
                 | _ -> ()
 
-            let acquireAndHandoff durable key (ports: ChatAdmissionTransactionPorts) onQueued witness =
+            let acquireAndHandoff
+                durable
+                (key: ChatExecutionKey)
+                purpose
+                (ports: ChatAdmissionTransactionPorts)
+                onQueued
+                witness
+                =
                 task {
-                    let! acquired = ports.Acquire witness
+                    let! acquired =
+                        match
+                            purpose,
+                            SessionExecutionBinding.tryContinuationAdmission
+                                durable
+                                (ManagedChatAcceptanceWitness.evidence witness)
+                        with
+                        | ChatAdmissionPurpose.EnterProviderStep, Some previous ->
+                            task {
+                                try
+                                    let! acquired =
+                                        ModelRouting.continueExecutionAdmission previous key.PhysicalUserMessageId
+
+                                    return Ok acquired
+                                with error ->
+                                    return Error error
+                            }
+                        | _ -> ports.Acquire witness
 
                     match acquired with
                     | Ok(ExecutionAdmissionAcquisition.Admitted _ as admission)
@@ -867,6 +936,7 @@ module HostSignalBootstrap =
             let startAdmissionFlight
                 durable
                 createTransaction
+                purpose
                 intent
                 managed
                 (key: ChatExecutionKey)
@@ -900,15 +970,31 @@ module HostSignalBootstrap =
                             else
                                 project ()
 
+                        let tryInputTarget witness =
+                            match purpose with
+                            | ChatAdmissionPurpose.EnterProviderStep -> None
+                            | ChatAdmissionPurpose.PublishInput ->
+                                SessionExecutionBinding.tryContinuationAdmission
+                                    durable
+                                    (ManagedChatAcceptanceWitness.evidence witness)
+                                |> Option.map (fun lease ->
+                                    ModelRouting.retainContinuationInput
+                                        lease
+                                        (ManagedChatAcceptanceWitness.key witness))
+
                         let! result =
                             ChatAdmissionTransaction.executeWithLeaseOwner
                                 ignore
                                 withLeaseOwner
+                                tryInputTarget
                                 { ports with
-                                    Acquire = acquireAndHandoff durable key ports onQueued }
+                                    Acquire = acquireAndHandoff durable key purpose ports onQueued }
                                 managed
 
-                        finishUnsettledAdmission intent output result
+                        match result with
+                        | Ok(ChatAdmissionTransactionOutcome.DeferredInput _) -> finish result
+                        | _ -> finishUnsettledAdmission intent output result
+
                         return result
                     }
 
@@ -920,7 +1006,7 @@ module HostSignalBootstrap =
                         releaseAdmissionTurn key.SessionId completion
                 }
 
-            let admissionFlight durable createTransaction intent managed (key: ChatExecutionKey) output =
+            let admissionFlight durable createTransaction purpose intent managed (key: ChatExecutionKey) output =
                 lock admissionInFlight (fun () ->
                     match admissionInFlight.TryGetValue key with
                     | true, existing when existing.Phase.Value = ChatAdmissionFlightPhase.Running ->
@@ -933,7 +1019,16 @@ module HostSignalBootstrap =
                         let phase = ref ChatAdmissionFlightPhase.Running
 
                         let started =
-                            startAdmissionFlight durable createTransaction intent managed key output outputs phase
+                            startAdmissionFlight
+                                durable
+                                createTransaction
+                                purpose
+                                intent
+                                managed
+                                key
+                                output
+                                outputs
+                                phase
 
                         admissionInFlight.[key] <-
                             { Work = started
@@ -942,14 +1037,16 @@ module HostSignalBootstrap =
 
                         started)
 
-            let admitManagedChatMessage durable createTransaction intent output =
+            let admitManagedChatMessage durable createTransaction purpose intent output =
                 let managed =
                     ChatAdmissionIntent.tryManaged intent
                     |> Option.defaultWith (fun () ->
                         invalidArg "intent" "managed chat transaction requires a managed intent")
 
                 let key = ChatAdmissionIntent.managedKey managed
-                let flight = admissionFlight durable createTransaction intent managed key output
+
+                let flight =
+                    admissionFlight durable createTransaction purpose intent managed key output
 
                 task {
                     try
@@ -970,21 +1067,130 @@ module HostSignalBootstrap =
                 match intent, journal, admissionTransaction with
                 | ChatAdmissionIntent.Decision.NoManagedExecution _, _, _
                 | ChatAdmissionIntent.Decision.HostInternal _, _, _ ->
-                    continueUnmanagedChatMessage intent
+                    continueUnmanagedChatMessage ()
                     Task.FromResult()
                 | ChatAdmissionIntent.Decision.Reject rejection, _, _ -> rejectedChatMessage (IntentRejected rejection)
                 | ChatAdmissionIntent.Decision.ExternalRootIntent _, Some durable, Some createTransaction ->
-                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
-                    admitManagedChatMessage durable createTransaction intent output
+                    admitManagedChatMessage durable createTransaction ChatAdmissionPurpose.PublishInput intent output
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, Some durable, Some createTransaction ->
-                    admitManagedChatMessage durable createTransaction intent output
+                    admitManagedChatMessage durable createTransaction ChatAdmissionPurpose.PublishInput intent output
                 | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _, Some durable, Some createTransaction ->
-                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
-                    admitManagedChatMessage durable createTransaction intent output
+                    admitManagedChatMessage durable createTransaction ChatAdmissionPurpose.PublishInput intent output
+                | ChatAdmissionIntent.Decision.AcceptedInputIntent _, Some durable, Some createTransaction ->
+                    admitManagedChatMessage
+                        durable
+                        createTransaction
+                        ChatAdmissionPurpose.EnterProviderStep
+                        intent
+                        output
                 | ChatAdmissionIntent.Decision.ExternalRootIntent _, _, _
                 | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _, _, _
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, _, _ ->
                     rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
+                | ChatAdmissionIntent.Decision.AcceptedInputIntent _, _, _ ->
+                    rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
+
+            let includedInput durable (selected: AcceptedChatExecutionEvidence) message =
+                let info = ProviderWireDecode.infoObject message
+
+                ProviderWireDecode.hostMessageId message
+                |> Option.filter (fun _ ->
+                    ProviderWireDecode.firstString info [ "role" ] = Some "user"
+                    && ProviderWireDecode.firstString info [ "sessionID"; "sessionId" ] = Some(
+                                                                                              SessionId.value
+                                                                                                  selected.SessionId
+                                                                                          ))
+                |> Option.map (fun physical ->
+                    { SessionId = selected.SessionId
+                      PhysicalUserMessageId = PhysicalUserMessageId.create physical })
+                |> Option.bind (fun key ->
+                    (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                    |> ChatExecutionProjection.byKey key)
+                |> Option.bind (function
+                    | ChatExecutionState.Accepted earlier when
+                        earlier.PhysicalUserMessageId <> selected.PhysicalUserMessageId
+                        && earlier.LogicalRunId = selected.LogicalRunId
+                        && earlier.AuthorityRootUserMessageId = selected.AuthorityRootUserMessageId
+                        && earlier.IdentitySeed = selected.IdentitySeed
+                        && (earlier.Origin = PromptOrigin.Continuation PromptContinuationKind.HumanMessage
+                            || earlier.Origin = PromptOrigin.Continuation PromptContinuationKind.BusyAgentNudge)
+                        ->
+                        let key =
+                            { SessionId = earlier.SessionId
+                              PhysicalUserMessageId = earlier.PhysicalUserMessageId }
+
+                        if ModelRouting.ownsExecutionAdmission key then
+                            None
+                        else
+                            Some key
+                    | _ -> None)
+
+            let settleIncludedInputs durable selected messages =
+                task {
+                    for key in messages |> List.choose (includedInput durable selected) do
+                        let! settled = ManagedChatSupersession.settle durable key
+
+                        match settled with
+                        | Ok() -> ModelRouting.cancelContinuationInput key
+                        | Error error ->
+                            raise (
+                                ChatAdmissionHookException(
+                                    TransactionFailed(ChatAdmissionTransactionError.SupersessionSettlementFailed error),
+                                    Some
+                                        { SessionId = selected.SessionId
+                                          PhysicalUserMessageId = selected.PhysicalUserMessageId }
+                                )
+                            )
+                }
+
+            let ensureVisibleInputAdmission (output: obj) =
+                task {
+                    let messages = ProviderWireDecode.messagesFromTransformOutput output
+
+                    match journal, admissionTransaction, ProviderWireCapture.lastUserMessageId messages with
+                    | Some durable, Some createTransaction, Some physicalId ->
+                        match
+                            messages
+                            |> List.tryFind (fun message ->
+                                ProviderWireDecode.hostMessageId message = Some(PhysicalUserMessageId.value physicalId))
+                        with
+                        | None -> ()
+                        | Some message ->
+                            let info = ProviderWireDecode.infoObject message
+                            let projection = createObj [ "message" ==> info; "parts" ==> message?parts ]
+
+                            let decoded = PromptIngressCodec.decodeWith info projection
+
+                            match decoded.InvalidIdentityCarrier, decoded.SessionId with
+                            | None, Some sessionId ->
+                                let key: ChatExecutionKey =
+                                    { SessionId = sessionId
+                                      PhysicalUserMessageId = physicalId }
+
+                                let state =
+                                    (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                                    |> ChatExecutionProjection.byKey key
+
+                                match state with
+                                | Some state when
+                                    state.terminalDisposition.IsNone
+                                    && (ModelRouting.tryReadExecution key |> Option.isNone)
+                                    && (SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence
+                                        |> Option.isSome)
+                                    ->
+                                    do!
+                                        admitManagedChatMessage
+                                            durable
+                                            createTransaction
+                                            ChatAdmissionPurpose.EnterProviderStep
+                                            (ChatAdmissionIntent.Decision.AcceptedInputIntent state.acceptedEvidence)
+                                            projection
+
+                                    do! settleIncludedInputs durable state.acceptedEvidence messages
+                                | _ -> ()
+                            | _ -> ()
+                    | _ -> ()
+                }
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
@@ -1024,7 +1230,6 @@ module HostSignalBootstrap =
                             // can enqueue after this message is accepted and supersede
                             // its model-routing lease before chat.params.
                             observePhysicalAdmission output sessionId physicalId
-                            JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
                         | _ -> ()
 
                         do! continueClassifiedChatMessage intent output
@@ -1045,10 +1250,13 @@ module HostSignalBootstrap =
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                         |> Option.map PhysicalUserMessageId.value)
                   ChatMessageHook = chatMessageHook
+                  EnsureVisibleInputAdmission = ensureVisibleInputAdmission
                   ConfirmProviderStarted = confirmProviderStarted
                   ObserveEvent =
                     (fun raw ->
                         task {
+                            observeVisibleChatMessage raw
+
                             HostEventCodec.tryDecodeExactProviderTerminal raw
                             |> Option.iter observeHostInternalTerminal
 

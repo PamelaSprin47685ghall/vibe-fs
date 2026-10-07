@@ -65,3 +65,17 @@ module HostEventEnvelope =
 
         trySessionId raw
         |> Option.orElseWith (fun () -> messageInfoSessionId (messageInfo raw))
+
+    let tryVisibleUserMessage (rawInput: obj) : (SessionId * PhysicalUserMessageId) option =
+        let raw = unwrap rawInput
+        let info = messageInfo raw
+
+        if
+            eventTypeOf raw <> "message.updated"
+            || primitiveNonWhitespaceString (field info "role") <> Some "user"
+        then
+            None
+        else
+            match tryMessageSessionId raw, primitiveNonWhitespaceString (field info "id") with
+            | Some sessionId, Some physicalId -> Some(sessionId, PhysicalUserMessageId.create physicalId)
+            | _ -> None

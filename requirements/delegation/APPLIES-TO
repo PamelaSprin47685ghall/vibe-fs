@@ -15,6 +15,7 @@
 /src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs
 /resources/provider/delegation/**
 /resources/provider/tool/fork/**
+/resources/provider/tool/resume/**
 /resources/provider/tool/commission/**
 /resources/provider/tool/join/**
 /resources/provider/host/pair-programming-tool-estimate/**

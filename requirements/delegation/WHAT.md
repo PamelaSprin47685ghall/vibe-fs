@@ -64,6 +64,8 @@ Orchestrator 的 commission 批量 join 按 FIFO 排空，遵守与 [013] 相同
 
 用户输入不得中断当前 LLM 输出或非 Join 工具，也不得为了唤醒 Join 而物理 abort 整个 session；输入留给下一次 LLM 请求。
 
+Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理消息时唤醒。重复可见回执不得打断下一次 Join，Join 尚未开始时收到的输入不预埋中断。Manager 听取输入后自行决定是否向 child 追加指导、取消工作或调整安排；系统不自动取消、重派或转发。
+
 ## [017] 返回不转移权威
 
 返回的 WorkRecord 或建议只是调用方的决策证据，不自动改变全局请求方向，不扩权，也不免除既定义务。
@@ -114,7 +116,9 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 ## [027] Busy nudge 不承载新 assignment
 
-同一 logical route 同时至多一个 active work unit，忙碌时明确拒绝新 charge。BusyAgentNudge 只作既有 LogicalRun 的内部 continuation。前一 work unit 完成后即可承接下一项，不依赖 join 消费或重建 participant。
+同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份、完成订阅与 handoff frontier，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
+
+前一 work unit 完成后，`resume` 才承接下一项，不依赖 join 消费或重建 participant。忙碌提示的发送路径不得因异步准备期间任务结束而自动改走新 assignment。
 
 ## [028] 编译依赖按 effect 边界分层
 

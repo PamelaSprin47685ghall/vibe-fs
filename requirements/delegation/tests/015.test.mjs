@@ -14,15 +14,6 @@ const quiescent = probe => {
   assert.equal(counts.pendingRuns, 0)
 }
 
-test('WHAT[delegation-015] interrupted prose distinguishes user input, operator abort and deadline', () => {
-  assert.match(join.renderInterrupted('english', 'UserMessageArrived'), /Something nearer has arrived/)
-  assert.match(join.renderInterrupted('english', 'DeadlineExpired'), /waiting ended/)
-  assert.match(join.renderInterrupted('english', 'OperatorAbort'), /waiting was interrupted/)
-  for (const reason of ['UserMessageArrived', 'DeadlineExpired', 'OperatorAbort']) {
-    assert.doesNotMatch(join.renderInterrupted('english', reason), /error|failed/i)
-  }
-})
-
 test('WHAT[delegation-015] spurious wake burst still delivers the actual queued completion exactly once', async () => {
   const probe = join.createJoinProbe()
   const id = await forkOne(probe)
@@ -149,5 +140,34 @@ test('WHAT[delegation-015] a queued or racing commission verdict is consumed bef
     assert.equal(out.verdicts[0].detail, 'head-1')
     assert.equal(change.verdictMailboxPendingCount(mailbox), 0, order)
   }
+})
+
+test('WHAT[delegation-015] a visible input wakes only active Join leases and duplicate receipts cannot interrupt a later Join', async () => {
+  const registry = join.createVisibleInputRegistry()
+  registry.signal(['manager', 'message-before-join'])
+  const first = registry.begin('manager')
+  registry.signal(['manager', 'message-before-join'])
+  first.deadline()
+  assert.deepEqual(await first.result, { kind: 'Interrupted', reason: 'DeadlineExpired' })
+  first.dispose()
+  const current = registry.begin('manager')
+  registry.signal(['manager', 'message-during-join'])
+  assert.deepEqual(await current.result, { kind: 'Interrupted', reason: 'UserMessageArrived' })
+  current.dispose()
+
+  const later = registry.begin('manager')
+  const unrelated = registry.begin('other-manager')
+  registry.signal(['manager', 'message-during-join'])
+  registry.signal(['manager', 'message-before-join'])
+  later.abort()
+  assert.deepEqual(await later.result, { kind: 'Interrupted', reason: 'OperatorAbort' })
+  later.dispose()
+  const fresh = registry.begin('manager')
+  registry.signal(['manager', 'fresh-message'])
+  assert.deepEqual(await fresh.result, { kind: 'Interrupted', reason: 'UserMessageArrived' })
+  unrelated.deadline()
+  assert.deepEqual(await unrelated.result, { kind: 'Interrupted', reason: 'DeadlineExpired' })
+  fresh.dispose()
+  unrelated.dispose()
 })
 }

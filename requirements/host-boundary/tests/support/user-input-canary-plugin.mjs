@@ -35,19 +35,45 @@ export default {
             return hooks.tool['js-manager'].execute(args, context)
           },
         },
+        join: {
+          ...hooks.tool.join,
+          execute: async (args, context) => {
+            const result = await hooks.tool.join.execute(args, context)
+            await emit('join.result', { sessionID: context.sessionID, result })
+            return result
+          },
+        },
       },
       'chat.headers': async (request, output) => {
         await hooks['chat.headers']?.(request, output)
         output.headers['x-wxs-canary-session'] = request.sessionID
         output.headers['x-wxs-canary-message'] = request.message.id
       },
+      'chat.params': async (...args) => {
+        try {
+          return await hooks['chat.params'](...args)
+        } catch (error) {
+          await emit('hook.failed', { hook: 'chat.params', error: String(error), stack: error.stack })
+          throw error
+        }
+      },
+      'experimental.chat.messages.transform': async (...args) => {
+        try {
+          return await hooks['experimental.chat.messages.transform'](...args)
+        } catch (error) {
+          await emit('hook.failed', { hook: 'experimental.chat.messages.transform', error: String(error), stack: error.stack })
+          throw error
+        }
+      },
       'chat.message': async (request, output) => {
         await emit('message.received', {
           sessionID: request.sessionID, messageID: request.messageID ?? output.message.id,
         })
         await hooks['chat.message'](request, output)
+        const metadata = output.parts?.find(part => part.metadata?.wanxiangshu_origin)?.metadata
         await emit('message.accepted', {
           sessionID: request.sessionID, messageID: request.messageID ?? output.message.id,
+          agent: output.message.agent, origin: metadata?.wanxiangshu_origin,
         })
       },
       event: async (request) => {

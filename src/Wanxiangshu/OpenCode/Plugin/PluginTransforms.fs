@@ -531,9 +531,17 @@ module PluginTransforms =
                 outObj
 
         { BeginPhysicalProviderAttempt =
-            SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
-                journal
-                scope.Sessions.Quiescence.BeginProviderAttempt
+            fun sessionId output ->
+                task {
+                    do! wired.EnsureVisibleInputAdmission output
+
+                    do!
+                        SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                            journal
+                            scope.Sessions.Quiescence.BeginProviderAttempt
+                            sessionId
+                            output
+                }
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
             SessionStartedAtLedger.bindSessionStartedAt port clock terminateSession Diagnostic.emit
