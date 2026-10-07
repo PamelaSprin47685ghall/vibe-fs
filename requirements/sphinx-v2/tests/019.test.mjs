@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 import * as persistence from '../../../dist/Sphinx/V2/Persistence/Surface.js'
 import {
   store, digest, mustOk, body, envelope, goal, createdBody, work,
@@ -514,3 +519,70 @@ test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-w
     })
   }
 })
+
+const appendCutChild = fileURLToPath(new URL('./support/append-cut-settlement-child.mjs', import.meta.url))
+
+for (const scenario of ['valid', 'malformed', 'valid-release', 'malformed-release']) {
+  test(`WHAT[sphinx-v2-019] actual store ${scenario} preserves Sphinx settlement and cold replay under explicit bad-payload defense`, async t => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-append-cut-')))
+    const commonDir = join(root, '.git')
+    const sourceWriter = randomUUID()
+    const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`)
+    const raw = batch('native-cut-' + scenario, 'native-settlement-' + scenario, [createdBody(text)])
+    const malformed = scenario.startsWith('malformed')
+    const release = scenario.endsWith('-release')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const probe = async (mode, writerId, request) => {
+      try {
+        return JSON.parse(await runVerificationToolProbe(process.execPath,
+          [appendCutChild, mode, commonDir, writerId, scenario, JSON.stringify(request)],
+          { cwd: dirname(commonDir), env, signal: t.signal }))
+      } catch (error) {
+        if (error?.stderr && typeof error.message === 'string') error.message += '\n' + error.stderr
+        throw error
+      }
+    }
+    let completed = false
+    try {
+      const measured = await probe('measure', sourceWriter, { raw })
+      assert.notEqual(measured.pid, process.pid)
+      assert.deepEqual(measured.counts, { append: 1, fsync: 1, close: 1, release: 1, injected: release ? 1 : 0 })
+      assert.equal(measured.physicalPreconditions, true)
+      assert.equal(measured.inquiryId, raw.inquiry)
+      assert.equal(measured.commandId, raw.commandId)
+      assert.equal(measured.original.payload.inquiry, raw.inquiry)
+      assert.equal(measured.original.payload.commandId, raw.commandId)
+      assert.equal(measured.facts.length, malformed ? 2 : 1)
+      assert.equal(measured.facts[0].id, measured.original.id)
+      assert.equal(measured.facts[0].stream, measured.original.stream)
+      assert.deepEqual(measured.facts[0].payload, malformed ? {} : measured.original.payload)
+      assert.equal(measured.kind, release ? 'CommitUnknown' : 'Committed')
+      assert.equal(measured.phase, release ? 'StoreRelease' : null)
+      assert.equal(measured.causeSame, release)
+      assert.equal(measured.originalErrorSame, release ? true : null)
+      assert.equal(measured.cutIds.length, malformed ? 1 : 0)
+      assert.equal(readFileSync(sourceFile, 'base64'), measured.bytes)
+      assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+
+      const coldWriter = randomUUID()
+      const cold = await probe('cold', coldWriter, {
+        sourceWriter, bytes: measured.bytes, facts: measured.facts,
+        inquiryId: raw.inquiry, current: measured.current,
+      })
+      assert.notEqual(cold.pid, measured.pid)
+      assert.notEqual(cold.pid, process.pid)
+      assert.equal(cold.writerId, coldWriter)
+      assert.equal(cold.preserved, true)
+      assert.deepEqual(cold.current, measured.current)
+      assert.equal(readFileSync(sourceFile, 'base64'), measured.bytes)
+      assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', `${coldWriter}.ndjson`)), false)
+      t.diagnostic(JSON.stringify({ scenario, measurePid: measured.pid, coldPid: cold.pid,
+        physicalAndCold: true, ...measured.counts, kind: measured.kind, cutIds: measured.cutIds }))
+      completed = true
+    } finally {
+      if (completed) rmSync(root, { recursive: true, force: true })
+      else t.diagnostic('SPHINX_APPEND_CUT_FAILURE_EVIDENCE: retained ' + root)
+    }
+  })
+}

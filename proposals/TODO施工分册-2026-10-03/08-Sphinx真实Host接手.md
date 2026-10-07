@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[U0-A1-S0](../U0-A1-Sphinx结算传播-2026-10-07.md)实际Store防御前提有限完成：gen252相关29/29、324pass/0fail/0skip/15TODO，仅pending。四分支保真实Sphinx rule、bad fact/cut-tail、Release Unknown原载体及独立cold；生产已有保护，本包只补测试。下一S1原Commands callback/重复incident guard，再S2真正Wire/MCP物理fatal。S0不关闭合法encoder自然cut、committed-cuts消费或H0b fresh acceptance。
+
 最新[upstream48a0bf426合并](../archive/2026-10-07/Upstream忙碌指导合并-2026-10-07.md)已有限验收：gen233产品2049/0、实际flat28/0、安装版Host六场景所在native13/13。新的可见输入/exact lease交接合同不授予Sphinx fresh witness；U0-A1/H0b及完整034边界保持，下方gen230与旧前置记录只属其原输入。
 
 2026-10-07，B1-H0a 的原 owner、公有提示和 observed execution 已有限验收；下一主线是 **H0b 的 canonical 原子首次接纳能力**，随后接 effect 前持久绑定。U0-A0 已有限验收：gen230产品2042/0、监督器93/0、实际flat28/0；当前证据以[U0记录](../archive/2026-10-07/U0追加结果与消费者施工-2026-10-07.md)为准。下一按[U0-A1接手卡](../U0-A1结算传播接手卡-2026-10-07.md)补actual cut/mandatory owner，可与H0b存储合同设计并行；下面原生Release红及旧“未实施”仅作历史依据，不能重复施工。本卡优先于历史 H0 顺序。前置 A2 不重复施工；完整034、公开执行与首个答案仍未完成。
