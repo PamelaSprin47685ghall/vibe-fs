@@ -950,7 +950,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008'],
+    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-012', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008'],
     lawOwners: {
       'EFFECT-ACCOUNTING-008': 'effect-accounting',
     },

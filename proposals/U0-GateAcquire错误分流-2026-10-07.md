@@ -1,5 +1,19 @@
 # U0-G0：GateAcquire 的锁争用与原始 I/O 错误
 
+## G1 payload 独立证明（有限完成）
+
+2026-10-07 从 `766044391` 认领 G1，仅新增 durable-events[012] 四叶与独立 native helper，补原 JournalSurface 的012归属；生产算法不改。G0共享锁分类已有保护，新增正式四叶直接通过，没有新业务红。
+
+实际链为 `JournalSurface_writePayload → EventStoreBlobWriter.Write → Store.WritePayload → withStoreLock`。WHAT[012]规定内容寻址落盘与引用闭包；原 `IBlobWriter.Write` 仍为 `Result<BlobWriteReceipt,string>`，拒绝保原字符串错误，不谎称 AppendError/Prepared 或 Error 引用合同。先以原 Journal 写非空旧正文和合法 TerminalOutputCaptured，建立真实 RuntimeStarted/业务事实、Current/XTrace、read/head/heads及 canonical bytes，再只测新 payload。首次EACCES、首次EIO、真实ELOCKED后成功、真实ELOCKED后EACCES四叶保持原等待预算；busy使用实际锁与受控barrier，不sleep或概率重跑。每叶另开OS进程cold，只读原Current、正文、事实/head及字节；被测新payload不得追加事件或强制lazy初始化。
+
+gen297 Fable174 Surface/834模块及完整check通过；正式完整durable-events/EFP＋JS002/requirement017为41/41文件、287pass/0fail/14skip/15TODO，73.34s wall/335.00s累计test，仅pending退出1；outer27527 accepted=true88.401ms。所有14skip均integration未启用，15TODO保持原完整清单。独立native四叶4pass/0fail/0skip/0TODO、exit0、9.068155s，measure/cold PID依次28780/28790、28803/28806、28826/28831、28841/28847。
+
+两直接错误仅mkdir1次；busy两叶先实际ELOCKED，释放barrier后原mkdir总2次。成功只有新payload的write/fsync/close/Release各1，无事件append；三失败均无新增payload/append、legalAfterFailure=0。两条真实旧事实及read/head/heads、旧正文、XTrace.latestTerminalPresent、Current和canonical bytes均严格保留，cold没有新writer/init/锁。
+
+gen297 compiler=`5a110810e2a6e42005106082d96aeab4efba261d6b40395a0d9dea4b4f7b8c14`，generated=`dcdd5dcebd5d8a44c28bb61059644dad3506831866410d661660e44c85eb6438`，artifact=`624e33e4e020e8c42e90f53151e94081b6e9751a81c745978199771889d7bba2`。最终文档冻结与原件/SHA另见[本包收据](archive/2026-10-07/payload-lock-g1/receipt.txt)。
+
+本项不关闭 owner.json、持续争用取消/等待上限、Git hook、payload fsync/Release故障分类、Journal mandatory fatal owner、完整WHAT[012]或CI。下一D0-P原装配前提；[J3整包卡](U0-A1-Journal-J3施工卡-2026-10-07.md)已补串行拒绝/同步Release的实际风险，须另完整窗口迁移，不以纯类型候选冒领。
+
 ## 认领与根因
 
 从 `149aa5d31` 接续U0-A1卡的GateAcquire项。依据 durable-events[004,006,013,017]：进入物理追加前失败应保原请求、阶段与原异常，不能悄悄重试成一次成功写入。本包只修原EventStore物理锁等待；独立Git IntegrationGate不改。WritePayload与Git hook也调用这个共享助手，因而一并停止重试非争用错误，但不借本批Append证明验收其各自错误合同。
