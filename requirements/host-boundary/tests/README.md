@@ -25,8 +25,8 @@
 - C52 已在候选编译产物中复现评审字段重现后恢复到错误键位（`/tmp/vibe-fs-argument-owner-batch3.log`，4 通过、1 失败）；C53 已复现两个不同调用同时取得同一参数对象（`/tmp/vibe-fs-argument-owner-race-red.log`，两个 before 均成功）。这些日志保留为修复前的失败证据。
 - C54/C55 的六个独立用例已取得修复前失败证据（`/tmp/vibe-fs-argument-after-business-red.log`，0 通过、6 失败）：三个 after 所有权反例与三个非协议业务 getter 读取反例分别失败。最终候选已完成 Fable 822 模块编译链接，新增 Host 回归 16 通过、0 失败（`/tmp/vibe-fs-host-final-regressions.log`），覆盖共同调用身份、参数恢复和按字段所有权读取；该结果不替代安装版 Host 执行异常后自动调用 after 的待证义务。
 - 032真实canary不再把缺失SDK观察默认为成功，不伪造版本、完成状态和取消结论。观察器保存原始参数副本及键序，实际after验证恢复；公开事件唤醒完整SDK读取后确认终态和持久输入。目标版本fixture只声明预期环境，不是通过记录。本轮已启用 integration 并通过该真实 Host canary；所在五文件验证共 103 通过、0 失败、0 跳过、5 TODO（`/tmp/vibe-fs-resume-focused-integration.log`）。这证明已执行的正常恢复场景，安装版 Host 执行器抛错后自动调用 after 仍单列待证。
-- 003 将旧源码分支词形断言替换为实际注册 hook：coarse abort 保留当前 execution，当前 exact cancelled assistant 才结算自己的 Cancelled；033 另证旧 Guard 的迟到 cancelled receipt 不动新 Human。SDK abort 的明确错误 carrier 必须拒绝交接，不能把 Promise 已返回当排空成功。
-- 033 增加自然 Guard/H/J 的安装版 OpenCode1.18.29 canary，真实挂住 transform 或 provider，并在 H hook 返回 Host 前接受 J。默认容量和 Manager 单槽容量各有 PAUSED、STARTED、INTERLEAVED 三种场景；每种场景使用独立 Host、工作区与回环服务，共六个物理生命周期，防止前一场景结束后自然产生的新 Guard 占用后一场景容量。场景内部的 G/H/J 仍使用同一 Host 和 session。分别核对回答 parent、durable ProviderStarted 与 terminal、一次结算、零 ProviderRetry 和物理清理；单槽场景的辅助角色使用独立模型池。MCE005 另证 Host 先发布 assistant 创建事件、后冻结 plan 时，请求返回前仍须持久 Started；由公开 SDK 提供真实 assistant.id，不补造 run。原始红例、最终范围和未完成的 boot/no-assistant 证明见[本批记录](../../../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。
+- 003 调用实际注册 hook：coarse abort 保留当前 execution，当前 exact cancelled assistant 才结算自己的 Cancelled；033 另证迟到旧 receipt 不动新 Human，以及后来的输入可替代旧 pending demand 而不发出 Host abort。
+- 033 的安装版 OpenCode 1.18.29 canary 改为用户输入的非中断合同：分别挂住实际 SSE 输出与生产 `js-manager` 工具体，在新 Human 抵达后确认没有 SDK abort、没有提前发起新 provider 请求；释放后旧输出完整、工具 completed，下一次实际 provider wire 包含新输入及旧输出/工具结果，回答 parent 匹配新 Human。默认容量以准入完成为屏障；Manager 单槽容量以物理输入抵达为屏障，因为旧 provider step 尚占着唯一模型槽，不能先等新准入完成再释放旧 step。各执行两种场景，独立 Host、工作区和回环服务，最终检查物理清理。原“新输入必须排空 Guard”的 canary 已删除；历史记录不再定义当前产品语义。Join 的独立唤醒和 child 保留由 delegation 015 验证。
 
 03 对内部测试入口的限制与本包 029 的物理终止证明方式仍需统一裁决。现有物理 fixture 保留，不新增扫描豁免。
 

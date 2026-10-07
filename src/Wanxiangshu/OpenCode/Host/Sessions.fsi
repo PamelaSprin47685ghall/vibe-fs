@@ -25,4 +25,3 @@ type InjectedSessionPort =
             InjectedSessionPort
 
     interface ISessionHostPort
-    interface IExternalInputSupersessionPort

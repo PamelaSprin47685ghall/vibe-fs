@@ -78,7 +78,6 @@ module HostSignalBootstrap =
     let wire
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
-        (externalInput: IExternalInputSupersessionPort)
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
@@ -768,20 +767,6 @@ module HostSignalBootstrap =
                         do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionSuperseded state.key)
                 }
 
-            let drainExactAttempt previous witness =
-                task {
-                    match! externalInput.InterruptSupersededAttempt(previous, witness) with
-                    | Ok() -> ()
-                    | Error error ->
-                        invalidOp ("external input supersession failed to drain the old Host attempt: " + error)
-                }
-
-            let drainSupersededAttempt managed witness prior =
-                match managed, prior with
-                | (ChatAdmissionIntent.ManagedIntent.ExternalRoot _ | ChatAdmissionIntent.ManagedIntent.ActiveHumanContinuation _),
-                  Some previous when ModelRouting.wasExecutionSuperseded previous -> drainExactAttempt previous witness
-                | _ -> Task.FromResult()
-
             let beginAdmissionTurn sessionId =
                 lock admissionInFlight (fun () ->
                     let preceding =
@@ -847,11 +832,10 @@ module HostSignalBootstrap =
                         return result
                 }
 
-            let handoffAcquisition durable key managed prior witness admission =
+            let handoffAcquisition durable key admission =
                 task {
                     try
                         do! settleSupersededAdmissions durable key
-                        do! drainSupersededAttempt managed witness prior
                     with error ->
                         raise (ChatAdmissionLeaseHandoffException(error, admission))
                 }
@@ -861,14 +845,14 @@ module HostSignalBootstrap =
                 | ExecutionAdmissionAcquisition.Queued _ -> onQueued ()
                 | _ -> ()
 
-            let acquireAndHandoff durable key managed prior (ports: ChatAdmissionTransactionPorts) onQueued witness =
+            let acquireAndHandoff durable key (ports: ChatAdmissionTransactionPorts) onQueued witness =
                 task {
                     let! acquired = ports.Acquire witness
 
                     match acquired with
                     | Ok(ExecutionAdmissionAcquisition.Admitted _ as admission)
                     | Ok(ExecutionAdmissionAcquisition.Queued _ as admission) ->
-                        do! handoffAcquisition durable key managed prior witness admission
+                        do! handoffAcquisition durable key admission
                         observeQueuedAcquisition onQueued admission
                     | _ -> ()
 
@@ -902,11 +886,6 @@ module HostSignalBootstrap =
                     task {
                         do! preceding
 
-                        let prior =
-                            priorExecutions durable key
-                            |> List.tryFind (fun state -> ModelRouting.ownsExecutionAdmission state.key)
-                            |> Option.map _.key
-
                         let ports: ChatAdmissionTransactionPorts =
                             createTransaction (ModelRouting.projectHostModel output)
 
@@ -926,7 +905,7 @@ module HostSignalBootstrap =
                                 ignore
                                 withLeaseOwner
                                 { ports with
-                                    Acquire = acquireAndHandoff durable key managed prior ports onQueued }
+                                    Acquire = acquireAndHandoff durable key ports onQueued }
                                 managed
 
                         finishUnsettledAdmission intent output result

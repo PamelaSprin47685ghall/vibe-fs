@@ -97,7 +97,6 @@ module PluginHost =
         : Result<
               IEventObservationPort *
               ISessionHostPort *
-              IExternalInputSupersessionPort *
               ISessionSnapshotPort option *
               string option *
               Events.HostEventPort option,
@@ -126,11 +125,4 @@ module PluginHost =
 
         let snapshotPort = SessionSnapshotPort.create input
 
-        Ok(
-            eventPort,
-            sessionPort :> ISessionHostPort,
-            sessionPort :> IExternalInputSupersessionPort,
-            snapshotPort,
-            terminalKey,
-            Some hostEventPort
-        )
+        Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some hostEventPort)

@@ -8,8 +8,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Execution.Session.ChatExecution
-open Wanxiangshu.Interaction.Authority
 
 [<RequireQualifiedAccess>]
 module ManagedSessionTermination =
@@ -403,33 +401,6 @@ type InjectedSessionPort
             | Some port -> return! port.AbortSession sessionId
             | None -> return Error "No Host transport: cannot abort session"
         }
-
-    let interruptSupersededAttempt (prior: ChatExecutionKey) (replacement: ManagedChatAcceptanceWitness) =
-        let evidence = ManagedChatAcceptanceWitness.evidence replacement
-        let replacementKey = ManagedChatAcceptanceWitness.key replacement
-
-        let externalInput =
-            match evidence.Origin with
-            | PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-            | PromptOrigin.Continuation PromptContinuationKind.HumanMessage -> true
-            | _ -> false
-
-        if
-            not externalInput
-            || prior.SessionId <> replacementKey.SessionId
-            || prior = replacementKey
-            || not (ModelRouting.wasExecutionSuperseded prior)
-            || not (ModelRouting.ownsExecutionAdmission replacementKey)
-        then
-            Task.FromResult(Error "external input supersession does not own the exact prior and replacement executions")
-        else
-            match underlyingPort with
-            | Some port -> port.AbortSession prior.SessionId
-            | None -> Task.FromResult(Error "No Host transport: cannot drain superseded attempt")
-
-    interface IExternalInputSupersessionPort with
-        member _.InterruptSupersededAttempt(prior, replacement) =
-            interruptSupersededAttempt prior replacement
 
     interface ISessionHostPort with
         member _.AbortChildren(parentId) = abortChildren parentId

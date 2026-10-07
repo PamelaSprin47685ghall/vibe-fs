@@ -62,6 +62,8 @@ Orchestrator 的 commission 批量 join 按 FIFO 排空，遵守与 [013] 相同
 
 外部用户输入、操作员取消或超时结束 Join 等待时，返回 `Interrupted`，不作为 ForkError。外部输入只打断等待，不取消 child 或剥夺权限。
 
+用户输入不得中断当前 LLM 输出或非 Join 工具，也不得为了唤醒 Join 而物理 abort 整个 session；输入留给下一次 LLM 请求。
+
 ## [017] 返回不转移权威
 
 返回的 WorkRecord 或建议只是调用方的决策证据，不自动改变全局请求方向，不扩权，也不免除既定义务。

@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — 用户输入只打断 Join 等待
+
+- 删除 PR #51（`558ed1c75`）引入的外部输入物理中断端口及全部接线。新 user prompt 不再调用 Host abort，当前 LLM 输出与非 Join 工具自然完成，新输入留到下一次 LLM 请求；Join 继续使用独立等待唤醒，不取消 child。
+- 准入资源仍按 exact execution 交接，旧回调不能释放新执行。同步纠正 managed-session-lifecycle 016 与 delegation 015，删除“新输入排空 Guard”的旧测试合同。
+- 回归包含 unwanted abort 的先红后绿、pending demand 替代，以及安装版 OpenCode 1.18.29 的 SSE/生产工具悬置场景；默认容量与 Manager 单槽容量均检查旧结果完整、新输入出现在下一次 provider wire 和物理清理。
+
 ## Unreleased — 程序无返回值不再击穿沙箱
 
 - 现场：`js-predictor` 程序只 `console.log`、没有 `return`，沙箱报 `PROGRAM_FAILED: undefined is not an object (evaluating 'json.startsWith')`。根因：`JSON.stringify(undefined)`（及函数、Symbol）返回 `undefined` 而非字符串，`decodeRunResult` 对它调用 `StartsWith`。现在包装器在序列化结果不是字符串时与循环引用同样返回 `INVALID_RETURN_VALUE`，符合 repository-programming WHAT[011]。

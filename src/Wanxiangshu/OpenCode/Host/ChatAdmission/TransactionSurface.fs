@@ -303,7 +303,7 @@ module TransactionSurface =
                                     return
                                         raise (
                                             ChatAdmissionLeaseHandoffException(
-                                                InvalidOperationException "SDK abort rejected",
+                                                InvalidOperationException "superseded settlement failed",
                                                 ExecutionAdmissionAcquisition.Admitted lease
                                             )
                                         )

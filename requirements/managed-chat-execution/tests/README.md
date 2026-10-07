@@ -16,7 +16,7 @@
 
 012 的 A—E 调用生产准入事务并在受控边界停止；F—I 验证生产 lifecycle 的事实前缀。它们没有把得到的持久化输出传给后续恢复，因此不能命名为完整 crash recovery。`admissionPhaseSamples` 显式构造不同阶段的输入，重复调用真正 recovery 并逐次保留 effect；它证明的是这些输入的局部决策，不是进程重启或 durable owner 的 effect 幂等。对重复输入的检查保留整个结果序列，不先转成按 key 去重的字典。
 
-本批 007 补准入交接失败：SDK 拒绝排空旧 attempt 后，新输入先持久 Failed，再释放自己的 admission；terminal unknown/unavailable 时不释放，并保留取消失败的原始原因。Host 033 经实际注册 hook 验证同一拒绝路径。真实 Guard/H/J 的回答 parent、ProviderStarted、一次 terminal 和零错误 retry 则由安装版 Host canary 另证，不能用 transaction 受控端口替代。日志及剩余边界见[本批记录](../../../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。
+007 的准入交接失败验证 superseded execution 结算失败后的补偿：新输入先持久 Failed，再释放自己的 admission；terminal unknown/unavailable 时不释放，并保留结算失败的原始原因。外部输入不再拥有物理 abort 路径，不以 SDK abort 失败构造该分支。Host 033 的实际 hook 与安装版 canary 分别验证 exact 准入交接及当前输出/非 Join 工具不受新输入中断；transaction 受控端口不替代物理 Host 证明。
 
 003 的并发测试即使一条 hook 失败也会等待所有已启动 hook 收束后清理目录，不让仍在写入的 journal 失去目录。模型投影结束前封口 output 登记；正式迟到 hook 在公开投影的微任务窗口进入，仍须取得自己的完整模型且容量只有一个 exact owner。旧源码词形计数已由这些行为回归替代，不能继续把它们当作调用链证明。
 

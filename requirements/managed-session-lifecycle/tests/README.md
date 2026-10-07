@@ -8,6 +8,7 @@
 - 002/003/011 调用真实 satellite owner，端口提供 association 与 Host 观察，验证单次创建、确切复用、拒绝冲突和替换结果。端口数组不是一个共同的顺序日志；没有真实 journal 重启或首 prompt 悬置证明。
 - 004/009/014 包含同步委托与部分真实 journal。006—010/015 保留 fold、codec、视图和属性测试；GAP-132 另补真实 fork/resume 与 canonical work 消费/重开断言，范围见下文，不等同于实际父取消或 OS 进程恢复。
 - 016/017 调用实际 Session adapter/termination，悬置清理与 Host abort，观察终态不得提前发生、完整 Authority Root 和根会话拒绝。016 删除了只改变测试变量的“虚拟时钟”断言。017 尚未接真实父等待与全部 successor 入口。
+- 016 的外部输入合同另由 host-boundary 033 安装版 Host canary 共证：当前 SSE 和非 Join 工具自然完成，新输入仅进入下一次 provider 请求，不发出 SDK abort；默认容量与 Manager 单槽容量均覆盖。Join 中断及不取消 child 见 delegation 015。
 - 018 实际 fork tool detach 后读取 durable Active，断言未 abort；另经真实 Scope.CancelSessionChildren 发起受权取消，在 Host abort 端口受控悬置时读取目标 child 的 durable Abandoned，另一个 owner 的同名 child 仍 Active，取消必须等端口完成才返回。两个隔离违约分别漏写 abandon、丢弃 cleanup 等待，用于独立验证断言。四种非授权终止（TurnAborted、provider retry、Fission external-abort 形态、unknown stop）经真实 run lifecycle 投递后按各自真实语义落账、永不写 Abandoned/Retired，冷重放一致且冷重开进程 re-enlist 复用同一 handle 与 child（见下文 session018 核对段）。这些仍不证明 OS 进程退出、全部 PTY 清理或物理 Host 会话存续。020 使用实际插件重开 journal，加纯 authority 属性测试；它不证明尚未落地的五类 durable exact closure。
 - 019 保留实际 execution interpreter 的局部验证，GAP-126 的 cancel/delete drain 断言已落地（见下文 session019 核对段）。021 的真实 fatal 链仍缺证明。022 运行真实 Casebook：有/无 draft、Bookkeeper 不可用、归档读取与重复拒绝；尚未观察 identity 去留及五类 typed settlement。
 - 023 调用实际身份解析，区分拒绝旧活跃身份与历史恢复。024 只证明 handle 拒绝第二个活动绑定及 road 保留给定模型；不是 crash、模型固定或 PTY 排空证明。
