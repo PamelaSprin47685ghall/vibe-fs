@@ -35,6 +35,14 @@ D0只认领“已接纳的真实删除归档必须被同scope shutdown等待，�
 
 ## 保留边界
 
+### 2026-10-07 原装配入口复核
+
+PluginHooks把原SyncDelegateRuntime交给ToolRegistry，但baseSpecs没有Sphinx/同步Engineer consumer，该参数未被工具行为消费。唯一OpenCodeHostPort.Dispatch来自Sphinx OpenCode Surface自建harness，不能借给另一plugin。公开fork属于Road/HostFork，不建立HostSessionDeletion读取的SyncDelegate attached binding；也不能直接stage队列冒充公开工作。
+
+D0下一前提是让SpikePlugin原装配只生成一次原Hooks/Scope，public入口继续返回同Hooks，薄Semantic Surface只借同Scope.SyncDelegateRuntime调用原Engineer并只读原attached ID；delete/finalize/dispose继续走原hooks，不新增wrapper或第二runtime。这属于实现方案，不是要求用户额外审批的新流程；尚未落地/运行，不能预填绿。
+
+即使借用接缝完成，也须先证明原Manager chat admission、原Reconciler完成产生非空WorkRecord、production callbacks产生draft，以及删除时原Bookkeeper仍有active owner。不能用scripted Bookkeeper、手工noteAnswer或profile重绑补前提。薄Surface证明与public插件共用原装配，仍不等于public tool自然触发已接通；这项保留给实际consumer施工。
+
 完整[022]的取证identity/角色和PersistenceFailed合同、重复delete与父子交错、durable exact closure、crash/跨进程恢复、全部child drain/fatal顺序、installed Host及整个knowledge013均未闭合。
 
 另一个只读发现：RecordBackgroundFailure与StartDisposeAsync的Option.orElse参数顺序让后来失败覆盖旧失败，与firstFailure命名不符。当前WHAT尚未规定通用scope多错聚合的first优先级；此点只登记为合同待核候选，不在D0或K2-C顺手交换两行。

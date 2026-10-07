@@ -473,14 +473,8 @@ module JournalPortObservationSurface =
                 cancellation.Dispose()
             }
 
-    let openActualJournal commonDir writerId (startedAt: string) : Task<obj> =
+    let private openActualJournalOnStore store writerId (startedAt: string) : Task<obj> =
         task {
-            let store =
-                EventStore.createLocal
-                    commonDir
-                    writerId
-                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
-
             let! opened =
                 EventStoreJournalWriter.resumeOrCreate (
                     RuntimeId.create ("native-" + writerId),
@@ -496,6 +490,28 @@ module JournalPortObservationSurface =
                 | Error error -> return failwithf "native journal attach rejected: %A" error
                 | Ok journal -> return box (ActualJournalHandle(store, journal, init))
         }
+
+    let openActualJournal commonDir writerId startedAt : Task<obj> =
+        let store =
+            EventStore.createLocal
+                commonDir
+                writerId
+                (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
+
+        openActualJournalOnStore store writerId startedAt
+
+    let openActualJournalWithStore (store: obj) writerId startedAt : Task<obj> =
+        openActualJournalOnStore (unbox<EventStoreHandle> store).Store writerId startedAt
+
+    let observeActualJournalProjection (value: obj) : obj =
+        let current = AgentJournal.snapshot (unbox<ActualJournalHandle> value).Journal
+
+        box
+            {| runtimeId = current.RuntimeId |> Option.map RuntimeId.value |> Option.toObj
+               runtimeStartCount = current.AgentProjections.RuntimeStartCount
+               sessionCount = Map.count current.AgentProjections.Sessions
+               hasNativeSession =
+                Map.containsKey (SessionId.create "native-settlement") current.AgentProjections.Sessions |}
 
     let observeActualJournal (value: obj) : obj =
         let handle = unbox<ActualJournalHandle> value

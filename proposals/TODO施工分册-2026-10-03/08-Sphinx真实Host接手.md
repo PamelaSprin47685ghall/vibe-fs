@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[Journal J1](../U0-A1-Journal消费者-2026-10-07.md)原初始化四叶有限完成：gen290相关41/41、279pass/0fail/14skip/15TODO，仅pending，native4/0。原F04/F39结算→report/self-SIGKILL与独立cold已证；下一J2业务cut，mandatory owner/duplicate、Boot与完整024保留。D0已核明public tool缺attached同步入口，须借唯一原装配并先证Reconciler/Bookkeeper前提，不能用fork或第二runtime取绿。
+
 最新[K1-U](../U0-A1-Casebook消费者-2026-10-07.md)Unknown＋Cuts双waiter有限完成，gen288相关41/41、279pass/0fail/4skip/24TODO，仅pending；首owner唯一callback与原incident/error/prepared/cause及独立cold保持，生产无改动。下一Journal J1和D0接缝；不以此授fresh authority或完整Casebook/Host验收。
 
 最新[K2-C](../U0-A1-Casebook消费者-2026-10-07.md)原Boot owner物理四叶有限完成，gen286相关73/73、547pass/0fail/7skip/27TODO，仅pending，native4/0；两cut原report后自行SIGKILL、两控制自然退出，全部独立cold保旧Case/bytes。已有保护无生产修复或虚假业务红；下一K1-U和[SessionDeleted前提](../U0-A1-SessionDeleted前提-2026-10-07.md)限定的D0，不把本包升为installed Host、完整删除或H0b authority。

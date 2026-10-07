@@ -76,10 +76,10 @@
       "assertedInvariant": "The canonical fold and this writer's RuntimeStarted envelope must agree; a rejected runtime start means this process must not emit any business fact as if it were the live runtime,",
       "commitDisposition": "The cut-tail fact is written by the integrator path before this branch reads it (cut evidence exists). No business fact is committed by this writer in this branch (business appends require runtimeStartedCommitted). Error returned AND the fuse tripped; sibling PersistenceCuts owns the settlement-first/type-tetyped rework if any,",
       "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Owner slice owns the proof,",
-      "formalTestId": null,
+      "evidenceType": "J1 actual lazy RuntimeStarted committed cut: real Append/Journal rule persists bad fact and cut-tail, fsync/close/owned Release settle before original native child reports once and self-SIGKILLs; independent OS cold preserves bytes and last-good selected Journal Current. Payload-only defense injection, not a naturally malformed encoder.",
+      "formalTestId": "requirements/durable-events/tests/024.test.mjs::WHAT[durable-events-024] original Journal RuntimeStarted malformed settles before its physical terminal and independent cold replay",
       "status": "RetainedFuse",
-      "notes": "RuntimeStarted semantic cut — startup seal; fail-stop on lifecycle inconsistency."
+      "notes": "Finite original physical proof completed; required typed composition capability and duplicate-incident guard remain open under durable-events-024. J1 does not prove Boot/installed Host or business F38."
     },
     {
       "id": "F05",
@@ -660,10 +660,10 @@
       "assertedInvariant": "A failed initialization must not authorize any business append or successful runtime publication.",
       "commitDisposition": "Poison retains the initialization error before the fuse. Current business event stays NotAttempted.",
       "scopeOfEffect": "Current process.",
-      "evidenceType": "Typed branch inspection; native006 proves non-cut initialization uncertainty, not this fatal cut branch.",
-      "formalTestId": null,
+      "evidenceType": "J1 actual lazy RuntimeStarted CommitUnknown(StoreRelease) with Prepared bad fact and cut-tail: original cause/request/Prepared, owned append/fsync/close/Release and first initialization identity observed before original native child reports once and self-SIGKILLs; independent OS cold preserves canonical bytes and last-good selected Journal Current. Legal success and empty-Cuts Unknown controls return normally.",
+      "formalTestId": "requirements/durable-events/tests/024.test.mjs::WHAT[durable-events-024] original Journal RuntimeStarted malformed-release settles before its physical terminal and independent cold replay",
       "status": "RetainedFuse",
-      "notes": "Actual unknown-cut fatal and mandatory capability acceptance remain open under durable-events-024."
+      "notes": "Finite actual Unknown-cut physical proof completed with explicit payload-only defense and Release-after-success response fault. Mandatory capability/duplicate guard, dynamic poison at fatal instant, business F38 and Boot/installed Host remain open under durable-events-024."
     },
     {
       "id": "F40",

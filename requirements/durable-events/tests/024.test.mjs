@@ -9,6 +9,7 @@ import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool
 import * as settlement from '../../../dist/Sphinx/V2/Composition/SettlementSurface.js'
 import * as wire from '../../../dist/Sphinx/V2/Wire/Surface.js'
 import * as mcp from '../../../dist/Sphinx/V2/Hosts/Mcp/Surface.js'
+import * as journals from '../../../dist/Verification/JournalPortObservationSurface.js'
 
 const child = fileURLToPath(new URL('./support/sphinx-command-settlement-child.mjs', import.meta.url))
 const configuration = {
@@ -272,6 +273,143 @@ for (const binding of ['wire', 'mcp']) {
       }
     })
   }
+}
+
+const journalPhysicalCoordinator = fileURLToPath(new URL('./support/journal-physical-coordinator.mjs', import.meta.url))
+const journalPhysicalChild = fileURLToPath(new URL('./support/journal-physical-child.mjs', import.meta.url))
+
+for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-release']) {
+  test(`WHAT[durable-events-024] original Journal RuntimeStarted ${scenario} settles before its physical terminal and independent cold replay`, async t => {
+    assert.equal(typeof journals.openActualJournalWithStore, 'function')
+    assert.equal(typeof journals.observeActualJournalProjection, 'function')
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-physical-settlement-')))
+    const commonDir = join(root, '.git')
+    const sourceWriter = randomUUID()
+    const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`)
+    const malformed = scenario.startsWith('malformed')
+    const release = scenario.endsWith('-release')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    delete env.NODE_OPTIONS
+    delete env.WANXIANGSHU_NO_FATAL_EXIT
+    const probe = async (entry, args) => {
+      try {
+        return JSON.parse(await runVerificationToolProbe(process.execPath, [entry, ...args],
+          { cwd: root, env, signal: t.signal }))
+      } catch (error) {
+        if (error?.stderr && typeof error.message === 'string') error.message += '\n' + error.stderr
+        throw error
+      }
+    }
+    let completed = false
+    try {
+      const measured = await probe(journalPhysicalCoordinator, [commonDir, sourceWriter, scenario])
+      assert.notEqual(measured.coordinatorPid, process.pid)
+      assert.notEqual(measured.pid, process.pid)
+      assert.notEqual(measured.pid, measured.coordinatorPid)
+      assert.equal(measured.cleanupRequested, false)
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, malformed
+        ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+      assert.equal(measured.receipts.length, scenario === 'valid' ? 2 : 1)
+      const firstReceipt = measured.receipts[0]
+      const receipt = measured.receipts.at(-1)
+      const original = firstReceipt.originalRequested[0]
+      const initializationId = firstReceipt.initial.initEventId
+      assert.equal(original.id, initializationId)
+      assert.equal(original.stream, 'journal/workspace')
+      assert.equal(original.type, 'JournalEnvelope')
+      assert.notDeepEqual(original.payload, {})
+      assert.deepEqual(firstReceipt.requested, [{ ...original, payload: malformed ? {} : original.payload }])
+      assert.deepEqual(firstReceipt.facts[0], firstReceipt.requested[0])
+      const count = scenario === 'valid' ? 2 : 1
+      assert.deepEqual(receipt.counts, { append: count, fsync: count, close: count, release: count,
+        injected: release ? 1 : 0 })
+      assert.equal(receipt.lockReleased, true)
+      assert.equal(receipt.openDescriptors, 0)
+      assert.equal(receipt.syncedDescriptors, 0)
+      assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+      assert.equal(readFileSync(sourceFile, 'base64'), receipt.bytes)
+      assert.equal(receipt.facts.length, malformed || scenario === 'valid' ? 2 : 1)
+      for (const frontier of receipt.heads) {
+        const finalFact = receipt.facts.filter(fact => fact.stream === frontier.stream).at(-1)
+        assert.equal(frontier.head, finalFact.id)
+        assert.deepEqual(frontier.heads, [finalFact.id])
+      }
+      assert.equal(firstReceipt.initial.revision, '0')
+      assert.equal(firstReceipt.initial.waitCompleted, false)
+      assert.equal(firstReceipt.cuts.length, malformed ? 1 : 0)
+      if (release) {
+        assert.deepEqual(firstReceipt.appendError, { code: 'CommitUnknown', phase: 'StoreRelease',
+          causeSame: true, requested: firstReceipt.requested,
+          prepared: { durableEvents: firstReceipt.facts, cuts: firstReceipt.cuts }, cleanupFailures: [] })
+      } else assert.equal(firstReceipt.appendError, null)
+      if (malformed) {
+        const [cut] = firstReceipt.cuts
+        const cutFact = receipt.facts[1]
+        assert.equal(cut.rule, 'Journal')
+        assert.equal(cut.failedEventId, initializationId)
+        assert.equal(cut.cutEventId, cutFact.id)
+        assert.equal(cutFact.type, 'ProjectionCutTail')
+        assert.equal(cutFact.payload.rule, 'Journal')
+        assert.equal(cutFact.payload.failed_event_id, initializationId)
+        assert.deepEqual(cutFact.parents, [initializationId])
+        assert.notEqual(cutFact.stream, original.stream)
+        assert.deepEqual(receipt.projection, { runtimeId: null, runtimeStartCount: 0,
+          sessionCount: 0, hasNativeSession: false })
+        assert.equal(measured.returned, null)
+        assert.equal(measured.reports.length, 1)
+        assert.equal(measured.reports[0].operation, 'runtime-started-semantic-cut')
+        if (release) {
+          assert.match(measured.reports[0].result, /semantic cut append settled unknown at StoreRelease/)
+          assert.match(measured.reports[0].result, /original Journal initialization owned Release completed before response failed/)
+        } else assert.match(measured.reports[0].result, /RuntimeStarted semantic cut:/)
+      } else {
+        assert.deepEqual(measured.reports, [])
+        assert.equal(measured.returned.first.kind, release ? 'NotAttempted' : 'Committed')
+        const { afterFirst, afterSecond, first, second } = measured.returned
+        assert.equal(afterFirst.revision, release ? '0' : '2')
+        assert.equal(afterFirst.lastCommittedLocalSeq, release ? '0' : '2')
+        assert.equal(afterFirst.poisoned, release)
+        if (release) {
+          assert.equal(afterFirst.waitCompleted, false)
+          assert.equal(afterSecond.waitCompleted, false)
+          assert.equal(afterSecond.revision, '0')
+          assert.equal(first.error.failedEventId, initializationId)
+          assert.notEqual(first.error.eventId, initializationId)
+          assert.equal(first.error.code, 'CommitUnknown')
+          assert.equal(first.error.phase, 'StoreRelease')
+          assert.deepEqual(first.error.requestedIds, [initializationId])
+          assert.deepEqual(first.error.preparedIds, [initializationId])
+          assert.deepEqual(first.error.cutIds, [])
+          assert.equal(second.kind, 'NotAttempted')
+          assert.equal(second.error.failedEventId, initializationId)
+          assert.notEqual(second.error.eventId, first.error.eventId)
+        }
+        assert.deepEqual(measured.returned.projection, { runtimeId: 'native-' + sourceWriter,
+          runtimeStartCount: 1, sessionCount: release ? 0 : 1, hasNativeSession: !release })
+      }
+      const projection = measured.returned?.projection ?? receipt.projection
+      const coldWriter = randomUUID()
+      const cold = await probe(journalPhysicalChild, ['cold', commonDir, coldWriter, scenario,
+        JSON.stringify({ sourceWriter, bytes: receipt.bytes, facts: receipt.facts, heads: receipt.heads, projection })])
+      assert.notEqual(cold.pid, measured.pid)
+      assert.notEqual(cold.pid, measured.coordinatorPid)
+      assert.notEqual(cold.pid, process.pid)
+      assert.equal(cold.writerId, coldWriter)
+      assert.equal(cold.preserved, true)
+      assert.deepEqual(cold.projection, projection)
+      assert.equal(cold.bytes, receipt.bytes)
+      assert.equal(readFileSync(sourceFile, 'base64'), receipt.bytes)
+      assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', `${coldWriter}.ndjson`)), false)
+      assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+      t.diagnostic(JSON.stringify({ scenario, measuredPid: measured.pid, coldPid: cold.pid,
+        physicalAndCold: true, counts: receipt.counts, cutIds: receipt.cuts.map(cut => cut.cutEventId) }))
+      completed = true
+    } finally {
+      if (completed) rmSync(root, { recursive: true, force: true })
+      else t.diagnostic('JOURNAL_PHYSICAL_SETTLEMENT_FAILURE_EVIDENCE: retained ' + root)
+    }
+  })
 }
 
 test.todo('WHAT[durable-events-024] actual semantic-cut caller requires injected fatal capability and refuses fatal before committed or unknown settlement')

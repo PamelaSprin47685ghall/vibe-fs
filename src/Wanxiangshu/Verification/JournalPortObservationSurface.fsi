@@ -30,6 +30,8 @@ module JournalPortObservationSurface =
     val rejectedPayloadPoisonsWriterScenario: commonDir: string -> writerTag: string -> Task<obj>
 
     val openActualJournal: commonDir: string -> writerId: string -> startedAt: string -> Task<obj>
+    val openActualJournalWithStore: store: obj -> writerId: string -> startedAt: string -> Task<obj>
+    val observeActualJournalProjection: value: obj -> obj
     val observeActualJournal: value: obj -> obj
     val containsActualJournalEvent: value: obj -> eventId: string -> bool
     val appendActualJournal: value: obj -> Task<obj>
