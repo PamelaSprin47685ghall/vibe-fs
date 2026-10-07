@@ -53,7 +53,6 @@ module HostSignalBootstrap =
     val wire:
         observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
-        externalInput: IExternalInputSupersessionPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
         journal: AgentJournal option ->

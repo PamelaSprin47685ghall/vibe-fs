@@ -390,25 +390,72 @@ test('WHAT[verification-system-006] continuing worker cost IPC cannot renew a pe
     const inner = path.join(directory, 'inner.mjs')
     const launcher = path.join(directory, 'supervise.mjs')
     const receipt = path.join(directory, 'send-receipt')
+    const receiverReceipt = path.join(directory, 'receive-receipt')
     fs.writeFileSync(fixture, '')
     fs.writeFileSync(inner, `import fs from 'node:fs'
 const entryFile = process.argv[2]
 const snapshot = { version: 1, entryFile, enabled: true, pid: null, status: 'missing', reason: 'Pre-import observation not received', preImport: null, exit: null, interval: null }
-process.send({ type: 'runner:file-start', data: { entryFile, pid: process.pid, parentPid: process.ppid } })
 let count = 0
-setInterval(() => {
-  const data = count === 1 ? { ...snapshot, unobservedCost: 0 } : snapshot
+let inFlight = false
+function sendCost(data, next) {
+  inFlight = true
   process.send({ type: 'runner:worker-cost', data }, error => {
-    if (!error) {
-      fs.writeFileSync(${JSON.stringify(receipt + '.next')}, JSON.stringify({ pid: process.pid, sent: ++count }))
-      fs.renameSync(${JSON.stringify(receipt + '.next')}, ${JSON.stringify(receipt)})
-    }
+    if (error) throw error
+    fs.writeFileSync(${JSON.stringify(receipt + '.next')}, JSON.stringify({ pid: process.pid, sent: ++count }))
+    fs.renameSync(${JSON.stringify(receipt + '.next')}, ${JSON.stringify(receipt)})
+    inFlight = false
+    next?.()
   })
-}, 10)
+}
+const prefix = [snapshot, { ...snapshot, unobservedCost: 0 }, snapshot, snapshot]
+function sendPrefix(index) {
+  if (index < prefix.length) {
+    sendCost(prefix[index], () => sendPrefix(index + 1))
+    return
+  }
+  setInterval(() => {
+    if (!inFlight) sendCost(snapshot)
+  }, 10)
+}
+process.send({ type: 'runner:file-start', data: { entryFile, pid: process.pid, parentPid: process.ppid } }, error => {
+  if (error) throw error
+  sendPrefix(0)
+})
 `)
     const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
-    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
-await superviseNodeTest({ files: [${JSON.stringify(fixture)}], inner: ${JSON.stringify(inner)}, label: 'worker-cost-ipc', silenceMs: 300 })
+    fs.writeFileSync(launcher, `import fs from 'node:fs'
+import { ChildProcess } from 'node:child_process'
+import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+const originalEmit = ChildProcess.prototype.emit
+const originalError = console.error
+const received = []
+let owner = null
+let beforeTimeout = null
+let timeoutCount = 0
+try {
+  ChildProcess.prototype.emit = function (name, ...args) {
+    const result = Reflect.apply(originalEmit, this, [name, ...args])
+    if (name !== 'message' || this.spawnargs?.[0] !== process.execPath || this.spawnargs?.[1] !== ${JSON.stringify(inner)}) return result
+    const event = args[0]
+    if (event?.type === 'runner:file-start' && event.data?.entryFile === ${JSON.stringify(fixture)} && event.data.pid === this.pid && event.data.parentPid === process.pid) {
+      owner = { pid: this.pid, parentPid: process.pid }
+    }
+    if (owner?.pid === this.pid && event?.type === 'runner:worker-cost' && event.data?.entryFile === ${JSON.stringify(fixture)}) received.push(event.data)
+    return result
+  }
+  console.error = function (...args) {
+    Reflect.apply(originalError, this, args)
+    if (typeof args[0] === 'string' && args[0].startsWith("WATCHDOG: 'worker-cost-ipc' silent for ")) {
+      timeoutCount += 1
+      beforeTimeout = received.slice()
+    }
+  }
+  await superviseNodeTest({ files: [${JSON.stringify(fixture)}], inner: ${JSON.stringify(inner)}, label: 'worker-cost-ipc', silenceMs: 300, throwOnFailure: true })
+} finally {
+  ChildProcess.prototype.emit = originalEmit
+  console.error = originalError
+  fs.writeFileSync(${JSON.stringify(receiverReceipt)}, JSON.stringify({ owner, timeoutCount, beforeTimeout, afterTimeout: received.slice(beforeTimeout?.length ?? 0) }))
+}
 `)
     const env = { ...process.env }
     delete env.NODE_TEST_CONTEXT
@@ -428,8 +475,18 @@ await superviseNodeTest({ files: [${JSON.stringify(fixture)}], inner: ${JSON.str
     assert.match(output, /verdict counts unavailable; no authoritative summary/)
     assert.match(output, /post-exit group verification\/reclamation:.*accepted=true/)
     const sent = JSON.parse(fs.readFileSync(receipt, 'utf8'))
-    assert.ok(sent.sent > 3, output)
+    const received = JSON.parse(fs.readFileSync(receiverReceipt, 'utf8'))
+    const evidence = `${output}\nSender receipt: ${JSON.stringify(sent)}\nReceiver receipt: ${JSON.stringify(received)}`
+    assert.ok(sent.sent > 3, evidence)
     assert.throws(() => process.kill(sent.pid, 0), { code: 'ESRCH' })
+    assert.deepEqual(received.owner, { pid: sent.pid, parentPid: child.pid }, evidence)
+    assert.equal(received.timeoutCount, 1, evidence)
+    assert.ok(Array.isArray(received.beforeTimeout) && received.beforeTimeout.length > 4, evidence)
+    const expectedSnapshot = { version: 1, entryFile: fixture, enabled: true, pid: null, status: 'missing', reason: 'Pre-import observation not received', preImport: null, exit: null, interval: null }
+    assert.deepEqual(received.beforeTimeout.slice(0, 4), [expectedSnapshot, { ...expectedSnapshot, unobservedCost: 0 }, expectedSnapshot, expectedSnapshot], evidence)
+    for (const snapshot of [...received.beforeTimeout.slice(4), ...received.afterTimeout]) {
+      assert.deepEqual(snapshot, expectedSnapshot, evidence)
+    }
     const observed = output.split('\n').filter(line => line.startsWith('runner: worker cost '))
       .map(line => JSON.parse(line.slice('runner: worker cost '.length)))
     assert.equal(observed.length, 1, output)

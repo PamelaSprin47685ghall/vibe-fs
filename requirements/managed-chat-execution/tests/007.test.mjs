@@ -68,11 +68,11 @@ test('WHAT[managed-chat-execution-007] release boundary failure is typed without
   assert.equal(result.commitCount, 0)
   assert.equal(result.providerCount, 0)
 })
-test('WHAT[managed-chat-execution-007] rejected supersession abort terminalizes the accepted successor before releasing its admission', async () => {
+test('WHAT[managed-chat-execution-007] failed supersession settlement terminalizes the accepted successor before releasing its admission', async () => {
   const result = await run('HandoffRejected')
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'LeaseHandoffFailed')
-  assert.equal(result.error.cause, 'SDK abort rejected')
+  assert.equal(result.error.cause, 'superseded settlement failed')
   assert.equal(result.error.settlement, 'TerminalCommitted')
   assert.equal(result.error.release, 'Applied')
   assert.equal(result.durableLifecycle, 'Terminal')
@@ -84,12 +84,12 @@ test('WHAT[managed-chat-execution-007] rejected supersession abort terminalizes 
   assert.ok(result.trace.indexOf('TerminalizeAccepted') < result.trace.indexOf('ReleaseBeforeProvider'))
   assert.equal(result.trace.filter(value => value === 'TerminalizeAccepted').length, 1)
 })
-test('WHAT[managed-chat-execution-007] supersession abort failure preserves ownership and its cause while successor settlement is unknown or unavailable', async () => {
+test('WHAT[managed-chat-execution-007] failed supersession settlement preserves ownership while successor settlement is unknown or unavailable', async () => {
   for (const failurePoint of ['HandoffTerminalUnknown', 'HandoffTerminalUnavailable']) {
     const result = await run(failurePoint)
     assert.equal(result.ok, false)
     assert.equal(result.error.kind, 'LeaseHandoffFailed')
-    assert.equal(result.error.cause, 'SDK abort rejected')
+    assert.equal(result.error.cause, 'superseded settlement failed')
     assert.equal(result.error.settlement, 'SettlementIncomplete')
     assert.equal(result.durableLifecycle, 'Accepted')
     assert.equal(result.terminalDisposition, null)

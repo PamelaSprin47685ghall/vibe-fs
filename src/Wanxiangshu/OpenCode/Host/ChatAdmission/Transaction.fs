@@ -47,7 +47,7 @@ type internal ChatAdmissionHandoffSettlement =
     | SettlementBoundaryFailed of exn
 
 type internal ChatAdmissionLeaseHandoffException(cause: exn, acquisition: ExecutionAdmissionAcquisition) =
-    inherit Exception("external input failed to drain its superseded Host attempt", cause)
+    inherit Exception("superseded execution settlement failed after lease acquisition", cause)
     member _.Cause = cause
     member _.Acquisition = acquisition
 

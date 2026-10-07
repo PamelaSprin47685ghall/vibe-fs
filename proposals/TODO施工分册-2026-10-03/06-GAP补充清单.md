@@ -206,6 +206,6 @@ GAP-055接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-20
 
 ## 已退出与已关闭项的边界
 
-GAP-170—175 和 GAP-196/191 等 RETIRED 项保持历史语义，不重新施工旧内核、旧 ProjectionCut 或旧 todo 账本。GAP-216（构建）、214（Git cleanliness）、146（guard owned interrupt）、081（TOML 原值）及 161（Casebook 同次捕获差分）已关闭；保留回归，不把它们当新未实现前提。GAP-223本批关闭，仍保留033六个真实Host场景、actual Manager发送许可及相邻exact结算回归；不能扩为GAP-139或全部生命周期已证。GAP-221 的持久 canvas 等旧路径不得回生。其它历史 CLOSED 记录若有后来 PARTIAL/OPEN 的具体范围，以最新证据和现行条款对照，不从 CLOSED 标签推导整个包完整。
+GAP-170—175 和 GAP-196/191 等 RETIRED 项保持历史语义，不重新施工旧内核、旧 ProjectionCut 或旧 todo 账本。GAP-216（构建）、214（Git cleanliness）、146（guard owned interrupt）、081（TOML 原值）及 161（Casebook 同次捕获差分）已关闭；保留回归，不把它们当新未实现前提。GAP-223 的历史关闭证据保留，但033旧六场景的用户输入物理 abort 合同已被 upstream821492601 撤销，不得据此恢复旧端口。当前 actual Manager 发送许可、相邻 exact 结算和新033四场景依现行 WHAT 分别验收，进度见[2026-10-07记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)；不能扩为GAP-139或全部生命周期已证。GAP-221 的持久 canvas 等旧路径不得回生。其它历史 CLOSED 记录若有后来 PARTIAL/OPEN 的具体范围，以最新证据和现行条款对照，不从 CLOSED 标签推导整个包完整。
 
 最终归档要求：每个上表条目有“对应现行条款、负责 owner、正式证据/人工审阅、剩余边界、结果提交”五项。仅消除 424 个 TODO 而没有处理基线137条及后续增量记录，不能宣告本计划全部完成。

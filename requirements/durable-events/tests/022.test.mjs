@@ -42,6 +42,7 @@ const productionSources = (plan) => plan.compileItems
 
 const CONTRACT_SHARDS = [
   'eventstore-model-contract',
+  'eventstore-append-result-contract',
   'eventstore-port-contract',
   'eventstore-event-vocabulary-contract',
   'eventstore-git-contract',
@@ -100,6 +101,7 @@ const EXTENDED_FOCUSED_RUNTIME_LOCALITIES = [
 
 const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'eventstore-model-contract',
+  'eventstore-append-result-contract',
   'eventstore-port-contract',
   'eventstore-event-vocabulary-contract',
   'eventstore-git-contract',
@@ -107,9 +109,7 @@ const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'casebook-event-vocabulary-contract',
   'js-transaction-event-vocabulary-contract',
   'identity',
-  // Pure vocabulary tier retagged during B-series: Foundation.Outcome lives under
-  // runtime-platform (the term/outcome root namespace) and is reachable from the
-  // canonical model contract. This is a contract-tier provider, not a runtime artifact.
+  // Other contract vocabularies may still depend on the neutral Outcome tier.
   'outcome',
   'foundation-roles',
   'runtime-platform-language',
@@ -254,9 +254,34 @@ test('WHAT[durable-events-022] Journal outcome contract excludes the store capab
   assert.ok(!productionSources(foundation).includes('Persistence/Journal/Outcome.fs'))
 })
 
+test('WHAT[durable-events-022] append results have one pure compile owner without acquiring the store capability', () => {
+  const { project, plan } = planShard('eventstore-append-result-contract')
+  assert.equal(project.subsystem, 'persistence')
+  assert.equal(project.legacyKind, 'contract')
+  const storeTypes = ['Persistence/EventStore/StoreTypes.fsi', 'Persistence/EventStore/StoreTypes.fs']
+  assert.deepEqual(project.compileItems, storeTypes.map(source => join(SOURCE_ROOT, source)))
+  for (const source of project.compileItems) {
+    assert.deepEqual(projects.filter(owner => owner.compileItems.includes(source)).map(owner => owner.projectPath),
+      [project.projectPath], `${source} must have exactly one Compile owner`)
+  }
+  assert.deepEqual(productionSources(plan), [
+    'Foundation/Identity.fs', 'Foundation/Quiescence.fs',
+    'Persistence/EventStore/Model.fs', 'Persistence/EventStore/StoreTypes.fs',
+  ])
+  const port = requireShard('eventstore-port-contract')
+  assert.deepEqual(port.compileItems, [
+    'Persistence/EventStore/Port.fsi', 'Persistence/EventStore/Port.fs',
+    'Persistence/EventStore/EventStoreHandle.fsi', 'Persistence/EventStore/EventStoreHandle.fs',
+  ].map(source => join(SOURCE_ROOT, source)))
+  assert.ok(port.references.includes(project.projectPath))
+  const journal = planShard('journal-outcome-contract').plan
+  assert.ok(!journal.projectPaths.includes(project.projectPath), 'C0 must not add a future Journal result dependency')
+  assert.ok(!productionSources(planShard('outcome').plan).some(source => source.startsWith('Persistence/')))
+})
+
 // B4 compile isolation for durable-events-022: the durable-events-023 probe
 // pattern applied to the locality dimension. Positive: every bounded
-// locality the WHAT-022 budgets name — the seven EventStore contract
+// locality the WHAT-022 budgets name — the eight EventStore contract
 // localities (100 production sources), the two focused EventStore runtime
 // localities (185), plus the extended locality tiers (2026-10-04:
 // contract tier interaction-authority-fold and
@@ -464,7 +489,114 @@ integrationTest('WHAT[durable-events-022] real Fable compiles the journal observ
   }
 })
 
-integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserves bounded Journal outcomes and the private Host witness owner', async (t) => {
+integrationTest('WHAT[durable-events-022] pure append results compile every original case and reject the identical store capability probe', async (t) => {
+  const { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { dirname, relative } = await import('node:path')
+  const { materializeOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-append-result-compile-'))
+  const copies = []
+  const sourceDigests = new Map()
+  const digestOf = file => ({
+    hash: createHash('sha256').update(readFileSync(file)).digest('hex'),
+    mtime: statSync(file).mtimeMs,
+  })
+  const capabilityProbe = [
+    'namespace Wanxiangshu.ContractProbe',
+    'open Wanxiangshu.Persistence.EventStore',
+    'module ProbeStoreCapability =',
+    '    let append (store: IEventStore) (events: EventEnvelope list) = store.Append(events)',
+    '',
+  ].join('\n')
+  const resultProbe = [
+    'namespace Wanxiangshu.ContractProbe',
+    'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Persistence.EventStore',
+    'module ProbeAppendResults =',
+    '    let eventId = EventId.create "append-result-probe"',
+    '    let streamId = EventStreamId.create "append-result-stream"',
+    '    let invalid =',
+    '        [ StorageInvalid.IdentityCollision eventId; StorageInvalid.NonCanonical "canonical";',
+    '          StorageInvalid.MalformedEnvelope "envelope"; StorageInvalid.MissingParent eventId;',
+    '          StorageInvalid.CyclicParents; StorageInvalid.MissingPayload(PayloadRef.create "payload");',
+    '          StorageInvalid.UnknownEventType "unknown" ]',
+    '    let classifyInvalid = function',
+    '        | StorageInvalid.IdentityCollision _ -> 1',
+    '        | StorageInvalid.NonCanonical _ -> 2',
+    '        | StorageInvalid.MalformedEnvelope _ -> 3',
+    '        | StorageInvalid.MissingParent _ -> 4',
+    '        | StorageInvalid.CyclicParents -> 5',
+    '        | StorageInvalid.MissingPayload _ -> 6',
+    '        | StorageInvalid.UnknownEventType _ -> 7',
+    '    let invalidKinds = invalid |> List.map classifyInvalid',
+    '    let conflict = DomainConflict.ConcurrentHeads(streamId, [eventId])',
+    '    let heads = match conflict with DomainConflict.ConcurrentHeads(_, values) -> values',
+    '    let cut: SemanticCut =',
+    '        { Rule = "probe"; FailedEventId = eventId; Reason = "cut"; CutEventId = eventId }',
+    '    let receipt: AppendReceipt = { Cuts = [cut] }',
+    '    let found = AppendReceipt.cutFor eventId receipt',
+    '    let missing = AppendReceipt.cutFor eventId AppendReceipt.empty',
+    '    let errors = [ AppendError.StorageInvalid invalid.Head; AppendError.SemanticCut cut;',
+    '                   AppendError.AppendFailed "refused" ]',
+    '    let classify = function',
+    '        | AppendError.StorageInvalid _ -> 1',
+    '        | AppendError.SemanticCut _ -> 2',
+    '        | AppendError.AppendFailed _ -> 3',
+    '    let kinds = errors |> List.map classify',
+    '',
+  ].join('\n')
+  const compileProbe = async (shard, source) => {
+    const { project, plan } = planShard(shard)
+    const copyRoot = mkdtempSync(join(tmpdir(), 'wxs-append-result-input-'))
+    copies.push(copyRoot)
+    const items = plan.compileItems.map(file => {
+      if (!sourceDigests.has(file)) sourceDigests.set(file, digestOf(file))
+      const destination = join(copyRoot, 'src', relative(SOURCE_ROOT, file))
+      mkdirSync(dirname(destination), { recursive: true })
+      cpSync(file, destination)
+      return destination
+    })
+    const probe = join(copyRoot, 'probe.fs')
+    writeFileSync(probe, source)
+    const isolatedPlan = { ...plan, compileItems: [...items, probe] }
+    const flat = materializeOwnerCompile(isolatedPlan, { scratchRoot })
+    const xml = readFileSync(flat.projectPath, 'utf8')
+    assert.ok(!xml.includes('<ProjectReference'), `${shard} must compile one flat project`)
+    assert.equal((xml.match(/<Compile Include=/g) ?? []).length, isolatedPlan.compileItems.length)
+    return compileOwnerProject({
+      projectPath: project.projectPath,
+      aggregatePath: null,
+      scratchRoot,
+      stdio: 'pipe',
+      compilePlan: isolatedPlan,
+    })
+  }
+  try {
+    await t.test('WHAT[durable-events-022] the original port closure compiles its real append capability', async () => {
+      const result = await compileProbe('eventstore-port-contract', capabilityProbe)
+      assert.equal(result.ok, true, `the original capability probe must compile\n${result.stdout}\n${result.stderr}`)
+    })
+    await t.test('WHAT[durable-events-022] the pure result closure compiles all original result cases', async () => {
+      const result = await compileProbe('eventstore-append-result-contract', resultProbe)
+      assert.equal(result.ok, true, `all original result cases must compile\n${result.stdout}\n${result.stderr}`)
+    })
+    await t.test('WHAT[durable-events-022] the pure result closure rejects the identical append capability', async () => {
+      const result = await compileProbe('eventstore-append-result-contract', capabilityProbe)
+      assert.equal(result.ok, false, 'a pure result consumer must not acquire IEventStore')
+      const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
+      assert.match(rejection, /IEventStore/)
+      assert.match(rejection, /is not defined/, 'the failure must name the missing capability, not probe syntax or the toolchain')
+    })
+  } finally {
+    for (const copyRoot of copies) rmSync(copyRoot, { recursive: true, force: true })
+    rmSync(scratchRoot, { recursive: true, force: true })
+    for (const [file, digest] of sourceDigests) {
+      assert.deepEqual(digestOf(file), digest, `${file} must retain its original bytes and mtime`)
+    }
+  }
+})
+
+integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserves bounded Journal outcomes and the full Host effect owner', async (t) => {
   const { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname, relative } = await import('node:path')
@@ -483,15 +615,14 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
     '',
   ].join('\n')
 
-  const HOST_ACCEPTANCE_PROBE = [
+  const HOST_EFFECT_PROBE = [
     'namespace Wanxiangshu.Probe',
+    'open Wanxiangshu.Foundation.Identity',
     'open Wanxiangshu.OpenCode',
-    'open Wanxiangshu.Execution.Session.ChatExecution',
-    'module ProbeHostAcceptance =',
-    '    let retire (port: IExternalInputSupersessionPort)',
-    '               (prior: ChatExecutionKey)',
-    '               (replacement: ManagedChatAcceptanceWitness) =',
-    '        port.InterruptSupersededAttempt(prior, replacement)',
+    'module ProbeHostEffect =',
+    '    let send (port: ISessionHostPort) (session: SessionId)',
+    '             (text: string) (options: SessionPromptOptions) =',
+    '        port.SendPrompt(session, text, options)',
     '',
   ].join('\n')
 
@@ -549,9 +680,9 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
   }
 
   try {
-    await t.test('WHAT[durable-events-022] full Host contract compiles with the original private acceptance witness', async () => {
-      const result = await compileProbe('host-session-contract', HOST_ACCEPTANCE_PROBE)
-      assert.equal(result.ok, true, `the full Host owner must retain its real acceptance witness\n${result.stdout}\n${result.stderr}`)
+    await t.test('WHAT[durable-events-022] full Host contract compiles with its real SendPrompt capability', async () => {
+      const result = await compileProbe('host-session-contract', HOST_EFFECT_PROBE)
+      assert.equal(result.ok, true, `the full Host owner must retain its real SendPrompt capability\n${result.stdout}\n${result.stderr}`)
     })
 
     await t.test('WHAT[durable-events-022] actual recovery compiles with only its Snapshot read capability', async () => {
@@ -559,11 +690,11 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
       assert.equal(result.ok, true, `actual recovery must retain the Snapshot read capability\n${result.stdout}\n${result.stderr}`)
     })
 
-    await t.test('WHAT[durable-events-022] actual recovery rejects the identical full Host acceptance probe', async () => {
-      const result = await compileProbe('delegation-recovery-runtime', HOST_ACCEPTANCE_PROBE)
-      assert.equal(result.ok, false, 'the identical full Host acceptance probe must fail in the actual recovery closure')
+    await t.test('WHAT[durable-events-022] actual recovery rejects the identical full Host effect probe', async () => {
+      const result = await compileProbe('delegation-recovery-runtime', HOST_EFFECT_PROBE)
+      assert.equal(result.ok, false, 'the identical full Host effect probe must fail in the actual recovery closure')
       const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
-      assert.match(rejection, /IExternalInputSupersessionPort|ManagedChatAcceptanceWitness|ChatExecution/)
+      assert.match(rejection, /ISessionHostPort|SessionPromptOptions/)
       assert.match(rejection, /is not defined/, 'the real boundary must reject the Host symbol, not probe syntax or the toolchain')
     })
 
@@ -577,11 +708,11 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
       assert.equal(result.ok, true, `the pure Journal contract must retain its original typed results\n${result.stdout}\n${result.stderr}`)
     })
 
-    await t.test('WHAT[durable-events-022] standalone Journal outcome contract rejects the original full Host acceptance probe', async () => {
-      const result = await compileProbe('journal-outcome-contract', HOST_ACCEPTANCE_PROBE)
-      assert.equal(result.ok, false, 'the pure Journal result contract must reject the identical full Host acceptance capability')
+    await t.test('WHAT[durable-events-022] standalone Journal outcome contract rejects the full Host effect probe', async () => {
+      const result = await compileProbe('journal-outcome-contract', HOST_EFFECT_PROBE)
+      assert.equal(result.ok, false, 'the pure Journal result contract must reject the identical full Host effect capability')
       const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
-      assert.match(rejection, /IExternalInputSupersessionPort|ManagedChatAcceptanceWitness|ChatExecution/)
+      assert.match(rejection, /ISessionHostPort|SessionPromptOptions/)
       assert.match(rejection, /is not defined/)
     })
   } finally {

@@ -1,5 +1,7 @@
 # durable-events 测试
 
+2026-10-07 C0：022新增纯append-result唯一工程归属及同一IEventStore编译探针正反例，八原F#源和compile-order不改。实际Model3fs、纯结果4、Port6、Journal7；真实flat连同现行Snapshot/Journal/Host矩阵11/0，gen220相邻正式绿。未实现新的typed Commit/Release或fresh派发许可，详见[有限记录](../../../proposals/archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。
+
 2026-10-05的014成本oracle改为同一原生ready heap的真实cursor比较次数，墙钟保诊断。仍512 writers×16=8192，先深核完整输出、数量、唯一性，再核3NH+2K=222208上界。正式normal6/0；实际生产heapPop排序变异保完整输出但3605957比较越界唯一红，随后手工恢复，gen154相关225/225、1125/0。变异整叶234.281ms亦低于历史500ms，墙钟不能独立证明复杂度；旧并行973.2ms失败原样保留。[日志、patch与边界](../../../proposals/archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)明确不扩大监督预算、不降低worker、不把诊断wrapper当第二算法。
 
 WHAT 是验收依据；本目录说明当前证据，不额外规定实现。

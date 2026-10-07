@@ -1,5 +1,9 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+本轮有限交付已更新：gen220相关193/193、1205pass/0fail，完整006/010通过；IPC实际接收前提保300ms与原强断言，最新35d/106ed全CI截断原件已归档。下一做新交付输入CI及共同成本调查，不重复旧前提调查、不宣称N00整体闭合。正式/installed证据和剩余边界见[10月7日记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。
+
+2026-10-07：实际fetch upstream到821492601，现行managed-session-lifecycle[016]/delegation[015]撤销用户输入的物理中断授权，仅打断Join等待。普通合并及相关回归见[本轮记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。历史Guard替代和private supersession witness证据只属于当时合同，不得按旧计划恢复已撤销端口。exact acceptance/容量交接/旧回调隔离仍须保留。N00先核006发送前提，保持原起点、300ms及强断言。
+
 新到d821 PR原完整CI：824/824、4734/1、122skip/389TODO、262.38s wall，format/check/build通过，outer2812 accepted8.133ms。唯一006:431的`sent.sent > 3`准备断言失败；invalid诊断已观察、nested300ms静默正常拒绝，具体count未打印。N00下一核原callback发送/启动与该窗口前提，不削弱断言、不加ready续期或预算、不碰运气重跑；source d821与最终docs头2bbb待实际完整结果。[原unit](../archive/2026-10-06/baselines/d821-ci/vibe-fs-d821-ci-upstream-unit.log)保留，下一步以总计划首节为准。下段89a是此前归档输入。
 
 最新[89a CI](../archive/2026-10-06/baselines/89a-ci/vibe-fs-89a-ci-receipt.txt)是实质截断：actual PR28f98966/source89a同tree，format/check/build通过；原300秒只764/824、760/824，无全仓summary。两边唯一已完成失败为Host026旧Snapshot直接归属断言，grounding012均exit0；verification006/010/016仍queued。Host026/SW012按真实Snapshot边界修正后，gen210授权native产品176/176、1096/0、29skip/74TODO，仅pending；022真实flat独立7/0。[本批记录](../archive/2026-10-06/Journal合同与初次捕获-2026-10-06.md)。旧743的owned observation到期与六未绑定orphan仍保留，2b完整成本只属历史输入。
