@@ -1,6 +1,6 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-2026-10-07最新[N00正常退出残留](../N00正常退出残留负控-2026-10-07.md)有限完成：gen309完整相关6/6、131pass/0fail/0skip/0TODO、退出0；真实passing ledger/worker exit0后残留被原supervisor拒绝/回收，foreign同creation保全。错误放行隔离变异明确红，原字节恢复gen311 native1/0；生产/预算未改。最新[4fd官方CI](../archive/2026-10-07/baselines/4fd-ci/receipt.txt)仍805/824原300s截断、2active/17queued，无全局summary；016/021分别286s/298s才准入，不归因挂死或吞吐收益。原D0-P静默/ownedcapture与Host023失败仍保留。本包不重复认领，下一依总计划D0-R裁决或J3完整窗口，不授完整N00/Host/CI。
+2026-10-08接续：[N00正常退出残留](../N00正常退出残留负控-2026-10-07.md)有限完成：gen309完整相关6/6、131pass/0fail/0skip/0TODO、退出0；真实passing ledger/worker exit0后残留被原supervisor拒绝/回收，foreign同creation保全。错误放行隔离变异明确红，原字节恢复gen311 native1/0；生产/预算未改。最新[4fd官方CI](../archive/2026-10-07/baselines/4fd-ci/receipt.txt)仍805/824原300s截断、2active/17queued，无全局summary；016/021分别286s/298s才准入，不归因挂死或吞吐收益。原D0-P静默/ownedcapture与Host023失败仍保留。本包不重复认领，下一按总计划先K1-A/F，D0-R与J3各按独立卡，不授完整N00/Host/CI；下文旧“下一”仅保历史。
 
 2026-10-07最新[W1流式工具归档](../W1工具归档流式输出-2026-10-07.md)有限完成：gen295完整016单次288pass/0fail/19skip/2TODO、1/1排空，worker167.083317s、outer10612 accepted=true20.012ms，前后输入一致。标准pipeline及增量SHA/bytes替代整archive缓存拷贝，每次真实变异仍新archive；未删测试/复用owner/改原CI预算。W0及官方K2C成本原件保留，Darwin单次wall不证明Linux全量恢复。下一按总计划G1，J3与D0-P另包；以下旧“下一”仅保历史。
 
