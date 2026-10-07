@@ -74,9 +74,15 @@ module CasebookLifecycle =
         : Task<CaseFinalizeSettlement> =
         task {
             match! CasebookWorkflow.finalizeCase store case with
-            | Error reason when reason.Contains "already finalized" ->
-                return CaseFinalizeSettlement.phaseConflict delegateSessionId reason
-            | Error reason -> return CaseFinalizeSettlement.notCommitted delegateSessionId reason
+            | Error(CasebookMutationError.AlreadyFinalized identity) ->
+                return
+                    CaseFinalizeSettlement.phaseConflict
+                        delegateSessionId
+                        (CasebookMutationError.describe (CasebookMutationError.AlreadyFinalized identity))
+            | Error(CasebookMutationError.AppendFailure failure) ->
+                return CaseFinalizeSettlement.persistenceFailed delegateSessionId failure
+            | Error error ->
+                return CaseFinalizeSettlement.notCommitted delegateSessionId (CasebookMutationError.describe error)
             | Ok() ->
                 CasebookIndex.invalidate ()
                 return! refreshIndexThenSettle store delegateSessionId
@@ -261,7 +267,7 @@ module CasebookLifecycle =
             return! archiveCase store identity case
         }
 
-    let private refreshWhenTouched (store: IEventStore) (touched: Result<unit, string>) : Task<unit> =
+    let private refreshWhenTouched (store: IEventStore) (touched: Result<unit, CasebookMutationError>) : Task<unit> =
         task {
             match touched with
             | Ok() ->

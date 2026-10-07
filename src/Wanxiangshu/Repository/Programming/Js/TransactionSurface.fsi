@@ -28,6 +28,7 @@ module JsTransactionSurface =
 
     /// Append Committed through the same transaction stream.
     val appendCommitted: store: obj -> transactionId: string -> Task<obj>
+    val persistenceFailureToJs: failure: JsTransactionAppendFailure -> obj
 
     /// Observe only the Integrator-owned pending projection; no history reader
     /// or recovery mutation is exposed.

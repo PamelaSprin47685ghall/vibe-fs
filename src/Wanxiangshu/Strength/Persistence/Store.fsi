@@ -26,7 +26,10 @@ module StrengthStore =
             Task<Result<StrengthFrameBundle, string>>
 
     val append:
-        store: IEventStore -> sha256: (string -> string) -> event: StrengthEvent -> Task<Result<unit, AppendError>>
+        store: IEventStore ->
+        sha256: (string -> string) ->
+        event: StrengthEvent ->
+            Task<Result<unit, EventId * AppendError>>
 
     val publishWithPayloads:
         store: IEventStore ->

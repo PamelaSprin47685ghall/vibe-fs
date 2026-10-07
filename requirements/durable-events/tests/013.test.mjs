@@ -33,20 +33,35 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[durable-events-013] physical append failure leaves event and structural Current unchanged', async () => {
+test('WHAT[durable-events-013] before-append directory failure leaves bytes event and structural Current unchanged', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'append-failure-proof')
   try {
     const wanxiangDir = path.join(dir, 'wanxiang')
     mkdirSync(wanxiangDir, { recursive: true })
-    writeFileSync(path.join(wanxiangDir, 'events'), 'not a directory')
+    const eventsPath = path.join(wanxiangDir, 'events')
+    const beforeBytes = Buffer.from('not a directory', 'utf8')
+    writeFileSync(eventsPath, beforeBytes)
+    const incoming = event(3)
 
-    const rejected = await eventStore.append(store, [event(3)])
+    const rejected = await eventStore.append(store, [incoming])
 
     assert.equal(rejected.ok, false)
-    assert.equal(rejected.error.code, 'AppendFailed')
-    assert.equal(eventStore.read(store, id(3)), null, 'failed durability must not publish the prepared event')
-    assert.equal(eventStore.head(store, 'append/proof'), null, 'failed durability must not advance Current')
+    const { cause, ...failure } = rejected.error
+    assert.deepEqual(failure, {
+      code: 'AppendNotAttempted', phase: 'BeforePhysicalAppend', cleanupFailures: [],
+      requested: [incoming], prepared: { durableEvents: [incoming], cuts: [] }, priorRejection: null,
+    })
+    assert.ok(cause instanceof Error)
+    assert.equal(cause.code, 'EEXIST')
+    assert.equal(cause.syscall, 'mkdir')
+    assert.equal(cause.path, eventsPath)
+    assert.deepEqual(readFileSync(eventsPath), beforeBytes, 'the blocking ordinary file must remain byte-identical')
+    assert.equal(existsSync(path.join(eventsPath, 'append-failure-proof.ndjson')), false)
+    assert.equal(existsSync(path.join(dir, 'wanxiang.lock')), false, 'the acquired physical gate is released')
+    assert.equal(eventStore.read(store, id(3)), null, 'the unattempted append must not publish its prepared event')
+    assert.equal(eventStore.head(store, 'append/proof'), null, 'the unattempted append must not advance Current')
+    assert.deepEqual(eventStore.heads(store, 'append/proof'), [])
   } finally {
     eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })

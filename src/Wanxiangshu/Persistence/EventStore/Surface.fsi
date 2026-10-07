@@ -6,8 +6,19 @@ open System.Threading.Tasks
 /// Process-local EventStore owner surface. JS callers receive unprefixed
 /// operations; EventStoreHandle remains an opaque capability.
 module Surface =
+    val appendErrorToJs: error: AppendError -> obj
+
     /// Create a process-local writer capability. The caller owns its lifecycle.
     val create: commonDir: string * writerId: string -> EventStoreHandle
+
+    val createWithCurrentCommitFault:
+        commonDir: string * writerId: string * cause: obj * commitBeforeFailure: bool -> EventStoreHandle
+
+    val createAppendFailureStore:
+        baseHandle: EventStoreHandle * options: obj * onAppend: (obj -> unit) -> EventStoreHandle
+
+    val createAppendPayloadStore:
+        baseHandle: EventStoreHandle * malformed: bool * onAppend: (obj -> unit) -> EventStoreHandle
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.

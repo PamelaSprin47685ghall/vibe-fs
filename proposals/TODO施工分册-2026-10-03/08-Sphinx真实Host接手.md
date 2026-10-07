@@ -1,6 +1,6 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
-2026-10-06，B1-H0a 的原 owner、公有提示和 observed execution 已有限验收；下一主线是 **H0b 的 canonical 原子首次接纳能力**，随后接 effect 前持久绑定。本卡优先于历史 H0 顺序。前置 A2 不重复施工；完整034、公开执行与首个答案仍未完成。
+2026-10-07，B1-H0a 的原 owner、公有提示和 observed execution 已有限验收；下一主线是 **H0b 的 canonical 原子首次接纳能力**，随后接 effect 前持久绑定。U0-A0 已有限验收：gen230产品2042/0、监督器93/0、实际flat28/0；当前证据以[U0记录](../archive/2026-10-07/U0追加结果与消费者施工-2026-10-07.md)为准。下一按[U0-A1接手卡](../U0-A1结算传播接手卡-2026-10-07.md)补actual cut/mandatory owner，可与H0b存储合同设计并行；下面原生Release红及旧“未实施”仅作历史依据，不能重复施工。本卡优先于历史 H0 顺序。前置 A2 不重复施工；完整034、公开执行与首个答案仍未完成。
 
 ## 0. 已完成与下一认领
 
@@ -25,7 +25,7 @@ gen190 完整 Sphinx+delegation 为52/52排空、328pass/0fail/35TODO；全 Fabl
 
 按以下顺序认领：
 
-1. C0已有限验收，下一认领U0-A0：冻结exact request/prepared envelopes/物理失败阶段/原cause合同；先将现有Release两native业务红注册正式006，再补append/fsync/CurrentCommit/StorageInvalid+Release双故障。随后同包迁原Store、writer、AgentJournal和实际消费者，不能把新typed cause又字符串化。fresh unknown、duplicate/no-op无新写释放失败及RuntimeStarted未知分别裁决；含semantic cuts的Unknown须交原fatal owner，不沿旧WriteUnknown丢cut。新[只读审阅卡](../archive/2026-10-07/upstream-c0-n00/vibe-fs-u0-a0-settlement-review-20261007.txt)补齐真实边界与原子迁移frontier，不是实现证书。该批不接Host effect。
+1. C0/U0-A0均已有限验收，不再认领旧Release两个native探针。正式006覆盖实际append/open/fsync/close/Current/Release及准备、拒绝与双故障，原cause、实际Prepared/Cuts与消费者身份一起迁归；Boot回调普通异常覆盖和JS unknown-cut漏路已取正式红绿。U0-A1的Casebook mandatory owner、其余actual cut及duplicate incident按新卡各自认领，受控映射/I/O/cold/物理fatal分别结算。本包仍不接Host effect、不授fresh spend witness。
 2. U0有限验收后，原EventStore owner冻结“持实际 canonical 锁读新事实→纯准入→append→发布唯一 Current→返回确属本次 fresh acceptance”的合同。exact duplicate 独立返回，不能给它新的 spend witness。不同 handle、不同 OS process 必须共享同一所有权，Adapter-local semaphore 不足。不能跳过C0/U0或把本轮类型迁归当作首次接纳完成。
 3. 明确新字节增量与检查点前提，沿原 canonical storage 实现；不另建 Sphinx log/registry、不在每次派发全扫历史、不改变既有 fork/cut/idempotence。
 4. 先在010用两个真实 writer、再用两个 OS process 的 readiness barrier 证明：同 intent 不同 command 只能一次 fresh；exact replay、stale handle、CommitUnknown、cut 与冷 Pending 均零 Create/Send。有成功实际调用的非零正控。

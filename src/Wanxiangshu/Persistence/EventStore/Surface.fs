@@ -92,7 +92,43 @@ module Surface =
                 {| code = "UnknownEventType"
                    eventType = eventType |}
 
-    let private appendErrorToJs (error: AppendError) : obj =
+    let private phaseToJs phase =
+        match phase with
+        | AppendPhase.GateAcquire -> "GateAcquire"
+        | AppendPhase.Preparation -> "Preparation"
+        | AppendPhase.BeforePhysicalAppend -> "BeforePhysicalAppend"
+        | AppendPhase.PhysicalAppend -> "PhysicalAppend"
+        | AppendPhase.DurabilityOpen -> "DurabilityOpen"
+        | AppendPhase.DurabilityBarrier -> "DurabilityBarrier"
+        | AppendPhase.DurabilityClose -> "DurabilityClose"
+        | AppendPhase.CurrentCommit -> "CurrentCommit"
+        | AppendPhase.StoreRelease -> "StoreRelease"
+
+    let private preparedToJs (prepared: PreparedAppend) : obj =
+        box
+            {| durableEvents = prepared.DurableEvents |> List.map envelopeToJs |> List.toArray
+               cuts = prepared.Cuts |> List.map cutToJs |> List.toArray |}
+
+    let private optionalPreparedToJs prepared =
+        prepared |> Option.map preparedToJs |> Option.defaultValue null
+
+    let private faultToJs (fault: AppendFault) : obj =
+        box
+            {| phase = phaseToJs fault.Phase
+               cause = fault.Cause |}
+
+    let private rejectionToJs rejection : obj =
+        match rejection with
+        | AppendPreWriteRejection.StorageInvalid invalid ->
+            box
+                {| code = "StorageInvalid"
+                   error = storageInvalidToJs invalid |}
+        | AppendPreWriteRejection.PreparationRejected reason ->
+            box
+                {| code = "AppendFailed"
+                   reason = reason |}
+
+    let appendErrorToJs (error: AppendError) : obj =
         match error with
         | AppendError.StorageInvalid invalid ->
             box
@@ -106,9 +142,35 @@ module Surface =
             box
                 {| code = "AppendFailed"
                    reason = reason |}
+        | AppendError.AppendNotAttempted evidence ->
+            box
+                {| code = "AppendNotAttempted"
+                   phase = phaseToJs evidence.Primary.Phase
+                   cause = evidence.Primary.Cause
+                   cleanupFailures = evidence.CleanupFailures |> List.map faultToJs |> List.toArray
+                   requested = evidence.Requested |> List.map envelopeToJs |> List.toArray
+                   prepared = optionalPreparedToJs evidence.Prepared
+                   priorRejection = evidence.PriorRejection |> Option.map rejectionToJs |> Option.defaultValue null |}
+        | AppendError.CommitUnknown evidence ->
+            box
+                {| code = "CommitUnknown"
+                   phase = phaseToJs evidence.Primary.Phase
+                   cause = evidence.Primary.Cause
+                   cleanupFailures = evidence.CleanupFailures |> List.map faultToJs |> List.toArray
+                   requested = evidence.Requested |> List.map envelopeToJs |> List.toArray
+                   prepared = preparedToJs evidence.Prepared
+                   priorRejection = null |}
+        | AppendError.NoNewWriteReleaseFailed evidence ->
+            box
+                {| code = "NoNewWriteReleaseFailed"
+                   phase = "StoreRelease"
+                   cause = evidence.Cause
+                   cleanupFailures = ([||]: obj array)
+                   requested = evidence.Requested |> List.map envelopeToJs |> List.toArray
+                   prepared = optionalPreparedToJs evidence.Prepared
+                   priorRejection = null |}
 
-    /// Create a process-local writer capability. The caller owns its lifecycle.
-    let create (commonDir: string, writerId: string) : EventStoreHandle =
+    let private createIntegrator () =
         // Historical full program, assembled explicitly in registration order:
         // Structural, Journal, Strength, Sphinx, SphinxGeneric, Casebook, JsTransaction.
         let program =
@@ -118,12 +180,205 @@ module Surface =
             @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
             @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 
-        EventStoreHandle.Create(
-            EventStore.createLocal
-                commonDir
-                writerId
-                (CanonicalIntegrator.createWithRules program AuthoritativeEventTypes.isKnown)
+        CanonicalIntegrator.createWithRules program AuthoritativeEventTypes.isKnown
+
+    /// Create a process-local writer capability. The caller owns its lifecycle.
+    let create (commonDir: string, writerId: string) : EventStoreHandle =
+        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (createIntegrator ()))
+
+    /// Actual canonical preparation and append; only its returned Commit boundary faults.
+    let createWithCurrentCommitFault
+        (commonDir: string, writerId: string, cause: obj, commitBeforeFailure: bool)
+        : EventStoreHandle =
+        let integrator = createIntegrator ()
+
+        let failCommit (prepared: PreparedIntegration) =
+            { prepared with
+                Commit =
+                    fun () ->
+                        if commitBeforeFailure then
+                            prepared.Commit()
+
+                        raise (unbox<exn> cause) }
+
+        let observed =
+            { new ICanonicalIntegrator with
+                member _.PrepareLive events =
+                    integrator.PrepareLive events |> Result.map failCommit
+
+                member _.ReloadLocal directory = integrator.ReloadLocal directory
+                member _.IsEventTypeKnown eventType = integrator.IsEventTypeKnown eventType
+                member _.TryCurrent key = integrator.TryCurrent key
+                member _.TryEvent eventId = integrator.TryEvent eventId
+                member _.TryHeads streamId = integrator.TryHeads streamId
+                member _.TryHead streamId = integrator.TryHead streamId
+                member _.AllHeads() = integrator.AllHeads() }
+
+        EventStoreHandle.Create(EventStore.createLocal commonDir writerId observed)
+
+    let private phaseOfJs (value: obj) =
+        match str value with
+        | "GateAcquire" -> AppendPhase.GateAcquire
+        | "Preparation" -> AppendPhase.Preparation
+        | "BeforePhysicalAppend" -> AppendPhase.BeforePhysicalAppend
+        | "PhysicalAppend" -> AppendPhase.PhysicalAppend
+        | "DurabilityOpen" -> AppendPhase.DurabilityOpen
+        | "DurabilityBarrier" -> AppendPhase.DurabilityBarrier
+        | "DurabilityClose" -> AppendPhase.DurabilityClose
+        | "CurrentCommit" -> AppendPhase.CurrentCommit
+        | "StoreRelease" -> AppendPhase.StoreRelease
+        | _ -> invalidArg "phase" "unknown append phase"
+
+    let private controlledAppendError (options: obj) requested =
+        let code = str options?code
+        let cause = unbox<exn> options?cause
+
+        let cleanup =
+            if isNull options?cleanupFailures then
+                []
+            else
+                unbox<obj array> options?cleanupFailures
+                |> Array.toList
+                |> List.map (fun fault ->
+                    { Phase = phaseOfJs fault?phase
+                      Cause = unbox<exn> fault?cause })
+
+        match code with
+        | "AppendNotAttempted" ->
+            AppendError.AppendNotAttempted
+                { Requested = requested
+                  Prepared = None
+                  Primary =
+                    { Phase = phaseOfJs options?phase
+                      Cause = cause }
+                  CleanupFailures = cleanup
+                  PriorRejection = None }
+        | "CommitUnknown" ->
+            AppendError.CommitUnknown
+                { Requested = requested
+                  Prepared = { DurableEvents = requested; Cuts = [] }
+                  Primary =
+                    { Phase = phaseOfJs options?phase
+                      Cause = cause }
+                  CleanupFailures = cleanup }
+        | "NoNewWriteReleaseFailed" ->
+            AppendError.NoNewWriteReleaseFailed
+                { Requested = requested
+                  Prepared = None
+                  Cause = cause }
+        | _ -> invalidArg "code" "unknown controlled append failure"
+
+    let private observeAppendResult onAppend ordinal requested (result: Result<AppendReceipt, AppendError>) =
+        let error, originalError =
+            match result with
+            | Ok _ -> null, null
+            | Error failure -> appendErrorToJs failure, box failure
+
+        let cuts =
+            match result with
+            | Ok receipt -> receipt.Cuts
+            | Error failure -> AppendError.semanticCuts failure
+
+        onAppend (
+            box
+                {| ordinal = ordinal
+                   requested = requested |> List.map envelopeToJs |> List.toArray
+                   error = error
+                   cuts = cuts |> List.map cutToJs |> List.toArray
+                   originalError = originalError |}
         )
+
+    /// Controlled result mapping only. Other appends and all reads use the caller's actual store.
+    let createAppendFailureStore
+        (baseHandle: EventStoreHandle, options: obj, onAppend: obj -> unit)
+        : EventStoreHandle =
+        let store = baseHandle.Store
+
+        let failAt =
+            if isNull options?failAt then
+                1
+            else
+                unbox<int> options?failAt
+
+        if failAt <= 0 then
+            invalidArg "failAt" "append ordinal must be positive"
+
+        // DSL-MUTABLE: resource — controlled port invocation ordinal, not durable truth.
+        let mutable ordinal = 0
+
+        let controlled =
+            { new IEventStore with
+                member _.Append events =
+                    task {
+                        ordinal <- ordinal + 1
+                        let current = ordinal
+
+                        let! result =
+                            if current = failAt then
+                                Task.FromResult(Error(controlledAppendError options events))
+                            else
+                                store.Append events
+
+                        observeAppendResult onAppend current events result
+                        return result
+                    }
+
+                member _.WritePayload content = store.WritePayload content
+                member _.ReadPayload payloadRef = store.ReadPayload payloadRef
+                member _.TryCurrent key = store.TryCurrent key
+                member _.TryEvent eventId = store.TryEvent eventId
+                member _.TryHeads streamId = store.TryHeads streamId
+                member _.TryHead streamId = store.TryHead streamId
+                member _.AllHeads() = store.AllHeads()
+                member _.ReloadLocal() = store.ReloadLocal() }
+
+        EventStoreHandle.Create controlled
+
+    /// Physical boundary probe: alter only payload bytes and forward the real append settlement.
+    let createAppendPayloadStore
+        (baseHandle: EventStoreHandle, malformed: bool, onAppend: obj -> unit)
+        : EventStoreHandle =
+        let store = baseHandle.Store
+
+        let observed =
+            { new IEventStore with
+                member _.Append events =
+                    task {
+                        let requested =
+                            if malformed then
+                                events
+                                |> List.map (fun event ->
+                                    { event with
+                                        Payload = Encode.object [] })
+                            else
+                                events
+
+                        let! result = store.Append requested
+
+                        observeAppendResult
+                            (fun append ->
+                                onAppend (
+                                    box
+                                        {| originalRequested = events |> List.map envelopeToJs |> List.toArray
+                                           append = append |}
+                                ))
+                            1
+                            requested
+                            result
+
+                        return result
+                    }
+
+                member _.WritePayload content = store.WritePayload content
+                member _.ReadPayload reference = store.ReadPayload reference
+                member _.TryCurrent key = store.TryCurrent key
+                member _.TryEvent eventId = store.TryEvent eventId
+                member _.TryHeads stream = store.TryHeads stream
+                member _.TryHead stream = store.TryHead stream
+                member _.AllHeads() = store.AllHeads()
+                member _.ReloadLocal() = store.ReloadLocal() }
+
+        EventStoreHandle.Create observed
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.

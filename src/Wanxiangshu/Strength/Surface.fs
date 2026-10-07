@@ -1266,6 +1266,109 @@ module StrengthSurface =
             | StorageInvalid.UnknownEventType _ -> "UnknownEventType"
         | AppendError.SemanticCut _ -> "SemanticCut"
         | AppendError.AppendFailed _ -> "AppendFailed"
+        | AppendError.AppendNotAttempted _ -> "AppendNotAttempted"
+        | AppendError.CommitUnknown _ -> "CommitUnknown"
+        | AppendError.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
+
+    let private appendEnvelopeToJs (envelope: EventEnvelope) : obj =
+        box
+            {| id = EventId.value envelope.EventId
+               stream = EventStreamId.value envelope.StreamId
+               ``type`` = envelope.EventType
+               parents = envelope.Parents |> List.map EventId.value |> List.toArray
+               payload = envelope.Payload |> Encode.toString 0 |> JS.JSON.parse
+               payloadRefs = envelope.PayloadRefs |> List.map PayloadRef.value |> List.toArray |}
+
+    let private appendCutToJs (cut: SemanticCut) : obj =
+        box
+            {| failedEventId = EventId.value cut.FailedEventId
+               rule = cut.Rule
+               cutEventId = EventId.value cut.CutEventId
+               reason = cut.Reason |}
+
+    let private preparedAppendToJs (prepared: PreparedAppend) : obj =
+        box
+            {| durableEvents = prepared.DurableEvents |> List.map appendEnvelopeToJs |> List.toArray
+               cuts = prepared.Cuts |> List.map appendCutToJs |> List.toArray |}
+
+    let private appendFaultToJs (fault: AppendFault) : obj =
+        box
+            {| phase = sprintf "%A" fault.Phase
+               cause = fault.Cause |}
+
+    let private appendRejectionToJs rejection : obj =
+        match rejection with
+        | AppendPreWriteRejection.PreparationRejected reason ->
+            box
+                {| code = "AppendFailed"
+                   reason = reason |}
+        | AppendPreWriteRejection.StorageInvalid invalid ->
+            let detail =
+                match invalid with
+                | StorageInvalid.IdentityCollision eventId
+                | StorageInvalid.MissingParent eventId ->
+                    box
+                        {| code = appendErrorName (AppendError.StorageInvalid invalid)
+                           eventId = EventId.value eventId |}
+                | StorageInvalid.NonCanonical reason
+                | StorageInvalid.MalformedEnvelope reason ->
+                    box
+                        {| code = appendErrorName (AppendError.StorageInvalid invalid)
+                           reason = reason |}
+                | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
+                | StorageInvalid.MissingPayload payloadRef ->
+                    box
+                        {| code = "MissingPayload"
+                           payloadRef = PayloadRef.value payloadRef |}
+                | StorageInvalid.UnknownEventType eventType ->
+                    box
+                        {| code = "UnknownEventType"
+                           eventType = eventType |}
+
+            box
+                {| code = "StorageInvalid"
+                   error = detail |}
+
+    let private appendSettlementToJs failure : obj =
+        let view phase cause cleanup requested prepared prior : obj =
+            box
+                {| code = appendErrorName failure
+                   phase = phase
+                   cause = cause
+                   cleanupFailures = cleanup |> List.map appendFaultToJs |> List.toArray
+                   requested = requested |> List.map appendEnvelopeToJs |> List.toArray
+                   prepared = prepared |> Option.map preparedAppendToJs |> Option.defaultValue null
+                   priorRejection = prior |> Option.map appendRejectionToJs |> Option.defaultValue null |}
+
+        match failure with
+        | AppendError.AppendNotAttempted evidence ->
+            view
+                (sprintf "%A" evidence.Primary.Phase)
+                evidence.Primary.Cause
+                evidence.CleanupFailures
+                evidence.Requested
+                evidence.Prepared
+                evidence.PriorRejection
+        | AppendError.CommitUnknown evidence ->
+            view
+                (sprintf "%A" evidence.Primary.Phase)
+                evidence.Primary.Cause
+                evidence.CleanupFailures
+                evidence.Requested
+                (Some evidence.Prepared)
+                None
+        | AppendError.NoNewWriteReleaseFailed evidence ->
+            view "StoreRelease" evidence.Cause [] evidence.Requested evidence.Prepared None
+        | AppendError.StorageInvalid _
+        | AppendError.SemanticCut _
+        | AppendError.AppendFailed _ -> invalidArg "failure" "expected an append settlement failure"
+
+    let private settlementFailureToJs eventId failure : obj =
+        box
+            {| ok = false
+               error = appendErrorName failure
+               eventId = EventId.value eventId
+               settlement = appendSettlementToJs failure |}
 
     let storeAppend (store: obj) (sha256: string -> string) (event: obj) : Task<obj> =
         task {
@@ -1277,7 +1380,10 @@ module StrengthSurface =
                 return
                     match result with
                     | Ok() -> box {| ok = true |}
-                    | Error error ->
+                    | Error(eventId,
+                            ((AppendError.AppendNotAttempted _ | AppendError.CommitUnknown _ | AppendError.NoNewWriteReleaseFailed _) as failure)) ->
+                        settlementFailureToJs eventId failure
+                    | Error(_, error) ->
                         box
                             {| ok = false
                                error = appendErrorName error |}
@@ -1374,6 +1480,7 @@ module StrengthSurface =
                             {| ok = false
                                error = "StorageInvalid" |}
                     | StrengthDurableAppend.StorageFailed reason -> box {| ok = false; error = reason |}
+                    | StrengthDurableAppend.SettlementFailed(eventId, failure) -> settlementFailureToJs eventId failure
         }
 
     /// DELEGATE-6.6/STRENGTH-006: publish the durable candidate for one Bound
@@ -1400,6 +1507,11 @@ module StrengthSurface =
                         {| kind = "StorageInvalid"
                            error = error |}
                 | StrengthPreparedPublish.Rejected error -> box {| kind = "Rejected"; error = error |}
+                | StrengthPreparedPublish.SettlementFailed(eventId, failure) ->
+                    box
+                        {| kind = "SettlementFailed"
+                           eventId = EventId.value eventId
+                           settlement = appendSettlementToJs failure |}
         }
 
     let traceExpectedParts (bundle: obj) : obj array =

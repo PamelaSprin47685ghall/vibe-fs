@@ -103,13 +103,15 @@ module ExecutionFailurePolicy =
         | ExecutionFailure.StreamInterruptedAfterFirstToken
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> BreakerDecision.NoBreakerTransition
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> BreakerDecision.NoBreakerTransition
 
     let private deriveCapacitySettlement failure lifecycle capacity =
         match failure with
         | ExecutionFailure.AcceptanceUnknown
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> retainCapacity capacity
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> retainCapacity capacity
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied
@@ -125,7 +127,8 @@ module ExecutionFailurePolicy =
         function
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> FatalityDecision.FatalAfterSettlement
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> FatalityDecision.FatalAfterSettlement
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied
         | ExecutionFailure.UserCancelled
@@ -188,4 +191,6 @@ module ExecutionFailurePolicy =
                 return ExecutionFailureResolution.PreserveCurrentFact
             | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
                 return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
+            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
+                return ExecutionFailureResolution.PreserveCurrentFact
         }

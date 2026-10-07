@@ -114,6 +114,12 @@ module HostSessionDeletion =
             // resume this exact finalize. Expected/best-effort, never a
             // recovery decision — the commitment itself is the evidence.
             Diagnostic.emit "case-finalization-pending" [ "session_id", SessionId.value delegateId; "result", reason ]
+        | CaseFinalizeCommitment.PersistenceFailed failure ->
+            Diagnostic.emit
+                "case-finalization-pending"
+                [ "session_id", SessionId.value delegateId
+                  "event_id", EventId.value failure.EventId
+                  "result", CasebookMutationError.describe (CasebookMutationError.AppendFailure failure) ]
         | CaseFinalizeCommitment.PhaseConflict reason ->
             Diagnostic.fatal "case-finalization-failed" [ "session_id", SessionId.value delegateId; "result", reason ]
 

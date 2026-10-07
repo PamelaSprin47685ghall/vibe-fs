@@ -1,5 +1,7 @@
 # 06：GAP 补充清单与无 TODO 义务
 
+2026-10-07接续：[U0追加结果与消费者](../archive/2026-10-07/U0追加结果与消费者施工-2026-10-07.md)已有限验收，gen230相关产品2042/0、监督器93/0、实际flat编译28/0；实际I/O/cold、受控映射与物理fatal分别记账，不能将typed新case或邻近绿升级为全部cut传播完成。下一按[U0-A1接手卡](../U0-A1结算传播接手卡-2026-10-07.md)推进。GAP-097/098及H0b仍PARTIAL。最新[2d2e官方CI](../archive/2026-10-07/baselines/2d2e-ci/receipt.txt)原预算738/824排空且Host033双锚点真实失败；标题窄修已有正式局部绿，整体CI仍未验收。[737共同完整成本样本](../archive/2026-10-07/baselines/2d2e-cost/README.md)只完成调查，不推CPU收益或N00闭合。下方各历史“最新”由本段和总计划首节接续，旧失败与GAP状态保留。
+
 2026-10-06接续：GAP-055仍PARTIAL。[N04-C3](../N04真实只读Fable执行契约-2026-10-05.md)补真实独立consumer的exit73、正常action拒绝、Error/null精确聚合和四owner完整恢复，生产helper不改；gen170 native11/11，正式4/4文件312/0、17skip/2TODO。此项不替代FD/backing/ABA、全过程物理保护与同候选actual verify，T418/T419保留。N00最新[ccfc CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)完整821/821、4585/0、119skip/390TODO，unit约297秒仅pending；历史a15原300秒截断仍有效，不推定旧失败原因或稳定吞吐。
 
 本轮规划不关闭任何GAP。Sphinx GAP-153/219依次等待A2-R0真实恢复、R1资源/source、R2三producer及后续Host/profile/公开答案；D0/D1不能代替它们。制度学习GAP-180/181/182从canonical Rulebook及真实存储事务切入：现list Append逐记录写NDJSON，尚无崩溃整批恢复证明；DeferredWorkResurfaced实际fact/codec/fold也待接。这是源码调查与下一包前提，未取正式故障红绿；不把API批量调用或本次计划更新计作原子BIRTH验收。

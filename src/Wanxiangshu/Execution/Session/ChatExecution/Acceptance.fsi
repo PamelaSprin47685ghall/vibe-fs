@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open Wanxiangshu.Persistence.Journal.JournalOutcome
+open Wanxiangshu.Persistence.EventStore
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Context.Prefix
@@ -32,6 +33,7 @@ type ManagedChatAcceptanceError =
         attempted: AcceptedChatExecutionEvidence
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 type ManagedChatAcceptancePersistence =
@@ -70,6 +72,7 @@ type ManagedChatProviderLifecycleError =
     | ProjectionConflictAfterCommit of ChatExecutionState
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 type ManagedChatProviderLifecyclePersistence =

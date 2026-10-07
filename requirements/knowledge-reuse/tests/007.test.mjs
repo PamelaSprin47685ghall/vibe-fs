@@ -3,8 +3,9 @@ import test from 'node:test'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
+import { create as createEventStore, dispose as disposeEventStore, createAppendFailureStore } from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 
@@ -83,5 +84,73 @@ test('WHAT[knowledge-reuse-007] committed captured, refreshed and evicted facts 
     assert.equal(await findCase(store, 'removed'), null)
   } finally { disposeEventStore(store); rmSync(dir, { recursive: true, force: true }) }
 })
+
+const appendFates = [
+  { code: 'AppendNotAttempted', suffix: 'NOT_ATTEMPTED', kind: 'notAttempted', finalize: 'notCommitted', phase: 'BeforePhysicalAppend' },
+  { code: 'CommitUnknown', suffix: 'COMMIT_UNKNOWN', kind: 'unknown', finalize: 'unknown', phase: 'DurabilityBarrier' },
+  { code: 'NoNewWriteReleaseFailed', suffix: 'NO_NEW_WRITE_RELEASE_FAILED', kind: 'noNewWriteReleaseFailed', finalize: 'noNewWriteReleaseFailed', phase: 'StoreRelease' },
+]
+
+for (const fate of appendFates) {
+  for (const operation of ['Capture', 'Refresh', 'Access', 'Evict']) {
+    test(`WHAT[knowledge-reuse-007] typed adapter mapping ${operation} preserves ${fate.code} and the original request without retry`, async () => {
+      const local = createCasebookEventStore()
+      try {
+        if (operation !== 'Capture') await unwrap(casebook.archive(local.store, caseRec('case-identity', 'old-Q', 'old-A', [])))
+        const before = await findCase(local.store, 'case-identity')
+        const cause = new Error('original append cause')
+        const cleanupCause = new Error('original release cause')
+        const observed = []
+        const failing = createAppendFailureStore(local.store, {
+          code: fate.code, phase: fate.phase, cause,
+          cleanupFailures: [{ phase: 'StoreRelease', cause: cleanupCause }],
+        }, (append) => observed.push(append))
+        const result = await ({
+          Capture: () => casebook.archive(failing, caseRec('case-identity', 'new-Q', 'new-A', [])),
+          Refresh: () => casebook.refresh(failing, 'case-identity', 'new-Q', 'new-A', []),
+          Access: () => casebook.touchAccess(failing, 'case-identity'),
+          Evict: () => casebook.evictCase(failing, 'case-identity'),
+        }[operation])()
+        assert.equal(result.ok, false)
+        assert.equal(result.code, `CASEBOOK_APPEND_${fate.suffix}`)
+        assert.equal(observed.length, 1, 'a failed append is never retried with a fresh event identity')
+        const failure = result.persistenceFailure
+        assert.equal(failure.operation, operation)
+        assert.equal(failure.caseIdentity, 'case-identity')
+        assert.equal(failure.kind, fate.kind)
+        assert.equal(failure.eventId, observed[0].requested[0].id)
+        assert.deepEqual(failure.requestedEventIds, [failure.eventId])
+        assert.equal(failure.isOriginalError(observed[0].originalError), true)
+        assert.strictEqual(failure.primary.cause, cause)
+        if (fate.code !== 'NoNewWriteReleaseFailed') {
+          assert.equal(failure.primary.phase, fate.phase)
+          assert.strictEqual(failure.cleanupFailures[0].cause, cleanupCause)
+        }
+        assert.deepEqual(await findCase(local.store, 'case-identity'), before,
+          'this controlled mapping fixture does not append; physical Current behavior is proved separately')
+      } finally { local.close() }
+    })
+  }
+
+  test(`WHAT[knowledge-reuse-007] lifecycle ${fate.code} retains finalize identity and exposes its actual settlement fate`, async () => {
+    const local = createCasebookEventStore()
+    try {
+      const cause = new Error('finalize append cause')
+      const observed = []
+      const failing = createAppendFailureStore(local.store, { code: fate.code, phase: fate.phase, cause },
+        (append) => observed.push(append))
+      const result = await lifecycle.finalizeEngineerCase(failing, 'finalize-identity', 'trace', 'Q', 'A', [], '')
+      assert.equal(result.ok, false)
+      assert.equal(result.kind, fate.finalize)
+      assert.equal(result.releasesIdentity, false)
+      assert.equal(observed.length, 1)
+      assert.equal(result.persistenceFailure.caseIdentity, 'finalize-identity')
+      assert.equal(result.persistenceFailure.eventId, observed[0].requested[0].id)
+      assert.equal(result.persistenceFailure.isOriginalError(observed[0].originalError), true)
+      assert.strictEqual(result.persistenceFailure.primary.cause, cause)
+      assert.equal(await findCase(local.store, 'finalize-identity'), null)
+    } finally { local.close() }
+  })
+}
 
 test.todo('WHAT[knowledge-reuse-007] GAP-160: all production writers and recovery paths retain one EventStore authority')

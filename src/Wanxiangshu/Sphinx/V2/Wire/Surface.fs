@@ -3,6 +3,9 @@ namespace Wanxiangshu.Sphinx.V2.Wire
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
+open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Composition
 open Wanxiangshu.Sphinx.V2.Hosts
 
@@ -28,11 +31,24 @@ module Surface =
         | Ok payload -> payload
         | Error refusal -> refused refusal
 
+    let private bindAppendCutUnknown (incident: AppendCutUnknownIncident) =
+        let message =
+            sprintf
+                "inquiry %s; command %s; event %s: %s"
+                (InquiryId.value incident.InquiryId)
+                incident.CommandId
+                (Wanxiangshu.Foundation.Identity.EventId.value incident.EventId)
+                (AppendError.describe (AppendError.CommitUnknown incident.Evidence))
+
+        FatalProcess.trip "sphinx-semantic-cut" message
+
     let create (commonDir: string) (writerId: string) (configuration: obj) : RuntimeHandle =
         match Bind.createDurableStore commonDir writerId with
         | Error reason -> raise (InvalidOperationException reason)
         | Ok store ->
-            match Commands.create store (if isNull configuration then None else Some configuration) with
+            match
+                Commands.create store (if isNull configuration then None else Some configuration) bindAppendCutUnknown
+            with
             | Ok handle -> handle
             | Error refusal ->
                 raise (InvalidOperationException(sprintf "%s at %s: %s" refusal.Code refusal.Path refusal.Message))

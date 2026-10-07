@@ -1,5 +1,57 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
+
+[<RequireQualifiedAccess>]
+type CasebookAppendOperation =
+    | Capture
+    | Refresh
+    | Access
+    | Evict
+
+type CasebookAppendFailure =
+    { Operation: CasebookAppendOperation
+      CaseIdentity: string
+      EventId: EventId
+      Error: AppendError }
+
+[<RequireQualifiedAccess>]
+type CasebookMutationError =
+    | AlreadyFinalized of identity: string
+    | CaseMissing of identity: string
+    | PreparationRejected of reason: string
+    | AppendFailure of CasebookAppendFailure
+
+[<RequireQualifiedAccess>]
+module CasebookMutationError =
+    let describe error =
+        match error with
+        | CasebookMutationError.AlreadyFinalized identity -> sprintf "case already finalized for scope %s" identity
+        | CasebookMutationError.CaseMissing identity -> sprintf "case %s not found" identity
+        | CasebookMutationError.PreparationRejected reason -> reason
+        | CasebookMutationError.AppendFailure failure ->
+            sprintf
+                "case %s append %s failed: %s"
+                failure.CaseIdentity
+                (EventId.value failure.EventId)
+                (AppendError.describe failure.Error)
+
+[<RequireQualifiedAccess>]
+module CasebookAppendFailure =
+    let code failure =
+        match failure.Error with
+        | AppendError.AppendNotAttempted _ -> "CASEBOOK_APPEND_NOT_ATTEMPTED"
+        | AppendError.CommitUnknown _ -> "CASEBOOK_APPEND_COMMIT_UNKNOWN"
+        | AppendError.NoNewWriteReleaseFailed _ -> "CASEBOOK_APPEND_NO_NEW_WRITE_RELEASE_FAILED"
+        | _ -> "CASEBOOK_APPEND_FAILED"
+
+    let finalizeKind failure =
+        match failure.Error with
+        | AppendError.CommitUnknown _ -> "unknown"
+        | AppendError.NoNewWriteReleaseFailed _ -> "noNewWriteReleaseFailed"
+        | _ -> "notCommitted"
+
 /// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and
@@ -15,6 +67,7 @@ type CaseFinalizeCommitment =
     | NotCommitted of reason: string
     | Unknown of reason: string
     | PhaseConflict of reason: string
+    | PersistenceFailed of CasebookAppendFailure
 
 type CaseFinalizeSettlement =
     { Identity: CaseFinalizeIdentity
@@ -42,6 +95,10 @@ module CaseFinalizeSettlement =
     let phaseConflict (delegateSessionId: string) (reason: string) : CaseFinalizeSettlement =
         { Identity = { DelegateSessionId = delegateSessionId }
           Commitment = CaseFinalizeCommitment.PhaseConflict reason }
+
+    let persistenceFailed (delegateSessionId: string) (failure: CasebookAppendFailure) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.PersistenceFailed failure }
 
     /// Owner retention decision: only a durably-settled finalize releases the
     /// identity. NotCommitted/Unknown retain it so a later recovery can resume

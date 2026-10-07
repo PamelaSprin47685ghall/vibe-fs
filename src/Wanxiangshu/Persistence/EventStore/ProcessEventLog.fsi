@@ -11,6 +11,16 @@ type StoreFileGate =
 
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendCompletion =
+        | NoAppend
+        | AppendDurable
+
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendFailure =
+        | BeforeAppend of AppendFault
+        | AfterAppend of primary: AppendFault * cleanupFailures: AppendFault list
+
     type WriterPhysicalMetadata =
         { Name: string
           StatIdentity: string
@@ -22,7 +32,10 @@ module ProcessEventLog =
     val create: commonDir: string -> writerId: string -> ProcessEventLog
     val writerId: log: ProcessEventLog -> string
     val filePath: log: ProcessEventLog -> string
-    val append: log: ProcessEventLog -> events: EventEnvelope list -> unit
+
+    val append:
+        log: ProcessEventLog -> events: EventEnvelope list -> Result<PhysicalAppendCompletion, PhysicalAppendFailure>
+
     val decodeWriterText: label: string -> text: string -> Result<EventEnvelope list, StorageInvalid>
     val decodeWriterBytes: label: string -> bytes: byte[] -> Result<EventEnvelope list, StorageInvalid>
     val readLastCompleteLine: path: string -> Result<string option, string>

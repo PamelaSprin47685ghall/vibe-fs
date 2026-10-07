@@ -1,6 +1,6 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-本轮有限交付已更新：gen220相关193/193、1205pass/0fail，完整006/010通过；IPC实际接收前提保300ms与原强断言，最新35d/106ed全CI截断原件已归档。下一做新交付输入CI及共同成本调查，不重复旧前提调查、不宣称N00整体闭合。正式/installed证据和剩余边界见[10月7日记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。
+本轮有限交付保持回归：gen220相关193/193、1205pass/0fail，完整006/010通过，IPC原300ms与强断言不改。最新已收[2d2e官方PR CI](../archive/2026-10-07/baselines/2d2e-ci/receipt.txt)仍真实失败：format/check/build通过，原300000ms截断738/824排空、2active/84queued，无全局summary；另有requirement-system017对Host033双WHAT锚点的真实失败。只修两标题后native2/0，gen227正式017及Host033通过，不代表新CI已绿。006/010/016未准入，outer3082 accepted10.183ms不是未知库存全清证明。[737共同完整worker成本调查](../archive/2026-10-07/baselines/2d2e-cost/README.md)已交付，active/invalid/missing/queued排除，输入/host差值不作因果。下一有限候选先定非法版本拒绝前实际模块加载观察，保合法dry-run非零正控与原错误、零业务副作用；延后imports的错误优先级先明确。原预算/worker/tier保持，不称CPU收益或N00整体闭合。以下旧“下一核006前提”“先收新CI”由本段接续；正式/installed有限范围见[10月7日记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。
 
 2026-10-07：实际fetch upstream到821492601，现行managed-session-lifecycle[016]/delegation[015]撤销用户输入的物理中断授权，仅打断Join等待。普通合并及相关回归见[本轮记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。历史Guard替代和private supersession witness证据只属于当时合同，不得按旧计划恢复已撤销端口。exact acceptance/容量交接/旧回调隔离仍须保留。N00先核006发送前提，保持原起点、300ms及强断言。
 

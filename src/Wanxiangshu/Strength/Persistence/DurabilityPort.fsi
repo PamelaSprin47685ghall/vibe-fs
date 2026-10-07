@@ -2,6 +2,7 @@ namespace Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Projection
 
@@ -10,6 +11,7 @@ type StrengthPreparedPublish =
     | Published
     | Rejected of reason: string
     | StorageInvalid of reason: string
+    | SettlementFailed of EventId * AppendError
 
 [<RequireQualifiedAccess>]
 type StrengthDurableAppend =
@@ -17,6 +19,15 @@ type StrengthDurableAppend =
     | SemanticRejected of reason: string
     | StorageInvalid of reason: string
     | StorageFailed of reason: string
+    | SettlementFailed of EventId * AppendError
+
+[<Sealed>]
+type StrengthAppendException =
+    inherit System.Exception
+    new: eventId: EventId * failure: AppendError * cleanupFailures: exn list -> StrengthAppendException
+    member EventId: EventId
+    member Failure: AppendError
+    member CleanupFailures: exn list
 
 type StrengthPreparedRequest =
     { OwnerSessionId: SessionId

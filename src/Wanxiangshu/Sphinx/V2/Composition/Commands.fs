@@ -22,10 +22,45 @@ type internal AuthorizedStartConfiguration =
       RenderReserve: Map<string, float> }
 
 [<Sealed>]
-type RuntimeHandle internal (store: EventStoreHandle, configuration: AuthorizedStartConfiguration option) =
+type AppendCutUnknownIncident
+    internal
+    (
+        inquiryId: InquiryId,
+        commandId: string,
+        eventId: Wanxiangshu.Foundation.Identity.EventId,
+        evidence: AppendCommitUnknownEvidence
+    ) =
+    member _.InquiryId = inquiryId
+    member _.CommandId = commandId
+    member _.EventId = eventId
+    member _.Evidence = evidence
+
+[<Sealed>]
+type RuntimeHandle
+    internal
+    (
+        store: EventStoreHandle,
+        configuration: AuthorizedStartConfiguration option,
+        onAppendCutUnknown: AppendCutUnknownIncident -> unit
+    ) =
+    let delivered =
+        System.Collections.Generic.HashSet<Wanxiangshu.Foundation.Identity.EventId>()
+
+    let deliverCutUnknown inquiryId commandId eventId evidence =
+        if not (delivered.Add eventId) then
+            invalidOp "Sphinx append-cut incident was already delivered"
+
+        onAppendCutUnknown (AppendCutUnknownIncident(inquiryId, commandId, eventId, evidence))
+
     member internal _.Store = store.Store
     member internal _.Configuration = configuration
     member internal _.Dispose() = store.Dispose()
+
+    member internal _.SettleAppendCutUnknown(inquiryId, commandId, eventId, failure) =
+        match failure with
+        | AppendError.CommitUnknown evidence when not (List.isEmpty evidence.Prepared.Cuts) ->
+            deliverCutUnknown inquiryId commandId eventId evidence
+        | _ -> ()
 
 [<RequireQualifiedAccess>]
 module Commands =
@@ -125,7 +160,11 @@ module Commands =
         with error ->
             Error error.Message
 
-    let create (store: IEventStore) (raw: obj option) : Result<RuntimeHandle, ToolRefusal> =
+    let create
+        (store: IEventStore)
+        (raw: obj option)
+        (onAppendCutUnknown: AppendCutUnknownIncident -> unit)
+        : Result<RuntimeHandle, ToolRefusal> =
         let decoded =
             match raw with
             | None -> Ok None
@@ -133,10 +172,14 @@ module Commands =
 
         decoded
         |> Result.mapError (refusal "INVALID_START_CONFIGURATION" "configuration")
-        |> Result.map (fun configuration -> RuntimeHandle(EventStoreHandle.Create store, configuration))
+        |> Result.map (fun configuration ->
+            RuntimeHandle(EventStoreHandle.Create store, configuration, onAppendCutUnknown))
 
     let store (handle: RuntimeHandle) = handle.Store
     let dispose (handle: RuntimeHandle) = handle.Dispose()
+
+    let settleAppendCutUnknown (handle: RuntimeHandle) inquiryId commandId eventId failure =
+        handle.SettleAppendCutUnknown(inquiryId, commandId, eventId, failure)
 
     let private configurationView configuration =
         let profile = configuration.Profile
@@ -254,14 +297,28 @@ module Commands =
             @ receiptCurrentFields inquiryId (Bind.tryInquiry store inquiryId)
         )
 
-    let private appendRefusal fault =
-        let message =
-            match fault with
-            | AppendError.StorageInvalid invalid -> sprintf "the store refused invalid input: %A" invalid
-            | AppendError.SemanticCut cut -> cut.Reason
-            | AppendError.AppendFailed reason -> reason
+    let private terminalToolRefusal handle inquiryId commandId eventId fault =
+        settleAppendCutUnknown handle inquiryId commandId eventId fault
 
-        refusal "PERSISTENCE_REJECTED" "inquiryId" message
+        let settlement code =
+            let message =
+                sprintf
+                    "inquiry %s; command %s; event %s: %s. Reconcile the durable record before any retry."
+                    (InquiryId.value inquiryId)
+                    commandId
+                    (Wanxiangshu.Foundation.Identity.EventId.value eventId)
+                    (AppendError.describe fault)
+
+            refusal code "inquiryId" message
+
+        match fault with
+        | AppendError.StorageInvalid invalid ->
+            refusal "PERSISTENCE_REJECTED" "inquiryId" (sprintf "the store refused invalid input: %A" invalid)
+        | AppendError.SemanticCut cut -> refusal "PERSISTENCE_REJECTED" "inquiryId" cut.Reason
+        | AppendError.AppendFailed reason -> refusal "PERSISTENCE_REJECTED" "inquiryId" reason
+        | AppendError.AppendNotAttempted _ -> settlement "PERSISTENCE_NOT_ATTEMPTED"
+        | AppendError.CommitUnknown _ -> settlement "COMMIT_UNKNOWN"
+        | AppendError.NoNewWriteReleaseFailed _ -> settlement "RELEASE_FAILED"
 
     let private prepareCreation configuration (args: StartArgs) inquiryId fingerprint configHash =
         let goal =
@@ -297,10 +354,12 @@ module Commands =
             Codec.seal HostDigest.sha256Hex None batch
             |> Result.mapError (fun fault -> refusal fault.Code "goalText" fault.Message)
 
-    let private appendCreation (store: IEventStore) inquiryId fingerprint encoded =
+    let private appendCreation handle inquiryId commandId fingerprint encoded =
         task {
+            let store = store handle
+
             match! store.Append [ encoded ] with
-            | Error fault -> return Error(appendRefusal fault)
+            | Error fault -> return Error(terminalToolRefusal handle inquiryId commandId encoded.EventId fault)
             | Ok receipt when not (List.isEmpty receipt.Cuts) ->
                 return
                     Error(
@@ -318,11 +377,11 @@ module Commands =
                 return Ok(receiptPayload store "created" inquiryId receipt)
         }
 
-    let private createInquiry store configuration args inquiryId fingerprint configHash =
+    let private createInquiry handle configuration args inquiryId fingerprint configHash =
         task {
             match prepareCreation configuration args inquiryId fingerprint configHash with
             | Error fault -> return Error fault
-            | Ok encoded -> return! appendCreation store inquiryId fingerprint encoded
+            | Ok encoded -> return! appendCreation handle inquiryId args.CommandId fingerprint encoded
         }
 
     let private existingCreation
@@ -361,8 +420,9 @@ module Commands =
                     Error(refusal "PERSISTENCE_READ_FAILED" "commandId" "accepted command receipt is missing")
                 ))
 
-    let private configuredStart store configuration args =
+    let private configuredStart handle configuration args =
         task {
+            let store = store handle
             let configHash = configurationView configuration |> digest
 
             let fingerprint =
@@ -377,13 +437,11 @@ module Commands =
 
             match find store inquiryId with
             | Error fault -> return Error fault
-            | Ok None -> return! createInquiry store configuration args inquiryId fingerprint configHash
+            | Ok None -> return! createInquiry handle configuration args inquiryId fingerprint configHash
             | Ok(Some state) -> return existingCreation store configuration args inquiryId fingerprint configHash state
         }
 
     let start (handle: RuntimeHandle) (args: StartArgs) : Task<Result<obj, ToolRefusal>> =
-        let store = handle.Store
-
         match handle.Configuration with
         | None ->
             Task.FromResult(
@@ -394,7 +452,7 @@ module Commands =
                         "start requires explicit authorized startup resources and execution mode"
                 )
             )
-        | Some configuration -> configuredStart store configuration args
+        | Some configuration -> configuredStart handle configuration args
 
     let exportInquiry (handle: RuntimeHandle) (args: ExportArgs) : Result<obj, ToolRefusal> =
         let store = handle.Store

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -27,6 +28,7 @@ type HandoffCheckpointCommitment =
     | NotCommitted of reason: string
     | Unknown of reason: string
     | PhaseConflict of reason: string
+    | PersistenceFailed of JournalAppendFailure
 
 type HandoffCheckpointSettlement =
     { Identity: HandoffCheckpointIdentity
@@ -44,6 +46,12 @@ module HandoffCheckpointSettlement =
 
     val phaseConflict:
         parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+
+    val persistenceFailed:
+        parent: SessionId ->
+        handoff: PreparedDelegationHandoff ->
+        failure: JournalAppendFailure ->
+            HandoffCheckpointSettlement
 
 type ReusableHandoffPort =
     { Prepare: SessionId -> DelegationHandoffRoute -> Task<PreparedDelegationHandoff>

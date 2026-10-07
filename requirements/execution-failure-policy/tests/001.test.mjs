@@ -26,6 +26,15 @@ test('WHAT[execution-failure-policy-001] adapter rejects unclassified failure an
   }
 })
 
+test('WHAT[execution-failure-policy-001] no-new-write release failure preserves the fact and exact capacity without authorizing retry', () => {
+  const decision = policy.decide(input({ failure: { kind: 'PersistenceFailure', commitment: 'NoNewWrite' } }))
+  assert.equal(decision.resolution, 'PreserveCurrentFact')
+  assert.equal(decision.authorization, null)
+  assert.deepEqual(decision.capacitySettlement, { kind: 'RetainExactFence', fenceReference: 'fence-failure-policy' })
+  assert.deepEqual(decision.breaker, { kind: 'NoBreakerTransition' })
+  assert.equal(decision.fatality.kind, 'FatalAfterSettlement')
+})
+
 test('WHAT[execution-failure-policy-001] provider adapter preserves kind exact identity and first-token evidence', () => {
   assert.deepEqual(provider.classify({
     providerRun: 'run-17', requestKind: 'WorkMain', status: 'Transient', firstTokenObserved: false, diagnostic: 'never retry',

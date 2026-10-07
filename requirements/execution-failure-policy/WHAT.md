@@ -2,13 +2,15 @@
 
 ## [001] 封闭失败分类
 
-执行失败在最早可信边界归入 `LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`ProviderTransient`、`ProviderPermanent`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 或 `PersistenceFailure(NotCommitted | Committed | Unknown)`。异常类型、状态码与公开 Host 证据可参与解码；message、stack、stderr 等自由文本只作诊断，不决定类别与后果。
+执行失败在最早可信边界归入 `LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`ProviderTransient`、`ProviderPermanent`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 或 `PersistenceFailure(NotCommitted | Committed | Unknown | NoNewWrite)`。`NoNewWrite` 只承接已明确没有新追加、但存储释放失败的 receipt，保留其操作失败，不降格为成功或提交未知。异常类型、状态码与公开 Host 证据可参与解码；message、stack、stderr 等自由文本只作诊断，不决定类别与后果。
 
 ## [002] 单一完整决策
 
 唯一纯策略根据失败类别、durable execution phase、确切容量所有权与 provider recovery facts，一次给出互斥的 `PreserveCurrentFact`、`AwaitAcceptanceReconciliation`、`RetryFreshAttempt`、`TerminalizeAcceptedPreProvider` 或 `TerminalizeProviderStarted`，同时确定 breaker、容量结算和 fatality。调用方只解释这份不可拆分的决策，不另算、覆盖其维度或默认重试；重试与终态不得并存。
 
 `PersistenceFailure(NotCommitted)` 固定保留当前事实和已持有的 exact fence（未持有则不结算），不改变 breaker、不 fatal，并停止在未提交步骤的所有后继边界之前。只有新的 typed persistence/recovery event 可重新裁决，不因此扩大 provider retry 权限。
+
+`PersistenceFailure(NoNewWrite)` 保留当前事实和 exact fence，不改变 breaker、不授权 provider retry，不自动执行成功后的步骤；存储释放故障按 [006] 的结算前提保留 fatality，不能用已有事实反推本次操作已成功释放资源。
 
 ## [003] Provider retry 授权
 

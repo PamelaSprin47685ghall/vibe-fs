@@ -328,18 +328,18 @@ module CasebookSurface =
     // ── Workflows ────────────────────────────────────────────────────────────
 
     let private runWorkflowTask
-        (workflow: IEventStore -> Case -> Task<Result<unit, string>>)
+        (workflow: IEventStore -> Case -> Task<Result<unit, CasebookMutationError>>)
         (store: IEventStore)
         (parsed: Case)
         : Task<obj> =
         task {
             match! workflow store parsed with
             | Ok() -> return box {| ok = true |}
-            | Error message -> return box {| ok = false; error = message |}
+            | Error error -> return CasebookAppendSurface.mutationErrorToJs error
         }
 
     let private runStoreWorkflow
-        (workflow: IEventStore -> Case -> Task<Result<unit, string>>)
+        (workflow: IEventStore -> Case -> Task<Result<unit, CasebookMutationError>>)
         (store: IEventStore)
         (case: obj)
         : Task<obj> =
@@ -347,11 +347,11 @@ module CasebookSurface =
         | Error message -> Task.FromResult(box {| ok = false; error = message |})
         | Ok parsed -> runWorkflowTask workflow store parsed
 
-    let private runUnitResult (operation: Task<Result<unit, string>>) : Task<obj> =
+    let private runUnitResult (operation: Task<Result<unit, CasebookMutationError>>) : Task<obj> =
         task {
             match! operation with
             | Ok() -> return box {| ok = true |}
-            | Error message -> return box {| ok = false; error = message |}
+            | Error error -> return CasebookAppendSurface.mutationErrorToJs error
         }
 
     let fetchCase (store: obj) (capacity: int) (sessionId: string) : Task<obj> =
@@ -426,7 +426,8 @@ module CasebookSurface =
         task {
             match! CasebookStore.appendEvicted internalStore sessionId with
             | Ok _ -> return box {| ok = true |}
-            | Error message -> return box {| ok = false; error = message |}
+            | Error failure ->
+                return CasebookAppendSurface.mutationErrorToJs (CasebookMutationError.AppendFailure failure)
         }
 
     let featureEnabled (workspaceRoot: string) : bool = CasebookFeature.isEnabled workspaceRoot
@@ -474,11 +475,13 @@ module CasebookSurface =
                     ()
 
                 return box {| kind = "finalized" |}
-            | Error reason ->
+            | Error(CasebookMutationError.AppendFailure failure) ->
+                return CasebookAppendSurface.finalizeFailureToJs failure
+            | Error error ->
                 return
                     box
                         {| kind = "notCommitted"
-                           error = reason |}
+                           error = CasebookMutationError.describe error |}
         }
 
     // ── KR-003, KR-004, KR-010, KR-014, KR-015 Exports ──────────────────────

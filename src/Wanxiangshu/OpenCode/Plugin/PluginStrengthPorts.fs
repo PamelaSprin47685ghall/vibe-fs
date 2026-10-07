@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
@@ -44,6 +45,15 @@ module PluginStrengthPorts =
             strengthScope |> Option.iter (fun s -> s.TripStrengthFuse message)
             raise (InvalidOperationException message)
 
+        let failSettlement eventId failure : unit =
+            let message = AppendError.describe failure
+            strengthScope |> Option.iter (fun scope -> scope.TripStrengthFuse message)
+
+            if not (List.isEmpty (AppendError.semanticCuts failure)) then
+                Diagnostic.fatal "strength-semantic-cut" [ "result", message ]
+
+            raise (StrengthAppendException(eventId, failure, []))
+
         let commitAppendResult (appendResult: StrengthDurableAppend) : unit =
             match appendResult with
             | StrengthDurableAppend.Applied -> ()
@@ -54,6 +64,7 @@ module PluginStrengthPorts =
                 tripFuse ("Strength promotion commit storage invalid: " + reason)
             | StrengthDurableAppend.StorageFailed reason ->
                 tripFuse ("Strength promotion commit storage failure: " + reason)
+            | StrengthDurableAppend.SettlementFailed(eventId, failure) -> failSettlement eventId failure
 
         let commitReconciledEvent durability projection (turn: ReconciledTurn) : Task<unit> =
             task {

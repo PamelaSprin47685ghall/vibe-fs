@@ -35,4 +35,5 @@ module JsWorkflowSurface =
     val created: value: obj -> string array
     val failureCode: value: obj -> obj
     val failureReason: value: obj -> obj
+    val persistenceFailure: value: obj -> obj
     val render: value: obj -> string

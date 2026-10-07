@@ -222,8 +222,8 @@ test('WHAT[verification-system-007] journal poison preserves the first physical 
   const result = await temporal.writerPoisonPreservesFirstFailureScenario()
   assert.deepEqual(result, {
     appendCalls: 2,
-    first: 'CommitUnknown:append failed: disk exploded',
-    second: 'WriterPoisoned:append failed: disk exploded',
+    first: 'CommitUnknown:disk exploded',
+    second: 'WriterPoisoned:disk exploded',
   })
 })
 test('WHAT[verification-system-007] reconcile shutdown closes admission and waits for the running pass', async () => {

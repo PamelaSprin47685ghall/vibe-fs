@@ -21,7 +21,7 @@ module PluginBoot =
             StrengthScope: PluginStrengthScope
             Clock: IClockPort
             Timer: ITimerPort
-            StrengthFailClosed: string -> unit
+            StrengthFailFuse: string -> unit
             WorkspaceDirectory: string option
             FamilyParent: SessionId -> SessionId option
             /// host-boundary-032 / process-local protocol argument

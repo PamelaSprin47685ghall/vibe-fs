@@ -190,9 +190,11 @@ module CasebookStore =
 
     let private appendEvent
         (store: IEventStore)
+        (operation: CasebookAppendOperation)
+        (identity: string)
         (eventType: string)
         (payload: JsonValue)
-        : Task<Result<EventId, string>> =
+        : Task<Result<EventId, CasebookAppendFailure>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
             let streamId = EventStreamId.create CasebookStream
@@ -210,14 +212,25 @@ module CasebookStore =
             match! store.Append [ envelope ] with
             | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
-                let reason = sprintf "%s semantic cut: %s" eventType cut.Reason
-                return Error reason
+
+                return
+                    Error
+                        { Operation = operation
+                          CaseIdentity = identity
+                          EventId = eventId
+                          Error = AppendError.SemanticCut cut }
             | Ok _ -> return Ok eventId
-            | Error err -> return Error(sprintf "%s append failed: %A" eventType err)
+            | Error err ->
+                return
+                    Error
+                        { Operation = operation
+                          CaseIdentity = identity
+                          EventId = eventId
+                          Error = err }
         }
 
-    let appendCaptured (store: IEventStore) (case: Case) : Task<Result<EventId, string>> =
-        appendEvent store CapturedEventType (encodeCase case)
+    let appendCaptured (store: IEventStore) (case: Case) : Task<Result<EventId, CasebookAppendFailure>> =
+        appendEvent store CasebookAppendOperation.Capture case.Identity CapturedEventType (encodeCase case)
 
     let appendRefreshed
         (store: IEventStore)
@@ -227,7 +240,7 @@ module CasebookStore =
         (maintenanceFileState: string)
         (relatedPaths: string list)
         (observations: Observation list)
-        : Task<Result<EventId, string>> =
+        : Task<Result<EventId, CasebookAppendFailure>> =
         let payload =
             Encode.object
                 [ "identity", Encode.string identity
@@ -238,16 +251,20 @@ module CasebookStore =
                   "related_paths", Encode.list (List.map Encode.string relatedPaths)
                   "observations", Encode.list (List.map encodeObservation observations) ]
 
-        appendEvent store RefreshedEventType payload
+        appendEvent store CasebookAppendOperation.Refresh identity RefreshedEventType payload
 
-    let appendAccessed (store: IEventStore) (identity: string) : Task<Result<EventId, string>> =
+    let appendAccessed (store: IEventStore) (identity: string) : Task<Result<EventId, CasebookAppendFailure>> =
         appendEvent
             store
+            CasebookAppendOperation.Access
+            identity
             AccessedEventType
             (Encode.object [ "identity", Encode.string identity; "session_id", Encode.string identity ])
 
-    let appendEvicted (store: IEventStore) (identity: string) : Task<Result<EventId, string>> =
+    let appendEvicted (store: IEventStore) (identity: string) : Task<Result<EventId, CasebookAppendFailure>> =
         appendEvent
             store
+            CasebookAppendOperation.Evict
+            identity
             EvictedEventType
             (Encode.object [ "identity", Encode.string identity; "session_id", Encode.string identity ])

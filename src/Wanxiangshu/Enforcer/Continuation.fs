@@ -416,6 +416,8 @@ module EnforcerContinuation =
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey reason
+            | EnforcerCycleCommit.CycleCommitOutcome.NoNewWriteReleaseFailed failure ->
+                return raise (JournalAppendException failure)
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                 // The durable commit evidence is indeterminate — keep the exact
                 // request in-flight. The caller keeps the pending marker and
@@ -458,6 +460,8 @@ module EnforcerContinuation =
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey reason
+            | EnforcerCycleCommit.CycleCommitOutcome.NoNewWriteReleaseFailed failure ->
+                return raise (JournalAppendException failure)
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                 Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown

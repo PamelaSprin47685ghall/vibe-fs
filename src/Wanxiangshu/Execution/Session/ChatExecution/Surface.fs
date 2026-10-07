@@ -308,6 +308,7 @@ module Surface =
                    attempted = evidenceToJs attempted |}
         | ManagedChatAcceptanceError.NotAttempted _ -> box {| kind = "NotAttempted" |}
         | ManagedChatAcceptanceError.CommitUnknown _ -> box {| kind = "CommitUnknown" |}
+        | ManagedChatAcceptanceError.NoNewWriteReleaseFailed _ -> box {| kind = "NoNewWriteReleaseFailed" |}
         | ManagedChatAcceptanceError.FactRejected _ -> box {| kind = "FactRejected" |}
 
     let private intentToJs =
@@ -723,6 +724,13 @@ module Surface =
                     box
                         {| eventId = EventId.value eventId
                            failure = string failure |} |}
+        | ManagedChatProviderLifecycleError.NoNewWriteReleaseFailed(eventId, failure) ->
+            box
+                {| kind = "NoNewWriteReleaseFailed"
+                   detail =
+                    box
+                        {| eventId = EventId.value eventId
+                           failure = failure.Cause.Message |} |}
         | ManagedChatProviderLifecycleError.FactRejected(eventId, rejection) ->
             box
                 {| kind = "FactRejected"

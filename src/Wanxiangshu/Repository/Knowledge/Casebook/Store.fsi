@@ -32,7 +32,7 @@ module CasebookStore =
     val tryDecodeEnvelope: envelope: EventEnvelope -> Result<CasebookEvent, string>
 
     /// Append a CaseCaptured event to the Casebook stream.
-    val appendCaptured: store: IEventStore -> case: Case -> Task<Result<EventId, string>>
+    val appendCaptured: store: IEventStore -> case: Case -> Task<Result<EventId, CasebookAppendFailure>>
 
     /// Append a CaseRefreshed event to the Casebook stream.
     val appendRefreshed:
@@ -43,10 +43,10 @@ module CasebookStore =
         maintenanceFileState: string ->
         relatedPaths: string list ->
         observations: Observation list ->
-            Task<Result<EventId, string>>
+            Task<Result<EventId, CasebookAppendFailure>>
 
     /// Append a CaseAccessed event to the Casebook stream.
-    val appendAccessed: store: IEventStore -> identity: string -> Task<Result<EventId, string>>
+    val appendAccessed: store: IEventStore -> identity: string -> Task<Result<EventId, CasebookAppendFailure>>
 
     /// Append a CaseEvicted event to the Casebook stream.
-    val appendEvicted: store: IEventStore -> identity: string -> Task<Result<EventId, string>>
+    val appendEvicted: store: IEventStore -> identity: string -> Task<Result<EventId, CasebookAppendFailure>>

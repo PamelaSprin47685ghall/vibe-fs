@@ -173,13 +173,11 @@ module JsToolWorkflow =
             return value, rewrittenPaths mutations, createdPaths mutations
         }
 
-    let private mapPrepareFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
+    let private mapPersistenceFailure
+        (operation: Task<Result<'a, JsTransactionAppendFailure>>)
+        : Task<Result<'a, JsFailure>> =
         operation
-        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionPrepareFailed))
-
-    let private mapCommitFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
-        operation
-        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionCommitFailed))
+        |> TaskValue.map (Result.mapError JsFailure.TransactionPersistenceFailed)
 
     let private commitDurable
         (durable: IJsTransactionPersistence)
@@ -190,10 +188,10 @@ module JsToolWorkflow =
         (prepared: JsTransactionPrepared)
         : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
         taskResult {
-            let! _ = durable.AppendPrepared prepared |> mapPrepareFailure
+            let! _ = durable.AppendPrepared prepared |> mapPersistenceFailure
             do! preflight root readSnapshots mutations
             do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
-            let! _ = durable.AppendCommitted prepared.TransactionId |> mapCommitFailure
+            let! _ = durable.AppendCommitted prepared.TransactionId |> mapPersistenceFailure
             return value, rewrittenPaths mutations, createdPaths mutations
         }
 

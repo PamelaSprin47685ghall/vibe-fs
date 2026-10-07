@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 
 type GitObjectId
 
@@ -51,6 +52,7 @@ type PublishError =
     | SemanticCut of SemanticCut
     | PublishFailed of reason: string
     | IncompletePayloadClosure
+    | AppendSettlementFailed of EventId * AppendError
 
 [<RequireQualifiedAccess>]
 type ConvergeError =

@@ -28,6 +28,7 @@ module Surface =
         | "NotCommitted" -> PersistenceCommitment.NotCommitted
         | "Committed" -> PersistenceCommitment.Committed
         | "Unknown" -> PersistenceCommitment.Unknown
+        | "NoNewWrite" -> PersistenceCommitment.NoNewWrite
         | commitment -> invalidArg "failure.commitment" $"unknown persistence commitment '{commitment}'"
 
     let private failureOf (value: obj) =

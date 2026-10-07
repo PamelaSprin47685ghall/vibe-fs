@@ -149,17 +149,6 @@ module JsTransaction =
                 JsRollbackMutation.RestoreFile(path, newText, originalText)
             | JsStagedMutation.Create(path, text) -> JsRollbackMutation.RemoveCreatedFile(path, text))
 
-/// DSL-class: DurableFact — JS-012/015: identity of one js-* transaction.
-type JsTransactionId = private JsTransactionId of string
-
-module JsTransactionId =
-
-    let create (value: string) = JsTransactionId value
-    let value (JsTransactionId v) = v
-
-    let generate () =
-        JsTransactionId(System.Guid.NewGuid().ToString("N"))
-
 /// DSL-class: DurableFact — JS-015: one mutation as persisted in a prepared
 /// transaction, sufficient to undo it after a crash (original text for
 /// rewrites, absence for creates).

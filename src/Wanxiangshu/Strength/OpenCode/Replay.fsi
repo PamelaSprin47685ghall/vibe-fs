@@ -28,7 +28,7 @@ module StrengthReplay =
     val commitTracedAfterCapture:
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
-        strengthFailClosed: (string -> unit) ->
+        strengthFailFuse: (string -> unit) ->
         traceState: XTraceProjectionState option ->
         plans: StrengthReplayPlan list ->
             Task

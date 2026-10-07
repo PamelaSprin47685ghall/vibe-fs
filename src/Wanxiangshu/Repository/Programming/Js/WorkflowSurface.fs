@@ -144,4 +144,10 @@ module JsWorkflowSurface =
         | JsToolWorkflow.JsToolOutcome.Succeeded _ -> null
         | JsToolWorkflow.JsToolOutcome.Failed failure -> box (JsFailure.reason failure)
 
+    let persistenceFailure (value: obj) : obj =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Failed(JsFailure.TransactionPersistenceFailed failure) ->
+            JsTransactionSurface.persistenceFailureToJs failure
+        | _ -> null
+
     let render (value: obj) : string = JsToolsResult.render (outcomeOf value)

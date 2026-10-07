@@ -171,6 +171,7 @@ module internal SyncDelegateWorkflow =
             match settled.Commitment with
             | HandoffCheckpointCommitment.Committed
             | HandoffCheckpointCommitment.NotCommitted _
+            | HandoffCheckpointCommitment.PersistenceFailed _
             | HandoffCheckpointCommitment.Unknown _ -> return Ok()
             | HandoffCheckpointCommitment.PhaseConflict reason ->
                 let detail =

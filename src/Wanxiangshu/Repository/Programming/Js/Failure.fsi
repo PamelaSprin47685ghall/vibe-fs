@@ -1,5 +1,26 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
+
+type JsTransactionId = private JsTransactionId of string
+
+module JsTransactionId =
+    val create: value: string -> JsTransactionId
+    val value: JsTransactionId -> string
+    val generate: unit -> JsTransactionId
+
+[<RequireQualifiedAccess>]
+type JsTransactionAppendPhase =
+    | Prepared
+    | Committed
+
+type JsTransactionAppendFailure =
+    { Phase: JsTransactionAppendPhase
+      TransactionId: JsTransactionId
+      EventId: EventId
+      Error: AppendError }
+
 [<RequireQualifiedAccess>]
 type JsFailure =
     | InvalidProgram
@@ -30,6 +51,7 @@ type JsFailure =
     | TransactionCommitFailed
     | TransactionRollbackFailed
     | TransactionRecoveryRequired
+    | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
 
 module JsFailure =

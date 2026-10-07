@@ -464,7 +464,7 @@ export const SURFACE_MANIFEST = [
       'DURABLE-CONVERGENCE-007': 'durable-convergence',
     },
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'pure',
   },
   {
@@ -480,8 +480,8 @@ export const SURFACE_MANIFEST = [
     owner: 'knowledge-reuse',
     laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Repository/Knowledge/Casebook/BookkeeperSurface.js',
@@ -496,7 +496,7 @@ export const SURFACE_MANIFEST = [
     owner: 'knowledge-reuse',
     laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'resource',
   },
   {
@@ -937,7 +937,7 @@ export const SURFACE_MANIFEST = [
     laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007'],
     lawOwners: { 'DURABLE-CONVERGENCE-007': 'durable-convergence' },
     source: 'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'resource',
   },
   {
@@ -1726,8 +1726,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Verification/JournalPortObservationSurface.js',
     owner: 'verification-system',
-    laws: ['DURABLE-EVENTS-023'],
-    lawOwners: { 'DURABLE-EVENTS-023': 'durable-events' },
+    laws: ['DURABLE-EVENTS-006', 'DURABLE-EVENTS-023'],
+    lawOwners: { 'DURABLE-EVENTS-006': 'durable-events', 'DURABLE-EVENTS-023': 'durable-events' },
     source: 'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

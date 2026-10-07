@@ -24,7 +24,7 @@ module PluginBoot =
           StrengthScope: PluginStrengthScope
           Clock: IClockPort
           Timer: ITimerPort
-          StrengthFailClosed: string -> unit
+          StrengthFailFuse: string -> unit
           WorkspaceDirectory: string option
           FamilyParent: SessionId -> SessionId option
           ProtocolArgumentVault: ProtocolArgumentVault.Vault }
@@ -85,9 +85,7 @@ module PluginBoot =
             let clock = NodeTiming.nodeClockPort ()
             let timer = NodeTiming.nodeTimerPort ()
 
-            let strengthFailClosed (reason: string) : unit =
-                strengthScope.TripStrengthFuse reason
-                raise (InvalidOperationException reason)
+            let strengthFailFuse (reason: string) : unit = strengthScope.TripStrengthFuse reason
 
             let familyParent (sessionId: SessionId) =
                 match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
@@ -102,7 +100,7 @@ module PluginBoot =
                   StrengthScope = strengthScope
                   Clock = clock
                   Timer = timer
-                  StrengthFailClosed = strengthFailClosed
+                  StrengthFailFuse = strengthFailFuse
                   WorkspaceDirectory = workspaceDirectory
                   FamilyParent = familyParent
                   ProtocolArgumentVault = protocolArgumentVault }

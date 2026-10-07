@@ -17,6 +17,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
@@ -44,6 +45,15 @@ module StrengthDelegate =
     let private failClosed (strengthScope: PluginStrengthScope) (reason: string) : 'a =
         strengthScope.TripStrengthFuse reason
         raise (InvalidOperationException reason)
+
+    let private failSettlement (strengthScope: PluginStrengthScope) eventId failure cleanupFailures : 'a =
+        let message = AppendError.describe failure
+        strengthScope.TripStrengthFuse message
+
+        if not (List.isEmpty (AppendError.semanticCuts failure)) then
+            Diagnostic.fatal "strength-semantic-cut" [ "result", message ]
+
+        raise (StrengthAppendException(eventId, failure, cleanupFailures))
 
     /// WHAT[002]: the source exclusion is "not the Replica and not another
     /// InternalLeaf" — a durable association that classifies as InternalLeaf
@@ -918,6 +928,7 @@ module StrengthDelegate =
             failClosed strengthScope ("Strength DelegationRequested storage invalid: " + reason)
         | StrengthDurableAppend.StorageFailed reason ->
             failClosed strengthScope ("Strength DelegationRequested append failed: " + reason)
+        | StrengthDurableAppend.SettlementFailed(eventId, failure) -> failSettlement strengthScope eventId failure []
 
     let private persistNewDelegationRequest
         (strengthScope: PluginStrengthScope)
@@ -1051,6 +1062,8 @@ module StrengthDelegate =
                 return failClosed strengthScope ("Strength DelegationClosed storage invalid: " + reason)
             | StrengthDurableAppend.StorageFailed reason ->
                 return failClosed strengthScope ("Strength DelegationClosed append failed: " + reason)
+            | StrengthDurableAppend.SettlementFailed(eventId, failure) ->
+                return failSettlement strengthScope eventId failure []
         }
 
     let private renderCandidateOrThrow
@@ -1086,6 +1099,8 @@ module StrengthDelegate =
             match published with
             | StrengthPreparedPublish.StorageInvalid error ->
                 return failClosed strengthScope ("Strength Prepared storage invalid: " + error)
+            | StrengthPreparedPublish.SettlementFailed(eventId, failure) ->
+                return failSettlement strengthScope eventId failure []
             | StrengthPreparedPublish.Rejected _ -> return ()
             | StrengthPreparedPublish.Published ->
                 renderCandidateOrThrow
@@ -1250,6 +1265,15 @@ module StrengthDelegate =
                 return! handleReplicaCompletion strengthScope surface decisionId completed
         }
 
+    let private cancelAfterFailedAppend (surface: OwnerSurface) =
+        task {
+            try
+                do! surface.Ports.Runtime.CancelOwner surface.Owner
+                return []
+            with error ->
+                return [ error ]
+        }
+
     let private appendBoundAndExecute
         (strengthScope: PluginStrengthScope)
         (surface: OwnerSurface)
@@ -1276,6 +1300,9 @@ module StrengthDelegate =
                 | StrengthDurableAppend.StorageFailed reason ->
                     do! surface.Ports.Runtime.CancelOwner surface.Owner
                     return! failClosed strengthScope ("Strength DelegationBound append failed: " + reason)
+                | StrengthDurableAppend.SettlementFailed(eventId, failure) ->
+                    let! cleanupFailures = cancelAfterFailedAppend surface
+                    return! failSettlement strengthScope eventId failure cleanupFailures
                 | StrengthDurableAppend.Applied ->
                     return! executeBoundReplica strengthScope surface request.DecisionId preparation
             finally

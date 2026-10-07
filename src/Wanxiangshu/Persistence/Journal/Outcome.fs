@@ -2,23 +2,28 @@ namespace Wanxiangshu.Persistence.Journal
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 
 module JournalOutcome =
 
     type JournalFailure =
         | WriteFailed of reason: string
         | FlushFailed of reason: string
+        | StoreAppendUnknown of AppendCommitUnknownEvidence
+
+    type JournalAppendPoison =
+        { FailedEventId: EventId
+          Error: AppendError }
 
     /// A writer that never attempted the caller's event. This is deliberately
     /// distinct from CommitUnknown: lifecycle refusal is known-not-committed.
     type JournalUnavailable =
-        | WriterPoisoned of firstFailure: string
+        | WriterPoisoned of firstFailure: JournalAppendPoison
         | WriterClosing
         | WriterDisposed
 
-    /// PERSIST-002: physical append is committed or uncertain. Semantic cuts and
-    /// lifecycle refusal are both known-not-committed and stay explicit instead
-    /// of being collapsed into physical uncertainty.
+    /// The caller's fact and a failed lazy initialization have separate fates.
+    /// A durable semantic rejection and a no-new-write release failure also stay explicit.
     type CommitResult<'e> =
         | Committed of 'e
         /// Bytes are durable, but the business rule cut this event and immediately
@@ -26,6 +31,7 @@ module JournalOutcome =
         | Rejected of EventId * reason: string
         | NotAttempted of EventId * JournalUnavailable
         | CommitUnknown of EventId * JournalFailure
+        | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
 
     /// Physical fate of a single journal append.
     ///
@@ -37,6 +43,7 @@ module JournalOutcome =
         | WriteUnknown of EventId * JournalFailure
         | WriterUnavailable of EventId * JournalUnavailable
         | FactRejected of EventId * FoldRejection
+        | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
 
     module JournalAppendFailure =
 
@@ -46,11 +53,25 @@ module JournalOutcome =
                 sprintf "append outcome unknown for %s: write failed: %s" (EventId.value eventId) reason
             | WriteUnknown(eventId, FlushFailed reason) ->
                 sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
+            | WriteUnknown(eventId, StoreAppendUnknown evidence) ->
+                sprintf
+                    "append outcome unknown for %s at %A: %s"
+                    (EventId.value eventId)
+                    evidence.Primary.Phase
+                    evidence.Primary.Cause.Message
             | WriterUnavailable(eventId, WriterPoisoned firstFailure) ->
                 sprintf
                     "append not attempted for %s: writer poisoned by prior failure: %s"
                     (EventId.value eventId)
-                    firstFailure
+                    (sprintf
+                        "%s: %s"
+                        (EventId.value firstFailure.FailedEventId)
+                        (AppendError.describe firstFailure.Error))
+            | NoNewWriteReleaseFailed(eventId, failure) ->
+                sprintf
+                    "no new journal write for %s; store release failed: %s"
+                    (EventId.value eventId)
+                    failure.Cause.Message
             | WriterUnavailable(eventId, WriterClosing) ->
                 sprintf "append not attempted for %s: writer is closing" (EventId.value eventId)
             | WriterUnavailable(eventId, WriterDisposed) ->

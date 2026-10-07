@@ -562,7 +562,8 @@ type SyncDelegateRuntime
             // deliver the earned completion from the turn's own parts (neither
             // forgotten nor re-executed); the checkpoint stays pending-evidence.
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriterUnavailable _))
-            | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _)) ->
+            | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _))
+            | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.NoNewWriteReleaseFailed _)) ->
                 return finishCompletedCallFromTurn turn call
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)

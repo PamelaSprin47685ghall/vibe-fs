@@ -93,8 +93,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogrammingcalibration.fsproj"/>
 <Compile Include="OpenCode/Host/PluginHostInterop.fsi"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Host/ManagerReviewContract.fsi"/>
     <Compile Include="OpenCode/Host/ManagerReviewContract.fs"/>
     <Compile Include="OpenCode/Host/ToolSchemaJson.fsi"/>
@@ -112,6 +110,8 @@
     <Compile Include="OpenCode/Host/ProtocolArgumentVault.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fsi"/>

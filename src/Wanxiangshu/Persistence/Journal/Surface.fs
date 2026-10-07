@@ -62,6 +62,7 @@ module JournalSurface =
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> "NotCommitted"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> "Committed"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> "Unknown"
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> "NoNewWrite"
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied

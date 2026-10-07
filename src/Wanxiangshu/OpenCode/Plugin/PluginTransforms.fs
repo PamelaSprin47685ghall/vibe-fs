@@ -236,7 +236,7 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
-        let strengthFailFuse = boot.StrengthFailClosed
+        let strengthFailFuse = boot.StrengthFailFuse
 
         let requireProviderAdmission key =
             if ModelRouting.readExecutionAdmission key |> Option.isNone then
@@ -695,7 +695,7 @@ module PluginTransforms =
                             StrengthReplay.commitTracedAfterCapture
                                 journal
                                 strengthDurability
-                                (raiseFailClosed strengthFailFuse)
+                                strengthFailFuse
                                 traceState
                                 strengthReplayPlans
                     }

@@ -1490,6 +1490,7 @@ module SyncDelegateSurface =
                 match append.Failure with
                 | JournalAppendFailure.FactRejected _ -> return raise append
                 | JournalAppendFailure.WriterUnavailable _
+                | JournalAppendFailure.NoNewWriteReleaseFailed _
                 | JournalAppendFailure.WriteUnknown _ ->
                     let settled = harness.Runtime.SettleCompletedFromTurn turn
 
@@ -2133,6 +2134,15 @@ module SyncDelegateSurface =
             | HandoffCheckpointCommitment.NotCommitted detail -> "NotCommitted", detail
             | HandoffCheckpointCommitment.Unknown detail -> "Unknown", detail
             | HandoffCheckpointCommitment.PhaseConflict detail -> "PhaseConflict", detail
+            | HandoffCheckpointCommitment.PersistenceFailed failure ->
+                let label =
+                    match failure with
+                    | JournalAppendFailure.WriterUnavailable _ -> "NotCommitted"
+                    | JournalAppendFailure.WriteUnknown _ -> "Unknown"
+                    | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
+                    | JournalAppendFailure.FactRejected _ -> "PhaseConflict"
+
+                label, JournalAppendFailure.describe failure
 
         box
             {| parent = SessionId.value settled.Identity.Parent

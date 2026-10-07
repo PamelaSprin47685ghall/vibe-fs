@@ -198,6 +198,10 @@ Execution/Session/Attachment/AttachmentLeaseCore.fsi
 Execution/Session/Attachment/AttachmentLeaseCore.fs
 Foundation/Outcome.fsi
 Foundation/Outcome.fs
+Persistence/EventStore/Model.fsi
+Persistence/EventStore/Model.fs
+Persistence/EventStore/StoreTypes.fsi
+Persistence/EventStore/StoreTypes.fs
 Persistence/Journal/Outcome.fsi
 Persistence/Journal/Outcome.fs
 Execution/Delegation/SyncDelegate/Model.fsi
@@ -390,8 +394,6 @@ Participant/Provider/Attempt/Planner.fsi
 Participant/Provider/Attempt/Planner.fs
 Participant/Provider/Attempt/PlannerSurface.fsi
 Participant/Provider/Attempt/PlannerSurface.fs
-Persistence/EventStore/Model.fsi
-Persistence/EventStore/Model.fs
 Strength/EventVocabulary.fsi
 Strength/EventVocabulary.fs
 Strength/Events.fsi
@@ -420,8 +422,8 @@ Repository/Knowledge/Casebook/Model.fsi
 Repository/Knowledge/Casebook/Model.fs
 Repository/Knowledge/Casebook/Settlement.fsi
 Repository/Knowledge/Casebook/Settlement.fs
-Persistence/EventStore/StoreTypes.fsi
-Persistence/EventStore/StoreTypes.fs
+Repository/Knowledge/Casebook/AppendSurface.fsi
+Repository/Knowledge/Casebook/AppendSurface.fs
 Persistence/EventStore/Port.fsi
 Persistence/EventStore/Port.fs
 Persistence/EventStore/EventStoreHandle.fsi

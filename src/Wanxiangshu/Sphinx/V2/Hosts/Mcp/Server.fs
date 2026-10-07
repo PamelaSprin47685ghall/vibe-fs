@@ -120,7 +120,8 @@ module Mcp =
               Path = "inquiryId"
               Message = reason }
 
-    /// A refusal result: the call changed nothing, and it carries no business fact.
+    /// A terminal failure view. Persistence codes distinguish uncertain commits
+    /// from refusals that never attempted a write.
     let private refused (refusal: ToolRefusal) : Task<obj> =
         task {
             return
@@ -147,16 +148,33 @@ module Mcp =
           Path = "commandId"
           Message = fault.Message }
 
-    let private appendRefusal (fault: AppendError) : ToolRefusal =
-        let message =
-            match fault with
-            | AppendError.StorageInvalid invalid -> sprintf "the store refused the write as invalid: %A" invalid
-            | AppendError.SemanticCut cut -> sprintf "semantic cut: %s" cut.Reason
-            | AppendError.AppendFailed reason -> reason
+    let private terminalToolRefusal handle (args: CancelArgs) eventId (fault: AppendError) : ToolRefusal =
+        Commands.settleAppendCutUnknown handle (InquiryId.create args.InquiryId) args.CommandId eventId fault
 
-        { Code = "PERSISTENCE_REJECTED"
-          Path = "inquiryId"
-          Message = message }
+        let view code message : ToolRefusal =
+            { Code = code
+              Path = "inquiryId"
+              Message = message }
+
+        let settlement code =
+            let message =
+                sprintf
+                    "inquiry %s; command %s; event %s: %s. Reconcile the durable record before any retry."
+                    args.InquiryId
+                    args.CommandId
+                    (Wanxiangshu.Foundation.Identity.EventId.value eventId)
+                    (AppendError.describe fault)
+
+            view code message
+
+        match fault with
+        | AppendError.StorageInvalid invalid ->
+            view "PERSISTENCE_REJECTED" (sprintf "the store refused the write as invalid: %A" invalid)
+        | AppendError.SemanticCut cut -> view "PERSISTENCE_REJECTED" (sprintf "semantic cut: %s" cut.Reason)
+        | AppendError.AppendFailed reason -> view "PERSISTENCE_REJECTED" reason
+        | AppendError.AppendNotAttempted _ -> settlement "PERSISTENCE_NOT_ATTEMPTED"
+        | AppendError.CommitUnknown _ -> settlement "COMMIT_UNKNOWN"
+        | AppendError.NoNewWriteReleaseFailed _ -> settlement "RELEASE_FAILED"
 
     let private cutRefusal (receipt: Wanxiangshu.Persistence.EventStore.AppendReceipt) : ToolRefusal =
         { Code = "PERSISTENCE_SEMANTIC_CUT"
@@ -200,18 +218,19 @@ module Mcp =
         | Ok None -> refusedCurrent (unknownInquiry args.InquiryId)
         | Ok(Some current) -> record (receipt @ [ ("status", box (Encode.statusOf current)) ])
 
-    let private appendCancellation (store: IEventStore) (args: CancelArgs) (revision: Revision) encoded : Task<obj> =
+    let private appendCancellation handle (args: CancelArgs) (revision: Revision) encoded : Task<obj> =
         task {
+            let store = Commands.store handle
             let! appended = store.Append [ encoded ]
 
             match appended with
-            | Error fault -> return! refused (appendRefusal fault)
+            | Error fault -> return! refused (terminalToolRefusal handle args encoded.EventId fault)
             | Ok receipt when not (List.isEmpty receipt.Cuts) -> return! refused (cutRefusal receipt)
             | Ok _ -> return cancellationReceipt store args revision |> toolResult false
         }
 
     let private freshCancellation
-        (store: IEventStore)
+        (handle: RuntimeHandle)
         (args: CancelArgs)
         (state: InquiryState)
         (fingerprint: string)
@@ -235,10 +254,10 @@ module Mcp =
                 { Code = fault.Code
                   Path = "commandId"
                   Message = fault.Message }
-        | Ok encoded -> appendCancellation store args nextRevision encoded
+        | Ok encoded -> appendCancellation handle args nextRevision encoded
 
     let private admittedCancellation
-        (store: IEventStore)
+        (handle: RuntimeHandle)
         (args: CancelArgs)
         (state: InquiryState)
         (fingerprint: string)
@@ -263,10 +282,12 @@ module Mcp =
                           ("revision", Encode.revision revision)
                           ("status", box (Encode.statusOf state)) ]
                     |> toolResult false
-            | Ok(IdempotencyOutcome.Fresh _) -> return! freshCancellation store args state fingerprint
+            | Ok(IdempotencyOutcome.Fresh _) -> return! freshCancellation handle args state fingerprint
         }
 
-    let private cancelFromCurrent (store: IEventStore) (args: CancelArgs) : Task<obj> =
+    let private cancelFromCurrent handle (args: CancelArgs) : Task<obj> =
+        let store = Commands.store handle
+
         match currentState store (InquiryId.create args.InquiryId) with
         | Error fault -> refused (currentRefusal fault)
         | Ok None -> refused (unknownInquiry args.InquiryId)
@@ -281,24 +302,24 @@ module Mcp =
                     )
                 )
 
-            admittedCancellation store args state fingerprint
+            admittedCancellation handle args state fingerprint
 
     /// Requests cancellation through the canonical fold; a repeated command returns
     /// the original receipt. An unconfirmed physical abort stays cancelling.
-    let private cancelResult (store: IEventStore) (args: CancelArgs) : Task<obj> =
+    let private cancelResult handle (args: CancelArgs) : Task<obj> =
+        let store = Commands.store handle
+
         match store.ReloadLocal() with
         | Error reason ->
             refused
                 { Code = "PERSISTENCE_READ_FAILED"
                   Path = "inquiryId"
                   Message = reason }
-        | Ok _ -> cancelFromCurrent store args
+        | Ok _ -> cancelFromCurrent handle args
 
     /// Registers the seven public tools. Each one decodes its own arguments and then
     /// goes to the one Runtime; none of them decides what comes next.
     let private registerTools (server: obj) (handle: RuntimeHandle) : unit =
-        let store = Commands.store handle
-
         let register (tool: SphinxTool) (description: string) (inputSchema: obj) (handler: obj -> Task<obj>) =
             let config =
                 createObj
@@ -428,7 +449,7 @@ module Mcp =
             (fun args ->
                 match Tool.decodeCancel args with
                 | Error refusal -> refused refusal
-                | Ok decoded -> cancelResult store decoded)
+                | Ok decoded -> cancelResult handle decoded)
 
         register
             SphinxTool.InquiryExport
@@ -448,10 +469,21 @@ module Mcp =
                 (Tool.unsupported (Contract.toolName SphinxTool.GoalAmend))
                 Tool.decodeGoalAmend)
 
+    let private bindAppendCutUnknown (incident: AppendCutUnknownIncident) =
+        let message =
+            sprintf
+                "inquiry %s; command %s; event %s: %s"
+                (InquiryId.value incident.InquiryId)
+                incident.CommandId
+                (Wanxiangshu.Foundation.Identity.EventId.value incident.EventId)
+                (AppendError.describe (AppendError.CommitUnknown incident.Evidence))
+
+        FatalProcess.trip "sphinx-semantic-cut" message
+
     /// Boots the server against a durable store. The store already carries the v2 rule
     /// program, so replay happens through the same fold the caller reads.
     let serveConfigured (store: IEventStore) (configuration: obj option) : JS.Promise<unit> =
-        match Commands.create store configuration with
+        match Commands.create store configuration bindAppendCutUnknown with
         | Error refusal ->
             consoleError (
                 sprintf "[sphinx-mcp] configuration rejected: %s at %s: %s" refusal.Code refusal.Path refusal.Message

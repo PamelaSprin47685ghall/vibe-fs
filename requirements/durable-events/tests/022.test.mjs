@@ -88,6 +88,7 @@ const EXTENDED_CONTRACT_LOCALITIES = [
   'interaction-authority-fold',
   'execution-session-syncdelegaterole',
   'journal-outcome-contract',
+  'repository-programming-js-capability',
 ]
 
 const EXTENDED_FOCUSED_RUNTIME_LOCALITIES = [
@@ -275,7 +276,8 @@ test('WHAT[durable-events-022] append results have one pure compile owner withou
   ].map(source => join(SOURCE_ROOT, source)))
   assert.ok(port.references.includes(project.projectPath))
   const journal = planShard('journal-outcome-contract').plan
-  assert.ok(!journal.projectPaths.includes(project.projectPath), 'C0 must not add a future Journal result dependency')
+  assert.ok(journal.projectPaths.includes(project.projectPath), 'Journal outcomes carry the pure append settlement evidence')
+  assert.ok(!journal.projectPaths.includes(port.projectPath), 'Journal outcomes must not acquire the store capability')
   assert.ok(!productionSources(planShard('outcome').plan).some(source => source.startsWith('Persistence/')))
 })
 
@@ -489,7 +491,23 @@ integrationTest('WHAT[durable-events-022] real Fable compiles the journal observ
   }
 })
 
-integrationTest('WHAT[durable-events-022] pure append results compile every original case and reject the identical store capability probe', async (t) => {
+integrationTest('WHAT[durable-events-022] actual EventStore composition surface compiles its registered Sphinx rule dependency', async () => {
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-eventstore-surface-compile-'))
+  try {
+    const result = await compileOwnerProject({
+      projectPath: join(SOURCE_ROOT, 'Wanxiangshu.Owner.durable-events.runtime.fsproj'),
+      aggregatePath: null,
+      scratchRoot,
+      rootPropsPath: join(ROOT, 'Directory.Build.props'),
+      stdio: 'pipe',
+    })
+    assert.equal(result.ok, true, `actual composition surface must compile without undeclared Sphinx siblings\n${result.stdout}\n${result.stderr}`)
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[durable-events-022] pure append results compile every settlement case and reject the identical store capability probe', async (t) => {
   const { cpSync, mkdirSync, readFileSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname, relative } = await import('node:path')
@@ -536,13 +554,50 @@ integrationTest('WHAT[durable-events-022] pure append results compile every orig
     '    let receipt: AppendReceipt = { Cuts = [cut] }',
     '    let found = AppendReceipt.cutFor eventId receipt',
     '    let missing = AppendReceipt.cutFor eventId AppendReceipt.empty',
+    '    let envelope: EventEnvelope =',
+    '        { EventId = eventId; StreamId = streamId; EventType = "probe";',
+    '          Parents = []; Payload = Thoth.Json.Encode.object []; PayloadRefs = [] }',
+    '    let prepared: PreparedAppend = { DurableEvents = [envelope]; Cuts = [cut] }',
+    '    let cause = System.InvalidOperationException "native cause"',
+    '    let phases =',
+    '        [ AppendPhase.GateAcquire; AppendPhase.Preparation; AppendPhase.BeforePhysicalAppend;',
+    '          AppendPhase.PhysicalAppend; AppendPhase.DurabilityOpen; AppendPhase.DurabilityBarrier;',
+    '          AppendPhase.DurabilityClose; AppendPhase.CurrentCommit; AppendPhase.StoreRelease ]',
+    '    let classifyPhase = function',
+    '        | AppendPhase.GateAcquire -> 1',
+    '        | AppendPhase.Preparation -> 2',
+    '        | AppendPhase.BeforePhysicalAppend -> 3',
+    '        | AppendPhase.PhysicalAppend -> 4',
+    '        | AppendPhase.DurabilityOpen -> 5',
+    '        | AppendPhase.DurabilityBarrier -> 6',
+    '        | AppendPhase.DurabilityClose -> 7',
+    '        | AppendPhase.CurrentCommit -> 8',
+    '        | AppendPhase.StoreRelease -> 9',
+    '    let phaseKinds = phases |> List.map classifyPhase',
+    '    let fault: AppendFault = { Phase = AppendPhase.DurabilityBarrier; Cause = cause }',
+    '    let release: AppendFault = { Phase = AppendPhase.StoreRelease; Cause = cause }',
+    '    let notAttempted: AppendNotAttemptedEvidence =',
+    '        { Requested = [envelope]; Prepared = Some prepared; Primary = fault;',
+    '          CleanupFailures = [release]; PriorRejection = Some(AppendPreWriteRejection.StorageInvalid invalid.Head) }',
+    '    let unknown: AppendCommitUnknownEvidence =',
+    '        { Requested = [envelope]; Prepared = prepared; Primary = fault; CleanupFailures = [release] }',
+    '    let noNewWrite: AppendNoNewWriteReleaseFailure =',
+    '        { Requested = [envelope]; Prepared = Some prepared; Cause = cause }',
+    '    let preparation = AppendPreWriteRejection.PreparationRejected "pure refusal"',
     '    let errors = [ AppendError.StorageInvalid invalid.Head; AppendError.SemanticCut cut;',
-    '                   AppendError.AppendFailed "refused" ]',
+    '                   AppendError.AppendFailed "refused"; AppendError.AppendNotAttempted notAttempted;',
+    '                   AppendError.CommitUnknown unknown; AppendError.NoNewWriteReleaseFailed noNewWrite ]',
     '    let classify = function',
     '        | AppendError.StorageInvalid _ -> 1',
     '        | AppendError.SemanticCut _ -> 2',
     '        | AppendError.AppendFailed _ -> 3',
+    '        | AppendError.AppendNotAttempted _ -> 4',
+    '        | AppendError.CommitUnknown _ -> 5',
+    '        | AppendError.NoNewWriteReleaseFailed _ -> 6',
     '    let kinds = errors |> List.map classify',
+    '    let diagnostics = errors |> List.map AppendError.describe',
+    '    let causes = errors |> List.map AppendError.cause',
+    '    let cuts = errors |> List.map AppendError.semanticCuts',
     '',
   ].join('\n')
   const compileProbe = async (shard, source) => {
@@ -576,9 +631,9 @@ integrationTest('WHAT[durable-events-022] pure append results compile every orig
       const result = await compileProbe('eventstore-port-contract', capabilityProbe)
       assert.equal(result.ok, true, `the original capability probe must compile\n${result.stdout}\n${result.stderr}`)
     })
-    await t.test('WHAT[durable-events-022] the pure result closure compiles all original result cases', async () => {
+    await t.test('WHAT[durable-events-022] the pure result closure compiles all settlement cases and evidence', async () => {
       const result = await compileProbe('eventstore-append-result-contract', resultProbe)
-      assert.equal(result.ok, true, `all original result cases must compile\n${result.stdout}\n${result.stderr}`)
+      assert.equal(result.ok, true, `all settlement cases and evidence must compile\n${result.stdout}\n${result.stderr}`)
     })
     await t.test('WHAT[durable-events-022] the pure result closure rejects the identical append capability', async () => {
       const result = await compileProbe('eventstore-append-result-contract', capabilityProbe)
@@ -629,17 +684,30 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
   const JOURNAL_OUTCOME_PROBE = [
     'namespace Wanxiangshu.Probe',
     'open Wanxiangshu.Foundation.Identity',
+    'open Wanxiangshu.Persistence.EventStore',
     'open Wanxiangshu.Persistence.Journal.JournalOutcome',
     'module ProbeJournalOutcome =',
     '    let eventId = EventId.create "contract-probe"',
+    '    let cause = System.InvalidOperationException "native cause"',
+    '    let unknown: AppendCommitUnknownEvidence =',
+    '        { Requested = []; Prepared = { DurableEvents = []; Cuts = [] };',
+    '          Primary = { Phase = AppendPhase.StoreRelease; Cause = cause }; CleanupFailures = [] }',
+    '    let noNewWrite: AppendNoNewWriteReleaseFailure =',
+    '        { Requested = []; Prepared = None; Cause = cause }',
+    '    let poison: JournalAppendPoison =',
+    '        { FailedEventId = eventId; Error = AppendError.CommitUnknown unknown }',
     '    let outcomes: CommitResult<int> list =',
     '        [ Committed 1; Rejected(eventId, "cut");',
     '          NotAttempted(eventId, WriterClosing);',
-    '          CommitUnknown(eventId, WriteFailed "write") ]',
+    '          CommitUnknown(eventId, WriteFailed "write");',
+    '          CommitUnknown(eventId, StoreAppendUnknown unknown);',
+    '          CommitResult.NoNewWriteReleaseFailed(eventId, noNewWrite) ]',
     '    let failures =',
     '        [ WriteUnknown(eventId, WriteFailed "write");',
     '          WriteUnknown(eventId, FlushFailed "flush");',
-    '          WriterUnavailable(eventId, WriterPoisoned "first");',
+    '          WriteUnknown(eventId, StoreAppendUnknown unknown);',
+    '          JournalAppendFailure.NoNewWriteReleaseFailed(eventId, noNewWrite);',
+    '          WriterUnavailable(eventId, WriterPoisoned poison);',
     '          WriterUnavailable(eventId, WriterClosing);',
     '          WriterUnavailable(eventId, WriterDisposed);',
     '          FactRejected(eventId, { Fact = "fact"; Reason = "cut" }) ]',

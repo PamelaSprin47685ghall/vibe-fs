@@ -6,6 +6,11 @@ import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
+const purePersistenceResults = new Set([
+  resolve(ROOT, 'src/Wanxiangshu/Persistence/Journal/Outcome.fs'),
+  resolve(ROOT, 'src/Wanxiangshu/Persistence/EventStore/Model.fs'),
+  resolve(ROOT, 'src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs'),
+])
 
 const assertRecoveryClosure = (inventory, root) => {
   const visited = new Set()
@@ -15,8 +20,10 @@ const assertRecoveryClosure = (inventory, root) => {
     const project = inventory.projects.get(path)
     assert.ok(project, `referenced project must exist: ${path}`)
     for (const file of project.implementationFiles) {
-      assert.doesNotMatch(file, /\/(?:Persistence\/(?:Journal|EventStore)|Composition\/Durable|Process|OpenCode\/Tools)\//,
-        `recovery must not acquire durable composition or physical implementations: ${file}`)
+      if (!purePersistenceResults.has(file)) {
+        assert.doesNotMatch(file, /\/(?:Persistence\/(?:Journal|EventStore)|Composition\/Durable|Process|OpenCode\/Tools)\//,
+          `recovery must not acquire durable composition or physical implementations: ${file}`)
+      }
       assert.doesNotMatch(file, /\/(?:PluginRuntimeScope|ToolRuntimeScope|HostSignalBootstrap|SharedTerminalBus)\.fs$/,
         `recovery must not acquire a concrete host runtime: ${file}`)
     }

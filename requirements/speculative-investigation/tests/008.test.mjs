@@ -182,6 +182,57 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_integrator_Current_reflec
     assert.deepEqual(Strength.projectionTraceRange('d1', projection), { startInclusive: 10n, endExclusive: 12n })
   } finally { local.close() }
 })
+
+const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+const { createAppendFailureStore } = await import('../../../dist/Persistence/EventStore/Surface.js')
+const { replaySettlementThroughBoot } = await import('../../../dist/OpenCode/Host/PluginHooksSurface.js')
+
+for (const completed of [false, true]) {
+  test(`WHAT[speculative-investigation-008] actual Boot to Replay ${completed ? 'completed Prepared request preserves typed append settlement through the real fuse' : 'uncompleted Prepared request performs no consumption append'}`, async () => {
+    await withExecutablePlugin(async () => {
+      const local = createLocalEventStore()
+      try {
+        const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
+          { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual readonly material' },
+        ] }]).value
+        assert.equal((await append(local.store, Strength.eventRequested({
+          decisionId: 'd1', ownerSessionId: 'owner',
+          ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
+          sourcePhysicalUserMessageId: 'user-1', sourceProviderRun: 'run-1',
+          sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: Strength.protocolRevision,
+        }))).ok, true)
+        assert.equal((await append(local.store, Strength.eventBound('d1', 'run-1', 'replica', 'anchor-a'))).ok, true)
+        assert.deepEqual(await Strength.durabilityPublishPrepared(Strength.durabilityCreate(local.store), {
+          ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'run-1',
+          replicaSessionId: 'replica', anchorDigest: 'anchor-a', bundle,
+        }), { kind: 'Published' })
+        const cause = new Error('original Replay promotion durability cause')
+        const cleanupCause = new Error('original Replay promotion release cause')
+        const observed = []
+        const failing = createAppendFailureStore(local.store, {
+          code: 'CommitUnknown', phase: 'DurabilityBarrier', cause,
+          cleanupFailures: [{ phase: 'StoreRelease', cause: cleanupCause }],
+        }, (result) => observed.push(result))
+        const result = await replaySettlementThroughBoot({}, failing, completed)
+        assert.equal(observed.length, completed ? 1 : 0, 'the actual completed-request reconciliation decides consumption')
+        assert.equal(Strength.projectionIsPromoted('d1', Strength.storeCurrent(local.store)), false,
+          'controlled adapter failure does not claim a durable promotion')
+        if (!completed) {
+          assert.equal(result.completed, true)
+          assert.equal(result.fuseReason, null)
+          return
+        }
+        assert.equal(result.completed, false)
+        assert.equal(typeof result.fuseReason, 'string', 'the actual Boot-owned monotonic fuse was tripped')
+        assert.equal(result.typedFailure, true, 'Boot fuse must not replace StrengthAppendException with a generic exception')
+        assert.equal(result.eventId, observed[0].requested[0].id)
+        assert.equal(result.matchesAppendError(observed[0].originalError), true)
+        assert.strictEqual(result.cause, cause)
+        assert.strictEqual(observed[0].error.cleanupFailures[0].cause, cleanupCause)
+      } finally { local.close() }
+    })
+  })
+}
 }
 
 {

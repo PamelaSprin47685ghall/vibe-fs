@@ -391,6 +391,7 @@ module PluginHooks =
                     removePendingCheckpoint key
                     settledTodoCheckpointCalls.Remove(key) |> ignore
                 | JournalAppendFailure.WriteUnknown _
+                | JournalAppendFailure.NoNewWriteReleaseFailed _
                 | JournalAppendFailure.FactRejected _ -> ()
 
             let appendTerminalCheckpoint key sessionText callId =

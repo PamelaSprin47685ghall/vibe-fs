@@ -105,6 +105,7 @@ module TransactionSurface =
         | ManagedChatAcceptanceError.AuthorityRegistrationRejected _ -> "AuthorityRegistrationRejected"
         | ManagedChatAcceptanceError.NotAttempted _ -> "NotAttempted"
         | ManagedChatAcceptanceError.CommitUnknown _ -> "CommitUnknown"
+        | ManagedChatAcceptanceError.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
         | ManagedChatAcceptanceError.AttemptEvidenceInvalid _ -> "AttemptEvidenceInvalid"
         | ManagedChatAcceptanceError.AttemptKeyMismatch _ -> "AttemptKeyMismatch"
         | ManagedChatAcceptanceError.EstablishedEvidenceConflict _ -> "EstablishedEvidenceConflict"

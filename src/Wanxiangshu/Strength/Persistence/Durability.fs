@@ -41,6 +41,8 @@ module StrengthDurability =
                 | Error(PublishError.StorageInvalid error) ->
                     return StrengthPreparedPublish.StorageInvalid(sprintf "%A" error)
                 | Error(PublishError.SemanticCut cut) -> return StrengthPreparedPublish.Rejected cut.Reason
+                | Error(PublishError.AppendSettlementFailed(eventId, failure)) ->
+                    return StrengthPreparedPublish.SettlementFailed(eventId, failure)
                 | Error error -> return StrengthPreparedPublish.Rejected(sprintf "%A" error)
             }
 
@@ -48,10 +50,12 @@ module StrengthDurability =
             task {
                 match! StrengthStore.append store HostDigest.sha256Hex event with
                 | Ok _ -> return StrengthDurableAppend.Applied
-                | Error(AppendError.SemanticCut cut) -> return StrengthDurableAppend.SemanticRejected cut.Reason
-                | Error(AppendError.StorageInvalid error) ->
+                | Error(_, AppendError.SemanticCut cut) -> return StrengthDurableAppend.SemanticRejected cut.Reason
+                | Error(_, AppendError.StorageInvalid error) ->
                     return StrengthDurableAppend.StorageInvalid(sprintf "%A" error)
-                | Error err -> return StrengthDurableAppend.StorageFailed(sprintf "%A" err)
+                | Error(_, AppendError.AppendFailed reason) ->
+                    return StrengthDurableAppend.StorageFailed(sprintf "%A" (AppendError.AppendFailed reason))
+                | Error(eventId, failure) -> return StrengthDurableAppend.SettlementFailed(eventId, failure)
             }
 
         { LoadProjection = loadProjection

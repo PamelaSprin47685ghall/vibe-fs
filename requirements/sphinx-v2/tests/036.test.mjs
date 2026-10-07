@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {createHash} from 'node:crypto'
-import {accessSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync} from 'node:fs'
+import {createHash, randomUUID} from 'node:crypto'
+import {accessSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -238,7 +238,7 @@ async function withSphinxStdio(t, scenario, options = {}) {
   // SDK 默认安全环境加本次目录，不继承父测试的 fatal-disable 或 NODE_OPTIONS。
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [entryPath],
+    args: [...(options.importModule === undefined ? [] : ['--import', options.importModule]), entryPath],
     cwd: commonDir,
     env: {
       SPHINX_COMMON_DIR: commonDir,
@@ -749,6 +749,63 @@ test('WHAT[sphinx-v2-036] configured real stdio start persists byte-exact goals 
     else t.diagnostic('N06_A_FAILURE_EVIDENCE: shared durable directory retained at ' + commonDir)
   }
 })
+
+for (const operation of ['start', 'cancel']) {
+  test(`WHAT[sphinx-v2-036] actual_${operation}_release_failure_is_a_terminal_unknown_with_its_original_command`, async t => {
+    const commonDir = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-settlement-')))
+    const loader = fileURLToPath(new URL('./settlement-release-loader.mjs', import.meta.url))
+    const command = {commandId: 'positive-start', goalText: '初始事实\r\n雪 尾部  ', constraints: [],
+      materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
+    let failedReply
+    let evidence
+    let exported
+    let last
+    let closed = false
+    try {
+      await withSphinxStdio(t, async session => {
+        const first = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'positive.start'), 'created', 'positive.start')
+        const commandId = 'uncertain-' + operation
+        writeFileSync(join(commonDir, 'settlement-arm.json'), JSON.stringify({commandId}))
+        failedReply = await session.callTool(operation === 'start' ? 'sphinx_inquiry_start' : 'sphinx_inquiry_cancel',
+          operation === 'start' ? {...command, commandId, goalText: '新的真实事实\r\n尾部  '}
+            : {commandId, inquiryId: first.inquiryId, reason: 'authorized stop'}, 'uncertain.' + operation)
+        evidence = JSON.parse(readFileSync(join(commonDir, 'settlement-release.json'), 'utf8'))
+        assert.equal(evidence.releaseCalls, 1)
+        assert.equal(evidence.lockReleased, true)
+        assert.notEqual(evidence.pid, process.pid)
+        assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+        assert.equal(readFileSync(evidence.sourceFile, 'base64'), evidence.bytes)
+        const lines = Buffer.from(evidence.bytes, 'base64').toString('utf8').trimEnd().split('\n').map(JSON.parse)
+        assert.equal(lines.length, 2, 'Only the positive control and one failed invocation append; no automatic retry')
+        last = lines.at(-1)
+        assert.equal(last.payload.commandId, commandId)
+        assert.equal(last.payload.events[0].case, operation === 'start' ? 'InquiryCreated' : 'CancelRequested')
+        exported = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: last.payload.inquiry, mode: 'full'},
+          'uncertain.export'), 'exported', 'uncertain.export')
+        assert.equal(exported.events.at(-1).event_id, last.event_id)
+      }, {commonDir, startConfig, importModule: loader})
+      closed = true
+      const coldWriter = randomUUID()
+      const cold = Wire.create(commonDir, coldWriter, null)
+      try {
+        assert.deepEqual(Wire.exportInquiry(cold, {inquiryId: last.payload.inquiry, mode: 'full'}), exported)
+        assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', `${coldWriter}.ndjson`)), false)
+        assert.equal(readFileSync(evidence.sourceFile, 'base64'), evidence.bytes)
+      } finally { Wire.dispose(cold) }
+      t.diagnostic(JSON.stringify({operation, physicalAndCold: true, sourcePid: evidence.pid, coldPid: process.pid}))
+      const refusal = mcpRefusal(failedReply, 'actual Release uncertainty')
+      assert.equal(refusal.code, 'COMMIT_UNKNOWN')
+      assert.equal(refusal.path, 'inquiryId')
+      for (const identity of [last.payload.inquiry, last.payload.commandId, last.event_id, evidence.cause]) {
+        assert.ok(refusal.message.includes(identity), identity)
+      }
+      assert.match(refusal.message, /Reconcile the durable record before any retry/)
+    } finally {
+      if (closed) rmSync(commonDir, {recursive: true, force: true})
+      else t.diagnostic('SPHINX_SETTLEMENT_FAILURE_EVIDENCE: retained ' + commonDir)
+    }
+  })
+}
 
 test.todo('WHAT[sphinx-v2-036] registered writable MCP tools drive durable creation, work claim, result admission and authorized goal amendment through the single runtime')
 test.todo('WHAT[sphinx-v2-036] status/export over real stdio read an existing inquiry without creating leases, calling models or changing business state; receipts and dispatch observers need positive controls')

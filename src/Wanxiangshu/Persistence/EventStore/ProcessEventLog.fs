@@ -32,6 +32,16 @@ type StoreFileGate internal (releaseFn: obj) =
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
 
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendCompletion =
+        | NoAppend
+        | AppendDurable
+
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendFailure =
+        | BeforeAppend of AppendFault
+        | AfterAppend of primary: AppendFault * cleanupFailures: AppendFault list
+
     [<Import("default", "node:fs")>]
     let private nodeFs: obj = jsNative
 
@@ -276,6 +286,28 @@ module ProcessEventLog =
 
     let filePath (log: ProcessEventLog) = log.FilePath
 
+    let private tryAppendFault phase action =
+        try
+            Ok(action ())
+        with cause ->
+            Error { Phase = phase; Cause = cause }
+
+    let private closeAfterBarrier fd barrier =
+        let closed = tryAppendFault AppendPhase.DurabilityClose (fun () -> closeSync fd)
+
+        match barrier, closed with
+        | Ok(), Ok() -> Ok PhysicalAppendCompletion.AppendDurable
+        | Error primary, Ok() -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok(), Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Error primary, Error cleanup -> Error(PhysicalAppendFailure.AfterAppend(primary, [ cleanup ]))
+
+    let private appendDurabilityBarrier path =
+        match tryAppendFault AppendPhase.DurabilityOpen (fun () -> openSync path "r+") with
+        | Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok fd ->
+            tryAppendFault AppendPhase.DurabilityBarrier (fun () -> fsyncSync fd)
+            |> closeAfterBarrier fd
+
     let private durabilityBarrier path =
         let fd = openSync path "r+"
 
@@ -284,18 +316,34 @@ module ProcessEventLog =
         finally
             closeSync fd
 
+    let private appendBytes (log: ProcessEventLog) text =
+        match tryAppendFault AppendPhase.PhysicalAppend (fun () -> AppendAllText log.FilePath text "utf8") with
+        | Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok() -> appendDurabilityBarrier log.FilePath
+
+    let private appendEncoded (log: ProcessEventLog) text =
+        match
+            tryAppendFault AppendPhase.BeforePhysicalAppend (fun () -> ensureDirectory (eventsDirectory log.CommonDir))
+        with
+        | Error primary -> Error(PhysicalAppendFailure.BeforeAppend primary)
+        | Ok() -> appendBytes log text
+
     /// One semantic append = one sequence of complete canonical JSON+LF lines.
     /// Existing bytes are never read or rewritten.
-    let append (log: ProcessEventLog) (events: EventEnvelope list) : unit =
-        let text =
-            events
-            |> List.map (EventEnvelope.normalize >> CanonicalEventCodec.encode)
-            |> String.concat ""
+    let append
+        (log: ProcessEventLog)
+        (events: EventEnvelope list)
+        : Result<PhysicalAppendCompletion, PhysicalAppendFailure> =
+        let encoded =
+            tryAppendFault AppendPhase.BeforePhysicalAppend (fun () ->
+                events
+                |> List.map (EventEnvelope.normalize >> CanonicalEventCodec.encode)
+                |> String.concat "")
 
-        if text.Length > 0 then
-            ensureDirectory (eventsDirectory log.CommonDir)
-            AppendAllText log.FilePath text "utf8"
-            durabilityBarrier log.FilePath
+        match encoded with
+        | Error primary -> Error(PhysicalAppendFailure.BeforeAppend primary)
+        | Ok "" -> Ok PhysicalAppendCompletion.NoAppend
+        | Ok text -> appendEncoded log text
 
     let private decodeWriterLine (label: string) (line: string) : Result<EventEnvelope, StorageInvalid> =
         if String.IsNullOrEmpty line then

@@ -928,6 +928,7 @@ module DispatchSurface =
                 | ManagedChatAcceptanceError.ProjectionConflictAfterCommit _ -> "ProjectionConflictAfterCommit"
                 | ManagedChatAcceptanceError.NotAttempted _ -> "NotAttempted"
                 | ManagedChatAcceptanceError.CommitUnknown _ -> "CommitUnknown"
+                | ManagedChatAcceptanceError.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
                 | ManagedChatAcceptanceError.FactRejected _ -> "FactRejected"
 
             box
