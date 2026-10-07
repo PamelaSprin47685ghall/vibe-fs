@@ -5,6 +5,8 @@ import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
+import { Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import test from 'node:test'
 import { create } from 'tar'
 import { fixturePhase } from './fixture-phase.mjs'
@@ -42,14 +44,21 @@ function selectedNpmRoot() {
 async function archiveTools(root) {
   const archivePath = path.join(root, 'tools.tar')
   fixturePhase('node-tools:archive-enter', { archivePath })
-  const chunks = []
-  for await (const chunk of create({ cwd: path.join(root, 'selected'), portable: true, noMtime: true }, ['toolchain'])) {
-    chunks.push(chunk)
-  }
-  const bytes = Buffer.concat(chunks)
-  fs.writeFileSync(archivePath, bytes)
-  fixturePhase('node-tools:archive-written', { archivePath, bytes: bytes.length })
-  return { archivePath, archiveSha256: sha256(bytes), parentDirectory: path.join(root, 'candidates') }
+  const digest = createHash('sha256')
+  let bytes = 0
+  await pipeline(
+    create({ cwd: path.join(root, 'selected'), portable: true, noMtime: true }, ['toolchain']),
+    new Transform({
+      transform(chunk, _encoding, callback) {
+        digest.update(chunk)
+        bytes += chunk.length
+        callback(null, chunk)
+      },
+    }),
+    fs.createWriteStream(archivePath),
+  )
+  fixturePhase('node-tools:archive-written', { archivePath, bytes })
+  return { archivePath, archiveSha256: digest.digest('hex'), parentDirectory: path.join(root, 'candidates') }
 }
 
 export function registerNodeToolCandidateTests() {

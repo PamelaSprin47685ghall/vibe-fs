@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-07最新[W1流式工具归档](../W1工具归档流式输出-2026-10-07.md)有限完成：gen295完整016单次288pass/0fail/19skip/2TODO、1/1排空，worker167.083317s、outer10612 accepted=true20.012ms，前后输入一致。标准pipeline及增量SHA/bytes替代整archive缓存拷贝，每次真实变异仍新archive；未删测试/复用owner/改原CI预算。W0及官方K2C成本原件保留，Darwin单次wall不证明Linux全量恢复。下一按总计划G1，J3与D0-P另包；以下旧“下一”仅保历史。
+
 最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。[CI夹具续修](../CI夹具门禁与703收据-2026-10-07.md)保703的823/824截断及0e949完整824/824、4822/3原件；三个夹具修正后gen250相关14/14、170pass/0fail/0skip/3TODO，仅pending。ac88官方CI三个原失败文件均exit0，但797/824截断、2active/25queued且descendant observation deadline失败，无全局summary；后来的单group accepted不撤销该失败。完整CI、稳定吞吐与完整Host仍开放；产品Sphinx S0/S1已有限完成，下一K1 Casebook owner，见总计划与08卡。
 
 最新按[CLI前置与CI续接](../archive/2026-10-07/迁移CLI前置与CI续接-2026-10-07.md)：非法版本模块加载有限卡已完成，正式15/3红→相关19/235/0，合法dry-run与完整备份保持。4c3实际CI745/824截断，CE026旧忙碌断言按新合同补验7/0、完整capability193/0。下面2d2e与“候选未实施”只保历史；原预算、未知库存与整体吞吐边界不变，新头CI另验。
