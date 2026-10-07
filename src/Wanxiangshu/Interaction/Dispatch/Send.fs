@@ -631,13 +631,20 @@ module PromptDispatcherSend =
                     }
 
                 let dispatchClaimedContinuation () =
-                    match physicalSendAdmission physicalAdmission with
+                    let admission =
+                        match this.RequireActiveProfile sessionId profile with
+                        | Error error -> Error(PromptDispatcher.SendAttemptOutcome.Failed error)
+                        | Ok() ->
+                            physicalSendAdmission physicalAdmission
+                            |> Result.mapError PromptDispatcher.SendAttemptOutcome.AdmissionRejected
+
+                    match admission with
                     | Error failure ->
                         releaseRegistration registration
 
                         this.Abandon key sessionId PromptAbandonReason.SupersededBeforePhysicalSend
                         |> TaskValue.map (function
-                            | Ok() -> PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure
+                            | Ok() -> failure
                             | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error)
                     | Ok() ->
                         task {
@@ -667,50 +674,55 @@ module PromptDispatcherSend =
             (tools: Map<string, bool> option)
             (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             : Task<PromptDispatcher.SendAttemptOutcome> =
-            task {
-                let origin = PromptAuthority.PromptOrigin.Continuation continuation
-                let originLabel = PromptDispatcher.originLabel origin
+            let claimAndSend () =
+                task {
+                    let origin = PromptAuthority.PromptOrigin.Continuation continuation
+                    let originLabel = PromptDispatcher.originLabel origin
 
-                let key =
-                    deriveKey
-                        (this.ProjectionFor sessionId)
-                        sessionId
-                        (Some profile.LogicalRunId)
-                        (Some profile.AuthorityRootUserMessageId)
-                        origin
-                        payloadDigest
-
-                let claim =
-                    PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
-
-                let claimed =
-                    PromptSessionFact.PromptClaimed
-                        {| PromptKey = key
-                           SessionId = sessionId
-                           ContinuationKind = originLabel
-                           LogicalRunId = claim.LogicalRunId
-                           AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
-                           IdentitySeed = claim.IdentitySeed
-                           PayloadDigest = payloadDigest |}
-
-                match! this.Persist sessionId None claimed with
-                | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
-                | Ok() ->
-                    return!
-                        this.SendClaimedContinuation
-                            port
+                    let key =
+                        deriveKey
+                            (this.ProjectionFor sessionId)
                             sessionId
-                            text
-                            originLabel
-                            profile
-                            directory
-                            awaitMode
-                            onAccepted
-                            onSendObserved
-                            tools
-                            physicalAdmission
-                            key
-            }
+                            (Some profile.LogicalRunId)
+                            (Some profile.AuthorityRootUserMessageId)
+                            origin
+                            payloadDigest
+
+                    let claim =
+                        PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
+
+                    let claimed =
+                        PromptSessionFact.PromptClaimed
+                            {| PromptKey = key
+                               SessionId = sessionId
+                               ContinuationKind = originLabel
+                               LogicalRunId = claim.LogicalRunId
+                               AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
+                               IdentitySeed = claim.IdentitySeed
+                               PayloadDigest = payloadDigest |}
+
+                    match! this.Persist sessionId None claimed with
+                    | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
+                    | Ok() ->
+                        return!
+                            this.SendClaimedContinuation
+                                port
+                                sessionId
+                                text
+                                originLabel
+                                profile
+                                directory
+                                awaitMode
+                                onAccepted
+                                onSendObserved
+                                tools
+                                physicalAdmission
+                                key
+                }
+
+            match this.RequireActiveProfile sessionId profile with
+            | Error error -> Task.FromResult(PromptDispatcher.SendAttemptOutcome.Failed error)
+            | Ok() -> claimAndSend ()
 
         member private this.SendContinuationWithDigest
             (port: IDispatchSessionPort)

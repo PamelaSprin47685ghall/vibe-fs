@@ -95,6 +95,20 @@ module DispatchSurface =
         awaitMode: string ->
             Task<obj>
 
+    /// Hold the production dispatcher after its real durable claim append.
+    /// The callback changes scheduling only; all journal operations use the
+    /// production adapter and all admission decisions stay in the dispatcher.
+    val sendContinuationAfterClaim:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        afterClaim: (string -> Task) ->
+            Task<obj>
+
     val sendContinuationWithAcceptance:
         port: obj ->
         handle: JournalHandle ->
@@ -166,6 +180,27 @@ module DispatchSurface =
         promptKey: string ->
         agent: string ->
             Task<obj>
+
+    /// Freeze the real ingress decision before asynchronous Host preparation,
+    /// then accept that same decision through the production dispatcher.
+    val prepareManagedPromptAcceptance:
+        handle: JournalHandle ->
+        session: string ->
+        physicalMessageId: string ->
+        promptKey: string ->
+        agent: string ->
+            (unit -> Task<obj>)
+
+    /// Hold the frozen decision after real physical acceptance is durable,
+    /// before the dispatcher may establish managed execution acceptance.
+    val prepareManagedPromptAcceptanceAfterPhysical:
+        handle: JournalHandle ->
+        session: string ->
+        physicalMessageId: string ->
+        promptKey: string ->
+        agent: string ->
+        afterPhysical: (string -> Task) ->
+            (unit -> Task<obj>)
 
     /// PROMPT-004: accept the external HumanRoot through the same Dispatcher
     /// writer used by chat.message. The physical id is supplied by the caller as

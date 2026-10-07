@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。703官方CI另有两项独立门禁错误与823/824原300秒截断；下一先修夹具注释分类/真实时钟，完整CI及稳定吞吐仍开放。
+
 最新按[CLI前置与CI续接](../archive/2026-10-07/迁移CLI前置与CI续接-2026-10-07.md)：非法版本模块加载有限卡已完成，正式15/3红→相关19/235/0，合法dry-run与完整备份保持。4c3实际CI745/824截断，CE026旧忙碌断言按新合同补验7/0、完整capability193/0。下面2d2e与“候选未实施”只保历史；原预算、未知库存与整体吞吐边界不变，新头CI另验。
 
 本轮有限交付保持回归：gen220相关193/193、1205pass/0fail，完整006/010通过，IPC原300ms与强断言不改。最新已收[2d2e官方PR CI](../archive/2026-10-07/baselines/2d2e-ci/receipt.txt)仍真实失败：format/check/build通过，原300000ms截断738/824排空、2active/84queued，无全局summary；另有requirement-system017对Host033双WHAT锚点的真实失败。只修两标题后native2/0，gen227正式017及Host033通过，不代表新CI已绿。006/010/016未准入，outer3082 accepted10.183ms不是未知库存全清证明。[737共同完整worker成本调查](../archive/2026-10-07/baselines/2d2e-cost/README.md)已交付，active/invalid/missing/queued排除，输入/host差值不作因果。下一有限候选先定非法版本拒绝前实际模块加载观察，保合法dry-run非零正控与原错误、零业务副作用；延后imports的错误优先级先明确。原预算/worker/tier保持，不称CPU收益或N00整体闭合。以下旧“下一核006前提”“先收新CI”由本段接续；正式/installed有限范围见[10月7日记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。

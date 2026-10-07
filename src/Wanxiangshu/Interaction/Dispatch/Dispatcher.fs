@@ -127,10 +127,14 @@ module PromptDispatcher =
         | Error failure -> registrationAppendFailure requested projection failure
 
     let private validateAcceptedProfile
-        (identitySeed: PromptAuthority.IdentitySeed)
+        (claim: PromptAuthority.PromptClaim)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
-        if profile.IdentitySeed = identitySeed then
+        if
+            profile.IdentitySeed = claim.IdentitySeed
+            && claim.LogicalRunId = Some profile.LogicalRunId
+            && claim.AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
+        then
             Ok profile
         else
             Error(
@@ -380,7 +384,7 @@ module PromptDispatcher =
 
                     let acceptedProfileDecision
                         : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
-                        validateAcceptedProfile evidence.IdentitySeed profile
+                        validateAcceptedProfile evidence.Claim profile
 
                     let! acceptedProfile = acceptedProfileDecision
 
@@ -438,6 +442,11 @@ module PromptDispatcher =
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptPendingManagedPrompt evidence
+
+                    do!
+                        this.RequireActiveProfile evidence.Key.SessionId profile
+                        |> Result.mapError ManagedChatAcceptanceError.IntentRejected
+
                     let! witness = accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
                     PromptPhysicalAcceptance.accepted evidence.PromptKey evidence.Key.PhysicalUserMessageId
                     return witness
@@ -672,6 +681,18 @@ module PromptDispatcher =
         /// profile is exactly the thing that must not substitute for one.
         member this.ActiveProfile(sessionId: SessionId) =
             (this.ProjectionFor sessionId).ActiveLogicalRun
+
+        member internal this.RequireActiveProfile sessionId (expected: PromptAuthority.AuthorityExecutionProfile) =
+            match this.ActiveProfile sessionId with
+            | None -> Error "No active authority profile"
+            | Some active when active = expected -> Ok()
+            | Some active ->
+                Error(
+                    sprintf
+                        "Continuation profile does not match the active logical run: active logical run %s, supplied logical run %s"
+                        (LogicalRunId.value active.LogicalRunId)
+                        (LogicalRunId.value expected.LogicalRunId)
+                )
 
         member this.ResolveOrigin
             (physicalMessageId: PhysicalUserMessageId)

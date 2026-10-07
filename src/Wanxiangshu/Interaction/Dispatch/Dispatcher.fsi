@@ -51,6 +51,9 @@ module PromptDispatcher =
         member RuntimeId: RuntimeId
         member ProjectionFor: sessionId: SessionId -> PromptAuthority.PromptAuthorityProjection
 
+        member internal RequireActiveProfile:
+            sessionId: SessionId -> expected: PromptAuthority.AuthorityExecutionProfile -> Result<unit, string>
+
         member internal RunGateNudgeOnce:
             scope: string * send: (unit -> Task<Result<PromptKey, string>>) -> Task<Result<PromptKey, string>>
 

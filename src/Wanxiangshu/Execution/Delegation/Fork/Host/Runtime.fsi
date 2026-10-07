@@ -98,7 +98,9 @@ type HostForkRuntime =
             -> (PhysicalUserMessageId -> unit)
             -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
 
-    member internal SendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+    member internal SendBusyNudge:
+        (string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>)
+
     member internal ParentAbortToken: int
     member IsRetiredHandle: agentId: string -> bool option
     member Complete: run: PendingHostRun * outcome: TerminalOutcome -> unit

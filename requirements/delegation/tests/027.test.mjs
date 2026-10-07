@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
@@ -61,6 +64,94 @@ test('WHAT[delegation-027] busy guidance preserves the original work and complet
     assert.match(joined, /SECOND-DONE/)
   })
 })
+
+for (const byname of ['Ada', 'devops']) {
+for (const replacement of ['active', 'finished', 'successor']) {
+  test(`WHAT[delegation-027] prepared busy guidance for ${byname} stays bound to the original ${replacement} work`, async () => {
+    const owner = `busy-guidance-${byname}-${replacement}`
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-busy-guidance-'))
+    const preparing = Promise.withResolvers()
+    const release = Promise.withResolvers()
+    let attachmentSession
+    const runtime = await forkTool.createRuntimeWithWorkRecordRead(directory, [{ sessionId: owner, agent: 'manager' }], async session => {
+      if (session === attachmentSession) {
+        preparing.resolve()
+        await release.promise
+      }
+    })
+    try {
+      forkTool.acceptNextPrompt(runtime)
+      await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Source', 'ATTACHMENT-SOURCE')
+      attachmentSession = forkTool.child(runtime)
+      assert.equal(await forkTool.settle(runtime, owner, 'SOURCE-DONE', 'source-provider'), true)
+      forkTool.acceptNextPrompt(runtime)
+      if (byname === 'devops') {
+        await forkTool.injectAcceptedAssessment(runtime, owner)
+        assert.match(await forkTool.executeManagerResume(runtime, toolModule, owner, '', byname, 'ORIGINAL-WORK'), /carries this charge now/)
+      } else {
+        assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', byname, 'ORIGINAL-WORK'), /carries this charge now/)
+      }
+      const original = forkTool.workSnapshot(runtime, owner)
+      const originalHandoff = forkTool.handoffSnapshot(runtime)
+      assert.ok(originalHandoff.length > 0, 'the completed attachment source established a real handoff frontier')
+      const listeners = forkTool.terminalListenerCount(runtime)
+      const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'ORIGINAL-DONE', 'original-provider')
+      const guidance = forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
+      await preparing.promise
+      assert.equal(forkTool.promptCount(runtime), 1, 'attachment preparation has not sent guidance')
+      if (replacement !== 'active') {
+        await completeOriginal()
+        assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.byname === byname).lifecycle, 'CompletedAwaitingJoin')
+      }
+      if (replacement === 'successor') {
+        forkTool.acceptNextPrompt(runtime)
+        await forkTool.executeManagerResume(runtime, toolModule, owner, '', byname, 'SUCCESSOR-WORK')
+      }
+      const beforeRelease = forkTool.workSnapshot(runtime, owner)
+      const handoffBeforeRelease = forkTool.handoffSnapshot(runtime)
+      const countBeforeRelease = forkTool.promptCount(runtime)
+      forkTool.acceptNextPrompt(runtime)
+      release.resolve()
+      const result = await guidance
+      if (replacement === 'active') {
+        assert.match(result, /Guidance for .* has been appended/)
+        assert.equal(forkTool.promptCount(runtime), countBeforeRelease + 1)
+        assert.match(forkTool.prompt(runtime, countBeforeRelease), /ORIGINAL-GUIDANCE/)
+        assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
+        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
+        assert.equal(forkTool.terminalListenerCount(runtime), listeners)
+        forkTool.acceptNextPrompt(runtime)
+        await forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
+        assert.equal(forkTool.promptCount(runtime), countBeforeRelease + 2, 'identical text is a real independent guidance send')
+        assert.equal(forkTool.prompt(runtime, countBeforeRelease + 1), forkTool.prompt(runtime, countBeforeRelease))
+        assert.notEqual(forkTool.promptEvidence(runtime, countBeforeRelease + 1).promptKey, forkTool.promptEvidence(runtime, countBeforeRelease).promptKey)
+        assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
+        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
+        await completeOriginal()
+      } else {
+        assert.equal(result, '# The charge could not be placed.\n')
+        assert.equal(forkTool.promptCount(runtime), countBeforeRelease, 'stale guidance never reaches Host')
+        assert.deepEqual(forkTool.workSnapshot(runtime, owner), beforeRelease)
+        assert.deepEqual(forkTool.handoffSnapshot(runtime), handoffBeforeRelease)
+        if (replacement === 'successor') {
+          assert.doesNotMatch(forkTool.prompt(runtime, countBeforeRelease - 1), /ORIGINAL-GUIDANCE/)
+          const completeSuccessor = await forkTool.prepareTerminalDelivery(runtime, owner, 'SUCCESSOR-DONE', 'successor-provider')
+          await completeSuccessor()
+        }
+      }
+      assert.equal(forkTool.abortCount(runtime), 0)
+      assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), forkTool.workSnapshot(runtime, owner))
+      const joined = await forkTool.executeJoin(runtime, owner)
+      assert.match(joined, /ORIGINAL-DONE/)
+      if (replacement === 'successor') assert.match(joined, /SUCCESSOR-DONE/)
+    } finally {
+      release.resolve()
+      forkTool.disposeRuntime(runtime)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+}
 
 for (const phase of ['GUIDANCE', 'GUIDANCE_STOP']) {
 integrationTest(`WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child ${phase === 'GUIDANCE_STOP' ? 'final output' : 'tool step'}`, () => {

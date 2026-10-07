@@ -626,12 +626,10 @@ module HostForkAgent =
         }
 
     let private appendGuidanceToRun (runtime: HostForkRuntime) (run: PendingHostRun) prompt =
-        task {
-            match HostForkBinding.managedAgent runtime.Journal run.ChildId with
-            | None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" run.AgentId)
-            | Some agent ->
-                let! sent = runtime.SendBusyNudge run.AgentId run.ChildId run.Role agent prompt
-                return sent |> Result.map (fun () -> ForkResult.Nudged run.AgentId)
+        taskResult {
+            let! profile = HostForkBusyNudge.profileForRun runtime.Journal run
+            do! runtime.SendBusyNudge run.AgentId run.ChildId profile prompt
+            return ForkResult.Nudged run.AgentId
         }
 
     let private activeRun (runtime: HostForkRuntime) agentId =
@@ -769,10 +767,23 @@ module HostForkAgent =
                             preparedHandoff
             }
 
-        member this.AppendGuidance(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
-            task {
-                match this.IsCancelling, activeRun this agentId with
-                | true, _ -> return Error "Parent cancellation is in progress"
-                | false, None -> return Error(sprintf "Agent has no active assignment: %s" agentId)
-                | false, Some run -> return! appendGuidanceToRun this run prompt
+        member this.ActiveGuidanceProfile(agentId: string) =
+            match activeRun this agentId with
+            | None -> Error(sprintf "Agent has no active assignment: %s" agentId)
+            | Some run -> HostForkBusyNudge.profileForRun this.Journal run
+
+        member this.AppendGuidance
+            (agentId: string, expected: PromptAuthority.AuthorityExecutionProfile, prompt: string)
+            : Task<Result<ForkResult, string>> =
+            taskResult {
+                do! Result.requireFalse "Parent cancellation is in progress" this.IsCancelling
+
+                let! run =
+                    activeRun this agentId
+                    |> Result.requireSome (sprintf "Agent has no active assignment: %s" agentId)
+
+                let! current = HostForkBusyNudge.profileForRun this.Journal run
+                do! Result.requireTrue "Busy guidance assignment has changed" (current = expected)
+                do! this.SendBusyNudge agentId run.ChildId expected prompt
+                return ForkResult.Nudged agentId
             }

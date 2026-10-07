@@ -474,7 +474,13 @@ module ForkToolSurface =
                         )
         }
 
-    let private createRuntimeUsingAbort directory owners abortSession cancelSignals : Task<obj> =
+    let private createRuntimeUsingAbort
+        directory
+        owners
+        abortSession
+        cancelSignals
+        (beforeWorkRecord: (string -> Task) option)
+        : Task<obj> =
         emitJsExpr () "process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'" |> ignore
 
         task {
@@ -514,6 +520,19 @@ module ForkToolSurface =
                     fun sessionId range ->
                         LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
 
+            let parentWorkRecord sessionId =
+                task {
+                    match beforeWorkRecord with
+                    | Some observe -> do! observe sessionId
+                    | None -> ()
+
+                    return!
+                        LifecycleWorkRecordProjection.lifecycleWorkRecord
+                            (Some journal)
+                            (SessionId.create sessionId)
+                            true
+                }
+
             let scope =
                 new ToolRuntimeScope(
                     sessions,
@@ -526,7 +545,7 @@ module ForkToolSurface =
                     (fun _ -> None),
                     Dictionary<string, string>(),
                     None,
-                    None,
+                    Some parentWorkRecord,
                     None,
                     None,
                     cancelSignals,
@@ -540,7 +559,10 @@ module ForkToolSurface =
         }
 
     let createRuntime (directory: string) (owners: obj) : Task<obj> =
-        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok())) None
+        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok())) None None
+
+    let createRuntimeWithWorkRecordRead (directory: string) (owners: obj) (beforeRead: string -> Task) : Task<obj> =
+        createRuntimeUsingAbort directory owners (fun _ -> Task.FromResult(Ok())) None (Some beforeRead)
 
     let createRuntimeWithCancelSignals
         (directory: string)
@@ -552,6 +574,7 @@ module ForkToolSurface =
             owners
             (fun _ -> Task.FromResult(Ok()))
             (Some(fun sessionIds -> sessionIds |> Seq.map SessionId.value |> Seq.toArray |> cancelSignals))
+            None
 
     let createRuntimeWithAbort (directory: string) (owners: obj) (abortSession: string -> Task<obj>) : Task<obj> =
         let abort sessionId =
@@ -565,7 +588,7 @@ module ForkToolSurface =
                         Error(string result?error)
             }
 
-        createRuntimeUsingAbort directory owners abort None
+        createRuntimeUsingAbort directory owners abort None None
 
     let private managerContext (harness: ForkHarness) owner =
         { SessionId = SessionId.value (harness.OwnerSession owner)
@@ -693,6 +716,30 @@ module ForkToolSurface =
 
             return! spec.Execute args (managerContext harness owner)
         }
+
+    let executeManagerResumeWithAttachment
+        (value: obj)
+        (toolModule: obj)
+        (owner: string)
+        (byname: string)
+        (charge: string)
+        (attach: string)
+        : Task<string> =
+        let harness = unbox<ForkHarness> value
+        let spec = ForkTool.resumeSpec (ToolHostCodec.factory toolModule) harness.Scope
+
+        let args =
+            HostToolArguments(
+                box
+                    {| calling = null
+                       name = byname
+                       charge = charge
+                       keywords = null
+                       attach = attach
+                       expected_tool_calls = null |}
+            )
+
+        spec.Execute args (managerContext harness owner)
 
     let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
         task {
@@ -1045,6 +1092,15 @@ module ForkToolSurface =
         |> HandleProjection.workRecords
         |> List.map workView
         |> List.toArray
+
+    let handoffSnapshot (value: obj) : obj array =
+        (AgentJournal.snapshot (unbox<ForkHarness> value).Journal)
+            .AgentProjections.DelegationCompletedHandoffs
+        |> Map.toArray
+        |> Array.map (fun (key, sequence) ->
+            box
+                {| key = key
+                   sequence = string sequence |})
 
     let coldWorkSnapshot (directory: string) (owner: string) : Task<obj array> =
         task {

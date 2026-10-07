@@ -40,6 +40,18 @@ open Wanxiangshu.Composition.Durable
 /// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =
 
+    let profileForRun (journal: AgentJournal option) (run: PendingHostRun) =
+        let profile =
+            journal
+            |> Option.bind (fun durable ->
+                PromptAuthorityProjectionQueries.activeProfile
+                    run.ChildId
+                    (AgentJournal.snapshot durable).AgentProjections)
+
+        match profile with
+        | Some active when not run.Finished && active.AuthorityRootUserMessageId = run.AuthorityRoot -> Ok active
+        | _ -> Error "Busy nudge requires the original active assignment"
+
     /// Continuation of the child's active Logical Run. Never creates a new
     /// Authority Root / RunId / completion.
     ///
@@ -78,28 +90,11 @@ module HostForkBusyNudge =
             return sendResult sent
         }
 
-    let private sendWithJournal
-        (sessions: ISessionHostPort)
-        (j: AgentJournal)
-        (childId: SessionId)
-        (directory: string option)
-        (prompt: string)
-        =
-        task {
-            let snapshot = AgentJournal.snapshot j
-
-            match PromptAuthorityProjectionQueries.activeProfile childId snapshot.AgentProjections with
-            | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
-            | Some profile -> return! sendWithProfile sessions j childId profile directory prompt
-        }
-
     let send
         (sessions: ISessionHostPort)
-        (_parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (_role: Role)
-        (agent: string)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
         (directory: string option)
         (prompt: string)
         : Task<Result<unit, string>> =
@@ -107,9 +102,9 @@ module HostForkBusyNudge =
             match journal with
             | None ->
                 return Error "Busy nudge requires an AgentJournal: PROMPT-005 admits no sender outside the Dispatcher"
-            | Some j -> return! sendWithJournal sessions j childId directory prompt
+            | Some j -> return! sendWithProfile sessions j childId profile directory prompt
         }
 
-    let sender sessions parentId journal (directoryOf: string -> string option) =
-        fun (agentId: string) childId (role: Role) agent prompt ->
-            send sessions parentId journal childId role agent (directoryOf agentId) prompt
+    let sender sessions journal (directoryOf: string -> string option) =
+        fun (agentId: string) childId profile prompt ->
+            send sessions journal childId profile (directoryOf agentId) prompt

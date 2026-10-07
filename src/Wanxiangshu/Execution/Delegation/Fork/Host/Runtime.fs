@@ -431,7 +431,7 @@ type HostForkRuntime
                     prompt
                     observer)
 
-    let sendBusyNudge = HostForkBusyNudge.sender sessions parentId journal directoryOf
+    let sendBusyNudge = HostForkBusyNudge.sender sessions journal directoryOf
 
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
