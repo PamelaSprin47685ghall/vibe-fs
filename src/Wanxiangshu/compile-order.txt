@@ -1468,6 +1468,8 @@ OpenCode/Plugin/PluginStrengthPorts.fsi
 OpenCode/Plugin/PluginStrengthPorts.fs
 OpenCode/Plugin/PluginHostWiring.fsi
 OpenCode/Plugin/PluginHostWiring.fs
+OpenCode/Plugin/PluginHostWiringSurface.fsi
+OpenCode/Plugin/PluginHostWiringSurface.fs
 OpenCode/Plugin/PluginSessionWiring.fsi
 OpenCode/Plugin/PluginSessionWiring.fs
 OpenCode/Host/SessionBindingRecovery.fsi

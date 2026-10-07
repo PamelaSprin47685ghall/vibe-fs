@@ -13,6 +13,7 @@ import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/Fetch
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
+import * as hostFinalize from '../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js'
 import { createCase } from './support/casebook.mjs'
 import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
 
@@ -491,6 +492,198 @@ for (const malformed of [false, true]) {
       }
     })
   }
+}
+
+for (const scenario of [
+  { unknown: false, callbackThrows: false }, { unknown: true, callbackThrows: false },
+  { unknown: false, callbackThrows: true }, { unknown: true, callbackThrows: true },
+]) {
+  const { unknown, callbackThrows } = scenario
+  test(`WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture ${unknown ? 'CurrentCommitUnknown' : 'committed'} with ${callbackThrows ? 'throwing' : 'returning'} owner after real Bookkeeper settlement`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-casebook-host-finalize-'))
+    mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+    const cause = new Error('original Host Capture Current commit cause')
+    const observed = []
+    const incidents = []
+    const callbackError = new Error('original Capture owner callback error')
+    const owner = settlements.createOwner(incident => {
+      assert.equal(observed.length, 1, 'actual Capture settles before its original owner receives the incident')
+      incidents.push(incident)
+      if (callbackThrows) throw callbackError
+    })
+    const identity = `host-Capture-${unknown}`
+    const oldIdentity = `prior-${identity}`
+    let handle
+    try {
+      handle = eventStore.create(directory, 'setup')
+      const { baseline } = await createCase({ dir: directory, store: handle }, oldIdentity)
+      const before = await casebook.fetchCaseByIdentity(handle, oldIdentity)
+      const payloadRef = JSON.parse(baseline)['subject.txt'].payloadRef
+      const payloadBytes = Buffer.from(await eventStore.readPayload(handle, payloadRef))
+      await index.refresh(handle, 256)
+      const beforeIndex = index.tryGet()
+      const eventsDirectory = join(directory, 'wanxiang', 'events')
+      const setupFile = join(eventsDirectory, 'setup.ndjson')
+      const setupBytes = readFileSync(setupFile)
+      eventStore.dispose(handle)
+      handle = unknown
+        ? eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
+        : eventStore.create(directory, 'operation')
+      const wrapped = eventStore.createAppendPayloadStore(handle, true, value => observed.push(value))
+      const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
+      installBookkeeperRuntime(port, [identity])
+      lifecycle.notePrompt(identity, 'Original delegated investigation')
+      lifecycle.noteAnswer(identity, 'Original completed Engineer result')
+      lifecycle.collect(identity, 'read', { path: 'subject.txt' }, 'version-B')
+      let response
+      let rejection
+      try {
+        response = await hostFinalize.finalizeDraft(directory, wrapped, identity, owner)
+      } catch (error) {
+        rejection = error
+      }
+      assert.equal(createCalls.length, 1)
+      assert.equal(createCalls[0].physicalParentId, undefined)
+      assert.equal(programCalls.length, 1)
+      assert.ok(prompts.some(text => text.includes('CaseFinalize')))
+      assert.equal(observed.length, 1, 'the real finalized Capture is never retried')
+      const { originalRequested, append } = observed[0]
+      assert.equal(originalRequested.length, 1)
+      const original = originalRequested[0]
+      assert.equal(original.type, 'EngineerCaseCaptured')
+      assert.equal(original.payload.identity, identity)
+      assert.equal(original.payload.source_trace, identity)
+      assert.equal(original.payload.q, CANONICAL_Q)
+      assert.equal(original.payload.a, CANONICAL_A)
+      assert.deepEqual(original.payload.related_paths, ['subject.txt'])
+      assert.equal(original.payload.completion_file_state, baseline)
+      assert.equal(original.payload.maintenance_file_state, baseline)
+      assert.equal(append.requested[0].id, original.id)
+      assert.deepEqual(append.requested[0].payload, {})
+      assert.equal(append.cuts.length, 1)
+      const cut = append.cuts[0]
+      assert.equal(cut.rule, 'Casebook')
+      assert.equal(cut.failedEventId, original.id)
+      if (unknown) {
+        assert.equal(append.error.code, 'CommitUnknown')
+        assert.equal(append.error.phase, 'CurrentCommit')
+        assert.strictEqual(append.error.cause, cause)
+        assert.deepEqual(append.error.prepared.cuts, [cut])
+        assert.deepEqual(append.error.prepared.durableEvents.map(event => event.id), [original.id, cut.cutEventId])
+      } else assert.equal(append.error, null)
+      if (response !== undefined) {
+        assert.equal(response.identity, identity)
+        assert.equal(response.releasesIdentity, false)
+        assert.equal(response.persistenceFailure.operation, 'Capture')
+        assert.equal(response.persistenceFailure.eventId, original.id)
+        if (unknown) assert.equal(response.persistenceFailure.isOriginalError(append.originalError), true)
+      }
+      assert.deepEqual(index.tryGet(), beforeIndex)
+      assert.deepEqual(await casebook.fetchCaseByIdentity(handle, oldIdentity), before)
+      const operationFile = join(eventsDirectory, 'operation.ndjson')
+      const operationBytes = readFileSync(operationFile)
+      const facts = operationBytes.toString('utf8').trimEnd().split('\n').map(JSON.parse)
+      assert.deepEqual(facts.map(event => event.event_id), [original.id, cut.cutEventId])
+      assert.equal(facts[0].event_type, 'EngineerCaseCaptured')
+      assert.deepEqual(facts[0].payload, {})
+      assert.equal(facts[1].event_type, 'ProjectionCutTail')
+      assert.equal(facts[1].payload.failed_event_id, original.id)
+      assert.deepEqual(facts[1].parents, [original.id])
+      eventStore.dispose(handle)
+      handle = eventStore.create(directory, 'cold-reader')
+      assert.deepEqual(await casebook.fetchCaseByIdentity(handle, oldIdentity), before)
+      assert.equal(await casebook.fetchCaseByIdentity(handle, identity), null)
+      assert.deepEqual(Buffer.from(await eventStore.readPayload(handle, payloadRef)), payloadBytes)
+      assert.deepEqual(readFileSync(operationFile), operationBytes)
+      assert.deepEqual(readFileSync(setupFile), setupBytes)
+      assert.deepEqual(index.tryGet(), beforeIndex)
+      assert.equal(response, undefined, 'an actual Capture cut must not return a normal Host finalization settlement')
+      assert.equal(incidents.length, 1)
+      assert.strictEqual(rejection, callbackThrows ? callbackError : incidents[0])
+      assert.equal(settlements.isIncident(incidents[0]), true)
+      const incident = settlements.describeIncident(incidents[0])
+      assert.equal(incident.operation, 'Capture')
+      assert.equal(incident.caseIdentity, identity)
+      assert.equal(incident.eventId, original.id)
+      assert.deepEqual(incident.cuts, [cut])
+      if (unknown) {
+        assert.equal(incident.failure.isOriginalError(append.originalError), true)
+        assert.equal(incident.sharesPreparedWithError(append.originalError), true)
+        assert.strictEqual(incident.failure.primary.cause, cause)
+      }
+    } finally {
+      lifecycle.cleanup(identity)
+      bookkeeper.resetRuntime()
+      if (handle) eventStore.dispose(handle)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const fate of ['success', 'CurrentCommitUnknown', 'observer-throws']) {
+  test(`WHAT[knowledge-reuse-013] original Host finalization ${fate} without cuts retains the ordinary settlement after actual Capture`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-host-capture-control-'))
+    mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+    writeFileSync(join(directory, 'subject.txt'), 'version-B')
+    const identity = `host-control-${fate}`
+    const cause = new Error('original ordinary Capture error')
+    const observed = []
+    const incidents = []
+    const owner = settlements.createOwner(value => incidents.push(value))
+    let handle
+    try {
+      handle = fate === 'CurrentCommitUnknown'
+        ? eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
+        : eventStore.create(directory, 'operation')
+      const wrapped = eventStore.createAppendPayloadStore(handle, false, value => {
+        observed.push(value)
+        if (fate === 'observer-throws') throw cause
+      })
+      const { port, createCalls, programCalls } = scriptedBookkeeperPort()
+      installBookkeeperRuntime(port, [identity])
+      lifecycle.notePrompt(identity, 'Original completed work')
+      lifecycle.noteAnswer(identity, 'Original result')
+      lifecycle.collect(identity, 'read', { path: 'subject.txt' }, 'version-B')
+      const result = await hostFinalize.finalizeDraft(directory, wrapped, identity, owner)
+      assert.equal(result.identity, identity)
+      assert.equal(result.releasesIdentity, fate === 'success')
+      assert.equal(result.commitment, fate === 'success' ? 'Finalized'
+        : fate === 'CurrentCommitUnknown' ? 'PersistenceFailed' : 'Unknown')
+      assert.equal(result.reason, fate === 'observer-throws' ? cause.message : null)
+      assert.equal(createCalls.length, 1)
+      assert.equal(programCalls.length, 1)
+      assert.equal(observed.length, 1)
+      assert.deepEqual(incidents, [])
+      const { originalRequested, append } = observed[0]
+      assert.equal(originalRequested[0].type, 'EngineerCaseCaptured')
+      assert.deepEqual(append.cuts, [])
+      if (fate === 'CurrentCommitUnknown') {
+        assert.equal(result.persistenceFailure.isOriginalError(append.originalError), true)
+        assert.strictEqual(result.persistenceFailure.primary.cause, cause)
+        assert.equal(result.persistenceFailure.primary.phase, 'CurrentCommit')
+        assert.equal(await casebook.fetchCaseByIdentity(handle, identity), null)
+      } else {
+        assert.equal(result.persistenceFailure, null)
+        assert.equal(append.error, null)
+      }
+      const operationFile = join(directory, 'wanxiang', 'events', 'operation.ndjson')
+      const bytes = readFileSync(operationFile)
+      assert.equal(bytes.toString('utf8').trimEnd().split('\n').length, 1)
+      eventStore.dispose(handle)
+      handle = eventStore.create(directory, 'cold-reader')
+      const current = await casebook.fetchCaseByIdentity(handle, identity)
+      assert.equal(current.identity, identity, 'ordinary failure can follow actual durable Capture')
+      assert.equal(current.q, CANONICAL_Q)
+      assert.equal(current.a, CANONICAL_A)
+      assert.deepEqual(readFileSync(operationFile), bytes)
+      assert.deepEqual(readdirSync(join(directory, 'wanxiang', 'events')), ['operation.ndjson'])
+    } finally {
+      lifecycle.cleanup(identity)
+      bookkeeper.resetRuntime()
+      if (handle) eventStore.dispose(handle)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 }
 
 test.todo('WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before a mandatory injected fuse reports and kills once without modifying its projection')

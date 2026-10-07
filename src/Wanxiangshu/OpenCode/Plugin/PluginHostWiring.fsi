@@ -5,8 +5,17 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Git
 open Wanxiangshu.Strength.Persistence
+open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Repository.Knowledge.Casebook
 
 module PluginHostWiring =
+
+    val internal tryFinalizeWithin:
+        settlements: CasebookSettlementOwner ->
+        workspaceRoot: string ->
+        store: IEventStore ->
+        delegateSessionId: string ->
+            Task<CaseFinalizeSettlement>
 
     /// Composition-root handle for everything the Host needs after boot:
     /// the ports `HostSignalBootstrap.wire` produced plus the durability

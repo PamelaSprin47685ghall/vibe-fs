@@ -1461,6 +1461,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Plugin/PluginHostWiringSurface.js',
+    owner: 'host-boundary',
+    laws: ['KNOWLEDGE-REUSE-013'],
+    lawOwners: { 'KNOWLEDGE-REUSE-013': 'knowledge-reuse' },
+    source: 'src/Wanxiangshu/OpenCode/Plugin/PluginHostWiringSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Host/PluginHooksSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-014', 'EFFECT-ACCOUNTING-008'],
