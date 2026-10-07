@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[K1-U](../U0-A1-Casebook消费者-2026-10-07.md)Unknown＋Cuts双waiter有限完成，gen288相关41/41、279pass/0fail/4skip/24TODO，仅pending；首owner唯一callback与原incident/error/prepared/cause及独立cold保持，生产无改动。下一Journal J1和D0接缝；不以此授fresh authority或完整Casebook/Host验收。
+
 最新[K2-C](../U0-A1-Casebook消费者-2026-10-07.md)原Boot owner物理四叶有限完成，gen286相关73/73、547pass/0fail/7skip/27TODO，仅pending，native4/0；两cut原report后自行SIGKILL、两控制自然退出，全部独立cold保旧Case/bytes。已有保护无生产修复或虚假业务红；下一K1-U和[SessionDeleted前提](../U0-A1-SessionDeleted前提-2026-10-07.md)限定的D0，不把本包升为installed Host、完整删除或H0b authority。
 
 最新[K2-B](../U0-A1-Casebook消费者-2026-10-07.md)原Host finalization consumer有限完成，两业务红后接同一Boot owner；gen280相关257/257、1739pass/0fail/35skip/115TODO，仅pending，Fable/check通过。下一K2-C原Boot物理fatal child与独立cold，再另验完整删除链；不把helper绿授予installed Host或H0b fresh authority。

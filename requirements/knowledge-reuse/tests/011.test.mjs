@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
-import { sandbox, createCase, deferred, casebook, eventStore, parse } from './support/casebook.mjs'
+import { sandbox, createCase, deferred, casebook, eventStore, index, parse } from './support/casebook.mjs'
 import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
@@ -284,9 +284,10 @@ test('WHAT[knowledge-reuse-011] an active workspace flight rejects a different a
   }
 })
 
-test('WHAT[knowledge-reuse-011] two required owners on one workspace store share the original settled cut rejection and one callback', async t => {
+const assertSharedCutSettlement = async (t, unknown) => {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-shared-cut-')))
   mkdirSync(join(directory, '.wanxiang', 'casebook'), { recursive: true })
+  const cause = new Error('original shared Refresh Current commit cause')
   const reached = deferred()
   const release = deferred()
   const observations = []
@@ -305,13 +306,21 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     assert.equal(baselineEntry.kind, 'Present')
     const baselineBytes = Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef))
     assert.equal(baselineBytes.toString('utf8'), 'version-B')
+    await index.refresh(handle, 256)
+    const beforeIndex = index.tryGet()
     const eventsDirectory = join(directory, 'wanxiang', 'events')
     const setupFile = join(eventsDirectory, 'setup.ndjson')
     const setupBytes = readFileSync(setupFile)
     eventStore.dispose(handle)
-    handle = eventStore.create(directory, 'operation')
+    handle = undefined
+    handle = unknown
+      ? eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
+      : eventStore.create(directory, 'operation')
     shared = eventStore.createAppendPayloadStore(handle, true, value => observations.push(value))
-    const leftOwner = settlements.createOwner(value => leftIncidents.push(value))
+    const leftOwner = settlements.createOwner(value => {
+      assert.equal(observations.length, 1, 'the original actual Store settlement precedes owner delivery')
+      leftIncidents.push(value)
+    })
     const rightOwner = settlements.createOwner(value => rightIncidents.push(value))
     assert.notStrictEqual(leftOwner, rightOwner)
     const leftTool = bindOwnedFetch(directory, shared, leftOwner)
@@ -347,17 +356,29 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     const [original] = originalRequested
     assert.equal(original.payload.identity, identity)
     assert.deepEqual(append.requested, [{ ...original, payload: {} }])
-    assert.equal(append.error, null)
     assert.equal(append.cuts.length, 1)
     const [cut] = append.cuts
     assert.equal(cut.rule, 'Casebook')
     assert.equal(cut.failedEventId, original.id)
-    assert.deepEqual(eventStore.read(handle, original.id), append.requested[0])
-    const cutFact = eventStore.read(handle, cut.cutEventId)
-    assert.equal(cutFact.type, 'ProjectionCutTail')
-    assert.equal(cutFact.payload.rule, 'Casebook')
-    assert.equal(cutFact.payload.failed_event_id, original.id)
-    assert.deepEqual(cutFact.parents, [original.id])
+    if (unknown) {
+      assert.equal(append.error.code, 'CommitUnknown')
+      assert.equal(append.error.phase, 'CurrentCommit')
+      assert.strictEqual(append.error.cause, cause)
+      assert.deepEqual(append.error.cleanupFailures, [])
+      assert.deepEqual(append.error.requested, append.requested)
+      assert.deepEqual(append.error.prepared.cuts, [cut])
+      assert.deepEqual(append.error.prepared.durableEvents.map(event => event.id), [original.id, cut.cutEventId])
+      assert.equal(eventStore.read(handle, original.id), null, 'the injected fault precedes the live Current commit')
+      assert.equal(eventStore.read(handle, cut.cutEventId), null)
+    } else {
+      assert.equal(append.error, null)
+      assert.deepEqual(eventStore.read(handle, original.id), append.requested[0])
+      const cutFact = eventStore.read(handle, cut.cutEventId)
+      assert.equal(cutFact.type, 'ProjectionCutTail')
+      assert.equal(cutFact.payload.rule, 'Casebook')
+      assert.equal(cutFact.payload.failed_event_id, original.id)
+      assert.deepEqual(cutFact.parents, [original.id])
+    }
     assert.equal(leftIncidents.length, 1)
     assert.deepEqual(rightIncidents, [], 'only the first executing flight owns this settlement callback')
     assert.equal(first.status, 'rejected')
@@ -371,6 +392,18 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     assert.equal(incident.caseIdentity, identity)
     assert.equal(incident.eventId, original.id)
     assert.deepEqual(incident.cuts, append.cuts)
+    if (unknown) {
+      assert.equal(incident.failure.code, 'CASEBOOK_APPEND_COMMIT_UNKNOWN')
+      assert.equal(incident.failure.kind, 'unknown')
+      assert.equal(incident.failure.isOriginalError(append.originalError), true)
+      assert.equal(incident.sharesPreparedWithError(append.originalError), true)
+      assert.strictEqual(incident.failure.primary.cause, cause)
+      assert.equal(incident.failure.primary.phase, 'CurrentCommit')
+      assert.deepEqual(incident.failure.cleanupFailures, [])
+      assert.deepEqual(incident.failure.requestedEventIds, [original.id])
+      assert.deepEqual(incident.failure.preparedEventIds, [original.id, cut.cutEventId])
+    }
+    assert.deepEqual(index.tryGet(), beforeIndex, 'neither waiter advances the provider index after the cut')
     assert.deepEqual(await casebook.fetchCaseByIdentity(handle, identity), before)
     assert.equal(before.completionFileState, baseline)
     assert.equal(before.maintenanceFileState, baseline)
@@ -381,6 +414,9 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     assert.equal(facts[0].event_type, 'EngineerCaseRefreshed')
     assert.deepEqual(facts[0].payload, {})
     assert.equal(facts[1].event_type, 'ProjectionCutTail')
+    assert.equal(facts[1].payload.rule, 'Casebook')
+    assert.equal(facts[1].payload.failed_event_id, original.id)
+    assert.deepEqual(facts[1].parents, [original.id])
     assert.deepEqual(readFileSync(setupFile), setupBytes)
     assert.deepEqual(Buffer.from(await eventStore.readPayload(handle, baselineEntry.payloadRef)), baselineBytes)
 
@@ -404,6 +440,7 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     assert.deepEqual({ ...cold.current, accessOrder: BigInt(cold.current.accessOrder), lastAccessOrder: BigInt(cold.current.lastAccessOrder) }, before)
     assert.deepEqual(readFileSync(setupFile), setupBytes)
     assert.deepEqual(readFileSync(operationFile), operationBytes)
+    assert.deepEqual(index.tryGet(), beforeIndex)
   } finally {
     release.resolve()
     await Promise.allSettled([left, right])
@@ -412,6 +449,12 @@ test('WHAT[knowledge-reuse-011] two required owners on one workspace store share
     if (handle) eventStore.dispose(handle)
     rmSync(directory, { recursive: true, force: true })
   }
-})
+}
+
+test('WHAT[knowledge-reuse-011] two required owners on one workspace store share the original settled cut rejection and one callback',
+  t => assertSharedCutSettlement(t, false))
+
+test('WHAT[knowledge-reuse-011] two required owners on one workspace store share one actual CurrentCommitUnknown cut, original incident and Prepared',
+  t => assertSharedCutSettlement(t, true))
 
 test.todo('WHAT[knowledge-reuse-011] GAP-160: real replica branches become DomainConflict and converge through explicit resolution without LWW')
