@@ -106,6 +106,22 @@ test('WHAT[js-semantic-surface-002] imported runtime and unproved fields receive
       'alias[0] = api.read()',
       ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
     ]],
+    ['assigned alias runtime insertion', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }]',
+      'let alias',
+      'alias = scenarios',
+      'alias[0] = api.read()',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
+    ['implicit return alias runtime insertion', [
+      importSource(SURFACE_MANIFEST[0].module),
+      'const scenarios = [{ fields: [] }]',
+      'const getScenarios = () => scenarios',
+      'const alias = getScenarios()',
+      'alias[0] = api.read()',
+      ['for (const scenario of scenarios) console.log(scenario.', 'fields)'].join(''),
+    ]],
     ['escaped fixture container', [
       importSource(SURFACE_MANIFEST[0].module),
       'const scenarios = [{ fields: [] }]',
@@ -123,8 +139,10 @@ test('WHAT[js-semantic-surface-002] imported runtime and unproved fields receive
       const { root, write } = createWorkspaceFixture(t)
       write('requirements/consumer/tests/001.test.mjs', source.join('\n'))
       const found = hits(root)
-      assert.equal(found.filter(hit => hit.rule === 'du-shape').length, 1)
-      assert.equal(runBoundaryGate({ root }), 1)
+      assert.deepEqual({
+        duShapeCount: found.filter(hit => hit.rule === 'du-shape').length,
+        exitCode: runBoundaryGate({ root }),
+      }, { duShapeCount: 1, exitCode: 1 })
     })
   }
 })

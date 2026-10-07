@@ -1855,10 +1855,14 @@ const escapedDataNames = syntax => {
     if (name) names.add(name)
   }
   const visit = node => {
-    if (node.type === 'AssignmentExpression') mark(node.left)
+    if (node.type === 'AssignmentExpression') {
+      mark(node.left)
+      mark(node.right)
+    }
     if (node.type === 'UpdateExpression') mark(node.argument)
     if (node.type === 'VariableDeclarator' && (node.init?.type === 'Identifier' || node.init?.computed)) mark(node.init)
     if (node.type === 'ReturnStatement' && node.argument?.type === 'Identifier') mark(node.argument)
+    if (node.type === 'ArrowFunctionExpression') mark(node.body)
     if (node.type === 'Property') mark(node.value)
     if (node.type === 'ArrayExpression') node.elements.forEach(mark)
     if (node.type === 'CallExpression' || node.type === 'NewExpression') {
