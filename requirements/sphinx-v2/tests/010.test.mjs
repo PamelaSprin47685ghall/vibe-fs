@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Loop from '../../../dist/Sphinx/V2/Runtime/Surface.js'
+import { registerH0bRawAppendTests } from './support/h0b-raw-append-tests.mjs'
 import {
   store, persistence, body, envelope, createdBody, work, transition,
   batch, append, current, mustOk, withStore, digest,
@@ -39,6 +40,9 @@ const seed = ({ reserve = true, resources = plannedWork.reserved, reservationAtt
   ...(state === 'Planned' ? [] : [transition(workId, 'Planned', { case: 'Ready' })]),
   ...(state === 'Leased' ? [transition(workId, 'Ready', { case: 'Leased', fence: workId + ':1:logical' })] : []),
 ]
+
+registerH0bRawAppendTests({ inquiry, seed, request })
+
 const expectRejected = (writer, previous, events) => {
   const before = current(writer, inquiry)
   const outcome = persistence.prepareTransition(writer, digest, batch(inquiry, 'refused', events, previous))
