@@ -81,7 +81,7 @@ async function measure() {
     }
     syncBuiltinESMExports()
     surface = await import('../../../../dist/Verification/JournalPortObservationSurface.js')
-    handle = await surface.openActualJournal(commonDir, writerId)
+    handle = await surface.openActualJournal(commonDir, writerId, new Date().toISOString())
     const initial = surface.observeActualJournal(handle)
     assert.equal(fs.existsSync(file), false, 'Lazy journal acquisition writes nothing')
     recording = true

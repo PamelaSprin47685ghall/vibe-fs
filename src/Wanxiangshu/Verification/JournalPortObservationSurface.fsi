@@ -29,7 +29,7 @@ module JournalPortObservationSurface =
     /// exact first failure, publishes no revision, and refuses subsequent appends.
     val rejectedPayloadPoisonsWriterScenario: commonDir: string -> writerTag: string -> Task<obj>
 
-    val openActualJournal: commonDir: string -> writerId: string -> Task<obj>
+    val openActualJournal: commonDir: string -> writerId: string -> startedAt: string -> Task<obj>
     val observeActualJournal: value: obj -> obj
     val containsActualJournalEvent: value: obj -> eventId: string -> bool
     val appendActualJournal: value: obj -> Task<obj>

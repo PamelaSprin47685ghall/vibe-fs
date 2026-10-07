@@ -596,7 +596,7 @@ test('WHAT[behavior-diagnosis-017] concurrent gate nudge deduplicates at the dis
       const results = await dispatch.sendGateNudgesConcurrently(
         capturingPort(captured),
         opened.journal,
-        'ses_153',
+        'ses_153_owner',
         'nudge text',
         'BusyAgentNudge',
         'interaction-repair',

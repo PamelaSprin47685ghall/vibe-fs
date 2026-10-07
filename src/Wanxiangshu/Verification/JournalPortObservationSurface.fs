@@ -473,7 +473,7 @@ module JournalPortObservationSurface =
                 cancellation.Dispose()
             }
 
-    let openActualJournal commonDir writerId : Task<obj> =
+    let openActualJournal commonDir writerId (startedAt: string) : Task<obj> =
         task {
             let store =
                 EventStore.createLocal
@@ -485,7 +485,7 @@ module JournalPortObservationSurface =
                 EventStoreJournalWriter.resumeOrCreate (
                     RuntimeId.create ("native-" + writerId),
                     4242,
-                    DateTimeOffset.UtcNow,
+                    (DateTimeOffset.Parse startedAt).ToOffset TimeSpan.Zero,
                     store
                 )
 

@@ -529,13 +529,13 @@ module ReconcileSurface =
             let releaseOldRead = TaskCompletionSource<unit>()
             let humanReadEntered = TaskCompletionSource<unit>()
             let releaseHumanRead = TaskCompletionSource<unit>()
-            // DSL-MUTABLE: cross-callback-proof — observations of actual Scheduler callbacks.
+            // DSL-MUTABLE: algorithm-scratch — observations of actual Scheduler callbacks.
             let published = ResizeArray<ReconciledTurnContext>()
-            // DSL-MUTABLE: cross-callback-proof — complete snapshots delivered by actual Scheduler callbacks.
+            // DSL-MUTABLE: algorithm-scratch — complete snapshots delivered by actual Scheduler callbacks.
             let observedSnapshots = ResizeArray<string array>()
-            // DSL-MUTABLE: cross-callback-proof — counts actual snapshot reads.
+            // DSL-MUTABLE: algorithm-scratch — counts actual snapshot reads.
             let mutable snapshotReads = 0
-            // DSL-MUTABLE: cross-callback-proof — publication count when the next actual snapshot starts.
+            // DSL-MUTABLE: algorithm-scratch — publication count when the next actual snapshot starts.
             let mutable publishedBeforeHumanRead = 0
 
             let completedMessages physical provider =

@@ -1,6 +1,6 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
-最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。703官方CI另有两项独立门禁错误与823/824原300秒截断；下一先修夹具注释分类/真实时钟，完整CI及稳定吞吐仍开放。
+最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。[CI夹具续修](../CI夹具门禁与703收据-2026-10-07.md)保703的823/824截断及0e949完整824/824、4822/3原件；三个夹具修正后gen250相关14/14、170pass/0fail/0skip/3TODO，仅pending。新头完整CI、稳定吞吐与完整Host仍开放；下一产品接U0-A1-S0。
 
 最新按[CLI前置与CI续接](../archive/2026-10-07/迁移CLI前置与CI续接-2026-10-07.md)：非法版本模块加载有限卡已完成，正式15/3红→相关19/235/0，合法dry-run与完整备份保持。4c3实际CI745/824截断，CE026旧忙碌断言按新合同补验7/0、完整capability193/0。下面2d2e与“候选未实施”只保历史；原预算、未知库存与整体吞吐边界不变，新头CI另验。
 
