@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Sphinx.V2.Wire
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Sphinx.V2.Composition
 
 module Surface =
@@ -11,6 +12,9 @@ module Surface =
 
     /// Opens the canonical durable store. Null configuration permits reads only.
     val create: commonDir: string -> writerId: string -> configuration: obj -> RuntimeHandle
+
+    /// Binds the original Wire composition to the caller's canonical store capability.
+    val createWithStore: store: EventStoreHandle -> configuration: obj -> RuntimeHandle
 
     val dispose: RuntimeHandle -> unit
 

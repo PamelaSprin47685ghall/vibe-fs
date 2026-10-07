@@ -42,16 +42,21 @@ module Surface =
 
         FatalProcess.trip "sphinx-semantic-cut" message
 
+    let private createRuntime (store: IEventStore) (configuration: obj) : RuntimeHandle =
+        match
+            Commands.create store (if isNull configuration then None else Some configuration) bindAppendCutUnknown
+        with
+        | Ok handle -> handle
+        | Error refusal ->
+            raise (InvalidOperationException(sprintf "%s at %s: %s" refusal.Code refusal.Path refusal.Message))
+
     let create (commonDir: string) (writerId: string) (configuration: obj) : RuntimeHandle =
         match Bind.createDurableStore commonDir writerId with
         | Error reason -> raise (InvalidOperationException reason)
-        | Ok store ->
-            match
-                Commands.create store (if isNull configuration then None else Some configuration) bindAppendCutUnknown
-            with
-            | Ok handle -> handle
-            | Error refusal ->
-                raise (InvalidOperationException(sprintf "%s at %s: %s" refusal.Code refusal.Path refusal.Message))
+        | Ok store -> createRuntime store configuration
+
+    let createWithStore (store: EventStoreHandle) (configuration: obj) : RuntimeHandle =
+        createRuntime store.Store configuration
 
     let dispose (handle: RuntimeHandle) : unit = Commands.dispose handle
 

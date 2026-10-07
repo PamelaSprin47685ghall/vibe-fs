@@ -7,6 +7,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 import * as settlement from '../../../dist/Sphinx/V2/Composition/SettlementSurface.js'
+import * as wire from '../../../dist/Sphinx/V2/Wire/Surface.js'
+import * as mcp from '../../../dist/Sphinx/V2/Hosts/Mcp/Surface.js'
 
 const child = fileURLToPath(new URL('./support/sphinx-command-settlement-child.mjs', import.meta.url))
 const configuration = {
@@ -120,6 +122,156 @@ for (const scenario of ['valid', 'malformed-release', 'valid-release', 'not-atte
       else t.diagnostic('SPHINX_COMMAND_SETTLEMENT_FAILURE_EVIDENCE: retained ' + root)
     }
   })
+}
+
+const physicalCoordinator = fileURLToPath(new URL('./support/sphinx-physical-binding-coordinator.mjs', import.meta.url))
+const physicalChild = fileURLToPath(new URL('./support/sphinx-physical-binding-child.mjs', import.meta.url))
+
+for (const binding of ['wire', 'mcp']) {
+  for (const scenario of ['valid', 'valid-release', 'malformed-release']) {
+    test(`WHAT[durable-events-024] original Sphinx ${binding} binding ${scenario} settles before its physical terminal and independent cold replay`, async t => {
+      assert.equal(typeof (binding === 'wire' ? wire.createWithStore : mcp.serveConfigured), 'function')
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-physical-binding-')))
+      const commonDir = join(root, '.git')
+      const sourceWriter = randomUUID()
+      const fatal = scenario === 'malformed-release'
+      const release = scenario.endsWith('-release')
+      const command = { commandId: `physical-${binding}-${scenario}`, goalText: '原授权目标\r\nNUL:\u0000；雪 😀 尾部  ',
+        constraints: [], materialRefs: [], authorizationRef: 'user', profileRef: configuration.profileRef }
+      const cancelReason = '原用户请求取消\r\nNUL:\u0000；雪 😀 尾部  '
+      const env = { ...process.env }
+      delete env.NODE_TEST_CONTEXT
+      delete env.NODE_OPTIONS
+      delete env.WANXIANGSHU_NO_FATAL_EXIT
+      const probe = async (entry, args) => {
+        try {
+          return JSON.parse(await runVerificationToolProbe(process.execPath, [entry, ...args],
+            { cwd: root, env, signal: t.signal }))
+        } catch (error) {
+          if (error?.stderr && typeof error.message === 'string') error.message += '\n' + error.stderr
+          throw error
+        }
+      }
+      let completed = false
+      try {
+        let seed = null
+        if (binding === 'mcp') {
+          const seedWriter = randomUUID()
+          const seeded = await probe(child, ['measure', commonDir, seedWriter, 'valid', JSON.stringify({
+            configuration, command: { ...command, commandId: 'seed-' + command.commandId },
+          })])
+          assert.equal(seeded.result.ok, true)
+          assert.equal(seeded.result.value.outcome, 'created')
+          assert.equal(seeded.physical.facts.length, 1)
+          seed = { writerId: seedWriter, pid: seeded.pid, inquiryId: seeded.inquiryId,
+            bytes: seeded.physical.bytes, facts: seeded.physical.facts }
+        }
+        const measured = await probe(physicalCoordinator, [binding, commonDir, sourceWriter, scenario,
+          JSON.stringify({ configuration, command, cancelReason, seed })])
+        assert.notEqual(measured.coordinatorPid, process.pid)
+        assert.notEqual(measured.pid, process.pid)
+        assert.notEqual(measured.pid, measured.coordinatorPid)
+        assert.equal(measured.cleanupRequested, false, 'cleanup never supplies the fatal evidence')
+        assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, fatal
+          ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+        const receipt = measured.measured
+        assert.equal(receipt.parentPid, measured.coordinatorPid)
+        assert.equal(receipt.binding, binding)
+        assert.equal(receipt.commandId, command.commandId)
+        const { physical, original, requested, cuts } = receipt
+        assert.equal(original.type, 'sphinx/v2-transition@2')
+        assert.equal(original.payload.inquiry, receipt.inquiryId)
+        assert.equal(original.payload.commandId, command.commandId)
+        assert.equal(original.payload.events.length, 1)
+        assert.equal(original.payload.events[0].case, binding === 'wire' ? 'InquiryCreated' : 'CancelRequested')
+        if (binding === 'wire') assert.equal(original.payload.events[0].payload.goal.originalText, command.goalText)
+        else {
+          assert.equal(receipt.inquiryId, seed.inquiryId)
+          assert.equal(original.payload.events[0].payload.reason, cancelReason)
+          assert.equal(measured.protocol.command.reason, cancelReason)
+          assert.equal(measured.protocol.replies, fatal ? 0 : 1)
+          assert.equal(measured.protocol.read.inquiryId, seed.inquiryId)
+          assert.notEqual(seed.pid, measured.pid)
+        }
+        assert.deepEqual(requested, [{ ...original, payload: fatal ? {} : original.payload }])
+        assert.equal(physical.facts.length, fatal ? 2 : 1)
+        assert.deepEqual(physical.facts[0], requested[0])
+        assert.deepEqual(physical.counts, { append: 1, fsync: 1, close: 1, release: 1, injected: release ? 1 : 0 })
+        assert.equal(physical.lockReleased, true)
+        assert.equal(physical.openDescriptors, 0)
+        assert.equal(physical.syncedDescriptors, 0)
+        assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+        const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`)
+        assert.equal(readFileSync(sourceFile, 'base64'), physical.bytes)
+        for (const head of physical.heads) {
+          const fact = physical.facts.find(value => value.stream === head.stream)
+          assert.equal(head.head, fact.id)
+          assert.deepEqual(head.heads, [fact.id])
+        }
+        assert.equal(cuts.length, fatal ? 1 : 0)
+        if (release) {
+          assert.deepEqual(receipt.appendError, { code: 'CommitUnknown', phase: 'StoreRelease', causeSame: true,
+            requested, prepared: { durableEvents: physical.facts, cuts }, cleanupFailures: [], priorRejection: null })
+        } else assert.equal(receipt.appendError, null)
+        if (fatal) {
+          const [cut] = cuts
+          const cutFact = physical.facts[1]
+          assert.equal(cut.rule, 'SphinxV2')
+          assert.equal(cut.failedEventId, original.id)
+          assert.equal(cut.cutEventId, cutFact.id)
+          assert.equal(cutFact.type, 'ProjectionCutTail')
+          assert.equal(cutFact.payload.rule, 'SphinxV2')
+          assert.equal(cutFact.payload.failed_event_id, original.id)
+          assert.deepEqual(cutFact.parents, [original.id])
+          assert.notEqual(cutFact.stream, original.stream)
+          assert.equal(physical.current.ok, false)
+          assert.equal(physical.current.error.code, 'SemanticCut')
+          assert.match(physical.current.error.message, /INVALID_TRANSITION_DTO/)
+          assert.equal(measured.returned, null)
+          assert.equal(measured.reports.length, 1)
+          assert.equal(measured.reports[0].operation, 'sphinx-semantic-cut')
+          for (const text of [receipt.inquiryId, command.commandId, original.id, 'StoreRelease', receipt.causeText]) {
+            assert.ok(measured.reports[0].result.includes(text), text)
+          }
+        } else {
+          assert.deepEqual(measured.reports, [])
+          assert.equal(physical.current.ok, true)
+          assert.equal(physical.current.value.eventHead, original.id)
+          assert.equal(physical.current.value.revision, binding === 'wire' ? '0' : '1')
+          assert.equal(measured.returned.outcome, release ? 'refused' : binding === 'wire' ? 'created' : 'applied')
+          if (binding === 'mcp') {
+            assert.deepEqual(physical.current.value.status, { case: 'Cancelling' })
+            if (!release) assert.equal(measured.returned.status, 'cancelling')
+          }
+          if (release) {
+            assert.equal(measured.returned.refusal.code, 'COMMIT_UNKNOWN')
+            for (const text of [receipt.inquiryId, command.commandId, original.id, receipt.causeText]) {
+              assert.ok(measured.returned.refusal.message.includes(text), text)
+            }
+          }
+        }
+        const coldWriter = randomUUID()
+        const cold = await probe(physicalChild, ['cold', commonDir, coldWriter, scenario,
+          JSON.stringify({ sourceWriter, inquiryId: receipt.inquiryId, physical, seed })])
+        assert.notEqual(cold.pid, measured.pid)
+        assert.notEqual(cold.pid, measured.coordinatorPid)
+        assert.notEqual(cold.pid, process.pid)
+        assert.equal(cold.writerId, coldWriter)
+        assert.equal(cold.preserved, true)
+        assert.deepEqual(cold.current, physical.current)
+        assert.equal(cold.bytes, physical.bytes)
+        assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', `${coldWriter}.ndjson`)), false)
+        assert.equal(readFileSync(sourceFile, 'base64'), physical.bytes)
+        if (seed) assert.equal(readFileSync(join(commonDir, 'wanxiang', 'events', `${seed.writerId}.ndjson`), 'base64'), seed.bytes)
+        t.diagnostic(JSON.stringify({ binding, scenario, nativePid: measured.pid, coldPid: cold.pid,
+          terminal: measured.signal ?? measured.exitCode, physicalAndCold: true }))
+        completed = true
+      } finally {
+        if (completed) rmSync(root, { recursive: true, force: true })
+        else t.diagnostic('SPHINX_PHYSICAL_BINDING_FAILURE_EVIDENCE: retained ' + root)
+      }
+    })
+  }
 }
 
 test.todo('WHAT[durable-events-024] actual semantic-cut caller requires injected fatal capability and refuses fatal before committed or unknown settlement')

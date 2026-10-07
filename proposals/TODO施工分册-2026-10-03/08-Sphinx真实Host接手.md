@@ -1,5 +1,7 @@
 # N06-B1：真实 Host 接手与首次接纳施工卡
 
+最新[S2原物理binding](../U0-A1-Sphinx结算传播-2026-10-07.md)有限完成：gen269相关44/44、374pass/0fail/0skip/26TODO，原生六叶6/0；原Wire start和MCP actualcancel的Unknown＋cut先settle再原report/SIGKILL及独立cold已证。committedCuts、自然encoder冲突、完整024/Host仍留，不再认领旧“下一S2”。下一按H0b合同卡C1/C2前提裁决；其他U0-A1消费者分别认领。
+
 H0b后续顺序以[2026-10-07合同卡](../H0b原生Append基线与存储合同-2026-10-07.md)为准：C0原Append双handle/双进程基线有限完成，gen267相关29/29、308pass/0fail/0skip/14TODO，原生两叶2/0保实际PID；C1须真实消费者的同lease首次激活；C2须证明跨lease变化完备性与完整017成本。没有实际authority就明确拒绝，不加无人消费的API，不把native锁或stat相等当首次接纳许可。
 
 最新[U0-A1-K1](../U0-A1-Casebook消费者-2026-10-07.md)已有限验收：三组正式业务红后接原failure、required owner、workspace/Store flight守门与原owner重交；gen265相关41/41、252pass/0fail/4skip/24TODO，仅pending。Capture/Evict、actual physical fatal、完整knowledge013继续保留，不再认领下文旧“下一K1”。下一独立H0b-C0先证明原生Append不授fresh authority并冻结最小存储合同，S2物理fatal另包。
