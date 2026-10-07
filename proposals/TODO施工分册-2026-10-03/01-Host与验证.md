@@ -1,5 +1,7 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-07最新[N00正常退出残留](../N00正常退出残留负控-2026-10-07.md)有限完成：gen309完整相关6/6、131pass/0fail/0skip/0TODO、退出0；真实passing ledger/worker exit0后残留被原supervisor拒绝/回收，foreign同creation保全。错误放行隔离变异明确红，原字节恢复gen311 native1/0；生产/预算未改。最新[4fd官方CI](../archive/2026-10-07/baselines/4fd-ci/receipt.txt)仍805/824原300s截断、2active/17queued，无全局summary；016/021分别286s/298s才准入，不归因挂死或吞吐收益。原D0-P静默/ownedcapture与Host023失败仍保留。本包不重复认领，下一依总计划D0-R裁决或J3完整窗口，不授完整N00/Host/CI。
+
 2026-10-07最新[W1流式工具归档](../W1工具归档流式输出-2026-10-07.md)有限完成：gen295完整016单次288pass/0fail/19skip/2TODO、1/1排空，worker167.083317s、outer10612 accepted=true20.012ms，前后输入一致。标准pipeline及增量SHA/bytes替代整archive缓存拷贝，每次真实变异仍新archive；未删测试/复用owner/改原CI预算。W0及官方K2C成本原件保留，Darwin单次wall不证明Linux全量恢复。下一按总计划G1，J3与D0-P另包；以下旧“下一”仅保历史。
 
 最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。[CI夹具续修](../CI夹具门禁与703收据-2026-10-07.md)保703的823/824截断及0e949完整824/824、4822/3原件；三个夹具修正后gen250相关14/14、170pass/0fail/0skip/3TODO，仅pending。ac88官方CI三个原失败文件均exit0，但797/824截断、2active/25queued且descendant observation deadline失败，无全局summary；后来的单group accepted不撤销该失败。完整CI、稳定吞吐与完整Host仍开放；产品Sphinx S0/S1已有限完成，下一K1 Casebook owner，见总计划与08卡。

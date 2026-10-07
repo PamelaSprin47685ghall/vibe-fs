@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createWatchdogHarness } from './support/watchdog-harness.mjs'
 import { registerSupervisedToolReclamationTests } from './support/supervised-tool-reclamation-tests.mjs'
+import { registerNormalExitResidualTest } from './support/normal-exit-residual-tests.mjs'
 import { registerOwnedToolTests } from './support/owned-tool-tests.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
 import { createWorkerCostObserver, encodeWorkerCostRecord, MAX_WORKER_COST_BYTES, validateWorkerCostSnapshot, WORKER_COST_PREFIX } from './support/worker-cost-observation.mjs'
@@ -21,6 +22,7 @@ import { DIAGNOSTIC_RACE_MS, WATCHDOG_TIMEOUT_MS } from './e2e/support/time-budg
 import { attachEventCeilings, eventCeilingSetupProblems, isCountedSseEvent, normalizeEventCeilings } from './e2e/support/event-ceiling.js'
 
 registerSupervisedToolReclamationTests()
+registerNormalExitResidualTest()
 registerOwnedToolTests()
 
 test('WHAT[verification-system-006] event safety ceilings validate input and count actual non-heartbeat events', () => {
