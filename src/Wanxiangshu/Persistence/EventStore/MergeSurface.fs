@@ -81,19 +81,17 @@ module EventMergeSurface =
                 {| code = "UnknownEventType"
                    eventType = eventType |}
 
-    /// Merge named JS-native writer streams. Writer names only break impossible
-    /// duplicate ties; causal readiness and EventId determine the order.
-    let merge (streams: obj array) : obj =
-        let parsed =
-            streams
-            |> Array.toList
-            |> List.map (fun pair ->
-                let values = unbox<obj array> pair
-                let writer = str values[0]
-                let events = unbox<obj array> values[1] |> Array.toList |> List.map eventOfJs
-                writer, events)
+    let private streamsOfJs (streams: obj array) =
+        streams
+        |> Array.toList
+        |> List.map (fun pair ->
+            let values = unbox<obj array> pair
+            let writer = str values[0]
+            let events = unbox<obj array> values[1] |> Array.toList |> List.map eventOfJs
+            writer, events)
 
-        match EventKWayMerge.merge parsed with
+    let private resultToJs result : obj =
+        match result with
         | Ok events ->
             box
                 {| ok = true
@@ -102,3 +100,24 @@ module EventMergeSurface =
             box
                 {| ok = false
                    error = invalidToJs error |}
+
+    /// Merge named JS-native writer streams. Writer names only break impossible
+    /// duplicate ties; causal readiness and EventId determine the order.
+    let merge (streams: obj array) : obj =
+        streams |> streamsOfJs |> EventKWayMerge.merge |> resultToJs
+
+    let mergeWithDiagnostics (streams: obj array) : obj =
+        let observation = streams |> streamsOfJs |> EventKWayMerge.mergeWithDiagnostics
+        let diagnostics = {| readyComparisons = string observation.ReadyComparisons |}
+
+        match observation.Result with
+        | Ok events ->
+            box
+                {| ok = true
+                   events = events |> List.map eventToJs |> List.toArray
+                   diagnostics = diagnostics |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error
+                   diagnostics = diagnostics |}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as detector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { awaitOwned, chaoticText, createSensor, deferred, rawDelta, repetitiveText } from './support/stream.mjs'
+import { abortSource, awaitOwned, chaoticText, createSensor, deferred, rawDelta, repetitiveText } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-006] separately created detectors have independent state', () => {
   const first = detector.create()
@@ -20,7 +20,7 @@ test('WHAT[degeneration-guard-006] explicit detector reset preserves the armed c
   sensor.resetDetector(handle, 'session')
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   assert.deepEqual(aborts, ['session'])
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
   await sensor.activeTask(handle, 'session', 'run')
 })
 
@@ -29,7 +29,7 @@ test('WHAT[degeneration-guard-006] dropping a session after its interrupt comple
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   await awaitOwned(handle, 'session', 'run')
   sensor.dropSession(handle, 'session')
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'External' })
   assert.equal(sensor.activeTask(handle, 'session', 'run'), null)
 })
 
@@ -50,10 +50,10 @@ const assertFreshEvaluation = (fields, expected) => {
 
 const consumeAndDrain = async (handle, session, run, kind) => {
   await awaitOwned(handle, session, run)
-  assert.deepEqual(await sensor.consumeAbortCause(handle, session, run), { cause: 'DegenerationGuard', anomaly: kind })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource(session, run)), { cause: 'DegenerationGuard', anomaly: kind })
   await sensor.activeTask(handle, session, run)
   assert.equal(sensor.activeTask(handle, session, run), null)
-  assert.deepEqual(await sensor.consumeAbortCause(handle, session, run), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource(session, run)), { cause: 'External' })
 }
 
 for (const [kind, field, anomalyText] of [
@@ -145,7 +145,7 @@ for (const [kind, field, anomalyText] of [
     })
     sensor.observe(handle, rawDelta('session', field, text, 'old-run'))
     await awaitOwned(handle, 'session', 'old-run')
-    assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'old-run'), { cause: 'DegenerationGuard', anomaly: kind })
+    assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'old-run')), { cause: 'DegenerationGuard', anomaly: kind })
     const continued = sensor.activeTask(handle, 'session', 'old-run')
     assert.notEqual(continued, null)
     try {

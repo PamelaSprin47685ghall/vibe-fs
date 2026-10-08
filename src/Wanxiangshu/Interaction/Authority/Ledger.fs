@@ -39,6 +39,11 @@ module PromptAuthorityLedger =
                 PromptAuthorityRun.registerAuthority profile projection
                 |> Result.mapError PromptAuthorityRun.describeRegistrationRejection)
 
+    let private closeActiveRun (profile: PromptAuthority.AuthorityExecutionProfile) projection =
+        match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId projection with
+        | Ok closed -> closed
+        | Error error -> invalidOp error
+
     /// Road completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
     let closeCompletedHumanRootManager
         (projection: PromptAuthority.PromptAuthorityProjection)
@@ -48,11 +53,7 @@ module PromptAuthorityLedger =
             profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
             && profile.CanonicalRole = Role.Manager
             ->
-            { projection with
-                ActiveLogicalRun = None
-                PendingClaims = Map.empty
-                AcceptedContinuationIds = Map.empty
-                ClaimSequences = Map.empty }
+            closeActiveRun profile projection
         | _ -> projection
 
     /// PROMPT-005 `Claimed`.

@@ -369,6 +369,10 @@ module Reconciler =
                     let currentPhysical =
                         activeBinding |> Option.bind (fun bound -> bound.PhysicalUserMessageId)
 
+                    let isCurrentSnapshot observedSession observedGeneration =
+                        isCurrent observedSession observedGeneration
+                        && binding.TryPhysicalUserMessage observedSession = currentPhysical
+
                     currentPhysical |> Option.iter (armProjectionPass sessionId generation)
 
                     let observeProjectionSnapshot observedSession messages =
@@ -385,7 +389,7 @@ module Reconciler =
                     do!
                         ReconcilePass.run
                             snapshot
-                            isCurrent
+                            isCurrentSnapshot
                             isCleared
                             mapsFor
                             recordMaps

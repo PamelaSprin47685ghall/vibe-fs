@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 
 type DelegationHandoffWindow = { Range: XTraceRange; IsInitial: bool }
 
@@ -35,6 +36,7 @@ type HandoffCheckpointCommitment =
     | NotCommitted of reason: string
     | Unknown of reason: string
     | PhaseConflict of reason: string
+    | PersistenceFailed of JournalAppendFailure
 
 type HandoffCheckpointSettlement =
     { Identity: HandoffCheckpointIdentity
@@ -78,6 +80,12 @@ module HandoffCheckpointSettlement =
             { Parent = parent
               Route = handoff.Route }
           Commitment = HandoffCheckpointCommitment.PhaseConflict reason }
+
+    let persistenceFailed parent (handoff: PreparedDelegationHandoff) failure : HandoffCheckpointSettlement =
+        { Identity =
+            { Parent = parent
+              Route = handoff.Route }
+          Commitment = HandoffCheckpointCommitment.PersistenceFailed failure }
 
 type ReusableHandoffPort =
     { Prepare: SessionId -> DelegationHandoffRoute -> Task<PreparedDelegationHandoff>

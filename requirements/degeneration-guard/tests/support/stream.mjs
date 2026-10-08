@@ -4,6 +4,12 @@ import * as loopSensor from '../../../../dist/OpenCode/Host/LoopSensorSurface.js
 
 export const repetitiveText = () => ' retry'.repeat(2000)
 export const createSensor = options => loopSensor.create({ diagnostic: () => {}, ...options })
+export const abortSource = (sessionId, providerRun) => ({
+  sessionId,
+  physicalUserMessageId: 'controlled-source-physical',
+  authorityRootUserMessageId: 'controlled-source-authority-root',
+  providerRun,
+})
 export const deferred = () => Promise.withResolvers()
 export const rawDelta = (sessionID, field, delta, messageID = 'msg_a') => ({
   type: 'message.part.delta', properties: { sessionID, messageID, partID: 'part_a', field, delta },

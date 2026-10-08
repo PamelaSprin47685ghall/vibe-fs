@@ -16,6 +16,18 @@ export function isVerbose(options = {}) {
   return false
 }
 
+function printFailure(failure, stderr) {
+  const sourceFile = failure.sourceFile || failure.file
+  if (failure.file && failure.file !== sourceFile) stderr.write(`test entry ${failure.file}\n`)
+  const location = sourceFile ? `test at ${sourceFile}${failure.line ? `:${failure.line}:${failure.column || 1}` : ''}\n` : ''
+  stderr.write(`${location}✖ ${failure.name} (${failure.durationMs.toFixed(3)}ms)\n`)
+  const error = failure.error?.cause ?? failure.error
+  if (error) {
+    const formatted = error?.stack || util.inspect(error, { colors: false })
+    stderr.write(formatted.split('\n').map(line => `  ${line}`).join('\n') + '\n\n')
+  }
+}
+
 /**
  * Creates an async generator reporter function suitable for stream.compose(...) or manual iteration.
  *
@@ -34,6 +46,19 @@ export function createCompactReporter(options = {}) {
   const state = options.state ?? createRunState()
 
   const reporterFn = async function* compactReporter(source) {
+    const printedFailures = new Set()
+    let failureHeaderPrinted = false
+    const printNewFailures = summary => {
+      for (const failure of [...summary.failures, ...summary.containerFailureDetails]) {
+        if (printedFailures.has(failure)) continue
+        if (!failureHeaderPrinted) {
+          err.write('\n✖ failing tests:\n\n')
+          failureHeaderPrinted = true
+        }
+        printFailure(failure, err)
+        printedFailures.add(failure)
+      }
+    }
     for await (const event of source) {
       const type = event?.type
       const data = event?.data ?? {}
@@ -48,6 +73,7 @@ export function createCompactReporter(options = {}) {
       }
 
       applyEvent(state, event)
+      if (type === 'test:fail') printNewFailures(summarize(state))
 
       if (verbose && (type === 'test:pass' || type === 'test:fail')) {
         const isSuite = data.details?.type === 'suite'
@@ -79,26 +105,7 @@ export function createCompactReporter(options = {}) {
 
     const summary = summarize(state)
 
-    // Always print failures if any
-    const failures = [...summary.failures, ...summary.containerFailureDetails]
-    if (failures.length > 0) {
-      err.write('\n✖ failing tests:\n\n')
-      for (const f of failures) {
-        const sourceFile = f.sourceFile || f.file
-        if (f.file && f.file !== sourceFile) err.write(`test entry ${f.file}\n`)
-        const loc = sourceFile ? `test at ${sourceFile}${f.line ? `:${f.line}:${f.column || 1}` : ''}\n` : ''
-        err.write(`${loc}✖ ${f.name} (${f.durationMs.toFixed(3)}ms)\n`)
-        const errObj = f.error?.cause ?? f.error
-        if (errObj) {
-          const formatted = errObj?.stack || util.inspect(errObj, { colors: false })
-          const indented = formatted
-            .split('\n')
-            .map((line) => `  ${line}`)
-            .join('\n')
-          err.write(`${indented}\n\n`)
-        }
-      }
-    }
+    printNewFailures(summary)
 
     // Default mode prints compact summary to stderr
     const summaryText =

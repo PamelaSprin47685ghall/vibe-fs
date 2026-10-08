@@ -33,9 +33,6 @@ module RequirementGroundingRuntime =
     let private appendRequest (port: RequirementGroundingPort) sessionId snapshot =
         port.AppendRequested sessionId snapshot
 
-    let private appendMaterialObserved (port: RequirementGroundingPort) sessionId observation =
-        port.AppendMaterialObserved sessionId observation
-
     let private requestOne port sessionId snapshot =
         let current = stateFor port sessionId
 
@@ -86,46 +83,47 @@ module RequirementGroundingRuntime =
                           Packages = snapshots |> List.map _.PackageName }
         }
 
-    let private observeOneMaterial port sessionId snapshot material =
+    let private appendUnseenRead (port: RequirementGroundingPort) sessionId observation =
         let current = stateFor port sessionId
-        let key = GroundingIdentity.snapshotMaterialKey snapshot material
 
-        if Set.contains key current.VisibleMaterials then
+        if Set.contains observation current.ObservedReads then
             Task.FromResult(Ok())
         else
+            port.AppendReadObserved sessionId observation
+
+    let private observeOneRead (port: RequirementGroundingPort) workspace sessionId (read: GroundingFileRead) =
+        match GroundingCatalog.workspaceRelativePath workspace read.Path with
+        | None -> Task.FromResult(Ok())
+        | Some path ->
             let observation =
-                { Workspace = snapshot.Workspace
-                  PackageName = snapshot.PackageName
-                  Path = material.Path
-                  Digest = GroundingIdentity.materialDigest material.Path material.ResultBytes }
+                { Workspace = GroundingCatalog.canonicalWorkspace workspace
+                  Path = path
+                  Digest = GroundingIdentity.materialDigest path read.ResultBytes
+                  Coverage = read.Coverage }
 
-            taskResult {
-                do! appendMaterialObserved port sessionId observation
-                return ()
-            }
+            appendUnseenRead port sessionId observation
 
-    let private observeMaterials port sessionId materials =
+    let private observeReads port workspace sessionId reads =
         let rec loop remaining =
             match remaining with
             | [] -> Task.FromResult(Ok())
-            | (snapshot, material) :: tail ->
+            | read :: tail ->
                 taskResult {
-                    do! observeOneMaterial port sessionId snapshot material
+                    do! observeOneRead port workspace sessionId read
                     return! loop tail
                 }
 
-        loop materials
+        loop reads
 
-    let observeReadPaths
+    let observeFileReads
         (port: RequirementGroundingPort)
         workspace
         sessionId
-        paths
+        (reads: GroundingFileRead list)
         : Task<Result<RequirementGroundingDecision, string>> =
         taskResult {
-            let materials = GroundingCatalog.materialsForExactPaths workspace paths
-            do! observeMaterials port sessionId materials
-            return! requestPaths port workspace sessionId paths
+            do! observeReads port workspace sessionId reads
+            return! requestPaths port workspace sessionId (reads |> List.map _.Path)
         }
 
     let appendAnchored (port: RequirementGroundingPort) sessionId occurrence =

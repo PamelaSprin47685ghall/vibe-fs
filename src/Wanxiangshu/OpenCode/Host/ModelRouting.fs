@@ -1372,14 +1372,17 @@ module ModelRouting =
                 lease.Identity.SessionId = sessionId
                 && lease.Identity.PhysicalUserMessageId = physicalId)
 
+        let releaseUnretainedPhysical oldKey =
+            if not (hasContinuationInput oldKey) && heldPhysicalReleases.Remove oldKey then
+                releasePhysicalExecutionLocked oldKey |> ignore
+
         let releaseContinuationInputLocked key =
             match continuationInputs.TryGetValue key with
             | true, previous ->
                 continuationInputs.Remove key |> ignore
                 let oldKey = previous.Identity.SessionId, previous.Identity.PhysicalUserMessageId
 
-                if not (hasContinuationInput oldKey) && heldPhysicalReleases.Remove oldKey then
-                    releasePhysicalExecutionLocked oldKey |> ignore
+                releaseUnretainedPhysical oldKey
             | _ -> ()
 
         let cancelPendingPhysicalExecutionLocked (sessionId, physicalUserMessageId) =
@@ -1529,6 +1532,54 @@ module ModelRouting =
                 enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target active.Purpose
             | _ -> enforceStaleObservedBinding observed
 
+        let retargetContinuationInputs sessionId previousPhysicalId physicalUserMessageId admission =
+            match admission with
+            | ExecutionAdmissionAcquisition.Admitted lease ->
+                continuationInputs.Remove((sessionId, physicalUserMessageId)) |> ignore
+                heldPhysicalReleases.Remove(sessionId, previousPhysicalId) |> ignore
+
+                continuationInputs.Keys
+                |> Seq.filter (fun key ->
+                    let retained = continuationInputs.[key].Identity
+
+                    retained.SessionId = sessionId
+                    && retained.PhysicalUserMessageId = previousPhysicalId)
+                |> Seq.toArray
+                |> Array.iter (fun key -> continuationInputs.[key] <- lease)
+            | _ -> ()
+
+        let continueExecutionAdmissionLocked (previous: ExecutionAdmissionLease) physicalUserMessageId =
+            ensureHealthy ()
+            let identity = previous.Identity
+            let sessionId = identity.SessionId
+
+            match activeBySession.TryGetValue sessionId, admissionOwner.Target previous with
+            | (true, current), Ok target when
+                current.PhysicalUserMessageId = Some identity.PhysicalUserMessageId
+                && current.Participant = Some identity.Participant
+                && current.Target = target
+                ->
+                let replacement =
+                    capacity.ContinueExecution(sessionId, identity.PhysicalUserMessageId, physicalUserMessageId, target)
+
+                supersededPhysical.Add(sessionId, identity.PhysicalUserMessageId) |> ignore
+                supersedeCurrentDemand sessionId
+
+                let next =
+                    { current with
+                        PhysicalUserMessageId = Some physicalUserMessageId }
+
+                activeBySession.[sessionId] <- next
+                rememberLeasePurpose sessionId next
+                drainDemands ()
+
+                let admission =
+                    issueAdmission sessionId physicalUserMessageId current.RoutingRole identity.Participant replacement
+
+                retargetContinuationInputs sessionId identity.PhysicalUserMessageId physicalUserMessageId admission
+                admission
+            | _ -> invalidOp "continuation no longer owns its previous model lease"
+
         member _.AcquireExecutionAdmission
             (
                 sessionId: string,
@@ -1570,61 +1621,7 @@ module ModelRouting =
         member internal _.ContinueExecutionAdmission(previous: ExecutionAdmissionLease, physicalUserMessageId: string) =
             try
                 let acquired =
-                    lock gate (fun () ->
-                        ensureHealthy ()
-                        let identity = previous.Identity
-                        let sessionId = identity.SessionId
-
-                        match activeBySession.TryGetValue sessionId, admissionOwner.Target previous with
-                        | (true, current), Ok target when
-                            current.PhysicalUserMessageId = Some identity.PhysicalUserMessageId
-                            && current.Participant = Some identity.Participant
-                            && current.Target = target
-                            ->
-                            let replacement =
-                                capacity.ContinueExecution(
-                                    sessionId,
-                                    identity.PhysicalUserMessageId,
-                                    physicalUserMessageId,
-                                    target
-                                )
-
-                            supersededPhysical.Add(sessionId, identity.PhysicalUserMessageId) |> ignore
-                            supersedeCurrentDemand sessionId
-
-                            let next =
-                                { current with
-                                    PhysicalUserMessageId = Some physicalUserMessageId }
-
-                            activeBySession.[sessionId] <- next
-                            rememberLeasePurpose sessionId next
-                            drainDemands ()
-
-                            let admission =
-                                issueAdmission
-                                    sessionId
-                                    physicalUserMessageId
-                                    current.RoutingRole
-                                    identity.Participant
-                                    replacement
-
-                            match admission with
-                            | ExecutionAdmissionAcquisition.Admitted lease ->
-                                continuationInputs.Remove((sessionId, physicalUserMessageId)) |> ignore
-                                heldPhysicalReleases.Remove(sessionId, identity.PhysicalUserMessageId) |> ignore
-
-                                continuationInputs.Keys
-                                |> Seq.filter (fun key ->
-                                    let retained = continuationInputs.[key].Identity
-
-                                    retained.SessionId = sessionId
-                                    && retained.PhysicalUserMessageId = identity.PhysicalUserMessageId)
-                                |> Seq.toArray
-                                |> Array.iter (fun key -> continuationInputs.[key] <- lease)
-                            | _ -> ()
-
-                            admission
-                        | _ -> invalidOp "continuation no longer owns its previous model lease")
+                    lock gate (fun () -> continueExecutionAdmissionLocked previous physicalUserMessageId)
 
                 Task.FromResult acquired
             with error ->

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Sphinx.V2.Core
 
 open System
+open Fable.Core.JsInterop
 
 open Wanxiangshu.Foundation
 
@@ -102,9 +103,7 @@ type ObservationProjection =
 
 type InterpretationProjection =
     { Key: string
-      Status: string
-      InterpretationId: string option
-      Plugin: string option }
+      Outcome: InterpretationOutcome option }
 
 type RoundProjection =
     { Round: string
@@ -128,6 +127,7 @@ type BudgetProjection =
 
 type AnswerProjection =
     { RenderWork: string
+      ResultObservation: string
       AnswerRef: string
       StopReason: string }
 
@@ -295,11 +295,7 @@ module Projection =
             state.Interpretations
             |> Map.toList
             |> List.sortBy fst
-            |> List.map (fun (key, record) ->
-                { Key = key
-                  Status = record.Status
-                  InterpretationId = record.InterpretationId
-                  Plugin = record.PluginRef })
+            |> List.map (fun (key, record) -> { Key = key; Outcome = record.Outcome })
           Rounds =
             state.Rounds
             |> Map.toList
@@ -311,10 +307,173 @@ module Projection =
             state.Answer
             |> Option.map (fun answer ->
                 { RenderWork = WorkId.value answer.RenderWorkId
+                  ResultObservation = ObservationId.value answer.ResultObservationId
                   AnswerRef = answer.AnswerRef
                   StopReason = answer.StopReason }) }
 
-    let semanticHash (state: InquiryState) : string = state |> semanticProjection |> digest
+    let private record fields = createObj fields
+
+    let private items encode values =
+        values |> List.map encode |> List.toArray |> box
+
+    let private strings values = values |> List.toArray |> box
+
+    let private optional encode value =
+        value |> Option.map encode |> Option.defaultValue null
+
+    let private resources values =
+        values
+        |> items (fun (key, value) -> record [ "key", box key; "value", box value ])
+
+    let private goalView (goal: GoalProjection) =
+        record
+            [ "goalId", box goal.GoalId
+              "revision", box (string goal.Revision)
+              "originalText", box goal.OriginalText
+              "constraints", strings goal.Constraints
+              "materialRefs", strings goal.MaterialRefs
+              "authorizationRef", box goal.Authorization
+              "amendments",
+              goal.Amendments
+              |> items (fun amendment ->
+                  record
+                      [ "authorizedBy", box amendment.AuthorizedBy
+                        "revision", box (string amendment.Revision)
+                        "addedConstraints", strings amendment.AddedConstraints
+                        "replacedText", optional box amendment.ReplacedText ]) ]
+
+    let private interpretationView (value: InterpretationProjection) =
+        let fields =
+            match value.Outcome with
+            | None -> [ "status", box "pending"; "interpretationId", null; "plugin", null ]
+            | Some(InterpretationOutcome.Applied applied) ->
+                [ "status", box "applied"
+                  "interpretationId", box applied.InterpretationId
+                  "plugin", box applied.PluginRef
+                  "delta",
+                  record
+                      [ "schema", record [ "id", box applied.Delta.Schema.Id; "hash", box applied.Delta.Schema.Hash ]
+                        "canonicalPayload", box applied.Delta.CanonicalPayload ] ]
+            | Some(InterpretationOutcome.Failed failed) ->
+                [ "status", box "failed"
+                  "interpretationId", box failed.InterpretationId
+                  "plugin", box failed.PluginRef
+                  "reason", box failed.Reason ]
+
+        record (("key", box value.Key) :: fields)
+
+    let semanticView (state: InquiryState) : obj =
+        let projection = semanticProjection state
+
+        record
+            [ "apiVersion", box projection.ApiVersion
+              "goal", goalView projection.Goal
+              "graph",
+              projection.Graph
+              |> items (fun node ->
+                  record
+                      [ "id", box node.Id
+                        "role", box node.Role
+                        "kind", box node.Kind
+                        "schemaId", box node.SchemaId
+                        "schemaHash", box node.SchemaHash
+                        "revision", box (string node.Revision)
+                        "contentHash", box node.ContentHash
+                        "payload", box node.Payload ])
+              "edges",
+              projection.Edges
+              |> items (fun edge ->
+                  record
+                      [ "id", box edge.Id
+                        "tails", strings edge.Tails
+                        "heads", strings edge.Heads
+                        "relation", box edge.Relation
+                        "revision", box (string edge.Revision)
+                        "payload", optional box edge.Payload
+                        "payloadSchemaId", optional box edge.PayloadSchemaId ])
+              "certificates",
+              projection.Certificates
+              |> items (fun certificate ->
+                  record
+                      [ "key", box certificate.Key
+                        "slots",
+                        certificate.Slots
+                        |> items (fun slot ->
+                            record
+                                [ "slot", box slot.Slot
+                                  "producer", box slot.Producer
+                                  "schemaId", box slot.SchemaId
+                                  "schemaHash", box slot.SchemaHash
+                                  "revision", box (string slot.Revision)
+                                  "status", box slot.Status
+                                  "guarantee", box slot.Guarantee
+                                  "payload", box slot.Payload
+                                  "expectedBase", box (string slot.ExpectedBase) ]) ])
+              "work",
+              projection.Work
+              |> items (fun work ->
+                  record
+                      [ "id", box work.Id
+                        "round", optional box work.Round
+                        "plan", box work.Plan
+                        "producer", box work.Producer
+                        "capability", box work.Capability
+                        "attempt", box (float work.Attempt)
+                        "state", box work.State
+                        "dependencies", strings work.Dependencies
+                        "conflictKeys", strings work.ConflictKeys
+                        "input", optional box work.Input ])
+              "observations",
+              projection.Observations
+              |> items (fun observation ->
+                  record
+                      [ "key", box observation.Key
+                        "work", box observation.Work
+                        "attempt", box (float observation.Attempt)
+                        "observation", box observation.Observation
+                        "cluster", box observation.Cluster
+                        "schemaId", box observation.SchemaId
+                        "schemaHash", box observation.SchemaHash
+                        "result", box observation.Result ])
+              "interpretations", items interpretationView projection.Interpretations
+              "rounds",
+              projection.Rounds
+              |> items (fun round ->
+                  record
+                      [ "round", box round.Round
+                        "scope", box round.Scope
+                        "expected", strings round.Expected
+                        "received", strings round.Received
+                        "terminal", strings round.Terminal
+                        "closed", box round.Closed
+                        "outcome", optional box round.Outcome ])
+              "decisions",
+              projection.Decisions
+              |> items (fun (key, value) -> record [ "key", box key; "value", box value ])
+              "budget",
+              record
+                  [ "settledUsage", resources projection.Budget.SettledUsage
+                    "settledMoneyMinor", box (string projection.Budget.SettledMoneyMinor)
+                    "overruns",
+                    projection.Budget.Overruns
+                    |> items (fun overrun ->
+                        record
+                            [ "work", box overrun.Work
+                              "attempt", box (float overrun.Attempt)
+                              "resources", resources overrun.Resources ])
+                    "reservations",
+                    projection.Budget.Reservations
+                    |> items (fun (key, value) -> record [ "key", box key; "resources", resources value ]) ]
+              "answer",
+              projection.Answer
+              |> optional (fun answer ->
+                  record
+                      [ "renderWork", box answer.RenderWork
+                        "resultObservation", box answer.ResultObservation
+                        "answerRef", box answer.AnswerRef
+                        "stopReason", box answer.StopReason ]) ]
+
+    let semanticHash (state: InquiryState) : string = state |> semanticView |> digest
 
     /// Covers every materialized field, including the physical bindings recovery needs.
     /// Two hosts that dispatched through different sessions differ here, which is why
@@ -324,4 +483,4 @@ module Projection =
     /// Covers the accepted canonical envelopes in their exact order. Two hosts that ran
     /// different physical retries legitimately differ here; that is the point.
     let traceHash (envelopes: string list) : string =
-        envelopes |> List.toArray |> box |> digest
+        envelopes |> List.map Fable.Core.JS.JSON.parse |> List.toArray |> box |> digest

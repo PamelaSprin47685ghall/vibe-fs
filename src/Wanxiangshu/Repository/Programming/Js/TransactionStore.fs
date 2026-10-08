@@ -9,8 +9,8 @@ open Wanxiangshu.Persistence.EventStore
 /// Narrow durable capability exposed to js-* workflow/tool wiring. The Host
 /// registry never owns both AgentJournal and the raw EventStore capability.
 type IJsTransactionPersistence =
-    abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, string>>
-    abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, string>>
+    abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, JsTransactionAppendFailure>>
+    abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
 
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
@@ -80,8 +80,24 @@ module JsToolsTransactionStore =
             Decode.fromValue "$" decodeCommitted envelope.Payload |> Result.map Committed
         | other -> Error(sprintf "not a JsTransaction event: %s" other)
 
+    let private tripSettledCut eventType eventId error =
+        if
+            AppendError.semanticCuts error
+            |> List.exists (fun cut -> cut.FailedEventId = eventId)
+        then
+            FatalProcess.trip
+                "js-transaction-semantic-cut"
+                (sprintf
+                    "%s semantic cut after append %s: %s"
+                    eventType
+                    (EventId.value eventId)
+                    (AppendError.describe error))
+
     /// Append the Prepared fact using the Integrator-owned structural head.
-    let appendPrepared (store: IEventStore) (prepared: JsTransactionPrepared) : Task<Result<EventId, string>> =
+    let appendPrepared
+        (store: IEventStore)
+        (prepared: JsTransactionPrepared)
+        : Task<Result<EventId, JsTransactionAppendFailure>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
             let streamId = EventStreamId.create TransactionStream
@@ -100,13 +116,30 @@ module JsToolsTransactionStore =
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
                 let reason = "JsTransactionPrepared semantic cut: " + cut.Reason
                 FatalProcess.trip "js-transaction-semantic-cut" reason
-                return Error reason
+
+                return
+                    Error
+                        { Phase = JsTransactionAppendPhase.Prepared
+                          TransactionId = prepared.TransactionId
+                          EventId = eventId
+                          Error = AppendError.SemanticCut cut }
             | Ok _ -> return Ok eventId
-            | Error err -> return Error(sprintf "JsTransactionPrepared append failed: %A" err)
+            | Error err ->
+                tripSettledCut PreparedEventType eventId err
+
+                return
+                    Error
+                        { Phase = JsTransactionAppendPhase.Prepared
+                          TransactionId = prepared.TransactionId
+                          EventId = eventId
+                          Error = err }
         }
 
     /// Append the Committed fact for a prepared transaction.
-    let appendCommitted (store: IEventStore) (transactionId: JsTransactionId) : Task<Result<EventId, string>> =
+    let appendCommitted
+        (store: IEventStore)
+        (transactionId: JsTransactionId)
+        : Task<Result<EventId, JsTransactionAppendFailure>> =
         task {
             let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
             let streamId = EventStreamId.create TransactionStream
@@ -125,9 +158,23 @@ module JsToolsTransactionStore =
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
                 let reason = "JsTransactionCommitted semantic cut: " + cut.Reason
                 FatalProcess.trip "js-transaction-semantic-cut" reason
-                return Error reason
+
+                return
+                    Error
+                        { Phase = JsTransactionAppendPhase.Committed
+                          TransactionId = transactionId
+                          EventId = eventId
+                          Error = AppendError.SemanticCut cut }
             | Ok _ -> return Ok eventId
-            | Error err -> return Error(sprintf "JsTransactionCommitted append failed: %A" err)
+            | Error err ->
+                tripSettledCut CommittedEventType eventId err
+
+                return
+                    Error
+                        { Phase = JsTransactionAppendPhase.Committed
+                          TransactionId = transactionId
+                          EventId = eventId
+                          Error = err }
         }
 
     let createPersistence (store: IEventStore) : IJsTransactionPersistence =

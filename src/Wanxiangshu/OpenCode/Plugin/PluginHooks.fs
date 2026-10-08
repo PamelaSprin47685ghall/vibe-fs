@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 #nowarn "3511"
 
 open System
@@ -185,7 +186,8 @@ module PluginHooks =
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
-                        | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
+                        | Some ws ->
+                            CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws boot.CasebookSettlements
                         | None -> []
 
                     let toolRegistration =
@@ -390,6 +392,7 @@ module PluginHooks =
                     removePendingCheckpoint key
                     settledTodoCheckpointCalls.Remove(key) |> ignore
                 | JournalAppendFailure.WriteUnknown _
+                | JournalAppendFailure.NoNewWriteReleaseFailed _
                 | JournalAppendFailure.FactRejected _ -> ()
 
             let appendTerminalCheckpoint key sessionText callId =

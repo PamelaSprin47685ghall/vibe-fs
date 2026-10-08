@@ -25,6 +25,8 @@
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Settlement.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Settlement.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/AppendSurface.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/AppendSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Store.fsi"/>

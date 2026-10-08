@@ -60,11 +60,36 @@ const withPlugin = async (action) => {
 const withHost = async (mode, action) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-drain-journal-'))
   const host = await recoveryHost.bootControlledRecoveryHost(directory, 'absent', mode)
+  const pendingDrains = []
+  let barrierReleased = false
+  let actionFailure
+  const terminalWriter = {
+    trackDrain: (drain) => {
+      pendingDrains.push(drain)
+      return drain
+    },
+    releaseBarrier: () => {
+      if (!barrierReleased) {
+        recoveryHost.releaseTerminalBarrier(host)
+        barrierReleased = true
+      }
+    },
+  }
   try {
-    await action(host, directory)
+    await action(host, directory, terminalWriter)
+  } catch (error) {
+    actionFailure = { error }
+    throw error
   } finally {
-    recoveryHost.disposeRecoveryHost(host)
-    rmSync(directory, { recursive: true, force: true })
+    try {
+      if (mode === 'held') terminalWriter.releaseBarrier()
+      const settled = await Promise.allSettled(pendingDrains)
+      const failures = settled.filter((drain) => drain.status === 'rejected').map((drain) => drain.reason)
+      if (!actionFailure && failures.length) throw new AggregateError(failures, 'Held terminal drain failed', { cause: failures[0] })
+    } finally {
+      recoveryHost.disposeRecoveryHost(host)
+      rmSync(directory, { recursive: true, force: true })
+    }
   }
 }
 
@@ -83,14 +108,14 @@ const acquireSessionLeases = async (session) => {
 
 test('WHAT[managed-session-lifecycle-019] actual session delete waits for every exact terminal commit and capacity release before completing (GAP-126)', async () => {
   await withPlugin(async () => {
-    await withHost('held', async (host, directory) => {
+    await withHost('held', async (host, directory, terminalWriter) => {
       await seedDrainedSession(host, 'ses-delete')
       await recoveryHost.seedProviderStarted(host, 'ses-preserved', 'msg-preserved', 'provider-preserved')
       await acquireSessionLeases('ses-delete')
       await acquireLease('ses-preserved', 'msg-preserved')
 
       let completed = false
-      const drained = recoveryHost.clearSession(host, 'ses-delete')
+      const drained = terminalWriter.trackDrain(recoveryHost.clearSession(host, 'ses-delete'))
       drained.then(() => { completed = true }, () => { completed = true })
       await recoveryHost.awaitTerminalBarrier(host)
       await setImmediate()
@@ -107,7 +132,7 @@ test('WHAT[managed-session-lifecycle-019] actual session delete waits for every 
       assert.equal(recoveryHost.executionStatus(host, 'ses-delete', 'msg-ses-delete-started').phase, 'ProviderStarted')
       assert.equal(executionCount('ses-preserved', 'msg-preserved'), 1)
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       await drained
       assert.equal(completed, true)
 
@@ -129,14 +154,14 @@ test('WHAT[managed-session-lifecycle-019] actual session delete waits for every 
 
 test('WHAT[managed-session-lifecycle-019] actual logical cancel waits for every key settlement and exact capacity release (GAP-126)', async () => {
   await withPlugin(async () => {
-    await withHost('held', async (host, directory) => {
+    await withHost('held', async (host, directory, terminalWriter) => {
       await seedDrainedSession(host, 'ses-cancel')
       await recoveryHost.seedProviderStarted(host, 'ses-preserved', 'msg-preserved', 'provider-preserved')
       await acquireSessionLeases('ses-cancel')
       await acquireLease('ses-preserved', 'msg-preserved')
 
       let completed = false
-      const cancelled = recoveryHost.signalSessionCancelled(host, 'ses-cancel')
+      const cancelled = terminalWriter.trackDrain(recoveryHost.signalSessionCancelled(host, 'ses-cancel'))
       cancelled.then(() => { completed = true }, () => { completed = true })
       await recoveryHost.awaitTerminalBarrier(host)
       await setImmediate()
@@ -150,7 +175,7 @@ test('WHAT[managed-session-lifecycle-019] actual logical cancel waits for every 
       assert.equal(terminalLineCount(directory), 0)
       assert.equal(recoveryHost.executionStatus(host, 'ses-cancel', 'msg-ses-cancel-started').phase, 'ProviderStarted')
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       await cancelled
       assert.equal(completed, true)
 

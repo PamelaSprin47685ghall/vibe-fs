@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Context.Companion
@@ -133,7 +134,7 @@ module AgentJournalPortAdapter =
                     authority.PendingClaims
                     |> Map.exists (fun _ claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                                           PromptAuthority.ContinuationKind.JoinGuard
+                            PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
 

@@ -518,6 +518,98 @@ module ReconcileSurface =
         | ReconcileProgram.TurnInProgress -> "TurnInProgress", ""
         | ReconcileProgram.TurnNeedsContinuation reason -> "TurnNeedsContinuation", reason
 
+    let physicalIngressDuringSnapshotScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "held-snapshot-session"
+            let oldPhysical = PhysicalUserMessageId.create "held-snapshot-old"
+            let humanPhysical = PhysicalUserMessageId.create "held-snapshot-human"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, oldPhysical)
+            let oldReadEntered = TaskCompletionSource<unit>()
+            let releaseOldRead = TaskCompletionSource<unit>()
+            let humanReadEntered = TaskCompletionSource<unit>()
+            let releaseHumanRead = TaskCompletionSource<unit>()
+            // DSL-MUTABLE: algorithm-scratch — observations of actual Scheduler callbacks.
+            let published = ResizeArray<ReconciledTurnContext>()
+            // DSL-MUTABLE: algorithm-scratch — complete snapshots delivered by actual Scheduler callbacks.
+            let observedSnapshots = ResizeArray<string array>()
+            // DSL-MUTABLE: algorithm-scratch — counts actual snapshot reads.
+            let mutable snapshotReads = 0
+            // DSL-MUTABLE: algorithm-scratch — publication count when the next actual snapshot starts.
+            let mutable publishedBeforeHumanRead = 0
+
+            let completedMessages physical provider =
+                [ schedulerMessage physical "user" None None None false [||]
+                  schedulerMessage
+                      provider
+                      "assistant"
+                      (Some physical)
+                      (Some "stop")
+                      None
+                      true
+                      [| MessagePart.Text "completed response" |] ]
+
+            let oldMessages = completedMessages "held-snapshot-old" "held-snapshot-old-run"
+
+            let humanMessages =
+                oldMessages @ completedMessages "held-snapshot-human" "held-snapshot-human-run"
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        task {
+                            snapshotReads <- snapshotReads + 1
+
+                            if snapshotReads = 1 then
+                                AsyncSupport.trySetResult oldReadEntered () |> ignore
+                                do! releaseOldRead.Task
+                                return Ok oldMessages
+                            else
+                                publishedBeforeHumanRead <- published.Count
+                                AsyncSupport.trySetResult humanReadEntered () |> ignore
+                                do! releaseHumanRead.Task
+                                return Ok humanMessages
+                        } }
+
+            let onTurn (context: ReconciledTurnContext) : Task =
+                published.Add context
+                Task.FromResult(()) :> Task
+
+            let observeSnapshot (_: SessionId) (messages: SessionMessage list) : Task =
+                observedSnapshots.Add(messages |> List.map (fun message -> message.Id) |> List.toArray)
+                Task.FromResult(()) :> Task
+
+            let scheduler =
+                Reconciler.Scheduler(snapshot, store, onTurn, ?onSnapshot = Some observeSnapshot)
+
+            let quiescence = SessionQuiescenceGate()
+            quiescence.BeginProviderAttempt sessionId
+            scheduler.SignalIdle(sessionId, quiescence.ObserveIdle sessionId)
+            do! oldReadEntered.Task
+            scheduler.BindPhysicalUserMaterial(sessionId, humanPhysical)
+            quiescence.ObservePhysicalUserMessage(sessionId, humanPhysical)
+            quiescence.BeginProviderAttempt sessionId
+            scheduler.SignalIdle(sessionId, quiescence.ObserveIdle sessionId)
+            AsyncSupport.trySetResult releaseOldRead () |> ignore
+            do! humanReadEntered.Task
+            AsyncSupport.trySetResult releaseHumanRead () |> ignore
+            do! scheduler.StopAndDrain()
+
+            return
+                box
+                    {| snapshotReads = snapshotReads
+                       publishedBeforeHumanRead = publishedBeforeHumanRead
+                       observedSnapshots = observedSnapshots.ToArray()
+                       published =
+                        published
+                        |> Seq.map (fun context ->
+                            {| physical = PhysicalUserMessageId.value context.Turn.PhysicalUserMessageId
+                               providerRun = ProviderRunIdentity.value context.Turn.ProviderRun
+                               outcome = fst (outcomeAndReason context)
+                               hasQuiescence = Option.isSome context.Quiescence |})
+                        |> Seq.toArray |}
+        }
+
     let private formatObserved (snapshotReads: int) (observed: ReconciledTurnContext option) : obj =
         match observed with
         | None ->

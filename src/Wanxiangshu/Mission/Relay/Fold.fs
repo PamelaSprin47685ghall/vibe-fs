@@ -47,11 +47,6 @@ type RoadView =
         ActiveAuthorityRevision: AuthorityRevision option
         ActiveCleanupBlockerDigest: string option
         AcceptedAssessmentTransport: (string * string) option
-        /// Snapshot the accepted assessment bound (relay-assessment-003). Distinct
-        /// from ActiveSnapshotId, which stays at the incumbency-opening snapshot;
-        /// an exact replay compares its fresh capture against this one.
-        AcceptedAssessmentSnapshotId: WorkspaceSnapshotId option
-        AcceptedAssessmentScores: ScoreVector option
         RetiredIncumbencies: IncumbencyId list
         RetiredProviderRunIds: Set<string>
         Certificate: QualityCertificate option
@@ -157,6 +152,23 @@ module private Internal =
         (binding: AssessmentBinding)
         =
         accepted.Id = assessmentId || accepted.Binding.ToolCallId = binding.ToolCallId
+
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+            let! active = current.Active |> require "NoActiveIncumbency"
+            do! requireMatchingIncumbency active incumbencyId
+            let! accepted = active.Assessment |> require "AssessmentRequired"
+
+            if
+                current.AuthorityRevision = authorityRevision
+                && active.AuthorityRevision = authorityRevision
+                && isExactAssessment accepted accepted.Id binding snapshotId authorityRevision scores
+            then
+                return accepted.Scores
+            else
+                return! Error "AssessmentReplayConflict"
+        }
 
     let private decideStoredAssessment
         (accepted: AssessmentRecord)
@@ -722,6 +734,9 @@ module private Internal =
 module Fold =
     let empty = RelayState Map.empty
 
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
+        Internal.tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores
+
     let apply state roadId transaction =
         RelayTransaction.events transaction
         |> List.fold
@@ -758,13 +773,6 @@ module Fold =
                 |> Option.bind (fun active ->
                     active.Assessment
                     |> Option.map (fun assessment -> assessment.Binding.ToolCallId, assessment.Binding.PayloadDigest))
-              AcceptedAssessmentSnapshotId =
-                road.Active
-                |> Option.bind (fun active ->
-                    active.Assessment |> Option.map (fun assessment -> assessment.SnapshotId))
-              AcceptedAssessmentScores =
-                road.Active
-                |> Option.bind (fun active -> active.Assessment |> Option.map (fun assessment -> assessment.Scores))
               RetiredIncumbencies = road.Retired
               RetiredProviderRunIds = road.RetiredProviderRunIds
               Certificate = road.Certificate

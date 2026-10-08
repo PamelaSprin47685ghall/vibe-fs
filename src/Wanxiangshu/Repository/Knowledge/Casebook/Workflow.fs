@@ -24,7 +24,7 @@ module CasebookFeature =
 
 module CasebookWorkflow =
 
-    let archiveCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
+    let archiveCase (store: IEventStore) (case: Case) : Task<Result<unit, CasebookMutationError>> =
         task {
             let canonical =
                 { case with
@@ -32,7 +32,7 @@ module CasebookWorkflow =
 
             match! CasebookStore.appendCaptured store canonical with
             | Ok _ -> return Ok()
-            | Error err -> return Error err
+            | Error err -> return Error(CasebookMutationError.AppendFailure err)
         }
 
 
@@ -93,9 +93,12 @@ module CasebookWorkflow =
         (maintenanceFileState: string)
         (relatedPaths: string list)
         (observations: Observation list)
-        : Task<Result<unit, string>> =
+        : Task<Result<unit, CasebookMutationError>> =
         taskResult {
-            let! _ = CasebookStore.appendRefreshed store identity q a maintenanceFileState relatedPaths observations
+            let! _ =
+                CasebookStore.appendRefreshed store identity q a maintenanceFileState relatedPaths observations
+                |> TaskResult.mapError CasebookMutationError.AppendFailure
+
             return ()
         }
 
@@ -106,12 +109,14 @@ module CasebookWorkflow =
         (newStateRef: string)
         (q: string)
         (a: string)
-        : Task<Result<unit, string>> =
+        : Task<Result<unit, CasebookMutationError>> =
         taskResult {
-            let! caseOpt = fetchCase store 0 identity
+            let! caseOpt =
+                fetchCase store 0 identity
+                |> TaskResult.mapError CasebookMutationError.PreparationRejected
 
             match caseOpt with
-            | None -> return! Error(sprintf "case %s not found" identity)
+            | None -> return! Error(CasebookMutationError.CaseMissing identity)
             | Some existing ->
                 let related = existing.RelatedPaths
                 let obs = existing.Observations
@@ -119,17 +124,17 @@ module CasebookWorkflow =
                 return ()
         }
 
-    let finalizeCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
+    let finalizeCase (store: IEventStore) (case: Case) : Task<Result<unit, CasebookMutationError>> =
         task {
             match! fetchCase store 0 case.Identity with
-            | Error err -> return Error err
-            | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.Identity)
+            | Error err -> return Error(CasebookMutationError.PreparationRejected err)
+            | Ok(Some _) -> return Error(CasebookMutationError.AlreadyFinalized case.Identity)
             | Ok None -> return! archiveCase store case
         }
 
-    let touchCaseAccess (store: IEventStore) (identity: string) : Task<Result<unit, string>> =
+    let touchCaseAccess (store: IEventStore) (identity: string) : Task<Result<unit, CasebookMutationError>> =
         task {
             match! CasebookStore.appendAccessed store identity with
             | Ok _ -> return Ok()
-            | Error err -> return Error err
+            | Error err -> return Error(CasebookMutationError.AppendFailure err)
         }

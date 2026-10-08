@@ -409,20 +409,25 @@ export function restoreStagedDist(targetDist, backupDir) {
   }
 }
 
-// A previously interrupted build may have left a staged backup behind. When
-// dist exists with content, the interrupted build had committed, so dist is
-// authoritative and the stale backup is dropped; otherwise the backup is the
-// last known-good dist and is restored.
+function matchesCommittedOutputs(targetDist) {
+  try {
+    const manifest = readManifest({ root: path.dirname(targetDist) })
+    return manifest?.schema === MANIFEST_SCHEMA && checkOutputsValid(manifest, targetDist)
+  } catch {
+    return false
+  }
+}
+
+// Copying outputs can be interrupted before the manifest's atomic commit.
+// Only a complete match with committed output bytes authorizes dropping the
+// backup; otherwise restore the prior dist without changing the manifest.
 export function recoverStaleStagedDist(targetDist) {
   const backupDir = stagedBackupDirFor(targetDist)
   if (!fs.existsSync(backupDir)) return
-  const distHasContent =
-    fs.existsSync(targetDist) && fs.readdirSync(targetDist).length > 0
-  if (distHasContent) {
+  if (matchesCommittedOutputs(targetDist)) {
     fs.rmSync(backupDir, { recursive: true, force: true })
   } else {
-    fs.rmSync(targetDist, { recursive: true, force: true })
-    fs.renameSync(backupDir, targetDist)
+    restoreStagedDist(targetDist, backupDir)
   }
 }
 

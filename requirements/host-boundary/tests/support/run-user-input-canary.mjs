@@ -371,6 +371,9 @@ export default function route(role, running) {
   console.error(`Host stdout:\n${host.stdoutLog}\nHost stderr:\n${host.stderrLog}`)
   process.exitCode = 1
 } finally {
+  if (process.env.WXS_USER_INPUT_TRACE) {
+    fs.writeFileSync(process.env.WXS_USER_INPUT_TRACE, JSON.stringify({ observations, results }))
+  }
   release('tool')
   if (sessionID) {
     try {

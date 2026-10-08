@@ -9,14 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
-import {
-  collectVerificationInputs,
-  computeDigest,
-  diffVerificationInputs,
-  materializeVerificationSnapshot,
-  releaseVerificationSnapshot,
-  verifyVerificationSnapshotIntegrity,
-} from './lib/build-state.mjs'
+import { collectVerificationInputs, computeDigest, diffVerificationInputs } from './lib/build-state.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -234,6 +227,7 @@ export async function verify({
   const runLogDir = allocateRunLogDir(baseLogDir)
 
   const stepRunner = runStepOverride ?? defaultRunStepFactory(resolvedRoot, verbose, output)
+  const plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv })
   const mode = release ? 'release' : 'daily'
   const runStart = Date.now()
 
@@ -246,7 +240,7 @@ export async function verify({
     output.write(`FAIL: input collection error: ${err.message}\n`)
     return {
       mode,
-      steps: verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv }).map((p) => ({ label: p.label, status: 'not-run' })),
+      steps: plannedSteps.map((p) => ({ label: p.label, status: 'not-run' })),
       outcome: 'fail',
       failureReason: `input-collection-failed: ${err.message}`,
       wallMs,
@@ -256,139 +250,98 @@ export async function verify({
   }
 
   const initialDigest = computeDigest(beforeInputs).slice(0, 16)
-
-  // VS-016：执行前物化同一份完整、固定的输入快照；所有阶段在快照上执行，
-  // 与工作区并行编辑隔离。物化或准备一致性失败时零阶段启动并回收快照。
-  let snapshot
-  try {
-    snapshot = materializeVerificationSnapshot(resolvedRoot, beforeInputs, os.tmpdir())
-  } catch (err) {
-    const wallMs = Date.now() - runStart
-    output.write(`\n=== verify: ${mode}  inputs=${initialDigest} snapshot=error ===\n`)
-    output.write(`FAIL: snapshot preparation error: ${err.message}\n`)
-    return {
-      mode,
-      steps: verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv }).map((p) => ({ label: p.label, status: 'not-run' })),
-      outcome: 'fail',
-      failureReason: `snapshot-preparation-failed: ${err.message}`,
-      wallMs,
-      logDirectory: runLogDir,
-      exitCode: 1,
-    }
-  }
-
-  // 结论绑定：快照 manifest 写入本次 run 日志目录；结果对象、日志与输出
-  // 摘要共同绑定同一份快照 digest，证据与快照同源可查。快照本体在运行结
-  // 束后回收，manifest 持久保留。
-  const manifestPath = path.join(runLogDir, 'snapshot-manifest.json')
-  fs.writeFileSync(manifestPath, JSON.stringify({
-    digest: snapshot.digest,
-    root: resolvedRoot,
-    fileCount: snapshot.files.length,
-    files: snapshot.files,
-  }, null, 2))
-
-  const snapshotBinding = { digest: snapshot.digest, manifestPath, directory: snapshot.dir }
-  output.write(`\n=== verify: ${mode}  inputs=${initialDigest} snapshot=${snapshot.digest.slice(0, 16)} ===\n`)
-
-  const plannedSteps = verificationSteps({ root: snapshot.dir, release, verbose, env: hostEnv })
+  output.write(`\n=== verify: ${mode}  inputs=${initialDigest} ===\n`)
 
   const stepResults = []
   let pipelineFailed = false
   let failureReason
   let inputChanges
 
-  const checkInputsStable = () => {
-    // 工作树偏离：执行前捕获的输入身份不允许中途漂移。
-    let worktreeDiff
-    try {
-      worktreeDiff = diffVerificationInputs(beforeInputs, collectVerificationInputs(resolvedRoot))
-    } catch (err) {
-      worktreeDiff = { equal: false, reason: `after-input-collection-failed: ${err.message}` }
+  for (let i = 0; i < plannedSteps.length; i++) {
+    const stepPlan = plannedSteps[i]
+    if (pipelineFailed) {
+      stepResults.push({ label: stepPlan.label, status: 'not-run' })
+      continue
     }
-    if (!worktreeDiff.equal) return worktreeDiff
-    // 快照完整性：物化输入被改写、替换、增删（含步骤内改写后还原）立即失败。
-    return verifyVerificationSnapshotIntegrity(snapshot)
-  }
 
-  try {
-    for (let i = 0; i < plannedSteps.length; i++) {
-      const stepPlan = plannedSteps[i]
-      if (pipelineFailed) {
-        stepResults.push({ label: stepPlan.label, status: 'not-run' })
-        continue
+    let res
+    try {
+      res = await stepRunner({
+        ...stepPlan,
+        logDir: runLogDir,
+        cwd: resolvedRoot,
+      })
+    } catch (err) {
+      res = {
+        label: stepPlan.label,
+        ok: false,
+        exitCode: 1,
+        signal: null,
+        durationMs: 0,
+        error: err,
       }
+    }
 
-      let res
+    const durationMs = res.durationMs ?? 0
+    if (res.ok) {
+      stepResults.push({
+        label: res.label ?? stepPlan.label,
+        stage: res.label ?? stepPlan.label,
+        status: 'ok',
+        exitCode: res.exitCode ?? 0,
+        signal: res.signal ?? null,
+        durationMs,
+        wallMs: durationMs,
+      })
+      output.write(`  ${stepPlan.label.padEnd(14)} OK  ${(durationMs / 1000).toFixed(1)}s\n`)
+
       try {
-        res = await stepRunner({
-          ...stepPlan,
-          logDir: runLogDir,
-          cwd: snapshot.dir,
-          snapshotRoot: snapshot.dir,
-          snapshotDigest: snapshot.digest,
-        })
-      } catch (err) {
-        res = {
-          label: stepPlan.label,
-          ok: false,
-          exitCode: 1,
-          signal: null,
-          durationMs: 0,
-          error: err,
-        }
-      }
-
-      const durationMs = res.durationMs ?? 0
-      if (res.ok) {
-        stepResults.push({
-          label: res.label ?? stepPlan.label,
-          stage: res.label ?? stepPlan.label,
-          status: 'ok',
-          exitCode: res.exitCode ?? 0,
-          signal: res.signal ?? null,
-          durationMs,
-          wallMs: durationMs,
-        })
-        output.write(`  ${stepPlan.label.padEnd(14)} OK  ${(durationMs / 1000).toFixed(1)}s\n`)
-
-        const diff = checkInputsStable()
+        const currentInputs = collectVerificationInputs(resolvedRoot)
+        const diff = diffVerificationInputs(beforeInputs, currentInputs)
         if (!diff.equal) {
           pipelineFailed = true
           inputChanges = diff
           failureReason = `inputs-changed:${diff.reason}`
         }
-      } else {
+      } catch (err) {
         pipelineFailed = true
-        failureReason = `step-failed:${stepPlan.label}`
-        stepResults.push({
-          label: res.label ?? stepPlan.label,
-          stage: res.label ?? stepPlan.label,
-          status: 'failed',
-          exitCode: res.exitCode ?? 1,
-          signal: res.signal ?? null,
-          durationMs,
-          wallMs: durationMs,
-          ...(res.error ? { error: res.error } : {}),
-        })
-        output.write(`  ${stepPlan.label.padEnd(14)} FAIL(${res.exitCode ?? 1})  ${(durationMs / 1000).toFixed(1)}s\n`)
+        failureReason = `after-input-collection-failed: ${err.message}`
       }
+    } else {
+      pipelineFailed = true
+      failureReason = `step-failed:${stepPlan.label}`
+      stepResults.push({
+        label: res.label ?? stepPlan.label,
+        stage: res.label ?? stepPlan.label,
+        status: 'failed',
+        exitCode: res.exitCode ?? 1,
+        signal: res.signal ?? null,
+        durationMs,
+        wallMs: durationMs,
+        ...(res.error ? { error: res.error } : {}),
+      })
+      output.write(`  ${stepPlan.label.padEnd(14)} FAIL(${res.exitCode ?? 1})  ${(durationMs / 1000).toFixed(1)}s\n`)
     }
+  }
 
-    if (!inputChanges) {
-      const finalDiff = checkInputsStable()
-      if (!finalDiff.equal) {
-        inputChanges = finalDiff
+  let afterInputs
+  if (!inputChanges) {
+    try {
+      afterInputs = collectVerificationInputs(resolvedRoot)
+      const diff = diffVerificationInputs(beforeInputs, afterInputs)
+      if (!diff.equal) {
+        inputChanges = diff
         if (!pipelineFailed) {
           pipelineFailed = true
-          failureReason = `inputs-changed:${finalDiff.reason}`
+          failureReason = `inputs-changed:${diff.reason}`
         }
       }
+    } catch (err) {
+      if (!pipelineFailed) {
+        pipelineFailed = true
+        failureReason = `after-input-collection-failed: ${err.message}`
+      }
     }
-  } finally {
-    // 资源回收：无论成败还是步骤异常，快照在返回前释放；快照 manifest 已
-    // 持久于 run 日志目录，证据不随快照本体回收而丢失。
-    releaseVerificationSnapshot(snapshot)
   }
 
   const wallMs = Date.now() - runStart
@@ -410,7 +363,6 @@ export async function verify({
       outcome: 'fail',
       ...(failureReason ? { failureReason } : {}),
       ...(inputChanges ? { inputChanges } : {}),
-      snapshot: snapshotBinding,
       wallMs,
       logDirectory: runLogDir,
       exitCode: 1,
@@ -430,7 +382,6 @@ export async function verify({
     mode,
     steps: stepResults,
     outcome: 'pass',
-    snapshot: snapshotBinding,
     wallMs,
     logDirectory: runLogDir,
     exitCode: 0,

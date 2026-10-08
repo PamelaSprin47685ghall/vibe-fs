@@ -11,12 +11,13 @@ module CasebookFetchSurface =
 
     let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
-    let contract (toolModule: obj) (workspaceRoot: string) (store: obj) : obj =
+    let contract (toolModule: obj) (workspaceRoot: string) (store: obj) (owner: obj) : obj =
         let spec =
             Wanxiangshu.OpenCode.FetchTool.spec
                 (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
                 workspaceRoot
                 (storeOf store)
+                (unbox<CasebookSettlementOwner> owner)
 
         box
             {| name = spec.Name

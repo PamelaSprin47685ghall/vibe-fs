@@ -17,7 +17,7 @@ module PromptDispatcherSend =
             identitySeed: PromptAuthority.IdentitySeed ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
                 Task<Result<PromptKey, string>>
 
         member SendAgentOwnerRootDetachedObserved:
@@ -36,7 +36,8 @@ module PromptDispatcherSend =
             identitySeed: PromptAuthority.IdentitySeed ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
+            onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option ->
             tools: Map<string, bool> ->
                 Task<Result<PromptKey, string>>
 
@@ -48,7 +49,7 @@ module PromptDispatcherSend =
             profile: PromptAuthority.AuthorityExecutionProfile ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
                 Task<Result<PromptKey, string>>
 
         member SendGateNudge:
@@ -61,7 +62,7 @@ module PromptDispatcherSend =
             profile: PromptAuthority.AuthorityExecutionProfile ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
                 Task<Result<PromptKey, string>>
 
         member SendContinuationWithTools:
@@ -72,7 +73,8 @@ module PromptDispatcherSend =
             profile: PromptAuthority.AuthorityExecutionProfile ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
+            onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option ->
             tools: Map<string, bool> ->
                 Task<Result<PromptKey, string>>
 
@@ -86,7 +88,7 @@ module PromptDispatcherSend =
             profile: PromptAuthority.AuthorityExecutionProfile ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
                 Task<Result<PromptKey, string>>
 
         member SendManagedAssignment:
@@ -106,7 +108,7 @@ module PromptDispatcherSend =
             profile: PromptAuthority.AuthorityExecutionProfile ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
+            onAccepted: ContinuationAcceptanceObserver option ->
             physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
                 Task<PromptDispatcher.SendAttemptOutcome>
 
@@ -121,6 +123,7 @@ module PromptDispatcherSend =
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
+            observer: ContinuationAcceptanceObserver option ->
                 Task<PromptDispatcher.SendAttemptOutcome>
 
         member internal SendIdleInteractionRepair:

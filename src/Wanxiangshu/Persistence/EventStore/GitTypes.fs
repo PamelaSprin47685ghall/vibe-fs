@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 
 /// Git object identity exists only at the remote-sync membrane.
 type GitObjectId = private GitObjectId of string
@@ -99,6 +100,7 @@ type PublishError =
     | SemanticCut of SemanticCut
     | PublishFailed of reason: string
     | IncompletePayloadClosure
+    | AppendSettlementFailed of EventId * AppendError
 
 [<RequireQualifiedAccess>]
 type ConvergeError =

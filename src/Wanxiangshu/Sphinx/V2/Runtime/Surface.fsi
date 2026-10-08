@@ -9,8 +9,12 @@ open Wanxiangshu.Sphinx.V2.Plugins
 ///
 /// A caller supplies plain records. `Location` is NaN when absent, `Rank` is -1 when
 /// the plan was never compared, and `Kind` is a plain string naming the estimate kind.
-/// `Rank` alone decides.
+/// Usable estimates retain their declared kind and rank.
 module Surface =
+    /// Inspect the original registry's binding and lock through native declarations.
+    /// This operation does not execute plugin capabilities or authorize work.
+    val inspectRegistryBinding: declarations: obj array -> obj
+
     // Decision
     val decisionRank: string -> obj list -> obj array
     val decisionSupportsNumeric: obj list -> bool

@@ -14,15 +14,24 @@ module CasebookTools =
     /// Marker + EventStore availability → fetch + js-bookkeeper, or none.
     /// Acquire failure degrades the surface instead of failing the plugin —
     /// the schema gate and the execution gate stay in agreement.
-    let private tryBuildSpecs (factory: HostToolFactory) (workspaceRoot: string) : ToolSpec list =
+    let private tryBuildSpecs
+        (factory: HostToolFactory)
+        (workspaceRoot: string)
+        (owner: CasebookSettlementOwner)
+        : ToolSpec list =
         try
             let store = WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
-            [ FetchTool.spec factory workspaceRoot store; JsBookkeeperTool.spec factory ]
+
+            [ FetchTool.spec factory workspaceRoot store owner
+              JsBookkeeperTool.spec factory ]
         with _ ->
             []
 
-    let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) : ToolSpec list =
+    let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) (owner: CasebookSettlementOwner) : ToolSpec list =
+        if isNull (box owner) then
+            nullArg "owner"
+
         if not (CasebookFeature.isEnabled workspaceRoot) then
             []
         else
-            tryBuildSpecs factory workspaceRoot
+            tryBuildSpecs factory workspaceRoot owner

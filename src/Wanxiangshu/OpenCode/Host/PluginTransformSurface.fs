@@ -51,7 +51,7 @@ module PluginTransformSurface =
                   ApplyReadonlyDelegation = fun _ _ -> complete "delegation"
                   InjectPairGuideline = fun _ _ _ -> complete "pair"
                   ProjectRequirementGrounding = fun _ _ -> complete "grounding"
-                  InjectBloggerChronicle = fun _ _ -> record "chronicle"
+                  InjectBloggerChronicle = fun _ _ _ -> record "chronicle"
                   SettleAndReplaceDeferredInspections = fun _ _ -> complete "deferred"
                   SanitizeMessages = fun _ -> record "sanitize" }
 

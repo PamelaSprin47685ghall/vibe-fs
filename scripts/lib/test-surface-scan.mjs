@@ -305,8 +305,10 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/SyncDelegate/Surface.js',
     owner: 'delegation',
-    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'MANAGED-SESSION-001', 'MANAGED-SESSION-004', 'MANAGED-SESSION-009', 'MANAGED-SESSION-014'],
+    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'DELEG-025', 'DELEG-031', 'DISPATCH-PROTOCOL-003', 'DISPATCH-PROTOCOL-007', 'MANAGED-SESSION-001', 'MANAGED-SESSION-004', 'MANAGED-SESSION-009', 'MANAGED-SESSION-014'],
     lawOwners: {
+      'DISPATCH-PROTOCOL-003': 'dispatch-protocol',
+      'DISPATCH-PROTOCOL-007': 'dispatch-protocol',
       'MANAGED-SESSION-001': 'managed-session-lifecycle',
       'MANAGED-SESSION-004': 'managed-session-lifecycle',
       'MANAGED-SESSION-009': 'managed-session-lifecycle',
@@ -462,13 +464,14 @@ export const SURFACE_MANIFEST = [
       'DURABLE-CONVERGENCE-007': 'durable-convergence',
     },
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'pure',
   },
   {
     module: 'Repository/Knowledge/Casebook/IndexSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-012'],
+    laws: ['KNOWLEDGE-REUSE-012', 'MANAGED-SESSION-LIFECYCLE-022'],
+    lawOwners: { 'MANAGED-SESSION-LIFECYCLE-022': 'managed-session-lifecycle' },
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -478,8 +481,8 @@ export const SURFACE_MANIFEST = [
     owner: 'knowledge-reuse',
     laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Repository/Knowledge/Casebook/BookkeeperSurface.js',
@@ -492,15 +495,23 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/LifecycleSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
+    laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010', 'KNOWLEDGE-REUSE-013'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'Repository/Knowledge/Casebook/SettlementSurface.js',
+    owner: 'knowledge-reuse',
+    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-013', 'KNOWLEDGE-REUSE-015', 'KNOWLEDGE-REUSE-016'],
+    source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/SettlementSurface.fs',
+    representation: 'opaque-capability',
     kind: 'resource',
   },
   {
     module: 'Repository/Knowledge/Casebook/FetchSurface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-015'],
+    laws: ['KNOWLEDGE-REUSE-001', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-005', 'KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-009', 'KNOWLEDGE-REUSE-011', 'KNOWLEDGE-REUSE-013', 'KNOWLEDGE-REUSE-015', 'KNOWLEDGE-REUSE-016'],
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -560,6 +571,15 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Hosts/Mcp/Surface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-036', 'DURABLE-EVENTS-024'],
+    lawOwners: { 'DURABLE-EVENTS-024': 'durable-events' },
+    source: 'src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Surface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Sphinx/V2/Hosts/OpenCode/Surface.js',
     owner: 'sphinx-v2',
     laws: ['SPHINX-V2-034'],
@@ -568,12 +588,22 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Sphinx/V2/Composition/SettlementSurface.js',
+    owner: 'sphinx-v2',
+    laws: ['SPHINX-V2-009', 'SPHINX-V2-019', 'SPHINX-V2-036', 'DURABLE-EVENTS-024'],
+    lawOwners: { 'DURABLE-EVENTS-024': 'durable-events' },
+    source: 'src/Wanxiangshu/Sphinx/V2/Composition/SettlementSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Sphinx/V2/Wire/Surface.js',
     owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-036'],
+    laws: ['SPHINX-V2-009', 'SPHINX-V2-011', 'SPHINX-V2-020', 'SPHINX-V2-033', 'SPHINX-V2-036', 'DURABLE-EVENTS-024'],
+    lawOwners: { 'DURABLE-EVENTS-024': 'durable-events' },
     source: 'src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Sphinx/V2/Plugins/Bayes/Surface.js',
@@ -921,7 +951,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008'],
+    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-012', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008'],
     lawOwners: {
       'EFFECT-ACCOUNTING-008': 'effect-accounting',
     },
@@ -932,10 +962,10 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007'],
+    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-EVENTS-024', 'DURABLE-CONVERGENCE-007'],
     lawOwners: { 'DURABLE-CONVERGENCE-007': 'durable-convergence' },
     source: 'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'resource',
   },
   {
@@ -1432,6 +1462,24 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Plugin/PluginLifecycleSurface.js',
+    owner: 'host-boundary',
+    laws: ['MANAGED-SESSION-LIFECYCLE-022'],
+    lawOwners: { 'MANAGED-SESSION-LIFECYCLE-022': 'managed-session-lifecycle' },
+    source: 'src/Wanxiangshu/OpenCode/Plugin/PluginLifecycleSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Plugin/PluginHostWiringSurface.js',
+    owner: 'host-boundary',
+    laws: ['KNOWLEDGE-REUSE-013'],
+    lawOwners: { 'KNOWLEDGE-REUSE-013': 'knowledge-reuse' },
+    source: 'src/Wanxiangshu/OpenCode/Plugin/PluginHostWiringSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Host/PluginHooksSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-014', 'EFFECT-ACCOUNTING-008'],
@@ -1724,8 +1772,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Verification/JournalPortObservationSurface.js',
     owner: 'verification-system',
-    laws: ['DURABLE-EVENTS-023'],
-    lawOwners: { 'DURABLE-EVENTS-023': 'durable-events' },
+    laws: ['DURABLE-EVENTS-006', 'DURABLE-EVENTS-023', 'DURABLE-EVENTS-024'],
+    lawOwners: { 'DURABLE-EVENTS-006': 'durable-events', 'DURABLE-EVENTS-023': 'durable-events', 'DURABLE-EVENTS-024': 'durable-events' },
     source: 'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1793,7 +1841,7 @@ const isEnvironmentKeys = (node) => node?.type === 'CallExpression'
   && node.callee?.object?.name === 'Object' && node.callee?.property?.name === 'keys'
   && node.arguments[0]?.object?.name === 'process' && node.arguments[0]?.property?.name === 'env'
 
-const mangledLookupLines = (source) => {
+const mangledLookupLines = (source, syntax) => {
   const lines = new Set()
   const visit = (node, environmentNames = new Set()) => {
     if (!node || typeof node !== 'object') return
@@ -1820,15 +1868,144 @@ const mangledLookupLines = (source) => {
       else if (value && typeof value === 'object') visit(value, environmentNames)
     }
   }
-  try {
-    visit(parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true }))
-  } catch {
+  if (syntax) visit(syntax)
+  else {
     source.split('\n').forEach((line, index) => { if (B_MANGLED_LOOKUP.test(line)) lines.add(index + 1) })
   }
   return lines
 }
 
-const C1_DU_SHAPE = /\.cases\(\)|\.fields\b|\.tag\b/
+const syntaxChildren = node => Object.values(node).flatMap(value =>
+  Array.isArray(value) ? value.filter(child => child?.type) : value?.type ? [value] : [])
+
+const bindingNames = pattern => {
+  if (!pattern) return []
+  if (pattern.type === 'Identifier') return [pattern.name]
+  if (pattern.type === 'Property') return bindingNames(pattern.value)
+  if (pattern.type === 'AssignmentPattern') return bindingNames(pattern.left)
+  return syntaxChildren(pattern).flatMap(bindingNames)
+}
+
+const receiverName = node => {
+  if (node?.type === 'Identifier') return node.name
+  if (node?.type === 'MemberExpression') return receiverName(node.object)
+  return null
+}
+
+// A literal container ceases to be a proof once it can be changed or escape
+// through an alias/call. Name collisions conservatively retain the rejection.
+const escapedDataNames = syntax => {
+  const names = new Set()
+  const mark = node => {
+    const name = receiverName(node)
+    if (name) names.add(name)
+  }
+  const visit = node => {
+    if (node.type === 'AssignmentExpression') {
+      mark(node.left)
+      mark(node.right)
+    }
+    if (node.type === 'UpdateExpression') mark(node.argument)
+    if (node.type === 'VariableDeclarator' && (node.init?.type === 'Identifier' || node.init?.computed)) mark(node.init)
+    if (node.type === 'ReturnStatement' && node.argument?.type === 'Identifier') mark(node.argument)
+    if (node.type === 'ArrowFunctionExpression') mark(node.body)
+    if (node.type === 'Property') mark(node.value)
+    if (node.type === 'ArrayExpression') node.elements.forEach(mark)
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      if (node.callee.type === 'MemberExpression') mark(node.callee.object)
+      node.arguments.forEach(argument => { if (argument.type === 'Identifier') mark(argument) })
+    }
+    if (node.type === 'ExportSpecifier') mark(node.local)
+    syntaxChildren(node).forEach(visit)
+  }
+  visit(syntax)
+  return names
+}
+
+const isLiteralData = node => {
+  if (!node) return false
+  if (node.type === 'Literal') return true
+  if (node.type === 'ArrayExpression') return node.elements.every(isLiteralData)
+  if (node.type !== 'ObjectExpression') return false
+  return node.properties.every(property => property.type === 'Property'
+    && property.kind === 'init' && !property.method && !property.computed
+    && isLiteralData(property.value))
+}
+
+const fieldsAccessLines = (source, syntax) => {
+  const lines = new Set()
+  if (!syntax) {
+    source.split('\n').forEach((line, index) => { if (/\.fields\b/.test(line)) lines.add(index + 1) })
+    return lines
+  }
+  const escaped = escapedDataNames(syntax)
+  const values = (node, bindings) => node?.type === 'Identifier'
+    ? escaped.has(node.name) ? [] : bindings.get(node.name) ?? []
+    : node ? [node] : []
+  const nativeObject = (node, bindings) => {
+    const candidates = values(node, bindings)
+    return candidates.length > 0 && candidates.every(value => value.type === 'ObjectExpression' && isLiteralData(value))
+  }
+  const bindUnknown = (bindings, pattern) => bindingNames(pattern).forEach(name => bindings.set(name, []))
+  const visit = (node, bindings) => {
+    if (node.type === 'Program' || node.type === 'BlockStatement') {
+      const local = new Map(bindings)
+      for (const statement of node.body) {
+        if (statement.type === 'VariableDeclaration') statement.declarations.forEach(declaration => bindUnknown(local, declaration.id))
+        if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') bindUnknown(local, statement.id)
+      }
+      node.body.forEach(statement => visit(statement, local))
+      return
+    }
+    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) {
+      const local = new Map(bindings)
+      node.params.forEach(parameter => bindUnknown(local, parameter))
+      bindUnknown(local, node.id)
+      syntaxChildren(node).forEach(child => visit(child, local))
+      return
+    }
+    if (node.type === 'VariableDeclaration') {
+      for (const declaration of node.declarations) {
+        visit(declaration.id, bindings)
+        if (declaration.init) visit(declaration.init, bindings)
+        bindUnknown(bindings, declaration.id)
+        if (node.kind === 'const' && declaration.id.type === 'Identifier' && isLiteralData(declaration.init)) {
+          bindings.set(declaration.id.name, [declaration.init])
+        }
+      }
+      return
+    }
+    if (node.type === 'ForOfStatement') {
+      visit(node.right, bindings)
+      const local = new Map(bindings)
+      const declaration = node.left.declarations?.[0]
+      bindUnknown(local, declaration?.id ?? node.left)
+      visit(declaration?.id ?? node.left, local)
+      const candidates = values(node.right, bindings)
+      const array = candidates.length === 1 ? candidates[0] : null
+      if (node.left.kind === 'const' && declaration?.id.type === 'Identifier'
+        && array?.type === 'ArrayExpression' && isLiteralData(array)) {
+        local.set(declaration.id.name, array.elements)
+      }
+      visit(node.body, local)
+      return
+    }
+    if (node.type === 'CatchClause') {
+      const local = new Map(bindings)
+      bindUnknown(local, node.param)
+      visit(node.body, local)
+      return
+    }
+    if (node.type === 'MemberExpression'
+      && (node.computed ? node.property.value === 'fields' : node.property.name === 'fields')
+      && !nativeObject(node.object, bindings)) lines.add(node.loc.start.line)
+    syntaxChildren(node).forEach(child => visit(child, bindings))
+  }
+  visit(syntax, new Map())
+  return lines
+}
+
+const C1_DU_SHAPE = /\.cases\(\)|\.tag\b/
 const C2_FSHARP = /\bFSharp(?:List|Map|Set|Option|Result)\b/
 const C3_FABLE_MODULES = /fable_modules/
 // Ordinary JavaScript `.bind(...)` is not the legacy Fable helper; bare calls remain forbidden.
@@ -1871,14 +2048,22 @@ export const scanFile = (absPath, relPath) => {
   const source = readFileSync(absPath, 'utf8')
   const lines = source.split('\n')
   const moduleNames = moduleBindingNames(source)
-  const mangledLines = mangledLookupLines(source)
+  let syntax
+  try {
+    syntax = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true })
+  } catch {
+    syntax = null
+  }
+  const mangledLines = mangledLookupLines(source, syntax)
+  const fieldsLines = fieldsAccessLines(source, syntax)
   const hits = []
   for (let i = 0; i < lines.length; i++) {
     const text = lines[i]
     for (const [rule, re] of RULES) {
       if (rule === 'export-discovery') {
         if (isModuleDiscovery(text, moduleNames)) hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
-      } else if (rule === 'mangled-lookup' ? mangledLines.has(i + 1) : re.test(text)) {
+      } else if (rule === 'mangled-lookup' ? mangledLines.has(i + 1)
+        : rule === 'du-shape' ? fieldsLines.has(i + 1) || re.test(text) : re.test(text)) {
         hits.push({ file: relPath, line: i + 1, rule, text: text.trim() })
       }
     }

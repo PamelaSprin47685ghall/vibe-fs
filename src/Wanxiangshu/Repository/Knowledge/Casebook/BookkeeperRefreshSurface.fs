@@ -11,5 +11,5 @@ module CasebookBookkeeperRefreshSurface =
         task {
             match! CasebookBookkeeper.refreshStale (storeOf store) root sessionId with
             | Ok value -> return box {| ok = true; value = value |}
-            | Error message -> return box {| ok = false; error = message |}
+            | Error error -> return CasebookAppendSurface.mutationErrorToJs error
         }

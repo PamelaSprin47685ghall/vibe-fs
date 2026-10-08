@@ -42,6 +42,7 @@ module HostSignalSurface =
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> "PersistenceFailure(NotCommitted)"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> "PersistenceFailure(Committed)"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> "PersistenceFailure(Unknown)"
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> "PersistenceFailure(NoNewWrite)"
 
     let private snapshot signal : obj =
         match signal with

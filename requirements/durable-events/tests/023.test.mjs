@@ -215,13 +215,20 @@ test('WHAT[durable-events-023] EXEC_cancelled_waiter_releases_without_stealing_a
       assert.equal(result.revisionAdvanced, true, 'the commit still lands and advances revision')
     }),
   ))
-test('WHAT[durable-events-023] EXEC_unknown_append_poisons_and_is_never_confirmed', () =>
+test('WHAT[durable-events-023] EXEC_missing_payload_is_known_not_attempted_and_poisons_with_the_original_rejection', () =>
   withJournalDir('poison', (commonDir, tag) =>
-    surface.poisonedUnknownAppendScenario(commonDir, tag).then((result) => {
+    surface.rejectedPayloadPoisonsWriterScenario(commonDir, tag).then((result) => {
       assert.equal(result.seededOk, true)
-      assert.ok(result.failedOutcome.startsWith('Unknown:'), `uncertain append must report unknown, got ${result.failedOutcome}`)
+      assert.ok(result.failedOutcome.startsWith('Poisoned:'), `the known missing-payload rejection must not become Unknown, got ${result.failedOutcome}`)
+      assert.equal(result.missingPayloadRef, 'f'.repeat(64), 'the writer maps the blob address to its canonical payload handle')
+      assert.equal(result.failedFactAbsent, true, 'the rejected fact must not exist in canonical Current')
       assert.equal(result.poisoned, true, 'the port must observe the poisoned writer')
       assert.ok(result.afterOutcome.startsWith('Poisoned:'), `a poisoned writer must refuse later appends, got ${result.afterOutcome}`)
+      assert.equal(result.afterOutcome, result.failedOutcome, 'later refusal renders the original typed rejection')
+      assert.equal(result.laterFactAbsent, true, 'the poisoned writer must not publish a later fact')
+      assert.equal(result.originalPoisonPreserved, true, 'later refusal retains the first event identity and original AppendError object')
+      assert.equal(result.revisionAfterFailure, result.revisionBefore, 'known storage rejection publishes no revision')
+      assert.equal(result.revisionAfterPoisoned, result.revisionBefore, 'poison refusal publishes no revision')
     }),
   ))
 integrationTest('WHAT[durable-events-023] isolated compilation rejects physical-store authority in the codec closure', async () => {

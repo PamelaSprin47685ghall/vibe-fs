@@ -226,6 +226,7 @@ module FissionHostSurface =
                     AbortCause.External
                     (SessionQuiescenceGate())
                     context
+                    None
 
             let idleContext =
                 { context with
@@ -240,6 +241,7 @@ module FissionHostSurface =
                     None
                     None
                     idleContext
+                    None
 
             return
                 box

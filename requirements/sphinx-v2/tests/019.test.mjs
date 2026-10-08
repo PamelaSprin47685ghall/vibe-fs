@@ -1,12 +1,122 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 import * as persistence from '../../../dist/Sphinx/V2/Persistence/Surface.js'
 import {
   store, digest, mustOk, body, envelope, goal, createdBody, work,
   transition, accepted, graphNode, seedBodies, batch, prepare, append, current, withStore,
 } from './persistence-support.mjs'
+import { journalBytes } from './interpretation-support.mjs'
 
 const text = '\n原文保留\r\n  不归一化  '
+
+const priorSealed = JSON.parse(readFileSync(new URL('./fixtures/gen143-sealed-transitions.json', import.meta.url), 'utf8'))
+const priorInterpretationBytes = readFileSync(new URL('./fixtures/gen190-sealed-interpretations.json', import.meta.url))
+const priorInterpretations = JSON.parse(priorInterpretationBytes.toString('utf8'))
+
+test('WHAT[sphinx-v2-019] an actual gen190 Pending seal retains its exact native state and bytes through canonical cold replay', async () => {
+  assert.equal(digest(priorInterpretationBytes), '3e491ba0bb8ea456facbb55fb6c2adb23b71a41a442662d1a0800711125717ec')
+  assert.equal(priorInterpretations.generation, 190)
+  assert.equal(priorInterpretations.head, '101ff8d3522e20e0875e8c9507ba2722472ce66e')
+  assert.deepEqual(priorInterpretations.freshness, {
+    generation: 190,
+    compilerInputDigest: '94becf38ef47b1ebb4ac3bd801697c3c72805deea595b26458969918959d920e',
+    generatedInputDigest: '7e1e436680aaebd7854d037e7812a3b7d15d1ac0e547713b8e481ad4d95d014a',
+    artifactInputDigest: '845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c',
+  })
+  const scenario = priorInterpretations.scenarios.find(value => value.name === 'pending')
+  assert.equal(scenario.events.length, 1)
+  await withStore(async ({ open, close, commonDir }) => {
+    const writer = open()
+    const receipt = await store.append(writer, scenario.events)
+    assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
+    assert.deepEqual(receipt.cuts, [])
+    const live = current(writer, scenario.inquiry)
+    assert.deepEqual(mustOk(live), scenario.state)
+    assert.equal(Object.keys(mustOk(live).interpretations[0].value).length, 7)
+    assert.equal(live.stateHash, scenario.stateHash)
+    assert.equal(live.stateHash, scenario.events[0].payload.postStateFingerprint)
+    const bytes = Buffer.from(journalBytes(commonDir)[0][1], 'base64')
+    assert.equal(digest(bytes), scenario.writerBytesSha256)
+    assert.equal(bytes.toString('base64'), scenario.writerBytesBase64)
+    assert.deepEqual(store.read(writer, scenario.events[0].id), scenario.events[0])
+    close(writer)
+    assert.deepEqual(current(open(), scenario.inquiry), live)
+  })
+})
+
+test('WHAT[sphinx-v2-019] actual gen190 no-op Applied and Failed seals become explicit cuts while their original envelopes remain intact', async t => {
+  for (const scenario of priorInterpretations.scenarios.filter(value => value.name !== 'pending')) {
+    await t.test('WHAT[sphinx-v2-019] cuts the old ' + scenario.name + ' complete post-state fingerprint', async () => {
+      assert.equal(scenario.events.length, 2)
+      const originalBytes = Buffer.from(scenario.writerBytesBase64, 'base64')
+      assert.equal(digest(originalBytes), scenario.writerBytesSha256)
+      await withStore(async ({ open, close, commonDir }) => {
+        const writer = open()
+        const receipt = await store.append(writer, scenario.events)
+        assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
+        assert.equal(receipt.cuts.length, 1)
+        assert.equal(receipt.cuts[0].rule, 'SphinxV2')
+        assert.equal(receipt.cuts[0].failedEventId, scenario.events[1].id)
+        assert.match(receipt.cuts[0].reason, /post-state-mismatch/)
+        for (const event of scenario.events) assert.deepEqual(store.read(writer, event.id), event)
+        const bytes = Buffer.from(journalBytes(commonDir)[0][1], 'base64')
+        assert.deepEqual(bytes.subarray(0, originalBytes.length), originalBytes, 'the old canonical history is not rewritten or resealed')
+        assert.equal(store.read(writer, receipt.cuts[0].cutEventId).type, 'ProjectionCutTail')
+        const refused = current(writer, scenario.inquiry)
+        assert.equal(refused.ok, false)
+        assert.equal(refused.error.code, 'SemanticCut')
+        close(writer)
+        assert.deepEqual(current(open(), scenario.inquiry), refused)
+      })
+    })
+  }
+})
+
+test('WHAT[sphinx-v2-019] previously sealed @2 creation and undispatched work retain their exact complete state through cold replay', async t => {
+  assert.equal(priorSealed.head, '45e4137e4fd58c9788f160246401d562dc0e5d29')
+  assert.equal(priorSealed.generation, 143)
+  for (const scenario of priorSealed.scenarios.slice(0, 2)) {
+    await t.test('WHAT[sphinx-v2-019] preserves actual prior seal for ' + scenario.inquiry, async () => {
+      await withStore(async ({ open, close }) => {
+        const writer = open()
+        const receipt = await store.append(writer, [scenario.event])
+        assert.equal(receipt.ok, true)
+        assert.deepEqual(receipt.cuts, [])
+        const live = current(writer, scenario.inquiry)
+        assert.deepEqual(mustOk(live), scenario.state)
+        assert.equal(live.stateHash, scenario.event.payload.postStateFingerprint)
+        close(writer)
+        assert.deepEqual(current(open(), scenario.inquiry), live)
+      })
+    })
+  }
+})
+
+test('WHAT[sphinx-v2-019] prior missing-round dispatch and aggregate reservation seals become explicit durable cuts', async t => {
+  for (const scenario of priorSealed.scenarios.slice(2)) {
+    await t.test('WHAT[sphinx-v2-019] refuses the prior incorrect seal for ' + scenario.inquiry, async () => {
+      await withStore(async ({ open, close }) => {
+        const writer = open()
+        const receipt = await store.append(writer, [scenario.event])
+        assert.equal(receipt.ok, true)
+        assert.equal(receipt.cuts.length, 1)
+        assert.match(receipt.cuts[0].reason, scenario.inquiry === 'legacy-noop-dispatch' ? /unknown-round/ : /post-state-mismatch/)
+        assert.deepEqual(store.read(writer, scenario.event.id), scenario.event, 'the original history remains intact')
+        const refused = current(writer, scenario.inquiry)
+        assert.equal(refused.ok, false)
+        assert.equal(refused.error.code, 'SemanticCut')
+        close(writer)
+        assert.deepEqual(current(open(), scenario.inquiry), refused)
+      })
+    })
+  }
+})
 
 const expectCut = async (handle, event, code) => {
   const receipt = await store.append(handle, [event])
@@ -20,6 +130,35 @@ const expectCut = async (handle, event, code) => {
   assert.equal(cut.type, 'ProjectionCutTail')
   return receipt.cuts[0]
 }
+
+test('WHAT[sphinx-v2-019] an older answer without an observation reference is a durable strict DTO cut', async () => {
+  await withStore(async ({ open, close }) => {
+    const handle = open()
+    const creation = await append(handle, batch('old-answer', 'create', [createdBody('answer provenance')]))
+    const candidate = prepare(handle, batch('old-answer', 'answer', [
+      body('WorkPlanned', { work: [work('answer-work')] }),
+      transition('answer-work', 'Planned', {
+        case: 'Running', fence: 'answer-work:1:logical', physicalRef: 'answer-work:host-receipt',
+      }),
+      accepted('answer-work', 'answer-result'),
+      body('AnswerCommitted', {
+        renderWorkId: 'answer-work', resultObservationId: 'answer-result',
+        answerRef: 'answer-artifact', stopReason: 'model-ranked-stop',
+      }),
+    ], creation))
+    delete candidate.payload.events.at(-1).payload.resultObservationId
+    const receipt = await store.append(handle, [candidate])
+    assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
+    assert.equal(receipt.cuts.length, 1)
+    assert.match(receipt.cuts[0].reason, /INVALID_TRANSITION_DTO/)
+    assert.equal(receipt.cuts[0].failedEventId, candidate.id)
+    assert.deepEqual(store.read(handle, candidate.id), candidate)
+    const rejected = current(handle, 'old-answer')
+    assert.equal(rejected.error.code, 'SemanticCut')
+    close(handle)
+    assert.deepEqual(current(open(), 'old-answer'), rejected)
+  })
+})
 
 test('WHAT[sphinx-v2-019] a rejected multi-body preparation never publishes its valid prefix', async () => {
   await withStore(async ({ open }) => {
@@ -327,13 +466,36 @@ const cases = [
   body('CertificateInvalidated', { invalidation: envelope('{}'), reason: 'goal changed' }),
   body('DecisionRecorded', { decision: envelope('{}') }),
   body('AnswerPrepared', { renderWorkId: 'work-1', draftRef: 'draft-1' }),
-  body('AnswerCommitted', { renderWorkId: 'work-1', answerRef: 'answer-1', stopReason: 'resource-limited' }),
+  body('AnswerCommitted', { renderWorkId: 'work-1', resultObservationId: 'observation-1', answerRef: 'answer-1', stopReason: 'resource-limited' }),
   body('CancelRequested', { reason: 'user stop' }),
   body('InquiryCancelled', { reason: 'settled' }),
   body('InquirySuspended', { reason: 'missing capability' }),
   body('InquiryFailed', { reason: 'failed' }),
   body('InquiryStatusChanged', { status: 'input-required', reason: 'authorization needed' }),
 ]
+
+const dispatchSeedBodies = includeIntent => [
+  createdBody(text),
+  body('RoundOpened', { roundId: 'round-1', scopeId: 'scope-1', expectedWork: ['work-2'] }),
+  body('WorkPlanned', { work: [work('work-2')] }),
+  transition('work-2', 'Planned', { case: 'Ready' }),
+  body('BudgetReserved', {
+    reservation: { workId: 'work-2', attempt: 1, resources: [{ key: 'calls', value: 1 }], moneyMinor: null },
+    renderReserve: [{ key: 'calls', value: 1 }],
+  }),
+  transition('work-2', 'Ready', { case: 'Leased', fence: 'work-2:1:logical' }),
+  ...(includeIntent ? [cases.find(value => value.case === 'DispatchRequested')] : []),
+]
+
+const bodySeed = value => {
+  if (value.case === 'InquiryCreated') return [value]
+  if (value.case === 'DispatchRequested') return dispatchSeedBodies(false)
+  if (value.case === 'DispatchReceiptRecorded') return dispatchSeedBodies(true)
+  if (value.case === 'InterpretationApplied' || value.case === 'InterpretationFailed') {
+    return [...seedBodies(text), cases.find(body => body.case === 'InterpretationPending')]
+  }
+  return seedBodies(text)
+}
 
 test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-writer canonical replay without losing public DTO fields', async () => {
   assert.equal(cases.length, 30)
@@ -342,7 +504,7 @@ test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-w
     assert.deepEqual(mustOk(persistence.canonicalizeBody(value)), value, value.case)
     await withStore(async ({ open, close }) => {
       const first = open()
-      const creation = await append(first, batch('body-inquiry', 'seed', value.case === 'InquiryCreated' ? [value] : seedBodies(text)))
+      const creation = await append(first, batch('body-inquiry', 'seed', bodySeed(value)))
       const encoded = value.case === 'InquiryCreated' ? creation
         : await append(first, batch('body-inquiry', 'body', [value], creation))
       const durable = store.read(first, encoded.id)
@@ -357,3 +519,70 @@ test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-w
     })
   }
 })
+
+const appendCutChild = fileURLToPath(new URL('./support/append-cut-settlement-child.mjs', import.meta.url))
+
+for (const scenario of ['valid', 'malformed', 'valid-release', 'malformed-release']) {
+  test(`WHAT[sphinx-v2-019] actual store ${scenario} preserves Sphinx settlement and cold replay under explicit bad-payload defense`, async t => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-append-cut-')))
+    const commonDir = join(root, '.git')
+    const sourceWriter = randomUUID()
+    const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`)
+    const raw = batch('native-cut-' + scenario, 'native-settlement-' + scenario, [createdBody(text)])
+    const malformed = scenario.startsWith('malformed')
+    const release = scenario.endsWith('-release')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    const probe = async (mode, writerId, request) => {
+      try {
+        return JSON.parse(await runVerificationToolProbe(process.execPath,
+          [appendCutChild, mode, commonDir, writerId, scenario, JSON.stringify(request)],
+          { cwd: dirname(commonDir), env, signal: t.signal }))
+      } catch (error) {
+        if (error?.stderr && typeof error.message === 'string') error.message += '\n' + error.stderr
+        throw error
+      }
+    }
+    let completed = false
+    try {
+      const measured = await probe('measure', sourceWriter, { raw })
+      assert.notEqual(measured.pid, process.pid)
+      assert.deepEqual(measured.counts, { append: 1, fsync: 1, close: 1, release: 1, injected: release ? 1 : 0 })
+      assert.equal(measured.physicalPreconditions, true)
+      assert.equal(measured.inquiryId, raw.inquiry)
+      assert.equal(measured.commandId, raw.commandId)
+      assert.equal(measured.original.payload.inquiry, raw.inquiry)
+      assert.equal(measured.original.payload.commandId, raw.commandId)
+      assert.equal(measured.facts.length, malformed ? 2 : 1)
+      assert.equal(measured.facts[0].id, measured.original.id)
+      assert.equal(measured.facts[0].stream, measured.original.stream)
+      assert.deepEqual(measured.facts[0].payload, malformed ? {} : measured.original.payload)
+      assert.equal(measured.kind, release ? 'CommitUnknown' : 'Committed')
+      assert.equal(measured.phase, release ? 'StoreRelease' : null)
+      assert.equal(measured.causeSame, release)
+      assert.equal(measured.originalErrorSame, release ? true : null)
+      assert.equal(measured.cutIds.length, malformed ? 1 : 0)
+      assert.equal(readFileSync(sourceFile, 'base64'), measured.bytes)
+      assert.equal(existsSync(join(commonDir, 'wanxiang.lock')), false)
+
+      const coldWriter = randomUUID()
+      const cold = await probe('cold', coldWriter, {
+        sourceWriter, bytes: measured.bytes, facts: measured.facts,
+        inquiryId: raw.inquiry, current: measured.current,
+      })
+      assert.notEqual(cold.pid, measured.pid)
+      assert.notEqual(cold.pid, process.pid)
+      assert.equal(cold.writerId, coldWriter)
+      assert.equal(cold.preserved, true)
+      assert.deepEqual(cold.current, measured.current)
+      assert.equal(readFileSync(sourceFile, 'base64'), measured.bytes)
+      assert.equal(existsSync(join(commonDir, 'wanxiang', 'events', `${coldWriter}.ndjson`)), false)
+      t.diagnostic(JSON.stringify({ scenario, measurePid: measured.pid, coldPid: cold.pid,
+        physicalAndCold: true, ...measured.counts, kind: measured.kind, cutIds: measured.cutIds }))
+      completed = true
+    } finally {
+      if (completed) rmSync(root, { recursive: true, force: true })
+      else t.diagnostic('SPHINX_APPEND_CUT_FAILURE_EVIDENCE: retained ' + root)
+    }
+  })
+}

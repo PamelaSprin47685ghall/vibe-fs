@@ -1,8 +1,70 @@
 # Host、Provider、验证与发布：剩余 TODO 施工分册
 
+2026-10-08接续：[N00正常退出残留](../N00正常退出残留负控-2026-10-07.md)有限完成：gen309完整相关6/6、131pass/0fail/0skip/0TODO、退出0；真实passing ledger/worker exit0后残留被原supervisor拒绝/回收，foreign同creation保全。错误放行隔离变异明确红，原字节恢复gen311 native1/0；生产/预算未改。最新[4fd官方CI](../archive/2026-10-07/baselines/4fd-ci/receipt.txt)仍805/824原300s截断、2active/17queued，无全局summary；016/021分别286s/298s才准入，不归因挂死或吞吐收益。原D0-P静默/ownedcapture与Host023失败仍保留。本包不重复认领，下一按总计划先K1-A/F，D0-R与J3各按独立卡，不授完整N00/Host/CI；下文旧“下一”仅保历史。
+
+2026-10-07最新[W1流式工具归档](../W1工具归档流式输出-2026-10-07.md)有限完成：gen295完整016单次288pass/0fail/19skip/2TODO、1/1排空，worker167.083317s、outer10612 accepted=true20.012ms，前后输入一致。标准pipeline及增量SHA/bytes替代整archive缓存拷贝，每次真实变异仍新archive；未删测试/复用owner/改原CI预算。W0及官方K2C成本原件保留，Darwin单次wall不证明Linux全量恢复。下一按总计划G1，J3与D0-P另包；以下旧“下一”仅保历史。
+
+最新[忙碌resume换任隔离](../忙碌resume换任隔离-2026-10-07.md)有限验收：原工作profile贯穿准备、claim、发送与接纳；正式9条原业务红及physical append后两条红，gen246相关182/182、1064pass/0fail/18skip/85TODO，仅pending退出1，安装版六canary所在native19/19。没有改变Root、完成订阅、handoff或物理中断合同。[CI夹具续修](../CI夹具门禁与703收据-2026-10-07.md)保703的823/824截断及0e949完整824/824、4822/3原件；三个夹具修正后gen250相关14/14、170pass/0fail/0skip/3TODO，仅pending。ac88官方CI三个原失败文件均exit0，但797/824截断、2active/25queued且descendant observation deadline失败，无全局summary；后来的单group accepted不撤销该失败。完整CI、稳定吞吐与完整Host仍开放；产品Sphinx S0/S1已有限完成，下一K1 Casebook owner，见总计划与08卡。
+
+最新按[CLI前置与CI续接](../archive/2026-10-07/迁移CLI前置与CI续接-2026-10-07.md)：非法版本模块加载有限卡已完成，正式15/3红→相关19/235/0，合法dry-run与完整备份保持。4c3实际CI745/824截断，CE026旧忙碌断言按新合同补验7/0、完整capability193/0。下面2d2e与“候选未实施”只保历史；原预算、未知库存与整体吞吐边界不变，新头CI另验。
+
+本轮有限交付保持回归：gen220相关193/193、1205pass/0fail，完整006/010通过，IPC原300ms与强断言不改。最新已收[2d2e官方PR CI](../archive/2026-10-07/baselines/2d2e-ci/receipt.txt)仍真实失败：format/check/build通过，原300000ms截断738/824排空、2active/84queued，无全局summary；另有requirement-system017对Host033双WHAT锚点的真实失败。只修两标题后native2/0，gen227正式017及Host033通过，不代表新CI已绿。006/010/016未准入，outer3082 accepted10.183ms不是未知库存全清证明。[737共同完整worker成本调查](../archive/2026-10-07/baselines/2d2e-cost/README.md)已交付，active/invalid/missing/queued排除，输入/host差值不作因果。下一有限候选先定非法版本拒绝前实际模块加载观察，保合法dry-run非零正控与原错误、零业务副作用；延后imports的错误优先级先明确。原预算/worker/tier保持，不称CPU收益或N00整体闭合。以下旧“下一核006前提”“先收新CI”由本段接续；正式/installed有限范围见[10月7日记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。
+
+2026-10-07：实际fetch upstream到821492601，现行managed-session-lifecycle[016]/delegation[015]撤销用户输入的物理中断授权，仅打断Join等待。普通合并及相关回归见[本轮记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)。历史Guard替代和private supersession witness证据只属于当时合同，不得按旧计划恢复已撤销端口。exact acceptance/容量交接/旧回调隔离仍须保留。N00先核006发送前提，保持原起点、300ms及强断言。
+
+新到d821 PR原完整CI：824/824、4734/1、122skip/389TODO、262.38s wall，format/check/build通过，outer2812 accepted8.133ms。唯一006:431的`sent.sent > 3`准备断言失败；invalid诊断已观察、nested300ms静默正常拒绝，具体count未打印。N00下一核原callback发送/启动与该窗口前提，不削弱断言、不加ready续期或预算、不碰运气重跑；source d821与最终docs头2bbb待实际完整结果。[原unit](../archive/2026-10-06/baselines/d821-ci/vibe-fs-d821-ci-upstream-unit.log)保留，下一步以总计划首节为准。下段89a是此前归档输入。
+
+最新[89a CI](../archive/2026-10-06/baselines/89a-ci/vibe-fs-89a-ci-receipt.txt)是实质截断：actual PR28f98966/source89a同tree，format/check/build通过；原300秒只764/824、760/824，无全仓summary。两边唯一已完成失败为Host026旧Snapshot直接归属断言，grounding012均exit0；verification006/010/016仍queued。Host026/SW012按真实Snapshot边界修正后，gen210授权native产品176/176、1096/0、29skip/74TODO，仅pending；022真实flat独立7/0。[本批记录](../archive/2026-10-06/Journal合同与初次捕获-2026-10-06.md)。旧743的owned observation到期与六未绑定orphan仍保留，2b完整成本只属历史输入。
+
+**npm setup完整016及初次capture有限验收。** 原public install真实held ci业务红→Error/null native2/0，原completed/terminal/close及删除前groups/foreign oracle保留。gen210完整006/010/016为3/3、348/1、19skip/2TODO，016实际worker exit0；唯一失败在旧probe双故障foreign准备，尚未触发setup。改原child IPC readiness、保原3000ms并核marker/PID/原ps、error/close/stderr后，gen211完整006/010为61/0、无skip/TODO、25.35s wall，group58401 accepted18.358ms；fresh前后一致。最终七capture场景通过：原ps失败后在原deadline恢复实际冻结父链、排空已知groups仍抛原Error；double/missing-root明确拒绝不完整。原红/变异、ESRCH native未立及unknown/预算耗尽边界见本批记录；gen206失败和foreign旧失败的唯一原因不追认。
+
+最新[2b84 PR CI收据](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-2b84-ci-upstream-receipt.txt)与[source收据](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-2b84-ci-origin-receipt.txt)：actual PR merge a49091541、source2b84dfa86，tree/input相同；两边824/824、4726pass/0fail、121skip/389TODO，退出1仅pending-proof。format/check/build通过；PR255.57s/source261.73s wall，原预算/worker保持。016 actual worker16025约60.37s/60.30s，各201条工具链完整排空；outer各自2822 accepted=true/7.727ms与8.813ms（不同host）。这两张证书不消除a8真实300秒截断和local gen201六个006失败，也不证明未知库存或稳定吞吐。完整成本、原日志及ZIP均在同目录；[016下一卡](../archive/2026-10-06/baselines/2b84-ci/vibe-fs-016-next-owner-measurement-card-20261006.txt)先细量原capture owner各阶段，不把不同变异工具的归档成本叫可缓存重复。
+
+**原probe setup清理有限包已完成。** 原Error交回caller时真实monitor/tool仍活的业务红、双故障丢主因变异红→native10/0；现在先接原completed，setup失败stop并等待原owner结算，单错保原对象、双错保两个cause。gen204正式006/010为58pass/0fail、2/2排空，无skip/TODO；outer12499 accepted=true/17.129ms，fresh前后一致，全Fable/check通过。[记录](../archive/2026-10-06/工具观察器异常清理-2026-10-06.md)与[最终收据](../archive/2026-10-06/owned-tool-setup/final-receipt.txt)区分native、正式及最终文档输入。此包不新增creation inventory协议，不关闭未知早杀、持续ps不可用或所有消费者的义务。npm随后另取原公开API实际红及native2/0，正式边界以上段为准，不借probe证书。
+
+最新[075源CI收据](../archive/2026-10-06/baselines/075-ci/vibe-fs-075-ci-origin-receipt.txt)：actual source075，format/check/build通过，原300000ms截断775/824、structured012/014活动、47queued，无outer汇总，另有grounding006历史断言失败；006/010/016未准入。outer3112 accepted=true/13.886ms，不是新的upstream合并PR证书。[与101共同771完整worker成本](../archive/2026-10-06/baselines/075-ci/vibe-fs-ci075-101-cost-comparison-20261006.txt)为自身CPU+23.706s、parent窗口+22.301s，增量分散，输入/host不同且未含工具CPU/IO，不能归唯一原因。build在unit预算之外，最后活动文件也不是定位结果。预算/worker/tier保持。
+
+历史[101 CI收据](../archive/2026-10-06/baselines/101-ci/vibe-fs-101-ci-receipt.txt)：actual merge69d6d807，原300000ms截断792/821、006/009活动、27queued，无outer权威summary。791完整同PID成本样本，2missing/1invalid不补值；010/016未准入。outer3116 accepted=true/8.232ms，本次无termination/orphan行，仅属该输入。历史[4f0](../archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)的ps ETIMEDOUT/GitHub回收两个node仍保留。
+
+**M2-E0-F0 原错误传播已有限验收。** 两个实际native场景先取得成功ps snapshot，再在freeze-confirmation/descendant-drain触发真正/bin/ps错误，旧公开caller丢原Error对象，2业务红。保存原对象为failure.cause后定向3/3、相邻15/15，gen190完整006为52/0、无skip/TODO；全Fable/check/Fantomas及fresh前后一致。两原红的tool/monitor原本自然排空、foreign存活、HOME已清，故不能称资源回收缺陷已修；未改回收算法、默认ps次数、预算或verdict。partial库存移交仍为源码线索，下一步先定真实creation owner的terminal/lease能力，不杀未知PID、不再补已有inner finally。[有限源收据](../archive/2026-10-06/sphinx-host-owner/source-receipt.txt)保原红与剩余边界。
+
+**M2-E0-F1 已知monitor排空，后续有限修复。** gen197原120选集两例保cause却见caller捕获时monitor仍活；增强夹具真实核自有lineage后暂停monitor，旧实现确定2业务红。成功snapshot须即时保留已有group集合，capture/drain失败后在同一原deadline内继续观察这些组，再抛原Error；不猜新PID、不补杀未知group。终止路径新增一次真实initial snapshot，正常成功路径不变。原单fault严格tool/monitor空、foreign活、HOME释放与双cause分支分别验收，最终输入证书见[合并续接](../archive/2026-10-06/Upstream增量与施工续接-2026-10-06.md)。未知inventory、持续ps不可用和历史4f0整体义务仍保留；F0原自然排空证据不升级为F1证明。
+
+gen200正式006/010为56/0、group accepted=true。产品119文件选集另在36drained/10active/73queued触发原5秒静默，capture第一查询已见原deadline过期，随后kill EPERM、group accepted=false，无权威summary；后续实际ps仅证明该组及已记录worker当时已空。直接修改边界9/9、239/0、14skip/2TODO是独立定向证明，不给119发证。下一metadata准备卡只建议三个原ps查询合成同次真实PID/PPID/PGID快照，须保父链与缺项拒绝；未实施，不承诺首次1000ms就绪，也不修另外两个时序夹具前提。最终输入、原失败与新头CI见[收据](../archive/2026-10-06/upstream-24c/final-receipt.txt)。
+
+**M3-A0 四个预取消npm夹具已减负并验收。** Error/null×bootstrap/archive不再做三次无用完整npm准备；真实missing paths、未分配parent、actual loopback server和完整device/inode/mode/bytes库存证明先取消、零effect。所有held/positive/version/namespace原oracle与production helper保留，无活owner复用或输入缓存。gen190正式016为285pass/0fail/20skip/2TODO、1/1排空、156.23s wall；201actual工具均有spawn/exit/group-drained/monitor-close，受控SIGKILL和非零退出不称业务成功。Local Darwin且与另一选集并行，101中016仍queued，不能声称Linux/CI时间收益。[完整016收据](../archive/2026-10-06/sphinx-host-owner/vibe-fs-016-preaborted-gen190-receipt-20261006.txt)。
+
+历史[1eb CI真实截断](../archive/2026-10-06/baselines/1eb-ci/vibe-fs-1eb-ci-receipt.txt)优先于更旧ccfc输入：实际merge38141ff83，原300秒仅793/821排空，006/010活动、26排队，无权威summary；format/check/build通过，group3068 accepted=true。006在286.771秒准入，010在299.968秒准入，016仍queued。两输入无可执行diff、host不同；共同793项增加146.350 worker-seconds，不由此推断CPU/IO或最后叶为原因。N00-M1-A已补真实worker身份/CPU的非续期诊断，本地有限调查见[记录](../archive/2026-10-06/验证成本有限调查-2026-10-06.md)：006约17秒、自身CPU约0.45秒，不含子工具，不能判空等或CI根因。新4f0的Linux样本及清理边界按上段接续，016仍没有实际工具阶段；预算、并发、完整测试保留。
+
+历史ccfc证据见[原始CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)：实际merge67c80a46，原300秒/双worker下821/821排空、4585pass/0fail、119skip/390TODO，296.38秒wall；format/check/build通过，outer group2817 accepted=true、8.676ms。unit约297秒退出1仅pending，没有本次outer超时。016占用68.604秒，201个工具各有完整关闭/排空身份；三项新Darwin native在Linux unit均skip。M0审计完成；后续M1—M3按上段当前证据接续，不把墙钟减CPU叫IO，也不改预算或worker。
+
+历史[a15](../archive/2026-10-05/baselines/a15-ci/receipt.txt)仍是794/821、006/011活动、25排队、无summary的真实截断；[6b](../archive/2026-10-05/baselines/6b-ci/receipt.txt)仍是821/821、4577/0仅pending。ccfc较a15共同794项减145.632 worker-seconds，较6b完整821项增19.939；host和输入不同，无CPU/IO因果，不因新排空宣布吞吐稳定或抹掉旧失败。下方旧“下一步”不得盖过总计划当前队列。
+
+N04-C3只补现有scope的独立消费者失败证明：真实exit73后action正常返回仍拒绝，Error/null精确AggregateError；两份受控变异有效，生产helper恢复原SHA256。[执行契约的新接续](../N04真实只读Fable执行契约-2026-10-05.md)要求先调查FD/backing/祖先路径ABA的实际强制能力，再做暂停consumer的mounted路径矩阵及foreign资源拒绝；最终小物理、正式unit与各项证明分别记账。N04-C/N08/T418/T419和GAP-055仍未闭合。
+
+2026-10-05 当前状态：N00 非续期诊断、N05-A/T386 当前读取及 Sphinx 核心答案来源守门前置已交付；N05-B/T388 自动Grounding原材料与工具后缀有限范围已验收。gen137正式223/223排空、1454pass/0fail、21skip、87TODO，仅pending exit1；真实Host integration1/0、无skip/TODO。正文保真不复原native read已丢失的字节，native仍PartialFile；legacy/user、完整插件Long Stroke、T406 Runtime/profile/公开入口及新头全仓CI另验。见[最新记录](../archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)与[总计划当前状态](../TODO施工总计划-2026-10-03.md)。
+
+N00仍未整体验收：d5992761e CI的完整artifact已保存，016第797个准入、283.833s启动，原300s截断817/818，无权威汇总。实际活动叶是self-modifying npm CLI的prepare，尚未spawn；此前工具均退出并排空。这个输入证明晚准入后预算耗尽，不把last-verdict nonexec、5秒静默或未执行的SDK组当成原因。单016本地原预算286/0、14skip、2TODO、150.759s完整排空，只是Darwin观测。下一步先量化Linux单016全成本，再决定独立组的负载分界；不得缓存变异归档或复用prepared owner。历史33dc失败仍未唯一归因，952秒IdleSleep样本不解释Linux；预算和worker不变。见[完整unit日志](../archive/2026-10-05/baselines/vibe-fs-n00-d599-ci-unit.log)。
+
+2026-10-05 新排期以[总计划 N00—N09](../TODO施工总计划-2026-10-03.md)为准：e7a60a769已合并，gen127正式137/137排空、1041/0、19skip、72TODO，实际015 Host21/0。旧0d539 CI817/818原300s backstop及旧本地静默仍保留；新头CI另记，不以选集或旧6a2替代。N04-B首个Darwin原工程已真实readonly Fable/Node5/5、小物理8/8、轻量33/0+2skip及相关正式回归通过，见[执行契约](../N04真实只读Fable执行契约-2026-10-05.md)。N04-C/N08的backing/FD/ABA/native/OS、同候选actual verify和完整T418/T419继续施工，不能以局部绿升级为全发布通过。
+
+2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。六个目录 owner 局部修复及 PP-011/T335 验收完成：gen116 正式 80/80、772/0、7 skip、31 TODO；cf6fb31e8 Linux CI 818/818、4292/0、104 skip、396 TODO，两者仅 pending exit1。原 gen115 失败保留，不据后续成功定位其唯一原因。PP-011 的 plugin 重开不等于独立 OS 进程恢复，GAP-082 其他义务保留；T418/T419 的完整只读/FD/ABA/actual verify 接续施工。下文 gen113 待验收与 Archive 未施工属于历史输入。
+
 返回[总计划](../TODO施工总计划-2026-10-03.md)；[逐项原始清单](05-逐项清单.md)。本分册的 P0/P1/P2 表示风险优先级；执行波次与跨包前提以总计划为准。
 
-本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。VS-016的T418/T419已于2026-10-04结算（固定快照物化与结论绑定，见VS-016卡已结算记录）；下一批建议按总计划顺序推进，DIST-001/005/007依赖本批同候选快照可优先。本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
+最新统一输入仍待最终：gen112缺显式SDKroot的18排空436/0/7skip/2TODO不能替原6skip；补齐选定Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空。npm首正例拆真实工具归档准备与实际install/assert的有序判决叶，保原强oracle和held负例，不改预算；gen113待附件，最后Node/npm pass不是唯一归因。001/019误名单只属setup，Archive本批未施工。
+
+S03 最新接手入口是[源码目录身份与NuGet协议夹具](../archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)。Fable的aac79边界接续至source owner，真实0/2→定向12/0，parent/root私有dev/ino在publication/revalidate前后/dispose/catch守门；正常rootENOENT幂等、unknown parked不猜。15个NuGet非法图仅共享真实不改写Git前提，每叶SDK/restore/HOME/feed/packages独立且原typed/calls断言保持。195→13仅静态Git成本，最终统一输入待附件；TOCTOU/ABA、其它owner、完整FD、runtime readonly、T418/T419与GAP-055 PARTIAL保留。
+
+9909真实CI `37200928231`在300000ms backstop仅817/818完成、1active016、0queued、无权威summary，是实际超时而非pending-only。最后null lock framework dependency map场景test:pass是最近进展，不是唯一故障归因。须以新冻结输入的同配置证据判断优化结果，不调workers或扩大300000/5000。
+
+后续aac79 CI `37202396189`为818/818、4253/0/103skip/404TODO，244.51s wall/370.10s testtime，仅pending退出1；未含本批修复，不消除9909物理原因。NuGet同15叶before23.782s/after13.165s各15/0只是单次本机观测；source第三个parent失配/rootmissing反例加入后完整定向13/0、2.942s，旧12/0是此前截面，统一输入待附件。
+
+fileWaits诊断已有正式红绿；历史72e83 CI仍仅817/818、无authoritative summary/活动身份，gen103仍是静默失败。新fe9 CI `37195699694` 已818/818、4188/0/102skip/404TODO、solely pending proof，首批gen108的418/0也各自只证明对应输入，不定位旧物理原因。第二批最终结果另由附件绑定；重复fixture准备只按完整行为/断言等价评估，不调workers、不扩大300000/5000、不删测试。
+
+本分册创建时只做只读规划，合计 **64 个编号文件、71 项实际 TODO**，该数是历史截面。仓库根目录为 `/Users/yuanxi/Workwork/vibe-fs`。随后Host就绪与Guard替代批次已完成总计划R01—R04，GAP-223关闭，最新证据见[交付记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。VS-016的T418/T419与GAP-055仍PARTIAL，源码/依赖/工具准备不等于实际同候选verify或只读执行；DIST-001/005/007不能假定同候选快照已可用。最新上游取舍见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。本批不删除安装版executor throw的T180。测试夹具字符串中的`todo`不计入债务，历史数字不是新的全量统计。
+
+历史focused编译证据：Controller恢复曾经传递依赖SessionHostPort，故当时须补ChatExecution真实边，闭包56→66fs。此段只属590输入，不能继续要求当前recovery引入完整Host。当前Snapshot已独立唯一owner、recovery51fs，SW012明确Snapshot与实际ChildRecoveryWorkflow顺序并排除HostPort/Acceptance/Settlement；gen210授权native176回归通过，66 ratchet保持。原红和旧增长记录保留，SDK/同候选actual verify的当前状态以首节与总计划为准。
 
 ## 使用这份分册
 
@@ -79,7 +141,9 @@
 
 ### PP-011 · P1 · 生产 Journal 路径的 SHA-256 组装
 
-- **已有/欠缺**：真正 SHA-256 与参考值一致，忽略易失字段、参数变化必须改变摘要均已证；仍缺生产 composition wiring。
+当前状态：T335 已验收完成；定向 7/0、gen116 正式选集和 cf6fb31e8 Linux 全量 unit 均通过。生产落盘、plugin 重开与两接线变异已补，不再按“只有 adapter agreement”重复施工，GAP-082 其他义务保持 PARTIAL。
+
+- **已有/剩余边界**：SHA-256 参考值、易失字段排除、参数配对和实际 production composition wiring 已证；本卡不覆盖独立 OS 进程恢复或全部重试/压缩分支。
 - **前提/先红**：沿 `Context/Prefix/Wire.fs` 调用 `ProjectionRenderer.cutoffDigest HostDigest.sha256Hex` 到实际持久产物；不用测试直接传正确 hash 函数来替代组装。独立 Node crypto 对准确语义前缀求值，错误 digest/错误截点必须失败。
 - **步骤**：从公开 transform 驱动真实 journal 写入，观察持久 digest 及语义来源；发现错误注入才修 composition。保留“物理 call ID 改变不影响、真实参数改变影响”的正反配对。
 - **验收/停止**：真实落盘值等于独立 oracle，重开后一致；不能把 `XWireSurface` 另一次手工 wiring 当生产入口。
@@ -447,13 +511,31 @@ owner：`src/Wanxiangshu/OpenCode/Host/ModelRouting.fs/.fsi`、`ModelCapacity/{M
 
 ### VS-016 · P0 · 实际验收绑定同一个不可变候选（2 TODO）
 
-- **已有**：完整tracked输入集合及Git inventory失败传播已补；源码/资源/规范/脚本等输入和步骤边界变化能拒绝。当前仍在可变工作区执行，“一步内改后恢复”是现存 executable TODO。
+接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-2026-10-04.md)已补真实npm安装45项与完整selected Node/npm bundle 15项定向通过，0失败；详细入口与证明范围见[本批记录](../archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)和[016测试说明](../../requirements/verification-system/tests/README.md)。真实安装使用独立HOME/npmrc/cache及私有Node执行`npm ci --ignore-scripts`，原始package/lock一次读取，实际安装完整成员与发布归档物化结果相等，安装临时root回收后才返回。非法registry/依赖/override/workspace/link、工具身份不符、真实integrity失败、lock缺项和取消均有公开反例，`null`取消仍保留原原因。
+
+安装receipt的`bootstrap-admission`只检查选中Node字节与npm CLI入口；独立工具owner的`selected-node-npm-bundle`才绑定选定归档中的完整Node/npm成员并执行真实探针。二者共用归档校验，工具探针后重新验证完整物理成员；实际CLI新增文件被拒绝。步骤边界复核不是只读保护或同阶段改后恢复证明。
+
+npm声明的必需生产依赖图须在所选npm包内闭合；direct `graceful-fs`及transitive `@gar/promise-retry`缺失、父目录实际补包的正式反例拒绝。optional缺失允许，存在则递归校验，不宣称任意loaded module、绝对文件读取或OS闭包已封闭。完整npm11.12.1工具包另取得15项定向通过，仍不是实际仓库依赖安装。Homebrew Node26的58项定向只有45通过、13失败，真实缺`libnode`被拒绝；后续平台证据统一见本批记录，旧失败保留。
+
+早期45项默认夹具实际npm为11.18.0，当时尚未安装仓库依赖；接续实际application安装证据见下文，不扩大旧夹具范围。工具prepare/runProbe取消已先红后绿：挂起实际npm探针时保留Error/null原原因，POSIX进程组/后代退出并排空pipe、回收全部ownedroot；启动前取消先于缺失归档读取。
+
+第二批见[工具归档安装与输出根](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)：新增`installVerificationDependenciesFromToolArchive`，真实定向10项通过、0失败（含父组）；安装器自己准备完整工具，直接使用原bundle角色路径，最终发布前完整复核工具，固定`toolDigest`进入installation/dependencyDigest，返回独立依赖前回收工具与安装root。两锁定包、held tarball后非CLI库/成员改动、actual Node/npm版本拒绝、Error/null取消及启动前取消都有正式证据。新入口未升级旧raw bootstrap的证明范围，也未接实际verify或提供只读能力。
+
+Mac真实嵌套挂载已证明输出root保留、仅清子项、不动只读输入及owned挂载回收；受控编译spawn证明发布清理，不证明实际Fable只读执行。upstream `590a3f69e` copy/chmod实际父目录替换反例仍报告PASS、exitCode0，文件inode/ctime恢复不能闭合运行期输入。下一步闭合SDK、Git及dotnet/Fable/NuGet，执行真正只读候选并绑定实际verify。Windows子树回收未证；GAP-055仍PARTIAL，T418/T419保持。
+
+实际application依赖现有原生Node定向4项通过、0失败、0skip/TODO（1父3叶）：选定`174c2a2533`的Git tree/sourceDigest，以完整Node22.23.3/npm11.12.1归档真实安装236个仓库锁定包；toolDigest与11693成员完整inventory绑定，平台optional有7项存在、16项缺失，实际Fable List/Acorn/Tar消费者通过且全部ownedroot回收。证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。该结果仅属于明确选定tree及darwin-arm64依赖，不证明当前dirty合并输入、native Host/lifecycle/SDK、实际Fable编译、RO或actualverify，不关闭T418/T419。
+
+接续[选定SDK准备](../archive/2026-10-04/S03选定SDK准备-2026-10-04.md)、[本地工具恢复](../archive/2026-10-04/S03本地工具恢复-2026-10-04.md)与[单项目工程 owner](../archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)，现新增[独立编译 owner](../archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)。前批单 net10.0/no ProjectReference、私有派生 lock/清空缓存 locked 复验和 raw/contentHash 区分保持；编译将原 artifacts 按字节/mode复制到自有 seed，实际 SDK/Fable DLL只将合法产物写入本次根，完整库存与四 input digest 绑定。Fable aac79已提交，后续按顶部source身份/NuGet前提共享批验收→逐owner命名空间调查及同候选实际构建/验证接续；准备优化必须语义等价，Git/OS、只读候选仍需证明，不能以195→13静态次数关闭9909CI实际超时。其它工程图单独证明，不重复准备owner，不删除T418/T419。SDK packs/tool bundled FSharp.Core不能算前批四包工程图已证明的闭包。
+
+2026-10-04已实施指定tree的源码准备owner及真实Git对象回归，见[源码准备记录](../archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。当前receipt仅绑定源码，不绑定实际verify、依赖或只读执行；后续从该owner接入，不另造工作区copy快照或第二份候选真相。
+
+- **已有**：完整tracked输入集合及Git inventory失败传播已补；源码/资源/规范/脚本等输入和步骤边界变化能拒绝。本次补符号链接枚举前置：输入根、普通文件/目录及tracked corpus父目录的未知链接一律拒绝，不跟随外部可写目标；普通文件不会因名叫obj而被当作输出。见[S03记录](../archive/2026-10-03/S03输入链接边界-2026-10-03.md)。当前仍在可变工作区执行，“一步内改后恢复”是现存 executable TODO。
 - **前提**：明确输入闭包包括被generator实际消费的tracked corpus、工具链/锁文件、构建脚本、测试与规范；dist和日志是输出，必须放可写且不反向成为输入的区域。原工作区继续编辑与快照被篡改是两个不同命题。
 - **先红 A**：真实 verify入口的 build/unit/integration/package 分别记录所用候选身份与根，原工作区在运行中编辑不影响隔离候选；不能偷借原repo dist、node_modules解析路径、资源或git查询。让任一阶段错误cwd/import回原repo，验收必须失败。
 - **先红 B**：在同一步内尝试write→restore、rename、delete/add、符号链接替换快照输入；写被阻止或整个候选立即失效，绝不能最终hash相同就通过。准备期间并发改变输入也不能形成混合世代。
 - **步骤**：先设计可证明的固定输入准备与可写输出分界，再让所有阶段从同一封闭根执行，外部依赖按锁定身份解析；记录candidate/closure/toolchain/结果绑定。对准备失败、取消、子进程失败做资源回收。copy/chmod/fs.watch各有绕过边界，不单独当完整设计。
 - **验收/停止**：两正式反例在实际入口成立，输入准备一致、所有阶段同源、输出证据绑定唯一候选，原工作区不被锁死。受当前平台权限模型限制无法保障不变性时清楚列出边界，不能先删TODO承诺未来补齐。
-- **已结算（2026-10-04，S03）**：T418/T419 闭合并移除 TODO。verify() 执行前把 collectVerificationInputs 闭包物化为 tmpdir 快照：输入文件 444、目录 555，快照根可写以承载 .fable-build 等合法输出；node_modules 以 symlink、.git 以 gitfile 按原树锁定身份进入运行环境，均不入输入 digest。每步双校验：工作树偏离（既有反例语义保留）＋快照完整性（inode/ctime/mtime/size/内容哈希＋输入区新增扫描，步骤内改写后还原可发现）。结果对象、run 日志 snapshot-manifest.json、输出摘要共同绑定快照 digest；快照本体 finally 回收，manifest 持久保留。T418 按 D2（fixed isolated inputs selected）重写为攻击快照输入本身：普通用户平台写入被物理只读阻止使该步骤失败，权限模型失效平台由元数据漂移的边界校验发现，断言强度未弱化。语义裁决：原工作区运行中编辑不污染隔离候选（阶段读快照、证据绑快照），但运行 fail-closed 报告工作树偏离——快照身份捕获自工作树，来源漂移按 016「运行期间输入被改写必须中断」处理。017 的阶段真实入口断言改以快照执行根为 relative 基准（语义不变）。仍留边界见 GAP-055：非输入依赖共享原树身份未做完全物理隔离，release 全链（Long Stroke/package）在快照上的真实运行证据归后续批次。
+- **590合并取舍（未结算）**：上游copy/chmod物化与inode/ctime/mtime/size/hash边界检查不能证明输入不可变。真实父目录替换→阶段读新字节→恢复原目录仍报告PASS exitCode0；本次保留本地verify/build-state/016/017及原TODO，不把上游快照运行或manifest称为本地交付。T418/T419与GAP-055保持PARTIAL，实际verify同候选、完整依赖、真正只读执行及结果绑定按以上步骤继续，证据见[590同步记录](../archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。
 
 ### VS-审阅债 · P1/P2 · 不增加虚假占位测试
 

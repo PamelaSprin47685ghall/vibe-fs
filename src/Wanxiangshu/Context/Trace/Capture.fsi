@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Trace
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation

@@ -23,8 +23,7 @@ module Encode =
     let attempt (value: Attempt) : string = string (Attempt.value value)
 
     /// Plain, sorted key/value records only.
-    let record (entries: (string * obj) list) : obj =
-        box (entries |> List.sortBy fst |> Map.ofList)
+    let record (entries: (string * obj) list) : obj = entries |> List.sortBy fst |> createObj
 
     /// A list is emitted as a plain array.
     let list (items: 'a list) (encode: 'a -> obj) : obj =
@@ -51,4 +50,4 @@ module Encode =
     let awaitingResults = "awaiting_results"
 
     /// The semantic projection, as a plain object.
-    let semanticView (state: InquiryState) : obj = Projection.semanticProjection state
+    let semanticView (state: InquiryState) : obj = Projection.semanticView state

@@ -384,23 +384,48 @@ const withPlugin = async (action) => {
 const withHost = async (mode, action) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-terminal-journal-'))
   const host = await recoveryHost.bootControlledRecoveryHost(directory, 'absent', mode)
+  const pendingDrains = []
+  let barrierReleased = false
+  let actionFailure
+  const terminalWriter = {
+    trackDrain: (drain) => {
+      pendingDrains.push(drain)
+      return drain
+    },
+    releaseBarrier: () => {
+      if (!barrierReleased) {
+        recoveryHost.releaseTerminalBarrier(host)
+        barrierReleased = true
+      }
+    },
+  }
   try {
-    await action(host, directory)
+    await action(host, directory, terminalWriter)
+  } catch (error) {
+    actionFailure = { error }
+    throw error
   } finally {
-    recoveryHost.disposeRecoveryHost(host)
-    rmSync(directory, { recursive: true, force: true })
+    try {
+      if (mode === 'held') terminalWriter.releaseBarrier()
+      const settled = await Promise.allSettled(pendingDrains)
+      const failures = settled.filter((drain) => drain.status === 'rejected').map((drain) => drain.reason)
+      if (!actionFailure && failures.length) throw new AggregateError(failures, 'Held terminal drain failed', { cause: failures[0] })
+    } finally {
+      recoveryHost.disposeRecoveryHost(host)
+      rmSync(directory, { recursive: true, force: true })
+    }
   }
 }
 
 test('WHAT[managed-chat-execution-006] public Host terminal event waits for durable commit before exact capacity release under held and uncertain append (GAP-126)', async () => {
   await withPlugin(async () => {
-    await withHost('held', async (host, directory) => {
+    await withHost('held', async (host, directory, terminalWriter) => {
       await recoveryHost.seedProviderStarted(host, sessionId, physicalUserMessageId, providerRun)
       await recoveryHost.seedProviderStarted(host, decoySessionId, decoyPhysicalUserMessageId, decoyProviderRun)
       await acquireLease(sessionId, physicalUserMessageId)
       await acquireLease(decoySessionId, decoyPhysicalUserMessageId)
 
-      const settle = recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed')
+      const settle = terminalWriter.trackDrain(recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed'))
       await recoveryHost.awaitTerminalBarrier(host)
 
       // The barrier holds the terminal writer: the append is not confirmed, so
@@ -411,7 +436,7 @@ test('WHAT[managed-chat-execution-006] public Host terminal event waits for dura
       assert.equal(terminalLineCount(directory), 0)
       assert.equal(recoveryHost.executionStatus(host, sessionId, physicalUserMessageId).phase, 'ProviderStarted')
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       const settled = await settle
       assert.equal(settled.phase, 'Terminal')
       assert.equal(settled.disposition, 'Completed')
@@ -441,23 +466,24 @@ test('WHAT[managed-chat-execution-006] public Host terminal event waits for dura
       assert.equal(recoveryHost.executionStatus(host, sessionId, physicalUserMessageId).phase, 'ProviderStarted')
     })
 
-    await withHost('held', async (host, directory) => {
+    await withHost('held', async (host, directory, terminalWriter) => {
       await recoveryHost.seedProviderStarted(host, sessionId, physicalUserMessageId, providerRun)
       await acquireLease(sessionId, physicalUserMessageId)
 
       // A competing terminal parks behind the held first writer.
-      const first = recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed')
+      const first = terminalWriter.trackDrain(recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Completed'))
       await recoveryHost.awaitTerminalBarrier(host)
       const competing = recoveryHost.signalExactTerminal(host, sessionId, physicalUserMessageId, providerRun, 'Failed')
+      const competingRejected = terminalWriter.trackDrain(assert.rejects(competing))
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       const settled = await first
       assert.equal(settled.phase, 'Terminal')
       assert.equal(settled.disposition, 'Completed')
 
       // The first terminal fact wins; the competing disposition fails closed
       // without a second write or a second release effect.
-      await assert.rejects(competing)
+      await competingRejected
       assert.equal(terminalLineCount(directory), 1)
       assert.equal(executionCount(sessionId, physicalUserMessageId), 0)
 

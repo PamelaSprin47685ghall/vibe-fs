@@ -39,21 +39,6 @@ module Outcome =
         | InboxFull
         | Protocol of reason: string
 
-    type JournalFailure =
-        | WriteFailed of reason: string
-        | FlushFailed of reason: string
-
-    type JournalUnavailable =
-        | WriterPoisoned of firstFailure: string
-        | WriterClosing
-        | WriterDisposed
-
-    type CommitResult<'e> =
-        | Committed of 'e
-        | Rejected of EventId * reason: string
-        | NotAttempted of EventId * JournalUnavailable
-        | CommitUnknown of EventId * JournalFailure
-
 /// Why a journal line was refused during a fold.
 ///
 /// PERSIST-004 requires a corrupt journal to stop startup rather than be
@@ -64,12 +49,3 @@ type FoldRejection = { Fact: string; Reason: string }
 
 module FoldRejection =
     val reject: factName: string -> reason: string -> Result<'a, FoldRejection>
-
-/// Physical fate of a single journal append.
-type JournalAppendFailure =
-    | WriteUnknown of EventId * Outcome.JournalFailure
-    | WriterUnavailable of EventId * Outcome.JournalUnavailable
-    | FactRejected of EventId * FoldRejection
-
-module JournalAppendFailure =
-    val describe: failure: JournalAppendFailure -> string

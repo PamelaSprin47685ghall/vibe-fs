@@ -43,6 +43,26 @@ test('WHAT[host-boundary-005] EXEC_reconcile_projection_edge_drives_exactly_one_
     hasQuiescence: true,
   })
 })
+test('WHAT[host-boundary-005] physical ingress fences a held old snapshot while the next wake publishes the human turn', async () => {
+  const result = await ReconcileSurface.physicalIngressDuringSnapshotScenario()
+
+  assert.deepEqual(result, {
+    snapshotReads: 2,
+    publishedBeforeHumanRead: 0,
+    observedSnapshots: [[
+      'held-snapshot-old',
+      'held-snapshot-old-run',
+      'held-snapshot-human',
+      'held-snapshot-human-run',
+    ]],
+    published: [{
+      physical: 'held-snapshot-human',
+      providerRun: 'held-snapshot-human-run',
+      outcome: 'TurnCompleted',
+      hasQuiescence: true,
+    }],
+  })
+})
 test('WHAT[host-boundary-005] EXEC_reconcile_without_projection_edge_reads_once_and_exposes_no_counter', async () => {
   const result = await ReconcileSurface.idleProvisionalWithoutProjectionEdgeScenario()
   assert.deepEqual(result, {

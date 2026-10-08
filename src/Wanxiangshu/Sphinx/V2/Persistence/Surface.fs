@@ -85,6 +85,24 @@ module Surface =
                        value = Representation.state state
                        stateHash = Representation.fingerprint digest state |}
 
+    let proposeAdvance (handle: EventStoreHandle, digest: string -> string, inquiryId: string) =
+        match inquiry (box inquiryId) with
+        | Error reason -> failure "INVALID_INQUIRY_ID" reason
+        | Ok inquiryId ->
+            match current handle inquiryId with
+            | Error fault -> currentError fault
+            | Ok None -> failure "UNKNOWN_INQUIRY" "inquiry has no accepted durable creation"
+            | Ok(Some state) ->
+                let plan = Driver.advance state
+
+                box
+                    {| ok = true
+                       value =
+                        box
+                            {| events = plan.Events |> List.map Representation.body |> List.toArray
+                               outcome = Wanxiangshu.Sphinx.V2.Runtime.Surface.classifyOutcome state |}
+                       stateHash = Representation.fingerprint digest state |}
+
     let admitCancel (handle: EventStoreHandle, raw: obj) =
         let decoder =
             BodyDto.exact

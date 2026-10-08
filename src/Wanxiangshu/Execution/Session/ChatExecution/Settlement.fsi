@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Foundation
 open System.Threading.Tasks
 

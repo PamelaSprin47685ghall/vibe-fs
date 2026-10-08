@@ -8,13 +8,96 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
+open Wanxiangshu.Strength.OpenCode
+open Wanxiangshu.Strength.Persistence
 
 module PluginHooksSurface =
+
+    let private replaySettlementObservation (boot: PluginBoot.Boot) (failure: exn option) : obj =
+        let fuseReason = boot.StrengthScope.StrengthFuseReason |> Option.toObj
+
+        match failure with
+        | Some(:? StrengthAppendException as error) ->
+            box
+                {| completed = false
+                   typedFailure = true
+                   eventId = EventId.value error.EventId
+                   cause = AppendError.cause error.Failure |> Option.toObj
+                   matchesAppendError = fun (expected: obj) -> obj.ReferenceEquals(box error.Failure, expected)
+                   fuseReason = fuseReason |}
+        | Some error ->
+            box
+                {| completed = false
+                   typedFailure = false
+                   error = error
+                   fuseReason = fuseReason |}
+        | None ->
+            box
+                {| completed = true
+                   typedFailure = false
+                   fuseReason = fuseReason |}
+
+    /// Observe the actual Boot fuse through Prepared request consumption in Replay.
+    let replaySettlementThroughBoot (input: obj) (store: obj) (completed: bool) : Task<obj> =
+        task {
+            let! boot = PluginBoot.create input
+            // DSL-MUTABLE: algorithm-scratch — preserve the real Replay exception through owner cleanup.
+            let mutable failure: exn option = None
+
+            try
+                let assistant: SessionMessage =
+                    { Id = "run-1"
+                      Role = "assistant"
+                      Agent = Some "engineer"
+                      Finish = Some "stop"
+                      ErrorName = None
+                      Model = None
+                      ParentId = Some "user-1"
+                      CreatedAt = None
+                      Completed = completed
+                      IsCompaction = false
+                      PromptKey = None
+                      Parts = [| MessagePart.Text "completed provider output" |]
+                      PartIds = [| None |]
+                      ToolParts = [||] }
+
+                let snapshots =
+                    { new ISessionSnapshotPort with
+                        member _.GetMessages _ = Task.FromResult(Ok [ assistant ]) }
+
+                let durability = StrengthDurability.create (unbox<EventStoreHandle> store).Store
+
+                let! _ =
+                    StrengthReplay.applyBeforeXTrace
+                        None
+                        (Some snapshots)
+                        (Some durability)
+                        boot.StrengthFailFuse
+                        (fun _ -> None)
+                        (Some "owner")
+                        (box {| messages = ([||]: obj array) |})
+
+                ()
+            with error ->
+                failure <- Some error
+
+            try
+                do! boot.Scope.DisposeAsync()
+            with cleanup ->
+                match failure with
+                | Some primary ->
+                    raise (System.AggregateException("Replay and Boot cleanup failed", [| primary; cleanup |]))
+                | None -> raise cleanup
+
+            return replaySettlementObservation boot failure
+        }
 
     /// Opaque Host-owned observation for the Blogger adapter proof.
     type BloggerAdapterObservation private (first: string, second: string) =

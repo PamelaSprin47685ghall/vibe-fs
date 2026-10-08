@@ -25,6 +25,7 @@ module InteractionRepairWorkflow =
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         observation: TurnObservationJournalPort option ->
+        observer: ContinuationAcceptanceObserver option ->
             Task
 
     val repairIncompleteInteraction:
@@ -35,4 +36,5 @@ module InteractionRepairWorkflow =
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         observation: TurnObservationJournalPort option ->
+        observer: ContinuationAcceptanceObserver option ->
             Task

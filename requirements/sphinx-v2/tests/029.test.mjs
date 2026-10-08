@@ -81,6 +81,40 @@ test('WHAT[sphinx-v2-029] an investigation wins when it is estimated highest', (
   assert.equal(chosen.SelectedPlanId, 'probe.counterexample')
 })
 
+const estimateScope = 'scope-answer-now-unestimated'
+const declaredEstimate = (PlanId, Kind, Rank, Location = null) => ({
+  PlanId, ScopeId: estimateScope, Kind, Rank, Location,
+})
+
+test('WHAT[sphinx-v2-029] answer.now receives no default advantage when it is Unestimated', () => {
+  for (const Kind of ['ordinal-only', 'single-response-provisional', 'model-estimate']) {
+    const investigation = declaredEstimate('investigation', Kind, 2, Kind === 'model-estimate' ? 0.4 : null)
+    const answerNow = declaredEstimate('answer.now', 'unestimated', 0, 1)
+    for (const candidates of [[answerNow, investigation], [investigation, answerNow]]) {
+      assert.equal(Loop.decisionSelect(estimateScope, candidates).SelectedPlanId, investigation.PlanId)
+    }
+  }
+})
+
+test('WHAT[sphinx-v2-029] an estimated answer.now may win against an Unestimated investigation', () => {
+  const answerNow = declaredEstimate('answer.now', 'ordinal-only', 2)
+  const investigation = declaredEstimate('investigation', 'unestimated', 0, 1)
+  for (const candidates of [[answerNow, investigation], [investigation, answerNow]]) {
+    assert.equal(Loop.decisionSelect(estimateScope, candidates).SelectedPlanId, answerNow.PlanId)
+  }
+})
+
+test('WHAT[sphinx-v2-029] selected ordinal and provisional answers retain their actual estimate kind', () => {
+  for (const Kind of ['ordinal-only', 'single-response-provisional', 'model-estimate']) {
+    const winner = declaredEstimate('answer.now', Kind, 1, Kind === 'model-estimate' ? 0.8 : null)
+    const alternative = declaredEstimate('investigation', Kind, 2, Kind === 'model-estimate' ? 0.2 : null)
+    const selected = Loop.decisionSelect(estimateScope, [winner, alternative])
+    assert.equal(selected.SelectedPlanId, winner.PlanId)
+    assert.equal(selected.SelectedKind, Kind)
+    assert.equal(Loop.decisionRank(estimateScope, [winner, alternative])[0].Kind, Kind)
+  }
+})
+
 // ---------------------------------------------------------------------------
 // 5. exclusion is operational, never a semantic demotion.
 // ---------------------------------------------------------------------------

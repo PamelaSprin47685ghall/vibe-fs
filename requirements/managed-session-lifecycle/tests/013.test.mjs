@@ -48,8 +48,7 @@ test('WHAT[managed-session-lifecycle-013] a stale-projection consumer is arbitra
     assert.equal(await forkTool.settle(runtime, owner, 'RACE-ANSWER', 'provider-a'), true)
     let deliveries = 0
 
-    // A cold instance (fresh writer, full replay — the shape a restarted
-    // process takes) consumes first: its own append confirms and it delivers.
+    // A fresh writer with replay consumes before the old runtime reads again.
     const first = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
     assert.equal(first.ok, true)
     assert.match(first.workRecord, /RACE-ANSWER/)
@@ -71,7 +70,7 @@ test('WHAT[managed-session-lifecycle-013] a stale-projection consumer is arbitra
     const late = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
     assert.equal(late.ok, false)
     assert.match(late.error, /AlreadyRetired/)
-    assert.equal(deliveries, 1, 'exactly one delivery survives the cross-instance consumption race')
+    assert.equal(deliveries, 1, 'sequential cold and stale consumers deliver only once')
   })
 })
 }

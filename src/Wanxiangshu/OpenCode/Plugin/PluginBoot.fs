@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
+open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
 
@@ -24,10 +25,30 @@ module PluginBoot =
           StrengthScope: PluginStrengthScope
           Clock: IClockPort
           Timer: ITimerPort
-          StrengthFailClosed: string -> unit
+          StrengthFailFuse: string -> unit
+          CasebookSettlements: CasebookSettlementOwner
           WorkspaceDirectory: string option
           FamilyParent: SessionId -> SessionId option
           ProtocolArgumentVault: ProtocolArgumentVault.Vault }
+
+    let private bindCasebookSemanticCut (incident: CasebookSemanticCutIncident) =
+        let failure = incident.Failure
+
+        let cutIds =
+            incident.Cuts
+            |> List.map (fun cut -> EventId.value cut.CutEventId)
+            |> String.concat ","
+
+        Diagnostic.fatal
+            "casebook-semantic-cut"
+            [ "result",
+              sprintf
+                  "%A case=%s event=%s cuts=%s: %s"
+                  failure.Operation
+                  failure.CaseIdentity
+                  (EventId.value failure.EventId)
+                  cutIds
+                  (Wanxiangshu.Persistence.EventStore.AppendError.describe failure.Error) ]
 
     let create (input: obj) : Task<Boot> =
         task {
@@ -85,9 +106,9 @@ module PluginBoot =
             let clock = NodeTiming.nodeClockPort ()
             let timer = NodeTiming.nodeTimerPort ()
 
-            let strengthFailClosed (reason: string) : unit =
-                strengthScope.TripStrengthFuse reason
-                raise (InvalidOperationException reason)
+            let strengthFailFuse (reason: string) : unit = strengthScope.TripStrengthFuse reason
+
+            let casebookSettlements = CasebookSettlementOwner bindCasebookSemanticCut
 
             let familyParent (sessionId: SessionId) =
                 match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
@@ -102,7 +123,8 @@ module PluginBoot =
                   StrengthScope = strengthScope
                   Clock = clock
                   Timer = timer
-                  StrengthFailClosed = strengthFailClosed
+                  StrengthFailFuse = strengthFailFuse
+                  CasebookSettlements = casebookSettlements
                   WorkspaceDirectory = workspaceDirectory
                   FamilyParent = familyParent
                   ProtocolArgumentVault = protocolArgumentVault }

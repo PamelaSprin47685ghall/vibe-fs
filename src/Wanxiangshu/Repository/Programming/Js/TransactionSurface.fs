@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
 
 /// JS-native owner boundary for the transaction decision algebra and its one
@@ -193,10 +194,66 @@ module JsTransactionSurface =
           WorkspaceRoot = text (value?workspaceRoot)
           Mutations = mutations }
 
+    let persistenceFailureToJs (failure: JsTransactionAppendFailure) : obj =
+        let eventIds events =
+            events
+            |> List.map (fun (event: EventEnvelope) -> EventId.value event.EventId)
+            |> List.toArray
+
+        let faultToJs (fault: AppendFault) =
+            box
+                {| phase = string fault.Phase
+                   cause = fault.Cause |}
+
+        let fields =
+            [ "phase" ==> string failure.Phase
+              "transactionId" ==> JsTransactionId.value failure.TransactionId
+              "eventId" ==> EventId.value failure.EventId
+              "isOriginalError"
+              ==> (fun (expected: obj) -> obj.ReferenceEquals(box failure.Error, expected)) ]
+
+        let evidence =
+            match failure.Error with
+            | AppendError.AppendNotAttempted value ->
+                [ "kind" ==> "notAttempted"
+                  "requestedEventIds" ==> eventIds value.Requested
+                  "preparedEventIds"
+                  ==> (value.Prepared |> Option.map (fun p -> eventIds p.DurableEvents) |> Option.toObj)
+                  "primary" ==> faultToJs value.Primary
+                  "cleanupFailures"
+                  ==> (value.CleanupFailures |> List.map faultToJs |> List.toArray) ]
+            | AppendError.CommitUnknown value ->
+                [ "kind" ==> "unknown"
+                  "requestedEventIds" ==> eventIds value.Requested
+                  "preparedEventIds" ==> eventIds value.Prepared.DurableEvents
+                  "primary" ==> faultToJs value.Primary
+                  "cleanupFailures"
+                  ==> (value.CleanupFailures |> List.map faultToJs |> List.toArray) ]
+            | AppendError.NoNewWriteReleaseFailed value ->
+                [ "kind" ==> "noNewWriteReleaseFailed"
+                  "requestedEventIds" ==> eventIds value.Requested
+                  "preparedEventIds"
+                  ==> (value.Prepared |> Option.map (fun p -> eventIds p.DurableEvents) |> Option.toObj)
+                  "primary"
+                  ==> box
+                          {| phase = "StoreRelease"
+                             cause = value.Cause |}
+                  "cleanupFailures" ==> ([||]: obj array) ]
+            | _ -> [ "kind" ==> "rejected" ]
+
+        createObj (fields @ evidence)
+
     let private appendResult result =
         match result with
         | Ok _ -> box {| ok = true |}
-        | Error message -> box {| ok = false; error = message |}
+        | Error failure ->
+            let domainFailure = JsFailure.TransactionPersistenceFailed failure
+
+            box
+                {| ok = false
+                   code = JsFailure.code domainFailure
+                   error = JsFailure.reason domainFailure
+                   persistenceFailure = persistenceFailureToJs failure |}
 
     /// Append Prepared through the canonical EventStore Current integrator.
     let appendPrepared (store: obj) (prepared: obj) : Task<obj> =

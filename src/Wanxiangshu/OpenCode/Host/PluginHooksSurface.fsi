@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Persistence.Journal
 
 module PluginHooksSurface =
+    val replaySettlementThroughBoot: input: obj -> store: obj -> completed: bool -> Task<obj>
 
     /// Opaque Host-owned observation for the Blogger adapter proof.
     type BloggerAdapterObservation =

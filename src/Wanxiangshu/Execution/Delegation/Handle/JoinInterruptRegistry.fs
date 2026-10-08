@@ -100,6 +100,11 @@ type JoinAttemptRegistry() =
         member _.SignalVisibleUserMessage(sessionId: SessionId, physicalId: PhysicalUserMessageId) : unit =
             let key = SessionId.value sessionId
 
+            let currentAttempts () =
+                match active.TryGetValue key with
+                | true, list when list.Count > 0 -> list |> Seq.toList
+                | _ -> []
+
             let attempts =
                 lock gate (fun () ->
                     let seen =
@@ -110,13 +115,7 @@ type JoinAttemptRegistry() =
                             visibleMessages.[key] <- seen
                             seen
 
-                    if not (seen.Add physicalId) then
-                        []
-                    else
-
-                        match active.TryGetValue key with
-                        | true, list when list.Count > 0 -> list |> Seq.toList
-                        | _ -> [])
+                    if not (seen.Add physicalId) then [] else currentAttempts ())
 
             // Only the CURRENT active attempts wake; none active → dropped.
             for attempt in attempts do

@@ -123,7 +123,7 @@ module PluginSessionWiring =
         /// observes only continue-vs-terminal (delegation-023).
         let delegateRetryPort (durable: AgentJournal) : SyncDelegateRetryPort =
             { Retry =
-                fun turn failure error ->
+                fun turn observer failure error ->
                     task {
                         let! verdict =
                             ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure
@@ -132,6 +132,7 @@ module PluginSessionWiring =
                                 scope.BloggerRuntimeHost
                                 durable
                                 turn
+                                observer
                                 failure
                                 error
 

@@ -58,6 +58,13 @@ type HostForkRuntime =
     member internal Clock: IClockPort
     member internal Now: unit -> DateTimeOffset
     member internal AdoptChild: agentId: string * childId: SessionId -> unit
+
+    member internal ObservePromptSend:
+        agentId: string *
+        onAccepted: (PhysicalUserMessageId -> unit) *
+        send: (ContinuationAcceptanceObserver -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>) ->
+            Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>
+
     member SendDeferredFirstPrompt: agentId: string -> Task<Result<unit, string>>
     member DiscardDeferredFirstPrompt: agentId: string -> unit
     member internal Gate: obj
@@ -91,7 +98,9 @@ type HostForkRuntime =
             -> (PhysicalUserMessageId -> unit)
             -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
 
-    member internal SendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+    member internal SendBusyNudge:
+        (string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>)
+
     member internal ParentAbortToken: int
     member IsRetiredHandle: agentId: string -> bool option
     member Complete: run: PendingHostRun * outcome: TerminalOutcome -> unit

@@ -34,6 +34,12 @@ module HostFact =
                Occurrence: RequirementGroundingOccurrence |} ->
             AgentFact
 
+    val inline RequirementGroundingReadObserved:
+        payload:
+            {| SessionId: SessionId
+               Observation: RequirementGroundingReadObserved |} ->
+            AgentFact
+
     val inline TipGuidanceDelivered:
         payload:
             {| SessionId: SessionId

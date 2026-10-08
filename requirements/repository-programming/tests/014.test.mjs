@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { caseName, failureCode, failureReason, rewritten, run, runObserved } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
@@ -37,7 +37,7 @@ test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_exter
       1 << 20,
       null,
       async (readPaths, effectPaths) => {
-        assert.deepEqual(readPaths, ['a.txt'])
+        assert.deepEqual(readPaths, [{ path: realpathSync(join(dir, 'a.txt')), resultBytes: 'alpha\n' }])
         assert.deepEqual(effectPaths, ['a.txt'])
         writeFileSync(join(dir, 'a.txt'), 'external\n', 'utf8')
       },
@@ -133,7 +133,7 @@ test('WHAT[repository-programming-014] JS014_preflight_covers_read_only_snapshot
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } = await import("node:fs");
+const { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
@@ -183,7 +183,7 @@ test('WHAT[repository-programming-014] JS014_workflow_rejects_a_changed_read_onl
       null,
       async (readPaths, effectPaths) => {
         observations += 1
-        assert.deepEqual(readPaths, ['dependency.txt'])
+        assert.deepEqual(readPaths, [{ path: realpathSync(join(dir, 'dependency.txt')), resultBytes: 'snapshot' }])
         assert.deepEqual(effectPaths, ['output.txt'])
         writeFileSync(join(dir, 'dependency.txt'), 'external', 'utf8')
       },
@@ -247,7 +247,7 @@ test('WHAT[repository-programming-014] JS014_workflow_tracks_every_file_scanned_
       1 << 20,
       null,
       async (readPaths) => {
-        assert.deepEqual(readPaths, ['source.txt'])
+        assert.deepEqual(readPaths, [], 'grep retains freshness snapshots without explicit file-read observations')
         writeFileSync(join(dir, 'source.txt'), 'external', 'utf8')
       },
     )

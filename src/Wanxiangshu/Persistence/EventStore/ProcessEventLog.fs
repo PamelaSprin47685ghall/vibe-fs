@@ -32,6 +32,16 @@ type StoreFileGate internal (releaseFn: obj) =
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
 
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendCompletion =
+        | NoAppend
+        | AppendDurable
+
+    [<RequireQualifiedAccess>]
+    type PhysicalAppendFailure =
+        | BeforeAppend of AppendFault
+        | AfterAppend of primary: AppendFault * cleanupFailures: AppendFault list
+
     [<Import("default", "node:fs")>]
     let private nodeFs: obj = jsNative
 
@@ -104,6 +114,12 @@ module ProcessEventLog =
 
     [<Emit("$0($1, $2)")>]
     let private lockAsync (fn: obj) (path: string) (options: obj) : Task<obj> = jsNative
+
+    [<Emit("($0 != null && $0.code === 'ELOCKED')")>]
+    let private isLockContention (cause: exn) : bool = jsNative
+
+    [<Import("setTimeout", "node:timers/promises")>]
+    let private waitForLockRetry (milliseconds: int) : Task<unit> = jsNative
 
     [<Import("join", "node:path")>]
     let private join2 (a: string) (b: string) : string = jsNative
@@ -210,6 +226,40 @@ module ProcessEventLog =
     let isWriterActiveAt nowMs lastActivityMs =
         lastActivityMs >= nowMs - writerRetentionMs
 
+    let private tryAcquireLock (target: string) (options: obj) waitStep : Task<obj option> =
+        task {
+            try
+                let! release = lockAsync lockfile target options
+                return Some release
+            with cause when isLockContention cause ->
+                let delay = min 150.0 (Math.Round(30.0 * Math.Pow(1.1, float waitStep))) |> int
+                do! waitForLockRetry delay
+                return None
+        }
+
+    let private acquireAvailableLock (target: string) : Task<obj> =
+        task {
+            let options =
+                createObj
+                    [ "fs" ==> processAwareFs
+                      "realpath" ==> false
+                      "stale" ==> 5000
+                      "update" ==> 1500
+                      "retries" ==> 0 ]
+
+            // DSL-MUTABLE: resource — this acquisition's physical release capability.
+            let mutable acquired: obj option = None
+            // DSL-MUTABLE: algorithm-scratch — index in the original ten-delay retry cycle.
+            let mutable waitStep = 0
+
+            while acquired.IsNone do
+                let! release = tryAcquireLock target options waitStep
+                acquired <- release
+                waitStep <- (waitStep + 1) % 10
+
+            return acquired.Value
+        }
+
     /// Cross-process physical serialization shared by runtime append and the
     /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
     /// only; it is not durable/domain state and contains no history meaning.
@@ -217,23 +267,7 @@ module ProcessEventLog =
         task {
             let target = wanxiangDirectory commonDir
             ensureDirectory target
-
-            let! release =
-                lockAsync
-                    lockfile
-                    target
-                    (createObj
-                        [ "fs" ==> processAwareFs
-                          "realpath" ==> false
-                          "stale" ==> 5000
-                          "update" ==> 1500
-                          "retries"
-                          ==> createObj
-                                  [ "forever" ==> true
-                                    "minTimeout" ==> 30
-                                    "maxTimeout" ==> 150
-                                    "factor" ==> 1.1 ] ])
-
+            let! release = acquireAvailableLock target
             return new StoreFileGate(release)
         }
 
@@ -276,6 +310,28 @@ module ProcessEventLog =
 
     let filePath (log: ProcessEventLog) = log.FilePath
 
+    let private tryAppendFault phase action =
+        try
+            Ok(action ())
+        with cause ->
+            Error { Phase = phase; Cause = cause }
+
+    let private closeAfterBarrier fd barrier =
+        let closed = tryAppendFault AppendPhase.DurabilityClose (fun () -> closeSync fd)
+
+        match barrier, closed with
+        | Ok(), Ok() -> Ok PhysicalAppendCompletion.AppendDurable
+        | Error primary, Ok() -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok(), Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Error primary, Error cleanup -> Error(PhysicalAppendFailure.AfterAppend(primary, [ cleanup ]))
+
+    let private appendDurabilityBarrier path =
+        match tryAppendFault AppendPhase.DurabilityOpen (fun () -> openSync path "r+") with
+        | Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok fd ->
+            tryAppendFault AppendPhase.DurabilityBarrier (fun () -> fsyncSync fd)
+            |> closeAfterBarrier fd
+
     let private durabilityBarrier path =
         let fd = openSync path "r+"
 
@@ -284,18 +340,34 @@ module ProcessEventLog =
         finally
             closeSync fd
 
+    let private appendBytes (log: ProcessEventLog) text =
+        match tryAppendFault AppendPhase.PhysicalAppend (fun () -> AppendAllText log.FilePath text "utf8") with
+        | Error primary -> Error(PhysicalAppendFailure.AfterAppend(primary, []))
+        | Ok() -> appendDurabilityBarrier log.FilePath
+
+    let private appendEncoded (log: ProcessEventLog) text =
+        match
+            tryAppendFault AppendPhase.BeforePhysicalAppend (fun () -> ensureDirectory (eventsDirectory log.CommonDir))
+        with
+        | Error primary -> Error(PhysicalAppendFailure.BeforeAppend primary)
+        | Ok() -> appendBytes log text
+
     /// One semantic append = one sequence of complete canonical JSON+LF lines.
     /// Existing bytes are never read or rewritten.
-    let append (log: ProcessEventLog) (events: EventEnvelope list) : unit =
-        let text =
-            events
-            |> List.map (EventEnvelope.normalize >> CanonicalEventCodec.encode)
-            |> String.concat ""
+    let append
+        (log: ProcessEventLog)
+        (events: EventEnvelope list)
+        : Result<PhysicalAppendCompletion, PhysicalAppendFailure> =
+        let encoded =
+            tryAppendFault AppendPhase.BeforePhysicalAppend (fun () ->
+                events
+                |> List.map (EventEnvelope.normalize >> CanonicalEventCodec.encode)
+                |> String.concat "")
 
-        if text.Length > 0 then
-            ensureDirectory (eventsDirectory log.CommonDir)
-            AppendAllText log.FilePath text "utf8"
-            durabilityBarrier log.FilePath
+        match encoded with
+        | Error primary -> Error(PhysicalAppendFailure.BeforeAppend primary)
+        | Ok "" -> Ok PhysicalAppendCompletion.NoAppend
+        | Ok text -> appendEncoded log text
 
     let private decodeWriterLine (label: string) (line: string) : Result<EventEnvelope, StorageInvalid> =
         if String.IsNullOrEmpty line then

@@ -94,6 +94,21 @@ module HostFactFold =
                     projection
             )
 
+        | HostFactCases.RequirementGroundingReadObserved payload ->
+            Ok(
+                AgentProjection.update
+                    payload.SessionId
+                    (fun session ->
+                        let prior =
+                            session.RequirementGrounding
+                            |> Option.defaultValue RequirementGroundingProjection.empty
+
+                        { session with
+                            RequirementGrounding =
+                                Some(RequirementGroundingProjection.applyReadObserved payload.Observation prior) })
+                    projection
+            )
+
         | HostFactCases.RequirementGroundingAnchored payload ->
             AgentProjection.tryUpdate
                 payload.SessionId

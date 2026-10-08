@@ -125,3 +125,66 @@ test('WHAT[dispatch-protocol-006] DP_006_same_payload_landings_stay_exact_per_ph
   assert.equal(landedAs('msg_2')?.promptKey, 'pk_2')
   assert.equal(landedAs('msg_3'), undefined, 'an abandoned claim never lands')
 })
+
+for (const boundary of ['new root', 'exact run close']) {
+  test(`WHAT[dispatch-protocol-006] an accepted None-root scope keeps its consumed sequence across ${boundary}`, () => {
+    const session = `accepted-none-root-${boundary}`
+    const seed = inheritedSeed('engineer', 'manager-owning-none-root-sequence')
+    const origin = { kind: 'AuthorityRoot', label: 'AgentOwnerRoot' }
+    const payload = 'same original root payload'
+    const scope = authority.claimScopeDigest(session, null, origin, payload)
+    const firstSequence = authority.nextClaimSequence(scope, authority.empty)
+    assert.equal(firstSequence, 1)
+    const firstKey = authority.derivePromptKey(H, session, null, null, origin, payload, firstSequence)
+    const claim = authority.claimAgentOwnerRoot(firstKey, session, payload, seed)
+    assert.equal(claim.ok, true, claim.error)
+    let state = authority.registerClaim(claim.value, authority.empty)
+    state = authority.acceptClaim(firstKey, 'physical-accepted-none-root', state)
+    assert.equal(state.pendingClaims.length, 0,
+      'this consumed None scope has no Pending claim from which to recover its counter')
+    assert.equal(authority.nextClaimSequence(scope, state), 2)
+    const built = authority.createAuthorityRoot(H, RUNTIME, session,
+      'AgentOwnerRoot', 'physical-accepted-none-root', seed)
+    assert.equal(built.ok, true, built.error)
+    state = authority.registerAuthority(built.value, state)
+    if (boundary === 'exact run close') {
+      const closed = authority.closeAuthority(built.value.logicalRun, built.value.authorityRoot, state)
+      assert.equal(closed.ok, true, closed.error)
+      state = closed.value
+      assert.equal(state.activeLogicalRun, null)
+    }
+    const nextSequence = authority.nextClaimSequence(scope, state)
+    const nextKey = authority.derivePromptKey(H, session, null, null, origin, payload, nextSequence)
+    assert.notEqual(nextKey, firstKey,
+      'a later independent same-payload root act cannot reuse an already physically accepted PromptKey')
+    assert.equal(nextSequence, 2)
+    assert.equal(state.physicalLandings.find(landing => landing.physical === 'physical-accepted-none-root').promptKey, firstKey)
+  })
+}
+
+test('WHAT[dispatch-protocol-006] exact close clears a Some continuation scope even when its run id equals the absence marker', () => {
+  for (const [label, hasher] of [['normal', H], ['absence-marker', () => '\u0000absent']]) {
+    const session = `some-run-sequence-${label}`
+    const built = authority.createAuthorityRoot(hasher, RUNTIME, session,
+      'HumanRoot', `physical-some-run-${label}`, rootSelection('engineer'))
+    assert.equal(built.ok, true, built.error)
+    const root = built.value
+    if (label === 'absence-marker') assert.equal(root.logicalRun, '\u0000absent')
+    const origin = authority.originForContinuation('ManagerGuard')
+    const scope = authority.claimScopeDigest(session, root.logicalRun, origin, 'owned-continuation')
+    const key = authority.derivePromptKey(H, session, root.logicalRun, root.authorityRoot,
+      origin, 'owned-continuation', 1)
+    let state = authority.registerAuthority(root, authority.empty)
+    state = authority.registerClaim(
+      authority.claimContinuation(key, session, 'ManagerGuard', root, 'owned-continuation'), state)
+    assert.equal(state.pendingClaims[0].logicalRun, root.logicalRun)
+    assert.equal(authority.nextClaimSequence(scope, state), 2)
+    const closed = authority.closeAuthority(root.logicalRun, root.authorityRoot, state)
+    assert.equal(closed.ok, true, closed.error)
+    assert.equal(closed.value.activeLogicalRun, null)
+    assert.deepEqual(closed.value.pendingClaims, [])
+    assert.equal(authority.nextClaimSequence(scope, closed.value), 1,
+      `${label}: scope ownership is the typed Some run, not the spelling of its encoded prefix`)
+    assert.deepEqual(closed.value.claimSequences, [])
+  }
+})

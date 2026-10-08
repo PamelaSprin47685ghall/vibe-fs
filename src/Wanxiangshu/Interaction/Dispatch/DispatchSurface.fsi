@@ -10,6 +10,7 @@ open Wanxiangshu.Persistence.Journal
 /// constructors, send observations, and claim counts are plain values.
 [<RequireQualifiedAccess>]
 module DispatchSurface =
+    val closeCompletedHumanRootManager: projection: obj -> obj
     val internal sessionPort: port: obj -> ISessionHostPort
     val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
@@ -41,6 +42,40 @@ module DispatchSurface =
     val sendAgentOwnerRootAwait:
         port: obj -> handle: JournalHandle -> session: string -> text: string -> identitySeed: obj -> Task<obj>
 
+    val sendAgentOwnerRootWithAcceptance:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        identitySeed: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
+    val deliverDetachedVerdict: listener: obj -> kind: string -> reason: string -> Task<obj>
+
+    val sendAgentOwnerRootWithAcceptanceRegistration:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        identitySeed: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
+    val awaitPhysicalConfirmation: promptKey: string -> timeoutMs: int -> Task<obj>
+
+    /// Preserve one opaque typed callback across independent registrations.
+    val preparePhysicalAcceptanceObserver: onAccepted: (string -> unit) -> obj
+
+    /// Return the production owner's opaque registration resource unchanged.
+    val registerPhysicalAcceptanceObserver: promptKey: string -> observer: obj -> obj
+
+    val disposePhysicalAcceptanceObserver: registration: obj -> unit
+
     val sendManagedAssignment:
         port: obj ->
         handle: JournalHandle ->
@@ -58,6 +93,44 @@ module DispatchSurface =
         continuation: string ->
         profile: obj ->
         awaitMode: string ->
+            Task<obj>
+
+    /// Hold the production dispatcher after its real durable claim append.
+    /// The callback changes scheduling only; all journal operations use the
+    /// production adapter and all admission decisions stay in the dispatcher.
+    val sendContinuationAfterClaim:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        afterClaim: (string -> Task) ->
+            Task<obj>
+
+    val sendContinuationWithAcceptance:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
+    val sendContinuationWithAcceptanceRegistration:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        profile: obj ->
+        awaitMode: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
             Task<obj>
 
     val sendGateNudgesConcurrently:
@@ -107,6 +180,27 @@ module DispatchSurface =
         promptKey: string ->
         agent: string ->
             Task<obj>
+
+    /// Freeze the real ingress decision before asynchronous Host preparation,
+    /// then accept that same decision through the production dispatcher.
+    val prepareManagedPromptAcceptance:
+        handle: JournalHandle ->
+        session: string ->
+        physicalMessageId: string ->
+        promptKey: string ->
+        agent: string ->
+            (unit -> Task<obj>)
+
+    /// Hold the frozen decision after real physical acceptance is durable,
+    /// before the dispatcher may establish managed execution acceptance.
+    val prepareManagedPromptAcceptanceAfterPhysical:
+        handle: JournalHandle ->
+        session: string ->
+        physicalMessageId: string ->
+        promptKey: string ->
+        agent: string ->
+        afterPhysical: (string -> Task) ->
+            (unit -> Task<obj>)
 
     /// PROMPT-004: accept the external HumanRoot through the same Dispatcher
     /// writer used by chat.message. The physical id is supplied by the caller as

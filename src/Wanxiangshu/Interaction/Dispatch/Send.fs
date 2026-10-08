@@ -4,6 +4,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
@@ -22,6 +23,23 @@ open Wanxiangshu.Foundation.Identity
 /// recognise the message when `chat.message` delivers it (PROMPT-011).
 [<AutoOpen>]
 module PromptDispatcherSend =
+
+    let private observeHostSend
+        (key: PromptKey)
+        (observer: (PromptDispatcher.PromptSendObservation -> unit) option)
+        (send: unit -> Task<SendOutcome>)
+        : Task<SendOutcome> =
+        match observer with
+        | None -> send ()
+        | Some observe ->
+            observe (PromptDispatcher.PromptSendObservation.Sending key)
+            let pending = send ()
+
+            task {
+                let! outcome = pending
+                observe (PromptDispatcher.PromptSendObservation.Answered(key, outcome))
+                return outcome
+            }
 
     /// PROMPT-011: the key is derived, never generated.
     ///
@@ -58,12 +76,47 @@ module PromptDispatcherSend =
             return key
         }
 
-    let private cancelPhysicalOnError (key: PromptKey) (result: Result<PromptKey, string>) =
+    let private registerAcceptance (key: PromptKey) (observer: ContinuationAcceptanceObserver option) =
+        observer
+        |> Option.map (fun owner ->
+            let registration = PromptPhysicalAcceptance.register key owner.Notify
+
+            try
+                owner.AttachDisposable registration
+                registration
+            with error ->
+                registration.Dispose()
+                raise error)
+
+    let private releaseRegistration (registration: IDisposable option) =
+        registration |> Option.iter (fun owned -> owned.Dispose())
+
+    let private beginOwnedConfirmation key registration (observer: ContinuationAcceptanceObserver) =
+        let outcome, subscription = PromptPhysicalAcceptance.beginConfirmation key None
+
+        try
+            observer.AttachDisposable subscription
+            outcome, subscription
+        with error ->
+            subscription.Dispose()
+            releaseRegistration registration
+            raise error
+
+    let private invokeObservedHostSend key onSendObserved registration send =
+        try
+            observeHostSend key onSendObserved send
+        with error ->
+            releaseRegistration registration
+            raise error
+
+    let private releaseFailedResult registration result =
+        if Result.isError result then
+            releaseRegistration registration
+
+    let private releaseFailedAttempt registration result =
         match result with
-        | Ok _ -> result
-        | Error _ ->
-            PromptPhysicalAcceptance.cancel key
-            result
+        | PromptDispatcher.SendAttemptOutcome.Sent _ -> ()
+        | _ -> releaseRegistration registration
 
     let private persistSubmittedFact
         (key: PromptKey)
@@ -110,9 +163,7 @@ module PromptDispatcherSend =
             let! persisted = persistSubmittedFact key sessionId persist receipt
 
             match persisted with
-            | Error err ->
-                PromptPhysicalAcceptance.cancel key
-                return Error err
+            | Error err -> return Error err
             | Ok() -> return! awaitAdmissionConfirmation key confirmationWaiterOpt
         }
 
@@ -140,15 +191,12 @@ module PromptDispatcherSend =
                             physicalId
                             key
                 | Retryable error ->
-                    PromptPhysicalAcceptance.cancel key
                     let! _ = abandon (PromptAbandonReason.SendFailed error) error
                     return Error error
                 | Fatal error ->
-                    PromptPhysicalAcceptance.cancel key
                     let! _ = abandon (PromptAbandonReason.SendFailed error) error
                     return Error error
                 | AcceptanceUnknown reason ->
-                    PromptPhysicalAcceptance.cancel key
                     return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
             }
 
@@ -156,7 +204,6 @@ module PromptDispatcherSend =
             try
                 return! settle
             with ex ->
-                PromptPhysicalAcceptance.cancel key
                 return Error ex.Message
         }
 
@@ -168,18 +215,13 @@ module PromptDispatcherSend =
         | PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure ->
             Error(sprintf "idle-derived send admission rejected before physical dispatch: %A" failure)
 
-    let private continuationAttemptOutcome (key: PromptKey) (outcome: SendOutcome) (result: Result<PromptKey, string>) =
+    let private continuationAttemptOutcome (outcome: SendOutcome) (result: Result<PromptKey, string>) =
         match outcome, result with
-        | (Retryable _ | Fatal _), Error error ->
-            PromptPhysicalAcceptance.cancel key
-            PromptDispatcher.SendAttemptOutcome.NotSent error
+        | (Retryable _ | Fatal _), Error error -> PromptDispatcher.SendAttemptOutcome.NotSent error
         | _, Ok sentKey -> PromptDispatcher.SendAttemptOutcome.Sent sentKey
-        | _, Error error ->
-            PromptPhysicalAcceptance.cancel key
-            PromptDispatcher.SendAttemptOutcome.Failed error
+        | _, Error error -> PromptDispatcher.SendAttemptOutcome.Failed error
 
     let private awaitPhysicalAwareContinuationAttempt
-        (key: PromptKey)
         (sendTask: Task<SendOutcome>)
         (record: SendOutcome -> Task<Result<PromptKey, string>>)
         : Task<PromptDispatcher.SendAttemptOutcome> =
@@ -187,9 +229,8 @@ module PromptDispatcherSend =
             try
                 let! outcome = sendTask
                 let! result = record outcome
-                return continuationAttemptOutcome key outcome result
+                return continuationAttemptOutcome outcome result
             with ex ->
-                PromptPhysicalAcceptance.cancel key
                 return raise ex
         }
 
@@ -363,7 +404,8 @@ module PromptDispatcherSend =
             (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (onDetachedFailure: (string -> Task) option)
             (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
@@ -411,36 +453,54 @@ module PromptDispatcherSend =
                             Some(fun verdict -> this.SettleDetachedSend key sessionId verdict onDetachedFailure)
                         | PromptDispatcher.AwaitMode.Await -> None }
 
-                let confirmationWaiterOpt =
-                    match awaitMode, onAccepted with
-                    | PromptDispatcher.AwaitMode.Await, Some callback ->
-                        PromptPhysicalAcceptance.register key callback
-                        let confirmationTask = PromptPhysicalAcceptance.awaitConfirmation key None
-                        Some confirmationTask
-                    | _ -> None
+                let registration = registerAcceptance key onAccepted
 
-                let sendTask = port.SendPrompt(sessionId, text, options)
+                let confirmation =
+                    match awaitMode, onAccepted with
+                    | PromptDispatcher.AwaitMode.Await, Some observer ->
+                        Some(beginOwnedConfirmation key registration observer)
+                    | _ -> None
 
                 let acceptFn physicalId =
                     this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId claim.IdentitySeed
                     |> TaskValue.map (Result.map ignore)
 
-                match awaitMode with
-                | PromptDispatcher.AwaitMode.Detached ->
-                    let! _ = this.PersistDetachedInvocation(key, sessionId)
-                    this.ObserveDetachedSend key sessionId sendTask onDetachedFailure
-                    return key
-                | PromptDispatcher.AwaitMode.Await ->
-                    return!
-                        awaitPhysicalAwareSend
-                            key
-                            sessionId
-                            (fun fact -> this.Persist sessionId None fact)
-                            acceptFn
-                            (fun reason error ->
-                                this.Abandon key sessionId reason |> TaskValue.map (fun _ -> Error error))
-                            sendTask
-                            confirmationWaiterOpt
+                let awaitRootSend sendTask =
+                    task {
+                        let! outcome =
+                            awaitPhysicalAwareSend
+                                key
+                                sessionId
+                                (fun fact -> this.Persist sessionId None fact)
+                                acceptFn
+                                (fun reason error ->
+                                    this.Abandon key sessionId reason |> TaskValue.map (fun _ -> Error error))
+                                sendTask
+                                (confirmation |> Option.map fst)
+
+                        releaseFailedResult registration outcome
+                        return outcome
+                    }
+
+                let sendClaimedRoot sendTask =
+                    match awaitMode with
+                    | PromptDispatcher.AwaitMode.Detached ->
+                        taskResult {
+                            let! _ = this.PersistDetachedInvocation(key, sessionId)
+                            this.ObserveDetachedSend key sessionId sendTask onDetachedFailure
+                            return key
+                        }
+                    | PromptDispatcher.AwaitMode.Await -> awaitRootSend sendTask
+
+                try
+                    let sendTask =
+                        invokeObservedHostSend key onSendObserved registration (fun () ->
+                            port.SendPrompt(sessionId, text, options))
+
+                    let! result = sendClaimedRoot sendTask
+                    return result
+                finally
+                    confirmation |> Option.iter (fun (_, owned) -> owned.Dispose())
             }
 
         member this.SendAgentOwnerRoot
@@ -450,9 +510,9 @@ module PromptDispatcherSend =
             (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None
+            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None None
 
         member this.SendAgentOwnerRootDetachedObserved
             (port: IDispatchSessionPort)
@@ -470,6 +530,7 @@ module PromptDispatcherSend =
                 directory
                 PromptDispatcher.AwaitMode.Detached
                 None
+                None
                 (Some onFailure)
                 None
 
@@ -480,7 +541,8 @@ module PromptDispatcherSend =
             (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool>)
             : Task<Result<PromptKey, string>> =
             this.SendAgentOwnerRootCore
@@ -491,6 +553,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 None
                 (Some tools)
 
@@ -509,7 +572,8 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             (key: PromptKey)
@@ -530,9 +594,7 @@ module PromptDispatcherSend =
                         | PromptDispatcher.AwaitMode.Await -> None }
 
 
-                match awaitMode, onAccepted with
-                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
-                | _ -> ()
+                let registration = registerAcceptance key onAccepted
 
                 // The admission check and the Host call are deliberately
                 // synchronous neighbours. No await may reopen a window where
@@ -540,7 +602,8 @@ module PromptDispatcherSend =
                 // proven but before SendPrompt is invoked.
                 let sendAdmitted () : Task<PromptDispatcher.SendAttemptOutcome> =
                     task {
-                        let sendTask = port.SendPrompt(sessionId, text, options)
+                        let sendTask =
+                            observeHostSend key onSendObserved (fun () -> port.SendPrompt(sessionId, text, options))
 
                         let acceptFn physicalId =
                             this.AcceptContinuation key sessionId physicalId
@@ -561,20 +624,40 @@ module PromptDispatcherSend =
                             match awaitMode with
                             | PromptDispatcher.AwaitMode.Detached -> detachedOutcome ()
                             | PromptDispatcher.AwaitMode.Await ->
-                                awaitPhysicalAwareContinuationAttempt key sendTask (fun outcome ->
+                                awaitPhysicalAwareContinuationAttempt sendTask (fun outcome ->
                                     this.RecordSendOutcome key sessionId outcome acceptFn)
 
                         return! sendAfterAdmission ()
                     }
 
-                match physicalSendAdmission physicalAdmission with
-                | Error failure ->
-                    return!
+                let dispatchClaimedContinuation () =
+                    let admission =
+                        match this.RequireActiveProfile sessionId profile with
+                        | Error error -> Error(PromptDispatcher.SendAttemptOutcome.Failed error)
+                        | Ok() ->
+                            physicalSendAdmission physicalAdmission
+                            |> Result.mapError PromptDispatcher.SendAttemptOutcome.AdmissionRejected
+
+                    match admission with
+                    | Error failure ->
+                        releaseRegistration registration
+
                         this.Abandon key sessionId PromptAbandonReason.SupersededBeforePhysicalSend
                         |> TaskValue.map (function
-                            | Ok() -> PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure
+                            | Ok() -> failure
                             | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error)
-                | Ok() -> return! sendAdmitted ()
+                    | Ok() ->
+                        task {
+                            let! result = sendAdmitted ()
+                            releaseFailedAttempt registration result
+                            return result
+                        }
+
+                try
+                    return! dispatchClaimedContinuation ()
+                with error ->
+                    releaseRegistration registration
+                    return raise error
             }
 
         member private this.SendContinuationWithDigestAttempt
@@ -586,53 +669,60 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             : Task<PromptDispatcher.SendAttemptOutcome> =
-            task {
-                let origin = PromptAuthority.PromptOrigin.Continuation continuation
-                let originLabel = PromptDispatcher.originLabel origin
+            let claimAndSend () =
+                task {
+                    let origin = PromptAuthority.PromptOrigin.Continuation continuation
+                    let originLabel = PromptDispatcher.originLabel origin
 
-                let key =
-                    deriveKey
-                        (this.ProjectionFor sessionId)
-                        sessionId
-                        (Some profile.LogicalRunId)
-                        (Some profile.AuthorityRootUserMessageId)
-                        origin
-                        payloadDigest
-
-                let claim =
-                    PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
-
-                let claimed =
-                    PromptSessionFact.PromptClaimed
-                        {| PromptKey = key
-                           SessionId = sessionId
-                           ContinuationKind = originLabel
-                           LogicalRunId = claim.LogicalRunId
-                           AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
-                           IdentitySeed = claim.IdentitySeed
-                           PayloadDigest = payloadDigest |}
-
-                match! this.Persist sessionId None claimed with
-                | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
-                | Ok() ->
-                    return!
-                        this.SendClaimedContinuation
-                            port
+                    let key =
+                        deriveKey
+                            (this.ProjectionFor sessionId)
                             sessionId
-                            text
-                            originLabel
-                            profile
-                            directory
-                            awaitMode
-                            onAccepted
-                            tools
-                            physicalAdmission
-                            key
-            }
+                            (Some profile.LogicalRunId)
+                            (Some profile.AuthorityRootUserMessageId)
+                            origin
+                            payloadDigest
+
+                    let claim =
+                        PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
+
+                    let claimed =
+                        PromptSessionFact.PromptClaimed
+                            {| PromptKey = key
+                               SessionId = sessionId
+                               ContinuationKind = originLabel
+                               LogicalRunId = claim.LogicalRunId
+                               AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
+                               IdentitySeed = claim.IdentitySeed
+                               PayloadDigest = payloadDigest |}
+
+                    match! this.Persist sessionId None claimed with
+                    | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
+                    | Ok() ->
+                        return!
+                            this.SendClaimedContinuation
+                                port
+                                sessionId
+                                text
+                                originLabel
+                                profile
+                                directory
+                                awaitMode
+                                onAccepted
+                                onSendObserved
+                                tools
+                                physicalAdmission
+                                key
+                }
+
+            match this.RequireActiveProfile sessionId profile with
+            | Error error -> Task.FromResult(PromptDispatcher.SendAttemptOutcome.Failed error)
+            | Ok() -> claimAndSend ()
 
         member private this.SendContinuationWithDigest
             (port: IDispatchSessionPort)
@@ -643,7 +733,8 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigestAttempt
@@ -656,6 +747,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 tools
                 None
             |> TaskValue.map publicResultOfAttempt
@@ -668,7 +760,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
                 port
@@ -680,6 +772,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
                 None
 
         /// Non-idle gate reminder with exact terminal occasion identity. Used by
@@ -695,7 +788,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
             : Task<Result<PromptKey, string>> =
             let payloadDigest =
                 PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun
@@ -721,6 +814,7 @@ module PromptDispatcherSend =
                         awaitMode
                         onAccepted
                         None
+                        None
             )
 
         member this.SendContinuationWithTools
@@ -731,7 +825,8 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
+            (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
             (tools: Map<string, bool>)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
@@ -744,6 +839,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                onSendObserved
                 (Some tools)
 
         member private this.SendAgentOwnerRootWithSeed
@@ -764,6 +860,7 @@ module PromptDispatcherSend =
                     identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Detached
+                    None
                     None
                     None
                     tools
@@ -788,6 +885,7 @@ module PromptDispatcherSend =
                     directory
                     PromptDispatcher.AwaitMode.Detached
                     None
+                    None
                     tools
             | None -> this.SendAgentOwnerRootWithSeed port sessionId text directory tools issueIdentitySeed
 
@@ -811,7 +909,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
                 port
@@ -823,6 +921,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
                 None
 
         /// HOST-004: idle-derived continuation whose quiescence permit is
@@ -837,7 +936,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (onAccepted: ContinuationAcceptanceObserver option)
             (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
@@ -850,6 +949,7 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
                 None
                 (Some physicalAdmission)
 
@@ -866,6 +966,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+            (observer: ContinuationAcceptanceObserver option)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
                 port
@@ -876,6 +977,7 @@ module PromptDispatcherSend =
                 profile
                 directory
                 awaitMode
+                observer
                 None
                 None
                 (Some physicalAdmission)
@@ -901,6 +1003,7 @@ module PromptDispatcherSend =
                 profile
                 directory
                 awaitMode
+                None
                 None
                 None
                 (Some physicalAdmission)

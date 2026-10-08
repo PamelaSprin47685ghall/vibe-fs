@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open System.Threading.Tasks
+open Wanxiangshu.OpenCode
 
 /// Delegation-owned opaque runtime harness. Host sessions, journal writers,
 /// attached-session state and completion turns never cross into JS; callers
@@ -10,6 +11,41 @@ module SyncDelegateSurface =
     /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
     /// Every owner must first be admitted as an explicit durable HumanRoot.
     val create: directory: string -> owners: obj -> Task<obj>
+
+    /// Recording at the controlled Host boundary; this does not install an SDK.
+    val createForHostRecording: directory: string -> owners: obj -> Task<obj>
+
+    val internal withHostRuntime:
+        value: obj -> useRuntime: (SyncDelegateRuntime -> ISessionHostPort -> 'result) -> 'result
+
+    val recordingSnapshot: value: obj -> obj
+    val awaitRecordingPromptCount: value: obj -> count: int -> Task
+    val returnRecordingPromptOutcome: value: obj -> session: string -> index: int -> outcome: obj -> bool
+
+    /// Same canonical journal and Host port, using the production provider
+    /// recovery workflow and a real Blogger scope. Model routing reads the
+    /// calling process's already-isolated configuration.
+    val createForProviderRecovery: directory: string -> owners: obj -> Task<obj>
+
+    val createForGuardRecovery: directory: string -> owners: obj -> Task<obj>
+    val closeRecovery: value: obj -> Task
+    val closeGuardRecovery: value: obj -> Task
+    val observeGuardDelta: value: obj -> raw: obj -> unit
+    val awaitGuardInterrupt: value: obj -> session: string -> providerRun: string -> Task
+
+    val observeExactGuardAbort:
+        value: obj -> session: string -> physical: string -> authorityRoot: string -> providerRun: string -> Task
+
+    val observeRepairTurn:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        finish: string ->
+        delivery: string ->
+        idleEvidence: bool ->
+            Task
 
     /// managed-session-lifecycle-001: drive SyncDelegateRuntime's production child
     /// observation into AttachedSessionRuntime against controlled Host callbacks.
@@ -29,6 +65,60 @@ module SyncDelegateSurface =
 
     /// Exact formal response from the accepted terminal of this invocation.
     val invokeResponse: value: obj -> owner: string -> question: string -> Task<obj>
+
+    val startObserved: value: obj -> owner: string -> charge: string -> obj
+    val startObservedWithPreparationFailure: value: obj -> owner: string -> charge: string -> reason: string -> obj
+    val observedAdmission: execution: obj -> Task<obj>
+    val observedCompletion: execution: obj -> Task<obj>
+    val returnPromptOutcome: value: obj -> owner: string -> role: string -> index: int -> outcome: obj -> bool
+    val rejectPrompt: value: obj -> owner: string -> role: string -> index: int -> reason: string -> bool
+
+    val confirmPromptPhysical:
+        value: obj -> owner: string -> role: string -> index: int -> physical: string -> Task<bool>
+
+    /// Real managed ingress from a captured PromptKey, including durable
+    /// ChatExecution Accepted. Returns only the native witness observation.
+    val confirmManagedPromptPhysical:
+        value: obj -> owner: string -> role: string -> index: int -> physical: string -> Task<obj>
+
+    /// Controlled exact-stop capability for this harness's own children. This
+    /// does not install or prove the real Host terminal subscription.
+    val observeProviderFailureStop: value: obj -> session: string -> providerRun: string -> bool
+
+    /// Cardinality of the process-shared production stop fence, not call state.
+    val recoveryStopSnapshot: value: obj -> obj
+
+    val promptIdentity: value: obj -> owner: string -> role: string -> index: int -> obj
+    val promptClaimState: value: obj -> owner: string -> role: string -> index: int -> obj
+    val terminalListenerCount: value: obj -> int
+
+    val settleExactTerminal:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        formalText: string ->
+        reasoningText: string ->
+            Task<bool>
+
+    val settleExactFallback:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        formalText: string ->
+            bool
+
+    val observeExactProviderFailure:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        reason: string ->
+            Task<bool>
 
     /// Settle the current managed child through the real HandleTurn path.
     val settleWithAuthorityRoot:

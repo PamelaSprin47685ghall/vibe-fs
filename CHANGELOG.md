@@ -1,5 +1,100 @@
 # Changelog — 版本历史
 
+## Unreleased — S03 源码目录身份与 NuGet 协议夹具
+
+- gen112完整Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空；缺SDKroot的436/0/7skip/2TODO只属较窄截面，误名单仅setup。npm第一正例拆真实准备完成与实际install/assert判决叶，保原强断言/held负例/预算，gen113最终待附件，不提前记绿；Archive本批未施工。
+
+- Git源码owner私有捕获canonical parent/root dev/ino，在publication、revalidate前后和cleanup拒绝foreign；同库存目录置换正式0/2→定向12/0，完整Git/.git/bytes/mode断言保留。TOCTOU/ABA、完整FD与其它owner仍未闭合。
+- 15个NuGet非法图仅共享真实不改写Git前提，每叶SDK/restore/HOME/feed/packages独立，原typed/calls断言不变；195→13是静态Git成本，不冒称CI改善。最终输入结果待[本批附件](proposals/archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)。
+- 9909真实CI在300000ms backstop仅817/818、active016、无权威summary，是实际超时而非pending-only；预算与默认workers不变，T418/T419继续保留。
+- aac79 CI另已818/818、4253/0/103skip/404TODO，仅pending退出1，未含本批修复，不认作9909原因消除。NuGet同15叶各15/0、23.782s→13.165s只是本机单次观测；source第三个parent失配/rootmissing例加入后完整定向13/0、2.942s，最终统一输入仍待验收。source红例只观察旧revalidate接受，未运行旧dispose删除；修复后dispose拒绝与foreign库存另有正式断言。
+
+## Unreleased — S03 编译目录身份与清理
+
+- Fable编译owner私有捕获canonical parent/root物理dev/ino；消费、发布、revalidate与cleanup拒绝同路径foreign目录，即使完整库存相同也不能删除foreign。正常parent且rootENOENT幂等，清理拒绝保留原Error/null与Aggregate cause，不扫描unknown parked路径。
+- 正式parent/root置换0/2真实红例保留；初次cp mode setup失败不冒称产品红。新批结果以[验收附件入口](proposals/archive/2026-10-04/S03编译目录身份与清理-2026-10-04.md)为准，preflight仍有TOCTOU/ABA，不声称其它owner、完整FD或readonly已闭合。
+- 第二批9909/gen110已429/0/6skip/2TODO、18/18排空、groupaccepted=true；其绿色不替代新输入验收，T418/T419保持。
+
+## Unreleased — S03 独立工具进程回收
+
+- 判决输送让步移到beforeEach，前一项runtime判决可在下一段同步工作之前送出；原三项正式回归3/3。真实失败完整原因/位置/stack立即打印，后续挂住仍可见；相同事实不重印，不合并共享Error的不同测试，021完整18/18。
+
+- 薄monitor拥有actual工具组，EOF或实际exit/error后回收；调用方取消Error/null在正常cleanup后精确保留，cleanup失败保留Aggregate cause。supervisor冻结原组并只等待已观察额外组，foreign对照保持。
+- 四个既有取消用例先await settlement，再发第二SIGTERM并加强ESRCH；完整库存、原原因及资源断言保留。注册/仅屏障正式红例后实际接入单项1/1，最终选集待[本批附件](proposals/archive/2026-10-04/S03独立工具进程回收-2026-10-04.md)绑定。
+- 首批74fc/gen108已有18/18排空、418/0/6skip/2TODO；新批不升级为fullsetsid/crash/ABA/OS或readonly闭包，控制面/bin/ps未完整固定，T418/T419保持。
+
+## Unreleased — S03 运行器因果输送与回收
+
+- coverage 改为异步等待真实runner/c8，父进程可响应子进程HTTP；完整报告不能掩盖signal失败，silent子进程获得stdin EOF。原分母/报告断言保留，011定向18/0。
+- supervisor静默失败先收原进程组和exact HOME，再交还caller；同步spawn错误停watchdog并保原cause，真实清理失败不吞verdict或null原因。Node/npm非法角色在读归档/分配root前typed拒绝，合法库存和完整探针不变。
+- [记录](proposals/archive/2026-10-04/S03运行器因果输送与回收-2026-10-04.md)分开绑定正式定向红绿与gen108的统一18验收（418/0/6skip/2TODO）。新fe9 CI4188/0只证明其输入，保gen103失败/旧72e83无结论；detached tool接上方独立监护批，runtime readonly、ABA、T418/T419未闭合。
+
+## Unreleased — S03 实际单项目 Fable 编译
+
+- 以选定 SDK/Fable DLL 编译已准备单项目；原 artifacts 精确复制到自有 seed，原源码、SDK、工具与工程 owner 保持，JS 及中间产物完整库存绑定四份输入身份。
+- 正式编译、进程 adapter 与诊断分开记证；SDK packs 和工具自带 FSharp.Core 不被四包 NuGet graph 覆盖，只读执行、完整工程图、OS 与实际 verify 同候选仍待证明。见[记录](proposals/archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)。
+- 保留前批72e83 CI在300000ms backstop下817/818完成、无权威summary/活动身份的无结论状态；最新接续从上方运行器记录认领，不以新输入CI或本地定向通过替代旧次结果。
+
+## Unreleased — S03 工程 NuGet 单项目准备
+
+- 从已准备源码与 SDK 恢复原单 net10.0/no ProjectReference 项目，使用明确归档和私有 feed；派生 lock 后清空包缓存，再实际 locked 复验，完整 graph/产物身份绑定原输入。
+- 区分 raw nupkg SHA512 与 NuGet contentHash；源码准备补 canonical parent、普通全库存及公开 receipt 复核。实际 Fable、全仓工程图、只读执行及同候选 verify 仍待证明，见[记录](proposals/archive/2026-10-04/S03工程NuGet单项目准备-2026-10-04.md)。
+
+## Unreleased — S03 选定本地工具恢复
+
+- 明确包 ID、版本和 SHA512，以已准备 SDK 私有恢复原本地工具 manifest，绑定真实 resolver、运行 DLL 与完整输出库存；取消或失败保留原因并回收自有根。
+- 真实 Fable/Fantomas 版本消费不代替工程 restore 或编译；S03 不可变执行与同候选 verify 仍未闭合。见[记录](proposals/archive/2026-10-04/S03本地工具恢复-2026-10-04.md)。
+
+## Unreleased — upstream 31e69b3dd 合并
+
+- 吸收 raw Chronicle 基数统一检查与显式 ABSORB 声明，保持过滤前拒绝及 live 规则名核对。修正新增测试的实际日志观察与排空，保留尚未接通的 registered Host TODO。
+- 两次普通合并的取舍与监督验收见[最新记录](proposals/archive/2026-10-04/Upstream增量-31e69b3dd-2026-10-04.md)；制度学习机制提炼与 S03 剩余边界未关闭。
+
+## Unreleased — upstream aaa123b12 增量
+
+- 吸收 occurrence frontier/coverage 分离、持久事实兼容解码、review 重放及跨任期 call 防线。补完整 binding 重放和开任期误退邮箱的正式红绿回归。
+- 保留 LifeCompleted Surface 的成功接线，撤回未闭合失败恢复的新增 Suicide 邮箱退休调用；GAP-157 与生产终结 TODO 保留。合并与验收见[记录](proposals/archive/2026-10-04/Upstream增量-aaa123b12-2026-10-04.md)。
+
+## Unreleased — S03 选定 SDK 准备
+
+- 从明确摘要的完整 SDK 归档独立物化，在私有配置目录下使用原 global.json 实际探测 SDK 与 runtime，拒绝越界工具路径、外部 SDK 借用和身份不符。探测后完整复核，失败与取消回收自有目录并保留原原因。
+- 真实 SDK10.0.302 完整库存及原10.0.100/latestFeature选择有正式定向证据；这只证明准备边界，NuGet/tool restore、实际 Fable、只读执行与 verify 同候选仍待施工。见[记录](proposals/archive/2026-10-04/S03选定SDK准备-2026-10-04.md)。
+
+## Unreleased — upstream 590a3f69e 增量
+
+- 合入会话 dormant 身份登记、冷读取持久消费投影刷新、取消与删除的公开 Surface，以及沙箱顶层无 JSON 返回值的类型化拒绝。吸收实际工程缺边及持久化、effect、生命周期回归。
+- 保留本地 S03 准备 owner 与两个 TODO，拒绝已被真实父目录替换反例证伪的 copy/chmod 快照接线；不将顺序冷读取证明写成跨实例同时消费已闭合。编译闭包 48→56 按本批新增依赖的八个源如实记录。
+- 本地受影响验收与合并裁决见[同步记录](proposals/archive/2026-10-04/Upstream增量-590a3f69e-2026-10-04.md)。
+- S03 另补本仓精确 Git 输入与完整 npm11.12.1 工具归档的真实依赖安装，独立产物的 Fable、Acorn、Tar 消费者及回收已定向通过；native Host、SDK/NuGet 和不可变执行仍未证明。
+
+## Unreleased — S03 工具归档安装与挂载输出清理
+
+- 新增从完整选定 Node/npm 归档执行真实 npm ci 的入口，沿原工具目录运行，安装 receipt 绑定工具摘要；安装前后及返回前复核完整工具成员，失败和取消回收自有目录。
+- 编译输出 reset 保留真实目录根，仅删除目录内成员，拒绝根链接或普通文件；真实 macOS 挂载输出回归证明旧删除根实现报 EBUSY，修复后可清理和写入，失败编译保留原产物。
+- upstream 的复制加 chmod 快照仍能通过父目录替换读取错误源码后恢复，并返回 PASS；保留正式反例、T418/T419 与 S03 未完成范围。见[本批记录](proposals/archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)。
+
+## Unreleased — S03 真实 npm 安装与 Node/npm 准备
+
+- 从选定 package/lock 字节执行真实 npm ci，显式核对 Node/npm 入口身份，使用私有配置、缓存及 HOME，禁用 lifecycle scripts。完整安装清单与独立归档产物逐项一致后才返回；锁外来源、完整性失败及取消均回收自有产物。
+- Node/npm 工具准备覆盖选定归档的全部成员，必需的声明生产依赖在 npm 包内闭合，拒绝父目录补库。实际版本探测从独立目录运行，探测结束再复核完整清单；取消排空实际进程组并保留原原因。共用归档物化规则，保留外部链接、特殊文件及截断归档拒绝。
+- 这两项仍是准备边界：未接入实际 verify，SDK/NuGet、只读执行和阶段内改后恢复尚待证明，T418/T419 保留。见[施工记录](proposals/archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)。
+
+## Unreleased — S03 明确身份的依赖归档准备
+
+- 新增依赖准备owner：完整读取调用者指定SHA-256的安装归档，解析后独立物化node_modules，复核全部目录、字节、权限和闭合内部链接，摘要绑定归档与源码锁文件字节。拒绝外部/悬空/循环链接、重复路径、链接祖先、特殊文件及截断归档。
+- 本批不执行npm安装，不证明归档符合锁文件来源，也未接入实际verify或只读执行。T418/T419保留；见[依赖准备记录](proposals/archive/2026-10-04/S03依赖归档准备-2026-10-04.md)。
+
+## Unreleased — S03 指定 Git tree 源码准备
+
+- 从明确指定的Git tree读取完整原始blob，保留路径、执行位和字节；在自有Git目录重新构造index/tree核对身份，避免工作区、attributes、replace refs和继承Git环境改变候选。缺对象、promisor仓、不支持的类型或无法忠实物化的路径均失败。
+- 普通合并upstream `46935e5bd` 的Replica请求收尾user行；新增真实注册hook回归，验证它不建立新的physical acceptance，原预算/终态仍绑定原bootstrap，语言变更只影响提示正文。
+- 源码准备尚未接入实际verify，依赖与只读执行未封闭，T418/T419保留。见[本批记录](proposals/archive/2026-10-04/S03指定树源码准备-2026-10-04.md)。
+
+## Unreleased — S03 输入枚举前置
+
+- 验证输入根、普通输入及tracked corpus路径的符号链接映射现在明确失败，不再静默漏收或读取外部可写目标；合法输出根链接与普通同名文件保持原边界。
+- 新增正式WHAT016反例；不可变候选、同阶段改后恢复及依赖隔离仍待完成，两项TODO保留。见[S03记录](proposals/archive/2026-10-03/S03输入链接边界-2026-10-03.md)。
+
 ## Unreleased — 忙碌子任务可随时接收指导
 
 - Manager 的 `resume` 可向忙碌 Engineer 或固定 DevOps 追加 `BusyAgentNudge`，影响下一次 LLM 请求；保留原任务、Root、完成回调和 handoff frontier，不取消、重派或新建任务。删除忙碌拒绝及按旧 charge 文本假装成功的路径，返回明确的指导已发送结果。

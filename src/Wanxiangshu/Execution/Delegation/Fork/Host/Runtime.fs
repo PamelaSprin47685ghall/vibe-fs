@@ -83,6 +83,62 @@ module private PtyHostHelpers =
             terminalByName
             |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
 
+type private PromptAcceptanceState =
+    | Open of ResizeArray<IDisposable>
+    | Closed
+
+type private PromptAcceptanceScope(notify: PhysicalUserMessageId -> unit, onClosed: PromptAcceptanceScope -> unit) as this
+    =
+    let gate = obj ()
+    // DSL-MUTABLE: resource — registrations belong to one observed Fork prompt.
+    let mutable state = Open(ResizeArray<IDisposable>())
+
+    let disposeRegistrations (owned: IDisposable array) =
+        for registration in owned do
+            registration.Dispose()
+
+    let notifyAndClose physical =
+        try
+            notify physical
+        finally
+            this.Dispose()
+
+    member _.Dispose() =
+        let resources =
+            lock gate (fun () ->
+                match state with
+                | Closed -> None
+                | Open resources ->
+                    state <- Closed
+                    Some(resources.ToArray()))
+
+        resources
+        |> Option.iter (fun owned ->
+            try
+                disposeRegistrations owned
+            finally
+                onClosed this)
+
+    member _.Observer: ContinuationAcceptanceObserver =
+        { Notify =
+            fun physical ->
+                lock gate (fun () ->
+                    match state with
+                    | Closed -> ()
+                    | Open _ -> notifyAndClose physical)
+          AttachDisposable =
+            fun registration ->
+                let release =
+                    lock gate (fun () ->
+                        match state with
+                        | Closed -> true
+                        | Open resources ->
+                            resources.Add registration
+                            false)
+
+                if release then
+                    registration.Dispose() }
+
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).
 type HostForkRuntime
@@ -128,6 +184,10 @@ type HostForkRuntime
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
     let bufferedJoinItems = Queue<JoinItem>()
     let gate = obj ()
+    // DSL-MUTABLE: resource — local acceptance scopes, including durable-Pending prompts without a run yet.
+    let mutable promptAcceptanceScopes =
+        Some(Dictionary<string, ResizeArray<PromptAcceptanceScope>>())
+
     let cancelGate = obj ()
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
@@ -146,6 +206,85 @@ type HostForkRuntime
     let mutable ownedWorkFailure: exn option = None
     // DSL-MUTABLE: resource — acknowledgement for observed callbacks without closing admission.
     let mutable observedWorkWaiter: TaskCompletionSource<unit> option = None
+
+    let removePromptAcceptanceScope agentId scope =
+        lock gate (fun () ->
+            match
+                promptAcceptanceScopes
+                |> Option.bind (fun registry ->
+                    match registry.TryGetValue agentId with
+                    | true, scopes -> Some(registry, scopes)
+                    | false, _ -> None)
+            with
+            | Some(registry, scopes) ->
+                scopes.Remove scope |> ignore
+
+                if scopes.Count = 0 then
+                    registry.Remove agentId |> ignore
+            | None -> ())
+
+    let addPromptAcceptanceScope (registry: Dictionary<string, ResizeArray<PromptAcceptanceScope>>) agentId scope =
+        let scopes =
+            match registry.TryGetValue agentId with
+            | true, current -> current
+            | false, _ ->
+                let created = ResizeArray<PromptAcceptanceScope>()
+                registry.[agentId] <- created
+                created
+
+        scopes.Add scope
+
+    let releaseRejectedPrompt (scope: PromptAcceptanceScope) outcome =
+        match outcome with
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected _ -> scope.Dispose()
+        | _ -> ()
+
+    let observePromptSend agentId onAccepted send =
+        let scope = PromptAcceptanceScope(onAccepted, removePromptAcceptanceScope agentId)
+
+        let registered =
+            lock gate (fun () ->
+                match promptAcceptanceScopes with
+                | None -> false
+                | Some registry ->
+                    addPromptAcceptanceScope registry agentId scope
+                    true)
+
+        let rejected () =
+            scope.Dispose()
+            Task.FromResult(HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected "Fork runtime observers are closed")
+
+        let sendObserved () =
+            task {
+                try
+                    let! outcome = send scope.Observer
+                    releaseRejectedPrompt scope outcome
+                    return outcome
+                with error ->
+                    scope.Dispose()
+                    return raise error
+            }
+
+        if registered then sendObserved () else rejected ()
+
+    let closePromptAcceptanceScopes stopping predicate =
+        let scopes =
+            lock gate (fun () ->
+                let current = promptAcceptanceScopes
+
+                if stopping then
+                    promptAcceptanceScopes <- None
+
+                current
+                |> Option.map (fun registry ->
+                    registry
+                    |> Seq.filter (fun (KeyValue(agentId, _)) -> predicate agentId)
+                    |> Seq.collect (fun (KeyValue(_, scopes)) -> scopes)
+                    |> Seq.toArray)
+                |> Option.defaultValue [||])
+
+        for scope in scopes do
+            scope.Dispose()
 
     let observedWorkTask () =
         match observedWorkWaiter with
@@ -278,9 +417,21 @@ type HostForkRuntime
     let handleOwnership = defaultArg ownership HandleOwnership.DurableParentHandle
 
     let sendChildPrompt =
-        HostForkRunLifecycle.childPromptSender sessions parentId journal directoryOf
+        fun agentId childId role identitySeed prompt onAccepted ->
+            observePromptSend agentId onAccepted (fun observer ->
+                HostForkRunLifecycle.childPromptSender
+                    sessions
+                    parentId
+                    journal
+                    directoryOf
+                    agentId
+                    childId
+                    role
+                    identitySeed
+                    prompt
+                    observer)
 
-    let sendBusyNudge = HostForkBusyNudge.sender sessions parentId journal directoryOf
+    let sendBusyNudge = HostForkBusyNudge.sender sessions journal directoryOf
 
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
@@ -373,6 +524,14 @@ type HostForkRuntime
             children.[agentId] <- childId
             processOwnedAgents.Add agentId |> ignore)
 
+    member internal _.ObservePromptSend
+        (
+            agentId: string,
+            onAccepted: PhysicalUserMessageId -> unit,
+            send: ContinuationAcceptanceObserver -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>
+        ) =
+        observePromptSend agentId onAccepted send
+
     /// GLORY-040: deliver a first prompt that was deferred until its review
     /// barrier had durably opened. Idempotent per agent id: a second call with
     /// nothing pending is a no-op success.
@@ -391,14 +550,15 @@ type HostForkRuntime
             =
             task {
                 let! sent =
-                    HostForkAgentOwner.sendFirstPromptObserved
-                        this.Sessions
-                        this.Journal
-                        pending.ChildId
-                        pending.IdentitySeed
-                        (this.DirectoryOf agentId)
-                        pending.Prompt
-                        (fun _ -> ())
+                    observePromptSend agentId ignore (fun observer ->
+                        HostForkAgentOwner.sendFirstPromptObserved
+                            this.Sessions
+                            this.Journal
+                            pending.ChildId
+                            pending.IdentitySeed
+                            (this.DirectoryOf agentId)
+                            pending.Prompt
+                            observer)
 
                 return
                     match sent with
@@ -478,6 +638,8 @@ type HostForkRuntime
     member internal _.ParentAbortToken = parentAbortToken
 
     member private _.DetachPendingObservers() =
+        closePromptAcceptanceScopes true (fun _ -> true)
+
         let subscriptions =
             lock gate (fun () ->
                 let values =
@@ -499,6 +661,7 @@ type HostForkRuntime
 
     member private this.DrainCancelledCallbacks(agentIds: string list, retainedAgents: string list) : Task<unit> =
         let cancelled = Set.ofList agentIds
+        closePromptAcceptanceScopes false (fun agentId -> Set.contains agentId cancelled)
 
         let subscriptions =
             lock gate (fun () ->

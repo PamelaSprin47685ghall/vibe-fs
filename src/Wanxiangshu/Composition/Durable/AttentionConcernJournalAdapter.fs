@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
@@ -66,21 +67,29 @@ module AttentionConcernJournalAdapter =
                 |> Seq.filter (fun mailbox -> mailbox.Active && mailbox.OwnerSessionId = owner)
                 |> Seq.toList
 
-            let rec loop (mailboxes: ConcernMailbox list) =
+            let appendRetirement (mailbox: ConcernMailbox) =
                 task {
-                    match mailboxes with
-                    | [] -> return Ok()
-                    | mailbox :: rest ->
-                        let fact =
-                            ConcernFactCases.MailboxRetired
-                                {| Generation = mailbox.Generation
-                                   Id = mailbox.Id
-                                   OwnerSessionId = owner |}
+                    let fact =
+                        ConcernFactCases.MailboxRetired
+                            {| Generation = mailbox.Generation
+                               Id = mailbox.Id
+                               OwnerSessionId = owner |}
 
-                        match! port.Append owner providerRun fact with
-                        | Ok() -> return! loop rest
-                        | Error ConcernAppendFailure.DurabilityUnavailable ->
-                            return Error "concern mailbox retirement durability unavailable"
+                    let! result = port.Append owner providerRun fact
+
+                    return
+                        result
+                        |> Result.mapError (fun ConcernAppendFailure.DurabilityUnavailable ->
+                            "concern mailbox retirement durability unavailable")
+                }
+
+            let rec loop (mailboxes: ConcernMailbox list) =
+                taskResult {
+                    match mailboxes with
+                    | [] -> return ()
+                    | mailbox :: rest ->
+                        let! _ = appendRetirement mailbox
+                        return! loop rest
                 }
 
             return! loop owned

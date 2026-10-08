@@ -32,28 +32,22 @@ module InstitutionalEnhancer =
         && nonEmpty candidate.Negative
         && not (rules |> List.exists (fun rule -> rule.Name = candidate.TipName.Trim()))
 
-    /// One bounded evaluation (WHAT institutional-learning-003). The caller
-    /// owns the semantic judgment: an admissible candidate concludes BIRTH, an
-    /// explicit absorbedRule naming a rule of the supplied canonical live
-    /// rulebook concludes ABSORB, and everything else discards. The evaluator
-    /// never guesses coverage from the experience text — substring matching
-    /// is not an abstraction oracle. The experience and the live rulebook
-    /// are the only inputs; no network, repository or provider access.
-    /// Pure.
+    let private absorbOrDiscard (rules: EnforcerRule list) (absorbedRule: string option) =
+        match absorbedRule |> Option.map (fun rule -> rule.Trim()) with
+        | Some name when rules |> List.exists (fun rule -> rule.Name = name) -> LearningDisposition.Absorb name
+        | _ -> LearningDisposition.Discard "no-reusable-mechanism"
+
+    /// Mechanical evaluation of caller-supplied candidates and absorb claims.
+    /// It does not extract a mechanism from the experience (WHAT[003]).
     let evaluate
         (experience: string)
         (rules: EnforcerRule list)
         (candidate: BirthCandidate option)
         (absorbedRule: string option)
         : LearningDisposition =
-        let claimedRule = absorbedRule |> Option.map (fun rule -> rule.Trim())
-
         match candidate with
         | Some candidate when candidateAdmissible candidate rules -> LearningDisposition.Birth(candidate.TipName.Trim())
-        | _ ->
-            match claimedRule with
-            | Some name when rules |> List.exists (fun rule -> rule.Name = name) -> LearningDisposition.Absorb name
-            | _ -> LearningDisposition.Discard "no-reusable-mechanism"
+        | _ -> absorbOrDiscard rules absorbedRule
 
     /// WHAT institutional-learning-002 revision contract around one
     /// evaluation. Before committing a BIRTH the live revision is re-read; on

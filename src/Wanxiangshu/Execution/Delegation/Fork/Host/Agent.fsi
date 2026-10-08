@@ -5,6 +5,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 
 module HostForkBinding =
@@ -15,7 +16,11 @@ module HostForkAgent =
     type HostForkRuntime with
         member BoundManagedAgent: childId: SessionId -> string option
 
-        member AppendGuidance: agentId: string * prompt: string -> Task<Result<ForkResult, string>>
+        member ActiveGuidanceProfile: agentId: string -> Result<PromptAuthority.AuthorityExecutionProfile, string>
+
+        member AppendGuidance:
+            agentId: string * expected: PromptAuthority.AuthorityExecutionProfile * prompt: string ->
+                Task<Result<ForkResult, string>>
 
         member Fork:
             agentId: string *

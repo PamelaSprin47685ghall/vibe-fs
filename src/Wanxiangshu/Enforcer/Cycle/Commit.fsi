@@ -7,6 +7,7 @@ module EnforcerCycleCommit =
         | KnownCommitted
         | KnownNotCommitted of reason: string
         | CommitUnknown of reason: string
+        | NoNewWriteReleaseFailed of Wanxiangshu.Persistence.Journal.JournalOutcome.JournalAppendFailure
 
     val commitCycle:
         Wanxiangshu.Persistence.Journal.AgentJournal ->

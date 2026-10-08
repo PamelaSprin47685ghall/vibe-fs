@@ -66,10 +66,12 @@ export default {
         }
       },
       'chat.message': async (request, output) => {
-        await emit('message.received', {
-          sessionID: request.sessionID, messageID: request.messageID ?? output.message.id,
-        })
-        await hooks['chat.message'](request, output)
+        await Promise.all([
+          hooks['chat.message'](request, output),
+          emit('message.received', {
+            sessionID: request.sessionID, messageID: request.messageID ?? output.message.id,
+          }),
+        ])
         const metadata = output.parts?.find(part => part.metadata?.wanxiangshu_origin)?.metadata
         await emit('message.accepted', {
           sessionID: request.sessionID, messageID: request.messageID ?? output.message.id,

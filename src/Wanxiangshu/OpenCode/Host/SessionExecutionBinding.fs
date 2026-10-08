@@ -55,34 +55,36 @@ module SessionExecutionBinding =
 
         sprintf "%s:%s:%s" (SessionId.value sessionId) (PhysicalUserMessageId.value physical) sortedRuns
 
+    let private continuationFromPrevious (durable: AgentJournal) (evidence: AcceptedChatExecutionEvidence) previous =
+        let key: ChatExecutionKey =
+            { SessionId = evidence.SessionId
+              PhysicalUserMessageId = PhysicalUserMessageId.create previous }
+
+        let state =
+            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.byKey key
+
+        match state, ModelRouting.tryReadExecution key with
+        | Some prior, Some lease when
+            key.PhysicalUserMessageId <> evidence.PhysicalUserMessageId
+            && (prior.terminalDisposition.IsNone
+                || (ModelRouting.tryContinuationInput
+                        { SessionId = evidence.SessionId
+                          PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+                    |> Option.exists (fun retained -> retained.Identity.PhysicalUserMessageId = previous)))
+            && prior.acceptedEvidence.LogicalRunId = evidence.LogicalRunId
+            && prior.acceptedEvidence.AuthorityRootUserMessageId = evidence.AuthorityRootUserMessageId
+            && prior.acceptedEvidence.IdentitySeed = evidence.IdentitySeed
+            ->
+            Some lease
+        | _ -> None
+
     let tryContinuationAdmission (durable: AgentJournal) (evidence: AcceptedChatExecutionEvidence) =
         match evidence.Origin with
         | PromptOrigin.Continuation PromptContinuationKind.BusyAgentNudge
         | PromptOrigin.Continuation PromptContinuationKind.HumanMessage ->
             ModelRouting.tryActivePhysical (SessionId.value evidence.SessionId)
-            |> Option.bind (fun previous ->
-                let key: ChatExecutionKey =
-                    { SessionId = evidence.SessionId
-                      PhysicalUserMessageId = PhysicalUserMessageId.create previous }
-
-                let state =
-                    (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                    |> ChatExecutionProjection.byKey key
-
-                match state, ModelRouting.tryReadExecution key with
-                | Some prior, Some lease when
-                    key.PhysicalUserMessageId <> evidence.PhysicalUserMessageId
-                    && (prior.terminalDisposition.IsNone
-                        || (ModelRouting.tryContinuationInput
-                                { SessionId = evidence.SessionId
-                                  PhysicalUserMessageId = evidence.PhysicalUserMessageId }
-                            |> Option.exists (fun retained -> retained.Identity.PhysicalUserMessageId = previous)))
-                    && prior.acceptedEvidence.LogicalRunId = evidence.LogicalRunId
-                    && prior.acceptedEvidence.AuthorityRootUserMessageId = evidence.AuthorityRootUserMessageId
-                    && prior.acceptedEvidence.IdentitySeed = evidence.IdentitySeed
-                    ->
-                    Some lease
-                | _ -> None)
+            |> Option.bind (continuationFromPrevious durable evidence)
         | _ -> None
 
     /// EMR-010 / host-boundary-008: a message with no durable Accepted is not

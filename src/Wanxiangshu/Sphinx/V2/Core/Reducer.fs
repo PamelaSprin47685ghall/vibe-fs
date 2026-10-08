@@ -64,7 +64,7 @@ module Reducer =
                       Decisions = Map.empty
                       Answer = None
                       CommandReceipts = Map.empty
-                      PhysicalBindings = Map.empty
+                      Dispatches = Map.empty
                       Status = InquiryStatus.Active }))
 
     /// The chain check is the fold's only ordering rule. A revision that skips or
@@ -277,6 +277,120 @@ module Reducer =
             |> Option.bind succeededAttempt
             |> Option.isSome)
 
+    let private reservationCoversWork (state: InquiryState) (work: WorkSpec) (reserved: Map<string, float>) =
+        work.Reserved
+        |> Map.forall (fun resource amount ->
+            state.ResourceSpecs |> List.exists (fun spec -> spec.Name = resource)
+            && (reserved |> Map.tryFind resource |> Option.defaultValue 0.0) >= amount)
+
+    let private dispatchReservation (state: InquiryState) (work: WorkSpec) : Result<unit, CoreError> =
+        let key =
+            InquiryState.reservationKey
+                { WorkId = work.Id
+                  Attempt = work.Attempt }
+
+        match state.Reservations |> Map.tryFind key with
+        | None -> Error(coreError "dispatch-reservation-missing" "dispatch requires its own persisted reservation")
+        | Some(_, reserved) when reservationCoversWork state work reserved -> Ok()
+        | Some _ ->
+            Error(coreError "dispatch-reservation-insufficient" "dispatch reservation does not cover the planned work")
+
+    let private dispatchRound (state: InquiryState) (work: WorkSpec) : Result<unit, CoreError> =
+        match work.RoundId with
+        | Some roundId when not (state.Rounds |> Map.containsKey roundId) ->
+            Error(coreError "unknown-round" "dispatch round does not exist")
+        | _ -> Ok()
+
+    let private freshDispatch (state: InquiryState) (body: DispatchRequestedBody) : Result<InquiryState, CoreError> =
+        currentWork state body.Work.Id
+        |> Result.bind (fun item ->
+            attemptMatches item body.Work "dispatch intent"
+            |> Result.bind (fun () ->
+                match item.State with
+                | WorkState.Ready -> Ok()
+                | WorkState.Leased fence when fence = item.Spec.Fence -> Ok()
+                | _ -> Error(coreError "dispatch-work-not-ready" "dispatch requires ready or leased work"))
+            |> Result.bind (fun () ->
+                if body.Work <> item.Spec then
+                    Error(coreError "spec-mismatch" "dispatch must retain the complete current work spec")
+                elif not (dependenciesSucceeded state item.Spec) then
+                    Error(coreError "dependency-unsatisfied" "dispatch dependencies have not succeeded")
+                elif
+                    state.Dispatches
+                    |> Map.exists (fun _ dispatch ->
+                        dispatch.Request.Work.Id = item.Spec.Id
+                        && dispatch.Request.Work.Attempt = item.Spec.Attempt)
+                then
+                    Error(coreError "duplicate-dispatch-attempt" "the work attempt already owns a dispatch intent")
+                else
+                    dispatchRound state item.Spec
+                    |> Result.bind (fun () -> dispatchReservation state item.Spec))
+            |> Result.map (fun () ->
+                { state with
+                    Dispatches =
+                        state.Dispatches
+                        |> Map.add body.DispatchIntentId { Request = body; Receipt = None } }))
+
+    let private applyDispatchRequested
+        (state: InquiryState)
+        (body: DispatchRequestedBody)
+        : Result<InquiryState, CoreError> =
+        match state.Dispatches |> Map.tryFind body.DispatchIntentId with
+        | Some existing when existing.Request = body -> Ok state
+        | Some _ -> Error(coreError "dispatch-intent-conflict" "dispatch identity is bound to a different request")
+        | None -> freshDispatch state body
+
+    let private receiptMatchesRequest (request: DispatchRequestedBody) (body: DispatchReceiptRecordedBody) =
+        if body.WorkId <> request.Work.Id then
+            Error(coreError "dispatch-work-mismatch" "receipt work does not match its accepted intent")
+        elif body.Attempt <> request.Work.Attempt then
+            Error(coreError "attempt-mismatch" "receipt attempt does not match its accepted intent")
+        elif body.Fence <> request.Work.Fence then
+            Error(coreError "stale-fence" "receipt fence does not match its accepted intent")
+        else
+            Ok()
+
+    let private receiptMatchesPhysical (item: WorkItem) (body: DispatchReceiptRecordedBody) =
+        let conflictsWithSpec =
+            item.Spec.PhysicalRef
+            |> Option.exists (fun physical -> physical <> body.PhysicalRef)
+
+        let conflictsWithRunning =
+            match item.State with
+            | WorkState.Running(_, physical) -> physical <> body.PhysicalRef
+            | _ -> false
+
+        if conflictsWithSpec || conflictsWithRunning then
+            Error(coreError "dispatch-physical-mismatch" "receipt conflicts with the current physical reference")
+        else
+            Ok()
+
+    let private recordDispatchReceipt
+        (state: InquiryState)
+        (dispatch: DispatchRecord)
+        (body: DispatchReceiptRecordedBody)
+        : Result<InquiryState, CoreError> =
+        receiptMatchesRequest dispatch.Request body
+        |> Result.bind (fun () -> currentWork state body.WorkId)
+        |> Result.bind (fun item ->
+            attemptMatches item dispatch.Request.Work "dispatch receipt"
+            |> Result.bind (fun () -> receiptMatchesPhysical item body))
+        |> Result.map (fun () ->
+            { state with
+                Dispatches =
+                    state.Dispatches
+                    |> Map.add body.DispatchIntentId { dispatch with Receipt = Some body } })
+
+    let private applyDispatchReceipt
+        (state: InquiryState)
+        (body: DispatchReceiptRecordedBody)
+        : Result<InquiryState, CoreError> =
+        match state.Dispatches |> Map.tryFind body.DispatchIntentId with
+        | None -> Error(coreError "unknown-dispatch-intent" "receipt requires an accepted dispatch intent")
+        | Some { Receipt = Some existing } when existing = body -> Ok state
+        | Some { Receipt = Some _ } -> Error(coreError "dispatch-receipt-conflict" "dispatch receipt is immutable")
+        | Some dispatch -> recordDispatchReceipt state dispatch body
+
     /// The state machine itself, kept separate from the spec checks so each half stays
     /// readable on its own.
     let private legalStateChange
@@ -482,9 +596,9 @@ module Reducer =
 
             Budget.tryReserve state.ResourceSpecs state.SettledUsage outstanding body.Reservation
             |> Result.mapError budgetError
-            |> Result.map (fun projected ->
+            |> Result.map (fun _ ->
                 { state with
-                    Reservations = state.Reservations |> Map.add key (workKey, projected) })
+                    Reservations = state.Reservations |> Map.add key (workKey, body.Reservation.Resources) })
 
     /// Settlement books the real usage and releases only the part that can no longer be
     /// consumed. When a provider reports nothing, the reservation stays booked.
@@ -612,9 +726,21 @@ module Reducer =
         : Result<InquiryState, CoreError> =
         let id = ObservationId.value body.ObservationId
 
-        if state.Interpretations |> Map.containsKey id then
-            Ok state
-        else
+        match
+            state.Observations |> Map.tryFind id,
+            state.Work |> Map.containsKey body.WorkId,
+            state.Interpretations |> Map.tryFind id
+        with
+        | None, _, _ -> Error(coreError "unknown-observation" (sprintf "observation %s is not accepted" id))
+        | Some _, false, _ ->
+            Error(coreError "unknown-work" (sprintf "work %s does not exist" (WorkId.value body.WorkId)))
+        | Some observation, _, _ when observation.WorkId <> body.WorkId ->
+            Error(coreError "interpretation-work-mismatch" "interpretation work does not match its observation")
+        | Some observation, _, _ when observation.Attempt <> body.Attempt ->
+            Error(coreError "interpretation-attempt-mismatch" "interpretation attempt does not match its observation")
+        | _, _, Some prior when prior.WorkId = body.WorkId && prior.Attempt = body.Attempt -> Ok state
+        | _, _, Some _ -> Error(coreError "interpretation-conflict" "interpretation pending identity changed")
+        | _, _, None ->
             Ok
                 { state with
                     Interpretations =
@@ -624,10 +750,27 @@ module Reducer =
                             { ObservationId = body.ObservationId
                               WorkId = body.WorkId
                               Attempt = body.Attempt
-                              InterpretationId = None
-                              PluginRef = None
-                              Status = "pending"
-                              Reason = None } }
+                              Outcome = None } }
+
+    let private applyInterpretationOutcome
+        (state: InquiryState)
+        (observationId: ObservationId)
+        (outcome: InterpretationOutcome)
+        : Result<InquiryState, CoreError> =
+        let id = ObservationId.value observationId
+
+        match state.Interpretations |> Map.tryFind id with
+        | None ->
+            Error(
+                coreError "missing-interpretation-pending" (sprintf "observation %s has no pending interpretation" id)
+            )
+        | Some { Outcome = Some prior } when prior = outcome -> Ok state
+        | Some { Outcome = Some _ } ->
+            Error(coreError "interpretation-conflict" "interpretation outcome differs from the recorded result")
+        | Some record ->
+            Ok
+                { state with
+                    Interpretations = state.Interpretations |> Map.add id { record with Outcome = Some outcome } }
 
     /// A graph patch is applied, not merely noted. Core checks producer identity,
     /// endpoint existence and revision sanity; it never judges whether the relation is
@@ -647,13 +790,32 @@ module Reducer =
                     Graph = nodes
                     Edges = edges })
 
+    let private successfulAnswerWork (item: WorkItem) : Result<WorkItem, CoreError> =
+        match item.State with
+        | WorkState.Succeeded attempt when attempt = item.Spec.Attempt -> Ok item
+        | _ -> Error(coreError "answer-work-not-succeeded" "answer work must have succeeded in its current attempt")
+
+    let private acceptedAnswerResult (state: InquiryState) (body: AnswerCommittedBody) (item: WorkItem) =
+        match state.Observations |> Map.tryFind (ObservationId.value body.ResultObservationId) with
+        | None -> Error(coreError "answer-observation-missing" "answer must reference an accepted result")
+        | Some result when
+            result.WorkId <> item.Spec.Id
+            || result.Attempt <> item.Spec.Attempt
+            || result.Fence <> item.Spec.Fence
+            || item.Spec.OutputSchema <> Some result.ResultSchema
+            ->
+            Error(coreError "answer-observation-mismatch" "answer result does not match the successful work")
+        | Some _ -> Ok()
+
     let private applyAnswer (state: InquiryState) (body: AnswerCommittedBody) : Result<InquiryState, CoreError> =
         match state.Answer with
         | Some existing when existing = body -> Ok state
         | Some _ -> Error(coreError "answer-conflict" "inquiry answer is immutable")
         | None ->
             currentWork state body.RenderWorkId
-            |> Result.map (fun _ ->
+            |> Result.bind successfulAnswerWork
+            |> Result.bind (acceptedAnswerResult state body)
+            |> Result.map (fun () ->
                 { state with
                     Answer = Some body
                     Status = InquiryStatus.StopReached body.StopReason })
@@ -716,13 +878,15 @@ module Reducer =
         | InquiryEventBody.UsageSettled usage -> applyUsageSettled state usage.Usage
         | InquiryEventBody.UsageOverrunRecorded usage -> applyUsageSettled state usage.Usage
         | InquiryEventBody.ReservationReleased(workId, attempt) -> releaseReservation state workId attempt
-        | InquiryEventBody.DispatchRequested _ -> Ok state
-        | InquiryEventBody.DispatchReceiptRecorded _ -> Ok state
+        | InquiryEventBody.DispatchRequested requested -> applyDispatchRequested state requested
+        | InquiryEventBody.DispatchReceiptRecorded receipt -> applyDispatchReceipt state receipt
         | InquiryEventBody.HostTerminalRecorded _ -> Ok state
         | InquiryEventBody.ResultAccepted acceptedBody -> applyResultAccepted state acceptedBody
         | InquiryEventBody.InterpretationPending pending -> applyInterpretation state pending
-        | InquiryEventBody.InterpretationApplied _ -> Ok state
-        | InquiryEventBody.InterpretationFailed _ -> Ok state
+        | InquiryEventBody.InterpretationApplied applied ->
+            applyInterpretationOutcome state applied.ObservationId (InterpretationOutcome.Applied applied)
+        | InquiryEventBody.InterpretationFailed failed ->
+            applyInterpretationOutcome state failed.ObservationId (InterpretationOutcome.Failed failed)
         | InquiryEventBody.GraphPatched patched -> applyGraphPatched state patched
         | InquiryEventBody.DecisionRecorded _ -> Ok state
         | InquiryEventBody.AnswerPrepared _ -> Ok state

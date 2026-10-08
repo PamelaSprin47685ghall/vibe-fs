@@ -459,25 +459,29 @@ module internal ChatAdmissionTransaction =
                 return! Error(ChatAdmissionTransactionError.InputProjectionFailed error)
         }
 
+    let private executeFreshAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) ports witness =
+        taskResult {
+            let! acquisition = acquireAdmission observe ports witness
+
+            match acquisition with
+            | AdmissionAcquisitionOutcome.AdmissionStopped outcome -> return outcome
+            | AdmissionAcquisitionOutcome.LeaseAcquired lease ->
+                return!
+                    withLeaseOwner witness (fun () ->
+                        taskResult {
+                            let! target, identity, model = targetAdmission observe ports witness lease
+                            let! _ = projectAdmission observe ports witness lease model
+                            return! commitAdmission observe ports witness lease identity
+                        })
+        }
+
     let private executeAdmission observe (withLeaseOwner: ChatAdmissionLeaseOwner) tryInputTarget ports managed =
         taskResult {
             let! witness = acceptAdmission observe ports managed
 
             match tryInputTarget witness with
             | Some target -> return! projectDeferredInput observe ports witness target
-            | None ->
-                let! acquisition = acquireAdmission observe ports witness
-
-                match acquisition with
-                | AdmissionAcquisitionOutcome.AdmissionStopped outcome -> return outcome
-                | AdmissionAcquisitionOutcome.LeaseAcquired lease ->
-                    return!
-                        withLeaseOwner witness (fun () ->
-                            taskResult {
-                                let! target, identity, model = targetAdmission observe ports witness lease
-                                let! _ = projectAdmission observe ports witness lease model
-                                return! commitAdmission observe ports witness lease identity
-                            })
+            | None -> return! executeFreshAdmission observe withLeaseOwner ports witness
         }
 
     let executeWithLeaseOwner

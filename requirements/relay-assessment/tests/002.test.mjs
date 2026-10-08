@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
+import { JournalSurface_snapshot } from '../../../dist/Persistence/Journal/Surface.js'
 
 const scores = ['PERFECT', 'REVISE', 'PERFECT', 'REVISE', 'PERFECT', 'PERFECT', 'REVISE', 'PERFECT']
 
@@ -76,6 +79,44 @@ test('WHAT[relay-assessment-002] actual tool exact replay returns the accepted r
     assert.match(first, /recorded = true/)
     const replay = await hooks.tool.review.execute(input, {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'})
     assert.equal(replay, first)
+  })
+})
+
+test('WHAT[relay-assessment-002] changed public narrative binding rejects replay without changing the accepted facts', async () => {
+  await withReview(async ({execute, hooks, directory, runtime, session}) => {
+    const input = reviewScores('REVISE')
+    const first = await execute(input)
+    assert.match(first, /recorded = true/)
+    const messages = runtime.messages.filter(message => message.info?.id === 'review-run')
+    assert.equal(messages.length, 1)
+    const message = messages[0]
+    const callIndex = message.parts.findIndex(part => part.type === 'tool' && part.callID === 'review-call')
+    assert.ok(callIndex > 0)
+    assert.deepEqual(message.parts[callIndex].state.input, input)
+    const narrative = message.parts.slice(0, callIndex).find(part => part.type === 'text')
+    assert.ok(narrative)
+    const original = narrative.text
+    const accepted = structuredClone(JournalSurface_snapshot(runtime.journal))
+    const eventDirectory = join(directory, '.git', 'wanxiang', 'events')
+    const facts = () => readdirSync(eventDirectory).filter(name => name.endsWith('.ndjson')).sort()
+      .map(name => ({ name, bytes: readFileSync(join(eventDirectory, name)) }))
+    const acceptedFacts = facts()
+    assert.ok(acceptedFacts.length > 0)
+    const context = {sessionID: session, callID: 'review-call', messageID: 'review-run', agent: 'manager'}
+    try {
+      narrative.text = 'The public assessment evidence changed after the accepted review.'
+      const changed = await hooks.tool.review.execute(input, context)
+      assert.match(changed, /recorded = false/)
+      assert.deepEqual(JournalSurface_snapshot(runtime.journal), accepted)
+      assert.deepEqual(facts(), acceptedFacts)
+      narrative.text = original
+      const exact = await hooks.tool.review.execute(input, context)
+      assert.equal(exact, first)
+      assert.deepEqual(JournalSurface_snapshot(runtime.journal), accepted)
+      assert.deepEqual(facts(), acceptedFacts)
+    } finally {
+      narrative.text = original
+    }
   })
 })
 

@@ -211,7 +211,7 @@ module HostSignalBootstrap =
                             ProviderRunBinding.quiescedRun messages
                             |> Result.toOption
                             |> Option.map (observeQuiescedAssistant sessionId attempt)
-                            |> Option.defaultWith (fun () -> Task.FromResult())
+                            |> Option.defaultWith (fun () -> Task.FromResult(()))
 
                         do! observed
                 }
@@ -263,36 +263,7 @@ module HostSignalBootstrap =
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
-            let continueFn =
-                fun (sessionId: SessionId) (kind: DegenerationKind) (directory: string option) ->
-                    task {
-                        let prompt =
-                            ProviderProse.documentFor sessionId (LoopSensor.continuationPath kind) Map.empty
-
-                        let! outcome =
-                            HostSessionNudge.sendContinuationResult
-                                sessionPort
-                                rootWorkspace
-                                sessionId
-                                prompt
-                                PromptAuthority.ContinuationKind.DegenerationGuard
-                                directory
-                                journal
-                                PromptDispatcher.AwaitMode.Detached
-                                None
-
-                        return outcome |> Result.map ignore
-                    }
-
-            let loopSensor =
-                LoopSensor.create
-                    scope.Sessions.OwnedSessions
-                    scope.Sessions.SessionParents
-                    sessionPort.InterruptAttempt
-                    continueFn
-                    Diagnostic.emit
-
-            scope.AttachLoopSensor loopSensor
+            HostTurnObserver.attachLoopSensor sessionPort rootWorkspace journal scope Diagnostic.emit
 
             let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =
                 journal
@@ -840,6 +811,13 @@ module HostSignalBootstrap =
                         releaseAdmissionTurn sessionId completion
                 }
 
+            let projectAdmissionOutput key result extra =
+                match result with
+                | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
+                    ModelRouting.projectHostModel extra (ModelRouting.toOpenCodeModel target)
+                    |> Result.defaultWith raise
+                | _ -> projectCommittedAdmission key extra
+
             let finishProjection
                 (phase: ChatAdmissionFlightPhase ref)
                 intent
@@ -853,12 +831,7 @@ module HostSignalBootstrap =
 
                     outputs
                     |> Seq.filter (fun requestOutput -> not (obj.ReferenceEquals(requestOutput, output)))
-                    |> Seq.iter (fun extra ->
-                        match result with
-                        | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
-                            ModelRouting.projectHostModel extra (ModelRouting.toOpenCodeModel target)
-                            |> Result.defaultWith raise
-                        | _ -> projectCommittedAdmission key extra)
+                    |> Seq.iter (projectAdmissionOutput key result)
                 finally
                     phase.Value <- ChatAdmissionFlightPhase.Finished
 
@@ -1097,9 +1070,8 @@ module HostSignalBootstrap =
                 |> Option.filter (fun _ ->
                     ProviderWireDecode.firstString info [ "role" ] = Some "user"
                     && ProviderWireDecode.firstString info [ "sessionID"; "sessionId" ] = Some(
-                                                                                              SessionId.value
-                                                                                                  selected.SessionId
-                                                                                          ))
+                        SessionId.value selected.SessionId
+                    ))
                 |> Option.map (fun physical ->
                     { SessionId = selected.SessionId
                       PhysicalUserMessageId = PhysicalUserMessageId.create physical })
@@ -1125,22 +1097,66 @@ module HostSignalBootstrap =
                             Some key
                     | _ -> None)
 
+            let settleIncludedInput durable (selected: AcceptedChatExecutionEvidence) key =
+                task {
+                    match! ManagedChatSupersession.settle durable key with
+                    | Ok() -> ModelRouting.cancelContinuationInput key
+                    | Error error ->
+                        raise (
+                            ChatAdmissionHookException(
+                                TransactionFailed(ChatAdmissionTransactionError.SupersessionSettlementFailed error),
+                                Some
+                                    { SessionId = selected.SessionId
+                                      PhysicalUserMessageId = selected.PhysicalUserMessageId }
+                            )
+                        )
+                }
+
             let settleIncludedInputs durable selected messages =
                 task {
                     for key in messages |> List.choose (includedInput durable selected) do
-                        let! settled = ManagedChatSupersession.settle durable key
+                        do! settleIncludedInput durable selected key
+                }
 
-                        match settled with
-                        | Ok() -> ModelRouting.cancelContinuationInput key
-                        | Error error ->
-                            raise (
-                                ChatAdmissionHookException(
-                                    TransactionFailed(ChatAdmissionTransactionError.SupersessionSettlementFailed error),
-                                    Some
-                                        { SessionId = selected.SessionId
-                                          PhysicalUserMessageId = selected.PhysicalUserMessageId }
-                                )
-                            )
+            let admitContinuationInput durable createTransaction physicalId projection messages sessionId =
+                task {
+                    let key: ChatExecutionKey =
+                        { SessionId = sessionId
+                          PhysicalUserMessageId = physicalId }
+
+                    let state =
+                        (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                        |> ChatExecutionProjection.byKey key
+
+                    match state with
+                    | Some state when
+                        state.terminalDisposition.IsNone
+                        && (ModelRouting.tryReadExecution key |> Option.isNone)
+                        && (SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence
+                            |> Option.isSome)
+                        ->
+                        do!
+                            admitManagedChatMessage
+                                durable
+                                createTransaction
+                                ChatAdmissionPurpose.EnterProviderStep
+                                (ChatAdmissionIntent.Decision.AcceptedInputIntent state.acceptedEvidence)
+                                projection
+
+                        do! settleIncludedInputs durable state.acceptedEvidence messages
+                    | _ -> ()
+                }
+
+            let admitVisibleMessage durable createTransaction physicalId messages message =
+                task {
+                    let info = ProviderWireDecode.infoObject message
+                    let projection = createObj [ "message" ==> info; "parts" ==> message?parts ]
+                    let decoded = PromptIngressCodec.decodeWith info projection
+
+                    match decoded.InvalidIdentityCarrier, decoded.SessionId with
+                    | None, Some sessionId ->
+                        do! admitContinuationInput durable createTransaction physicalId projection messages sessionId
+                    | _ -> ()
                 }
 
             let ensureVisibleInputAdmission (output: obj) =
@@ -1149,46 +1165,12 @@ module HostSignalBootstrap =
 
                     match journal, admissionTransaction, ProviderWireCapture.lastUserMessageId messages with
                     | Some durable, Some createTransaction, Some physicalId ->
-                        match
+                        return!
                             messages
                             |> List.tryFind (fun message ->
                                 ProviderWireDecode.hostMessageId message = Some(PhysicalUserMessageId.value physicalId))
-                        with
-                        | None -> ()
-                        | Some message ->
-                            let info = ProviderWireDecode.infoObject message
-                            let projection = createObj [ "message" ==> info; "parts" ==> message?parts ]
-
-                            let decoded = PromptIngressCodec.decodeWith info projection
-
-                            match decoded.InvalidIdentityCarrier, decoded.SessionId with
-                            | None, Some sessionId ->
-                                let key: ChatExecutionKey =
-                                    { SessionId = sessionId
-                                      PhysicalUserMessageId = physicalId }
-
-                                let state =
-                                    (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                                    |> ChatExecutionProjection.byKey key
-
-                                match state with
-                                | Some state when
-                                    state.terminalDisposition.IsNone
-                                    && (ModelRouting.tryReadExecution key |> Option.isNone)
-                                    && (SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence
-                                        |> Option.isSome)
-                                    ->
-                                    do!
-                                        admitManagedChatMessage
-                                            durable
-                                            createTransaction
-                                            ChatAdmissionPurpose.EnterProviderStep
-                                            (ChatAdmissionIntent.Decision.AcceptedInputIntent state.acceptedEvidence)
-                                            projection
-
-                                    do! settleIncludedInputs durable state.acceptedEvidence messages
-                                | _ -> ()
-                            | _ -> ()
+                            |> Option.map (admitVisibleMessage durable createTransaction physicalId messages)
+                            |> Option.defaultWith (fun () -> Task.FromResult())
                     | _ -> ()
                 }
 

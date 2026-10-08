@@ -77,28 +77,6 @@ module Outcome =
         | InboxFull
         | Protocol of reason: string
 
-    type JournalFailure =
-        | WriteFailed of reason: string
-        | FlushFailed of reason: string
-
-    /// A writer that never attempted the caller's event. This is deliberately
-    /// distinct from CommitUnknown: lifecycle refusal is known-not-committed.
-    type JournalUnavailable =
-        | WriterPoisoned of firstFailure: string
-        | WriterClosing
-        | WriterDisposed
-
-    /// PERSIST-002: physical append is committed or uncertain. Semantic cuts and
-    /// lifecycle refusal are both known-not-committed and stay explicit instead
-    /// of being collapsed into physical uncertainty.
-    type CommitResult<'e> =
-        | Committed of 'e
-        /// Bytes are durable, but the business rule cut this event and immediately
-        /// wrote a durable reset fact. This invocation failed; the writer remains usable.
-        | Rejected of EventId * reason: string
-        | NotAttempted of EventId * JournalUnavailable
-        | CommitUnknown of EventId * JournalFailure
-
 /// Why a journal line was refused during a fold.
 ///
 /// PERSIST-004 requires a corrupt journal to stop startup rather than be
@@ -111,50 +89,3 @@ module FoldRejection =
 
     let reject factName reason =
         Error { Fact = factName; Reason = reason }
-
-/// Physical fate of a single journal append.
-///
-/// WriteUnknown = durable-state indeterminate; WriterUnavailable = the writer
-/// refused without attempting (known-not-committed); FactRejected = the line
-/// bytes are durable but the semantic fold cut it — the append boundary treats
-/// it as fatal evidence rather than retryable.
-type JournalAppendFailure =
-    | WriteUnknown of EventId * Outcome.JournalFailure
-    | WriterUnavailable of EventId * Outcome.JournalUnavailable
-    | FactRejected of EventId * FoldRejection
-
-module JournalAppendFailure =
-
-    /// Diagnostic rendering (HOST-007). The ONE place a failed append becomes a
-    /// string.
-    ///
-    /// Nine call sites wrote `sprintf "%A" failure.Failure` — a field that does not
-    /// exist on this union. Each was independently wrong in the same way, which is
-    /// what a missing function looks like. `%A` is also reflection-based: under Fable
-    /// it renders whatever the emitted shape happens to be, so the operator-facing
-    /// text would drift with the compiler rather than with the domain.
-    ///
-    /// The two cases read differently on purpose. `WriteUnknown` is a physical
-    /// uncertainty; `FactRejected` is a durable semantic cut and is fatal to the
-    /// current process at the append boundary.
-    let describe (failure: JournalAppendFailure) : string =
-        match failure with
-        | WriteUnknown(eventId, Outcome.WriteFailed reason) ->
-            sprintf "append outcome unknown for %s: write failed: %s" (EventId.value eventId) reason
-        | WriteUnknown(eventId, Outcome.FlushFailed reason) ->
-            sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
-        | WriterUnavailable(eventId, Outcome.WriterPoisoned firstFailure) ->
-            sprintf
-                "append not attempted for %s: writer poisoned by prior failure: %s"
-                (EventId.value eventId)
-                firstFailure
-        | WriterUnavailable(eventId, Outcome.WriterClosing) ->
-            sprintf "append not attempted for %s: writer is closing" (EventId.value eventId)
-        | WriterUnavailable(eventId, Outcome.WriterDisposed) ->
-            sprintf "append not attempted for %s: writer is disposed" (EventId.value eventId)
-        | FactRejected(eventId, rejection) ->
-            sprintf
-                "journal semantic cut at %s: fact \'%s\' rejected: %s"
-                (EventId.value eventId)
-                rejection.Fact
-                rejection.Reason

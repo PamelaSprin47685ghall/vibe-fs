@@ -213,6 +213,7 @@ module ChatExecutionRecovery =
     let private persistenceDecision (evidence: ChatExecutionRecoveryEvidence) =
         match evidence.PersistenceCommitment with
         | PersistenceCommitment.Unknown -> manual ManualInterventionReason.PersistenceOutcomeUnknown evidence
+        | PersistenceCommitment.NoNewWrite -> manual ManualInterventionReason.PersistenceOutcomeUnknown evidence
         | PersistenceCommitment.Committed ->
             ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.RecoveryAlreadyCommitted)
         | PersistenceCommitment.NotCommitted -> notCommittedDecision evidence

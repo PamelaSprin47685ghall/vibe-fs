@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Verification
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading
 open System.Threading.Tasks
@@ -84,7 +85,9 @@ module JournalPortObservationSurface =
         | Ok _ -> "Ok"
         | Error(WriteUnknown(_, WriteFailed reason)) -> "Unknown:" + reason
         | Error(WriteUnknown(_, FlushFailed reason)) -> "UnknownFlush:" + reason
-        | Error(WriterUnavailable(_, WriterPoisoned first)) -> "Poisoned:" + first
+        | Error(WriteUnknown(_, StoreAppendUnknown evidence)) -> "Unknown:" + evidence.Primary.Cause.Message
+        | Error(WriterUnavailable(_, WriterPoisoned first)) -> "Poisoned:" + AppendError.describe first.Error
+        | Error(JournalAppendFailure.NoNewWriteReleaseFailed _) -> "NoNewWriteReleaseFailed"
         | Error(WriterUnavailable(_, WriterClosing)) -> "Closing"
         | Error(WriterUnavailable(_, WriterDisposed)) -> "Disposed"
         | Error(FactRejected _) -> "Rejected"
@@ -383,7 +386,7 @@ module JournalPortObservationSurface =
                        revisionAdvanced = revisionAdvanced |}
         }
 
-    let poisonedUnknownAppendScenario (commonDir: string) (writerTag: string) : Task<obj> =
+    let rejectedPayloadPoisonsWriterScenario (commonDir: string) (writerTag: string) : Task<obj> =
         task {
             let store = openStore commonDir writerTag
             use! journal = openJournal store writerTag
@@ -397,17 +400,215 @@ module JournalPortObservationSurface =
                 | Ok _ -> true
                 | Error _ -> false
 
+            let revisionBefore = string (JournalRevision.value journal.Revision)
             let! failed = journal.AppendAgent (StreamId.Session session) None (missingPayloadFact session)
             let failedOutcome = appendOutcomeName failed
             let poisoned = terminal.IsPoisoned()
+            let revisionAfterFailure = string (JournalRevision.value journal.Revision)
+
+            let missingPayloadRef =
+                match failed with
+                | Error(WriterUnavailable(_,
+                                          WriterPoisoned { Error = AppendError.StorageInvalid(StorageInvalid.MissingPayload payloadRef) })) ->
+                    PayloadRef.value payloadRef
+                | _ -> ""
+
+            let absentNotAttempted result =
+                match result with
+                | Error(WriterUnavailable(eventId, WriterPoisoned _)) -> store.TryEvent eventId |> Option.isNone
+                | _ -> false
 
             let! after = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
             let afterOutcome = appendOutcomeName after
+            let revisionAfterPoisoned = string (JournalRevision.value journal.Revision)
+
+            let originalPoisonPreserved =
+                match failed, after with
+                | Error(WriterUnavailable(eventId, WriterPoisoned first)),
+                  Error(WriterUnavailable(_, WriterPoisoned later)) ->
+                    first.FailedEventId = eventId
+                    && later.FailedEventId = first.FailedEventId
+                    && obj.ReferenceEquals(first.Error, later.Error)
+                | _ -> false
 
             return
                 box
                     {| seededOk = seededOk
                        failedOutcome = failedOutcome
                        poisoned = poisoned
-                       afterOutcome = afterOutcome |}
+                       afterOutcome = afterOutcome
+                       missingPayloadRef = missingPayloadRef
+                       failedFactAbsent = absentNotAttempted failed
+                       laterFactAbsent = absentNotAttempted after
+                       originalPoisonPreserved = originalPoisonPreserved
+                       revisionBefore = revisionBefore
+                       revisionAfterFailure = revisionAfterFailure
+                       revisionAfterPoisoned = revisionAfterPoisoned |}
         }
+
+    type private ActualJournalHandle(store: IEventStore, journal: AgentJournal, init: Envelope) =
+        let cancellation = new CancellationTokenSource()
+        // DSL-MUTABLE: resource — observes completion of the actual registered waiter.
+        let mutable waitCompleted = false
+
+        let waiter =
+            task {
+                let! change =
+                    AgentJournal.awaitChangeFromOrCancel (AgentJournal.revision journal) cancellation.Token journal
+
+                waitCompleted <- true
+                return change
+            }
+
+        member _.Store = store
+        member _.Journal = journal
+        member _.Init = init
+        member _.WaitCompleted = waitCompleted
+
+        member _.Dispose() =
+            task {
+                cancellation.Cancel()
+                let! _ = waiter
+                do! (journal :> IAsyncDisposable).DisposeAsync()
+                cancellation.Dispose()
+            }
+
+    let private openActualJournalOnStore store writerId (startedAt: string) : Task<obj> =
+        task {
+            let! opened =
+                EventStoreJournalWriter.resumeOrCreate (
+                    RuntimeId.create ("native-" + writerId),
+                    4242,
+                    (DateTimeOffset.Parse startedAt).ToOffset TimeSpan.Zero,
+                    store
+                )
+
+            match opened with
+            | Error error -> return failwithf "native journal open rejected: %A" error
+            | Ok(writer, init, projection) ->
+                match AgentJournal.createFromProjection writer projection with
+                | Error error -> return failwithf "native journal attach rejected: %A" error
+                | Ok journal -> return box (ActualJournalHandle(store, journal, init))
+        }
+
+    let openActualJournal commonDir writerId startedAt : Task<obj> =
+        let store =
+            EventStore.createLocal
+                commonDir
+                writerId
+                (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
+
+        openActualJournalOnStore store writerId startedAt
+
+    let openActualJournalWithStore (store: obj) writerId startedAt : Task<obj> =
+        openActualJournalOnStore (unbox<EventStoreHandle> store).Store writerId startedAt
+
+    let observeActualJournalProjection (value: obj) : obj =
+        let current = AgentJournal.snapshot (unbox<ActualJournalHandle> value).Journal
+
+        box
+            {| runtimeId = current.RuntimeId |> Option.map RuntimeId.value |> Option.toObj
+               runtimeStartCount = current.AgentProjections.RuntimeStartCount
+               sessionCount = Map.count current.AgentProjections.Sessions
+               hasNativeSession =
+                Map.containsKey (SessionId.create "native-settlement") current.AgentProjections.Sessions |}
+
+    let observeActualJournal (value: obj) : obj =
+        let handle = unbox<ActualJournalHandle> value
+
+        box
+            {| initEventId = EventId.value handle.Init.EventId
+               revision = JournalRevision.value (AgentJournal.revision handle.Journal)
+               localSeq = handle.Journal.Writer.LocalSeq
+               lastCommittedLocalSeq = handle.Journal.Writer.LastCommittedLocalSeq
+               poisoned = handle.Journal.IsPoisoned
+               waitCompleted = handle.WaitCompleted |}
+
+    let containsActualJournalEvent (value: obj) eventId : bool =
+        (unbox<ActualJournalHandle> value).Store.TryEvent(EventId.create eventId)
+        |> Option.isSome
+
+    let private faultView (eventId: EventId) (failedEventId: EventId) (error: AppendError) =
+        let code, phase, cause, cleanup, requested, prepared, cuts =
+            match error with
+            | AppendError.CommitUnknown evidence ->
+                "CommitUnknown",
+                string evidence.Primary.Phase,
+                box evidence.Primary.Cause,
+                evidence.CleanupFailures,
+                evidence.Requested,
+                evidence.Prepared.DurableEvents,
+                evidence.Prepared.Cuts
+            | AppendError.AppendNotAttempted evidence ->
+                let prepared =
+                    evidence.Prepared |> Option.map _.DurableEvents |> Option.defaultValue []
+
+                let cuts = evidence.Prepared |> Option.map _.Cuts |> Option.defaultValue []
+
+                "AppendNotAttempted",
+                string evidence.Primary.Phase,
+                box evidence.Primary.Cause,
+                evidence.CleanupFailures,
+                evidence.Requested,
+                prepared,
+                cuts
+            | AppendError.NoNewWriteReleaseFailed evidence ->
+                let prepared =
+                    evidence.Prepared |> Option.map _.DurableEvents |> Option.defaultValue []
+
+                let cuts = evidence.Prepared |> Option.map _.Cuts |> Option.defaultValue []
+                "NoNewWriteReleaseFailed", "StoreRelease", box evidence.Cause, [], evidence.Requested, prepared, cuts
+            | AppendError.StorageInvalid _ -> "StorageInvalid", "", null, [], [], [], []
+            | AppendError.SemanticCut _ -> "SemanticCut", "", null, [], [], [], []
+            | AppendError.AppendFailed _ -> "AppendFailed", "", null, [], [], [], []
+
+        box
+            {| eventId = EventId.value eventId
+               failedEventId = EventId.value failedEventId
+               code = code
+               phase = phase
+               cause = cause
+               cleanupFailures =
+                cleanup
+                |> List.map (fun fault ->
+                    box
+                        {| phase = string fault.Phase
+                           cause = fault.Cause |})
+                |> List.toArray
+               requestedIds = requested |> List.map (fun event -> EventId.value event.EventId) |> List.toArray
+               preparedIds = prepared |> List.map (fun event -> EventId.value event.EventId) |> List.toArray
+               cutIds = cuts |> List.map (fun cut -> EventId.value cut.CutEventId) |> List.toArray |}
+
+    let appendActualJournal (value: obj) : Task<obj> =
+        task {
+            let handle = unbox<ActualJournalHandle> value
+
+            let! result =
+                AgentJournal.appendAgent
+                    (StreamId.Session(SessionId.create "native-settlement"))
+                    None
+                    (CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create "native-settlement" |})
+                    handle.Journal
+
+            match result with
+            | Ok _ -> return box {| kind = "Committed"; error = null |}
+            | Error(WriterUnavailable(eventId, WriterPoisoned failure)) ->
+                return
+                    box
+                        {| kind = "NotAttempted"
+                           error = faultView eventId failure.FailedEventId failure.Error |}
+            | Error(WriteUnknown(eventId, StoreAppendUnknown evidence)) ->
+                return
+                    box
+                        {| kind = "CommitUnknown"
+                           error = faultView eventId eventId (AppendError.CommitUnknown evidence) |}
+            | Error(JournalAppendFailure.NoNewWriteReleaseFailed(eventId, failure)) ->
+                return
+                    box
+                        {| kind = "NoNewWriteReleaseFailed"
+                           error = faultView eventId eventId (AppendError.NoNewWriteReleaseFailed failure) |}
+            | Error failure -> return failwithf "unexpected native journal failure: %A" failure
+        }
+
+    let disposeActualJournal (value: obj) : Task<unit> =
+        (unbox<ActualJournalHandle> value).Dispose()

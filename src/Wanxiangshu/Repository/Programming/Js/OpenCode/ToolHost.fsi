@@ -35,7 +35,7 @@ module JsToolSpec =
         surface: JsSurface ->
         workspaceRoot: string ->
         persistence: IJsTransactionPersistence option ->
-        fileAccessObservation: (HostToolContext -> string list -> string list -> Task<unit>) option ->
+        fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
             ToolSpec
 
     val createWithAdmission:
@@ -44,5 +44,5 @@ module JsToolSpec =
         admission: ToolAdmission ->
         workspaceRoot: string ->
         persistence: IJsTransactionPersistence option ->
-        fileAccessObservation: (HostToolContext -> string list -> string list -> Task<unit>) option ->
+        fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
             ToolSpec

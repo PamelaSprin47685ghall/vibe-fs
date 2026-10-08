@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,9 +10,31 @@ import * as BloggerChronicleSurface from '../../../dist/OpenCode/Host/BloggerChr
 import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as JournalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import * as LanguageSurface from '../../../dist/Participant/Provider/LanguageSurface.js'
+import * as CompanionRuntimeSurface from '../../../dist/Context/Companion/RuntimeSurface.js'
 import { acceptAuthorityRoot, claimBloggerRequest, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+
+integrationTest('WHAT[cognitive-environment-015] installed Host delivers ephemeral Blogger hints in two actual provider requests', () => {
+  const output = execFileSync(process.execPath, [join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 45000,
+  })
+  assert.deepEqual(JSON.parse(output.trim()), { providerRequests: 2, chronicleCompleted: true, historyClean: true, journalClean: true })
+})
+
+integrationTest('WHAT[cognitive-environment-015] a late actual provider callback failure cannot turn into a successful canary', () => {
+  assert.throws(() => execFileSync(process.execPath, [join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs'), '--late-provider-error'], {
+    cwd: root, encoding: 'utf8', timeout: 45000, stdio: 'pipe',
+  }), error => {
+    assert.equal(error.status, 1)
+    assert.match(error.stderr, /SyntaxError/)
+    assert.equal(error.stdout.includes('"chronicleCompleted":true'), false, 'failure must not publish a success result')
+    return true
+  }, 'a malformed actual HTTP request after both Blogger responses must still reject the canary')
+})
 
 const transformsSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 
@@ -273,6 +296,15 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
   assert.notEqual(marker.parts[0].text, zhResource, 'english binding must not fall back to the zh-CN leaf')
 })
 
+test('WHAT[cognitive-environment-015] B6_missing_physical_identity_cannot_borrow_the_session_model', async () => {
+  const session = 'ses-blog-blogger-1'
+  await acquireLease(session, 'msg-user-b6')
+  const output = { messages: [{ info: { role: 'user' }, parts: [{ type: 'text', text: 'No physical identity.' }] }] }
+  const original = structuredClone(output)
+  BloggerChronicleSurface.maybeInject(journalBoot.journal, session, 'en', output)
+  assert.deepEqual(output, original, 'an active whitelisted session lease cannot substitute for missing exact request identity')
+})
+
 // ---------------------------------------------------------------------------
 // GAP-077 补充（registered Host 链）：经真实插件注册的
 // experimental.chat.messages.transform 走完整 normalTransform（16 步真实
@@ -283,43 +315,10 @@ test('WHAT[cognitive-environment-015] B5_language_binding_selects_the_matching_r
 // initialize 幂等，路由结果继续由本文件顶部的隔离 HOME 配置驱动
 // （globalThis.__wanxiangshu_test_blogger_model）。
 //
-// 第九层（调用条件调查）结论：normalTransform 第 15 步 InjectBloggerChronicle
-// 在 prefixHorizon 分支之外无条件调用（PluginTransforms.fs），链上注入与否由
-// maybeInject 门禁的输入形状决定。companion blogger 会话在第 11 步
-// ApplyEnforcerContinuation 分支：blogger session 是 companion satellite
-// （tryMainSessionOf → Some main）→ handleContinuation 读 liveCtx =
-// tryLiveCycleContext（只读 process-local InFlight flight，scope.TryPeekCurrentRequest，
-// 绝不从 durable open 恢复）。live flight 在时 First-step 分支把 BloggerRequest
-// canonical 视图整体替换 wire（message id replaced）——第 15 步门禁读的
-// lastUserMessageId 变成渲染 id，tryReadExecution 无 lease → 静默 no-op。这就是
-// R1/R3/R4/R6 旧 setup 的 0 注入根因：不是 maybeInject 没被调用，是 continuation
-// 投影替换了门禁读取的 frontier。链上注入的真实形态（本批 setup）：
-// journal Accepted（chat.message admission transaction）+ journal durable open
-// BloggerRequest（plan freeze 的 companion 检查放行，claimBloggerRequest 落地后
-// 立即 dispose——dispose 先经 releaseCurrentRequest（flight 的规范释放入口，
-// exact requestId 匹配）释放 live flight，再清 scope episodes；flight 释放使
-// 第 11 步 liveCtx None，wire 保持 raw frontier）+
-// frontier physical 的 exact committed lease + 白名单模型。R5 保留 todo：typed
-// boundary failure 经 MessagesTransform TypedPolicyFailClosed membrane 后的
-// 可观察形态（JS 异常或静默诊断返回）未实证。
-//
-// 第十二层（Manager 裁决记录，方向 B）：第十一层「删除手动 acquireLease 即可
-// 解封」的诊断经第二十三批实跑证伪——pb-helper 重排后 R 系列仍 0 注入，第
-// 十层结论延续成立：stub chat.message 的 admission 只建立 session 级 lease，
-// PhysicalUserMessageId 绑定不落地，tryReadExecution 返回 null，maybeInject
-// 门禁静默 no-op。Manager 裁决：不新增 ModelRouting surface 入口（方向 A 破
-// 坏单一真源与边界，已否决）；零生产改动（不动 src/ 与 dist/），让 015 的
-// stub chat.message 调用形态对齐生产（方向 B）。生产语义（dispatch-protocol-
-// 010 / execution-model-routing-009）中 chat.message 边界的 user 消息是
-// model-free 的——managed send 固定 Model=None，target 由 admission 的
-// Acquire 步骤取得后在 Project 步骤投影至 mutable message；context-
-// compression-018 的 fresh binding 用例（同链、同入口、agent=manager、
-// model-free frontier）经 provider start boundary 租约校验实跑通过，是
-// fresh-reserve 路径落地的行为先例。本批施工：015 的 chat.message output
-// 与 transform 输入去掉提前塞入的 model 字段（对齐 018 先例形态）；
-// R1—R4/R6 解封为真实用例（行为级断言不变）；R5 保持 todo（typed 拒绝断言
-// 重设计归后续批次，Manager 已另行裁决）。形态假设由 DevOps 实跑裁决：R1
-// 的注入正例若仍为 0，即证伪方向 B。
+// The registered transform receives a physical Host history and may replace
+// its frontier with a canonical companion projection. Admission and marker
+// identity must remain bound to the original physical execution.
+// Fixture disposal uses the canonical request release before draining scope episodes.
 // ---------------------------------------------------------------------------
 
 const registeredUserMessage = (session, id) => ({
@@ -389,6 +388,9 @@ const chronicleMarkers = (messages) =>
       (m.parts[0]?.text === zhResource || m.parts[0]?.text === enResource),
   )
 
+const markerIdFor = (session, physical) =>
+  `text-${createHash('sha256').update([session, 'blogger-chronicle-text', physical].join('\u001f')).digest('hex').slice(0, 24)}`
+
 const hostHistoryContainsMarker = (runtime) =>
   runtime.messages.some((message) => {
     const text = JSON.stringify(message?.parts ?? [])
@@ -400,7 +402,6 @@ const journalTreeContainsMarker = (directory) => {
     for (const name of readdirSync(dir)) {
       const full = join(dir, name)
       if (statSync(full).isDirectory()) {
-        if (name === '.git') continue
         if (walk(full)) return true
       } else {
         const text = readFileSync(full, 'utf8')
@@ -409,10 +410,109 @@ const journalTreeContainsMarker = (directory) => {
     }
     return false
   }
-  return walk(directory)
+  return walk(join(directory, '.git', 'wanxiang', 'events'))
 }
 
-const withEnglishLanguage = async (action) => {
+test('WHAT[cognitive-environment-015] registered companion projection keeps the original execution model gate', async () => {
+  await withEnglishLanguage(async () => {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      const session = 'ses-blog-original-execution'
+      const physical = 'msg-blog-original-execution'
+      const main = 'ses-main-original-execution'
+      await appendCompanionBloggerLink(runtime, main, session)
+      const profile = await admitExecution(runtime, hooks, session, physical)
+      const request = await claimBloggerRequest({
+        runtime, mainSession: main, bloggerSession: session, profile,
+        dispatchPhysical: 'msg-dispatch-original-execution', requestId: 'req-original-execution',
+      })
+      let otherRequest
+      let requestReleased = false
+      const failures = []
+      try {
+        runtime.pushHostMessage(session, registeredUserMessage(session, physical))
+        runtime.pushHostMessage(session, {
+          info: { id: 'assistant-original-execution', sessionID: session, parentID: physical,
+            role: 'assistant', agent: 'blogger', providerID: 'test', modelID: 'step-3.5-flash-canary',
+            time: { created: 2 } },
+          parts: [],
+        })
+        const output = { messages: [registeredUserMessage(session, physical)] }
+        await hooks['experimental.chat.messages.transform']({ sessionID: session }, output)
+        assert.equal(CompanionRuntimeSurface.currentRequest(request.scope, session)?.requestId,
+          'req-original-execution', 'the first-step projection must retain its exact live request')
+        assert.notEqual(output.messages.at(-1).info.id, physical, 'the companion projection must actually replace the physical frontier')
+        assert.equal(chronicleMarkers(output.messages).length, 1, 'a rendered frontier must still use the admitted physical execution model')
+        const firstMarker = chronicleMarkers(output.messages)[0]
+        assert.equal(firstMarker.info.id, markerIdFor(session, physical))
+        const firstWire = JSON.stringify(output.messages)
+        // A new fixture scope resets shared flights, so release this exact
+        // owner before constructing the next independently isolated request.
+        request.dispose()
+        requestReleased = true
+        const otherSession = 'ses-blog-other-execution'
+        const otherMain = 'ses-main-other-execution'
+        await appendCompanionBloggerLink(runtime, otherMain, otherSession)
+        const otherProfile = await admitExecution(runtime, hooks, otherSession, physical)
+        otherRequest = await claimBloggerRequest({
+          runtime, mainSession: otherMain, bloggerSession: otherSession, profile: otherProfile,
+          dispatchPhysical: 'msg-dispatch-other-execution', requestId: 'req-other-execution',
+        })
+        runtime.pushHostMessage(otherSession, registeredUserMessage(otherSession, physical))
+        runtime.pushHostMessage(otherSession, {
+          info: { id: 'assistant-other-execution', sessionID: otherSession, parentID: physical,
+            role: 'assistant', agent: 'blogger', providerID: 'test', modelID: 'step-3.5-flash-canary',
+            time: { created: 2 } },
+          parts: [],
+        })
+        const otherOutput = { messages: [registeredUserMessage(otherSession, physical)] }
+        await hooks['experimental.chat.messages.transform']({ sessionID: otherSession }, otherOutput)
+        assert.equal(CompanionRuntimeSurface.currentRequest(otherRequest.scope, otherSession)?.requestId,
+          'req-other-execution', 'the other first-step projection must retain its exact live request')
+        const otherMarkers = chronicleMarkers(otherOutput.messages)
+        assert.equal(otherMarkers.length, 1)
+        assert.equal(otherMarkers[0].info.id, markerIdFor(otherSession, physical))
+        assert.notEqual(otherMarkers[0].info.id, firstMarker.info.id, 'another session cannot reuse the first occurrence marker')
+        assert.equal(JSON.stringify(output.messages), firstWire, 'another session cannot mutate the first request projection')
+        assert.equal(hostHistoryContainsMarker(runtime), false)
+        assert.equal(journalTreeContainsMarker(directory), false)
+      } catch (error) {
+        failures.push(error)
+      } finally {
+        try {
+          otherRequest?.dispose()
+        } catch (error) {
+          failures.push(error)
+        }
+        if (!requestReleased) {
+          try {
+            request.dispose()
+          } catch (error) {
+            failures.push(error)
+          }
+        }
+      }
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1) throw new AggregateError(failures, 'companion projection and cleanup failures')
+    })
+  })
+})
+
+test('WHAT[cognitive-environment-015] durable marker oracle observes Git-private event bytes', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'chronicle-marker-oracle-'))
+  try {
+    const events = join(directory, '.git', 'wanxiang', 'events')
+    mkdirSync(events, { recursive: true })
+    const log = join(events, 'all.ndjson')
+    writeFileSync(log, '{}\n')
+    assert.equal(journalTreeContainsMarker(directory), false)
+    writeFileSync(log, enResource)
+    assert.equal(journalTreeContainsMarker(directory), true)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+async function withEnglishLanguage(action) {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   LanguageSurface.refreshGlobalLanguage()
@@ -442,17 +542,7 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       // — the model-free frontier shape context-compression-018's fresh
       // binding case proves green through the provider start boundary).
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Durable BloggerRequest chain: the plan freeze companion check needs a
-      // journal open request (BloggerRequestMaterialized). The fixture
-      // dispose releases the live flight through releaseCurrentRequest (the
-      // canonical exact-requestId release entry; surface dispose alone only
-      // drains scope episodes and never wipes BloggerFlights), so
-      // tryLiveCycleContext reads the process-local InFlight
-      // (TryPeekCurrentRequest, never healed from durable open) as None and
-      // step 11 keeps the raw wire frontier instead of projecting the
-      // BloggerRequest canonical view (the ninth-layer root cause of the old
-      // zero-injection runs: the old fixture dispose skipped the release, so
-      // the live flight kept replacing the gate's frontier read).
+      // The durable open BloggerRequest is required by the attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -501,13 +591,13 @@ test('WHAT[cognitive-environment-015] R1_registered_transform_injects_one_marker
       assert.equal(markers.length, 1, 'registered transform must inject exactly one chronicle marker')
       const marker = markers[0]
       assert.equal(marker.parts[0].text, enResource, 'marker text must be the en leaf under the global language binding')
-      assert.ok(marker.info.id.startsWith('text-'), 'marker id must be digest-derived')
+      assert.equal(marker.info.id, markerIdFor(session, physical), 'the marker identity must bind the original physical execution')
       const markerIndex = outObj.messages.indexOf(marker)
       assert.ok(markerIndex >= 0)
       assert.equal(
-        outObj.messages[markerIndex + 1]?.info?.id,
-        physical,
-        'the marker must sit immediately before the frontier user message',
+        outObj.messages[markerIndex + 1],
+        outObj.messages.at(-1),
+        'the marker must sit immediately before the final projected frontier',
       )
 
       // WHAT 015：提示只作用于当次转换，不写入日志或历史。transform 修改的
@@ -523,13 +613,6 @@ test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_sess
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-      // A committed whitelisted lease but no CompanionBloggerLinked in the
-      // journal: the session is not a companion, so the isCompanion half of
-      // the injection gate must refuse — the only reason this case injects
-      // nothing. The exact lease is committed by the chat.message admission
-      // (direction B: the admission transaction itself acquires and commits
-      // the physical-bound lease), so the zero-injection verdict is
-      // attributable to the companion gate alone, not a lease read miss.
       const session = 'ses-blog-registered-2'
       const physical = 'msg-user-r2'
       await admitExecution(runtime, hooks, session, physical)
@@ -565,15 +648,13 @@ test('WHAT[cognitive-environment-015] R2_registered_transform_non_companion_sess
 test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occurrence_without_duplicate_markers', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
-    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
       const session = 'ses-blog-registered-3'
       const main = 'ses-blog-main-registered-3'
       const physical = 'msg-user-r3'
       await appendCompanionBloggerLink(runtime, main, session)
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Same shape as R1: the durable open request feeds the plan freeze
-      // companion check; the fixture dispose releases the live flight via
-      // releaseCurrentRequest so step 11 keeps the raw wire frontier.
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -606,17 +687,20 @@ test('WHAT[cognitive-environment-015] R3_registered_transform_replays_same_occur
       const first = chronicleMarkers(outObj.messages)
       assert.equal(first.length, 1, 'the first pass injects exactly one marker')
 
-      // 同一 outObj（同一 occurrence 的重复 transform）：既有同文本 assistant
-      // 消息被 filter 剔除后重新插入恰好一条，id 保持 digest 稳定。
+      // Host replays the same physical occurrence from its original history,
+      // not from the earlier request's canonical provider projection.
+      outObj.messages = [registeredUserMessage(session, physical)]
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, outObj)
       const replayed = chronicleMarkers(outObj.messages)
       assert.equal(replayed.length, 1, 'replay must not accumulate duplicate markers')
       assert.equal(replayed[0].info.id, first[0].info.id, 'the same occurrence keeps its digest-derived id stable')
       assert.equal(
-        outObj.messages[outObj.messages.indexOf(replayed[0]) + 1]?.info?.id,
-        physical,
-        'the marker must stay immediately before the frontier user message after replay',
+        outObj.messages[outObj.messages.indexOf(replayed[0]) + 1],
+        outObj.messages.at(-1),
+        'the marker must stay immediately before the projected frontier after replay',
       )
+      assert.equal(hostHistoryContainsMarker(runtime), false, 'Host replay cannot persist an earlier request hint')
+      assert.equal(journalTreeContainsMarker(directory), false, 'canonical capture cannot retain an earlier request hint')
     })
   })
 })
@@ -636,9 +720,7 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       const userOne = registeredUserMessage(session, physicalOne)
       runtime.pushHostMessage(session, structuredClone(userOne))
       const profile = await admitExecution(runtime, hooks, session, physicalOne)
-      // Same shape as R1: durable open request feeds the plan freeze; the
-      // fixture dispose releases the live flight via releaseCurrentRequest
-      // so step 11 keeps the raw wire frontier.
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -711,20 +793,22 @@ test('WHAT[cognitive-environment-015] R4_registered_transform_followup_request_h
       assert.notEqual(secondMarkers[0].info.id, firstMarkerId, 'a new occurrence derives a new marker id')
       const markerIndex = secondRequest.messages.indexOf(secondMarkers[0])
       assert.equal(
-        secondRequest.messages[markerIndex + 1]?.info?.id,
-        physicalTwo,
-        'the fresh marker precedes the new frontier user message',
+        secondRequest.messages[markerIndex + 1],
+        secondRequest.messages.at(-1),
+        'the fresh marker precedes the final projected frontier',
       )
       assert.equal(
-        secondRequest.messages[markerIndex - 1]?.info?.id,
-        physicalOne,
-        'the earlier physical user message remains ahead of the fresh marker',
+        secondMarkers[0].info.id,
+        markerIdFor(session, physicalTwo),
+        'the new marker identity must use the new physical execution, not its rendered projection',
       )
+      assert.equal(hostHistoryContainsMarker(runtime), false)
+      assert.equal(journalTreeContainsMarker(directory), false)
     })
   })
 })
 
-test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_with_typed_rejection', { todo: 'ninth-layer adjudication: setup now isolates the exact committed lease (durable Accepted stays via the chat.message admission transaction, journal open BloggerRequest feeds the plan freeze with the live flight disposed, the exact lease is committed through the ModelRouting surface and then settled away with releasePhysical), so the provider start boundary requireProviderAdmission must read no committed lease and reject with the CommittedAdmissionUnavailable typed failure. Open gap: the MessagesTransform hook is registered TypedPolicyFailClosed (HookPolicy), and the observable shape of that typed boundary failure at the hook boundary — a JS exception surfaced to this test, or a quiet typed-failure return swallowed by the membrane — has not been proven by a real run. Direction-B note: the tenth-layer conclusion carries until the model-free admission reshape is proven by a real run, so when this case is unsealed the lease-isolation setup must be re-derived from whichever admission shape actually lands the committed lease — a manual acquireLease after an admission-owned lease walks the idempotent AlreadyApplied path and its Applied assertion would need adjustment. The assertion intent stays: fail closed, never a quiet zero-injection completion. Assertions and setup preserved' }, async () => {
+test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_lease_fails_closed_at_execution_admission', async () => {
   await withEnglishLanguage(async () => {
     delete globalThis.__wanxiangshu_test_blogger_model
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
@@ -737,9 +821,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
       // Accepted 执行仍先建立——被测的是 lease 缺席，不是 Accepted 缺席。
       const physical = 'msg-user-r5'
       const profile = await admitExecution(runtime, hooks, session, physical)
-      // Same shape as R1: the durable open request feeds the plan freeze
-      // companion check; the fixture dispose releases the live flight via
-      // releaseCurrentRequest so step 11 keeps the raw wire frontier.
+      // The durable open request feeds the companion attempt-plan freeze.
       const bloggerRequest = await claimBloggerRequest({
         runtime,
         mainSession: main,
@@ -771,13 +853,7 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         parts: [],
       })
 
-      // Ninth-layer adjudication: commit the exact lease through the
-      // ModelRouting surface (the production emr-011 path), then settle it
-      // away on the capacity owner (durable Accepted stays in the journal);
-      // the provider start boundary's requireProviderAdmission must reject
-      // the transform with the CommittedAdmissionUnavailable typed failure —
-      // fail-closed, not a quiet zero-injection completion.
-      await acquireLease(session, physical, 'blogger', 'blogger')
+      // Retire only the admission-issued lease; durable Accepted remains.
       const released = ModelRoutingSurface.releasePhysical(session, physical)
       assert.ok(
         released?.kind === 'Applied' || released?.kind === 'AlreadyApplied',
@@ -790,8 +866,8 @@ test('WHAT[cognitive-environment-015] R5_registered_transform_without_committed_
         (error) => {
           assert.match(
             String(error?.message ?? error),
-            /committed-admission-unavailable/,
-            'the rejection must be the CommittedAdmissionUnavailable typed boundary failure',
+            /EMR-010: managed provider step for physical user message msg-user-r5 has no committed model-routing lease/,
+            'the exact execution admission boundary must reject before any projection or injection',
           )
           return true
         },
@@ -812,9 +888,7 @@ test('WHAT[cognitive-environment-015] R6_registered_transform_non_whitelisted_mo
         const physical = 'msg-user-r6'
         await appendCompanionBloggerLink(runtime, main, session)
         const profile = await admitExecution(runtime, hooks, session, physical)
-        // Same shape as R1: durable open request feeds the plan freeze; the
-        // fixture dispose releases the live flight via releaseCurrentRequest
-        // so step 11 keeps the raw wire frontier.
+        // The durable open request feeds the companion attempt-plan freeze.
         const bloggerRequest = await claimBloggerRequest({
           runtime,
           mainSession: main,

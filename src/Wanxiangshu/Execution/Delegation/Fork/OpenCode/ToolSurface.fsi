@@ -8,6 +8,7 @@ open System.Threading.Tasks
 module ForkToolSurface =
 
     val createRuntime: directory: string -> owners: obj -> Task<obj>
+    val createRuntimeWithWorkRecordRead: directory: string -> owners: obj -> beforeRead: (string -> Task) -> Task<obj>
     val createRuntimeWithAbort: directory: string -> owners: obj -> abortSession: (string -> Task<obj>) -> Task<obj>
 
     val createRuntimeWithCancelSignals:
@@ -32,6 +33,16 @@ module ForkToolSurface =
             Task<string>
 
     val captureOwnerOpening: value: obj -> owner: string -> text: string -> Task
+
+    val executeManagerResumeWithAttachment:
+        value: obj ->
+        toolModule: obj ->
+        owner: string ->
+        byname: string ->
+        charge: string ->
+        attach: string ->
+            Task<string>
+
     val captureOwnerDeltaPart: value: obj -> owner: string -> text: string -> providerRun: string -> Task
     val childCount: value: obj -> int
     val abortCount: value: obj -> int
@@ -42,6 +53,11 @@ module ForkToolSurface =
     val acceptNextPrompt: value: obj -> unit
     val terminalListenerCount: value: obj -> int
     val prompt: value: obj -> index: int -> obj
+    val captureChildPromptSender: value: obj -> owner: string -> byname: string -> onAccepted: (string -> unit) -> obj
+    val sendCapturedChildPrompt: captured: obj -> text: string -> Task<obj>
+    val promptEvidence: value: obj -> index: int -> obj
+    val confirmPromptPhysical: value: obj -> index: int -> physicalMessageId: string -> Task<obj>
+    val physicalAcceptanceObservation: value: obj -> index: int -> physicalMessageId: string -> obj
     val nextPromptAcceptanceUnknown: value: obj -> reason: string -> unit
     val nextPromptAdmittedWithReceipt: value: obj -> receipt: string -> unit
     val cancelOwnerChildren: value: obj -> owner: string -> Task
@@ -66,6 +82,7 @@ module ForkToolSurface =
     val emitStopWithReason: obj -> string -> string -> string -> string -> Task
     val replayWorkCompletion: obj -> string -> string -> Task<obj>
     val workSnapshot: obj -> string -> obj array
+    val handoffSnapshot: obj -> obj array
     val coldWorkSnapshot: string -> string -> Task<obj array>
     val replayBinding: obj -> string -> string -> Task<obj>
     val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task

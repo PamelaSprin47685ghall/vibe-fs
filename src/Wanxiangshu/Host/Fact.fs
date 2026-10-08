@@ -12,6 +12,9 @@ module HostFact =
     let inline RequirementGroundingMaterialObserved payload =
         AgentFact.Host(HostFactCases.RequirementGroundingMaterialObserved payload)
 
+    let inline RequirementGroundingReadObserved payload =
+        AgentFact.Host(HostFactCases.RequirementGroundingReadObserved payload)
+
     let inline RequirementGroundingAnchored payload =
         AgentFact.Host(HostFactCases.RequirementGroundingAnchored payload)
 

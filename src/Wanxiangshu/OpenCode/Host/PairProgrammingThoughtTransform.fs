@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -18,6 +19,9 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
@@ -29,6 +33,11 @@ open Wanxiangshu.OpenCode.Host.PairProgramming
 /// occasion（SessionId + CallGap + ResultGap）最多一个 pair，重复 transform 只 replay、
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
+
+    [<RequireQualifiedAccess>]
+    type CursorPresentationOwner =
+        | PairGuidance
+        | RequirementGrounding
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
@@ -391,6 +400,23 @@ module PairProgrammingThoughtTransform =
             clonedMessage?parts <- box clonedParts
             Some clonedMessage
 
+    let private mapTerminalResultText (mapText: string -> string) (originalPart: obj) : obj =
+        let originalState = originalPart?state
+        let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
+
+        match partStatus originalPart with
+        | Some "completed" when isString originalState?output ->
+            clonedState?output <- box (mapText (unbox<string> originalState?output))
+        | Some "error" when isString originalState?error ->
+            clonedState?error <- box (mapText (unbox<string> originalState?error))
+        | Some "error" when isString originalState?output ->
+            clonedState?output <- box (mapText (unbox<string> originalState?output))
+        | _ -> ()
+
+        let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
+        clonedPart?state <- clonedState
+        clonedPart
+
     let private stripKnownCursorSuffixes (suffixTexts: string list) (originalPart: obj) : obj =
         let stripKnown (value: string) =
             (value, suffixTexts)
@@ -399,21 +425,7 @@ module PairProgrammingThoughtTransform =
                     .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal)
                     .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal))
 
-        let originalState = originalPart?state
-        let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
-
-        match partStatus originalPart with
-        | Some "completed" when isString originalState?output ->
-            clonedState?output <- box (stripKnown (unbox<string> originalState?output))
-        | Some "error" when isString originalState?error ->
-            clonedState?error <- box (stripKnown (unbox<string> originalState?error))
-        | Some "error" when isString originalState?output ->
-            clonedState?output <- box (stripKnown (unbox<string> originalState?output))
-        | _ -> ()
-
-        let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-        clonedPart?state <- clonedState
-        clonedPart
+        mapTerminalResultText stripKnown originalPart
 
     let private terminalTextPartIndex (parts: obj array) : int option =
         parts
@@ -523,6 +535,215 @@ module PairProgrammingThoughtTransform =
         | None when messageRole rawMsg = "user" -> stripUserMessageCursorSuffixes suffixTexts rawMsg
         | None -> rawMsg
 
+    type private CursorPresentation =
+        { GuidanceBytes: string
+          RequirementBytes: string }
+
+    type private CursorResultIdentity =
+        { MessageId: TranscriptMessageAddress
+          PartId: HostToolPartId option
+          CallId: ToolCallId }
+
+    type private CapturedCursorResult =
+        { Body: string
+          Presentations: CursorPresentation list }
+
+    type private CapturedCursorResults =
+        { HasTrace: bool
+          Results: Map<CursorResultIdentity, CapturedCursorResult> }
+
+    let private cursorPartId (part: obj) =
+        if isNull part?id then
+            Some None
+        elif isString part?id then
+            Some(Some(HostToolPartId.create (unbox<string> part?id)))
+        else
+            None
+
+    let private cursorResultIdentity (rawMsg: obj) =
+        let parts = rawParts rawMsg
+
+        parts
+        |> Array.mapi terminalGuidanceIndex
+        |> Array.choose id
+        |> Array.tryLast
+        |> Option.filter (fun index -> isString rawMsg?info?id && isString parts.[index]?callID)
+        |> Option.bind (fun index ->
+            cursorPartId parts.[index]
+            |> Option.map (fun partId ->
+                index,
+                { MessageId = TranscriptMessageAddress.create (unbox<string> rawMsg?info?id)
+                  PartId = partId
+                  CallId = ToolCallId.create (unbox<string> parts.[index]?callID) }))
+
+    let private cursorPresentationPrefixes
+        (guidance: PairProgrammingGuideline list)
+        (occurrences: RequirementGroundingOccurrence list)
+        =
+        let guidanceBytes =
+            guidance
+            |> List.map (fun pair -> cursorGuidanceSeparator + pair.MarkerText)
+            |> String.concat ""
+
+        occurrences
+        |> List.scan
+            (fun prefix occurrence ->
+                let bytes =
+                    occurrence.Reads
+                    |> List.map (fun read -> cursorGuidanceSeparator + read.CursorResultBytes)
+                    |> String.concat ""
+
+                prefix + bytes)
+            ""
+        |> List.collect (fun reads ->
+            [ { GuidanceBytes = guidanceBytes
+                RequirementBytes = reads }
+              { GuidanceBytes = ""
+                RequirementBytes = reads } ])
+
+    let private presentationsAtMessage (session: SessionAgentProjection option) (rawMsg: obj) =
+        let atMessage gap =
+            match gap with
+            | TranscriptGap.After address ->
+                isString rawMsg?info?id
+                && TranscriptMessageAddress.value address = unbox<string> rawMsg?info?id
+            | _ -> false
+
+        match session with
+        | None -> []
+        | Some state ->
+            let guidance = state.Guidelines |> Option.defaultValue GuidelineProjection.empty
+
+            let grounding =
+                state.RequirementGrounding
+                |> Option.defaultValue RequirementGroundingProjection.empty
+
+            let atAnchor (pairs: PairProgrammingGuideline list) (occurrences: RequirementGroundingOccurrence list) =
+                cursorPresentationPrefixes
+                    (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
+                    (occurrences |> List.filter (fun occurrence -> atMessage occurrence.ResultGap))
+
+            atAnchor (GuidelineProjection.pairs guidance) (RequirementGroundingProjection.occurrences grounding)
+            @ atAnchor
+                (GuidelineProjection.visiblePairs guidance)
+                (RequirementGroundingProjection.visibleOccurrences grounding)
+            |> List.distinct
+
+    let private captureCursorResult journal trace session (rawMsg: obj) =
+        let capture identity =
+            taskResult {
+                let! body =
+                    XTraceMaterialization.tryHostToolResult
+                        journal
+                        identity.MessageId
+                        identity.PartId
+                        identity.CallId
+                        trace
+
+                return
+                    body
+                    |> Option.map (fun original ->
+                        identity,
+                        { Body = original
+                          Presentations = presentationsAtMessage session rawMsg })
+            }
+
+        cursorResultIdentity rawMsg
+        |> Option.map (snd >> capture)
+        |> Option.defaultWith (fun () -> Task.FromResult(Ok None))
+
+    let private captureCursorResults journal sessionId rawMessages =
+        let session =
+            AgentJournal.snapshot journal
+            |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
+
+        let capture trace =
+            taskResult {
+                let! captured =
+                    rawMessages
+                    |> TaskResultList.traverseM (captureCursorResult journal trace session)
+
+                return
+                    { HasTrace = true
+                      Results = captured |> List.choose id |> Map.ofList }
+            }
+
+        session
+        |> Option.bind _.XTrace
+        |> Option.map capture
+        |> Option.defaultWith (fun () ->
+            Task.FromResult(
+                Ok
+                    { HasTrace = false
+                      Results = Map.empty }
+            ))
+
+    let private findCapturedCursorResult captures rawMsg =
+        cursorResultIdentity rawMsg
+        |> Option.bind (fun (index, identity) ->
+            captures.Results
+            |> Map.tryFind identity
+            |> Option.map (fun result -> index, result))
+
+    let private mapCapturedResult index mapText (rawMsg: obj) =
+        let clonedParts = Array.copy (rawParts rawMsg)
+        clonedParts.[index] <- mapTerminalResultText mapText clonedParts.[index]
+        let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
+        clonedMessage?parts <- box clonedParts
+        clonedMessage
+
+    let private matchingPresentations captured value =
+        captured.Presentations
+        |> List.filter (fun presentation ->
+            value = captured.Body + presentation.GuidanceBytes + presentation.RequirementBytes)
+
+    let private stripCapturedPresentation owner captured value =
+        let retain presentation =
+            match owner with
+            | CursorPresentationOwner.PairGuidance -> captured.Body + presentation.RequirementBytes
+            | CursorPresentationOwner.RequirementGrounding -> captured.Body + presentation.GuidanceBytes
+
+        match matchingPresentations captured value |> List.map retain |> List.distinct with
+        | [] -> Ok value
+        | [ retained ] -> Ok retained
+        | _ -> Error "Cursor presentation ownership is ambiguous at the captured Host result"
+
+    let private stripCapturedResult captures owner suffixTexts rawMsg =
+        let strip (index, captured) =
+            let originalPart = (rawParts rawMsg).[index]
+            let state = originalPart?state
+
+            let value =
+                if partStatus originalPart = Some "error" && isString state?error then
+                    unbox<string> state?error
+                else
+                    unbox<string> state?output
+
+            stripCapturedPresentation owner captured value
+            |> Result.map (fun retained -> mapCapturedResult index (fun _ -> retained) rawMsg)
+
+        if not captures.HasTrace || messageRole rawMsg = "user" then
+            Ok(stripCursorSuffixes suffixTexts rawMsg)
+        else
+            findCapturedCursorResult captures rawMsg
+            |> Option.map strip
+            |> Option.defaultValue (Ok rawMsg)
+
+    let stripCursorSuffixesWithJournal
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (owner: CursorPresentationOwner)
+        (suffixTexts: string list)
+        (rawMessages: obj list)
+        : Task<Result<obj list, string>> =
+        taskResult {
+            let! captured = captureCursorResults journal sessionId rawMessages
+
+            return!
+                rawMessages
+                |> List.traverseResultM (stripCapturedResult captured owner suffixTexts)
+        }
+
     let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
         appendCursorSuffixes markerTexts rawMsg
 
@@ -599,15 +820,46 @@ module PairProgrammingThoughtTransform =
         =
         tryBucket table address |> Option.iter (emitPairs output)
 
-    let private projectGuidanceToMessage (markerTexts: string list) (message: obj) : obj =
+    let private terminalResultText (part: obj) =
+        let state = part?state
+
+        if partStatus part = Some "error" && isString state?error then
+            tryUnboxString state?error
+        else
+            tryUnboxString state?output
+
+    let private projectCapturedGuidance captures markerTexts message =
+        let insert (index, captured) =
+            let guidanceBytes =
+                markerTexts
+                |> List.map (fun text -> cursorGuidanceSeparator + text)
+                |> String.concat ""
+
+            let present value =
+                captured.Presentations
+                |> List.tryFind (fun presentation ->
+                    presentation.GuidanceBytes = ""
+                    && value = captured.Body + presentation.RequirementBytes)
+                |> Option.map (fun presentation -> captured.Body + guidanceBytes + presentation.RequirementBytes)
+
+            rawParts message
+            |> fun parts -> terminalResultText parts.[index]
+            |> Option.bind present
+            |> Option.map (fun output -> mapCapturedResult index (fun _ -> output) message)
+
+        findCapturedCursorResult captures message |> Option.bind insert
+
+    let private projectGuidanceToMessage captures (markerTexts: string list) (message: obj) : obj =
         if messageRole message = "user" then
             appendCursorGuidanceToUserMessage markerTexts message
             |> Option.defaultValue message
         else
-            appendCursorGuidanceToTerminalToolResult markerTexts message
+            projectCapturedGuidance captures markerTexts message
+            |> Option.orElseWith (fun () -> appendCursorGuidanceToTerminalToolResult markerTexts message)
             |> Option.defaultValue message
 
     let private projectCursorMessage
+        captures
         (cursorAfter: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
         (address: string)
         (message: obj)
@@ -619,9 +871,10 @@ module PairProgrammingThoughtTransform =
             |> Seq.sortBy (fun pair -> pair.Ordinal)
             |> Seq.map (fun pair -> pair.MarkerText)
             |> Seq.toList
-            |> fun markerTexts -> projectGuidanceToMessage markerTexts message
+            |> fun markerTexts -> projectGuidanceToMessage captures markerTexts message
 
     let private replayAddressed
+        captures
         (providerId: string option)
         (addressed: (string * obj) list)
         (pairs: PairProgrammingGuidelineWire list)
@@ -653,18 +906,19 @@ module PairProgrammingThoughtTransform =
 
         for address, message in addressed do
             emitBucketPairs output before address
-            output.Add(projectCursorMessage cursorAfter address message)
+            output.Add(projectCursorMessage captures cursorAfter address message)
             emitBucketPairs output after address
 
         Seq.toList output
 
     let private replay
+        captures
         (providerId: string option)
         (realMessages: obj list)
         (pairs: PairProgrammingGuidelineWire list)
         : Result<obj list, string> =
         addressedRealMessages realMessages
-        |> Result.map (fun addressed -> replayAddressed providerId addressed pairs)
+        |> Result.map (fun addressed -> replayAddressed captures providerId addressed pairs)
 
     // ── 本轮新 pair 的 placement（只读当前真实消息）──────────────────────────
 
@@ -811,6 +1065,7 @@ module PairProgrammingThoughtTransform =
         |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
 
     let private commitPairInjection
+        (replayMessages: obj list -> PairProgrammingGuidelineWire list -> Result<obj list, string>)
         (providerId: string option)
         (history: PairProgrammingGuidelineWire list)
         (visibleHistory: PairProgrammingGuidelineWire list)
@@ -826,7 +1081,7 @@ module PairProgrammingThoughtTransform =
             let existing = findPlacement visibleHistory callGap resultGap
 
             if Option.isSome existing || skipAutoInjectedRequested providerId then
-                return! replay providerId realMessages visibleHistory
+                return! replayMessages realMessages visibleHistory
             else
                 let ordinal = nextGuidelineOrdinal history
 
@@ -838,7 +1093,7 @@ module PairProgrammingThoughtTransform =
                       ResultGap = resultGap
                       ConcernPlacement = concernPlacement }
 
-                let! rendered = replay providerId realMessages (visibleHistory @ [ candidate ])
+                let! rendered = replayMessages realMessages (visibleHistory @ [ candidate ])
                 do! append candidate
                 return rendered
         }
@@ -896,6 +1151,7 @@ module PairProgrammingThoughtTransform =
         | _ -> rawMessages |> List.exists messageRoleIsInternal
 
     let private commitCurrentPairPlacement
+        (replayMessages: obj list -> PairProgrammingGuidelineWire list -> Result<obj list, string>)
         providerId
         history
         visibleHistory
@@ -909,10 +1165,11 @@ module PairProgrammingThoughtTransform =
             let! placementOpt = decideCurrentPlacement realMessages
 
             match placementOpt with
-            | None -> return! replay providerId realMessages visibleHistory
+            | None -> return! replayMessages realMessages visibleHistory
             | Some(callGap, resultGap) ->
                 return!
                     commitPairInjection
+                        replayMessages
                         providerId
                         history
                         visibleHistory
@@ -961,7 +1218,20 @@ module PairProgrammingThoughtTransform =
                     memory, memory, (fun pair -> Task.FromResult(appendMemory key pair))
 
             let suffixes = history |> List.map (fun pair -> pair.MarkerText)
-            let rawMessages = rawMessages |> List.map (stripCursorSuffixes suffixes)
+
+            let! captures =
+                match journal, sessionId with
+                | Some durable, Some sid -> captureCursorResults durable (SessionId.create sid) rawMessages
+                | _ ->
+                    Task.FromResult(
+                        Ok
+                            { HasTrace = false
+                              Results = Map.empty }
+                    )
+
+            let! rawMessages =
+                rawMessages
+                |> List.traverseResultM (stripCapturedResult captures CursorPresentationOwner.PairGuidance suffixes)
 
             let strippedCallIds =
                 rawMessages
@@ -980,6 +1250,7 @@ module PairProgrammingThoughtTransform =
                 |> sanitizeActiveToolCalls lang
 
             let providerId = providerIdFromMessages realMessages
+            let replayMessages = replay captures providerId
 
             let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
 
@@ -995,10 +1266,11 @@ module PairProgrammingThoughtTransform =
                     (List.isEmpty orphaned)
 
             if isInternalSessionOrMessage journal sessionId rawMessages then
-                return! replay providerId realMessages visibleHistory
+                return! replayMessages realMessages visibleHistory
             else
                 return!
                     commitCurrentPairPlacement
+                        replayMessages
                         providerId
                         history
                         visibleHistory

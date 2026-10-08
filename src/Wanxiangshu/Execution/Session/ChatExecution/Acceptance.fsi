@@ -1,10 +1,11 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
+open Wanxiangshu.Persistence.EventStore
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
@@ -32,6 +33,7 @@ type ManagedChatAcceptanceError =
         attempted: AcceptedChatExecutionEvidence
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 type ManagedChatAcceptancePersistence =
@@ -70,6 +72,7 @@ type ManagedChatProviderLifecycleError =
     | ProjectionConflictAfterCommit of ChatExecutionState
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 type ManagedChatProviderLifecyclePersistence =
@@ -112,4 +115,4 @@ module ManagedChatProviderLifecycle =
             Task<Result<ManagedChatTerminalWitness, ManagedChatProviderLifecycleError>>
 
 module JournalAppendOutcome =
-    val toExecutionFailure: Wanxiangshu.Foundation.JournalAppendFailure -> ExecutionFailure
+    val toExecutionFailure: JournalAppendFailure -> ExecutionFailure

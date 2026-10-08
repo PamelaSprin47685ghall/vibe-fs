@@ -196,6 +196,11 @@ module PromptAuthority =
           PayloadDigest: string
           PhysicalUserMessageId: PhysicalUserMessageId }
 
+    type ClaimSequenceCounter =
+        { SessionId: SessionId
+          LogicalRunId: LogicalRunId option
+          Count: int }
+
     /// DSL-state-combination: domain — the two optional authority profiles
     /// represent durable before/active evidence; they are not stage latches.
     type PromptAuthorityProjection =
@@ -230,10 +235,9 @@ module PromptAuthority =
             /// fired twice against the same tree" yields two distinct PromptKeys
             /// instead of one that looks like a duplicate.
             ///
-            /// Bounded by the current Logical Run: `registerAuthority` clears it,
-            /// so it grows with the number of distinct payloads in one run, not
-            /// with session lifetime (PERSIST-008).
-            ClaimSequences: Map<string, int>
+            /// Run closure removes only counters owned by that run. Unlanded
+            /// Root scopes belong to the session and keep their consumed count.
+            ClaimSequences: Map<string, ClaimSequenceCounter>
         }
 
     let empty: PromptAuthorityProjection =
@@ -390,9 +394,18 @@ module PromptAuthority =
                payloadDigest |]
         )
 
+    /// Root claims have no LogicalRunId until physical acceptance. Their
+    /// sequence scope belongs to the session, so closing a run cannot reset it.
+    let rootClaimSequences (sessionId: SessionId) (projection: PromptAuthorityProjection) =
+        projection.ClaimSequences
+        |> Map.filter (fun _ counter -> counter.SessionId = sessionId && counter.LogicalRunId.IsNone)
+
     /// The ClaimSequence this scope's next claim would carry.
     let nextClaimSequence (scope: string) (projection: PromptAuthorityProjection) =
-        (Map.tryFind scope projection.ClaimSequences |> Option.defaultValue 0) + 1
+        (Map.tryFind scope projection.ClaimSequences
+         |> Option.map (fun counter -> counter.Count)
+         |> Option.defaultValue 0)
+        + 1
 
     /// PROMPT-011's key. Deterministic in every input, so the same logical
     /// dispatch derives the same key on any process that folds the same journal.

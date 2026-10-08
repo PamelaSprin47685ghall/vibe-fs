@@ -9,11 +9,66 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
+
+    let private sendGuardContinuation
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (journal: AgentJournal option)
+        (source: ProviderAttemptSource)
+        (kind: DegenerationKind)
+        (directory: string option)
+        (observer: ContinuationAcceptanceObserver option)
+        : Task<Result<unit, string>> =
+        task {
+            let prompt =
+                ProviderProse.documentFor source.SessionId (LoopSensor.continuationPath kind) Map.empty
+
+            let! outcome =
+                HostSessionNudge.sendContinuationResult
+                    sessionPort
+                    rootWorkspace
+                    source.SessionId
+                    prompt
+                    PromptAuthority.ContinuationKind.DegenerationGuard
+                    directory
+                    journal
+                    PromptDispatcher.AwaitMode.Detached
+                    observer
+
+            return outcome |> Result.map ignore
+        }
+
+    let attachLoopSensor
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (emitDiagnostic: string -> (string * string) list -> unit)
+        : unit =
+        let continueSession (source: ProviderAttemptSource) kind directory observer =
+            match HostSessionNudge.tryActiveProfile journal source.SessionId with
+            | Some profile when profile.AuthorityRootUserMessageId <> source.AuthorityRootUserMessageId ->
+                Task.FromResult(Error "Degeneration guard source authority is no longer active")
+            | _ -> sendGuardContinuation sessionPort rootWorkspace journal source kind directory observer
+
+        let sensor =
+            LoopSensor.create
+                scope.Sessions.OwnedSessions
+                scope.Sessions.SessionParents
+                sessionPort.InterruptAttempt
+                continueSession
+                emitDiagnostic
+
+        scope.AttachLoopSensor sensor
 
     let private isDurableFissionOwner (journal: AgentJournal option) (sessionId: SessionId) =
         journal
@@ -42,7 +97,17 @@ module HostTurnObserver =
             // SessionId + ProviderRun transfers, so a wrong/late run can never
             // consume a newer attempt's anomaly and session-only recovery is
             // never authorized.
-            scope.LoopSensor.ConsumeAbortCause(context.Turn.SessionId, context.Turn.ProviderRun, context.Turn.Directory)
+            let source: ProviderAttemptSource =
+                { SessionId = context.Turn.SessionId
+                  PhysicalUserMessageId = context.Turn.PhysicalUserMessageId
+                  AuthorityRootUserMessageId = context.Turn.AuthorityRootUserMessageId
+                  ProviderRun = context.Turn.ProviderRun }
+
+            let observer =
+                scope.SyncDelegateRuntime
+                |> Option.bind (fun runtime -> runtime.BindContinuationAcceptance source)
+
+            scope.LoopSensor.ConsumeAbortCause(source, context.Turn.Directory, observer)
         | _ -> Task.FromResult AbortCause.External
 
     /// DEG-OWN: settle the owned interrupt/continuation task before admitting

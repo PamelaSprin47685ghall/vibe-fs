@@ -647,10 +647,11 @@ module internal BodyDto =
                           DraftRef = get.Required.Field "draftRef" nonBlank }))
         | "AnswerCommitted" ->
             exact
-                [ "renderWorkId"; "answerRef"; "stopReason" ]
+                [ "renderWorkId"; "resultObservationId"; "answerRef"; "stopReason" ]
                 (Decode.object (fun get ->
                     InquiryEventBody.AnswerCommitted
                         { RenderWorkId = get.Required.Field "renderWorkId" workId
+                          ResultObservationId = get.Required.Field "resultObservationId" observationId
                           AnswerRef = get.Required.Field "answerRef" nonBlank
                           StopReason = get.Required.Field "stopReason" nonBlank }))
         | "CancelRequested" -> reason |> Decode.map InquiryEventBody.CancelRequested

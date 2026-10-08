@@ -7,7 +7,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-append-result-contract.fsproj"/>
     <Compile Include="Persistence/EventStore/GitTypes.fsi"/>
     <Compile Include="Persistence/EventStore/GitTypes.fs"/>
   </ItemGroup>

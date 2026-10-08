@@ -1,4 +1,46 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
+import {
+  withJournal, hostPort, prepareAcceptanceObserver, sendWithAcceptanceObserver,
+  acceptObservedPhysical, acceptanceObservation,
+} from './support/authority.mjs'
+
+for (const path of ['root', 'continuation']) {
+  test(`WHAT[dispatch-protocol-004] a detached ${path} observer exception propagates without losing actual acceptance or other confirmation results`, async t => {
+    await withJournal(`a2-observer-throw-${path}`, async handle => {
+      const context = await prepareAcceptanceObserver(handle, path, 'observer-throws')
+      const seen = []
+      const error = new Error(`observer-error-${context.session}`)
+      let sends = 0
+      let release
+      const sdk = new Promise(resolve => { release = resolve })
+      try {
+        const sent = await sendWithAcceptanceObserver(path,
+          hostPort(() => { sends += 1; return sdk }),
+          handle, context, physical => {
+            seen.push(acceptanceObservation(handle, context, physical))
+            throw error
+          },
+        )
+        assert.equal(sent.ok, true, sent.error)
+        t.mock.timers.enable({ apis: ['setTimeout'] })
+        const first = dispatch.awaitPhysicalConfirmation(sent.key, 50)
+        const second = dispatch.awaitPhysicalConfirmation(sent.key, 50)
+        const physical = `accepted-before-throw-${context.session}`
+        await assert.rejects(acceptObservedPhysical(handle, context, sent.key, physical), actual => actual === error)
+        assert.deepEqual(seen, [{ physical, pending: 0, accepted: true }])
+        assert.equal(dispatch.pendingClaimCount(handle, context.session), 0)
+        assert.equal(executionStatus.query(handle, context.session, physical).accepted, true)
+        t.mock.timers.tick(50)
+        assert.deepEqual(await first, { kind: 'Accepted', physical, reason: null })
+        assert.deepEqual(await second, { kind: 'Accepted', physical, reason: null })
+        assert.equal(sends, 1)
+      } finally { release(dispatch.admittedWithReceipt('throwing-observer-receipt')) }
+    })
+  })
+}
 
 {
 const { default: assert } = await import("node:assert/strict");

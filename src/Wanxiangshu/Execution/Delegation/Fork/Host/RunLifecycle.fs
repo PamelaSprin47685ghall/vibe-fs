@@ -71,8 +71,14 @@ module HostForkRunLifecycle =
         | Some binding -> acceptedWorkOutcome durable parentId childId root physical binding
         | None -> AgentOwnerDispatchOutcome.AcceptanceUncertain "physical acceptance exists; child binding is missing"
 
-    let private acceptedOutcome durable childId identitySeed onAccepted (evidence: PromptAuthority.AcceptedDispatch) =
-        onAccepted evidence.PhysicalUserMessageId
+    let private acceptedOutcome
+        durable
+        childId
+        identitySeed
+        (onAccepted: ContinuationAcceptanceObserver)
+        (evidence: PromptAuthority.AcceptedDispatch)
+        =
+        onAccepted.Notify evidence.PhysicalUserMessageId
 
         let root =
             PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
@@ -134,25 +140,29 @@ module HostForkRunLifecycle =
         (payloadDigest: string)
         (identitySeed: PromptAuthority.IdentitySeed)
         (claim: PromptAuthority.PromptClaim)
-        (onAccepted: PhysicalUserMessageId -> unit)
+        (onAccepted: ContinuationAcceptanceObserver)
         (accepted: PromptAuthority.AcceptedDispatch -> AgentOwnerDispatchOutcome)
         (error: string)
         =
-        // AcceptanceUnknown intentionally leaves the claim Pending. Restore the
-        // process-local callback cancelled by the synchronous dispatcher error,
-        // then re-read durable truth to close the accepted-between-read race.
-        PromptPhysicalAcceptance.register claim.PromptKey onAccepted
+        let registration =
+            PromptPhysicalAcceptance.register claim.PromptKey onAccepted.Notify
+
+        try
+            onAccepted.AttachDisposable registration
+        with error ->
+            registration.Dispose()
+            raise error
 
         match durableDispatchObservation durable childId payloadDigest identitySeed with
         | DurableDispatchObservation.Accepted evidence ->
-            PromptPhysicalAcceptance.cancel claim.PromptKey
+            registration.Dispose()
             accepted evidence
         | DurableDispatchObservation.Pending _ -> AgentOwnerDispatchOutcome.AcceptanceUncertain error
         | DurableDispatchObservation.IdentityMismatch ->
-            PromptPhysicalAcceptance.cancel claim.PromptKey
+            registration.Dispose()
             AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
         | DurableDispatchObservation.Dispatchable ->
-            PromptPhysicalAcceptance.cancel claim.PromptKey
+            registration.Dispose()
             AgentOwnerDispatchOutcome.Rejected error
 
     let private classifySendError
@@ -160,7 +170,7 @@ module HostForkRunLifecycle =
         (childId: SessionId)
         (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
-        (onAccepted: PhysicalUserMessageId -> unit)
+        (onAccepted: ContinuationAcceptanceObserver)
         (error: string)
         =
         let payloadDigest = HostDigest.sha256Hex prompt
@@ -198,7 +208,7 @@ module HostForkRunLifecycle =
         (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
-        (onAccepted: PhysicalUserMessageId -> unit)
+        (onAccepted: ContinuationAcceptanceObserver)
         : Task<AgentOwnerDispatchOutcome> =
         task {
             let svc = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
@@ -242,7 +252,7 @@ module HostForkRunLifecycle =
         (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
-        (onAccepted: PhysicalUserMessageId -> unit)
+        (onAccepted: ContinuationAcceptanceObserver)
         : Task<AgentOwnerDispatchOutcome> =
         match journal with
         | None ->
@@ -264,7 +274,7 @@ module HostForkRunLifecycle =
         (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
-        (onAccepted: PhysicalUserMessageId -> unit)
+        (onAccepted: ContinuationAcceptanceObserver)
         =
         sendAgentOwnerRootObserved sessions journal childId identitySeed directory prompt onAccepted
 
@@ -315,6 +325,7 @@ module HostForkRunLifecycle =
             match settled.Commitment with
             | HandoffCheckpointCommitment.Committed
             | HandoffCheckpointCommitment.NotCommitted _
+            | HandoffCheckpointCommitment.PersistenceFailed _
             | HandoffCheckpointCommitment.Unknown _ -> ()
             | HandoffCheckpointCommitment.PhaseConflict reason ->
                 let detail =

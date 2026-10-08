@@ -346,3 +346,56 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_authorization_payload_has
   }
 })
 }
+
+{
+const {default: assert} = await import('node:assert/strict')
+const {mkdtempSync, realpathSync, readFileSync, rmSync} = await import('node:fs')
+const {randomUUID} = await import('node:crypto')
+const {tmpdir} = await import('node:os')
+const {join} = await import('node:path')
+const {fileURLToPath} = await import('node:url')
+const {default: test} = await import('node:test')
+const {runVerificationToolProbe} = await import('../../../scripts/lib/verification-tool-probe.mjs')
+const child = fileURLToPath(new URL('./support/append-settlement-child.mjs', import.meta.url))
+for (const scenario of ['store', 'append', 'prepared', 'duplicate']) {
+  test(`WHAT[speculative-investigation-006] actual_${scenario}_release_failure_keeps_strength_settlement_evidence`, async t => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'strength-settlement-')))
+    const commonDir = join(root, '.git')
+    const sourceWriter = randomUUID()
+    const env = {...process.env}
+    delete env.NODE_TEST_CONTEXT
+    const probe = async (mode, writer, input) => {
+      try {
+        return JSON.parse(await runVerificationToolProbe(process.execPath,
+          [child, mode, commonDir, writer, scenario, JSON.stringify(input)], {cwd: root, env, signal: t.signal}))
+      } catch (error) {
+        if (typeof error?.stderr === 'string') error.message += '\n' + error.stderr
+        throw error
+      }
+    }
+    try {
+      const measured = await probe('measure', sourceWriter, {})
+      assert.equal(measured.removals, 1)
+      assert.equal(measured.releaseCalls, scenario === 'prepared' ? 2 : 1)
+      assert.equal(measured.appendCalls, scenario === 'duplicate' ? 0 : 1)
+      assert.deepEqual(measured.appendedTypes, scenario === 'duplicate' ? []
+        : [scenario === 'prepared' ? 'StrengthCandidatePrepared' : 'DelegationRequested'])
+      const cold = await probe('cold', randomUUID(), {sourceWriter, bytes: measured.bytes, event: measured.event})
+      assert.notEqual(cold.pid, measured.pid)
+      assert.deepEqual(cold.event, measured.event)
+      assert.deepEqual(cold.candidate, measured.candidate)
+      assert.equal(readFileSync(join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`), 'base64'), measured.bytes)
+      t.diagnostic(JSON.stringify({scenario, physicalAndCold: true, measurePid: measured.pid, coldPid: cold.pid}))
+      assert.equal(measured.threw, false, 'The consumer returns the settled outcome after the original Release failure')
+      assert.equal(measured.causeSame, true)
+      assert.equal(measured.result.eventId, measured.event.id)
+      assert.equal(measured.result.kind ?? measured.result.ok, scenario === 'prepared' ? 'SettlementFailed' : false)
+      assert.deepEqual(measured.result.settlement, {
+        code: scenario === 'duplicate' ? 'NoNewWriteReleaseFailed' : 'CommitUnknown',
+        phase: 'StoreRelease', cleanupFailures: [], requested: [measured.event],
+        prepared: scenario === 'duplicate' ? null : {durableEvents: [measured.event], cuts: []}, priorRejection: null,
+      })
+    } finally { rmSync(root, {recursive: true, force: true}) }
+  })
+}
+}

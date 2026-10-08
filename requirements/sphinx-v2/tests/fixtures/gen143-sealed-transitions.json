@@ -1,0 +1,1027 @@
+{
+  "head": "45e4137e4fd58c9788f160246401d562dc0e5d29",
+  "generation": 143,
+  "compilerInputDigest": "e054ceec94a7c657f299a21e82ed5556c56183c47ba5d80939e091a6cfce0dbf",
+  "artifactInputDigest": "845bbaca212c5fcc788ba4418658d405cee89498b947218554acfddd6f29e36c",
+  "scenarios": [
+    {
+      "inquiry": "legacy-created",
+      "event": {
+        "id": "ev99ac308cadcd4a021dc9e82f45cdb7b6a9e93db140c79d05cf8da941a6a091c5",
+        "parents": [],
+        "payload": {
+          "schemaVersion": "2",
+          "inquiry": "legacy-created",
+          "previousRevision": "0",
+          "previousHead": null,
+          "revision": "0",
+          "commandId": "legacy-create",
+          "commandFingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+          "postStateFingerprint": "bb6013cc35a7c3f1133689f55904d2affb43e080a68ad7f0e339357b2ee3edc9",
+          "events": [
+            {
+              "case": "InquiryCreated",
+              "payload": {
+                "goal": {
+                  "goalId": "goal-1",
+                  "revision": "0",
+                  "originalText": "old sealed creation",
+                  "constraints": [],
+                  "materialRefs": [
+                    "artifact-not-a-payload-hash"
+                  ],
+                  "authorizationRef": "user-authorized",
+                  "createdBy": "user",
+                  "amendments": []
+                },
+                "resourceSpecs": [
+                  {
+                    "name": "calls",
+                    "kind": {
+                      "case": "Consumed",
+                      "unitName": "call"
+                    },
+                    "authorizedLimit": 10
+                  }
+                ],
+                "profileRef": "proof-profile",
+                "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "payloadRefs": [],
+        "stream": "sphinx-v2/legacy-created",
+        "type": "sphinx/v2-transition@2"
+      },
+      "state": {
+        "id": "legacy-created",
+        "apiVersion": "2",
+        "revision": "0",
+        "eventHead": "ev99ac308cadcd4a021dc9e82f45cdb7b6a9e93db140c79d05cf8da941a6a091c5",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "old sealed creation",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [],
+        "reservations": [],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [],
+        "interpretations": [],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "legacy-create",
+            "value": {
+              "fingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+              "revision": "0",
+              "eventId": "ev99ac308cadcd4a021dc9e82f45cdb7b6a9e93db140c79d05cf8da941a6a091c5"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      }
+    },
+    {
+      "inquiry": "legacy-work",
+      "event": {
+        "id": "ev0c6a9a1fa7d976691a5aab7fdbe2a036977a2d9802b7600b5b05a7919063aa60",
+        "parents": [],
+        "payload": {
+          "schemaVersion": "2",
+          "inquiry": "legacy-work",
+          "previousRevision": "0",
+          "previousHead": null,
+          "revision": "0",
+          "commandId": "legacy-create",
+          "commandFingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+          "postStateFingerprint": "5383055ad438434e487a1546601ec1fe7184ed3f7f8d6c570b15a3c89a191f16",
+          "events": [
+            {
+              "case": "InquiryCreated",
+              "payload": {
+                "goal": {
+                  "goalId": "goal-1",
+                  "revision": "0",
+                  "originalText": "old sealed ordinary work",
+                  "constraints": [],
+                  "materialRefs": [
+                    "artifact-not-a-payload-hash"
+                  ],
+                  "authorizationRef": "user-authorized",
+                  "createdBy": "user",
+                  "amendments": []
+                },
+                "resourceSpecs": [
+                  {
+                    "name": "calls",
+                    "kind": {
+                      "case": "Consumed",
+                      "unitName": "call"
+                    },
+                    "authorizedLimit": 10
+                  }
+                ],
+                "profileRef": "proof-profile",
+                "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkPlanned",
+              "payload": {
+                "work": [
+                  {
+                    "id": "legacy-work-1",
+                    "attempt": 1,
+                    "fence": "legacy-work-1:1:logical",
+                    "roundId": "round-1",
+                    "planId": "plan-1",
+                    "producer": "proof-producer",
+                    "capability": "render",
+                    "input": {
+                      "schema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "canonicalPayload": "{}"
+                    },
+                    "outputSchema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "dependencies": [],
+                    "conflictKeys": [],
+                    "physicalRef": null,
+                    "reserved": [
+                      {
+                        "key": "calls",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkAttemptTransitioned",
+              "payload": {
+                "workId": "legacy-work-1",
+                "attempt": 1,
+                "fence": "legacy-work-1:1:logical",
+                "fromState": "Planned",
+                "nextState": {
+                  "case": "Ready"
+                },
+                "physicalRef": null
+              }
+            },
+            {
+              "case": "BudgetReserved",
+              "payload": {
+                "reservation": {
+                  "workId": "legacy-work-1",
+                  "attempt": 1,
+                  "resources": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ],
+                  "moneyMinor": null
+                },
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "payloadRefs": [],
+        "stream": "sphinx-v2/legacy-work",
+        "type": "sphinx/v2-transition@2"
+      },
+      "state": {
+        "id": "legacy-work",
+        "apiVersion": "2",
+        "revision": "0",
+        "eventHead": "ev0c6a9a1fa7d976691a5aab7fdbe2a036977a2d9802b7600b5b05a7919063aa60",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "old sealed ordinary work",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "legacy-work-1",
+            "value": {
+              "spec": {
+                "id": "legacy-work-1",
+                "attempt": 1,
+                "fence": "legacy-work-1:1:logical",
+                "roundId": "round-1",
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": null,
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Ready"
+              }
+            }
+          }
+        ],
+        "reservations": [
+          {
+            "key": "legacy-work-1|1",
+            "value": {
+              "workId": "legacy-work-1",
+              "attempt": 1,
+              "resources": [
+                {
+                  "key": "calls",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        ],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [],
+        "interpretations": [],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "legacy-create",
+            "value": {
+              "fingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+              "revision": "0",
+              "eventId": "ev0c6a9a1fa7d976691a5aab7fdbe2a036977a2d9802b7600b5b05a7919063aa60"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      }
+    },
+    {
+      "inquiry": "legacy-noop-dispatch",
+      "event": {
+        "id": "evaad5ba8a70b34d7729adc6f0fb568fd1dca88f54f40a7bc4e671ea5f27c048fb",
+        "parents": [],
+        "payload": {
+          "schemaVersion": "2",
+          "inquiry": "legacy-noop-dispatch",
+          "previousRevision": "0",
+          "previousHead": null,
+          "revision": "0",
+          "commandId": "legacy-create",
+          "commandFingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+          "postStateFingerprint": "15b97269abc192f7d201dc3b52fe5d7fae0908c73d3272be5fd5af47aec24ed6",
+          "events": [
+            {
+              "case": "InquiryCreated",
+              "payload": {
+                "goal": {
+                  "goalId": "goal-1",
+                  "revision": "0",
+                  "originalText": "old sealed dispatch no-op",
+                  "constraints": [],
+                  "materialRefs": [
+                    "artifact-not-a-payload-hash"
+                  ],
+                  "authorizationRef": "user-authorized",
+                  "createdBy": "user",
+                  "amendments": []
+                },
+                "resourceSpecs": [
+                  {
+                    "name": "calls",
+                    "kind": {
+                      "case": "Consumed",
+                      "unitName": "call"
+                    },
+                    "authorizedLimit": 10
+                  }
+                ],
+                "profileRef": "proof-profile",
+                "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkPlanned",
+              "payload": {
+                "work": [
+                  {
+                    "id": "legacy-dispatch-work",
+                    "attempt": 1,
+                    "fence": "legacy-dispatch-work:1:logical",
+                    "roundId": "round-1",
+                    "planId": "plan-1",
+                    "producer": "proof-producer",
+                    "capability": "render",
+                    "input": {
+                      "schema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "canonicalPayload": "{}"
+                    },
+                    "outputSchema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "dependencies": [],
+                    "conflictKeys": [],
+                    "physicalRef": null,
+                    "reserved": [
+                      {
+                        "key": "calls",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkAttemptTransitioned",
+              "payload": {
+                "workId": "legacy-dispatch-work",
+                "attempt": 1,
+                "fence": "legacy-dispatch-work:1:logical",
+                "fromState": "Planned",
+                "nextState": {
+                  "case": "Ready"
+                },
+                "physicalRef": null
+              }
+            },
+            {
+              "case": "BudgetReserved",
+              "payload": {
+                "reservation": {
+                  "workId": "legacy-dispatch-work",
+                  "attempt": 1,
+                  "resources": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ],
+                  "moneyMinor": null
+                },
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "case": "DispatchRequested",
+              "payload": {
+                "work": {
+                  "id": "legacy-dispatch-work",
+                  "attempt": 1,
+                  "fence": "legacy-dispatch-work:1:logical",
+                  "roundId": "round-1",
+                  "planId": "plan-1",
+                  "producer": "proof-producer",
+                  "capability": "render",
+                  "input": {
+                    "schema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "canonicalPayload": "{}"
+                  },
+                  "outputSchema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "dependencies": [],
+                  "conflictKeys": [],
+                  "physicalRef": null,
+                  "reserved": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ]
+                },
+                "dispatchIntentId": "legacy-intent",
+                "publicEnvelope": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{\"question\":\"old public\"}"
+                },
+                "privateTicket": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{\"ticket\":\"host-private\"}"
+                }
+              }
+            }
+          ]
+        },
+        "payloadRefs": [],
+        "stream": "sphinx-v2/legacy-noop-dispatch",
+        "type": "sphinx/v2-transition@2"
+      },
+      "state": {
+        "id": "legacy-noop-dispatch",
+        "apiVersion": "2",
+        "revision": "0",
+        "eventHead": "evaad5ba8a70b34d7729adc6f0fb568fd1dca88f54f40a7bc4e671ea5f27c048fb",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "old sealed dispatch no-op",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "legacy-dispatch-work",
+            "value": {
+              "spec": {
+                "id": "legacy-dispatch-work",
+                "attempt": 1,
+                "fence": "legacy-dispatch-work:1:logical",
+                "roundId": "round-1",
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": null,
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Ready"
+              }
+            }
+          }
+        ],
+        "reservations": [
+          {
+            "key": "legacy-dispatch-work|1",
+            "value": {
+              "workId": "legacy-dispatch-work",
+              "attempt": 1,
+              "resources": [
+                {
+                  "key": "calls",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        ],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [],
+        "interpretations": [],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "legacy-create",
+            "value": {
+              "fingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+              "revision": "0",
+              "eventId": "evaad5ba8a70b34d7729adc6f0fb568fd1dca88f54f40a7bc4e671ea5f27c048fb"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      }
+    },
+    {
+      "inquiry": "legacy-reservation-aggregate",
+      "event": {
+        "id": "ev02e7863305af08360060d2a0d8d4b38318cc1734baf9c3f998612c828433079e",
+        "parents": [],
+        "payload": {
+          "schemaVersion": "2",
+          "inquiry": "legacy-reservation-aggregate",
+          "previousRevision": "0",
+          "previousHead": null,
+          "revision": "0",
+          "commandId": "legacy-create",
+          "commandFingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+          "postStateFingerprint": "8692204fe281d585479ba982224cef013952e669a009bd1d120af975e8f94607",
+          "events": [
+            {
+              "case": "InquiryCreated",
+              "payload": {
+                "goal": {
+                  "goalId": "goal-1",
+                  "revision": "0",
+                  "originalText": "old sealed aggregate reservation",
+                  "constraints": [],
+                  "materialRefs": [
+                    "artifact-not-a-payload-hash"
+                  ],
+                  "authorizationRef": "user-authorized",
+                  "createdBy": "user",
+                  "amendments": []
+                },
+                "resourceSpecs": [
+                  {
+                    "name": "calls",
+                    "kind": {
+                      "case": "Consumed",
+                      "unitName": "call"
+                    },
+                    "authorizedLimit": 10
+                  }
+                ],
+                "profileRef": "proof-profile",
+                "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkPlanned",
+              "payload": {
+                "work": [
+                  {
+                    "id": "legacy-first",
+                    "attempt": 1,
+                    "fence": "legacy-first:1:logical",
+                    "roundId": "round-1",
+                    "planId": "plan-1",
+                    "producer": "proof-producer",
+                    "capability": "render",
+                    "input": {
+                      "schema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "canonicalPayload": "{}"
+                    },
+                    "outputSchema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "dependencies": [],
+                    "conflictKeys": [],
+                    "physicalRef": null,
+                    "reserved": [
+                      {
+                        "key": "calls",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkAttemptTransitioned",
+              "payload": {
+                "workId": "legacy-first",
+                "attempt": 1,
+                "fence": "legacy-first:1:logical",
+                "fromState": "Planned",
+                "nextState": {
+                  "case": "Ready"
+                },
+                "physicalRef": null
+              }
+            },
+            {
+              "case": "BudgetReserved",
+              "payload": {
+                "reservation": {
+                  "workId": "legacy-first",
+                  "attempt": 1,
+                  "resources": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ],
+                  "moneyMinor": null
+                },
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkPlanned",
+              "payload": {
+                "work": [
+                  {
+                    "id": "legacy-second",
+                    "attempt": 1,
+                    "fence": "legacy-second:1:logical",
+                    "roundId": "round-1",
+                    "planId": "plan-1",
+                    "producer": "proof-producer",
+                    "capability": "render",
+                    "input": {
+                      "schema": {
+                        "id": "response@2",
+                        "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                      },
+                      "canonicalPayload": "{}"
+                    },
+                    "outputSchema": {
+                      "id": "response@2",
+                      "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                    },
+                    "dependencies": [],
+                    "conflictKeys": [],
+                    "physicalRef": null,
+                    "reserved": [
+                      {
+                        "key": "calls",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "case": "WorkAttemptTransitioned",
+              "payload": {
+                "workId": "legacy-second",
+                "attempt": 1,
+                "fence": "legacy-second:1:logical",
+                "fromState": "Planned",
+                "nextState": {
+                  "case": "Ready"
+                },
+                "physicalRef": null
+              }
+            },
+            {
+              "case": "BudgetReserved",
+              "payload": {
+                "reservation": {
+                  "workId": "legacy-second",
+                  "attempt": 1,
+                  "resources": [
+                    {
+                      "key": "calls",
+                      "value": 1
+                    }
+                  ],
+                  "moneyMinor": null
+                },
+                "renderReserve": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "payloadRefs": [],
+        "stream": "sphinx-v2/legacy-reservation-aggregate",
+        "type": "sphinx/v2-transition@2"
+      },
+      "state": {
+        "id": "legacy-reservation-aggregate",
+        "apiVersion": "2",
+        "revision": "0",
+        "eventHead": "ev02e7863305af08360060d2a0d8d4b38318cc1734baf9c3f998612c828433079e",
+        "goal": {
+          "goalId": "goal-1",
+          "revision": "0",
+          "originalText": "old sealed aggregate reservation",
+          "constraints": [],
+          "materialRefs": [
+            "artifact-not-a-payload-hash"
+          ],
+          "authorizationRef": "user-authorized",
+          "createdBy": "user",
+          "amendments": []
+        },
+        "resourceSpecs": [
+          {
+            "name": "calls",
+            "kind": {
+              "case": "Consumed",
+              "unitName": "call"
+            },
+            "authorizedLimit": 10
+          }
+        ],
+        "renderReserve": [
+          {
+            "key": "calls",
+            "value": 1
+          }
+        ],
+        "configHash": "a9fa523dbf9c44301cdee5bd1ae4092c74f4ebcc302d75c4124d28826ea01d29",
+        "profileRef": "proof-profile",
+        "graph": [],
+        "edges": [],
+        "certificates": [],
+        "work": [
+          {
+            "key": "legacy-first",
+            "value": {
+              "spec": {
+                "id": "legacy-first",
+                "attempt": 1,
+                "fence": "legacy-first:1:logical",
+                "roundId": "round-1",
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": null,
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Ready"
+              }
+            }
+          },
+          {
+            "key": "legacy-second",
+            "value": {
+              "spec": {
+                "id": "legacy-second",
+                "attempt": 1,
+                "fence": "legacy-second:1:logical",
+                "roundId": "round-1",
+                "planId": "plan-1",
+                "producer": "proof-producer",
+                "capability": "render",
+                "input": {
+                  "schema": {
+                    "id": "response@2",
+                    "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                  },
+                  "canonicalPayload": "{}"
+                },
+                "outputSchema": {
+                  "id": "response@2",
+                  "hash": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+                },
+                "dependencies": [],
+                "conflictKeys": [],
+                "physicalRef": null,
+                "reserved": [
+                  {
+                    "key": "calls",
+                    "value": 1
+                  }
+                ]
+              },
+              "state": {
+                "case": "Ready"
+              }
+            }
+          }
+        ],
+        "reservations": [
+          {
+            "key": "legacy-first|1",
+            "value": {
+              "workId": "legacy-first",
+              "attempt": 1,
+              "resources": [
+                {
+                  "key": "calls",
+                  "value": 1
+                }
+              ]
+            }
+          },
+          {
+            "key": "legacy-second|1",
+            "value": {
+              "workId": "legacy-second",
+              "attempt": 1,
+              "resources": [
+                {
+                  "key": "calls",
+                  "value": 2
+                }
+              ]
+            }
+          }
+        ],
+        "settledUsage": [],
+        "settledMoneyMinor": "0",
+        "overruns": [],
+        "observations": [],
+        "interpretations": [],
+        "rounds": [],
+        "decisions": [],
+        "answer": null,
+        "commandReceipts": [
+          {
+            "key": "legacy-create",
+            "value": {
+              "fingerprint": "0b24e097868847e367b7e419e6f6aa9947d229400f47778f8c8458cc0a819a51",
+              "revision": "0",
+              "eventId": "ev02e7863305af08360060d2a0d8d4b38318cc1734baf9c3f998612c828433079e"
+            }
+          }
+        ],
+        "physicalBindings": [],
+        "status": {
+          "case": "Active"
+        }
+      }
+    }
+  ]
+}

@@ -19,38 +19,6 @@ type IEventStorePort =
     abstract ReadAll: inquiryId: InquiryId -> Task<Result<Envelope list, string>>
     abstract TryCurrentRevision: inquiryId: InquiryId -> Task<Revision option>
 
-type DispatchReceipt =
-    { DispatchIntentId: string
-      PhysicalRef: string
-      Receipt: string }
-
-type PhysicalStatus =
-    | Running
-    | Succeeded
-    | Failed of reason: string
-    | Cancelled
-    | Unknown
-
-type IHostPort =
-    abstract Capabilities: unit -> string list
-
-    abstract Dispatch:
-        inquiryId: InquiryId * work: WorkSpec * publicEnvelope: JsonEnvelope * privateTicket: JsonEnvelope ->
-            Task<Result<DispatchReceipt, string>>
-
-    abstract ReadStatus:
-        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<PhysicalStatus>
-
-    abstract ReadResult:
-        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string ->
-            Task<Result<string option, string>>
-
-    abstract RequestCancel:
-        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<Result<Unit, string>>
-
-    /// Re-open the question "does this dispatch exist?" after a crash window.
-    abstract Reconcile: inquiryId: InquiryId * dispatchIntentId: string -> Task<Result<string option, string>>
-
 type IProviderPort =
     abstract Complete:
         inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->

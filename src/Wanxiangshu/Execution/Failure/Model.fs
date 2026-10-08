@@ -8,6 +8,7 @@ type PersistenceCommitment =
     | NotCommitted
     | Committed
     | Unknown
+    | NoNewWrite
 
 [<RequireQualifiedAccess>]
 /// DSL-class: Evidence

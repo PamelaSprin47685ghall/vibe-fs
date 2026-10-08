@@ -24,6 +24,8 @@
 
 提交成功的判定标准仅在于该事件的 `event_id` 是否已携带完全一致的 canonical 字节存在于本地事实流中。严禁通过 Git ref、内存状态或退出码反推提交状态。物理追加真正发生后的异常标记为 `CommitUnknown`；而在进入追加门禁前因写者关闭或损坏导致的拒绝必须标记为明确的未尝试状态。
 
+本次调用在真正进入物理追加之前的异常为 `AppendNotAttempted`；进入追加之后的写入、durability barrier、Current commit 或锁释放异常为 `CommitUnknown`。重复请求或空请求没有产生新追加，其锁释放失败独立为 `NoNewWriteReleaseFailed`，不撤销已有事实，也不证明发生了新追加。错误必须保留原请求、实际 preparation（含 cut-tail）、阶段、原异常对象及有序 cleanup 异常；cleanup 不得覆盖主故障。Journal 懒写 `RuntimeStarted` 的结果属于初始化事实，初始化失败时当前业务事实仍为未尝试，后续 poison 拒绝保留首次失败的事件身份和原因。
+
 ## [007] StorageInvalid 全局 fail-closed
 
 遇到格式损坏、非规范化 JSON、标识碰撞、retained writer 集合内部缺失父事件、成环依赖、载荷缺失/哈希失配或未知的权威 `event_type` 时，必须彻底拒绝以此快照构建投影或启动运行时，直接进入 fail-closed 状态。durable-convergence-011 已整体淘汰 writer 中的 parent 属于 retention boundary，不构成缺失父事件。绝对禁止跳过 retained writer 内的损坏事件继续折叠。

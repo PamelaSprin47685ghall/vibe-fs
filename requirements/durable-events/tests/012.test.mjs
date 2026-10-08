@@ -201,3 +201,111 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
   })
 })
 }
+
+{
+  const { default: assert } = await import('node:assert/strict')
+  const { randomUUID, createHash } = await import('node:crypto')
+  const { mkdtempSync, readFileSync, realpathSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+  const { runVerificationToolProbe } = await import('../../../scripts/lib/verification-tool-probe.mjs')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const child = fileURLToPath(new URL('./support/payload-lock-acquire-child.mjs', import.meta.url))
+
+  for (const scenario of ['mkdir-eacces', 'mkdir-eio', 'busy-success', 'busy-eacces']) {
+    test(`WHAT[durable-events-012] actual Journal payload ${scenario} respects the original gate and preserves canonical history`, async t => {
+      assert.equal(typeof journal.JournalSurface_writePayload, 'function')
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'payload-lock-acquire-')))
+      const commonDir = join(root, '.git')
+      const sourceWriterId = randomUUID()
+      const measureWriter = randomUUID()
+      const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriterId}.ndjson`)
+      const request = { sourceWriterId, sessionId: 'payload-g1-existing-session',
+        oldBody: '原有非空payload\r\nNUL:\u0000；雪 😀 保留尾空格  ',
+        incomingBody: '新的非空payload\r\nNUL:\u0000；é 😀 保留尾空格  ' }
+      const oldDigest = createHash('sha256').update(request.oldBody, 'utf8').digest('hex')
+      const incomingDigest = createHash('sha256').update(request.incomingBody, 'utf8').digest('hex')
+      const env = { ...process.env }
+      delete env.NODE_TEST_CONTEXT
+      delete env.NODE_OPTIONS
+      const probe = async (mode, writer) => {
+        try {
+          return JSON.parse(await runVerificationToolProbe(process.execPath,
+            [child, mode, commonDir, writer, scenario, JSON.stringify(request)], { cwd: root, env, signal: t.signal }))
+        } catch (error) {
+          if (typeof error?.stderr === 'string' && typeof error.message === 'string') error.message += '\n' + error.stderr
+          throw error
+        }
+      }
+      let completed = false
+      try {
+        const measured = await probe('measure', measureWriter)
+        const cold = await probe('cold', randomUUID())
+        const success = scenario === 'busy-success'
+        assert.notEqual(measured.pid, process.pid)
+        assert.notEqual(cold.pid, process.pid)
+        assert.notEqual(cold.pid, measured.pid)
+        assert.equal(measured.oldDigest, oldDigest)
+        assert.equal(measured.incomingDigest, incomingDigest)
+        assert.deepEqual(measured.result, success ? { ok: true, blobRef: 'blobs/' + incomingDigest,
+          blobDigest: incomingDigest } : { ok: false,
+          error: `event-store payload write failed: Controlled one-hop payload ${scenario} mkdir failure` })
+        if (!success) assert.equal(typeof measured.result.error, 'string')
+        assert.deepEqual({ append: measured.observed.append, payloadWrite: measured.observed.payloadWrite,
+          payloadFsync: measured.observed.payloadFsync, payloadClose: measured.observed.payloadClose,
+          release: measured.observed.release, injected: measured.observed.injected },
+        { append: 0, payloadWrite: success ? 1 : 0, payloadFsync: success ? 1 : 0,
+          payloadClose: success ? 1 : 0, release: success ? 1 : 0, injected: success ? 0 : 1 })
+        assert.equal(measured.observed.legalAfterFailure, 0)
+        assert.equal(measured.payloadBeforeRelease, false)
+        assert.equal(measured.before.incomingBytes, null)
+        assert.equal(measured.before.writerCreated, false)
+        assert.deepEqual(measured.before.payloadFiles, [oldDigest])
+        assert.deepEqual(measured.before.eventFiles, [`${sourceWriterId}.ndjson`])
+        assert.equal(measured.before.oldBytes, Buffer.from(request.oldBody, 'utf8').toString('base64'))
+        assert.ok(measured.beforeCurrent.sessions.includes(request.sessionId))
+        assert.deepEqual(measured.beforeCurrent.sessionProjections[request.sessionId].xTrace,
+          { openingPresent: false, partCount: 0, latestTerminalPresent: true })
+        assert.deepEqual(measured.beforeViews, measured.facts.map(fact => ({
+          event: fact, head: fact.id, heads: [fact.id],
+        })))
+        assert.equal(measured.facts.length, 2)
+        assert.deepEqual(measured.facts.at(-1).payloadRefs, [oldDigest])
+        assert.deepEqual(measured.views, measured.beforeViews)
+        assert.deepEqual(measured.afterCurrent, measured.beforeCurrent)
+        assert.deepEqual(measured.physical, { ...measured.before,
+          incomingBytes: success ? Buffer.from(request.incomingBody, 'utf8').toString('base64') : null,
+          payloadFiles: success ? [oldDigest, incomingDigest].sort() : [oldDigest] })
+        assert.deepEqual(measured.oldRead, { ok: true, content: request.oldBody })
+        assert.deepEqual(measured.incomingRead, success ? { ok: true, content: request.incomingBody }
+          : { ok: false, error: 'event-store payload missing: ' + incomingDigest })
+        if (scenario.startsWith('busy-')) {
+          assert.ok(measured.observed.busy > 0)
+          assert.deepEqual(measured.busyBeforeRelease, { settled: false, append: 0, payloadWrite: 0,
+            payloadFsync: 0, lockExists: true, physical: { ...measured.before, lockReleased: false } })
+        } else {
+          assert.equal(measured.observed.busy, 0)
+          assert.equal(measured.observed.mkdirAttempts, 1)
+          assert.equal(measured.busyBeforeRelease, null)
+        }
+        assert.deepEqual(cold.current, measured.beforeCurrent)
+        assert.deepEqual(cold.facts, measured.facts)
+        assert.deepEqual(cold.views, measured.beforeViews)
+        assert.deepEqual(cold.oldRead, measured.oldRead)
+        assert.deepEqual(cold.incomingRead, measured.incomingRead)
+        assert.deepEqual(cold.physical, measured.physical)
+        assert.equal(readFileSync(sourceFile, 'base64'), measured.before.sourceBytes)
+        assert.deepEqual(readFileSync(join(commonDir, 'wanxiang', 'payloads', oldDigest)), Buffer.from(request.oldBody, 'utf8'))
+        if (success) assert.deepEqual(readFileSync(join(commonDir, 'wanxiang', 'payloads', incomingDigest)),
+          Buffer.from(request.incomingBody, 'utf8'))
+        t.diagnostic(JSON.stringify({ scenario, measurePid: measured.pid, coldPid: cold.pid,
+          actualPayloadAndCold: true, ...measured.observed }))
+        completed = true
+      } finally {
+        if (completed) rmSync(root, { recursive: true, force: true })
+        else t.diagnostic('PAYLOAD_LOCK_ACQUIRE_FAILURE_EVIDENCE: retained ' + root)
+      }
+    })
+  }
+}

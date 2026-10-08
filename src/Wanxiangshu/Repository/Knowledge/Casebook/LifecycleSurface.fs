@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
@@ -8,6 +9,25 @@ open Wanxiangshu.Persistence.Journal
 /// Draft storage, collector state, and Bookkeeper/Journal capabilities remain
 /// private to the lifecycle owner.
 module CasebookLifecycleSurface =
+
+    let private settlementToJs (settled: CaseFinalizeSettlement) : obj =
+        match settled.Commitment with
+        | CaseFinalizeCommitment.Finalized
+        | CaseFinalizeCommitment.NothingToFinalize ->
+            box
+                {| ok = true
+                   releasesIdentity = CaseFinalizeSettlement.releasesIdentity settled |}
+        | CaseFinalizeCommitment.NotCommitted reason
+        | CaseFinalizeCommitment.Unknown reason
+        | CaseFinalizeCommitment.PhaseConflict reason ->
+            box
+                {| ok = false
+                   error = reason
+                   releasesIdentity = false |}
+        | CaseFinalizeCommitment.PersistenceFailed failure ->
+            let result = CasebookAppendSurface.finalizeFailureToJs failure
+            result?releasesIdentity <- CaseFinalizeSettlement.releasesIdentity settled
+            result
 
     let enable (workspaceRoot: string) : unit =
         CasebookLifecycle.setEnabled (Some workspaceRoot)
@@ -40,14 +60,35 @@ module CasebookLifecycleSurface =
         task {
             let! settled = CasebookLifecycle.tryFinalizeDraft workspaceRoot store sessionId
 
-            return
-                match settled.Commitment with
-                | CaseFinalizeCommitment.Finalized
-                | CaseFinalizeCommitment.NothingToFinalize -> box {| ok = true |}
-                | CaseFinalizeCommitment.NotCommitted reason
-                | CaseFinalizeCommitment.Unknown reason
-                | CaseFinalizeCommitment.PhaseConflict reason -> box {| ok = false; error = reason |}
+            return settlementToJs settled
         }
 
-    let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =
-        CasebookLifecycle.touchAccess workspaceRoot (acquireStore workspaceRoot) sessionId
+    let finalizeEngineerCase
+        (store: obj)
+        (identity: string)
+        (trace: string)
+        (question: string)
+        (answer: string)
+        (relatedPaths: string array)
+        (baseline: string)
+        : Task<obj> =
+        task {
+            let! settled =
+                CasebookLifecycle.finalizeEngineerCase
+                    (unbox<EventStoreHandle> store).Store
+                    identity
+                    trace
+                    question
+                    answer
+                    (Array.toList relatedPaths)
+                    baseline
+
+            return settlementToJs settled
+        }
+
+    let touchAccess (workspaceRoot: string) (sessionId: string) : Task<obj> =
+        task {
+            match! CasebookLifecycle.touchAccess workspaceRoot (acquireStore workspaceRoot) sessionId with
+            | Ok() -> return box {| ok = true |}
+            | Error error -> return CasebookAppendSurface.mutationErrorToJs error
+        }

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Repository.Knowledge.Casebook
 
 /// CASE-009: assembles the conditional Casebook tool specs. This module is
 /// the only place that names the EventStore for tool registration, keeping
@@ -8,4 +9,4 @@ open Wanxiangshu.OpenCode
 /// token pair (AgentJournal + IEventStore in one file is forbidden).
 module CasebookTools =
 
-    val buildSpecs: factory: HostToolFactory -> workspaceRoot: string -> ToolSpec list
+    val buildSpecs: factory: HostToolFactory -> workspaceRoot: string -> owner: CasebookSettlementOwner -> ToolSpec list

@@ -31,4 +31,5 @@ module CasebookLifecycle =
         completionStateRef: string ->
             Task<CaseFinalizeSettlement>
 
-    val touchAccess: workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<unit>
+    val touchAccess:
+        workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<Result<unit, CasebookMutationError>>

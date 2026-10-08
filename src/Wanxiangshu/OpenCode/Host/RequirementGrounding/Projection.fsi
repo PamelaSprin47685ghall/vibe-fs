@@ -7,6 +7,7 @@ type RequirementGroundingProjectionState =
     { Pending: Map<string, GroundingSnapshot>
       OccurrencesRev: RequirementGroundingOccurrence list
       VisibleMaterials: Set<string>
+      ObservedReads: Set<RequirementGroundingReadObserved>
       VisibleFromOrdinal: int64 }
 
 [<RequireQualifiedAccess>]
@@ -31,6 +32,9 @@ module RequirementGroundingProjection =
         RequirementGroundingMaterialObserved ->
         RequirementGroundingProjectionState ->
             RequirementGroundingProjectionState
+
+    val applyReadObserved:
+        RequirementGroundingReadObserved -> RequirementGroundingProjectionState -> RequirementGroundingProjectionState
 
     val applyAnchored:
         RequirementGroundingOccurrence ->

@@ -7,7 +7,29 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module EventStore =
 
-    let private asAppendStorage (error: StorageInvalid) = AppendError.StorageInvalid error
+    [<RequireQualifiedAccess>]
+    type private AppendWork =
+        | Rejected of AppendPreWriteRejection
+        | NotAttempted of AppendNotAttemptedEvidence
+        | Unknown of AppendCommitUnknownEvidence
+        | NoNewWrite of AppendReceipt * PreparedAppend option
+        | NewWrite of AppendReceipt * PreparedAppend
+
+    let private tryPreparation action =
+        try
+            Ok(action ())
+        with cause ->
+            Error
+                { Phase = AppendPhase.Preparation
+                  Cause = cause }
+
+    let private notAttempted requested prepared primary =
+        AppendWork.NotAttempted
+            { Requested = requested
+              Prepared = prepared
+              Primary = primary
+              CleanupFailures = []
+              PriorRejection = None }
 
     let private validateVocabulary
         (integrator: ICanonicalIntegrator)
@@ -186,37 +208,165 @@ module EventStore =
                 return! validateFreshBatch commonDir integrator fresh
         }
 
-    let private commitPrepared (log: ProcessEventLog) (prepared: PreparedIntegration) : AppendReceipt =
-        ProcessEventLog.append log prepared.DurableEvents
-        prepared.Commit()
-        { Cuts = prepared.Cuts }
+    let private completedAppend receipt prepared completion =
+        match completion with
+        | ProcessEventLog.PhysicalAppendCompletion.NoAppend -> AppendWork.NoNewWrite(receipt, Some prepared)
+        | ProcessEventLog.PhysicalAppendCompletion.AppendDurable -> AppendWork.NewWrite(receipt, prepared)
+
+    let private currentCommitFailure requested prepared completion cause =
+        let primary =
+            { Phase = AppendPhase.CurrentCommit
+              Cause = cause }
+
+        match completion with
+        | ProcessEventLog.PhysicalAppendCompletion.NoAppend -> notAttempted requested (Some prepared) primary
+        | ProcessEventLog.PhysicalAppendCompletion.AppendDurable ->
+            AppendWork.Unknown
+                { Requested = requested
+                  Prepared = prepared
+                  Primary = primary
+                  CleanupFailures = [] }
+
+    let private commitCurrent requested (integration: PreparedIntegration) prepared completion =
+        try
+            integration.Commit()
+            completedAppend { Cuts = integration.Cuts } prepared completion
+        with cause ->
+            currentCommitFailure requested prepared completion cause
+
+    let private commitPrepared requested (log: ProcessEventLog) (integration: PreparedIntegration) =
+        let prepared: PreparedAppend =
+            { DurableEvents = integration.DurableEvents
+              Cuts = integration.Cuts }
+
+        match ProcessEventLog.append log prepared.DurableEvents with
+        | Ok completion -> commitCurrent requested integration prepared completion
+        | Error(ProcessEventLog.PhysicalAppendFailure.BeforeAppend primary) ->
+            notAttempted requested (Some prepared) primary
+        | Error(ProcessEventLog.PhysicalAppendFailure.AfterAppend(primary, cleanup)) ->
+            AppendWork.Unknown
+                { Requested = requested
+                  Prepared = prepared
+                  Primary = primary
+                  CleanupFailures = cleanup }
 
     let private appendFresh
         (integrator: ICanonicalIntegrator)
         (log: ProcessEventLog)
+        (requested: EventEnvelope list)
         (fresh: EventEnvelope list)
-        : Result<AppendReceipt, AppendError> =
-        result {
-            let! prepared =
-                integrator.PrepareLive fresh
-                |> Result.mapError (fun reason -> AppendError.AppendFailed("integration preparation failed: " + reason))
-
-            return commitPrepared log prepared
-        }
+        : AppendWork =
+        match tryPreparation (fun () -> integrator.PrepareLive fresh) with
+        | Error primary -> notAttempted requested None primary
+        | Ok(Error reason) ->
+            AppendWork.Rejected(
+                AppendPreWriteRejection.PreparationRejected("integration preparation failed: " + reason)
+            )
+        | Ok(Ok prepared) -> commitPrepared requested log prepared
 
     let private appendValidated
         (commonDir: string)
         (integrator: ICanonicalIntegrator)
         (log: ProcessEventLog)
         (events: EventEnvelope list)
-        : Result<AppendReceipt, AppendError> =
-        result {
-            let! fresh = validateForAppend commonDir integrator events |> Result.mapError asAppendStorage
+        : AppendWork =
+        match tryPreparation (fun () -> validateForAppend commonDir integrator events) with
+        | Error primary -> notAttempted events None primary
+        | Ok(Error invalid) -> AppendWork.Rejected(AppendPreWriteRejection.StorageInvalid invalid)
+        | Ok(Ok []) -> AppendWork.NoNewWrite(AppendReceipt.empty, None)
+        | Ok(Ok fresh) -> appendFresh integrator log events fresh
 
-            if List.isEmpty fresh then
-                return AppendReceipt.empty
-            else
-                return! appendFresh integrator log fresh
+    let private rejectionError rejection =
+        match rejection with
+        | AppendPreWriteRejection.StorageInvalid invalid -> AppendError.StorageInvalid invalid
+        | AppendPreWriteRejection.PreparationRejected reason -> AppendError.AppendFailed reason
+
+    let private settleWork work =
+        match work with
+        | AppendWork.Rejected rejection -> Error(rejectionError rejection)
+        | AppendWork.NotAttempted evidence -> Error(AppendError.AppendNotAttempted evidence)
+        | AppendWork.Unknown evidence -> Error(AppendError.CommitUnknown evidence)
+        | AppendWork.NoNewWrite(receipt, _)
+        | AppendWork.NewWrite(receipt, _) -> Ok receipt
+
+    let private settleReleaseFailure requested work cause =
+        let release =
+            { Phase = AppendPhase.StoreRelease
+              Cause = cause }
+
+        match work with
+        | AppendWork.Rejected rejection ->
+            Error(
+                AppendError.AppendNotAttempted
+                    { Requested = requested
+                      Prepared = None
+                      Primary = release
+                      CleanupFailures = []
+                      PriorRejection = Some rejection }
+            )
+        | AppendWork.NotAttempted evidence ->
+            Error(
+                AppendError.AppendNotAttempted
+                    { evidence with
+                        CleanupFailures = evidence.CleanupFailures @ [ release ] }
+            )
+        | AppendWork.Unknown evidence ->
+            Error(
+                AppendError.CommitUnknown
+                    { evidence with
+                        CleanupFailures = evidence.CleanupFailures @ [ release ] }
+            )
+        | AppendWork.NoNewWrite(_, prepared) ->
+            Error(
+                AppendError.NoNewWriteReleaseFailed
+                    { Requested = requested
+                      Prepared = prepared
+                      Cause = cause }
+            )
+        | AppendWork.NewWrite(_, prepared) ->
+            Error(
+                AppendError.CommitUnknown
+                    { Requested = requested
+                      Prepared = prepared
+                      Primary = release
+                      CleanupFailures = [] }
+            )
+
+    let private acquireAppendGate commonDir =
+        task {
+            try
+                let! acquired = ProcessEventLog.acquireStoreLock commonDir
+                return Ok acquired
+            with cause ->
+                return
+                    Error
+                        { Phase = AppendPhase.GateAcquire
+                          Cause = cause }
+        }
+
+    let private releaseAppendGate (acquired: StoreFileGate) =
+        task {
+            try
+                do! acquired.Release()
+                return Ok()
+            with cause ->
+                return Error cause
+        }
+
+    let private settleReleased requested work released =
+        match released with
+        | Ok() -> settleWork work
+        | Error cause -> settleReleaseFailure requested work cause
+
+    let private appendOwned commonDir integrator log gate requested =
+        task {
+            match! acquireAppendGate commonDir with
+            | Error primary -> return notAttempted requested None primary |> settleWork
+            | Ok acquired ->
+                let work = lock gate (fun () -> appendValidated commonDir integrator log requested)
+                let! released = releaseAppendGate acquired
+
+                return settleReleased requested work released
         }
 
     let createLocal (commonDir: string) (writerId: string) (integrator: ICanonicalIntegrator) : IEventStore =
@@ -231,15 +381,7 @@ module EventStore =
 
         { new IEventStore with
             member _.Append(events) =
-                ProcessEventLog.withStoreLock commonDir (fun () ->
-                    task {
-                        return
-                            lock gate (fun () ->
-                                try
-                                    appendValidated commonDir integrator log events
-                                with ex ->
-                                    Error(AppendError.AppendFailed ex.Message))
-                    })
+                appendOwned commonDir integrator log gate events
 
             member _.WritePayload(content) =
                 ProcessEventLog.withStoreLock commonDir (fun () ->

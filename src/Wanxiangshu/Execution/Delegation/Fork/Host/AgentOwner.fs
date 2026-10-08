@@ -44,23 +44,13 @@ module HostForkAgentOwner =
         (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
         (onDetachedFailure: (string -> Task) option)
         : Task<Result<PromptKey, string>> =
         let sendClaimed (durable: AgentJournal) =
             let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
-            match onAccepted, onDetachedFailure with
-            | Some accepted, _ ->
-                dispatcher.SendAgentOwnerRoot
-                    (DispatchSessionPort.ofSessionPort sessions)
-                    childId
-                    prompt
-                    identitySeed
-                    directory
-                    PromptDispatcher.AwaitMode.Await
-                    (Some accepted)
-            | None, Some callback ->
+            match onDetachedFailure with
+            | Some callback ->
                 dispatcher.SendAgentOwnerRootDetachedObserved
                     (DispatchSessionPort.ofSessionPort sessions)
                     childId
@@ -68,7 +58,7 @@ module HostForkAgentOwner =
                     identitySeed
                     directory
                     callback
-            | None, None ->
+            | None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot
                     (DispatchSessionPort.ofSessionPort sessions)
@@ -84,7 +74,7 @@ module HostForkAgentOwner =
         | Some durable -> sendClaimed durable
 
     let sendFirstPrompt sessions journal childId identitySeed directory prompt =
-        sendFirstPromptCore sessions journal childId identitySeed directory prompt None None
+        sendFirstPromptCore sessions journal childId identitySeed directory prompt None
 
     let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted =
         HostForkRunLifecycle.sendAgentOwnerRootObserved

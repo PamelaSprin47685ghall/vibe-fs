@@ -59,9 +59,8 @@ module RequirementGroundingTransform =
         "requirement-grounding-read-" + (HostDigest.sha256Hex input).Substring(0, 24)
 
     let cursorResult (path: string) (resultBytes: string) : string =
-        LlmFacing.instructions [ resultBytes ]
-        |> LlmFacing.withData [ LlmFacing.Data.stringField "requirement_source_path" path ]
-        |> LlmFacing.render
+        LlmFacing.originalMaterial resultBytes (LlmFacing.Data.stringField "requirement_source_path" path)
+        |> LlmFacing.renderOriginalMaterial
 
     let private buildReadMessage (read: RequirementGroundingAnchoredRead) : obj =
         let input = createObj [ "filePath", box read.Path ]
@@ -242,16 +241,20 @@ module RequirementGroundingTransform =
                 + String.Join(", ", orphaned)
             )
 
-    let private stripCursorHistory history rawMessages =
+    let private stripCursorHistory journal session history rawMessages =
         let providerId = PairProgrammingThoughtTransform.providerIdFromMessages rawMessages
 
         if PairProgrammingThoughtTransform.isCursorProvider providerId then
             let suffixes = history |> List.collect _.Reads |> List.map _.CursorResultBytes
 
-            rawMessages
-            |> List.map (PairProgrammingThoughtTransform.stripCursorSuffixes suffixes)
+            PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
+                journal
+                session
+                PairProgrammingThoughtTransform.CursorPresentationOwner.RequirementGrounding
+                suffixes
+                rawMessages
         else
-            rawMessages
+            Task.FromResult(Ok rawMessages)
 
     let private appendRequestedAtCurrentPlacement journal sessionId realMessages providerId history pending =
         taskResult {
@@ -285,7 +288,8 @@ module RequirementGroundingTransform =
             let port = AgentJournalPortAdapter.forRequirementGrounding journal
             let history = RequirementGroundingRuntime.historyOccurrences port session
             let visibleHistory = RequirementGroundingRuntime.occurrences port session
-            let! realMessages = validateSyntheticHistory history (stripCursorHistory history rawMessages)
+            let! stripped = stripCursorHistory journal session history rawMessages
+            let! realMessages = validateSyntheticHistory history stripped
             let providerId = PairProgrammingThoughtTransform.providerIdFromMessages realMessages
             let pending = RequirementGroundingRuntime.pending port session
             return! anchorRequested journal sessionId realMessages providerId visibleHistory pending

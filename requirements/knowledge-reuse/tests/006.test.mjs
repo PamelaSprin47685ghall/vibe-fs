@@ -94,6 +94,41 @@ test('WHAT[knowledge-reuse-006] CASE006_mechanical_refresh_missing_file_still_pu
     cleanup()
   }
 })
+
+for (const fate of [
+  { code: 'AppendNotAttempted', suffix: 'NOT_ATTEMPTED', phase: 'BeforePhysicalAppend' },
+  { code: 'CommitUnknown', suffix: 'COMMIT_UNKNOWN', phase: 'DurabilityBarrier' },
+  { code: 'NoNewWriteReleaseFailed', suffix: 'NO_NEW_WRITE_RELEASE_FAILED', phase: 'StoreRelease' },
+]) {
+  test(`WHAT[knowledge-reuse-006] Bookkeeper typed mapping ${fate.code} does not report a successful refresh or retry`, async () => {
+    const { dir, handle, cleanup } = sandbox()
+    const { port, createCalls } = scriptedBookkeeperPort()
+    try {
+      writeFileSync(join(dir, 'a.txt'), 'old bytes', 'utf8')
+      assert.equal((await archiveWithBaseline(handle, dir,
+        record('typed-refresh', 'old Q', 'old A', [fileRead('a.txt', casebook.contentHash('old bytes'))]))).ok, true)
+      const before = (await casebook.fetchCase(handle, 10, 'typed-refresh')).value
+      writeFileSync(join(dir, 'a.txt'), 'changed bytes', 'utf8')
+      await installBookkeeperRuntime(port, ['typed-refresh'])
+      const cause = new Error('Bookkeeper append failure')
+      const observed = []
+      const failing = eventStore.createAppendFailureStore(handle, { code: fate.code, phase: fate.phase, cause },
+        (append) => observed.push(append))
+      const result = await bookkeeperRefresh.refreshStale(failing, dir, 'typed-refresh')
+      assert.equal(result.ok, false)
+      assert.equal(result.value, undefined)
+      assert.equal(result.code, `CASEBOOK_APPEND_${fate.suffix}`)
+      assert.equal(createCalls.length, 1)
+      assert.equal(observed.length, 1)
+      assert.equal(result.persistenceFailure.operation, 'Refresh')
+      assert.equal(result.persistenceFailure.eventId, observed[0].requested[0].id)
+      assert.equal(result.persistenceFailure.isOriginalError(observed[0].originalError), true)
+      assert.strictEqual(result.persistenceFailure.primary.cause, cause)
+      assert.deepEqual((await casebook.fetchCase(handle, 10, 'typed-refresh')).value, before,
+        'controlled mapping fixture refused the append; native physical ambiguity has a separate oracle')
+    } finally { bookkeeper.resetRuntime(); cleanup() }
+  })
+}
 }
 
 {
@@ -496,6 +531,8 @@ test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the 
   const { createCase, casebook, eventStore, parse } = await import('./support/casebook.mjs')
   const { installBookkeeperRuntime } = await import('./support/bookkeeper-session-support.mjs')
   const fetchSurface = await import('../../../dist/Repository/Knowledge/Casebook/FetchSurface.js')
+  const settlements = await import('../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js')
+  const owner = settlements.createOwner(() => assert.fail('zero-setter maintenance must not produce a semantic cut'))
   const bookkeeper = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
   const directory = mkdtempSync(join(tmpdir(), 'wxs-bookkeeper-zero-setter-'))
   const prompts = []
@@ -531,7 +568,7 @@ test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the 
     },
   }
   const fetch = (shelfmark) => fetchSurface.contract(
-    { tool: { schema: { string: () => ({}) } } }, directory, store,
+    { tool: { schema: { string: () => ({}) } } }, directory, store, owner,
   ).execute({ shelfmark }, { sessionID: 'zero-setter-reader', agent: 'engineer' })
   const expectedDiff = (before, after) => [
     'diff --git a/subject.txt b/subject.txt',

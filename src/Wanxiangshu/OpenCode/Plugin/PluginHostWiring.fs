@@ -22,7 +22,7 @@ module PluginHostWiring =
     /// workspace store once. Acquiring the store is pre-validated by the
     /// outer `try`; once held, lifecycle failures report via the task's
     /// settled signature instead of retrying the pyramid.
-    let private tryFinalizeWithin workspaceRoot store delegateSessionId =
+    let private settleFinalization workspaceRoot store delegateSessionId =
         task {
             try
                 return! CasebookLifecycle.tryFinalizeDraft workspaceRoot store delegateSessionId
@@ -34,18 +34,28 @@ module PluginHostWiring =
                 return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
         }
 
-    /// Workspace root–DelegateSessionId → settlement. The two layers of
-    /// indeterminate-durability failure compose at the module boundary: store
-    /// acquisition collapses to Unknown, lifecycle failure does too, and the
-    /// detached Task is handed to the caller unchanged.
-    let private tryFinalize workspaceRoot delegateSessionId =
+    let internal tryFinalizeWithin (settlements: CasebookSettlementOwner) workspaceRoot store delegateSessionId =
+        task {
+            let! settled = settleFinalization workspaceRoot store delegateSessionId
+
+            match settled.Commitment with
+            | CaseFinalizeCommitment.PersistenceFailed failure -> settlements.Observe failure
+            | _ -> ()
+
+            return settled
+        }
+
+    let private acquireFinalizationStore workspaceRoot =
         try
             let commonDir = RuntimePath.gitCommonDir workspaceRoot
-            let store = WorkspaceEventStore.acquire commonDir
-            tryFinalizeWithin workspaceRoot store delegateSessionId
-
+            Ok(WorkspaceEventStore.acquire commonDir)
         with ex ->
-            Task.FromResult(CaseFinalizeSettlement.unknown delegateSessionId ex.Message)
+            Error ex
+
+    let private tryFinalize settlements workspaceRoot delegateSessionId =
+        match acquireFinalizationStore workspaceRoot with
+        | Ok store -> tryFinalizeWithin settlements workspaceRoot store delegateSessionId
+        | Error cause -> Task.FromResult(CaseFinalizeSettlement.unknown delegateSessionId cause.Message)
 
     /// Composition-root handle for everything the Host needs after boot:
     /// the ports `HostSignalBootstrap.wire` produced plus the durability
@@ -200,7 +210,7 @@ module PluginHostWiring =
 
                                 BookkeeperRuntime.completePhysical terminal.SessionId outcome)
                             workspaceDirectory
-                            (Some tryFinalize)
+                            (Some(tryFinalize boot.CasebookSettlements))
                             (Some CasebookLifecycle.cleanupDraft)
 
                     return

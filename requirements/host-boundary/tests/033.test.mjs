@@ -218,6 +218,6 @@ test('WHAT[host-boundary-033] a later human input replaces queued demand with no
       assert.equal(execution.oldFinish, execution.phase === 'STREAMING' ? 'stop' : 'tool-calls')
     }
   }
-  integrationTest('WHAT[host-boundary-033] WHAT[managed-session-lifecycle-016] installed Host preserves streaming and non-join tools until the next human request', () => runInstalledCanary(false))
-  integrationTest('WHAT[host-boundary-033] WHAT[managed-session-lifecycle-016] one-slot Host preserves streaming and non-join tools until the next human request', () => runInstalledCanary(true))
+  integrationTest('WHAT[host-boundary-033] installed Host preserves streaming and non-join tools until the next human request', () => runInstalledCanary(false))
+  integrationTest('WHAT[host-boundary-033] one-slot Host preserves streaming and non-join tools until the next human request', () => runInstalledCanary(true))
 }

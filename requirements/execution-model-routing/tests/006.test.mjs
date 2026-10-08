@@ -79,7 +79,7 @@ test('WHAT[execution-model-routing-006] EMR_006_same_physical_message_retry_reus
 
 for (const borrowed of [false, true]) {
 for (const completed of [false, true]) {
-test(`WHAT[execution-model-routing-006] WHAT[execution-model-routing-010] guidance transfers the ${borrowed ? 'borrowed' : 'owned'} credit ${completed ? 'after terminal output' : 'after a tool step'} and stale callbacks cannot release its next step`, async () => {
+test(`WHAT[execution-model-routing-006] guidance transfers the ${borrowed ? 'borrowed' : 'owned'} credit ${completed ? 'after terminal output' : 'after a tool step'} and stale callbacks cannot release its next step`, async () => {
   let changedPolicy = false
   const runtime = createRuntime(() => target(changedPolicy ? 'other/new-policy' : 'provider/shared'))
   if (borrowed) await acquireTarget(runtime, 'lender', 'lender-root', 'manager', 'commissioner')

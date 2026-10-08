@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Manager
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact

@@ -21,6 +21,7 @@ type DecisionModelError = { Code: string; Message: string }
 module DecisionModel =
     /// Ranks estimates within one scope. Unestimated plans are never placed.
     val rankInScope: string -> ContributionEstimate list -> ContributionEstimate list
+    /// Unestimated is never usable, even if a rank is supplied.
     val usable: ContributionEstimate -> bool
     val supportsNumericComparison: ContributionEstimate list -> bool
     val isProvisionalOnly: ContributionEstimate list -> bool

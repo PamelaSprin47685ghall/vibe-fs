@@ -9,6 +9,10 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module EventKWayMerge =
 
+    type MergeObservation =
+        { Result: Result<EventEnvelope list, StorageInvalid>
+          ReadyComparisons: int64 }
+
     let private eventKey (eventId: EventId) = EventId.value eventId
 
     type private WriterStream =
@@ -31,6 +35,11 @@ module EventKWayMerge =
         { CursorIndex: int
           EventKey: string
           WriterId: string }
+
+    type private ReadyHeap =
+        { Entries: ResizeArray<ReadyCursor>
+          // DSL-MUTABLE: algorithm-scratch — pair comparisons during this merge only.
+          mutable Comparisons: int64 }
 
     type private HeadDisposition =
         | AlreadySeen
@@ -115,7 +124,8 @@ module EventKWayMerge =
         else
             strictFrontierError seen writers cursors
 
-    let private compareReadyCursor left right =
+    let private compareReadyCursor (heap: ReadyHeap) left right =
+        heap.Comparisons <- heap.Comparisons + 1L
         let byEvent = compare left.EventKey right.EventKey
 
         if byEvent <> 0 then
@@ -123,14 +133,17 @@ module EventKWayMerge =
         else
             compare left.WriterId right.WriterId
 
-    let private swapHeap (heap: ResizeArray<ReadyCursor>) left right =
-        let value = heap.[left]
-        heap.[left] <- heap.[right]
-        heap.[right] <- value
+    let private swapHeap (heap: ReadyHeap) left right =
+        let value = heap.Entries.[left]
+        heap.Entries.[left] <- heap.Entries.[right]
+        heap.Entries.[right] <- value
 
-    let private bubbleParent (heap: ResizeArray<ReadyCursor>) child =
+    let private bubbleParent (heap: ReadyHeap) child =
         let parent = (child - 1) / 2
-        let shouldSwap = child > 0 && compareReadyCursor heap.[child] heap.[parent] < 0
+
+        let shouldSwap =
+            child > 0
+            && compareReadyCursor heap heap.Entries.[child] heap.Entries.[parent] < 0
 
         if shouldSwap then
             swapHeap heap child parent
@@ -138,47 +151,47 @@ module EventKWayMerge =
         else
             None
 
-    let private heapPush (heap: ResizeArray<ReadyCursor>) readyCursor =
-        heap.Add readyCursor
+    let private heapPush (heap: ReadyHeap) readyCursor =
+        heap.Entries.Add readyCursor
 
         let rec bubble child =
             match bubbleParent heap child with
             | Some nextChild -> bubble nextChild
             | None -> ()
 
-        bubble (heap.Count - 1)
+        bubble (heap.Entries.Count - 1)
 
-    let private smallerChild (heap: ResizeArray<ReadyCursor>) parent =
+    let private smallerChild (heap: ReadyHeap) parent =
         let left = parent * 2 + 1
         let right = left + 1
 
-        match left < heap.Count, right < heap.Count with
+        match left < heap.Entries.Count, right < heap.Entries.Count with
         | false, _ -> None
-        | true, true when compareReadyCursor heap.[right] heap.[left] < 0 -> Some right
+        | true, true when compareReadyCursor heap heap.Entries.[right] heap.Entries.[left] < 0 -> Some right
         | true, _ -> Some left
 
-    let private nextSinkAction (heap: ResizeArray<ReadyCursor>) parent =
+    let private nextSinkAction (heap: ReadyHeap) parent =
         match smallerChild heap parent with
-        | Some child when compareReadyCursor heap.[child] heap.[parent] < 0 ->
+        | Some child when compareReadyCursor heap heap.Entries.[child] heap.Entries.[parent] < 0 ->
             swapHeap heap child parent
             Sunk child
         | _ -> Settled
 
-    let rec private sinkHeapRoot (heap: ResizeArray<ReadyCursor>) (parent: int) =
+    let rec private sinkHeapRoot (heap: ReadyHeap) (parent: int) =
         match nextSinkAction heap parent with
         | Sunk nextParent -> sinkHeapRoot heap nextParent
         | Settled -> ()
 
-    let private restoreHeapRoot (heap: ResizeArray<ReadyCursor>) last =
-        if heap.Count > 0 then
-            heap.[0] <- last
+    let private restoreHeapRoot (heap: ReadyHeap) last =
+        if heap.Entries.Count > 0 then
+            heap.Entries.[0] <- last
             sinkHeapRoot heap 0
 
-    let private heapPop (heap: ResizeArray<ReadyCursor>) =
-        let first = heap.[0]
-        let lastIndex = heap.Count - 1
-        let last = heap.[lastIndex]
-        heap.RemoveAt lastIndex
+    let private heapPop (heap: ReadyHeap) =
+        let first = heap.Entries.[0]
+        let lastIndex = heap.Entries.Count - 1
+        let last = heap.Entries.[lastIndex]
+        heap.Entries.RemoveAt lastIndex
         restoreHeapRoot heap last
         first
 
@@ -190,12 +203,7 @@ module EventKWayMerge =
             entries.Add token
             waiters.Add(key, entries)
 
-    let private queueCursor
-        (writers: WriterStream array)
-        (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
-        index
-        =
+    let private queueCursor (writers: WriterStream array) (cursors: Cursor array) (heap: ReadyHeap) index =
         let cursor = cursors.[index]
 
         match cursor.Readiness, currentHead writers cursors index with
@@ -298,7 +306,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         index
         (head: EventEnvelope)
         =
@@ -316,7 +324,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         index
         =
         let cursor = cursors.[index]
@@ -342,7 +350,7 @@ module EventKWayMerge =
     let private wakeParentToken
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         (token: WaiterToken)
         =
         let cursor = cursors.[token.CursorIndex]
@@ -359,7 +367,7 @@ module EventKWayMerge =
         (parentWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         key
         =
         match parentWaiters.TryGetValue key with
@@ -371,7 +379,7 @@ module EventKWayMerge =
     let private wakeDuplicateToken
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         (token: WaiterToken)
         =
         let cursor = cursors.[token.CursorIndex]
@@ -384,7 +392,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         key
         =
         match duplicateWaiters.TryGetValue key with
@@ -408,7 +416,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         (ordered: ResizeArray<EventEnvelope>)
         index
         head
@@ -447,7 +455,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (heap: ResizeArray<ReadyCursor>)
+        (heap: ReadyHeap)
         (ordered: ResizeArray<EventEnvelope>)
         (readyCursor: ReadyCursor)
         : Result<unit, StorageInvalid> =
@@ -481,7 +489,7 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (ready: ResizeArray<ReadyCursor>)
+        (ready: ReadyHeap)
         (ordered: ResizeArray<EventEnvelope>)
         =
         let readyCursor = heapPop ready
@@ -510,10 +518,10 @@ module EventKWayMerge =
         (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
         (writers: WriterStream array)
         (cursors: Cursor array)
-        (ready: ResizeArray<ReadyCursor>)
+        (ready: ReadyHeap)
         (ordered: ResizeArray<EventEnvelope>)
         =
-        if ready.Count > 0 then
+        if ready.Entries.Count > 0 then
             popAndAdvance
                 allowExternalParents
                 knownIds
@@ -535,10 +543,7 @@ module EventKWayMerge =
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
-    let private mergeCore
-        allowExternalParents
-        (streams: (string * EventEnvelope list) list)
-        : Result<EventEnvelope list, StorageInvalid> =
+    let private mergeCore allowExternalParents (streams: (string * EventEnvelope list) list) : MergeObservation =
         // Collapse duplicate writer keys exactly as the previous Map-backed
         // implementation did. Writer bytes are immutable; only the current
         // cursor snapshot is replaced while the heap stays O(log writers).
@@ -561,7 +566,11 @@ module EventKWayMerge =
         let seen = Dictionary<string, EventEnvelope>()
         let parentWaiters = Dictionary<string, ResizeArray<WaiterToken>>()
         let duplicateWaiters = Dictionary<string, ResizeArray<WaiterToken>>()
-        let ready = ResizeArray<ReadyCursor>()
+
+        let ready =
+            { Entries = ResizeArray<ReadyCursor>()
+              Comparisons = 0L }
+
         let ordered = ResizeArray<EventEnvelope>()
 
         // DSL-MUTABLE: algorithm-scratch — one finite loop verdict; per-writer state is immutable data.
@@ -595,18 +604,25 @@ module EventKWayMerge =
         while isContinuing () do
             advance ()
 
-        match progress with
-        | MergeProgress.Finished result -> result
-        | MergeProgress.Continue -> Error(StorageInvalid.NonCanonical "k-way merge exited without a terminal result")
+        let result =
+            match progress with
+            | MergeProgress.Finished result -> result
+            | MergeProgress.Continue ->
+                Error(StorageInvalid.NonCanonical "k-way merge exited without a terminal result")
+
+        { Result = result
+          ReadyComparisons = ready.Comparisons }
 
     /// Strict merge for complete histories. Any parent absent from the supplied
     /// writer set is storage corruption.
     let merge (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
-        mergeCore false streams
+        (mergeCore false streams).Result
 
     /// Retention-window merge. A parent absent from the entire retained set is a
     /// causal predecessor before the truncation boundary and is considered
     /// satisfied. Dependencies that are present inside the retained set still
     /// participate in ordering and cycle detection.
     let mergeRetained (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
-        mergeCore true streams
+        (mergeCore true streams).Result
+
+    let mergeWithDiagnostics (streams: (string * EventEnvelope list) list) : MergeObservation = mergeCore false streams

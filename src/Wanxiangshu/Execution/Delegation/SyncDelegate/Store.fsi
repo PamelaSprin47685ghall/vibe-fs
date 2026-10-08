@@ -5,6 +5,13 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+type internal SyncDelegateCallAcceptance =
+    new: admissionRoot: TaskCompletionSource<AuthorityRootUserMessageId option> -> SyncDelegateCallAcceptance
+    member AttachDisposable: registration: IDisposable -> unit
+    member Accept: physical: PhysicalUserMessageId * notify: (unit -> unit) -> unit
+    member Owns: physical: PhysicalUserMessageId -> bool
+    member Close: unit -> unit
+
 type internal SyncDelegateTerminalFailureScope =
     | FreshAuthorityRoot of AuthorityRootUserMessageId
     | ExistingAuthorityContinuation of PhysicalUserMessageId
@@ -16,7 +23,8 @@ and internal SyncDelegateCall =
       Delegate: SessionId
       Agent: string
       Invocations: SyncDelegateInvocation list
-      AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
+      AdmissionRoot: TaskCompletionSource<AuthorityRootUserMessageId option>
+      Acceptance: SyncDelegateCallAcceptance
       mutable AcceptedPhysical: PhysicalUserMessageId option
       mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
       mutable TerminalFailureScope: SyncDelegateTerminalFailureScope option
@@ -29,7 +37,8 @@ and internal SyncDelegateInvocation =
       Charge: string
       ExpectedToolCalls: int option
       PrepareProviderPrompt: unit -> Task<LlmFacing.Document>
-      CaptureResponse: (string -> unit) option
+      ObserveAdmission: (SyncDelegateObservedAdmission -> unit) option
+      CaptureResponse: (SyncDelegateTerminalResponse -> unit) option
       IsCancelled: unit -> bool
       Batch: SyncDelegateBatch option
       Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>
@@ -53,6 +62,7 @@ type internal SyncDelegateCallStore =
 
     member TryPeekCallByDelegate: delegateSession: SessionId -> SyncDelegateCall option
     member TryPopCallByDelegate: delegateSession: SessionId -> SyncDelegateCall option
+    member TryPopExactCall: call: SyncDelegateCall -> SyncDelegateCall option
     member FailCall: call: SyncDelegateCall * error: string -> unit
     member Admit: invocation: SyncDelegateInvocation -> SyncDelegateAdmission
     member ReleaseAdmission: ownerScope: ReuseScopeId * role: SyncDelegateRole -> unit

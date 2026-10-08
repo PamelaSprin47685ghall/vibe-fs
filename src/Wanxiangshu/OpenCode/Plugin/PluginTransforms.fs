@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 #nowarn "3511"
 
 open System
@@ -144,7 +145,8 @@ module PluginTransforms =
           ApplyReadonlyDelegation: string option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
-          InjectBloggerChronicle: string option -> obj -> unit
+          InjectBloggerChronicle:
+              string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> obj -> unit
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: obj -> unit }
 
@@ -175,6 +177,32 @@ module PluginTransforms =
     let private raiseFailClosed (fuse: string -> unit) (reason: string) : 'a =
         fuse reason
         raise (InvalidOperationException reason)
+
+    let private canonicalCaptureMessages (journal: AgentJournal option) session rawMessages =
+        let restore durable =
+            task {
+                match!
+                    PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
+                        durable
+                        session
+                        PairProgrammingThoughtTransform.CursorPresentationOwner.PairGuidance
+                        []
+                        rawMessages
+                with
+                | Error error -> return Error error
+                | Ok paired ->
+                    return!
+                        PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
+                            durable
+                            session
+                            PairProgrammingThoughtTransform.CursorPresentationOwner.RequirementGrounding
+                            []
+                            paired
+            }
+
+        journal
+        |> Option.map restore
+        |> Option.defaultWith (fun () -> Task.FromResult(Ok rawMessages))
 
     let private decodePromptOrigin (label: string) : PromptAuthority.PromptOrigin =
         match label with
@@ -208,7 +236,7 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
-        let strengthFailFuse = boot.StrengthFailClosed
+        let strengthFailFuse = boot.StrengthFailFuse
 
         let requireProviderAdmission key =
             if ModelRouting.readExecutionAdmission key |> Option.isNone then
@@ -634,8 +662,13 @@ module PluginTransforms =
                             { RawMessages = rawMessages
                               Current = None }
                     | Some sessionId ->
+                        let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
+
+                        let captureMessages =
+                            canonical |> Result.defaultWith (raiseFailClosed strengthFailFuse)
+
                         let observations =
-                            rawMessages
+                            captureMessages
                             |> List.choose (fun rawMessage ->
                                 ProviderWireCapture.decodeCapturedMessage rawMessage
                                 |> Option.map (fun message ->
@@ -670,7 +703,7 @@ module PluginTransforms =
                             StrengthReplay.commitTracedAfterCapture
                                 journal
                                 strengthDurability
-                                (raiseFailClosed strengthFailFuse)
+                                strengthFailFuse
                                 traceState
                                 strengthReplayPlans
                     }
@@ -744,10 +777,11 @@ module PluginTransforms =
           ProjectRequirementGrounding =
             RequirementGroundingTransform.projectOrTerminate journal workspaceDirectory terminateSession
           InjectBloggerChronicle =
-            fun projectionSessionIdOpt outObj ->
+            fun projectionSessionIdOpt physicalUserMessageId outObj ->
                 BloggerChronicleText.maybeInject
                     journal
                     projectionSessionIdOpt
+                    physicalUserMessageId
                     (languageFor projectionSessionIdOpt)
                     outObj
           SettleAndReplaceDeferredInspections =
@@ -810,6 +844,10 @@ module PluginTransforms =
         (outObj: obj)
         : Task<unit> =
         task {
+            let physicalUserMessageId =
+                ProviderWireDecode.messagesFromTransformOutput outObj
+                |> ProviderWireCapture.lastUserMessageId
+
             // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform (durable-evidence gate)
             do! caps.BeginPhysicalProviderAttempt projectionSessionIdOpt outObj
 
@@ -871,7 +909,7 @@ module PluginTransforms =
                 do! caps.ApplyReadonlyDelegation projectionSessionIdOpt outObj
 
             // 15. BloggerChronicleText.maybeInject
-            caps.InjectBloggerChronicle projectionSessionIdOpt outObj
+            caps.InjectBloggerChronicle projectionSessionIdOpt physicalUserMessageId outObj
 
             // 15.1 Re-apply replaced inspection results after any intermediate insertions
             do! caps.SettleAndReplaceDeferredInspections projectionSessionIdOpt outObj

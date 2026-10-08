@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading
@@ -10,7 +11,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -29,6 +29,17 @@ type JournalAppendException(failure: JournalAppendFailure) =
 
 
 module private AgentJournalInternals =
+
+    let tripUnknownCuts failure =
+        match failure with
+        | StoreAppendUnknown evidence when not (List.isEmpty evidence.Prepared.Cuts) ->
+            FatalProcess.trip
+                "journal-semantic-cut"
+                (sprintf
+                    "semantic cut append settled unknown at %A: %s"
+                    evidence.Primary.Phase
+                    evidence.Primary.Cause.Message)
+        | _ -> ()
 
     let registerWaiter
         (fromRevision: JournalRevision)
@@ -238,7 +249,11 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             let! appended = writer.Append stream providerRun fact
 
             match appended with
-            | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure))
+            | CommitUnknown(eventId, failure) ->
+                tripUnknownCuts failure
+                return Error(WriteUnknown(eventId, failure))
+            | CommitResult.NoNewWriteReleaseFailed(eventId, failure) ->
+                return Error(JournalAppendFailure.NoNewWriteReleaseFailed(eventId, failure))
             | NotAttempted(eventId, unavailable) -> return Error(WriterUnavailable(eventId, unavailable))
             | Rejected(eventId, reason) ->
                 let failure =

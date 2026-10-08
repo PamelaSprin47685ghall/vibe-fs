@@ -22,6 +22,9 @@ module JsToolsBindings =
     [<Import("isAbsolute", "node:path")>]
     let private pathIsAbsolute (path: string) : bool = jsNative
 
+    [<Import("realpathSync", "node:fs")>]
+    let private realpathSync (path: string) : string = jsNative
+
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
@@ -56,6 +59,18 @@ module JsToolsBindings =
         else
             Error(JsFailure.PathDenied path)
 
+    let private readPathResolutionFailure path (error: obj) =
+        if string error?code = "ENOENT" then
+            JsFailure.FileNotFound path
+        else
+            JsFailure.FileReadFailed path
+
+    let private resolveReadPath path =
+        try
+            Ok(realpathSync path)
+        with error ->
+            Error(readPathResolutionFailure path error)
+
     /// Interpret a JS find value: string → Exact anchor, RegExp → Regex anchor.
     let private anchorOf (find: obj) : Result<AnchorSpec, JsFailure> =
         if isString find then
@@ -71,13 +86,28 @@ module JsToolsBindings =
         | AnchorSpec.Exact text when System.String.IsNullOrEmpty text -> Error JsFailure.AnchorEmptyContent
         | _ -> Ok()
 
-    let private makeReadMember (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) =
+    let private makeReadMember
+        (root: string)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        =
         "read"
         ==> fun (path: string) ->
             result {
                 let! full = resolveInside root path
-                let! text = JsUtf8Fs.readUtf8Classified full
+                let! readPath = resolveReadPath full
+                let! readRoot = resolveReadPath root
+                let relative = (pathRelative readRoot readPath).Replace("\\", "/")
+
+                do!
+                    if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
+                        Error(JsFailure.PathDenied path)
+                    else
+                        Ok()
+
+                let! text = JsUtf8Fs.readUtf8Classified readPath
                 readSnapshots.Add { Path = path; Text = text }
+                explicitReads.Add { Path = readPath; ResultBytes = text }
 
                 return createObj [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
             }
@@ -186,10 +216,11 @@ module JsToolsBindings =
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
-                  makeReadMember root readSnapshots
+                  makeReadMember root readSnapshots explicitReads
 
               if Set.contains JsCapability.Glob capabilities then
                   makeGlobMember root

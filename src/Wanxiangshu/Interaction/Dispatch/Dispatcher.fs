@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Persona
@@ -17,6 +18,11 @@ open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
+
+    [<RequireQualifiedAccess>]
+    type PromptSendObservation =
+        | Sending of PromptKey
+        | Answered of PromptKey * SendOutcome
 
     let internal originLabel = PromptAuthority.originLabel
 
@@ -121,10 +127,14 @@ module PromptDispatcher =
         | Error failure -> registrationAppendFailure requested projection failure
 
     let private validateAcceptedProfile
-        (identitySeed: PromptAuthority.IdentitySeed)
+        (claim: PromptAuthority.PromptClaim)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
-        if profile.IdentitySeed = identitySeed then
+        if
+            profile.IdentitySeed = claim.IdentitySeed
+            && claim.LogicalRunId = Some profile.LogicalRunId
+            && claim.AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
+        then
             Ok profile
         else
             Error(
@@ -142,6 +152,35 @@ module PromptDispatcher =
             Error(
                 ManagedChatAcceptanceError.IntentRejected("Continuation managed intent requires an active logical run")
             )
+
+    let private tryPendingGateNudgeKey
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (origin: PromptAuthority.PromptOrigin)
+        (digest: string)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : PromptKey option =
+        let pending =
+            projection.PendingClaims
+            |> Map.toList
+            |> List.filter (fun (_, claim) ->
+                claim.SessionId = profile.SessionId
+                && claim.LogicalRunId = Some profile.LogicalRunId
+                && claim.AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
+                && claim.Origin = origin
+                && claim.PayloadDigest = digest)
+
+        match pending with
+        | [ key, _ ] -> Some key
+        | _ -> None
+
+    let private attachPhysicalAcceptanceObserver (observer: ContinuationAcceptanceObserver) (key: PromptKey) =
+        let registration = PromptPhysicalAcceptance.register key observer.Notify
+
+        try
+            observer.AttachDisposable registration
+        with error ->
+            registration.Dispose()
+            raise error
 
     /// PROMPT-007: whether the caller waits for PhysicalAccepted.
     ///
@@ -345,7 +384,7 @@ module PromptDispatcher =
 
                     let acceptedProfileDecision
                         : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
-                        validateAcceptedProfile evidence.IdentitySeed profile
+                        validateAcceptedProfile evidence.Claim profile
 
                     let! acceptedProfile = acceptedProfileDecision
 
@@ -376,15 +415,7 @@ module PromptDispatcher =
                       PhysicalUserMessageId = evidence.PhysicalUserMessageId }
                     evidence
 
-            match intent with
-            | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
-                taskResult {
-                    let! profile = this.AcceptExternalManagedRoot evidence
-                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
-                }
-            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
-            | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence ->
+            let acceptEstablishedInput (evidence: AcceptedChatExecutionEvidence) =
                 let key: ChatExecutionKey =
                     { SessionId = evidence.SessionId
                       PhysicalUserMessageId = evidence.PhysicalUserMessageId }
@@ -398,9 +429,24 @@ module PromptDispatcher =
                     Task.FromResult(
                         Error(ManagedChatAcceptanceError.IntentRejected "Input has no exact accepted evidence")
                     )
+
+            match intent with
+            | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+                taskResult {
+                    let! profile = this.AcceptExternalManagedRoot evidence
+                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
+                }
+            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
+            | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence -> acceptEstablishedInput evidence
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptPendingManagedPrompt evidence
+
+                    do!
+                        this.RequireActiveProfile evidence.Key.SessionId profile
+                        |> Result.mapError ManagedChatAcceptanceError.IntentRejected
+
                     let! witness = accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
                     PromptPhysicalAcceptance.accepted evidence.PromptKey evidence.Key.PhysicalUserMessageId
                     return witness
@@ -576,7 +622,7 @@ module PromptDispatcher =
                     accepted.PromptKey = key
                     && accepted.SessionId = sessionId
                     && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
             let acceptExisting
                 (accepted: PromptAuthority.AcceptedDispatch)
@@ -636,6 +682,18 @@ module PromptDispatcher =
         member this.ActiveProfile(sessionId: SessionId) =
             (this.ProjectionFor sessionId).ActiveLogicalRun
 
+        member internal this.RequireActiveProfile sessionId (expected: PromptAuthority.AuthorityExecutionProfile) =
+            match this.ActiveProfile sessionId with
+            | None -> Error "No active authority profile"
+            | Some active when active = expected -> Ok()
+            | Some active ->
+                Error(
+                    sprintf
+                        "Continuation profile does not match the active logical run: active logical run %s, supplied logical run %s"
+                        (LogicalRunId.value active.LogicalRunId)
+                        (LogicalRunId.value expected.LogicalRunId)
+                )
+
         member this.ResolveOrigin
             (physicalMessageId: PhysicalUserMessageId)
             (promptKey: PromptKey option)
@@ -690,6 +748,34 @@ module PromptDispatcher =
                 gateKind
                 terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
+
+        member this.ObserveGateNudgeAcceptance
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            (observer: ContinuationAcceptanceObserver)
+            : unit =
+            let projection = this.ProjectionFor profile.SessionId
+            let digest = PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun
+            let origin = PromptAuthority.PromptOrigin.Continuation continuation
+
+            let accepted =
+                projection.AcceptedDispatches
+                |> Map.tryFind (PromptAuthority.acceptedDispatchKey profile.SessionId digest)
+                |> Option.filter (fun landing ->
+                    landing.SessionId = profile.SessionId
+                    && landing.Origin = origin
+                    && landing.PayloadDigest = digest
+                    && Map.tryFind landing.PhysicalUserMessageId projection.PhysicalLandings = Some landing
+                    && Map.tryFind landing.PhysicalUserMessageId projection.AcceptedContinuationIds = Some continuation)
+
+            match projection.ActiveLogicalRun, accepted with
+            | Some active, Some landing when active = profile -> observer.Notify landing.PhysicalUserMessageId
+            | Some active, None when active = profile ->
+                tryPendingGateNudgeKey profile origin digest projection
+                |> Option.iter (attachPhysicalAcceptanceObserver observer)
+            | _ -> ()
 
         /// provider-attempt-recovery-008: has this Blogger request + terminal occasion already spent its one interaction repair.
         ///

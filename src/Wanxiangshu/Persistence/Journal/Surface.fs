@@ -1,12 +1,12 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
@@ -62,6 +62,7 @@ module JournalSurface =
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> "NotCommitted"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> "Committed"
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> "Unknown"
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> "NoNewWrite"
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied
@@ -316,6 +317,18 @@ module JournalSurface =
             {| pendingCount = Map.count state.Pending
                occurrenceCount = List.length state.OccurrencesRev
                visibleMaterialCount = Set.count state.VisibleMaterials
+               readObservations =
+                state.ObservedReads
+                |> Set.toArray
+                |> Array.map (fun read ->
+                    box
+                        {| workspace = read.Workspace
+                           path = read.Path
+                           digest = read.Digest
+                           coverage =
+                            match read.Coverage with
+                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.CompleteFile -> "CompleteFile"
+                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.PartialFile -> "PartialFile" |})
                visibleFromOrdinal = state.VisibleFromOrdinal |}
 
     let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =

@@ -12,6 +12,11 @@ open Wanxiangshu.Persistence.Journal
 /// HOST-013：永久 pair-programming auto-injected pairs。
 module PairProgrammingThoughtTransform =
 
+    [<RequireQualifiedAccess>]
+    type CursorPresentationOwner =
+        | PairGuidance
+        | RequirementGrounding
+
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =
         { Ordinal: int64
@@ -62,6 +67,14 @@ module PairProgrammingThoughtTransform =
 
     val appendCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj option
     val stripCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj
+
+    val stripCursorSuffixesWithJournal:
+        journal: AgentJournal ->
+        sessionId: SessionId ->
+        owner: CursorPresentationOwner ->
+        suffixTexts: string list ->
+        rawMessages: obj list ->
+            Task<Result<obj list, string>>
 
     val internal gapsAroundAddress:
         gapCtor: (TranscriptMessageAddress -> TranscriptGap) ->

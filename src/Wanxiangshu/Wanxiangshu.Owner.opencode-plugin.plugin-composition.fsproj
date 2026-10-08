@@ -7,6 +7,7 @@
     <WanxiangshuCompileShard>plugin-composition</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
@@ -92,8 +93,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogrammingcalibration.fsproj"/>
 <Compile Include="OpenCode/Host/PluginHostInterop.fsi"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Host/ManagerReviewContract.fsi"/>
     <Compile Include="OpenCode/Host/ManagerReviewContract.fs"/>
     <Compile Include="OpenCode/Host/ToolSchemaJson.fsi"/>
@@ -111,10 +110,14 @@
     <Compile Include="OpenCode/Host/ProtocolArgumentVault.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fs"/>
+    <Compile Include="OpenCode/Plugin/PluginHostWiringSurface.fsi"/>
+    <Compile Include="OpenCode/Plugin/PluginHostWiringSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs"/>
     <Compile Include="OpenCode/Host/SessionBindingRecovery.fsi"/>
@@ -134,6 +137,8 @@
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fsi"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fs"/>
+    <Compile Include="OpenCode/Plugin/PluginLifecycleSurface.fsi"/>
+    <Compile Include="OpenCode/Plugin/PluginLifecycleSurface.fs"/>
     <Compile Include="OpenCode/Plugin/Plugin.fsi"/>
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
   </ItemGroup>

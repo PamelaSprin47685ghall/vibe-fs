@@ -36,7 +36,7 @@ module FetchTool =
     let private fetchGate = obj ()
 
     let private fetchInFlight =
-        System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
+        System.Collections.Generic.Dictionary<string * string, IEventStore * System.Threading.Tasks.Task<string>>()
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -62,35 +62,50 @@ module FetchTool =
     let private unavailable language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
+    let private observeMutationFailure (owner: CasebookSettlementOwner) (error: CasebookMutationError) =
+        match error with
+        | CasebookMutationError.AppendFailure failure -> owner.Observe failure
+        | _ -> ()
+
+    let private touchAccess owner workspaceRoot store identity =
+        task {
+            match! CasebookLifecycle.touchAccess workspaceRoot store identity with
+            | Ok() -> ()
+            | Error error -> observeMutationFailure owner error
+        }
+
     /// Serve the maintained body of a case reported as changed, or stay stale.
-    let private serveMaintained language workspaceRoot store identity (cachedAnswer: string) =
+    let private serveMaintained owner language workspaceRoot store identity (cachedAnswer: string) =
         task {
             let! latest = CasebookWorkflow.fetchCase store 256 identity
 
             match latest with
             | Ok(Some updated) ->
-                do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                do! touchAccess owner workspaceRoot store identity
                 return refreshed language updated.A
             | _ -> return stale language cachedAnswer
         }
 
     /// Maintain the case from the provided diff, then serve the maintained body.
-    let private refreshFromDiff language workspaceRoot store identity (cachedAnswer: string) =
+    let private refreshFromDiff owner language workspaceRoot store identity (cachedAnswer: string) =
         task {
             let! changed = CasebookBookkeeper.refreshStale store workspaceRoot identity
 
             match changed with
-            | Ok true -> return! serveMaintained language workspaceRoot store identity cachedAnswer
+            | Ok true -> return! serveMaintained owner language workspaceRoot store identity cachedAnswer
             | Ok false ->
-                do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                do! touchAccess owner workspaceRoot store identity
                 return fresh language cachedAnswer
-            | Error _ -> return stale language cachedAnswer
+            | Error error ->
+                observeMutationFailure owner error
+                return stale language cachedAnswer
         }
 
-    let private handleResolvedCase language workspaceRoot store (case: Case) =
-        refreshFromDiff language workspaceRoot store case.Identity case.A
+    let private handleResolvedCase owner language workspaceRoot store (case: Case) =
+        refreshFromDiff owner language workspaceRoot store case.Identity case.A
 
     let private runFetch
+        (owner: CasebookSettlementOwner)
         (language: ProviderLanguage)
         (workspaceRoot: string)
         (store: IEventStore)
@@ -100,30 +115,41 @@ module FetchTool =
             match! CasebookIndex.resolve store 256 shelfmark with
             | Error _ -> return unavailable language
             | Ok None -> return noCase language
-            | Ok(Some case) -> return! handleResolvedCase language workspaceRoot store case
+            | Ok(Some case) -> return! handleResolvedCase owner language workspaceRoot store case
         }
 
-    let private createFlightWork language workspaceRoot store shelfmark =
+    let private createFlightWork key owner language workspaceRoot store shelfmark =
         task {
             try
-                return! runFetch language workspaceRoot store shelfmark
+                return! runFetch owner language workspaceRoot store shelfmark
             finally
-                lock fetchGate (fun () -> fetchInFlight.Remove shelfmark |> ignore)
+                lock fetchGate (fun () -> fetchInFlight.Remove key |> ignore)
         }
 
-    let private getOrCreateFlightWork language workspaceRoot store shelfmark =
+    let private getOrCreateFlightWork owner language workspaceRoot store shelfmark =
+        let key = workspaceRoot, shelfmark
+
         lock fetchGate (fun () ->
-            match fetchInFlight.TryGetValue shelfmark with
-            | true, existing -> existing
+            match fetchInFlight.TryGetValue key with
+            | true, (boundStore, existing) when obj.ReferenceEquals(boundStore, store) -> existing
+            | true, _ -> invalidOp "Casebook fetch flight store binding mismatch"
             | false, _ ->
-                let work = createFlightWork language workspaceRoot store shelfmark
-                fetchInFlight.[shelfmark] <- work
+                let work = createFlightWork key owner language workspaceRoot store shelfmark
+                fetchInFlight.[key] <- store, work
                 work)
 
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 
-    let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
+    let spec
+        (factory: HostToolFactory)
+        (workspaceRoot: string)
+        (store: IEventStore)
+        (owner: CasebookSettlementOwner)
+        : ToolSpec =
+        if isNull (box owner) then
+            nullArg "owner"
+
         { Name = "fetch"
           Description = prose (ProviderLanguageBinding.readGlobalPreference ()) Path.Description
           Arguments = [ "shelfmark", ToolHostCodec.stringSchema factory ]
@@ -139,5 +165,5 @@ module FetchTool =
                     elif String.IsNullOrWhiteSpace shelfmark then
                         return ToolHostCodec.tomlObjectWithInstructions [ prose language Path.ShelfmarkRequired ] []
                     else
-                        return! getOrCreateFlightWork language workspaceRoot store shelfmark
+                        return! getOrCreateFlightWork owner language workspaceRoot store shelfmark
                 } }

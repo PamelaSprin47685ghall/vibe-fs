@@ -109,8 +109,9 @@ module internal SyncDelegateWorkflow =
         task {
             try
                 return! item.PrepareProviderPrompt()
-            with _ ->
-                return LlmFacing.instruction item.Charge
+            with
+            | error when item.ObserveAdmission.IsSome -> return raise error
+            | _ -> return LlmFacing.instruction item.Charge
         }
 
     let private prepareAllPrompts (invocations: SyncDelegateInvocation list) : Task<LlmFacing.Document list> =
@@ -137,7 +138,7 @@ module internal SyncDelegateWorkflow =
             | Some(FreshAuthorityRoot root) -> TerminalStop.belongsTo root stop
             | Some(ExistingAuthorityContinuation _)
             | None -> false)
-        |> Option.bind (fun _ -> store.TryPopCallByDelegate delegateSession)
+        |> Option.bind store.TryPopExactCall
         |> Option.iter (fun current -> store.FailCall(current, message))
 
     let private onTerminalOutcome
@@ -170,6 +171,7 @@ module internal SyncDelegateWorkflow =
             match settled.Commitment with
             | HandoffCheckpointCommitment.Committed
             | HandoffCheckpointCommitment.NotCommitted _
+            | HandoffCheckpointCommitment.PersistenceFailed _
             | HandoffCheckpointCommitment.Unknown _ -> return Ok()
             | HandoffCheckpointCommitment.PhaseConflict reason ->
                 let detail =
@@ -381,17 +383,18 @@ module internal SyncDelegateWorkflow =
     let invoke
         (store: SyncDelegateCallStore)
         (deps: Dependencies)
-        (ownerSessionKey: string)
+        (ownerSessionId: SessionId)
         (role: SyncDelegateRole)
         (charge: string)
         (expectedToolCalls: int option)
         (batch: SyncDelegateBatch option)
         (prepareProviderPrompt: unit -> Task<LlmFacing.Document>)
-        (captureResponse: (string -> unit) option)
+        (observeAdmission: (SyncDelegateObservedAdmission -> unit) option)
+        (captureResponse: (SyncDelegateTerminalResponse -> unit) option)
         (isCancelled: unit -> bool)
         : Task<Result<SyncDelegateInvocationResult, string>> =
         task {
-            let owner = SessionId.create ownerSessionKey
+            let owner = ownerSessionId
             let ownerScope = ReuseScope.ofSession owner
 
             let completion =
@@ -406,6 +409,7 @@ module internal SyncDelegateWorkflow =
                   Charge = charge
                   ExpectedToolCalls = expectedToolCalls
                   PrepareProviderPrompt = prepareProviderPrompt
+                  ObserveAdmission = observeAdmission
                   CaptureResponse = captureResponse
                   IsCancelled = isCancelled
                   Batch = batch

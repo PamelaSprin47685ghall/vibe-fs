@@ -9,7 +9,7 @@
 | 003 | exact generation/occurrence 的生产fold；实际 publish 入口的重放/冲突 | 真实退休与 append 竞争、持久恢复 |
 | 004 | pure placement 全有或全无；实际插件冻结旧 Pair Hint、新 occurrence 收新消息、之后不再重复 | 同一持久提交的失败/放弃/进程崩溃与重开 |
 | 005 | 实际 subscribe/publish 不改变双方 PromptAuthority 观察、不创建/提示/abort Host 会话 | 完整 obligation 与 office 投影、交付后的模型证据判断 |
-| 006 | 手动退休后的拒绝、不可变 concern、新代公告、旧材料不穿代；实际 participant 终结驱动退休（manager LifeCompleted 经 `AttentionConcernJournalAdapter.retireMailboxesOf` 追加 durable MailboxRetired → 投影退休；decoy 隔离与后继显式同义 subscribe 获新代并列断言，GAP-157 转正） | session delete/cancel、HandleAbandon 与 Fission replacement 路径是否同样构成 participant 终结待语义裁决；退休 append 失败的重试路径仅靠幂等语义，无独立持久化反例 |
+| 006 | 手动退休后的拒绝、新代公告及旧材料不穿代；公开开任期保持已订阅邮箱；LifeCompleted Surface 成功追加 MailboxRetired 并保全 decoy，后继显式 subscribe 获新代的强断言保留 | 真实 Suicide、放弃/replacement 及持久退休失败恢复仍缺证。新增 Suicide 的 post-commit 邮箱调用已撤回：失败后旧任不再有重试准入，不能称幂等恢复；生产终结 TODO 与 GAP-157 PARTIAL 保留 |
 | 007 | 待真实职责边界审计 | 禁词扫描不能证明没有工作流或新权威 |
 
 插件用例运行真正工具、共享 journal 和 messages transform，Host/provider 端口由正式 fixture 提供；没有真实 provider 调用。提示内容从正式 NUL+BOM 后缀观察，不能沿用已废止的 synthetic-message 假设。普通 transform 可能启动 Blogger；“publish 不打断 owner”观察 owner 的物理请求，而不是禁止所有合法旁路工作。

@@ -142,15 +142,9 @@ const { mkdtempSync, rmSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
-const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
-const hash = (value) => `H(${value})`
-const capturingPort = () => ({
-  SubscribeTerminal: () => ({ Dispose: () => {} }),
-  SendPrompt: async () => dispatch.admittedWithReceipt('accepted-006'),
-})
 const personas = {
   engineer: 'Engineer',
   coder: 'Coder',
@@ -173,11 +167,6 @@ const rootSelection = (participant) => {
     },
   }
 }
-const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', participant = 'engineer') => {
-  const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(participant))
-  assert.equal(built.ok, true, built.ok ? '' : built.error)
-  return built.value
-}
 const acceptOwner = async (handle, session = 'ses_owner') => {
   const accepted = await dispatch.acceptHumanRootSelection(
     handle,
@@ -187,11 +176,6 @@ const acceptOwner = async (handle, session = 'ses_owner') => {
   )
   assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
   return accepted.profile
-}
-const observation = (result) => {
-  assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.ok(result.observation)
-  return result.observation
 }
 
 test('WHAT[dispatch-protocol-008] DP_008_concurrent_exact_gate_nudges_share_one_claim_and_send', async () => {
@@ -215,6 +199,7 @@ test('WHAT[dispatch-protocol-008] DP_008_concurrent_exact_gate_nudges_share_one_
         },
       }
       const session = 'ses_gate'
+      const profile = await acceptOwner(opened.journal, session)
       const results = await dispatch.sendGateNudgesConcurrently(
         port,
         opened.journal,
@@ -223,7 +208,7 @@ test('WHAT[dispatch-protocol-008] DP_008_concurrent_exact_gate_nudges_share_one_
         'ManagerGuard',
         'ManagerAction',
         'run_terminal',
-        profileFor('rt-gate-single-flight', session, 'msg_gate', 'manager'),
+        profile,
       )
 
       assert.deepEqual(results.map((result) => result.ok), [true, true])

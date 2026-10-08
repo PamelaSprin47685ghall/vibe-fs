@@ -1,5 +1,28 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
+
+type JsTransactionId = private JsTransactionId of string
+
+module JsTransactionId =
+    let create (value: string) = JsTransactionId value
+    let value (JsTransactionId v) = v
+
+    let generate () =
+        JsTransactionId(System.Guid.NewGuid().ToString("N"))
+
+[<RequireQualifiedAccess>]
+type JsTransactionAppendPhase =
+    | Prepared
+    | Committed
+
+type JsTransactionAppendFailure =
+    { Phase: JsTransactionAppendPhase
+      TransactionId: JsTransactionId
+      EventId: EventId
+      Error: AppendError }
+
 /// DSL-class: Vocabulary — JS-019: stable failure codes (proposal §77/§77.1) —
 /// program-foreseeable failures are typed branches with stable LLM-visible
 /// codes; exceptions are only for crashes. Codes are frozen once shipped.
@@ -33,9 +56,24 @@ type JsFailure =
     | TransactionCommitFailed
     | TransactionRollbackFailed
     | TransactionRecoveryRequired
+    | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
 
 module JsFailure =
+
+    let private transactionPhaseCode (phase: JsTransactionAppendPhase) =
+        match phase with
+        | JsTransactionAppendPhase.Prepared -> "TRANSACTION_PREPARE_"
+        | JsTransactionAppendPhase.Committed -> "TRANSACTION_COMMIT_"
+
+    let private appendFailureCode (error: AppendError) =
+        match error with
+        | AppendError.AppendNotAttempted _ -> "NOT_ATTEMPTED"
+        | AppendError.CommitUnknown _ -> "UNKNOWN"
+        | AppendError.NoNewWriteReleaseFailed _ -> "NO_NEW_WRITE_RELEASE_FAILED"
+        | AppendError.StorageInvalid _
+        | AppendError.SemanticCut _
+        | AppendError.AppendFailed _ -> "FAILED"
 
     /// Stable machine-readable code; the LLM-visible rendering is code + reason.
     let code (failure: JsFailure) : string =
@@ -68,6 +106,8 @@ module JsFailure =
         | JsFailure.TransactionCommitFailed -> "TRANSACTION_COMMIT_FAILED"
         | JsFailure.TransactionRollbackFailed -> "TRANSACTION_ROLLBACK_FAILED"
         | JsFailure.TransactionRecoveryRequired -> "TRANSACTION_RECOVERY_REQUIRED"
+        | JsFailure.TransactionPersistenceFailed failure ->
+            transactionPhaseCode failure.Phase + appendFailureCode failure.Error
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
@@ -107,6 +147,12 @@ module JsFailure =
         | JsFailure.TransactionCommitFailed -> "transaction commit failed"
         | JsFailure.TransactionRollbackFailed -> "transaction rollback failed"
         | JsFailure.TransactionRecoveryRequired -> "durable transaction recovery is required"
+        | JsFailure.TransactionPersistenceFailed failure ->
+            sprintf
+                "transaction %s event %s: %s"
+                (JsTransactionId.value failure.TransactionId)
+                (EventId.value failure.EventId)
+                (AppendError.describe failure.Error)
         | JsFailure.UnknownMember -> "member is not part of this generated surface"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.

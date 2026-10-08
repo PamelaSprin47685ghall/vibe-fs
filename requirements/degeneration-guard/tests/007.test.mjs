@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { awaitOwned, createSensor, deferred, repetitiveText } from './support/stream.mjs'
+import { abortSource, awaitOwned, createSensor, deferred, repetitiveText } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-007] a successful interrupt is single-flight and continuation waits for explicit reconciliation', async () => {
   const aborts = []
@@ -12,10 +12,10 @@ test('WHAT[degeneration-guard-007] a successful interrupt is single-flight and c
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   assert.deepEqual(aborts, ['session'])
   assert.deepEqual(continuations, [])
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
   await sensor.activeTask(handle, 'session', 'run')
   assert.deepEqual(continuations, [['session', 'TooRepetitive']])
-  assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+  assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'External' })
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   await sensor.activeTask(handle, 'session', 'run')
   assert.deepEqual(aborts, ['session'])
@@ -37,7 +37,7 @@ for (const failure of ['refused', 'thrown']) {
     })
     sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
     await awaitOwned(handle, 'session', 'run')
-    assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+    assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'External' })
     assert.deepEqual(continuations, [])
     assert.equal(sensor.activeTask(handle, 'session', 'run'), null)
     assert.ok(diagnostics.some(([, fields]) => fields.some(([name, value]) => name === 'result' && value === 'failed')))
@@ -81,7 +81,7 @@ test('WHAT[degeneration-guard-007] reconciled abort waits for interrupt acceptan
   sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
   const interrupted = sensor.activeTask(handle, 'session', 'run')
   assert.notEqual(interrupted, null)
-  const cause = sensor.consumeAbortCause(handle, 'session', 'run')
+  const cause = sensor.consumeAbortCause(handle, abortSource('session', 'run'))
   try {
     assert.deepEqual(continuations, [])
     assert.equal(sensor.activeTask(handle, 'session', 'run'), interrupted)
@@ -92,7 +92,7 @@ test('WHAT[degeneration-guard-007] reconciled abort waits for interrupt acceptan
     assert.notEqual(continued, null)
     continuation.resolve({ ok: true })
     await continued
-    assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), { cause: 'External' })
+    assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), { cause: 'External' })
     assert.deepEqual(continuations, [['session', 'TooRepetitive']])
   } finally {
     interrupt.resolve({ ok: true })
@@ -112,7 +112,7 @@ for (const failure of ['refused', 'thrown']) {
     })
     sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
     const interrupted = sensor.activeTask(handle, 'session', 'run')
-    const cause = sensor.consumeAbortCause(handle, 'session', 'run')
+    const cause = sensor.consumeAbortCause(handle, abortSource('session', 'run'))
     if (failure === 'thrown') interrupt.reject(new Error('transport failed'))
     else interrupt.resolve({ ok: false, error: 'refused' })
     await interrupted
@@ -135,7 +135,7 @@ for (const outcome of ['accepted', 'refused', 'thrown']) {
     })
     sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
     const retiredTask = sensor.activeTask(handle, 'session', 'run')
-    const retiredCause = sensor.consumeAbortCause(handle, 'session', 'run')
+    const retiredCause = sensor.consumeAbortCause(handle, abortSource('session', 'run'))
     sensor.dropSession(handle, 'session')
     sensor.observe(handle, sensor.textDelta('session', repetitiveText(), 'run'))
     const replacementTask = sensor.activeTask(handle, 'session', 'run')
@@ -150,7 +150,7 @@ for (const outcome of ['accepted', 'refused', 'thrown']) {
       assert.deepEqual(continuations, [])
       replacementInterrupt.resolve({ ok: true })
       await replacementTask
-      assert.deepEqual(await sensor.consumeAbortCause(handle, 'session', 'run'), {
+      assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource('session', 'run')), {
         cause: 'DegenerationGuard', anomaly: 'TooRepetitive',
       })
       await sensor.activeTask(handle, 'session', 'run')

@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Verification
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
@@ -41,7 +41,12 @@ module EventStoreWriterSurface =
         | Rejected _ -> "Rejected"
         | CommitUnknown(_, WriteFailed reason) -> "CommitUnknown:" + reason
         | CommitUnknown(_, FlushFailed reason) -> "CommitUnknownFlush:" + reason
-        | NotAttempted(_, WriterPoisoned reason) -> "WriterPoisoned:" + reason
+        | CommitUnknown(_, StoreAppendUnknown evidence) -> "CommitUnknown:" + evidence.Primary.Cause.Message
+        | CommitResult.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
+        | NotAttempted(_, WriterPoisoned failure) ->
+            match failure.Error with
+            | AppendError.CommitUnknown evidence -> "WriterPoisoned:" + evidence.Primary.Cause.Message
+            | error -> "WriterPoisoned:" + AppendError.describe error
         | NotAttempted(_, WriterClosing) -> "WriterClosing"
         | NotAttempted(_, WriterDisposed) -> "WriterDisposed"
 
@@ -117,12 +122,25 @@ module EventStoreWriterSurface =
             // DSL-MUTABLE: algorithm-scratch — controlled-store append call counter.
             let mutable appendCalls = 0
 
-            let append (_: EventEnvelope list) =
+            let failure = InvalidOperationException "disk exploded"
+
+            let append (events: EventEnvelope list) =
                 appendCalls <- appendCalls + 1
 
                 match appendCalls with
                 | 1 -> Task.FromResult(Ok AppendReceipt.empty)
-                | 2 -> Task.FromResult(Error(AppendError.AppendFailed "disk exploded"))
+                | 2 ->
+                    Task.FromResult(
+                        Error(
+                            AppendError.CommitUnknown
+                                { Requested = events
+                                  Prepared = { DurableEvents = events; Cuts = [] }
+                                  Primary =
+                                    { Phase = AppendPhase.PhysicalAppend
+                                      Cause = failure }
+                                  CleanupFailures = [] }
+                        )
+                    )
                 | _ -> Task.FromResult(Ok AppendReceipt.empty)
 
             let store = ControlledEventStore(append) :> IEventStore

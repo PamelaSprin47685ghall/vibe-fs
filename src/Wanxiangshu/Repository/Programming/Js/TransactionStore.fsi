@@ -7,8 +7,8 @@ open Wanxiangshu.Persistence.EventStore
 /// Narrow durable capability exposed to js-* workflow/tool wiring. The Host
 /// registry never owns both AgentJournal and the raw EventStore capability.
 type IJsTransactionPersistence =
-    abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, string>>
-    abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, string>>
+    abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, JsTransactionAppendFailure>>
+    abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
 
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
@@ -26,6 +26,11 @@ module JsToolsTransactionStore =
 
     val isTransactionEventType: eventType: string -> bool
     val tryDecodeEnvelope: envelope: EventEnvelope -> Result<DecodedTransactionEvent, string>
-    val appendPrepared: store: IEventStore -> prepared: JsTransactionPrepared -> Task<Result<EventId, string>>
-    val appendCommitted: store: IEventStore -> transactionId: JsTransactionId -> Task<Result<EventId, string>>
+
+    val appendPrepared:
+        store: IEventStore -> prepared: JsTransactionPrepared -> Task<Result<EventId, JsTransactionAppendFailure>>
+
+    val appendCommitted:
+        store: IEventStore -> transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
+
     val createPersistence: store: IEventStore -> IJsTransactionPersistence

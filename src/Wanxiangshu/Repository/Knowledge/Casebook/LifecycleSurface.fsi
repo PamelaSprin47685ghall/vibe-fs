@@ -6,6 +6,15 @@ open System.Threading.Tasks
 /// Draft storage, collector state, and Bookkeeper/Journal capabilities remain
 /// private to the lifecycle owner.
 module CasebookLifecycleSurface =
+    val finalizeEngineerCase:
+        store: obj ->
+        identity: string ->
+        trace: string ->
+        question: string ->
+        answer: string ->
+        relatedPaths: string array ->
+        baseline: string ->
+            Task<obj>
 
     val enable: workspaceRoot: string -> unit
 
@@ -25,4 +34,4 @@ module CasebookLifecycleSurface =
 
     val tryFinalize: workspaceRoot: string -> sessionId: string -> Task<obj>
 
-    val touchAccess: workspaceRoot: string -> sessionId: string -> Task<unit>
+    val touchAccess: workspaceRoot: string -> sessionId: string -> Task<obj>

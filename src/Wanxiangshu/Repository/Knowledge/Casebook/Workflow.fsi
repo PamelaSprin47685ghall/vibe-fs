@@ -13,7 +13,7 @@ module CasebookFeature =
 /// CASE-003/004/005 / KR-004/005/015: Casebook workflow.
 module CasebookWorkflow =
 
-    val archiveCase: store: IEventStore -> case: Case -> Task<Result<unit, string>>
+    val archiveCase: store: IEventStore -> case: Case -> Task<Result<unit, CasebookMutationError>>
 
     val fetchCase:
         store: IEventStore -> capacity: int -> identityOrSessionId: string -> Task<Result<Case option, string>>
@@ -32,7 +32,7 @@ module CasebookWorkflow =
         maintenanceFileState: string ->
         relatedPaths: string list ->
         observations: Observation list ->
-            Task<Result<unit, string>>
+            Task<Result<unit, CasebookMutationError>>
 
     val refreshWithDiff:
         store: IEventStore ->
@@ -41,7 +41,7 @@ module CasebookWorkflow =
         newStateRef: string ->
         q: string ->
         a: string ->
-            Task<Result<unit, string>>
+            Task<Result<unit, CasebookMutationError>>
 
-    val finalizeCase: store: IEventStore -> case: Case -> Task<Result<unit, string>>
-    val touchCaseAccess: store: IEventStore -> identity: string -> Task<Result<unit, string>>
+    val finalizeCase: store: IEventStore -> case: Case -> Task<Result<unit, CasebookMutationError>>
+    val touchCaseAccess: store: IEventStore -> identity: string -> Task<Result<unit, CasebookMutationError>>

@@ -10,4 +10,5 @@ module JsToolsBindings =
         root: string ->
         staging: ResizeArray<JsStagedMutation> ->
         readSnapshots: ResizeArray<JsReadSnapshot> ->
+        explicitReads: ResizeArray<JsExplicitFileRead> ->
             obj

@@ -216,6 +216,7 @@ module Representation =
     let private answer (value: AnswerCommittedBody) =
         record
             [ "renderWorkId", box (WorkId.value value.RenderWorkId)
+              "resultObservationId", box (ObservationId.value value.ResultObservationId)
               "answerRef", box value.AnswerRef
               "stopReason", box value.StopReason ]
 
@@ -225,6 +226,22 @@ module Representation =
     let private reasonPayload reason = record [ "reason", box reason ]
 
     /// Every body has a named DTO. No DU, Option, F# list or map crosses canonical JSON.
+    let private dispatchRequest (value: DispatchRequestedBody) =
+        record
+            [ "work", workSpec value.Work
+              "dispatchIntentId", box value.DispatchIntentId
+              "publicEnvelope", envelope value.PublicEnvelope
+              "privateTicket", envelope value.PrivateTicket ]
+
+    let private dispatchReceipt (value: DispatchReceiptRecordedBody) =
+        record
+            [ "workId", box (WorkId.value value.WorkId)
+              "attempt", attempt value.Attempt
+              "fence", box (Fence.value value.Fence)
+              "dispatchIntentId", box value.DispatchIntentId
+              "physicalRef", box value.PhysicalRef
+              "receipt", envelope value.Receipt ]
+
     let body value =
         match value with
         | InquiryEventBody.InquiryCreated value ->
@@ -260,24 +277,8 @@ module Representation =
             tagged "ReservationReleased" (record [ "workId", box (WorkId.value work); "attempt", attempt value ])
         | InquiryEventBody.UsageOverrunRecorded value ->
             tagged "UsageOverrunRecorded" (record [ "usage", usage value.Usage ])
-        | InquiryEventBody.DispatchRequested value ->
-            tagged
-                "DispatchRequested"
-                (record
-                    [ "work", workSpec value.Work
-                      "dispatchIntentId", box value.DispatchIntentId
-                      "publicEnvelope", envelope value.PublicEnvelope
-                      "privateTicket", envelope value.PrivateTicket ])
-        | InquiryEventBody.DispatchReceiptRecorded value ->
-            tagged
-                "DispatchReceiptRecorded"
-                (record
-                    [ "workId", box (WorkId.value value.WorkId)
-                      "attempt", attempt value.Attempt
-                      "fence", box (Fence.value value.Fence)
-                      "dispatchIntentId", box value.DispatchIntentId
-                      "physicalRef", box value.PhysicalRef
-                      "receipt", envelope value.Receipt ])
+        | InquiryEventBody.DispatchRequested value -> tagged "DispatchRequested" (dispatchRequest value)
+        | InquiryEventBody.DispatchReceiptRecorded value -> tagged "DispatchReceiptRecorded" (dispatchReceipt value)
         | InquiryEventBody.WorkAttemptTransitioned value ->
             tagged
                 "WorkAttemptTransitioned"
@@ -356,6 +357,33 @@ module Representation =
         | InquiryStatus.Failed reason -> record [ "case", box "Failed"; "reason", box reason ]
         | InquiryStatus.Cancelled reason -> record [ "case", box "Cancelled"; "reason", box reason ]
 
+    let private interpretationOutcome outcome =
+        match outcome with
+        | None ->
+            [ "interpretationId", null
+              "pluginRef", null
+              "status", box "pending"
+              "reason", null ]
+        | Some(InterpretationOutcome.Applied applied) ->
+            [ "interpretationId", box applied.InterpretationId
+              "pluginRef", box applied.PluginRef
+              "status", box "applied"
+              "reason", null
+              "delta", envelope applied.Delta ]
+        | Some(InterpretationOutcome.Failed failed) ->
+            [ "interpretationId", box failed.InterpretationId
+              "pluginRef", box failed.PluginRef
+              "status", box "failed"
+              "reason", box failed.Reason ]
+
+    let private interpretation (value: InterpretationRecord) =
+        record (
+            [ "observationId", box (ObservationId.value value.ObservationId)
+              "workId", box (WorkId.value value.WorkId)
+              "attempt", attempt value.Attempt ]
+            @ interpretationOutcome value.Outcome
+        )
+
     /// All InquiryState fields, including receipt contents and physical bindings. Map/set
     /// order is canonical; list order is preserved. Event identity excludes this view.
     let state (value: InquiryState) =
@@ -396,19 +424,7 @@ module Representation =
                         "attempt", attempt overrun.Attempt
                         "resources", resources overrun.Resources ])
               "observations", pairs id accepted value.Observations
-              "interpretations",
-              pairs
-                  id
-                  (fun (interpretation: InterpretationRecord) ->
-                      record
-                          [ "observationId", box (ObservationId.value interpretation.ObservationId)
-                            "workId", box (WorkId.value interpretation.WorkId)
-                            "attempt", attempt interpretation.Attempt
-                            "interpretationId", optional box interpretation.InterpretationId
-                            "pluginRef", optional box interpretation.PluginRef
-                            "status", box interpretation.Status
-                            "reason", optional box interpretation.Reason ])
-                  value.Interpretations
+              "interpretations", pairs id interpretation value.Interpretations
               "rounds",
               pairs
                   RoundId.value
@@ -436,14 +452,11 @@ module Representation =
               "physicalBindings",
               pairs
                   id
-                  (fun (binding: PhysicalBinding) ->
+                  (fun (dispatch: DispatchRecord) ->
                       record
-                          [ "workId", box (WorkId.value binding.WorkId)
-                            "attempt", attempt binding.Attempt
-                            "dispatchIntentId", box binding.DispatchIntentId
-                            "physicalRef", optional box binding.PhysicalRef
-                            "receipt", optional box binding.Receipt ])
-                  value.PhysicalBindings
+                          [ "request", dispatchRequest dispatch.Request
+                            "receipt", optional dispatchReceipt dispatch.Receipt ])
+                  value.Dispatches
               "status", status value.Status ]
 
     let fingerprint (digest: string -> string) value =

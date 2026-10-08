@@ -89,12 +89,15 @@ export class TestRunState {
   _recordContainerFailure(data, file, fileWrapper = false) {
     const key = `${fileWrapper ? 'file' : 'test'}::${this._resultKey(data, file)}`
     const ms = Number(data.details?.duration_ms ?? data.durationMs)
-    this._containerFailures.set(key, {
+    const failure = {
       name: data.name ?? '<unnamed container>', file, sourceFile: data.file,
       line: data.line, column: data.column, nesting: data.nesting,
       durationMs: Number.isFinite(ms) && ms >= 0 ? ms : 0,
       error: data.details?.error,
-    })
+    }
+    const existing = this._containerFailures.get(key)
+    if (existing && Object.keys(failure).every(field => existing[field] === failure[field])) return
+    this._containerFailures.set(key, failure)
   }
 
   /**

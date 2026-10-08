@@ -1,5 +1,31 @@
 # 06：GAP 补充清单与无 TODO 义务
 
+2026-10-07接续：[U0追加结果与消费者](../archive/2026-10-07/U0追加结果与消费者施工-2026-10-07.md)已有限验收，gen230相关产品2042/0、监督器93/0、实际flat编译28/0；实际I/O/cold、受控映射与物理fatal分别记账，不能将typed新case或邻近绿升级为全部cut传播完成。下一按[U0-A1接手卡](../U0-A1结算传播接手卡-2026-10-07.md)推进。GAP-097/098及H0b仍PARTIAL。最新[2d2e官方CI](../archive/2026-10-07/baselines/2d2e-ci/receipt.txt)原预算738/824排空且Host033双锚点真实失败；标题窄修已有正式局部绿，整体CI仍未验收。[737共同完整成本样本](../archive/2026-10-07/baselines/2d2e-cost/README.md)只完成调查，不推CPU收益或N00闭合。下方各历史“最新”由本段和总计划首节接续，旧失败与GAP状态保留。
+
+2026-10-06接续：GAP-055仍PARTIAL。[N04-C3](../N04真实只读Fable执行契约-2026-10-05.md)补真实独立consumer的exit73、正常action拒绝、Error/null精确聚合和四owner完整恢复，生产helper不改；gen170 native11/11，正式4/4文件312/0、17skip/2TODO。此项不替代FD/backing/ABA、全过程物理保护与同候选actual verify，T418/T419保留。N00最新[ccfc CI](../archive/2026-10-05/baselines/ccfc-ci/receipt.txt)完整821/821、4585/0、119skip/390TODO，unit约297秒仅pending；历史a15原300秒截断仍有效，不推定旧失败原因或稳定吞吐。
+
+本轮规划不关闭任何GAP。Sphinx GAP-153/219依次等待A2-R0真实恢复、R1资源/source、R2三producer及后续Host/profile/公开答案；D0/D1不能代替它们。制度学习GAP-180/181/182从canonical Rulebook及真实存储事务切入：现list Append逐记录写NDJSON，尚无崩溃整批恢复证明；DeferredWorkResurfaced实际fact/codec/fold也待接。这是源码调查与下一包前提，未取正式故障红绿；不把API批量调用或本次计划更新计作原子BIRTH验收。
+
+2026-10-05最新状态：6a282ecfc全仓CI已818/818、4303/0、105skip、396TODO，仅pending退出1；gen121正式相关80文件783/0。后续按[总计划N00—N09](../TODO施工总计划-2026-10-03.md)施工。本页历史表中GAP-077的inline/未接registered、GAP-181的仅ABSORB/DISCARD叙述均已过时；015交付已证，机械BIRTH已存在，剩余分别是认知语义以及统一Rulebook、原子生效和私有机制提炼。GAP状态不因规划或旧TODO消失自动关闭。
+
+2026-10-05 当前接续：[目录所有权与生产接线](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)。本批六 namespace owner、PP-011/T335、grounding B/T387 与 cognitive/015 注册投递切片已验收完成；gen116 正式 80/80、772/0，cf6fb31e8 Linux 818/818、4292/0，仅既有 pending 退出1。canary completed 后隔离及晚到 HTTP 错误回归最终 integration 21/0。原失败记录保留，整体 GAP 状态不变；后续 S03 只读/FD/ABA/actual verify 及其他语义按原卡继续，不重做本批切片。
+
+当前scope仍pending final：gen112缺显式SDKroot的436/0/7skip/2TODO排空不替代6skip范围；完整Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空。npm第一正例只拆真实准备完成与实际install/assert判决边界，原强断言/held负例/5000及300000保持，gen113最终待附件，不因此关闭任何GAP。误名单setup与不同输入单列，Archive未施工。
+
+最新证据补充：aac79 CI `37202396189`为818/818、4253/0/103skip/404TODO、244.51s wall/370.10s testtime，仅pending退出1，未含当前source/NuGet共享修复，不改写9909实际cap。NuGet同15叶before15/0 23.782s→after15/0 13.165s只属本机单次观测；source新增parent替换/rootmissing第三反例后完整定向13/0、2.942s，原12/0为此前截面，统一输入待附件。所有PARTIAL/T418/T419状态保持。
+
+GAP-055 最新增量见[实际单项目 Fable 编译](../archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)：原四 owner 保持、原 artifacts 的自有 seed、实际编译产物与完整库存身份绑定，正式结果见附件。前批单项目 NuGet 的派生 lock、raw/contentHash 和源码库存证据保持；SDK packs/tool bundled FSharp.Core 也参加编译，四包图不是所有编译输入闭包。历史“工程 NuGet/Fable 待施工”由此有限范围接续，不能推导全仓工程、真正只读执行或 actualverify 已经通过；GAP-055 PARTIAL 与 T418/T419 保持。
+
+最新接续[源码目录身份与NuGet协议夹具](../archive/2026-10-04/S03源码目录身份与NuGet协议夹具-2026-10-04.md)：source实际foreign parent/root红0/2，私有dev/ino守publication/revalidate前后/dispose/catch后定向12/0；Fable aac79已提交，archive/tools/NuGet同类未因此修完。15个NuGet非法图只共享不被该组改写的真实Git前提，各叶资源和原typed/calls断言保持，195→13静态成本不代表CI因果。9909 CI300000ms时817/818、active016、无summary是实际失败而非pending-only；新统一输入待附件。TOCTOU/ABA、完整FD、monitor fullsetsid/crash、/bin/ps来源及GAP-054全阶段、GAP-055/T418/T419的readonly/actualverify均保留，不删测试、调workers或扩预算。
+
+GAP-055接续[依赖归档准备](../archive/2026-10-04/S03依赖归档准备-2026-10-04.md)：独立物化所选摘要归档，复核完整成员、mode/字节及闭合链接；新增真实npm安装定向45项、完整selected Node/npm bundle定向15项通过，均0失败，见[本批记录](../archive/2026-10-04/S03真实npm与Node工具准备-2026-10-04.md)与[016测试说明](../../requirements/verification-system/tests/README.md)。安装receipt的`bootstrap-admission`与工具receipt的`selected-node-npm-bundle`范围不同；工具探针后共用归档owner重新核对完整物理成员，只是步骤边界复核。本批默认夹具实际npm为11.18.0，尚未以仓库声明11.12.1安装实际仓库依赖；SDK、Git、dotnet/Fable/NuGet、只读保护和实际verify同源/结论绑定未闭合，仍PARTIAL，不删除T418/T419。
+
+工具prepare/runProbe已补独立取消回归：挂起真实npm探针后保留Error/null原原因，POSIX进程组与后代退出、pipe排空、ownedroot回收，启动前取消先于缺失归档读取；Windows子树回收仍未证。
+
+工具owner还校验npm声明的必需生产依赖图在所选npm包内闭合：direct `graceful-fs`/transitive `@gar/promise-retry`缺失时不能借父目录实际补包。optional缺失允许，存在则递归；非任意loaded module、绝对文件读取或OS闭包证明。完整npm11.12.1工具包另15项通过，不是实际仓库安装。Homebrew Node26定向58项45通过、13失败，缺`libnode`真实拒绝；后续平台证据统一见本批记录，不隐藏失败。
+
+第二批见[工具归档安装与输出根](../archive/2026-10-04/S03工具归档安装与输出根-2026-10-04.md)：归档安装入口`installVerificationDependenciesFromToolArchive`真实10报告项通过、0失败（含父组），完整工具自己准备/回收，原bundle路径执行，公开发布前full revalidate，固定toolDigest绑定installation/dependencyDigest；真实held请求后工具库/成员改动、版本拒绝和Error/null取消均证明不发布。旧bootstrap仍只有原45项有限范围。Mac真实挂载仅补输出root保留、子项清理与owned挂载回收，受控spawn不证明actual Fable只读执行。upstream `590a3f69e` copy/chmod父目录替换后恢复的实际反例仍报告PASS、exitCode0，保留T418/T419、GAP-055 PARTIAL及SDK/Git/NuGet/RO/actualverify剩余义务。
+
 返回[总计划](../TODO施工总计划-2026-10-03.md)。来源为基线 `8cf51cc84` 的 [GAP 台账](../../requirements/GAP.md)，本次没有修改其状态。逐行核对得到 **137 项未闭合记录：10 OPEN、127 PARTIAL**。它们与 424 个 TODO 是多对多关系，不能相加作为任务数。
 
 2026-10-03实施增量：调查曾新增GAP-223，使未闭合数达到138项（11 OPEN、127 PARTIAL）；后续R01—R04正式完成并关闭该项，当前回到 **137项未闭合：10 OPEN、127 PARTIAL**。证据见[Host就绪与Guard替代记录](../archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。006判决输送及Host就绪只补齐GAP-054的有限证明，不关闭全阶段审阅债；下一批是总计划S03的T418/T419。
@@ -22,7 +48,7 @@
 
 ### G03：认知材料及实际任务轨迹
 
-范围 GAP-076/077/078/083/118 及 office 的语义部分。先穷举实际投递材料与权限，再用有限、可复核任务验证职责边界；每例记录输入、可见材料、实际动作、证据、审阅判断和未覆盖情况。特别补 cognitive-environment015 的 Blogger 白名单/重复注入/历史不变真实 Host 路径，不能因为默认清单没 TODO 就跳过。参见分册 03、04。
+范围 GAP-076/077/078/083/118 及 office 的语义部分。先穷举实际投递材料与权限，再用有限、可复核任务验证职责边界；每例记录输入、可见材料、实际动作、证据、审阅判断和未覆盖情况。cognitive-environment015 的 Blogger 白名单/重复注入/历史隔离真实Host路径已完成并保持回归，后续优先001/003/004/005/007的实际请求分区与权限不随知识扩大。参见分册03、04及总计划N07/N09。
 
 ### G04：等待、时钟和工程边界的残余部分
 
@@ -54,7 +80,7 @@
 | GAP-052 · PARTIAL | requirement-system-001/002/005/007/008/010 | [requirement-system](01-Host与验证.md)：无运行时 TODO；仍按本卡审阅 | 格式检查不能判定语义重复、隐性规则、组织权或历史编号复用；001、004—008、011、017、018 保留可识别形式的正反例，其余人工审阅。 |
 | GAP-053 · PARTIAL | feature-ablation-002 | [feature-ablation](04-认知与Sphinx.md)：无运行时 TODO；仍按本卡审阅 | registry、执行/schema/事实/角色 gate 的行为有反例；尚未证明每个业务包关闭后全链零副作用及借用面完整。新 registry 接口不改变此证明限制。 |
 | GAP-054 · PARTIAL | verification-system-004/005/006/007/010/012/018/019 | [verification-system](01-Host与验证.md)：016 | 保留真实监督与门禁反例；尚非全部门禁、业务进展来源、监测起止、冻结判据与扫描例外的完整证明。Temporal 样本也须逐项核对其实际层级。 |
-| GAP-055 · PARTIAL | verification-system-006/016 | [verification-system](01-Host与验证.md)：016 | 已补真实corpus输入闭包：tracked proposals内容与Git跟踪集合身份参与验证digest，Git inventory失败阻止任何阶段启动；6项反例先红后绿。运行器仍只检查步骤边界，阶段中途修改再恢复仍可能通过。固定快照还缺准备一致性、真正不可写输入、外部依赖隔离、各阶段同源及结论绑定，两个TODO保留；copy、chmod或fs.watch均不当作完整隔离证明。 |
+| GAP-055 · PARTIAL | verification-system-006/016 | [verification-system](01-Host与验证.md)：016 | 已补corpus/输入链接拒绝、明确Git tree源码及库存/receipt复核、Node/npm与选定SDK/tool、单项目NuGet准备。最新[单项目Fable](../archive/2026-10-04/S03实际单项目Fable编译-2026-10-04.md)通过自有artifacts seed保护原四owner，实际执行与全输出身份绑定，最终正式结果见附件；四包NuGet graph不覆盖SDK packs/tool bundled FSharp.Core等全部编译输入，不升级为全仓工程图。历史bootstrap/Homebrew缺库与upstream590父目录替换PASS各自保留。Mac输出清理或有限编译不证明RO；Git/OS、全过程输入保护与actualverify同候选仍待闭合，T418/T419保留；copy/chmod/watch及前后库存不是全过程不变证明。 |
 | GAP-056 · PARTIAL | verification-system-008/020 | [verification-system](01-Host与验证.md)：016 | 用户已确认断言完整性按规范要求的结果和副作用判断；精确结构/文本仍完整比较。生成器设施的重放成功不等于全仓 oracle 独立、充分，继续人工审阅。 |
 | GAP-057 · PARTIAL | verification-system-021 | [verification-system](01-Host与验证.md)：016 | 计数、容器失败、结果流与文件完成已有回归；其它入口对未完成原因和范围的传播仍待证，TODO 应阻断完整验收。 |
 | GAP-058 · PARTIAL | js-semantic-surface-001/006 | [js-semantic-surface](01-Host与验证.md)：001/006 | `.mjs` 辅助文件义务与既有 `.js` 依赖、真实退出探针对内部物理入口的导入例外尚待裁决。保留可执行 TODO，不删除物理退出证据。 |
@@ -150,7 +176,7 @@
 | GAP-150 · OPEN | crash-reconciliation-019 | [crash-reconciliation](02-权限与生命周期.md)：001/002/003/004/005/006/008/009/011/012/015/016/017/018/019/020/021 | 独立effect proof registry的权威与维护关系仍需裁决；保留四阶段、歧义与物理证明要求，不以新增平行清单强行闭合。 |
 | GAP-151 · PARTIAL | durable-convergence | [durable-convergence](02-权限与生命周期.md)：002/003/004/005/007/008/010 | 真实Git、双remote配置保留与幂等用例存在；跨机器Current、受控CAS竞争、崩溃原子替换和增量成本仍待证。 |
 | GAP-152 · PARTIAL | durable-convergence-011 | [durable-convergence](02-权限与生命周期.md)：002/003/004/005/007/008/010 | 过期parent与从未存在的parent在当前窗口查询中不可区分；需决定开放边界或提供过期证据，不能由测试暗定。 |
-| GAP-153 · PARTIAL | delegation | [delegation](02-权限与生命周期.md)：001/004/005/006/007/008/010/013/014/015/017/019/020/021/022/023/025/026/028/029/030/031/032 | 实际fork/resume、批次、接收、队列和交接用例保留；Sphinx标准Engineer的完整权限链、全局注册、绑定恢复、重复terminal及fatal settlement→mandatory fuse仍待证。55转入42的四个Mailbox用例仅证明领取顺序和中断；旧只读Sphinx政策已退役。 |
+| GAP-153 · PARTIAL | delegation | [delegation](02-权限与生命周期.md)：001/004/005/006/007/008/010/013/014/015/017/019/020/021/022/023/025/026/028/029/030/031/032 | B1-A观察/fallback、D0通知及D1等待隔离/抛错有限完成，不替Sphinx权限链或fork全部terminal。retry/repair/guard仍缺本assignment归属；07第11节先真恢复夹具、隔离配置/实际scope/shared fence，再冻结lease/source与真实successor矩阵。取消/Dispose/registration lease、同步Host异常、全局注册、绑定恢复及mandatory fuse仍待；Mailbox仅领取/中断，旧只读Sphinx政策退役。 |
 | GAP-154 · PARTIAL | delegation-007/024 | [delegation](02-权限与生命周期.md)：001/004/005/006/007/008/010/013/014/015/017/019/020/021/022/023/025/026/028/029/030/031/032 | 活跃旧角色在创建child前拒绝的回归保留；本基线尚未重新编译执行，不将历史通过误报为当前通过。 |
 | GAP-155 · PARTIAL | concern-routing | [concern-routing](04-认知与Sphinx.md)：001/003/004/005/006/007 | 002证明engineer/manager/devops各收一次、blogger不收、新合格者重开后仍收到。新增重开测试证明旧occurrence冻结提示byte-identical、新occurrence不重复公告。原“coverage未恢复”声明撤销：原测试将同一placement的合法重放误判为新投递。插件重开不等于OS crash；真实workspace隔离、持久竞争、权限全链和进程crash仍缺证。 |
 | GAP-156 · PARTIAL | concern-routing-003 | [concern-routing](04-认知与Sphinx.md)：001/003/004/005/006/007 | 同occurrence不同sender/address/message原被当成功重放；已迁入完整材料一致性裁决、双语拒绝资源和真实入口反例，待新构建验证。 |
@@ -176,12 +202,12 @@
 | GAP-215 · PARTIAL | change-integration-001/003/004 | [change-integration](02-权限与生命周期.md)：004/006/011/015/017 | ref-only gate合同与实际CaptureSnapshot、durable claim/Published门内写入冲突；需选择最小有界可恢复事务或重设计门外提交协议，暂保留严格合同与TODO。 |
 | GAP-217 · PARTIAL | host-boundary-032 | [host-boundary](01-Host与验证.md)：019/029/032 | 已执行反例并修复readonly键序、删除中途失败回滚、重加review contract后的键序；两个独立暂存绑定exact session/call/tool，before在await前后复查，迟到或缺身份after不释放其他call暂存；Vault先按字段所有权判断再读取，不触发业务同名getter。16项新真实hook回归通过，断言原对象、完整描述符及键序。修正旧C11自抛异常冒充Host异常路径的标题；安装版Host executor抛错后自动after仍TODO，canary不默认成功，整条款不关闭。 |
 | GAP-218 · PARTIAL | crash-reconciliation-018/020/021 | [crash-reconciliation](02-权限与生命周期.md)：001/002/003/004/005/006/008/009/011/012/015/016/017/018/019/020/021 | 保留append失败传播与Unknown/poison反例；加载owner按真实Active work恢复已有AdmittedWork，用exact ChildWorkVoided关闭scoped authority，无scope合法历史才走原分支。018/020覆盖journal重开、零completion/horizon及新工作。仍缺plugin activation门禁，Load Phase/延迟激活合同与TargetAgent空值回退尚待修复。 |
-| GAP-219 · PARTIAL | sphinx-v2真实入口 | [sphinx-v2](04-认知与Sphinx.md)：001/004/010/011/012/013/017/021/022/026/034/036 | 上游已有MCP七工具解码、typed拒绝、cancel准入与canonical Persistence；旧handler忽略输入的诊断退役。start/claim/submit/amend仍unsupported、export traceUnavailable；现存inquiry status JSON出口待证。OpenCode可dispatch/request-cancel但没有结果/intent读取能力，Unknown及拒绝不能算物理可用。正式SDK和持久化证据见同步记录，完整纵向业务链与026跨算子传播仍待证。 |
+| GAP-219 · PARTIAL | sphinx-v2真实入口 | [sphinx-v2](04-认知与Sphinx.md)：001/004/010/011/012/013/017/021/022/026/034/036 | A已证明MCP/JS真实start/native查询/accepted trace、内容绑定receipt及冷进程；B0完整dispatch事实、逐work预留与冷恢复已证，旧handler/traceUnavailable诊断退役。B1-A/B2-0仅执行观察和Unestimated守门，claim/submit/授权amend、实际Host/profile、结果解释/renderer/公开答案及usage/取消仍未接。A2恢复归属先于Host接线。OpenCode adapter的Unknown/拒绝不算物理结果能力，整体纵向链与026传播仍待证。 |
 | GAP-220 · PARTIAL | obligation-ledger-001/002/006 | [obligation-ledger](02-权限与生命周期.md)：002/003/004/006/007 | 插件已不改写todowrite的provider定义与参数，todos原样交给Host；checkpoint由exact message.part.updated的completed终态确认。仍缺安装版OpenCode对当前session TodoTable的真实替换/清空物理canary。 |
 | GAP-222 · OPEN | sphinx-v2替代合同 | [sphinx-v2](04-认知与Sphinx.md)：001/004/010/011/012/013/017/021/022/026/034/036 | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
 
 ## 已退出与已关闭项的边界
 
-GAP-170—175 和 GAP-196/191 等 RETIRED 项保持历史语义，不重新施工旧内核、旧 ProjectionCut 或旧 todo 账本。GAP-216（构建）、214（Git cleanliness）、146（guard owned interrupt）、081（TOML 原值）及 161（Casebook 同次捕获差分）已关闭；保留回归，不把它们当新未实现前提。GAP-223本批关闭，仍保留033六个真实Host场景、actual Manager发送许可及相邻exact结算回归；不能扩为GAP-139或全部生命周期已证。GAP-221 的持久 canvas 等旧路径不得回生。其它历史 CLOSED 记录若有后来 PARTIAL/OPEN 的具体范围，以最新证据和现行条款对照，不从 CLOSED 标签推导整个包完整。
+GAP-170—175 和 GAP-196/191 等 RETIRED 项保持历史语义，不重新施工旧内核、旧 ProjectionCut 或旧 todo 账本。GAP-216（构建）、214（Git cleanliness）、146（guard owned interrupt）、081（TOML 原值）及 161（Casebook 同次捕获差分）已关闭；保留回归，不把它们当新未实现前提。GAP-223 的历史关闭证据保留，但033旧六场景的用户输入物理 abort 合同已被 upstream821492601 撤销，不得据此恢复旧端口。当前 actual Manager 发送许可、相邻 exact 结算和新033四场景依现行 WHAT 分别验收，进度见[2026-10-07记录](../archive/2026-10-07/Upstream增量与结果合同施工-2026-10-07.md)；不能扩为GAP-139或全部生命周期已证。GAP-221 的持久 canvas 等旧路径不得回生。其它历史 CLOSED 记录若有后来 PARTIAL/OPEN 的具体范围，以最新证据和现行条款对照，不从 CLOSED 标签推导整个包完整。
 
 最终归档要求：每个上表条目有“对应现行条款、负责 owner、正式证据/人工审阅、剩余边界、结果提交”五项。仅消除 424 个 TODO 而没有处理基线137条及后续增量记录，不能宣告本计划全部完成。

@@ -74,9 +74,15 @@ module CasebookLifecycle =
         : Task<CaseFinalizeSettlement> =
         task {
             match! CasebookWorkflow.finalizeCase store case with
-            | Error reason when reason.Contains "already finalized" ->
-                return CaseFinalizeSettlement.phaseConflict delegateSessionId reason
-            | Error reason -> return CaseFinalizeSettlement.notCommitted delegateSessionId reason
+            | Error(CasebookMutationError.AlreadyFinalized identity) ->
+                return
+                    CaseFinalizeSettlement.phaseConflict
+                        delegateSessionId
+                        (CasebookMutationError.describe (CasebookMutationError.AlreadyFinalized identity))
+            | Error(CasebookMutationError.AppendFailure failure) ->
+                return CaseFinalizeSettlement.persistenceFailed delegateSessionId failure
+            | Error error ->
+                return CaseFinalizeSettlement.notCommitted delegateSessionId (CasebookMutationError.describe error)
             | Ok() ->
                 CasebookIndex.invalidate ()
                 return! refreshIndexThenSettle store delegateSessionId
@@ -261,27 +267,39 @@ module CasebookLifecycle =
             return! archiveCase store identity case
         }
 
-    let private refreshWhenTouched (store: IEventStore) (touched: Result<unit, string>) : Task<unit> =
+    let private refreshWhenTouched
+        (store: IEventStore)
+        (touched: Result<unit, CasebookMutationError>)
+        : Task<Result<unit, CasebookMutationError>> =
         task {
             match touched with
             | Ok() ->
                 CasebookIndex.invalidate ()
                 let! _ = CasebookIndex.refresh store 256
-                return ()
-            | Error _ -> return ()
+                return Ok()
+            | Error error -> return Error error
         }
 
-    let private touchAccessEnabled (store: IEventStore) (sessionId: string) : Task<unit> =
+    let private touchAccessEnabled
+        (store: IEventStore)
+        (sessionId: string)
+        : Task<Result<unit, CasebookMutationError>> =
         task {
             try
                 let! touched = CasebookWorkflow.touchCaseAccess store sessionId
-                do! refreshWhenTouched store touched
-            with _ ->
-                ()
+                return! refreshWhenTouched store touched
+            with ex ->
+                return Error(CasebookMutationError.PreparationRejected ex.Message)
         }
 
-    let touchAccess (workspaceRoot: string) (store: IEventStore) (sessionId: string) : Task<unit> =
+    let touchAccess
+        (workspaceRoot: string)
+        (store: IEventStore)
+        (sessionId: string)
+        : Task<Result<unit, CasebookMutationError>> =
         task {
             if CasebookFeature.isEnabled workspaceRoot then
-                do! touchAccessEnabled store sessionId
+                return! touchAccessEnabled store sessionId
+            else
+                return Ok()
         }

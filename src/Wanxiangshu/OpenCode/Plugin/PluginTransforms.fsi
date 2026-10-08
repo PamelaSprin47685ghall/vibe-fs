@@ -33,7 +33,8 @@ module PluginTransforms =
             ApplyReadonlyDelegation: string option -> obj -> Task<unit>
             InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
             ProjectRequirementGrounding: string option -> obj -> Task<unit>
-            InjectBloggerChronicle: string option -> obj -> unit
+            InjectBloggerChronicle:
+                string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> obj -> unit
             SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
             SanitizeMessages: obj -> unit
         }

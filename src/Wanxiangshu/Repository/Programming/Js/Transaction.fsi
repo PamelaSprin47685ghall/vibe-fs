@@ -9,6 +9,8 @@ type JsStagedMutation =
 
 type JsReadSnapshot = { Path: string; Text: string }
 
+type JsExplicitFileRead = { Path: string; ResultBytes: string }
+
 [<RequireQualifiedAccess>]
 type JsCommitMutation =
     | RewriteFile of path: string * expectedCurrent: string * newText: string
@@ -38,13 +40,6 @@ module JsTransaction =
 
     val commitPlan: mutations: JsStagedMutation list -> JsCommitMutation list
     val rollbackPlan: mutations: JsStagedMutation list -> JsRollbackMutation list
-
-type JsTransactionId = private JsTransactionId of string
-
-module JsTransactionId =
-    val create: value: string -> JsTransactionId
-    val value: JsTransactionId -> string
-    val generate: unit -> JsTransactionId
 
 type JsDurableMutation =
     { Path: string

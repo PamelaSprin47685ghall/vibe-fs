@@ -87,6 +87,7 @@ type AnswerPreparedBody =
 
 type AnswerCommittedBody =
     { RenderWorkId: WorkId
+      ResultObservationId: ObservationId
       AnswerRef: string
       StopReason: string }
 

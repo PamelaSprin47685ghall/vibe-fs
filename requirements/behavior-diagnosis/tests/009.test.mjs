@@ -54,7 +54,7 @@ test('WHAT[behavior-diagnosis-009] raw cardinality precedes decode filtering on 
 
 {
 const { default: assert } = await import('node:assert/strict')
-const { mkdtempSync, readFileSync, rmSync } = await import('node:fs')
+const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import('node:fs')
 const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
 const blog = await import('../../../dist/Enforcer/BlogSurface.js')
@@ -66,7 +66,7 @@ const ownership = await import('../../verification-system/tests/support/blogger-
 resources.runtimeInstallFromPackage()
 
 let ownerCounter = 0
-const setupOwner = async (t) => {
+const withOwner = async (action) => {
   ownerCounter += 1
   const n = ownerCounter
   const ids = {
@@ -77,50 +77,85 @@ const setupOwner = async (t) => {
     physical: `msg-phys-blog-bd009-${n}`,
   }
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bd009-'))
-  const opened = await journal.JournalSurface_bootWithWriterId(
-    dir,
-    `writer-bd009-${n}`,
-    `rt-bd009-${n}`,
-    4242,
-    '2026-01-01T00:00:00Z',
-  )
-  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const durable = opened.journal.journal
-  await ownership.linkBlogger(opened.journal, ids.main, ids.blogger)
-  const profile = await ownership.rootBlogger(opened.journal, ids.blogger, ids.root)
-  // Real process-local owner scope (isolates the shared flight registry).
-  const scope = runtime.createScope()
-  const request = runtime.main({
-    requestId: ids.request,
-    mainSession: ids.main,
-    bloggerSession: ids.blogger,
-    toml: 'bd-009-toml',
-  })
-  assert.equal(runtime.claimCurrentRequest(scope, ids.blogger, request), 'Claimed')
-  await ownership.ownRequest({
-    handle: opened.journal,
-    durable,
-    scope,
-    bloggerSession: ids.blogger,
-    profile,
-    request,
-    physical: ids.physical,
-  })
-  t.after(() => {
+  let opened
+  let scope
+  let actionFailure
+  const drains = []
+  try {
+    opened = await journal.JournalSurface_bootWithWriterId(
+      dir,
+      `writer-bd009-${n}`,
+      `rt-bd009-${n}`,
+      4242,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    const durable = opened.journal.journal
+    await ownership.linkBlogger(opened.journal, ids.main, ids.blogger)
+    const profile = await ownership.rootBlogger(opened.journal, ids.blogger, ids.root)
+    // Real process-local owner scope (isolates the shared flight registry).
+    scope = runtime.createScope()
+    const request = runtime.main({
+      requestId: ids.request,
+      mainSession: ids.main,
+      bloggerSession: ids.blogger,
+      toml: 'bd-009-toml',
+    })
+    assert.equal(runtime.claimCurrentRequest(scope, ids.blogger, request), 'Claimed')
+    await ownership.ownRequest({
+      handle: opened.journal,
+      durable,
+      scope,
+      bloggerSession: ids.blogger,
+      profile,
+      request,
+      physical: ids.physical,
+    })
+    return await action({
+      ids,
+      durable,
+      scope,
+      request,
+      dir,
+      trackPending: pending => {
+        drains.push(Promise.allSettled([pending]))
+        return pending
+      },
+      writerFile: join(dir, 'wanxiang', 'events', `writer-bd009-${n}.ndjson`),
+    })
+  } catch (error) {
+    actionFailure = { error }
+    throw error
+  } finally {
+    const failures = []
     try {
-      runtime.dispose(scope)
-    } catch {}
+      if (scope) runtime.dispose(scope)
+    } catch (error) {
+      failures.push(error)
+    }
     try {
-      journal.JournalSurface_dispose(opened.journal)
-    } catch {}
-    rmSync(dir, { recursive: true, force: true })
-  })
-  return {
-    ids,
-    durable,
-    scope,
-    request,
-    writerFile: join(dir, 'wanxiang', 'events', `writer-bd009-${n}.ndjson`),
+      if (scope) await runtime.drainRepairEpisodes(scope)
+    } catch (error) {
+      failures.push(error)
+    }
+    for (const drain of drains) {
+      const [outcome] = await drain
+      if (outcome.status === 'rejected') failures.push(outcome.reason)
+    }
+    try {
+      if (opened?.ok) journal.JournalSurface_dispose(opened.journal)
+    } catch (error) {
+      failures.push(error)
+    }
+    try {
+      rmSync(dir, { recursive: true, force: true })
+    } catch (error) {
+      failures.push(error)
+    }
+    if (failures.length) {
+      const causes = actionFailure ? [actionFailure.error, ...failures] : failures
+      throw new AggregateError(causes, 'Blogger observation fixture cleanup failed', { cause: actionFailure ? actionFailure.error : failures[0] })
+    }
   }
 }
 
@@ -136,12 +171,7 @@ const ownedTerminal = (ids, run, parts = []) => [
 // rides in payload, and its fact is the union path
 // Agent → Context → BlogObservationCommitted.
 const isObservationLine = line => {
-  let parsed
-  try {
-    parsed = JSON.parse(line)
-  } catch {
-    return false
-  }
+  const parsed = JSON.parse(line)
   const fact = parsed?.payload?.Fact
   return Array.isArray(fact)
     && fact[0] === 'Agent'
@@ -152,13 +182,7 @@ const isObservationLine = line => {
 }
 
 const committedCount = (writerFile) => {
-  let text = ''
-  try {
-    text = readFileSync(writerFile, 'utf8')
-  } catch {
-    return 0
-  }
-  return text
+  return readFileSync(writerFile, 'utf8')
     .split('\n')
     .filter(line => line.trim() !== '')
     .filter(isObservationLine)
@@ -172,49 +196,102 @@ const undecodableChronicle = callID => ({
   state: { status: 'completed', input: { charge: 'only a charge, nothing else' } },
 })
 
-test('WHAT[behavior-diagnosis-009] GAP-112 real raw two-call terminal with only one decodable call commits nothing and advances no coverage', async (t) => {
-  const { ids, durable, scope, writerFile } = await setupOwner(t)
-  const parts = [
-    ownership.chroniclePart('call-1', 'primitive-obsession', 'one decodable observation'),
-    undecodableChronicle('call-2'),
-  ]
+test('WHAT[behavior-diagnosis-009] GAP-112 real raw two-call terminal with only one decodable call commits nothing and advances no coverage', async () => {
+  await withOwner(async ({ ids, durable, scope, writerFile }) => {
+    const parts = [
+      ownership.chroniclePart('call-1', 'primitive-obsession', 'one decodable observation'),
+      undecodableChronicle('call-2'),
+    ]
 
-  const outcome = await blog.continueTransform(
-    scope,
-    durable,
-    ids.blogger,
-    ownedTerminal(ids, 'run-mixed', parts),
-  )
-  assert.ok(['ProjectMessages', 'StopPhysicalRun'].includes(outcome.kind))
+    const outcome = await blog.continueTransform(
+      scope,
+      durable,
+      ids.blogger,
+      ownedTerminal(ids, 'run-mixed', parts),
+    )
+    assert.ok(['ProjectMessages', 'StopPhysicalRun'].includes(outcome.kind))
 
-  // The raw cardinality breach commits no BlogObservationCommitted, and
-  // coverage only ever advances through that single fact — zero facts means
-  // zero coverage advance.
-  assert.equal(committedCount(writerFile), 0)
-  // No commit, no release: the exact flight still holds the open request.
-  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+    // The raw cardinality breach commits no BlogObservationCommitted, and
+    // coverage only ever advances through that single fact — zero facts means
+    // zero coverage advance.
+    assert.equal(committedCount(writerFile), 0)
+    // No commit, no release: the exact flight still holds the open request.
+    assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+  })
 })
 
-test('WHAT[behavior-diagnosis-009] a single fully decodable call still commits exactly one observation through the same real chain', async (t) => {
-  const { ids, durable, scope, writerFile } = await setupOwner(t)
-  const parts = [ownership.chroniclePart('call-1', 'primitive-obsession', 'one decodable observation')]
+test('WHAT[behavior-diagnosis-009] a single fully decodable call still commits exactly one observation through the same real chain', async () => {
+  await withOwner(async ({ ids, durable, scope, writerFile, trackPending }) => {
+    const parts = [ownership.chroniclePart('call-1', 'primitive-obsession', 'one decodable observation')]
 
-  // A successful commit parks the continuation waiting for new material, so
-  // the durable effect is the assertion target — not the parked return.
-  const pending = blog.continueTransform(
-    scope,
-    durable,
-    ids.blogger,
-    ownedTerminal(ids, 'run-single', parts),
-  )
-  const deadline = Date.now() + 5000
-  while (committedCount(writerFile) === 0 && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20))
+    // A successful commit parks the continuation waiting for new material, so
+    // the durable effect is the assertion target — not the parked return.
+    trackPending(blog.continueTransform(
+      scope,
+      durable,
+      ids.blogger,
+      ownedTerminal(ids, 'run-single', parts),
+    ))
+    const deadline = Date.now() + 5000
+    while (committedCount(writerFile) === 0 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    assert.equal(committedCount(writerFile), 1)
+    assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+  })
+})
+
+test('WHAT[behavior-diagnosis-009] a missing unreadable or malformed writer log cannot count as zero committed observations', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-bd009-log-'))
+  try {
+    assert.throws(() => committedCount(join(dir, 'missing.ndjson')), { code: 'ENOENT' })
+    assert.throws(() => committedCount(dir), { code: 'EISDIR' })
+    const malformed = join(dir, 'malformed.ndjson')
+    writeFileSync(malformed, '{broken journal line}\n')
+    assert.throws(() => committedCount(malformed), SyntaxError)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
-  assert.equal(committedCount(writerFile), 1)
-  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
-
-  runtime.dispose(scope)
-  await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 1000))])
 })
+
+test('WHAT[behavior-diagnosis-009] cleanup cancels and drains a publicly claimed repair episode before retiring its owner resources', async () => {
+  let disposedScope
+  let identity
+  let directory
+  await withOwner(async ({ ids, scope, dir }) => {
+    identity = [ids.request, ids.physical, ids.main, ids.blogger]
+    assert.equal(runtime.claimRepairEpisode(scope, ...identity), 'Claimed')
+    disposedScope = scope
+    directory = dir
+  })
+  assert.equal(runtime.claimRepairEpisode(disposedScope, ...identity), 'Error:Blogger runtime is shutting down')
+  assert.equal(existsSync(directory), false)
+})
+
+for (const failure of [new Error('controlled Blogger fixture action failure'), null]) {
+  test(`WHAT[behavior-diagnosis-009] owner cleanup preserves the original ${failure === null ? 'null' : 'Error'} action failure`, async () => {
+    let directory
+    const [outcome] = await Promise.allSettled([withOwner(async ({ dir }) => {
+      directory = dir
+      throw failure
+    })])
+    assert.equal(outcome.status, 'rejected')
+    assert.equal(outcome.reason, failure)
+    assert.equal(existsSync(directory), false)
+  })
+  test(`WHAT[behavior-diagnosis-009] a rejected pending task preserves the original ${failure === null ? 'null' : 'Error'} as the cleanup cause`, async () => {
+    let directory
+    const drainFailure = new Error('controlled pending-task failure')
+    const [outcome] = await Promise.allSettled([withOwner(async ({ dir, trackPending }) => {
+      directory = dir
+      trackPending(Promise.reject(drainFailure))
+      throw failure
+    })])
+    assert.equal(outcome.status, 'rejected')
+    assert.ok(outcome.reason instanceof AggregateError)
+    assert.equal(outcome.reason.cause, failure)
+    assert.deepEqual(outcome.reason.errors, [failure, drainFailure])
+    assert.equal(existsSync(directory), false)
+  })
+}
 }

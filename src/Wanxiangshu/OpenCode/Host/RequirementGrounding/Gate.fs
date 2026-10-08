@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 open System
 open System.Threading.Tasks
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
@@ -9,6 +10,9 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingGate =
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isString (value: obj) : bool = jsNative
 
     let private textField (value: obj) name =
         if isNull value || isNull value?(name) then
@@ -32,8 +36,21 @@ module RequirementGroundingGate =
 
     let private observationPaths (toolName: string) (args: obj) =
         match toolName.ToLowerInvariant() with
-        | "read" -> distinct [ textField args "filePath"; textField args "path" ]
+        | "read" ->
+            textField args "filePath"
+            |> Option.orElseWith (fun () -> textField args "path")
+            |> Option.toList
         | _ -> []
+
+    let nativeReadObservations toolName (args: obj) (output: obj) =
+        if not (isString output) then
+            []
+        else
+            observationPaths toolName args
+            |> List.map (fun path ->
+                { Path = path
+                  ResultBytes = string output
+                  Coverage = GroundingReadCoverage.PartialFile })
 
     let private emptyDecision =
         { NeedsGrounding = false
@@ -73,13 +90,13 @@ module RequirementGroundingGate =
         (journal: AgentJournal option)
         (workspace: string)
         (sessionId: string)
-        (paths: string list)
+        (reads: GroundingFileRead list)
         : Task<Result<RequirementGroundingDecision, string>> =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
         | Some durable ->
             let port = AgentJournalPortAdapter.forRequirementGrounding durable
-            RequirementGroundingRuntime.observeReadPaths port workspace (SessionId.create sessionId) paths
+            RequirementGroundingRuntime.observeFileReads port workspace (SessionId.create sessionId) reads
 
     let private ignoreDecision (operation: unit -> Task<Result<RequirementGroundingDecision, string>>) : Task<unit> =
         task {
@@ -102,12 +119,12 @@ module RequirementGroundingGate =
         (journal: AgentJournal option)
         (workspace: string)
         (sessionId: string)
-        (paths: string list)
+        (reads: GroundingFileRead list)
         : Task<Result<RequirementGroundingDecision, string>> =
-        if List.isEmpty paths then
+        if List.isEmpty reads then
             Task.FromResult(Ok emptyDecision)
         else
-            observeReads journal workspace sessionId paths
+            observeReads journal workspace sessionId reads
 
     let before
         (journal: AgentJournal option)
@@ -165,18 +182,20 @@ module RequirementGroundingGate =
         match workspace with
         | None -> Task.FromResult(())
         | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
-        | Some root -> ignoreDecision (fun () -> decideRead journal root sessionId (observationPaths toolName args))
+        | Some root ->
+            let output = if isNull toolOutput then null else toolOutput?output
+            ignoreDecision (fun () -> decideRead journal root sessionId (nativeReadObservations toolName args output))
 
     let programObservation
         (journal: AgentJournal option)
         (workspace: string)
         (sessionId: string)
-        (readPaths: string list)
+        (reads: GroundingFileRead list)
         (effectPaths: string list)
         : Task<unit> =
         task {
-            if not (List.isEmpty readPaths) then
-                do! ignoreDecision (fun () -> decideRead journal workspace sessionId readPaths)
+            if not (List.isEmpty reads) then
+                do! ignoreDecision (fun () -> decideRead journal workspace sessionId reads)
 
             if not (List.isEmpty effectPaths) then
                 do! ignoreDecision (fun () -> decideMutation journal workspace sessionId effectPaths)

@@ -46,6 +46,7 @@ test('WHAT[verification-system-011] coverage exclude globs are fixed: node_modul
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawnSync, fork } = await import("node:child_process");
+const { createServer } = await import("node:http");
 const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, statSync, symlinkSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { default: path, join } = await import("node:path");
@@ -58,6 +59,135 @@ const { selectProductionModules, verifyCoverageDenominator } = await import("./s
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const C8_BIN = path.join(REPO_ROOT, 'node_modules/c8/bin/c8.js')
+
+const permissionRequest = `import { get } from 'node:http'
+await new Promise((resolve, reject) => {
+  const request = get(process.env.WXS_COVERAGE_PERMISSION_URL, response => {
+    response.resume()
+    response.on('error', reject)
+    response.on('end', resolve)
+  })
+  request.on('error', reject)
+})
+`
+
+const emptyStandardInput = `let inputLength = 0
+for await (const chunk of process.stdin) inputLength += chunk.length
+if (inputLength !== 0) throw new Error('Silent coverage execution must receive empty stdin')
+`
+
+function c8Wrapper({ permission = false, signal = false, emptyInput = false } = {}) {
+  return `${permission ? permissionRequest : ''}${emptyInput ? emptyStandardInput : ''}import { spawn } from 'node:child_process'
+await new Promise((resolve, reject) => {
+  const child = spawn(process.execPath, [${JSON.stringify(C8_BIN)}, ...process.argv.slice(2)], { stdio: 'inherit' })
+  child.on('error', reject)
+  child.on('close', (code, signal) => {
+    if (code !== 0 || signal !== null) reject(new Error('Actual c8 did not complete successfully'))
+    else resolve()
+  })
+})
+${signal ? "process.kill(process.pid, 'SIGTERM')\n" : ''}`
+}
+
+async function coverageWithPermission(dir, phase) {
+  let completed = false
+  const observations = []
+  const server = createServer((request, response) => {
+    observations.push({ url: request.url, completed })
+    response.end('permission granted')
+  })
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  try {
+    const testScriptContent = `${phase === 'runner' ? permissionRequest : ''}import assert from 'node:assert/strict'
+import { foo } from './dist/a.js'
+assert.equal(foo(1), 'positive')
+`
+    const fixture = createMiniFixture(dir, { testScriptContent })
+    const c8Bin = phase === 'reporter' ? join(dir, 'c8-wrapper.mjs') : C8_BIN
+    if (phase === 'reporter') writeFileSync(c8Bin, c8Wrapper({ permission: true }))
+    const result = await runCoverage({
+      root: dir, c8Bin, unitRunnerScript: fixture.testScript,
+      assertBuildFreshFn: fixture.assertBuildFreshFn,
+      collectInputsFn: fixture.collectInputsFn,
+      env: { ...process.env, WXS_COVERAGE_PERMISSION_URL: `http://127.0.0.1:${server.address().port}/${phase}` },
+      silent: true,
+    })
+    completed = true
+    assert.deepEqual(observations, [{ url: `/${phase}`, completed: false }])
+    assert.equal(result.ok, true, JSON.stringify(result))
+    assert.equal(result.productionModulesCount, 2)
+    const report = JSON.parse(readFileSync(join(result.reportDir, 'coverage-final.json'), 'utf8'))
+    const untested = Object.entries(report).find(([file]) => file.endsWith('/b.js'))?.[1]
+    assert.ok(untested, 'The actual c8 report must retain the unimported production module')
+    assert.ok(Object.values(untested.s).every(count => count === 0))
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+}
+
+for (const phase of ['runner', 'reporter']) {
+  test(`WHAT[verification-system-011] coverage ${phase} awaits actual child completion without blocking its owner's permission response`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), `coverage-permission-${phase}-`))
+    try {
+      await coverageWithPermission(directory, phase)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const phase of ['runner', 'reporter']) {
+  test(`WHAT[verification-system-011] silent coverage ${phase} receives stdin EOF before actual coverage work`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), `coverage-empty-input-${phase}-`))
+    try {
+      const fixture = createMiniFixture(directory, {
+        testScriptContent: `${phase === 'runner' ? emptyStandardInput : ''}import assert from 'node:assert/strict'
+import { foo } from './dist/a.js'
+assert.equal(foo(1), 'positive')
+`,
+      })
+      const c8Bin = phase === 'reporter' ? join(directory, 'c8-wrapper.mjs') : C8_BIN
+      if (phase === 'reporter') writeFileSync(c8Bin, c8Wrapper({ emptyInput: true }))
+      const result = await runCoverage({
+        root: directory, c8Bin, unitRunnerScript: fixture.testScript,
+        assertBuildFreshFn: fixture.assertBuildFreshFn,
+        collectInputsFn: fixture.collectInputsFn,
+        silent: true,
+      })
+      assert.equal(result.ok, true, JSON.stringify(result))
+      assert.equal(result.productionModulesCount, 2)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[verification-system-011] a signalled c8 process cannot publish success using its completed report', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'coverage-report-signal-'))
+  try {
+    const fixture = createMiniFixture(directory)
+    const c8Bin = join(directory, 'c8-wrapper.mjs')
+    writeFileSync(c8Bin, c8Wrapper({ signal: true }))
+    const result = await runCoverage({
+      root: directory, c8Bin, unitRunnerScript: fixture.testScript,
+      assertBuildFreshFn: fixture.assertBuildFreshFn,
+      collectInputsFn: fixture.collectInputsFn,
+      runId: 'signalled-report', silent: true,
+    })
+    const report = JSON.parse(readFileSync(join(directory, '.fable-build/coverage/signalled-report/report/coverage-final.json'), 'utf8'))
+    assert.equal(Object.keys(report).length, 2, 'Actual c8 completed its full production report before the wrapper received SIGTERM')
+    assert.equal(result.ok, false)
+    assert.equal(result.code, 'C8_REPORT_ERROR')
+    assert.equal(result.status, null)
+    assert.equal(result.signal, 'SIGTERM')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 function createMiniFixture(dir, options = {}) {
   const distDir = path.join(dir, 'dist')
   mkdirSync(distDir, { recursive: true })

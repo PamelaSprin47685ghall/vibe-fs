@@ -1,12 +1,16 @@
 # 04：认知材料、诊断、制度学习与 Sphinx
 
-返回[总计划](../TODO施工总计划-2026-10-03.md)。基线 `8cf51cc84`；本分册覆盖 11 个有 TODO 的包、80 个运行时 TODO。每行文件号对应 `requirements/<包>/tests/NNN.test.mjs`；完整标题和理由在[逐项清单](05-逐项清单.md)。本文描述待做工作，不是已执行证明。
+新排期以[总计划 N06/N07](../TODO施工总计划-2026-10-03.md)为准：Sphinx创建/读取、B0及A2-R0/R1/R2已有限验收，接[08卡](08-Sphinx真实Host接手.md)的真实Host/profile/首个持久答案，最后扩结果、资源和取消恢复；制度学习先统一canonical Rulebook和原子BIRTH，再私有机制提炼及有限语义验收。二者可与S03并行准备，不等待所有基础设施债务清零。现有MCP解码、机械BIRTH及下述015交付不重复施工。
+
+2026-10-05 当前状态：cognitive/015 注册投递切片已验收完成。原 physical、R1—R6、缺 physical/另一 session 与 raw Host 重放隔离已证；实际安装版两次 POST、exact chronicle completed、随后 SDK 历史及 journal 清洁已证。晚到实际 HTTP 错误旧版退出成功的正式红例已修；初始化清理受保护、Host/server 停止及 callbacks 排空后判决。最终完整 integration 21/0、无 skip/TODO，原 project 5030ms 超时及旧无 completed 屏障证据仍保留。以[本批附件](../archive/2026-10-04/目录所有权与生产接线-2026-10-04.md)为准，GAP-077 其他语义 PARTIAL，不重复旧 lease 调查。
+
+返回[总计划](../TODO施工总计划-2026-10-03.md)。`8cf51cc84`、11个有TODO的包及80个运行时TODO是创建计划时的清点，不是当前余量；当前代码基线ccfc及运行统计见总计划首节。每行文件号对应`requirements/<包>/tests/NNN.test.mjs`；原始标题和理由见[逐项清单](05-逐项清单.md)。待做描述不代表已执行证明。
 
 共同开工条件：读现行 WHAT 与测试 README，按总计划区分 A—F 类；修改生产前立正式反例；用本包已有真实入口；共享 Rulebook、MarkerText、journal 或 Host run 契约先由一人定边界。表中“变异”是候选验证手段，只在隔离候选副本使用，不改共享 dist、不拿测试内自建状态机充当生产。
 
-`b7768f478`实施增量见[记录](../archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。Blogger inline文本已迁双语资源，015已有真实canonical journal/lease上的direct maybeInject五例；下一步接registered transform/provider并比较两个真实请求的历史，磁盘不写不能替代它。制度学习已有caller candidate的机械检查、Born facts和纯revision重评；003/005的语义TODO保留，不将非空字段当抽象能力。
+`b7768f478`实施增量见[记录](../archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。该历史阶段只有资源化/direct maybeInject，后续registered transform和两个真实请求的历史隔离已经完成，见本页当前状态。制度学习已有caller candidate机械检查、Born facts与纯revision重评；003虽已没有原TODO，私有机制提炼与输入能力隔离的规范余债仍须核对，不能将非空字段当抽象能力。
 
-制度学习继续施工时依次做：按WHAT003只给Enhancer经验和canonical live rulebook，并立raw command/path/timestamp不得永久化的真实反例；按005证明trigger、negative/distinction、语义去重和长期注意力成本，拒绝不合格候选；在生产提交口引入真实expected revision判决，以两个并发调用和悬置Append证明冲突零部分效果；按008一次提交Born、Disposition及必要Deferred事实，在每个物理提交失败切点核对Current、磁盘、冻结收据和重试；最后把Born接入同一Blogger prompt/chronicle索引并重开核对。现在Born→Committed二追加会半落地，重试可能改为ABSORB/DISCARD，不能当作已解决前提。保留原表剩余义务，已完成机械基础不重复施工。
+制度学习后续按N07执行：先明确唯一live Rulebook、完整双语revision与life冻结，再在生产提交口引入expected revision和Born/Disposition/必要Deferred事实同批提交；以并发、物理失败与冷重开证明零半状态。接着证明celebrate闭合后恰一次resurface，最后实现只接经验和canonical Rulebook的私有Enhancer与有限语义验收。当前Born→Disposition分两次追加，存在半提交风险，尚待B0真实writer故障与冷重开验证；私有liveRules也不等于Blogger/chronicle已经消费。现行WHAT008已经规定必要事实同批，不再等待旧D12二选一审批。
 
 ## action-affordance
 
@@ -50,7 +54,7 @@
 | 010 | 首次、后续、重启、压缩后请求分别捕获 lifecycle 材料 | 该出现时出现、历史重放冻结、正常后续不重复教育；系统提示职责保持 |
 | 011 | 运行中更新 mission/运行材料后捕获下次真实请求 | 变化进入消息通道，不伪造用户授权或替换 Role Law；检查 authority 根及历史字节 |
 | 012 | Manager 接收可核对证据与相互矛盾评价，完成实际评审轨迹；检查真实 provider 输入是否泄露隐藏 Reviewer、双重确认或 barrier | 结论可追溯当前证据，缺证据不照搬隐藏过程；泄露本身也须拒绝，不能只查有没有扩权；与 relay-assessment 共用输入场景，独立记录有限语义判断 |
-| 015，补充 | 资源化与真实 journal/lease 上的五项直接 maybeInject 观察已完成；接续补正式注册 Host、历史与后续请求 | 保留白名单内/外和重复 transform 断言；直接捕获实际 provider 字节，证明同一 occurrence、另一 session 和后续请求的历史边界。GAP-077 不因没有运行时 TODO 而遗漏 |
+| 015，保持回归 | registered R1—R6、原physical身份、两次真实provider POST及completed后历史隔离已完成；晚到HTTP错误和清理也已正式证明，integration21/0 | 保留白名单、去重、缺physical不借session模型、canonical投影保持原physical、另一session隔离、缺committed lease拒绝与真实终态回归，不再列为新工单；其他认知语义/GAP余债按N07和001—012逐条推进 |
 
 **衔接。** 若所有接缝只覆盖纯 prompt 组装，先扩展已有正式 Host fixture 的请求捕获，再做语义审阅；不要在测试里组装一份“正确请求”后自证。013/016 等 README 人审余项随 GAP-076 补查，不虚增 TODO 统计。
 
@@ -143,7 +147,13 @@
 
 **入口。** [WHAT](../../requirements/institutional-learning/WHAT.md)、[Enhancer](../../src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs)、[InstitutionalLearningTools](../../src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs)、[JournalAdapter](../../src/Wanxiangshu/Composition/Durable/InstitutionalLearningJournalAdapter.fs)。GAP-180/181/182；D12；W5。
 
-当前已接入调用方提供 candidate 的机械 BIRTH 准入、Born 持久事实/投影及纯 revision 重评。接续先限定 Enhancer 输入并补实际机制提炼与语义准入，再将生产 revision CAS、Born/Disposition/Deferred 同批原子提交和重放冻结落实到真实 writer；最后接入统一 Blogger 规则索引。当前两次 Append 可能留下 Born 已写而收据未写的半状态，重试可改判 ABSORB/DISCARD。受控 provider 的机械协议证据不能替代真实有限样例的机制提炼审阅。
+当前已接入调用方提供candidate的机械BIRTH准入、Born持久事实/投影及纯revision重评。新顺序是N07-A0/A1统一canonical Rulebook与四个真实消费者，N07-B0/B1落实存储事务/CAS/必要Deferred事实，再验收C的resurface；最后D/E接实际机制提炼与有限语义审阅。原“先Enhancer、最后Blogger索引”的排班不再使用。N07可与N04/N06独立推进，公共Journal/Rulebook接口归一人，重叠Host资源文件串行整合。
+
+**N07-A0/A1接手。** 先读institutional-learning WHAT001/002/006/007/008及attention/behavior的life合同，追踪Catalog、RuntimeResourceAssembly、InstitutionalLearningTools和JournalAdapter。现在学习工具私有`liveRules`包含Born，但Blogger system、chronicle enum/decode、Main guidance仍主要读取resource规则；revision只hash当前语言视图中的Name/EnforcerText/MainText，不是完整双语四叶。A0交workspace/journal Born与session occurrence的作用域、完整revision输入、active/fresh life边界及逐消费者图；A1才统一实际读取。正式正控由真实BIRTH使新life的四路消费者共同见新规则；反例覆盖同名、缺叶、只改非当前语言仍更新revision、活跃life保持冻结。不要在RuntimeResources另造可变Rulebook或仅在学习工具局部合并。
+
+**N07-B0存储前提。** 当前Born→Disposition两次Append，可能产生半状态。进一步源码复核发现：`IEventStore.Append(list)`的整体PrepareLive不等于磁盘整体提交，`ProcessEventLog.append`把每条canonical记录编码成独立NDJSON行，再appendFileSync+fsync，未见整批frame/commit标记。此项仍是待正式验证的源码线索，不能称已复现或修好。先用真实writer的故障切点、原文件和独立冷重开，证明部分尾部怎样恢复，再由存储owner明确可恢复的事务边界；不得只把两次API调用合成一次就关闭T194/T195。
+
+**N07-B0/B1交付。** A0与B0由同一人定expected RulebookRevision在真正提交点检查的合同；Attention当前只有DeferredWorkRecorded，ProjectionUpdate借LearningDispositionCommitted隐式消费，尚缺WHAT008要求的DeferredWorkResurfaced事实及codec/fold。B0补必要载体和整批可恢复提交能力；B1验真实并发的一次重评、第二次冲突零半成品、非法任一事实整批拒绝、故障后全旧/全新、exact occurrence原冻结结果且零重评/零重复消费。合法旧历史的恢复边界必须明确。008旧TODO仍写待D12裁决，施工时按现行WHAT更新理由并保留未证义务，不能靠删占位算闭合。B/C完成再接D/E，不用机械字段或受控provider协议代替机制语义审阅。
 
 | 文件 | 施工步骤 | 可红反例与验收 |
 |---|---|---|
@@ -173,11 +183,52 @@
 
 ## sphinx-v2
 
+2026-10-05 N06-B前置Core答案来源守门已验收：必需resultObservationId、当前成功attempt、accepted结果work/fence/schema、原子prepare拒绝、真实semantic cut及合法冷重开。gen131包含完整Sphinx套件，212/212、1547/0；017/T406仍保留，因为实际profile renderer和Runtime/公开入口未接通。[记录](../archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。其后N06-A/B0及A2/H0a已有限验收，当前从08卡接B1-H0b，不重新施工创建/读取，也不能把Core守门当用户已获得答案。
+
+2026-10-05 N06-A有限验收完成：gen142正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall；前后freshness一致，group65775 accepted=true、17.144ms，exit1仅pending。真实SDK/JS创建、内容绑定原receipt、native查询/accepted trace与新OS进程重开已证。唯一Integrator.Current成对保存accepted state/envelope；查询不得再走History读取。启动拒绝、disposed、非法identity/list与合法特殊资源名的reserve绑定均有正式回归。[验收记录](../archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)明确未证边界。下一主线N06-B，完整036两个TODO、T406/T411/GAP-219保留。f0ead CI实质超时813/818、2 active/3 queued，另见[完整receipt](../archive/2026-10-05/baselines/f0ead-ci/receipt.txt)，选集不代替全仓。
+
 **入口与判断。** [WHAT](../../requirements/sphinx-v2/WHAT.md)、[SUPERSEDES](../../requirements/sphinx-v2/SUPERSEDES.md)、[README](../../requirements/sphinx-v2/tests/README.md)、[MCP Server](../../src/Wanxiangshu/Sphinx/V2/Hosts/Mcp/Server.fs)、[OpenCode Adapter](../../src/Wanxiangshu/Sphinx/V2/Hosts/OpenCode/Adapter.fs)、[Runtime Driver](../../src/Wanxiangshu/Sphinx/V2/Runtime/Driver.fs)、[Wire Surface](../../src/Wanxiangshu/Sphinx/V2/Wire/Surface.fs)。GAP-219/222；D01/D02；W5。
 
-创建计划时“MCP handler忽略参数”的诊断，已被上游`e1e7dd3f1`的新实现替代：七工具独立解码/typed拒绝，cancel有canonical准入/落盘，Persistence有canonical batch、冷重开和原子拒绝入口。GAP-219现在PARTIAL。start/work_next/work_submit/goal_amend仍明确unsupported，export traceUnavailable，现存inquiry status的JSON正向出口仍待证。OpenCode可dispatch/request-cancel，但ReadStatus仍Unknown，ReadResult/Reconcile因port缺读取能力拒绝；不能称状态/结果已能观察。先保留本批真实SDK协议与持久化基础证明，不重复造第二份decoder/store；从真实driver、读取DTO/trace及物理能力owner开始，继续下面的完整dispatch、worker结果、accepted renderer、取消/恢复与外部结果交付。
+创建计划时“MCP handler忽略参数”的诊断已被上游替代；N06-A完成真实start/status/export，work_next/work_submit/goal_amend仍unsupported。H0a已删除InquiryId猜owner、公私拼接与独立Provider假完成路径，借原SyncDelegateRuntime返回实际Admission/Completion；ReadStatus/ReadResult/Reconcile/cancel不宣称能力。受控Host port验收不等于installed Host或canonical binding；实际snapshot API仍待组合。GAP-219保持PARTIAL，下一H0b原子首次接纳与两道持久门，不重复decoder/store或已证owner交接。
 
-### 实施顺序与每步产物
+### N06-B 接手卡：先让运行事实可恢复，再接真实执行
+
+本卡取代下方完整义务索引中的开工顺序。A和B0有限验收已完成，不重做创建/读取及canonical派发接纳。[B0记录](../archive/2026-10-05/Sphinx派发事实与资源预留-2026-10-05.md)保留派发红绿与旧宽选集014墙钟失败；[观察与估值记录](../archive/2026-10-05/Sphinx执行观察与估值守门-2026-10-05.md)另记gen153四业务红、真实sort变异与最终gen155全静态及正式225/225、1125/0。B1-A/B2-0有限验收完成；B1—B6整体未完成，不用空delta或测试Surface冒充生产执行。
+
+B1-A之后的[B1-A2恢复因果包](07-Sphinx恢复因果.md)已落实：gen179四种恢复的16个旧/晚successor业务红，gen180三producer20个实际场景通过，effect前具体call绑定和actual PhysicalAccepted通知已接通，root+历史kind宽匹配删除。相邻Unknown Root清理另按正式反例验收，最终证书见[本轮记录](../archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。不能把这批有限证据称完整025/Fork/Host闭合；下一施工转[08真实Host接手卡](08-Sphinx真实Host接手.md)。
+
+A2-D0通知前置已有限完成，见[正式记录](../archive/2026-10-05/Sphinx恢复通知前置-2026-10-05.md)：gen157六个callback-empty红灯，gen159相关238/238、1178/0。Detached注册通知与Await等待分开，callback读到真实managed Accepted。D0本身不证明来源/Dispose；本轮R1/R2对这些另取sender/Fork及三producer证据，不借旧证书销项。
+
+A2-D1的确认等待隔离与通知异常也已有限完成，见[正式记录](../archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)：gen163六业务红、gen165定向36/0，gen166相关238/238、1186/0、28skip/129TODO，全静态/Fable通过；独立TCS与callback finally保exact Accepted。本轮lease/source与真恢复另行验收，不重复施工D1，也不把脚本retry称真实正控。
+
+| 子包 | 状态 | 本包退出条件 |
+| --- | --- | --- |
+| B0 canonical派发事实 | 有限验收完成 | 同一Current完整Request+Receipt option，当前身份/round/依赖/本work预留及冲突守门；重放、原子拒绝、冷重开、完整state与semantic hash已证。两项预留错误已修。真实Host来源、usage与receipt丢失对账未完成 |
+| B1 实际Host绑定 | A/A2/H0a有限验收完成；接H0b | gen190 Sphinx+delegation52/52、328/0/35TODO；三原业务红与early-guard变异有效。真实owner/family/public prompt、原observed/physical/exactterminal已证；canonical首次接纳、effect前binding、cold零重发与installedHost未证，034保留 |
+| B1-A2-D0 | 通知前置有限验收完成 | Detached支持已有actual acceptance callback且不新增等待；gen159全静态和238/238、1178/0。D0不代证来源/资源，本轮R1/R2另验；Host绑定和034不关闭 |
+| B1-A2-D1 | 确认等待/抛错有限验收完成 | 六个正式业务红后独立TCS、按调用资源清理、finally广播真实Accepted；gen165定向36/0，gen166相关238/238、1186/0，全静态通过。lease、call归属、同步Host异常由本轮R1另验；真实Host和034仍未闭合 |
+| B1-A2-R0/R1/R2 | 真恢复/资源/source有限包已实现 | 真实PluginScope/LoopSensor及三producer实际不同physical；typed source与每注册opaque lease，Send effect前交接、Fork Closed零effect；20矩阵通过后删宽匹配。最终验收及Unknown Root相邻修复见本轮记录，整体025/GAP-153/Host仍保留 |
+| B2 executable profile | B2-0/P0a有限验收完成；完整profile待施工 | 估值守门保持；P0a在原Registry补拓扑去重及declared/Execute完整manifest一致性，gen194的12业务失败被正式回归消除。真实artifact/ABI/schemaDoc核验、durable lock、prompt、授权/资源与Goal/material另接，不关闭002/029/015整体义务 |
+| B3 公开claim/submit与派发 | 待施工，依赖B0—B2 | 同一Commands持久lease、先intent后effect，append失败零派发；局部ticket/scope/attempt/fence准入 |
+| B4 实际结果与两事务解释 | O0a纯状态账有限验收完成；真实Observe待施工 | 完整Applied/Failed推进pending，冲突原子拒绝、terminal不重置、冷重开及旧seal处理已证明；实际Host结果/locked Observe/Graph delta仍未接通，021整体TODO保留 |
+| B5 accepted renderer答案 | 待施工，依赖B3/B4 | 实际renderer结果先accepted，再AnswerCommitted；公开正文和来源可取、停止标签诚实 |
+| B6 公开闭环验收 | 待施工，依赖B0—B5 | 017/036实际入口闭环、新OS冷重开、034实际Host证据，局部/受控/实际Host分别结算 |
+
+**B0，已验收的有限边界。** 原no-op路径已退出：DispatchRequested保完整Work/publicEnvelope/privateTicket，Receipt保完整intent/work/attempt/fence/physicalRef/native envelope，内部只有Dispatches一个map。fresh派发要求当前Ready/同fence Leased、完整Spec、真实成功依赖、已存在Some round及本work持久预留；None独立work允许。同intent exact replay先于fresh守门，同identity改内容拒绝；receipt同时核对Spec及Running物理引用。native字段仍叫physicalBindings，空值字节保持原seal；实际gen143旧创建/未派发work原样恢复，缺round旧派发和错误aggregate预留分别durable cut，原历史不删不重封。004/007/010/019/020覆盖正式Persistence/Current、原子批次、冷重开及hash。真实Host来源、副作用前append失败与receipt丢失对账、usage/容量完整义务保留，T401/T402/034不关闭。
+
+**B1，H0a有限交接已证，下一H0b。** actual owner≠InquiryId、nested family/public-only最终prompt、原订阅和Admission/Completion已由原生产runtime的受控Host port证明，旧错路径已退出；[源收据](../archive/2026-10-06/sphinx-host-owner/source-receipt.txt)保三原红和guard变异。H0b先定原EventStore跨handle/process atomic fresh acceptance：Append Ok可能是exact duplicate，不能发新的spend witness；不把全history Refresh塞入锁内。然后才接Invoke前Current/预留门和原handoff后SendPrompt前的可await child/key/finalbytes门。Receipt=None不证明未发，冷重开零盲重发必须由新实际入口验收。完整034/installedHost/receipt-loss恢复另记；[08卡](08-Sphinx真实Host接手.md)逐步列前置与正式反例。
+
+**B2，先选一个真实可执行profile。** P0a已修原Registry共享依赖重复枚举与outer/Execute完整manifest漂移；009/015的thin API只观察原bind/lockOf，不执行capability，不声称真实artifact/ABI已核验。duplicate-ID政策与durable PluginLockEntry载体仍未建立，不能借fixture装配称完整profile。现Plan/Render主要是验证器，PluginContext没有原Goal正文/constraints/materialRefs及内容；接手设计见[调查卡](../archive/2026-10-06/sphinx-registry/vibe-fs-b2-p0-profile-audit-20261006.txt)。下一P0b先冻结纯插件上下文和持久lock，再供应canonical schema文档/hash、真实executable/ABI、版本化prompt、授权、实际资源与executionMode。首条有限链做实际规划→成稿，计划集合含有真实成本的answer.now；Unestimated保持缺值。question/probe全面覆盖留E，有限profile范围写入验收记录。
+
+**B3，公开命令与唯一effect调度。** Commands接共享claim/submit，MCP/JS/原生入口只解码和调用。先定WHAT012的ticketHash/scope真实来源、公开字段和持久匹配；当前submit DTO只含attempt/fence等，不足以称完整局部准入。claim持久lease；BudgetReserved+DispatchRequested同批接受后才能派发，真实append拒绝的Host观察器必须为零。O0a已删除Driver伪造的unbound/empty InterpretationApplied，并阻止pending时继续购买；原dispatch模板Hash="empty"仍须在真实schema/profile接线时退出，不能由纯提议正控称生产派发可用。缺真实schema、上下文或授权时具体拒绝。先定公共类型，再调调用方和正式反例，不在各adapter另造driver。
+
+**B4，ReadResult前置从原N06-C移入B。** 实际Host已有ISessionSnapshotPort.GetMessages，组合到最窄读取能力，核对actual child、physical user message、唯一provider run、work token、attempt与实际schema；idle只表示通知。O0a已经修复Applied/Failed no-op：Core保存完整outcome，只允许合法Pending转移，exact replay保terminal，变化或相反结果拒绝；native/semantic hash保完整delta或reason。gen191旧实现29业务失败，gen193定向64/0/1TODO；相邻扫描器误报另包修复，gen195相关87/87、652/0/11skip/43TODO，最终静态收束与输入见[收据](../archive/2026-10-06/sphinx-interpretation/final-receipt.txt)。真实第一事务的Host响应、第二事务的locked Observe和Graph delta仍待接通；Core只保存opaque delta，不解释图。usage缺失保reservation，不填零；plugin失败后仅在显式新派生inquiry以新实现重解释，不另买模型响应。完整receipt丢失/unknown对账仍留C，受控port不升级成实际Host恢复。
+
+**B5，真实renderer到公开持久答案。** renderer work来自实际规划并保留成稿资源，输出通过真实schema和Render.validate。先成为accepted observation，再提交exact resultObservationId的AnswerCommitted，复用已完成Core来源守门。答案正文从这份结果取得，不把ref、排名数组或固定文本当答案。先证明未提交/拒绝renderer不能完成，再证明实际成功与独立重开；只声称实际停止证据支持的标签。
+
+**B6，最后接公开验收。** 017从start→claim→真实授权工作→submit→Observe→renderer→AnswerCommitted→公开正文，不能直接append完成事实；至少两个目标及不同command可区分。036核对共享Commands、跨入口和新OS进程读回；真实lease/model观察器先有正向对照，再证明status/export零effect。034另取得实际Host receipt与真实terminal，取消请求、abort返回和idle不冒充drained。Core、受控端口和实际Host的证明各自记账，C/D的完整乱序、usage、恢复、取消与late result继续保留。每个子包交付立即同步本表、总计划、逐项T状态与证据，不能到B6才回填。
+
+### 全包实施义务索引（开工顺序以上方接手卡为准）
 
 1. **Sphinx 合同封口。** 对 36 条现行 WHAT 与 SUPERSEDES 建逐条矩阵。重点是旧算法合格条件/退化、标准 Engineer、全链取消、旧 inquiry 明确拒绝；未承接的规则先进入现行 WHAT。不得恢复旧价格公式、四阶段接口或旧 SessionStore。
 2. **唯一 durable Runtime 外壳。** 先读已有 Contracts/Ports/Admission/Core/Integrator，确定 command admission→canonical atomic batch→Current publication→effect dispatch 的唯一所有者。MCP/OpenCode/JS 都调用它，adapter 不判下一阶段、不持第二份 Current。复用现有真实 store，不创造仅供测试的 runtime。

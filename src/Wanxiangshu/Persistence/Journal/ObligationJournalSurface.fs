@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -7,7 +8,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 
 /// Journal operations for the relay lifecycle, plus the retired obligation-ledger
 /// read boundary.
@@ -66,23 +66,7 @@ module ObligationJournalSurface =
 
                 let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
 
-                // concern-routing-006: the completed owner life retires its
-                // mailboxes before any later publish. The retirement fact
-                // replays idempotently, so a durability failure rejects the
-                // lifecycle call and the caller retries instead of silently
-                // keeping a live mailbox for a terminated participant.
-                match result with
-                | Error _ -> return appendResult result
-                | Ok _ ->
-                    let! retired =
-                        AttentionConcernJournalAdapter.retireMailboxesOf
-                            handle.Journal
-                            (SessionId.create sessionId)
-                            None
-
-                    match retired with
-                    | Ok() -> return box {| ok = true |}
-                    | Error reason -> return box {| ok = false; error = reason |}
+                return appendResult result
         }
 
     /// Idempotent accepted-assessment commit on a session that may already hold an

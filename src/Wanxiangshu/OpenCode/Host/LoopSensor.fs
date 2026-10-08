@@ -19,7 +19,12 @@ type LoopSensor
     (
         isOwned: SessionId -> bool,
         abortSession: SessionId -> Task<Result<unit, string>>,
-        continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>,
+        continueSession:
+            ProviderAttemptSource
+                -> DegenerationKind
+                -> string option
+                -> ContinuationAcceptanceObserver option
+                -> Task<Result<unit, string>>,
         emitDiagnostic: string -> (string * string) list -> unit,
         ?runOwnedWork: (unit -> Task) -> Task
     ) =
@@ -258,11 +263,15 @@ type LoopSensor
 
     /// Narrow physical exception boundary: only the continue effect may throw.
     member private this.TryContinueSession
-        (sessionId: SessionId, kind: DegenerationKind, directory: string option)
-        : Task<Result<unit, string>> =
+        (
+            source: ProviderAttemptSource,
+            kind: DegenerationKind,
+            directory: string option,
+            observer: ContinuationAcceptanceObserver option
+        ) : Task<Result<unit, string>> =
         task {
             try
-                let! outcome = continueSession sessionId kind directory
+                let! outcome = continueSession source kind directory observer
                 return outcome
             with ex ->
                 return Error ex.Message
@@ -281,19 +290,19 @@ type LoopSensor
 
     member private this.ContinueWorkerTask
         (
-            sessionId: SessionId,
-            providerRun: ProviderRunIdentity,
+            source: ProviderAttemptSource,
             kind: DegenerationKind,
             directory: string option,
+            observer: ContinuationAcceptanceObserver option,
             publicTask: Task,
             proxy: TaskCompletionSource<unit>
         ) : Task =
         (task {
             try
-                let! outcome = this.TryContinueSession(sessionId, kind, directory)
-                this.ReportContinueOutcome(sessionId, kind, outcome)
+                let! outcome = this.TryContinueSession(source, kind, directory, observer)
+                this.ReportContinueOutcome(source.SessionId, kind, outcome)
             finally
-                this.FinishContinue(sessionId, providerRun, publicTask, proxy)
+                this.FinishContinue(source.SessionId, source.ProviderRun, publicTask, proxy)
         }
         :> Task)
 
@@ -341,17 +350,17 @@ type LoopSensor
     /// only when the exact run/proxy is still current.
     member private this.StartContinueWork
         (
-            sessionId: SessionId,
-            providerRun: ProviderRunIdentity,
+            source: ProviderAttemptSource,
             kind: DegenerationKind,
             directory: string option,
+            observer: ContinuationAcceptanceObserver option,
             proxy: TaskCompletionSource<unit>,
             publicTask: Task
         ) =
         let launch () : Task =
-            this.ContinueWorkerTask(sessionId, providerRun, kind, directory, publicTask, proxy)
+            this.ContinueWorkerTask(source, kind, directory, observer, publicTask, proxy)
 
-        this.StartContinueExecution(sessionId, providerRun, kind, directory, proxy, publicTask, launch)
+        this.StartContinueExecution(source.SessionId, source.ProviderRun, kind, directory, proxy, publicTask, launch)
 
     member private this.Interrupt
         (
@@ -457,10 +466,10 @@ type LoopSensor
     /// Consumption requires the exact reconciled provider run: a wrong/late run
     /// never consumes the armed anomaly and never clears newer owned work.
     member this.ConsumeAbortCause
-        (sessionId: SessionId, expectedRun: ProviderRunIdentity, directory: string option)
+        (source: ProviderAttemptSource, directory: string option, observer: ContinuationAcceptanceObserver option)
         : Task<AbortCause> =
         task {
-            let interrupted = this.ActiveInterruptTask(sessionId, expectedRun)
+            let interrupted = this.ActiveInterruptTask(source.SessionId, source.ProviderRun)
 
             match interrupted with
             | Some interrupt -> do! interrupt
@@ -468,12 +477,13 @@ type LoopSensor
 
             let consumed =
                 interrupted
-                |> Option.bind (fun interrupt -> this.TryTakeArmedForContinue(sessionId, expectedRun, interrupt))
+                |> Option.bind (fun interrupt ->
+                    this.TryTakeArmedForContinue(source.SessionId, source.ProviderRun, interrupt))
 
             match consumed with
             | None -> return AbortCause.External
             | Some(kind, proxy, publicTask) ->
-                this.StartContinueWork(sessionId, expectedRun, kind, directory, proxy, publicTask)
+                this.StartContinueWork(source, kind, directory, observer, proxy, publicTask)
                 return AbortCause.DegenerationGuard kind
         }
 
@@ -496,8 +506,8 @@ type LoopSensor
     interface ILoopSensor with
         member this.Observe raw = this.Observe raw
 
-        member this.ConsumeAbortCause(sessionId, expectedRun, directory) =
-            this.ConsumeAbortCause(sessionId, expectedRun, directory)
+        member this.ConsumeAbortCause(source, directory, observer) =
+            this.ConsumeAbortCause(source, directory, observer)
 
         member this.DropSession sessionId = this.DropSession sessionId
         member this.ResetDetector sessionId = this.ResetDetector sessionId
@@ -534,7 +544,12 @@ module LoopSensor =
         (ownedSessions: HashSet<string>)
         (sessionParents: Dictionary<string, string>)
         (abortSession: SessionId -> Task<Result<unit, string>>)
-        (continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>)
+        (continueSession:
+            ProviderAttemptSource
+                -> DegenerationKind
+                -> string option
+                -> ContinuationAcceptanceObserver option
+                -> Task<Result<unit, string>>)
         (emitDiagnostic: string -> (string * string) list -> unit)
         =
         LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession, continueSession, emitDiagnostic)

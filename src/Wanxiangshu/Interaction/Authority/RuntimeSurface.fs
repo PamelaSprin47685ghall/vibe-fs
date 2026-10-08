@@ -276,7 +276,7 @@ module RuntimeSurface =
             | Error error, _
             | _, Error error -> Error error
 
-    let private projectionOf (value: obj) : PromptAuthority.PromptAuthorityProjection =
+    let internal projectionOf (value: obj) : PromptAuthority.PromptAuthorityProjection =
         if isNull value then
             PromptAuthority.empty
         else
@@ -320,7 +320,19 @@ module RuntimeSurface =
 
             let sequences =
                 arrayOf value?claimSequences
-                |> Array.fold (fun current item -> Map.add (text item?scope) (int (text item?count)) current) Map.empty
+                |> Array.fold
+                    (fun current item ->
+                        let counter: PromptAuthority.ClaimSequenceCounter =
+                            { SessionId = SessionId.create (text item?session)
+                              LogicalRunId =
+                                if isNull item?logicalRun then
+                                    None
+                                else
+                                    Some(LogicalRunId.create (text item?logicalRun))
+                              Count = int (text item?count) }
+
+                        Map.add (text item?scope) counter current)
+                    Map.empty
 
             { LastAuthorityProfile = profileOption value?lastAuthorityProfile
               ActiveLogicalRun = profileOption value?activeLogicalRun
@@ -330,7 +342,7 @@ module RuntimeSurface =
               AcceptedContinuationIds = accepted
               ClaimSequences = sequences }
 
-    let private projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
+    let internal projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
         box
             {| lastAuthorityProfile =
                 projection.LastAuthorityProfile
@@ -366,7 +378,15 @@ module RuntimeSurface =
                claimSequences =
                 projection.ClaimSequences
                 |> Map.toList
-                |> List.map (fun (scope, count) -> box {| scope = scope; count = count |})
+                |> List.map (fun (scope, counter) ->
+                    box
+                        {| scope = scope
+                           session = SessionId.value counter.SessionId
+                           logicalRun =
+                            counter.LogicalRunId
+                            |> Option.map LogicalRunId.value
+                            |> Option.defaultValue null
+                           count = counter.Count |})
                 |> List.toArray |}
 
     let private identitySeedValidationErrorToJs error : obj =

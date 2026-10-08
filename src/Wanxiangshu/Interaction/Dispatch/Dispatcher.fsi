@@ -12,6 +12,11 @@ open Wanxiangshu.Participant.Persona
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
+    [<RequireQualifiedAccess>]
+    type PromptSendObservation =
+        | Sending of PromptKey
+        | Answered of PromptKey * SendOutcome
+
     val internal originLabel: (PromptAuthority.PromptOrigin -> string)
 
     [<RequireQualifiedAccess>]
@@ -45,6 +50,9 @@ module PromptDispatcher =
         new: journal: IPromptJournal -> Runtime
         member RuntimeId: RuntimeId
         member ProjectionFor: sessionId: SessionId -> PromptAuthority.PromptAuthorityProjection
+
+        member internal RequireActiveProfile:
+            sessionId: SessionId -> expected: PromptAuthority.AuthorityExecutionProfile -> Result<unit, string>
 
         member internal RunGateNudgeOnce:
             scope: string * send: (unit -> Task<Result<PromptKey, string>>) -> Task<Result<PromptKey, string>>
@@ -120,6 +128,14 @@ module PromptDispatcher =
             gateKind: string ->
             terminalProviderRun: ProviderRunIdentity ->
                 PhysicalUserMessageId option
+
+        member ObserveGateNudgeAcceptance:
+            profile: PromptAuthority.AuthorityExecutionProfile ->
+            continuation: PromptAuthority.ContinuationKind ->
+            gateKind: string ->
+            terminalProviderRun: ProviderRunIdentity ->
+            observer: ContinuationAcceptanceObserver ->
+                unit
 
         member RepairAlreadyClaimed:
             profile: PromptAuthority.AuthorityExecutionProfile ->

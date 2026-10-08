@@ -111,11 +111,18 @@ const ADAPTER_RATCHET = new Map([
   // now consumes AttachedRuntime.fs (the Sync kind's adapter over AttachmentLeaseCore),
   // which itself consumes AttachmentLeaseCore.fs; the two files join this adapter
   // closure, one slot above the previous 47.
-  // 2026-10-04 sync: stash comparison proved the HEAD-state closure is already
-  // 56 and is unrelated to the sixth-batch changes (the before/after closure
-  // diff is empty); ratchet moved 48 -> 56 to restore the anti-growth anchor
-  // to reality. The growth predates this batch and was never recorded.
-  ['delegation-recovery-runtime', 56],
+  // 2026-10-04: declaring linkage-projection's real authority-model dependency
+  // adds eight production sources to this recovery closure (48 -> 56).
+  // Keep the measured bound explicit; the added files remain pure contracts.
+  // The real SessionHostPort contract also consumes ChatExecutionKey and
+  // ManagedChatAcceptanceWitness. Declaring that missing edge adds ten .fs
+  // sources (56 -> 66): Context/Prefix/Candidate; Foundation/Parallel,
+  // ParallelSurface, AsyncSupport; Execution/Session/ChatExecution/Facts,
+  // Projection, Acceptance, Settlement; Execution/Failure/Model; and
+  // Interaction/Authority/Run. These are the existing typed contracts and
+  // supporting modules, not concrete Host or I/O adapters. No runtime
+  // capability is introduced by recording the actual compile closure.
+  ['delegation-recovery-runtime', 66],
 ])
 
 test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
@@ -133,6 +140,21 @@ test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and re
 
   for (const pattern of forbidden) {
     assert.ok(!sources.some((source) => pattern.test(source)), `delegation contract leaks ${pattern}`)
+  }
+})
+
+test('WHAT[delegation-028] recovery Snapshot consumer excludes full Host admission capabilities', () => {
+  const { sources } = inspectShard('delegation-recovery-runtime')
+  assert.ok(sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
+  assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'))
+  for (const forbidden of [
+    'OpenCode/Host/SessionContract.fs',
+    'OpenCode/Host/SessionHostPort.fs',
+    'OpenCode/Host/SessionRuntimeOwner.fs',
+    'Execution/Session/ChatExecution/Acceptance.fs',
+    'Execution/Session/ChatExecution/Settlement.fs',
+  ]) {
+    assert.ok(!sources.includes(forbidden), `Snapshot recovery closure must not contain ${forbidden}`)
   }
 })
 

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -247,6 +248,7 @@ module DispatchSurface =
     /// claim/persist/send semantics remain PromptDispatcher.Runtime.
     let private sendAgentOwnerRootWithMode
         (awaitMode: PromptDispatcher.AwaitMode)
+        (onAccepted: ContinuationAcceptanceObserver option)
         (port: obj)
         (handle: JournalHandle)
         (session: string)
@@ -276,7 +278,7 @@ module DispatchSurface =
                         identitySeed
                         None
                         awaitMode
-                        None
+                        onAccepted
 
                 return
                     match result with
@@ -301,7 +303,7 @@ module DispatchSurface =
         (text: string)
         (identitySeed: obj)
         : Task<obj> =
-        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Detached port handle session text identitySeed
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Detached None port handle session text identitySeed
 
     let sendAgentOwnerRootAwait
         (port: obj)
@@ -310,7 +312,7 @@ module DispatchSurface =
         (text: string)
         (identitySeed: obj)
         : Task<obj> =
-        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await port handle session text identitySeed
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await None port handle session text identitySeed
 
     let sendManagedAssignment
         (port: obj)
@@ -377,102 +379,121 @@ module DispatchSurface =
             | "Detached" -> PromptDispatcher.AwaitMode.Detached
             | _ -> PromptDispatcher.AwaitMode.Await
 
-    /// Continuation may only attach to the target's own active Logical Run
-    /// (interaction-authority-017). This Surface always holds a JournalHandle, so
-    /// the journal-less branch HostSessionNudge must handle cannot occur here;
-    /// the two reachable rejections keep that path's wording verbatim.
-    let private activeProfileAt
-        (handle: JournalHandle)
-        (sessionId: SessionId)
-        : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        let projections = (AgentJournal.snapshot handle.Journal).AgentProjections
-
-        match Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner sessionId projections.Fission with
-        | Some _ -> Error "Session is retired by Fission"
-        | None ->
-            match PromptAuthorityProjectionQueries.activeProfile sessionId projections with
-            | Some active -> Ok active
-            | None -> Error "No active authority profile"
-
-    /// interaction-authority-017: the caller's profile is a claim, not authority.
-    /// A continuation may only extend the target's own active Logical Run, so the
-    /// supplied profile must equal the durable active profile exactly; any
-    /// difference in session, logical run, authority root or identity seed is
-    /// rejected before a runtime is built, before a durable claim is written and
-    /// before the Host transport is reached.
-    let private requireExactActiveProfile
-        (handle: JournalHandle)
-        (session: string)
-        (authorityProfile: PromptAuthority.AuthorityExecutionProfile)
-        : Result<unit, string> =
-        match activeProfileAt handle (SessionId.create session) with
-        | Error error -> Error error
-        | Ok active when active = authorityProfile -> Ok()
-        | Ok active ->
-            Error(
-                sprintf
-                    "Continuation profile does not match the active logical run: active logical run %s, supplied logical run %s"
-                    (LogicalRunId.value active.LogicalRunId)
-                    (LogicalRunId.value authorityProfile.LogicalRunId)
-            )
-
-    let sendContinuation
+    let sendAgentOwnerRootWithAcceptance
         (port: obj)
         (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        let observer: ContinuationAcceptanceObserver =
+            { Notify = PhysicalUserMessageId.value >> onAccepted
+              AttachDisposable = box >> attachRegistration }
+
+        sendAgentOwnerRootWithMode (awaitModeOf awaitMode) (Some observer) port handle session text identitySeed
+
+    let sendAgentOwnerRootWithAcceptanceRegistration
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        sendAgentOwnerRootWithAcceptance port handle session text identitySeed awaitMode onAccepted attachRegistration
+
+    let deliverDetachedVerdict (listener: obj) (kind: string) (reason: string) : Task<obj> =
+        let verdict =
+            match kind with
+            | "OwnedSettled" -> DetachedSendVerdict.OwnedSettled
+            | "Refused" -> DetachedSendVerdict.Refused reason
+            | "OutcomeUnknown" -> DetachedSendVerdict.OutcomeUnknown reason
+            | _ -> invalidArg "kind" (sprintf "Unknown detached verdict: %s" kind)
+
+        task {
+            do! (unbox<DetachedSendListener> listener) verdict
+            return box {| delivered = true |}
+        }
+
+    let awaitPhysicalConfirmation (promptKey: string) (timeoutMs: int) : Task<obj> =
+        task {
+            let! outcome = PromptPhysicalAcceptance.awaitConfirmation (PromptKey.create promptKey) (Some timeoutMs)
+
+            return
+                match outcome with
+                | Some(PromptPhysicalOutcome.Accepted physical) ->
+                    box
+                        {| kind = "Accepted"
+                           physical = PhysicalUserMessageId.value physical
+                           reason = null |}
+                | Some(PromptPhysicalOutcome.Rejected reason) ->
+                    box
+                        {| kind = "Rejected"
+                           physical = null
+                           reason = reason |}
+                | None ->
+                    box
+                        {| kind = "Unknown"
+                           physical = null
+                           reason = null |}
+        }
+
+    let preparePhysicalAcceptanceObserver (onAccepted: string -> unit) : obj =
+        box (fun (physical: PhysicalUserMessageId) -> onAccepted (PhysicalUserMessageId.value physical))
+
+    let registerPhysicalAcceptanceObserver (promptKey: string) (observer: obj) : obj =
+        PromptPhysicalAcceptance.register (PromptKey.create promptKey) (unbox<PhysicalUserMessageId -> unit> observer)
+        |> box
+
+    let disposePhysicalAcceptanceObserver (registration: obj) : unit =
+        (unbox<IDisposable> registration).Dispose()
+
+    let private sendContinuationWithObserver
+        (port: obj)
+        (journal: IPromptJournal)
         (session: string)
         (text: string)
         (continuation: string)
         (profile: obj)
         (awaitMode: string)
+        (onAccepted: ContinuationAcceptanceObserver option)
         : Task<obj> =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                // interaction-authority-017: the durable active profile, not the
-                // caller-supplied one, is what a continuation may extend. Both the
-                // active-run and exact-match checks are read-only and happen before
-                // any runtime is built, so a rejected target never reaches
-                // PromptDispatcher, never records a durable claim and never calls
-                // the Host transport.
-                match requireExactActiveProfile handle session authorityProfile with
-                | Error error ->
-                    return
+                let runtime = PromptDispatcher.forPrompts journal
+                let adapter = PlainSessionPort(port)
+
+                let! result =
+                    runtime.SendContinuation
+                        adapter.DispatchPort
+                        (SessionId.create session)
+                        text
+                        kind
+                        authorityProfile
+                        None
+                        (awaitModeOf awaitMode)
+                        onAccepted
+
+                return
+                    match result with
+                    | Ok key ->
+                        box
+                            {| ok = true
+                               key = PromptKey.value key
+                               error = null
+                               observation = adapter.LastObservation |}
+                    | Error error ->
                         box
                             {| ok = false
                                key = null
                                error = error
-                               observation = null |}
-                | Ok _ ->
-                    let runtime =
-                        PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
-
-                    let adapter = PlainSessionPort(port)
-
-                    let! result =
-                        runtime.SendContinuation
-                            adapter.DispatchPort
-                            (SessionId.create session)
-                            text
-                            kind
-                            authorityProfile
-                            None
-                            (awaitModeOf awaitMode)
-                            None
-
-                    return
-                        match result with
-                        | Ok key ->
-                            box
-                                {| ok = true
-                                   key = PromptKey.value key
-                                   error = null
-                                   observation = adapter.LastObservation |}
-                        | Error error ->
-                            box
-                                {| ok = false
-                                   key = null
-                                   error = error
-                                   observation = adapter.LastObservation |}
+                               observation = adapter.LastObservation |}
             | None, _ ->
                 return
                     box
@@ -488,6 +509,107 @@ module DispatchSurface =
                            error = error
                            observation = null |}
         }
+
+    let sendContinuation
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        : Task<obj> =
+        sendContinuationWithObserver
+            port
+            (PromptJournalAdapter.create handle.Journal)
+            session
+            text
+            continuation
+            profile
+            awaitMode
+            None
+
+    let private afterAppendJournal (journal: IPromptJournal) (afterAppend: PromptSessionFact -> Task) : IPromptJournal =
+        { new IPromptJournal with
+            member _.RuntimeId = journal.RuntimeId
+            member _.ProjectionFor sessionId = journal.ProjectionFor sessionId
+            member _.HandleForChild sessionId = journal.HandleForChild sessionId
+            member _.ChatAcceptancePersistence() = journal.ChatAcceptancePersistence()
+
+            member _.Append sessionId providerRun fact =
+                task {
+                    let! result = journal.Append sessionId providerRun fact
+
+                    match result with
+                    | Ok() -> do! afterAppend fact
+                    | Error _ -> ()
+
+                    return result
+                } }
+
+    let sendContinuationAfterClaim
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        (afterClaim: string -> Task)
+        : Task<obj> =
+        let journal =
+            afterAppendJournal (PromptJournalAdapter.create handle.Journal) (function
+                | PromptSessionFact.PromptClaimed claim -> afterClaim (PromptKey.value claim.PromptKey)
+                | _ -> Task.FromResult(()) :> Task)
+
+        sendContinuationWithObserver port journal session text continuation profile awaitMode None
+
+    let sendContinuationWithAcceptance
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        let observer: ContinuationAcceptanceObserver =
+            { Notify = PhysicalUserMessageId.value >> onAccepted
+              AttachDisposable = box >> attachRegistration }
+
+        sendContinuationWithObserver
+            port
+            (PromptJournalAdapter.create handle.Journal)
+            session
+            text
+            continuation
+            profile
+            awaitMode
+            (Some observer)
+
+    let sendContinuationWithAcceptanceRegistration
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (awaitMode: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        sendContinuationWithAcceptance
+            port
+            handle
+            session
+            text
+            continuation
+            profile
+            awaitMode
+            onAccepted
+            attachRegistration
 
     let sendGateNudgesConcurrently
         (port: obj)
@@ -801,6 +923,7 @@ module DispatchSurface =
                 | ManagedChatAcceptanceError.ProjectionConflictAfterCommit _ -> "ProjectionConflictAfterCommit"
                 | ManagedChatAcceptanceError.NotAttempted _ -> "NotAttempted"
                 | ManagedChatAcceptanceError.CommitUnknown _ -> "CommitUnknown"
+                | ManagedChatAcceptanceError.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
                 | ManagedChatAcceptanceError.FactRejected _ -> "FactRejected"
 
             box
@@ -812,20 +935,23 @@ module DispatchSurface =
                    participant = null
                    role = null |}
 
-    let private acceptManagedDecision
+    let private prepareManagedDecision
         (handle: JournalHandle)
+        (journal: IPromptJournal)
         (message: ChatAdmissionIntent.DecodedMessage)
-        : Task<obj> =
-        task {
-            let decision = PromptIngress.resolveDecision (Some handle.Journal) message
+        : unit -> Task<obj> =
+        let decision = PromptIngress.resolveDecision (Some handle.Journal) message
 
-            let! accepted =
-                (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
-                    .AcceptManagedChatIntent
-                    decision
+        let runtime = PromptDispatcher.forPrompts journal
 
-            return managedAcceptanceView accepted
-        }
+        fun () ->
+            task {
+                let! accepted = runtime.AcceptManagedChatIntent decision
+                return managedAcceptanceView accepted
+            }
+
+    let private acceptManagedDecision handle message =
+        prepareManagedDecision handle (PromptJournalAdapter.create handle.Journal) message ()
 
     let acceptManagedExternal
         (handle: JournalHandle)
@@ -844,6 +970,49 @@ module DispatchSurface =
               IsHostSynthetic = false
               Text = None }
 
+    let private managedPromptMessage
+        (session: string)
+        (physicalMessageId: string)
+        (promptKey: string)
+        (agent: string)
+        : ChatAdmissionIntent.DecodedMessage =
+        { SessionId = Some(SessionId.create session)
+          PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+          InvalidIdentityCarrier = None
+          ExplicitAgent = Some agent
+          PromptKey = Some(PromptKey.create promptKey)
+          IsHostCompaction = false
+          IsHostSynthetic = false
+          Text = None }
+
+    let prepareManagedPromptAcceptance
+        (handle: JournalHandle)
+        (session: string)
+        (physicalMessageId: string)
+        (promptKey: string)
+        (agent: string)
+        : unit -> Task<obj> =
+        prepareManagedDecision
+            handle
+            (PromptJournalAdapter.create handle.Journal)
+            (managedPromptMessage session physicalMessageId promptKey agent)
+
+    let prepareManagedPromptAcceptanceAfterPhysical
+        (handle: JournalHandle)
+        (session: string)
+        (physicalMessageId: string)
+        (promptKey: string)
+        (agent: string)
+        (afterPhysical: string -> Task)
+        : unit -> Task<obj> =
+        let journal =
+            afterAppendJournal (PromptJournalAdapter.create handle.Journal) (function
+                | PromptSessionFact.PromptPhysicalAccepted accepted ->
+                    afterPhysical (PromptKey.value accepted.PromptKey)
+                | _ -> Task.FromResult(()) :> Task)
+
+        prepareManagedDecision handle journal (managedPromptMessage session physicalMessageId promptKey agent)
+
     let acceptManagedPromptClaim
         (handle: JournalHandle)
         (session: string)
@@ -851,16 +1020,7 @@ module DispatchSurface =
         (promptKey: string)
         (agent: string)
         : Task<obj> =
-        acceptManagedDecision
-            handle
-            { SessionId = Some(SessionId.create session)
-              PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
-              InvalidIdentityCarrier = None
-              ExplicitAgent = Some agent
-              PromptKey = Some(PromptKey.create promptKey)
-              IsHostCompaction = false
-              IsHostSynthetic = false
-              Text = None }
+        prepareManagedPromptAcceptance handle session physicalMessageId promptKey agent ()
 
     /// PROMPT-004: accept the external HumanRoot through the same Dispatcher
     /// writer used by chat.message. The physical id is supplied by the caller as
@@ -941,7 +1101,21 @@ module DispatchSurface =
                claimSequences =
                 projection.ClaimSequences
                 |> Map.toArray
-                |> Array.map (fun (scope, count) -> box {| scope = scope; count = count |}) |}
+                |> Array.map (fun (scope, counter) ->
+                    box
+                        {| scope = scope
+                           session = SessionId.value counter.SessionId
+                           logicalRun =
+                            counter.LogicalRunId
+                            |> Option.map LogicalRunId.value
+                            |> Option.defaultValue null
+                           count = counter.Count |}) |}
+
+    let closeCompletedHumanRootManager (projection: obj) : obj =
+        projection
+        |> RuntimeSurface.projectionOf
+        |> PromptAuthorityLedger.closeCompletedHumanRootManager
+        |> RuntimeSurface.projectionToJs
 
     let private watermarkText (value: obj) =
         if isNull value then "" else string value

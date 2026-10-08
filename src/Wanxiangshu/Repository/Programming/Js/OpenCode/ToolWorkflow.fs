@@ -133,7 +133,7 @@ module JsToolsData =
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
-    type FileAccessObservation = string list -> string list -> Task<unit>
+    type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
@@ -173,13 +173,11 @@ module JsToolWorkflow =
             return value, rewrittenPaths mutations, createdPaths mutations
         }
 
-    let private mapPrepareFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
+    let private mapPersistenceFailure
+        (operation: Task<Result<'a, JsTransactionAppendFailure>>)
+        : Task<Result<'a, JsFailure>> =
         operation
-        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionPrepareFailed))
-
-    let private mapCommitFailure (operation: Task<Result<'a, string>>) : Task<Result<'a, JsFailure>> =
-        operation
-        |> TaskValue.map (Result.mapError (fun _ -> JsFailure.TransactionCommitFailed))
+        |> TaskValue.map (Result.mapError JsFailure.TransactionPersistenceFailed)
 
     let private commitDurable
         (durable: IJsTransactionPersistence)
@@ -190,10 +188,10 @@ module JsToolWorkflow =
         (prepared: JsTransactionPrepared)
         : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
         taskResult {
-            let! _ = durable.AppendPrepared prepared |> mapPrepareFailure
+            let! _ = durable.AppendPrepared prepared |> mapPersistenceFailure
             do! preflight root readSnapshots mutations
             do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
-            let! _ = durable.AppendCommitted prepared.TransactionId |> mapCommitFailure
+            let! _ = durable.AppendCommitted prepared.TransactionId |> mapPersistenceFailure
             return value, rewrittenPaths mutations, createdPaths mutations
         }
 
@@ -254,7 +252,10 @@ module JsToolWorkflow =
                     // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
                     let readSnapshots = ResizeArray<JsReadSnapshot>()
-                    let api = JsToolsBindings.createApi capabilities root staging readSnapshots
+                    let explicitReads = ResizeArray<JsExplicitFileRead>()
+
+                    let api =
+                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads
 
                     let! resultJson =
                         JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
@@ -262,7 +263,7 @@ module JsToolWorkflow =
                     let! value = JsToolsData.parse resultJson
                     let mutations = staging |> Seq.toList
                     let snapshots = readSnapshots |> Seq.toList
-                    let readPaths = snapshots |> List.map _.Path |> List.distinct
+                    let readPaths = explicitReads |> Seq.distinct |> Seq.toList
                     let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
                     let hasMutationCapability =

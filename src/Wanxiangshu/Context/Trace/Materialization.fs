@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Host
 
 /// Durable XTrace -> canonical X semantic projection.
 ///
@@ -24,6 +25,35 @@ module XTraceMaterialization =
           Tools = []
           System = []
           Messages = [] }
+
+    let tryHostToolResult
+        (journal: AgentJournal)
+        (messageId: TranscriptMessageAddress)
+        (partId: HostToolPartId option)
+        (callId: ToolCallId)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<string option, string>> =
+        let candidates =
+            XTraceProjection.partsForHostMessageIds (Set.singleton (TranscriptMessageAddress.value messageId)) xTrace
+            |> List.filter (fun part ->
+                part.Kind = "tool_result"
+                && part.HostToolPartId = partId
+                && part.ToolCallId = Some callId)
+
+        taskResult {
+            match candidates with
+            | [] -> return None
+            | [ part ] ->
+                let! body = journal.Writer.BlobWriter.Read part.TextRef
+
+                do!
+                    Result.requireTrue
+                        "XTrace original Host tool result digest does not match its captured fact"
+                        (HostDigest.sha256Hex body = BlobDigest.value part.TextDigest)
+
+                return Some body
+            | _ -> return! Error "XTrace original Host tool result identity is ambiguous"
+        }
 
     let private semanticPart (part: XTracePartRef) (body: string) =
         match part.Kind with

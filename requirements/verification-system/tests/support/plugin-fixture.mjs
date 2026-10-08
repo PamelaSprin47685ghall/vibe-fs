@@ -228,7 +228,7 @@ export const awaitPrompted = (sessionId) => {
  * shared production instances, resolved AFTER `initSpikePlugin` so `acquire`
  * returns the already-registered entries rather than booting second owners.
  */
-export const withExecutablePlugin = async (body, options = {}) => {
+export const withExecutablePlugin = async (body, options = {}, createHooks = initSpikePlugin) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-'))
   const previousHome = process.env.HOME
   const previousUserProfile = process.env.USERPROFILE
@@ -242,7 +242,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
     const prompts = []
     const messages = []
     const client = stubClient(createdIds, prompts, messages, abortedIds)
-    const hooks = await initSpikePlugin({
+    const hooks = await createHooks({
       ...options,
       client,
       directory,
@@ -279,12 +279,15 @@ export const withExecutablePlugin = async (body, options = {}) => {
       // drains detached HostFork cancellation. AbortSession is sequenced after
       // durable handle abandonment, so observing every created child aborted is
       // a deterministic teardown barrier before releasing the last writer ref.
-      await hooks.dispose()
-      if (runtime !== undefined) {
-        try {
-          eventsSurface.releaseSharedForWorkspace(directory, runtime.terminalPort)
-        } finally {
-          journalSurface.JournalSurface_dispose(runtime.journal)
+      try {
+        await hooks.dispose()
+      } finally {
+        if (runtime !== undefined) {
+          try {
+            eventsSurface.releaseSharedForWorkspace(directory, runtime.terminalPort)
+          } finally {
+            journalSurface.JournalSurface_dispose(runtime.journal)
+          }
         }
       }
     }

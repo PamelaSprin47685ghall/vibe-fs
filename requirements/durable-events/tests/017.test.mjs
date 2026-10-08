@@ -94,3 +94,123 @@ test('WHAT[durable-events-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_
   }
 })
 }
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtemp, readFile, readdir, rm } = await import('node:fs/promises')
+const { tmpdir } = await import('node:os')
+const { default: path } = await import('node:path')
+const { fileURLToPath } = await import('node:url')
+const { runVerificationToolProbe } = await import('../../../scripts/lib/verification-tool-probe.mjs')
+const eventStore = await import('../../../dist/Persistence/EventStore/Surface.js')
+const codec = await import('../../../dist/Persistence/EventStore/CodecSurface.js')
+const childPath = fileURLToPath(new URL('./support/append-io-child.mjs', import.meta.url))
+
+async function runChild(mode, commonDir, writerId, request, signal) {
+  try {
+    return JSON.parse(await runVerificationToolProbe(process.execPath, [
+      childPath, mode, commonDir, writerId, JSON.stringify(request),
+    ], { cwd: path.dirname(commonDir), env: { ...process.env }, signal }))
+  } catch (error) {
+    if (error?.stderr && typeof error.message === 'string') error.message += `\n${error.stderr}`
+    throw error
+  }
+}
+
+function inside(filename, directory) {
+  return filename !== null && (filename === directory || filename.startsWith(`${directory}${path.sep}`))
+}
+
+function gitPath(filename, commonDir) {
+  return ['objects', 'refs', 'logs'].some(name => inside(filename, path.join(commonDir, name)))
+    || ['HEAD', 'packed-refs'].some(name => filename === path.join(commonDir, name))
+}
+
+for (const historyLength of [8, 128]) {
+  test(`WHAT[durable-events-017] activated_append_records_no_historical_content_IO_with_${historyLength}_facts_and_cold_replay`, async t => {
+    const root = await mkdtemp(path.join(tmpdir(), 'wanxiang-append-io-'))
+    const commonDir = path.join(root, '.git')
+    const eventsDir = path.join(commonDir, 'wanxiang', 'events')
+    const historicalFile = path.join(eventsDir, 'historical-writer.ndjson')
+    const writerFile = path.join(eventsDir, 'meter-writer.ndjson')
+    const history = []
+    for (let index = 0; index < historyLength; index++) {
+      history.push({
+        id: index === historyLength - 1 ? 'a'.repeat(40) : (index + 1).toString(16).padStart(40, '0'),
+        stream: 'proof/append-io', type: 'JobRequested',
+        parents: index === 0 ? [] : [history[index - 1].id],
+        payload: index === historyLength - 1 ? { anchor: 'stable' } : { index }, payloadRefs: [],
+      })
+    }
+    const incoming = {
+      id: 'c'.repeat(40), stream: 'proof/append-io', type: 'JobRequested',
+      parents: ['a'.repeat(40)], payload: { text: '万象-é', count: 7, detail: { ready: true } }, payloadRefs: [],
+    }
+    const expectedBytes = Buffer.from(codec.encode(incoming), 'utf8')
+    let seed
+    try {
+      seed = eventStore.create(commonDir, 'historical-writer')
+      assert.deepEqual(await eventStore.append(seed, history), { ok: true, cuts: [] })
+      assert.equal(eventStore.head(seed, incoming.stream), history.at(-1).id)
+      eventStore.dispose(seed)
+      seed = undefined
+      assert.deepEqual(await readdir(eventsDir), ['historical-writer.ndjson'])
+      const historicalBefore = await readFile(historicalFile)
+      assert.deepEqual(historicalBefore, Buffer.from(history.map(event => codec.encode(event)).join(''), 'utf8'))
+      const request = { historicalFile, anchor: history.at(-1), incoming, expectedEvents: [...history, incoming] }
+      const measured = await runChild('measure', commonDir, 'meter-writer', request, t.signal)
+      assert.ok(Number.isInteger(measured.pid) && measured.pid > 0 && measured.pid !== process.pid)
+      assert.deepEqual(measured.result, { ok: true, cuts: [] })
+      assert.deepEqual(measured.event, incoming)
+      assert.equal(measured.head, incoming.id)
+      assert.deepEqual(measured.heads, [incoming.id])
+      assert.deepEqual(Buffer.from(measured.writtenBase64, 'base64'), expectedBytes)
+      assert.deepEqual(await readFile(writerFile), expectedBytes)
+      assert.deepEqual(await readFile(historicalFile), historicalBefore)
+      assert.deepEqual((await readdir(eventsDir)).sort(), ['historical-writer.ndjson', 'meter-writer.ndjson'])
+      const cold = await runChild('cold', commonDir, 'cold-writer', request, t.signal)
+      assert.ok(Number.isInteger(cold.pid) && cold.pid > 0 && cold.pid !== process.pid && cold.pid !== measured.pid)
+      assert.deepEqual(cold.events, request.expectedEvents)
+      assert.equal(cold.head, incoming.id)
+      assert.deepEqual(cold.heads, [incoming.id])
+      assert.deepEqual((await readdir(eventsDir)).sort(), ['historical-writer.ndjson', 'meter-writer.ndjson'])
+      assert.deepEqual(await readFile(writerFile), expectedBytes)
+      assert.equal(expectedBytes.at(-1), 10)
+      assert.deepEqual(await readFile(historicalFile), historicalBefore)
+      assert.ok(measured.positive.some(record => record.launch && record.method === 'execFileSync' && record.executable === 'git' && record.argv.join(' ') === '--version'))
+      for (const method of ['readFileSync', 'promises.readFile']) {
+        assert.ok(measured.positive.some(record => record.method === method && record.success && record.bytes > 0 && record.paths.some(filename => gitPath(filename, commonDir))), `${method} observes real direct Git-path I/O`)
+      }
+      for (const method of ['readFileSync', 'readSync']) {
+        assert.ok(measured.activation.some(record => record.method === method && record.success && record.paths[0] === historicalFile && record.bytes > 0), `${method} observes real activation historical bytes`)
+      }
+      assert.deepEqual(measured.activation.filter(record => record.unattributed), [], 'activation content I/O must be attributable')
+      assert.deepEqual(measured.append.filter(record => record.unattributed), [], 'unattributed content I/O cannot prove zero')
+      const contentReads = measured.append.filter(record => record.kind === 'read' && record.paths.some(filename => inside(filename, eventsDir) && filename.endsWith('.ndjson')))
+      t.diagnostic(JSON.stringify({
+        historyLength, meterPid: measured.pid, coldPid: cold.pid,
+        activationReadBytes: measured.activation.filter(record => record.kind === 'read' && record.paths[0] === historicalFile).reduce((total, record) => total + (record.bytes ?? 0), 0),
+        appendEventReadCalls: contentReads.length,
+        appendEventReadBytes: contentReads.reduce((total, record) => total + (record.bytes ?? 0), 0),
+        actualWriterBytes: Buffer.from(measured.writtenBase64, 'base64').byteLength,
+        nativeLaunchCalls: measured.append.filter(record => record.launch).length,
+        gitFilesystemCalls: measured.append.filter(record => record.paths?.some(filename => gitPath(filename, commonDir))).length,
+        coldHead: cold.head,
+      }))
+      assert.equal(contentReads.length, 0, 'activated append must not perform any historical event content reads')
+      assert.equal(contentReads.reduce((total, record) => total + (record.bytes ?? 0), 0), 0)
+      assert.deepEqual(measured.append.filter(record => record.launch), [], 'native child process launches are absent during append')
+      assert.deepEqual(measured.append.filter(record => record.paths?.some(filename => gitPath(filename, commonDir))), [], 'direct Git object/ref filesystem access is absent during append')
+      const eventWrites = measured.append.filter(record => record.kind === 'write' && record.paths.some(filename => inside(filename, eventsDir)))
+      assert.ok(eventWrites.some(record => record.success && record.paths[0] === writerFile && record.bytes === expectedBytes.length), 'real forwarded content write carries all incoming UTF8 bytes')
+      assert.ok(eventWrites.every(record => record.paths[0] === writerFile), 'append writes only its own writer file')
+      const destructiveMethods = new Set(['rm', 'rmdir', 'unlink', 'rename', 'link', 'symlink', 'truncate', 'ftruncate', 'copyFile', 'cp'])
+      assert.deepEqual(measured.append.filter(record => destructiveMethods.has(record.method.replace('promises.', '').replace(/Sync$/, '')) && record.paths.some(filename => inside(filename, eventsDir))), [], 'append does not replace or delete writer history')
+      assert.ok(measured.append.some(record => record.method === 'fsyncSync' && record.success && record.paths[0] === writerFile), 'durability barrier uses the actual incoming writer fd')
+    } finally {
+      if (seed !== undefined) eventStore.dispose(seed)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+}
+}

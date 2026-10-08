@@ -22,3 +22,6 @@ module Integrator =
 
     /// Reads one published inquiry state.
     val tryState: obj -> InquiryId -> Result<InquiryState option, CurrentError>
+
+    /// Reads the accepted origin-to-head envelopes derived in the same canonical Current.
+    val tryTrace: obj -> InquiryId -> Result<EventEnvelope list option, CurrentError>

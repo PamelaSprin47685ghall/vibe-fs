@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.Journal
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Text
 open System.Threading.Tasks
@@ -7,7 +8,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Composition.Durable
@@ -198,7 +198,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
     let mutable currentSeq = 2L
     // DSL-MUTABLE: resource — poison latch: first append failure short-circuits
     // subsequent appends as Result error. None = healthy; set once, never cleared.
-    let mutable firstFailure: string option = None
+    let mutable firstFailure: JournalAppendPoison option = None
     // DSL-MUTABLE: resource — terminal close latch: drain completed, writer disposed.
     let mutable closed = false
     // DSL-MUTABLE: resource — serialized process writer operations.
@@ -217,19 +217,27 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
 
     member _.TryCurrent(key: string) = store.TryCurrent key
 
-    member private _.Poison(firstFailureReason: string) =
+    member private _.Poison(eventId: EventId, error: AppendError) =
         lock gate (fun () ->
             if firstFailure.IsNone && not closed then
-                firstFailure <- Some firstFailureReason)
+                firstFailure <-
+                    Some
+                        { FailedEventId = eventId
+                          Error = error })
 
     member private _.PriorPoison(eventId: EventId) : CommitResult<Envelope> option =
         lock gate (fun () -> firstFailure |> Option.map (fun f -> NotAttempted(eventId, WriterPoisoned f)))
 
-    static member private formatAppendError(error: AppendError) : string =
+    static member private tripUnknownCuts(error: AppendError) =
         match error with
-        | AppendError.StorageInvalid detail -> sprintf "storage invalid: %A" detail
-        | AppendError.SemanticCut cut -> sprintf "semantic cut %s: %s" cut.Rule cut.Reason
-        | AppendError.AppendFailed reason -> "append failed: " + reason
+        | AppendError.CommitUnknown evidence when not (List.isEmpty evidence.Prepared.Cuts) ->
+            FatalProcess.trip
+                "runtime-started-semantic-cut"
+                (sprintf
+                    "semantic cut append settled unknown at %A: %s"
+                    evidence.Primary.Phase
+                    evidence.Primary.Cause.Message)
+        | _ -> ()
 
     static member private commitEnvelope
         (store: IEventStore)
@@ -312,24 +320,24 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
             return Ok(writer :> IJournalWriter, init, Fold.empty)
         }
 
-    member private this.CommitRuntimeStartedLocked() : Task<Result<unit, string>> =
+    member private this.CommitRuntimeStartedLocked() : Task<Result<unit, AppendError>> =
         task {
             match! EventStoreJournalWriter.commitEnvelope store init with
             | Ok receipt when AppendReceipt.cutFor init.EventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor init.EventId receipt |> Option.get
                 let reason = "RuntimeStarted semantic cut: " + cut.Reason
                 FatalProcess.trip "runtime-started-semantic-cut" reason
-                return Error reason
+                return Error(AppendError.SemanticCut cut)
             | Ok _ ->
                 runtimeStartedCommitted <- true
                 return Ok()
             | Error error ->
-                let reason = EventStoreJournalWriter.formatAppendError error
-                this.Poison reason
-                return Error reason
+                this.Poison(init.EventId, error)
+                EventStoreJournalWriter.tripUnknownCuts error
+                return Error error
         }
 
-    member private this.EnsureRuntimeStartedLocked() : Task<Result<unit, string>> =
+    member private this.EnsureRuntimeStartedLocked() : Task<Result<unit, AppendError>> =
         if runtimeStartedCommitted then
             Task.FromResult(Ok())
         else
@@ -340,6 +348,21 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         | Some cut -> Rejected(eventId, cut.Reason)
         | None -> Committed envelope
 
+    static member private businessAppendFailure (eventId: EventId) (error: AppendError) =
+        match error with
+        | AppendError.CommitUnknown evidence -> CommitUnknown(eventId, StoreAppendUnknown evidence)
+        | AppendError.NoNewWriteReleaseFailed evidence -> CommitResult.NoNewWriteReleaseFailed(eventId, evidence)
+        | AppendError.SemanticCut cut -> Rejected(eventId, cut.Reason)
+        | AppendError.StorageInvalid _
+        | AppendError.AppendFailed _
+        | AppendError.AppendNotAttempted _ ->
+            NotAttempted(
+                eventId,
+                WriterPoisoned
+                    { FailedEventId = eventId
+                      Error = error }
+            )
+
     member private this.CommitBusinessEnvelopeLocked
         (eventId: EventId, envelope: Envelope)
         : Task<CommitResult<Envelope>> =
@@ -349,9 +372,8 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
                 currentSeq <- currentSeq + 1L
                 return EventStoreJournalWriter.businessCommitResult eventId envelope receipt
             | Error error ->
-                let reason = EventStoreJournalWriter.formatAppendError error
-                this.Poison reason
-                return CommitUnknown(eventId, WriteFailed reason)
+                this.Poison(eventId, error)
+                return EventStoreJournalWriter.businessAppendFailure eventId error
         }
 
     member private this.AppendHealthyLocked
@@ -362,7 +384,14 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         : Task<CommitResult<Envelope>> =
         task {
             match! this.EnsureRuntimeStartedLocked() with
-            | Error error -> return NotAttempted(eventId, WriterPoisoned("RuntimeStarted append failed: " + error))
+            | Error error ->
+                return
+                    NotAttempted(
+                        eventId,
+                        WriterPoisoned
+                            { FailedEventId = init.EventId
+                              Error = error }
+                    )
             | Ok() ->
                 let envelope: Envelope =
                     { RuntimeId = runtimeId

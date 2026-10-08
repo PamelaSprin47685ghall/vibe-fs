@@ -531,13 +531,16 @@ module StrengthStore =
         (store: IEventStore)
         (sha256: string -> string)
         (event: StrengthEvent)
-        : Task<Result<unit, AppendError>> =
+        : Task<Result<unit, EventId * AppendError>> =
         task {
             let envelope = toEnvelope sha256 event
 
             match! store.Append [ envelope ] with
-            | Ok receipt -> return appendReceiptResult envelope.EventId receipt
-            | Error error -> return Error error
+            | Ok receipt ->
+                return
+                    appendReceiptResult envelope.EventId receipt
+                    |> Result.mapError (fun error -> envelope.EventId, error)
+            | Error error -> return Error(envelope.EventId, error)
         }
 
     let private publishReceiptResult event eventId (receipt: AppendReceipt) =
@@ -548,11 +551,13 @@ module StrengthStore =
     /// STRENGTH-006: payload bytes become local content-addressed PayloadRefs
     /// before the Prepared event is appended. Git object identity is absent from
     /// the runtime path; remote sync blobifies these files later.
-    let private appendToPublish =
+    let private appendToPublish eventId =
         function
         | AppendError.StorageInvalid error -> PublishError.StorageInvalid error
         | AppendError.SemanticCut cut -> PublishError.SemanticCut cut
         | AppendError.AppendFailed reason -> PublishError.PublishFailed reason
+        | (AppendError.AppendNotAttempted _ | AppendError.CommitUnknown _ | AppendError.NoNewWriteReleaseFailed _) as failure ->
+            PublishError.AppendSettlementFailed(eventId, failure)
 
     let publishWithPayloads
         (store: IEventStore)
@@ -570,6 +575,10 @@ module StrengthStore =
             let! payloadRefs = writePayloads
             let event = buildEvent payloadRefs
             let envelope = toEnvelope sha256 event
-            let! receipt = store.Append [ envelope ] |> TaskResult.mapError appendToPublish
+
+            let! receipt =
+                store.Append [ envelope ]
+                |> TaskResult.mapError (appendToPublish envelope.EventId)
+
             return! publishReceiptResult event envelope.EventId receipt
         }

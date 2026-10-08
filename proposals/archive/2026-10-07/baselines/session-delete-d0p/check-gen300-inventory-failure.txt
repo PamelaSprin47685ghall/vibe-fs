@@ -1,0 +1,1 @@
+check.mjs: fatal error: compile-order.txt missing source 'OpenCode/Plugin/PluginLifecycleSurface.fsi'

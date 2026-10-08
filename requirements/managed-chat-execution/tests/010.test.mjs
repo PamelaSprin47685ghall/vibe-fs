@@ -84,11 +84,36 @@ const withPlugin = async (action) => {
 const withControlledHost = async (mode, action) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-chat-drain-journal-'))
   const host = await recoveryHost.bootControlledRecoveryHost(directory, 'absent', mode)
+  const pendingDrains = []
+  let barrierReleased = false
+  let actionFailure
+  const terminalWriter = {
+    trackDrain: (drain) => {
+      pendingDrains.push(drain)
+      return drain
+    },
+    releaseBarrier: () => {
+      if (!barrierReleased) {
+        recoveryHost.releaseTerminalBarrier(host)
+        barrierReleased = true
+      }
+    },
+  }
   try {
-    await action(host, directory)
+    await action(host, directory, terminalWriter)
+  } catch (error) {
+    actionFailure = { error }
+    throw error
   } finally {
-    recoveryHost.disposeRecoveryHost(host)
-    rmSync(directory, { recursive: true, force: true })
+    try {
+      if (mode === 'held') terminalWriter.releaseBarrier()
+      const settled = await Promise.allSettled(pendingDrains)
+      const failures = settled.filter((drain) => drain.status === 'rejected').map((drain) => drain.reason)
+      if (!actionFailure && failures.length) throw new AggregateError(failures, 'Held terminal drain failed', { cause: failures[0] })
+    } finally {
+      recoveryHost.disposeRecoveryHost(host)
+      rmSync(directory, { recursive: true, force: true })
+    }
   }
 }
 
@@ -132,14 +157,14 @@ test('WHAT[managed-chat-execution-010] public logical cancel and session delete 
     // Public logical cancel: the chat-side drain owner
     // (SessionRecoveryHost.SignalSession, the entry the runtime routes
     // SignalChatRecoverySession through) settles every key of the session.
-    await withControlledHost('held', async (host, directory) => {
+    await withControlledHost('held', async (host, directory, terminalWriter) => {
       await seedSessionKeys(host, 'ses-cancel')
       await recoveryHost.seedProviderStarted(host, 'ses-preserved', 'msg-preserved', 'provider-preserved')
       await acquireSessionLeases('ses-cancel')
       await acquireLease('ses-preserved', 'msg-preserved')
 
       let completed = false
-      const cancelled = recoveryHost.signalSessionCancelled(host, 'ses-cancel')
+      const cancelled = terminalWriter.trackDrain(recoveryHost.signalSessionCancelled(host, 'ses-cancel'))
       cancelled.then(() => { completed = true }, () => { completed = true })
       await recoveryHost.awaitTerminalBarrier(host)
       await setImmediate()
@@ -150,7 +175,7 @@ test('WHAT[managed-chat-execution-010] public logical cancel and session delete 
       assertHeldSettlement('ses-cancel', directory, host)
       assert.equal(executionCount('ses-preserved', 'msg-preserved'), 1)
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       await cancelled
       assert.equal(completed, true)
 
@@ -164,14 +189,14 @@ test('WHAT[managed-chat-execution-010] public logical cancel and session delete 
 
     // Session delete: the same drain semantics through the delete drain
     // owner the runtime's DisposeSession awaits (PluginSessionScope.ClearSession).
-    await withControlledHost('held', async (host, directory) => {
+    await withControlledHost('held', async (host, directory, terminalWriter) => {
       await seedSessionKeys(host, 'ses-delete')
       await recoveryHost.seedProviderStarted(host, 'ses-preserved', 'msg-preserved', 'provider-preserved')
       await acquireSessionLeases('ses-delete')
       await acquireLease('ses-preserved', 'msg-preserved')
 
       let completed = false
-      const drained = recoveryHost.clearSession(host, 'ses-delete')
+      const drained = terminalWriter.trackDrain(recoveryHost.clearSession(host, 'ses-delete'))
       drained.then(() => { completed = true }, () => { completed = true })
       await recoveryHost.awaitTerminalBarrier(host)
       await setImmediate()
@@ -180,7 +205,7 @@ test('WHAT[managed-chat-execution-010] public logical cancel and session delete 
       assertHeldSettlement('ses-delete', directory, host)
       assert.equal(executionCount('ses-preserved', 'msg-preserved'), 1)
 
-      recoveryHost.releaseTerminalBarrier(host)
+      terminalWriter.releaseBarrier()
       await drained
       assert.equal(completed, true)
 

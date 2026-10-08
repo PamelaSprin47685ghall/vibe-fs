@@ -21,8 +21,8 @@
 // which kills healthy multi-test files and fans hundreds of listeners out from one signal.
 // It runs node:test files that load the compiled distribution under dist/.
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { availableParallelism, tmpdir } from 'node:os'
 import { PassThrough } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -30,6 +30,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
 import { createRunState, applyEvent, summarize } from './test-run-state.mjs'
+import { createWorkerCostObserver } from './worker-cost-observation.mjs'
 
 import { parseConcurrency } from '../../../../scripts/lib/concurrency-cap.mjs'
 
@@ -99,7 +100,7 @@ export function bindTestEntry(event, entryFile) {
 
 export async function runTestFiles({
   files, concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY),
-  send = (message) => process.send?.(message), stdout = process.stdout, stderr = process.stderr,
+  send = (message, callback) => process.send?.(message, callback), stdout = process.stdout, stderr = process.stderr,
 }) {
   const fileLimit = parseConcurrency(concurrency)
   const workerCount = Math.min(files.length,
@@ -136,9 +137,21 @@ export async function runTestFiles({
   const runFile = async (file) => {
     const controller = new AbortController()
     active.add(controller)
+    const costs = createWorkerCostObserver({
+      entryFile: resolve(file), parentPid: process.pid,
+      enabled: process.env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
+    })
+    let reportedCosts = null
+    const reportCosts = (snapshot = costs.snapshot()) => {
+      const current = JSON.stringify(snapshot)
+      if (current === reportedCosts) return
+      reportedCosts = current
+      try { send({ type: 'runner:worker-cost', data: snapshot }, () => {}) } catch {}
+    }
     try {
       const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal, execArgv })
-      send({ type: 'runner:file-start', data: { entryFile: resolve(file) } })
+      send({ type: 'runner:file-start', data: { entryFile: resolve(file), pid: process.pid, parentPid: process.ppid } })
+      reportCosts()
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
       const attribute = (event) => {
@@ -150,11 +163,16 @@ export async function runTestFiles({
           if (errors.size > 0) return
           try {
             const event = attribute({ type, data })
+            if (type === 'test:stdout') {
+              costs.observe(event)
+              reportCosts()
+            }
             applyEvent(runState, event)
             send({ type, data: {
               name: data?.name, file: data?.file, entryFile: event.data.entryFile,
               testId: data?.testId, line: data?.line, column: data?.column,
-              nesting: data?.nesting, durationMs: data?.details?.duration_ms,
+              nesting: data?.nesting, testNumber: data?.testNumber, durationMs: data?.details?.duration_ms,
+              pid: process.pid, parentPid: process.ppid,
             } })
           } catch (error) { reportError(error) }
         })
@@ -168,6 +186,7 @@ export async function runTestFiles({
         }
       } catch (error) { reportError(error) }
       const completion = await drained
+      reportCosts(costs.finish())
       if (!completion.drained) reportError(completion.error)
       else send({ type: 'runner:file-drained', data: { entryFile: resolve(file) } })
     } finally { active.delete(controller) }
@@ -195,6 +214,17 @@ async function main() {
   // NODE_TEST_CONTEXT or any other Host-owned environment variable.
   const originalHome = process.env.HOME || process.env.USERPROFILE
   process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+  const arguments_ = process.argv.slice(2)
+  const homeIndex = arguments_.indexOf('--owned-test-home')
+  let suppliedHome = null
+  if (homeIndex !== -1) {
+    suppliedHome = arguments_[1]
+    if (homeIndex !== 0 || arguments_.lastIndexOf('--owned-test-home') !== 0 || typeof suppliedHome !== 'string' || !isAbsolute(suppliedHome) || !lstatSync(suppliedHome).isDirectory() || realpathSync(suppliedHome) !== suppliedHome) {
+      throw new Error('run-inner: owned test HOME must be an explicit canonical directory')
+    }
+  }
+  const files = (suppliedHome === null ? arguments_ : arguments_.slice(2))
+    .filter(argument => argument.endsWith('.mjs'))
 
   // Isolate HOME / USERPROFILE for the node:test inner runner so any test or
   // pre-import that touches ~/.config/opencode defaults to a throwaway temporary
@@ -202,12 +232,13 @@ async function main() {
   // Keep the .NET CLI tool store independent: compiler canaries must still resolve
   // the repository-pinned local Fable tool after application HOME is isolated.
   process.env.DOTNET_CLI_HOME ??= process.env.HOME
-  const runnerTestHome = mkdtempSync(join(tmpdir(), 'wxs-runner-home-'))
-  const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
-  mkdirSync(runnerRoutingDir, { recursive: true })
-  writeFileSync(
-    join(runnerRoutingDir, 'wanxiangshu.mjs'),
-    `export const routingProtocol = 2
+  const runnerTestHome = suppliedHome ?? realpathSync(mkdtempSync(join(tmpdir(), 'wxs-runner-home-')))
+  try {
+    const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
+    mkdirSync(runnerRoutingDir, { recursive: true })
+    writeFileSync(
+      join(runnerRoutingDir, 'wanxiangshu.mjs'),
+      `export const routingProtocol = 2
 export default function route(role, running, previous, purpose) {
   if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
@@ -224,24 +255,20 @@ export const predictorConfiguration = () => {
   }
   return { state: 'unconfigured', reason: null }
 }\n`,
-    'utf8',
-  )
-  process.env.HOME = runnerTestHome
-  process.env.USERPROFILE = runnerTestHome
-  if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
-
-  process.on('exit', () => {
-    try { rmSync(runnerTestHome, { recursive: true, force: true }) } catch {}
-  })
-
-  const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
-
-  if (files.length === 0) {
-    console.error('run-inner: no test files given')
-    process.exit(2)
+      'utf8',
+    )
+    process.env.HOME = runnerTestHome
+    process.env.USERPROFILE = runnerTestHome
+    if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
+    if (files.length === 0) {
+      console.error('run-inner: no test files given')
+      process.exitCode = 2
+      return
+    }
+    if (!await runTestFiles({ files })) process.exitCode = 1
+  } finally {
+    if (suppliedHome === null) rmSync(runnerTestHome, { recursive: true, force: true })
   }
-
-  if (!await runTestFiles({ files })) process.exitCode = 1
 }
 
 if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -25,7 +25,14 @@ module JournalPortObservationSurface =
     /// later committed change.
     val cancelWaiterScenario: commonDir: string -> writerTag: string -> Task<obj>
 
-    /// Physical uncertainty must report unknown (never confirmed) and poison the
-    /// writer once; the port must observe the poisoned latch, and later appends
-    /// are known-not-attempted instead of silently succeeding.
-    val poisonedUnknownAppendScenario: commonDir: string -> writerTag: string -> Task<obj>
+    /// A missing payload is a known storage rejection. The writer preserves that
+    /// exact first failure, publishes no revision, and refuses subsequent appends.
+    val rejectedPayloadPoisonsWriterScenario: commonDir: string -> writerTag: string -> Task<obj>
+
+    val openActualJournal: commonDir: string -> writerId: string -> startedAt: string -> Task<obj>
+    val openActualJournalWithStore: store: obj -> writerId: string -> startedAt: string -> Task<obj>
+    val observeActualJournalProjection: value: obj -> obj
+    val observeActualJournal: value: obj -> obj
+    val containsActualJournalEvent: value: obj -> eventId: string -> bool
+    val appendActualJournal: value: obj -> Task<obj>
+    val disposeActualJournal: value: obj -> Task<unit>

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
@@ -11,6 +12,7 @@ open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -450,25 +452,35 @@ module ForkTool =
         else
             finishNewManagerFork scope runtime context request language handles managed role
 
+    let private appendBusyGuidance (runtime: HostForkRuntime) (request: Request) language agentId profile rendered =
+        task {
+            match! runtime.AppendGuidance(agentId, profile, rendered) with
+            | Ok _ -> return successInstruction (namedProse language Path.Resume.GuidanceSent (request.Name.Trim()))
+            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
+        }
+
     let private reuseWhileActive
         (scope: ToolRuntimeScope)
         (runtime: HostForkRuntime)
         (request: Request)
         language
         handles
-        (role: Role)
         agentId
         =
-        task {
-            match! resolveAttachment scope handles request with
-            | Error path -> return consequence (prose language path)
-            | Ok attachment ->
-                let! rendered = prepareForkPromptWithRecord scope runtime role request None attachment
+        let prepareAndSend (profile: PromptAuthority.AuthorityExecutionProfile) =
+            task {
+                match! resolveAttachment scope handles request with
+                | Error path -> return consequence (prose language path)
+                | Ok attachment ->
+                    let! rendered =
+                        prepareForkPromptWithRecord scope runtime profile.CanonicalRole request None attachment
 
-                match! runtime.AppendGuidance(agentId, rendered) with
-                | Ok _ -> return successInstruction (namedProse language Path.Resume.GuidanceSent (request.Name.Trim()))
-                | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-        }
+                    return! appendBusyGuidance runtime request language agentId profile rendered
+            }
+
+        match runtime.ActiveGuidanceProfile agentId with
+        | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeNotPlaced))
+        | Ok profile -> prepareAndSend profile
 
     let private commitIdleReuse
         (scope: ToolRuntimeScope)
@@ -551,7 +563,7 @@ module ForkTool =
             lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
         match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
-        | true, _, role -> reuseWhileActive scope runtime request language handles role agentId
+        | true, _, _ -> reuseWhileActive scope runtime request language handles agentId
         | false, Some(_, role, _), _ -> reuseWhileAllowed scope runtime context request language handles role agentId
         | false, None, Role.DevOps ->
             reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId

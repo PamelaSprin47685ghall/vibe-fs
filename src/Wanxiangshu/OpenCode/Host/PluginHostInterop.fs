@@ -200,6 +200,8 @@ module PluginHostInterop =
             typed, HookSettlementEvidence.SettlementIncomplete
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown as typed ->
             typed, HookSettlementEvidence.SettlementIncomplete
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite as typed ->
+            typed, HookSettlementEvidence.SettlementIncomplete
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied
@@ -221,6 +223,9 @@ module PluginHostInterop =
             HookSettlementEvidence.NoOwnedExecution
         | ManagedChatAcceptanceError.CommitUnknown _ ->
             ExecutionFailure.AcceptanceUnknown, HookSettlementEvidence.DurableOutcomeUnknown
+        | ManagedChatAcceptanceError.NoNewWriteReleaseFailed _ ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite,
+            HookSettlementEvidence.SettlementIncomplete
         | ManagedChatAcceptanceError.FactRejected _ ->
             ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed, HookSettlementEvidence.NoOwnedExecution
         | ManagedChatAcceptanceError.EstablishedEvidenceConflict _ ->
@@ -260,6 +265,9 @@ module PluginHostInterop =
             HookSettlementEvidence.SettlementIncomplete
         | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.CommitUnknown _) ->
             ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown,
+            HookSettlementEvidence.SettlementIncomplete
+        | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.NoNewWriteReleaseFailed _) ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite,
             HookSettlementEvidence.SettlementIncomplete
         | ManagedChatSupersessionError.ProviderSettlementFailed(ManagedChatProviderLifecycleError.FactRejected _) ->
             ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed,

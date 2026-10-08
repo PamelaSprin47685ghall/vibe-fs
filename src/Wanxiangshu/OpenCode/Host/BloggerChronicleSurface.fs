@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -98,7 +99,16 @@ module BloggerChronicleSurface =
     /// Run the real production injection entry in place; the caller observes
     /// only the resulting message array.
     let maybeInject (journal: obj) (session: string) (language: obj) (outObj: obj) : obj =
-        BloggerChronicleText.maybeInject (Some(agentJournalOf journal)) (Some session) (languageOf language) outObj
+        let physical =
+            ProviderWireDecode.messagesFromTransformOutput outObj
+            |> ProviderWireCapture.lastUserMessageId
+
+        BloggerChronicleText.maybeInject
+            (Some(agentJournalOf journal))
+            (Some session)
+            physical
+            (languageOf language)
+            outObj
 
         let messages: obj array =
             if isNull outObj || isNull outObj?messages then

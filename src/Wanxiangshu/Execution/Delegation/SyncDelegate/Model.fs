@@ -1,9 +1,11 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
+open System.Threading.Tasks
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 
 type SyncDelegateRole = Wanxiangshu.Execution.Session.SyncDelegateRole
 
@@ -36,6 +38,34 @@ type SyncDelegateBatch =
 type SyncDelegateInvocationResult =
     | WorkRecord of string
     | MergedInto of ToolCallId
+
+type SyncDelegateDispatchEvidence =
+    { SessionId: SessionId
+      PromptKey: PromptKey
+      HostOutcome: SendOutcome option }
+
+type SyncDelegateAccepted =
+    { Dispatch: SyncDelegateDispatchEvidence
+      PhysicalUserMessageId: PhysicalUserMessageId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+
+[<RequireQualifiedAccess>]
+type SyncDelegateObservedAdmission =
+    | Accepted of SyncDelegateAccepted
+    | NotDispatched of reason: string
+    | Refused of SyncDelegateDispatchEvidence * reason: string
+    | Unconfirmed of SyncDelegateDispatchEvidence * reason: string
+
+type SyncDelegateTerminalResponse =
+    { SessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      ProviderRun: ProviderRunIdentity
+      FormalText: string }
+
+type SyncDelegateObservedExecution =
+    { Admission: Task<SyncDelegateObservedAdmission>
+      Completion: Task<Result<SyncDelegateTerminalResponse, string>> }
 
 module DedicatedDelegateKey =
     let create (scope: ReuseScopeId) (role: SyncDelegateRole) = { Scope = scope; Role = role }

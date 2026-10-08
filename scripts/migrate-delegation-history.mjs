@@ -41,11 +41,6 @@ const loadDist = async (modulePath) => {
   }
 }
 
-const EventStore = await loadDist('Persistence/EventStore/Surface.js')
-// 分类、读取与规划只经 Strength 的 JS 语义面（[015] 的登记入口）：dist 内部分级
-// 模块的导出名带 Fable 模块前缀，不是脚本契约。
-const Strength = await loadDist('Strength/Surface.js')
-
 const sha256 = (text) => createHash('sha256').update(text).digest('hex')
 const STRENGTH_STREAM_PREFIX = 'strength/'
 const IMPORT_EVENT_TYPE = 'DelegationHistoryImported'
@@ -102,6 +97,11 @@ const liveStore = resolve(join(repoRoot, '.git'))
 if (backup === liveStore || backup === repoRoot || backup.startsWith(liveStore + sep)) {
   fail(`拒绝在活库上运行: ${backup}；请先复制一份 .git 备份再迁移。`)
 }
+
+const EventStore = await loadDist('Persistence/EventStore/Surface.js')
+// 分类、读取与规划只经 Strength 的 JS 语义面（[015] 的登记入口）：dist 内部分级
+// 模块的导出名带 Fable 模块前缀，不是脚本契约。
+const Strength = await loadDist('Strength/Surface.js')
 
 // 临时副本（dry run）或直接操作备份（execute：唯一允许的写入）。
 let workDir = backup

@@ -78,6 +78,7 @@ module OrdinaryTurnWorkflow =
         (journal: AgentJournal option)
         (observation: TurnObservationJournalPort option)
         (context: ReconciledTurnContext)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         let isFissionReplaced =
             FissionRuntime.isSilentInterrupt context.Turn.SessionId
@@ -95,6 +96,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | false, None, ReconcileProgram.TurnInProgress ->
             InteractionRepairWorkflow.repairIncompleteInteraction
                 quiescence
@@ -104,6 +106,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | false, None, ReconcileProgram.TurnNeedsContinuation _ ->
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence
@@ -113,6 +116,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | false, None, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
             AsyncSupport.completedTask ()
 
@@ -271,6 +275,7 @@ module OrdinaryTurnWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<XTraceTerminalCompletion>)
+        (observer: ContinuationAcceptanceObserver option)
         =
         let turn = context.Turn
 
@@ -284,6 +289,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | ReconcileProgram.TurnNeedsContinuation _ ->
             // Absorb text and reasoning into the XTrace even though this turn is
             // not completable, then ask for the missing report. Still not provider recovery.
@@ -296,6 +302,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | ReconcileProgram.TurnAborted reason -> handleAborted eventPort abortCause turn reason
         | ReconcileProgram.TurnFailed error ->
             handleFailedTurn sessionPort rootWorkspace eventPort journal recoveryScope context error
@@ -324,6 +331,7 @@ module OrdinaryTurnWorkflow =
         (abortCause: AbortCause)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
+        (observer: ContinuationAcceptanceObserver option)
         : Task =
         let turn = context.Turn
 
@@ -342,6 +350,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 observation
+                observer
         | false, None ->
             let completeAgent () =
                 let tracePort = journal |> Option.map TerminalTracePort.forJournal
@@ -360,3 +369,4 @@ module OrdinaryTurnWorkflow =
                 quiescence
                 context
                 completeAgent
+                observer

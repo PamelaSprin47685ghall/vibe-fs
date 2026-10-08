@@ -20,20 +20,11 @@ module BloggerChronicleText =
 
     let private bloggerChronicleTextModelPrefixes: string list = [ "step-3.5-flash" ]
 
-    let private bloggerChronicleTextEnabled (projectionSessionIdOpt: string option) (outObj: obj) =
-        projectionSessionIdOpt
-        |> Option.bind (fun sessionId ->
-            // host-boundary-008: read the exact committed lease target for this
-            // request's trailing physical user message. Missing physical id or
-            // missing lease means no model information; never another
-            // execution's current model.
-            ProviderWireDecode.messagesFromTransformOutput outObj
-            |> ProviderWireCapture.lastUserMessageId
-            |> Option.bind (fun physical ->
-                ModelRouting.tryReadExecution
-                    { SessionId = SessionId.create sessionId
-                      PhysicalUserMessageId = physical }
-                |> Option.map (fun lease -> ModelRouting.toOpenCodeModel lease.Identity.Target)))
+    let private bloggerChronicleTextEnabled (sessionId: string) (physicalUserMessageId: PhysicalUserMessageId) =
+        ModelRouting.tryReadExecution
+            { SessionId = SessionId.create sessionId
+              PhysicalUserMessageId = physicalUserMessageId }
+        |> Option.map (fun lease -> ModelRouting.toOpenCodeModel lease.Identity.Target)
         |> Option.exists (fun model ->
             List.exists
                 (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal))
@@ -72,16 +63,14 @@ module BloggerChronicleText =
         && parts.Length = 1
         && isBloggerChronicleTextPart parts.[0]
 
-    let private bloggerChronicleTextMessageId (projectionSessionIdOpt: string option) (messages: obj list) =
-        let frontier =
-            messages
-            |> List.tryLast
-            |> Option.bind ProviderWireDecode.hostMessageId
-            |> Option.defaultValue "start"
-
+    let private bloggerChronicleTextMessageId (sessionId: string) (physicalUserMessageId: PhysicalUserMessageId) =
         let digest =
             HostDigest.sha256Hex (
-                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; "blogger-chronicle-text"; frontier ]
+                String.concat
+                    "\u001f"
+                    [ sessionId
+                      "blogger-chronicle-text"
+                      PhysicalUserMessageId.value physicalUserMessageId ]
             )
 
         "text-" + digest.Substring(0, 24)
@@ -101,12 +90,13 @@ module BloggerChronicleText =
     let maybeInject
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
+        (physicalUserMessageId: PhysicalUserMessageId option)
         (language: ProviderLanguage)
         (outObj: obj)
         =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId when
-            bloggerChronicleTextEnabled projectionSessionIdOpt outObj
+        match journal, projectionSessionIdOpt, physicalUserMessageId with
+        | Some durable, Some sessionId, Some physical when
+            bloggerChronicleTextEnabled sessionId physical
             && SessionAssociationProjection.isCompanion
                 (SessionId.create sessionId)
                 (AgentJournal.snapshot durable).AgentProjections.Associations
@@ -116,7 +106,7 @@ module BloggerChronicleText =
                 |> Array.toList
                 |> List.filter (isBloggerChronicleTextMessage >> not)
 
-            let messageId = bloggerChronicleTextMessageId projectionSessionIdOpt messages
+            let messageId = bloggerChronicleTextMessageId sessionId physical
             let text = bloggerChronicleText language
             let marker = bloggerChronicleTextMessage messageId text
 

@@ -1,4 +1,124 @@
 import test from 'node:test'
+import { withMacMountedOutput } from './support/mac-mounted-output.mjs'
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, lstatSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const { EventEmitter } = await import('node:events')
+const { compileIncremental, resetOutputDirectory } = await import('../../../scripts/lib/owner-compile.mjs')
+
+function staleOutput(outputRoot, foreignRoot) {
+  mkdirSync(join(outputRoot, 'nested'), { recursive: true })
+  writeFileSync(join(outputRoot, 'nested', 'old.js'), 'stale')
+  writeFileSync(join(outputRoot, '.hidden'), 'stale hidden')
+  symlinkSync(join(outputRoot, 'missing'), join(outputRoot, 'dangling'))
+  symlinkSync(foreignRoot, join(outputRoot, 'foreign'))
+}
+
+async function compileIntoMountedOutput(outputRoot) {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-mounted-compile-'))
+  try {
+    const source = join(root, 'Source.fs')
+    writeFileSync(source, 'namespace Mounted\nlet value = 1\n')
+    const props = join(root, 'Directory.Build.props')
+    writeFileSync(props, '<Project/>\n')
+    writeFileSync(join(root, 'Wanxiangshu.Shard.Mounted.fsproj'), '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><Compile Include="Source.fs"/></ItemGroup></Project>\n')
+    const compile = (code, emittedFile) => compileIncremental({
+      changedPaths: [source], isClean: true, root, projectDirectory: root,
+      rootPropsPath: props, scratchRoot: join(root, '.scratch'), outputDir: outputRoot, stdio: 'pipe',
+      spawn: (_command, args) => {
+        const staging = args[args.indexOf('-o') + 1]
+        mkdirSync(staging, { recursive: true })
+        writeFileSync(join(staging, emittedFile), 'export const value = 1;\n')
+        const child = new EventEmitter()
+        child.stdout = new EventEmitter()
+        child.stderr = new EventEmitter()
+        setImmediate(() => child.emit('close', code, null))
+        return child
+      },
+    })
+    const before = readFileSync(join(outputRoot, 'new.js'))
+    const failed = await compile(1, 'Partial.js')
+    assert.equal(failed.ok, false)
+    assert.deepEqual(readdirSync(outputRoot), ['new.js'])
+    assert.deepEqual(readFileSync(join(outputRoot, 'new.js')), before)
+    const completed = await compile(0, 'Compiled.js')
+    assert.equal(completed.ok, true)
+    assert.deepEqual(readdirSync(outputRoot), ['Compiled.js'])
+    assert.equal(readFileSync(join(outputRoot, 'Compiled.js'), 'utf8'), 'export const value = 1;\n')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+}
+
+test('WHAT[structured-workflow-012] output reset clears children and preserves foreign linked input', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-output-reset-'))
+  try {
+    const outputRoot = join(root, 'dist')
+    const foreignRoot = join(root, 'input')
+    mkdirSync(foreignRoot)
+    writeFileSync(join(foreignRoot, 'source.txt'), 'input bytes')
+    staleOutput(outputRoot, foreignRoot)
+    resetOutputDirectory(outputRoot)
+    assert.deepEqual(readdirSync(outputRoot), [])
+    assert.equal(readFileSync(join(foreignRoot, 'source.txt'), 'utf8'), 'input bytes')
+    writeFileSync(join(outputRoot, 'new.js'), 'new output')
+    assert.equal(readFileSync(join(outputRoot, 'new.js'), 'utf8'), 'new output')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('WHAT[structured-workflow-012] output reset rejects a linked root without replacing it or clearing foreign input', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-linked-output-reset-'))
+  try {
+    const foreignRoot = join(root, 'input')
+    const outputRoot = join(root, 'dist')
+    mkdirSync(foreignRoot)
+    writeFileSync(join(foreignRoot, 'source.txt'), 'input bytes')
+    symlinkSync(foreignRoot, outputRoot)
+    for (const suppliedRoot of [outputRoot, `${outputRoot}/`]) {
+      assert.throws(() => resetOutputDirectory(suppliedRoot), { code: 'OUTPUT_ROOT_NOT_DIRECTORY' })
+    }
+    assert.equal(lstatSync(outputRoot).isSymbolicLink(), true)
+    assert.deepEqual(readdirSync(foreignRoot), ['source.txt'])
+    assert.equal(readFileSync(join(foreignRoot, 'source.txt'), 'utf8'), 'input bytes')
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('WHAT[structured-workflow-012] output reset creates a missing directory and preserves invalid file and dangling-link roots', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-output-root-kind-'))
+  try {
+    const directory = join(root, 'nested', 'dist')
+    resetOutputDirectory(directory)
+    writeFileSync(join(directory, 'new.js'), 'output')
+    assert.equal(readFileSync(join(directory, 'new.js'), 'utf8'), 'output')
+    const file = join(root, 'file')
+    writeFileSync(file, 'original file')
+    const dangling = join(root, 'dangling')
+    symlinkSync(join(root, 'missing'), dangling)
+    for (const invalidRoot of [file, dangling]) {
+      assert.throws(() => resetOutputDirectory(invalidRoot), { code: 'OUTPUT_ROOT_NOT_DIRECTORY' })
+    }
+    assert.equal(readFileSync(file, 'utf8'), 'original file')
+    assert.equal(lstatSync(dangling).isSymbolicLink(), true)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+integrationTest('WHAT[structured-workflow-012] Mac nested mounted output resets under immutable input and cleanup preserves the original callback failure', { skip: process.platform !== 'darwin' ? 'Mac physical proof not acquired on this platform' : false }, async (t) => {
+  await assert.rejects(() => withMacMountedOutput(async ({ inputRoot, outputRoot }) => {
+    const inputBefore = readFileSync(join(inputRoot, 'source.txt'))
+    assert.throws(() => writeFileSync(join(inputRoot, 'source.txt'), 'changed'), { code: 'EROFS' })
+    staleOutput(outputRoot, inputRoot)
+    resetOutputDirectory(outputRoot)
+    assert.deepEqual(readdirSync(outputRoot), [])
+    assert.deepEqual(readFileSync(join(inputRoot, 'source.txt')), inputBefore)
+    writeFileSync(join(outputRoot, 'new.js'), 'new mounted output')
+    assert.equal(readFileSync(join(outputRoot, 'new.js'), 'utf8'), 'new mounted output')
+    await compileIntoMountedOutput(outputRoot)
+    assert.deepEqual(readFileSync(join(inputRoot, 'source.txt')), inputBefore)
+    throw null
+  }, { diagnostic: (message) => t.diagnostic(message), signal: t.signal }), (error) => error === null)
+})
+}
 
 {
 const { default: assert } = await import('node:assert/strict')
@@ -1101,6 +1221,52 @@ test('WHAT[structured-workflow-012] production focused closure carries upstream 
     plan.compileItems.indexOf(companionHostFs) < plan.compileItems.indexOf(pluginSessionScopeFs),
     'canonical order must compile the CompanionHost definition before its consumer',
   )
+})
+
+test('WHAT[structured-workflow-012] focused Controller compilation includes Snapshot recovery without private Host admission contracts', () => {
+  const controllerFs = join(SOURCE_ROOT, 'Execution/Delegation/Handle/Controller.fs')
+  const recoveryFs = join(SOURCE_ROOT, 'Execution/Delegation/ChildRecoveryWorkflow.fs')
+  const plan = planImpactCompile({
+    changedPaths: [controllerFs],
+    projectDirectory: SOURCE_ROOT,
+    fullThreshold: 1,
+  })
+
+  assert.equal(plan.mode, 'focused', `a Controller implementation change must stay focused, got ${plan.mode} (${plan.reason})`)
+  assert.ok(plan.compileItems.includes(controllerFs))
+  assert.ok(plan.compileItems.includes(recoveryFs))
+  for (const extension of ['fsi', 'fs']) {
+    const snapshot = join(SOURCE_ROOT, `OpenCode/Host/SessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include SessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.indexOf(snapshot) < plan.compileItems.indexOf(recoveryFs), 'Snapshot must precede its recovery consumer in canonical order')
+  }
+  for (const path of ['OpenCode/Host/SessionHostPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
+    for (const extension of ['fsi', 'fs']) {
+      assert.equal(plan.compileItems.includes(join(SOURCE_ROOT, `${path}.${extension}`)), false, `Snapshot recovery must not import ${path}.${extension}`)
+    }
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] real Fable compiles a focused Controller change with its declared Snapshot contracts', async () => {
+  const { compileIncremental } = await import('../../../scripts/lib/owner-compile.mjs')
+  const owned = mkdtempSync(join(tmpdir(), 'wanxiangshu-controller-focused-'))
+  try {
+    const outputDir = join(owned, 'out')
+    const result = await compileIncremental({
+      changedPaths: [join(SOURCE_ROOT, 'Execution/Delegation/Handle/Controller.fs')],
+      root: join(SOURCE_ROOT, '../..'),
+      projectDirectory: SOURCE_ROOT,
+      rootPropsPath: join(SOURCE_ROOT, '../../Directory.Build.props'),
+      scratchRoot: join(owned, 'scratch'),
+      outputDir,
+      stdio: 'pipe',
+    })
+    assert.equal(result.ok, true, result.stderr || result.stdout)
+    assert.equal(result.mode, 'focused', 'the production contract fix must not require a full fallback')
+    assert.ok(existsSync(join(outputDir, 'Execution/Delegation/Handle/Controller.js')), 'real Fable must emit the changed Controller')
+  } finally {
+    rmSync(owned, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and rejects unmapped added sources fail-closed', () => {

@@ -11,6 +11,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
@@ -22,6 +23,14 @@ open Wanxiangshu.Strength.Replica
 /// this module only wires Host messages, projection render, and durability.
 [<RequireQualifiedAccess>]
 module StrengthReplay =
+
+    let private failSettlement (tripFuse: string -> unit) (failure: StrengthAppendException) : 'a =
+        tripFuse failure.Message
+
+        if not (List.isEmpty (AppendError.semanticCuts failure.Failure)) then
+            Diagnostic.fatal "strength-semantic-cut" [ "result", failure.Message ]
+
+        raise failure
 
     let private coveredThroughSequenceOf (journal: AgentJournal option) (owner: SessionId) =
         journal
@@ -85,6 +94,8 @@ module StrengthReplay =
             | StrengthDurableAppend.StorageFailed error
             | StrengthDurableAppend.StorageInvalid error ->
                 return Error("Strength request consumption commit failed: " + error)
+            | StrengthDurableAppend.SettlementFailed(eventId, failure) ->
+                return raise (StrengthAppendException(eventId, failure, []))
         }
 
     let private commitCompletedRequest durability owner projection message =
@@ -151,14 +162,23 @@ module StrengthReplay =
             return! applyRenderedPlans ownerRole sessionId outObj rawMessages plans
         }
 
+    let private resolvedPlansOrFailClosed (tripFuse: string -> unit) result =
+        match result with
+        | Ok plans -> plans
+        | Error error ->
+            tripFuse error
+            raise (InvalidOperationException error)
+
     let private plansOrFailClosed
-        (failClosed: string -> StrengthReplayPlan list)
+        (tripFuse: string -> unit)
         (work: Task<Result<StrengthReplayPlan list, string>>)
         : Task<StrengthReplayPlan list> =
         task {
-            match! work with
-            | Ok plans -> return plans
-            | Error error -> return failClosed error
+            try
+                let! result = work
+                return resolvedPlansOrFailClosed tripFuse result
+            with :? StrengthAppendException as failure ->
+                return failSettlement tripFuse failure
         }
 
     let private applyForSession
@@ -170,15 +190,11 @@ module StrengthReplay =
         (sessionId: string)
         (outObj: obj)
         : Task<StrengthReplayPlan list> =
-        let failClosed reason =
-            strengthFailFuse reason
-            raise (InvalidOperationException reason)
-
         match strengthDurability with
         | None -> Task.FromResult([])
         | Some durability ->
             plansOrFailClosed
-                failClosed
+                strengthFailFuse
                 (replayWithDurability journal snapshotPort durability ownerRole sessionId outObj)
 
     /// Replay durable Promoted frames before XTrace. Returns plans that still
@@ -290,6 +306,8 @@ module StrengthReplay =
                 failClosed ("Strength Traced commit storage failure: " + error)
             | StrengthDurableAppend.StorageInvalid error ->
                 failClosed ("Strength Traced commit storage invalid: " + error)
+            | StrengthDurableAppend.SettlementFailed(eventId, failure) ->
+                raise (StrengthAppendException(eventId, failure, []))
         }
 
     let private commitPlanTrace
@@ -320,19 +338,31 @@ module StrengthReplay =
                 do! commitPlanTrace durable durability failClosed updated plan
         }
 
+    let private commitAvailableTrace journal strengthDurability traceState failClosed plans : Task =
+        task {
+            match journal, strengthDurability, traceState with
+            | Some durable, Some durability, Some updated ->
+                do! commitCapturedPlans durable durability failClosed updated plans
+            | _ -> ()
+        }
+
     /// Close Promoted → Traced after XTrace capture for plans that lacked a
     /// prior trace range. Stable Host ids recover the exact range; legacy
     /// positional traces fall back to unique canonical match (fail closed).
     let commitTracedAfterCapture
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
-        (strengthFailClosed: string -> unit)
+        (strengthFailFuse: string -> unit)
         (traceState: XTraceProjectionState option)
         (plans: StrengthReplayPlan list)
         : Task =
+        let failClosed reason =
+            strengthFailFuse reason
+            raise (InvalidOperationException reason)
+
         task {
-            match journal, strengthDurability, traceState with
-            | Some durable, Some durability, Some updated ->
-                do! commitCapturedPlans durable durability strengthFailClosed updated plans
-            | _ -> ()
+            try
+                do! commitAvailableTrace journal strengthDurability traceState failClosed plans
+            with :? StrengthAppendException as failure ->
+                return failSettlement strengthFailFuse failure
         }

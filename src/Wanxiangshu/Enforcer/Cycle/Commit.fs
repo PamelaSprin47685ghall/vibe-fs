@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Enforcer.Cycle
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Composition.Durable
 open System.Threading.Tasks
@@ -23,6 +24,7 @@ module EnforcerCycleCommit =
         | KnownCommitted
         | KnownNotCommitted of reason: string
         | CommitUnknown of reason: string
+        | NoNewWriteReleaseFailed of JournalAppendFailure
 
     let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
         let diagnostic = JournalAppendFailure.describe failure
@@ -33,6 +35,8 @@ module EnforcerCycleCommit =
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> CycleCommitOutcome.KnownCommitted
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
             CycleCommitOutcome.CommitUnknown diagnostic
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
+            CycleCommitOutcome.NoNewWriteReleaseFailed failure
         | ExecutionFailure.LocalInvariant
         | ExecutionFailure.ProtocolRejection
         | ExecutionFailure.AuthorizationDenied

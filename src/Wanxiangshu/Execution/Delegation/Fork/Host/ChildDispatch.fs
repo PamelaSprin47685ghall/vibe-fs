@@ -144,16 +144,16 @@ module HostForkChildDispatch =
                 pendingRuns.Remove agentId |> ignore)
 
     let private nudgeBusyChild
-        (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
-        (agentId: string)
-        (childId: SessionId)
-        (role: Role)
-        (agent: string)
+        (sendBusyNudge:
+            string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>)
+        journal
+        (run: PendingHostRun)
         (prompt: string)
         : Task<Result<ForkResult, string>> =
         taskResult {
-            do! sendBusyNudge agentId childId role agent prompt
-            return ForkResult.Nudged agentId
+            let! profile = HostForkBusyNudge.profileForRun journal run
+            do! sendBusyNudge run.AgentId run.ChildId profile prompt
+            return ForkResult.Nudged run.AgentId
         }
 
     let private completeIdleExistingSend
@@ -306,7 +306,8 @@ module HostForkChildDispatch =
                 -> string
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
-        (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (sendBusyNudge:
+            string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
@@ -327,9 +328,9 @@ module HostForkChildDispatch =
             | Some _, true -> return! Error "Fork runtime is cancelled"
             | Some _, false when preparedHandoff.IsSome ->
                 return! Error(sprintf "Agent already has an active assignment: %s" agentId)
-            | Some _, false ->
+            | Some run, false ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
-                return! nudgeBusyChild sendBusyNudge agentId childId role agent prompt
+                return! nudgeBusyChild sendBusyNudge journal run prompt
             | None, _ ->
                 return!
                     dispatchIdleExistingChild

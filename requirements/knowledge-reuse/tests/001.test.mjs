@@ -9,7 +9,7 @@ test('WHAT[knowledge-reuse-001] public fetch preserves stored prose without clai
   const local = sandbox()
   try {
     const { shelfmark } = await createCase(local)
-    const tool = fetchSurface.contract({ tool: { schema: { string: () => ({}) } } }, local.dir, local.store)
+    const tool = fetchSurface.contract({ tool: { schema: { string: () => ({}) } } }, local.dir, local.store, local.owner)
     const fetch = shelfmark => tool.execute({ shelfmark }, { sessionID: 'reader', agent: 'engineer' })
     const result = await fetch(shelfmark)
     assert.equal(parse(result).answer, 'Answer B')

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Persistence.Journal.JournalOutcome
+open Wanxiangshu.Persistence.EventStore
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -7,7 +9,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 
@@ -38,6 +39,7 @@ type ManagedChatAcceptanceError =
         attempted: AcceptedChatExecutionEvidence
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 /// The canonical acceptance operation needs only an exact projection read and
@@ -86,6 +88,7 @@ type ManagedChatProviderLifecycleError =
     | ProjectionConflictAfterCommit of ChatExecutionState
     | NotAttempted of EventId * JournalUnavailable
     | CommitUnknown of EventId * JournalFailure
+    | NoNewWriteReleaseFailed of EventId * AppendNoNewWriteReleaseFailure
     | FactRejected of EventId * FoldRejection
 
 type ManagedChatProviderLifecyclePersistence =
@@ -141,12 +144,12 @@ module JournalAppendOutcome =
 
     let toExecutionFailure =
         function
-        | Wanxiangshu.Foundation.JournalAppendFailure.WriterUnavailable _ ->
+        | JournalAppendFailure.WriterUnavailable _ ->
             ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-        | Wanxiangshu.Foundation.JournalAppendFailure.FactRejected _ ->
-            ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | Wanxiangshu.Foundation.JournalAppendFailure.WriteUnknown _ ->
-            ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | JournalAppendFailure.FactRejected _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+        | JournalAppendFailure.WriteUnknown _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+        | JournalAppendFailure.NoNewWriteReleaseFailed _ ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptance =
@@ -197,6 +200,8 @@ module ManagedChatAcceptance =
             ManagedChatAcceptanceError.NotAttempted(eventId, unavailable)
         | JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
             ManagedChatAcceptanceError.CommitUnknown(eventId, writeFailure)
+        | JournalAppendFailure.NoNewWriteReleaseFailed(eventId, failure) ->
+            ManagedChatAcceptanceError.NoNewWriteReleaseFailed(eventId, failure)
         | JournalAppendFailure.FactRejected(eventId, rejection) ->
             ManagedChatAcceptanceError.FactRejected(eventId, rejection)
 
@@ -255,6 +260,8 @@ module ManagedChatProviderLifecycle =
             ManagedChatProviderLifecycleError.NotAttempted(eventId, unavailable)
         | JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
             ManagedChatProviderLifecycleError.CommitUnknown(eventId, writeFailure)
+        | JournalAppendFailure.NoNewWriteReleaseFailed(eventId, failure) ->
+            ManagedChatProviderLifecycleError.NoNewWriteReleaseFailed(eventId, failure)
         | JournalAppendFailure.FactRejected(eventId, rejection) ->
             ManagedChatProviderLifecycleError.FactRejected(eventId, rejection)
 
