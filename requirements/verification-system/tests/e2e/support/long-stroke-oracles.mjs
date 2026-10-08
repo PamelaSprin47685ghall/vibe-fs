@@ -697,7 +697,7 @@ export async function oracleLongStroke(scenario, ctx) {
     'long-stroke: conflict repair must create one exact Conflict Resolver handle',
   );
   assert.ok(
-    scenario.provider.matchCount('continue.1') >= 0,
+    scenario.provider.matchCount('manager-interrupt.0') >= 0,
     'long-stroke determinism: the interrupted join closes the superseded provider turn exactly once',
   );
   assert.equal(
