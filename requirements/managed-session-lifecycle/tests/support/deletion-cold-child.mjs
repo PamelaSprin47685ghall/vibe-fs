@@ -12,7 +12,6 @@ const physical = () => Object.fromEntries(readdirSync(eventsDirectory).filter(na
   .sort().map(name => [name, readFileSync(join(eventsDirectory, name), 'base64')]))
 assert.notEqual(process.pid, request.parentPid)
 assert.deepEqual(physical(), request.files)
-const beforePayloadFiles = readdirSync(join(commonDir, 'wanxiangshu', 'payloads')).sort()
 const handle = eventStore.create(commonDir, 'd0g-independent-cold')
 try {
   assert.deepEqual(await casebook.fetchCaseByIdentity(handle, request.old.identity), decodeCase(request.old))
@@ -28,7 +27,9 @@ try {
   assert.deepEqual(eventStore.heads(handle, 'casebook'), [request.captureId])
   assert.equal(eventStore.head(handle, 'casebook'), request.captureId)
   assert.deepEqual(physical(), request.files)
-  assert.deepEqual(readdirSync(join(commonDir, 'wanxiangshu', 'payloads')).sort(), beforePayloadFiles)
+  // durable-events-012: payloads are inline in the ndjson event line; a
+  // payloads directory must never exist.
+  assert.equal(existsSync(join(commonDir, 'wanxiangshu', 'payloads')), false)
   assert.equal(existsSync(join(eventsDirectory, 'd0g-independent-cold.ndjson')), false)
   assert.equal(existsSync(join(commonDir, 'wanxiangshu.lock')), false)
   process.stdout.write(JSON.stringify({ pid: process.pid, verified: true }) + '\n')

@@ -1,4 +1,4 @@
-Investigate one question and return a bounded answer with its facts, evidence,
+Investigate one question and return a bounded answer with its facts, findings,
 hypotheses, and unresolved limits. Sphinx controls the complete inquiry within
 this call; do not drive individual stages or start another agent to run it.
 Workers use standard Engineer permissions, without a separate read-only profile

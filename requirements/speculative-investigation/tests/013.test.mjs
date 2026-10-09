@@ -664,7 +664,10 @@ test('WHAT[speculative-investigation-013] shared common-dir instances prepare on
         const prepared = durableEventsOfType(directory, 'StrengthCandidatePrepared')
         assert.equal(prepared.length, 1, 'shared consumers publish one exact material fact')
         assert.equal(prepared[0].payload_refs.length, 1)
-        const bundle = JSON.parse(readFileSync(join(directory, '.git', 'wanxiangshu', 'payloads', prepared[0].payload_refs[0]), 'utf8'))
+        // durable-events-012: payloads are inline in the ndjson event line.
+        const inlinePayload = prepared[0].payloads[prepared[0].payload_refs[0]]
+        assert.ok(inlinePayload, 'Prepared frame bundle is inline in the event line')
+        const bundle = JSON.parse(Buffer.from(inlinePayload, 'base64').toString('utf8'))
         assert.deepEqual(bundle.batches.map(batch => ({ text: batch.assistant_text, exchanges: batch.exchanges })), [{ text: ['finished'], exchanges: [] }])
         assert.doesNotMatch(JSON.stringify(bundle), /private predictor thinking/)
         for (const output of outputs) {

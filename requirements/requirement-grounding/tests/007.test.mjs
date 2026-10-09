@@ -406,21 +406,45 @@ for (const damage of ['missing', 'changed']) {
       await hooks['experimental.chat.messages.transform']({}, projected)
       const captured = trace.orderedSemanticParts(trace.snapshot(runtime.journal, sessionID)).find(part => part.kind === 'tool_result')
       assert.equal(captured.hostToolPartId, `part-${damage}`)
-      const payloadPath = join(directory, '.git', 'wanxiangshu', 'payloads', captured.textRef.slice('blobs/'.length))
-      assert.equal(readFileSync(payloadPath, 'utf8'), output, 'the fixture damages the actual captured result payload')
-      await withPresentationJournals(directory, async (pairJournal, groundingJournal) => {
-        if (damage === 'missing') rmSync(payloadPath)
-        else writeFileSync(payloadPath, 'changed payload\r\n')
-        const paired = await pair.tryInjectWithJournal(pairJournal, sessionID, pair.text, projected.messages)
-        assert.equal(paired.ok, false, 'Pair must reject failed original evidence instead of guessing a suffix boundary')
-        assert.match(paired.error, damage === 'missing' ? /payload missing/ : /digest does not match/)
-        const grounded = await grounding.projectWithJournal(groundingJournal, sessionID, projected.messages)
-        assert.equal(grounded.ok, false, 'Grounding must reject the same damaged evidence')
-        assert.match(grounded.error, damage === 'missing' ? /payload missing/ : /digest does not match/)
+      // durable-events-012: the ndjson line is the only payload carrier. Damage
+      // means: the content address no longer matches the bytes it names.
+      const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+      const writerFile = readdirSync(eventsDir).find((name) => name.endsWith('.ndjson'))
+      const writerPath = join(eventsDir, writerFile)
+      const lines = readFileSync(writerPath, 'utf8').trimEnd().split('\n')
+      const handle = captured.textRef.slice('blobs/'.length)
+      const index = lines.findIndex((line) => {
+        const row = JSON.parse(line)
+        return row.payload_refs?.includes(handle)
       })
+      assert.ok(index >= 0, 'the captured result payload is embedded in an event line')
+      const damaged = JSON.parse(lines[index])
+      assert.equal(Buffer.from(damaged.payloads[handle], 'base64').toString('utf8'), output,
+        'the fixture damages the actual captured result payload')
       if (damage === 'missing') {
-        await assert.rejects(pair.createJournal(join(directory, '.git')), error => /missing durable payload/.test(error.message),
-          'a cold boot also refuses the missing durable payload')
+        // No bytes remain under the reference: the line is no longer self-contained.
+        delete damaged.payloads[handle]
+      } else {
+        // Bytes remain but contradict the address they are stored under.
+        damaged.payloads[handle] = Buffer.from('changed payload\r\n', 'utf8').toString('base64')
+      }
+      lines[index] = JSON.stringify(damaged)
+      writeFileSync(writerPath, lines.join('\n') + '\n')
+      // Under the inline carrier the damaged line is not self-contained, so it is
+      // a physical storage fault the canonical Integrator refuses while opening
+      // history. Neither presentation owner can therefore be handed the evidence,
+      // and no boot can smuggle the damaged line into a fold.
+      const expected =
+        damage === 'missing' ? /missing durable inline payload/ : /durable inline payload digest mismatch/
+      for (const [owner, open] of [
+        ['pair', () => pair.createJournal(join(directory, '.git'))],
+        ['grounding', () => grounding.createJournal(join(directory, '.git'))],
+      ]) {
+        await assert.rejects(
+          open,
+          error => expected.test(error.message),
+          `${owner} must refuse the ${damage} durable inline payload instead of presenting it`,
+        )
       }
     })
   })
@@ -559,7 +583,10 @@ const runCompositionMutation = mutation => {
   delete env.NODE_TEST_CONTEXT
   return spawnSync(process.execPath, [
     '--loader', new URL('./support/007-composition-loader.mjs', import.meta.url).href,
-    '--test', '--test-name-pattern=registered composition preserves result suffixes.*anthropic',
+    // The child's summary counters are read as TAP lines (`# pass 1`). Pin the
+    // reporter: the default reporter is not TAP on every supported Node version.
+    '--test-reporter=tap', '--test',
+    '--test-name-pattern=registered composition preserves result suffixes.*anthropic',
     new URL(import.meta.url).pathname,
   ], {
     encoding: 'utf8', timeout: 30000,

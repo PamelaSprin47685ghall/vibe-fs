@@ -57,9 +57,9 @@ Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求�
 
 ## [009] managed model 准入与读取分离；dispatch message 保持 model-free
 
-所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 hook（`chat.params`、transform、tool）通过容量所有者的只读查询读取该 exact execution 已提交的租约并与真实观察核对；该查询不得调用 scheduler、不得接管预约、不得发放 fence、不得 commit/release，也不得因读取增加 duplicate/stale/conflict 计数。
+所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 hook（`chat.params`、transform、tool）通过容量所有者的只读查询读取该 exact execution 已提交的租约；该查询不得调用 scheduler、不得发放 fence、不得 commit/release，也不得因读取增加 duplicate/stale/conflict 计数。运行时观测只读，不再校验 agent 或 model/reasoning 与租约是否一致；漂移不变量由测试期 fast-check 性质保证：对任意 `route(role, running, previous, purpose)` 决策，`chat.message` 投影的 target 恒等于已提交租约 target，`chat.params` 观测恒不阻断。取舍：若漂移真实发生，运行时将静默通过，不再抛 PROMPT-006 拒绝。
 
-[006] 的追加材料在 `chat.message` 只投影旧目标；provider transform 先调用独立的可见输入准入操作，完成 exact lease 交接，再执行上述只读校验。这不是缺失租约的通用回填：没有 exact Accepted evidence、同 run 证明或旧 committed lease 时仍须 fail closed。
+[006] 的追加材料在 `chat.message` 只投影旧目标；provider transform 先调用独立的可见输入准入操作，完成 exact lease 交接，再执行上述只读查询。这不是缺失租约的通用回填：没有 exact Accepted evidence、同 run 证明或旧 committed lease 时仍须 fail closed。
 
 ## [010] provider capacity 独立成可抢占 token；只凭显式 lender 借用
 

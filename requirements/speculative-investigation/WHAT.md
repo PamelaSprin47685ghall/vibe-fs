@@ -81,7 +81,7 @@
 
 一份授权至少绑定：DecisionId（由协议版本 2、owner logical run 与来源 provider run 确定性派生，不按工具完成顺序或未来目标请求派生）、OwnerSessionId、owner logical run identity、authority root 与来源 physical user message、发出该批的 SourceProviderRun、固定顺序的完整 SourceToolCallIds（包含整批中不参与调用的 ID）、RequestedRounds（参与子集 max）与 ContractRevision（当前协议版本 2）。授权不增加 SelfNote、Hint 或 TrustScore 事件。
 
-持久化时机：来源整批完成并取得真实 owner 新输出证据后、外发副本前，写入 `DelegationRequested`；为合法普通续行冻结 target 与 mirror 后、副本首次外发前，写入 `DelegationBound`，固定 target、ReplicaSessionId 与 anchor digest；候选材料先写 `Prepared` 并持久化引用，之后才可被任何主模型可见路径消费。大对象仅通过 payload_refs 关联，不引入私有存储。
+持久化时机：来源整批完成并取得真实 owner 新输出证据后、外发副本前，写入 `DelegationRequested`；为合法普通续行冻结 target 与 mirror 后、副本首次外发前，写入 `DelegationBound`，固定 target、ReplicaSessionId 与 anchor digest；候选材料先写 `Prepared` 并持久化引用，之后才可被任何主模型可见路径消费。大对象以内容哈希 `payload_refs` 命名，其字节内嵌于同一条事件行（[durable-events-012]），不引入私有存储。
 
 写入失败或状态未知时 fail closed：先解析既有事实，未证明已提交不得外发；不得把存储错误降级为内存里的 consumed。Bound 必须先创建尚未发送 prompt 的空 child 并持久化成功，才允许发送 prompt 与进入模型准入；Bound 写失败时清理空 child，创建空 child 不得预占模型容量。
 

@@ -64,15 +64,15 @@ did. Remove process wrappers and emphasis that carry no fact: “after reviewing
 “further work is needed,” “the relevant issue.” Do not announce that you reached
 a conclusion; state the conclusion.
 
-The target is not diary-like completeness. It is a verdict backed by evidence.
+The target is not diary-like completeness. It is a verdict backed by facts.
 Every sentence should survive hostile review on its own: explicit subject,
-explicit predicate, explicit condition, explicit evidence, explicit boundary.
+explicit predicate, explicit condition, explicit facts, explicit boundary.
 Do not manufacture force with “obviously,” “completely,” “definitively,” or
 “beyond doubt.” Force comes from facts another reader can verify.
 
 Prefer falsifiable sentences. A sentence that code, protocol, state, tests, or
 external reality can directly prove or disprove is more valuable than “the issue
-is resolved” or “the overall logic is now clear.” If removing the evidence leaves
+is resolved” or “the overall logic is now clear.” If removing the facts leaves
 only confidence or tone, the sentence does not belong in Chronicle.
 
 Make every sentence as self-contained as possible. Avoid referents such as
@@ -81,8 +81,8 @@ when their meaning lives only in the lost transcript. Keep enough concrete nouns
 that the Chronicle still identifies the actor, boundary, protocol, state, and
 effect when read alone.
 
-Put evidence into the sentence itself. When settlement depends on an
-implementation fact, occurrence should contain the shortest evidence chain that
+Put facts into the sentence itself. When settlement depends on an
+implementation fact, occurrence should contain the shortest fact chain that
 supports it: which component emits what, which boundary accepts what, and where
 the value is rejected, ignored, or changed. Prefer “A emits X; B accepts only Y;
 X is dropped at Z” over “a comparison of A and B revealed a format mismatch.”
@@ -98,7 +98,7 @@ Each field answers one sharp question:
 
 - charge: exactly which proposition is not yet safe to believe, or which state
   must change? Do not say merely that something needs investigation.
-- occurrence: what shortest evidence chain or real mutation turned the case?
+- occurrence: what shortest fact chain or real mutation turned the case?
   Name entities, conditions, and effects directly.
 - settlement: what verdict can now be stated as fact? Land it in one sentence;
   do not prefix it with “confirmed,” “clarified,” or “established.”

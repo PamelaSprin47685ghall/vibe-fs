@@ -44,7 +44,7 @@
 
 物理 fingerprint 缓存不具权威。满足 [008] 的 clean no-op 必须在任何同步 transport 前返回，不另行 `ls-remote`、`fetch` 或内部 `push`。发生变化时只读写、验证变动文件，远端竞争仍走 CAS 收敛。
 
-writer 的 remote-read 判定必须比较 manifest activity。payload 没有该语义：本地 stat identity 未变、cached OID 等于 remote OID 且远端为 blob 时，不得重读 payload；不得因缺少 writer manifest 而重读全部历史 payload。
+writer 的 remote-read 判定必须比较 manifest activity。事件行自包含载荷（[durable-events-012]），远端快照只含 `writers/` 与 `writer-manifest`，没有独立 payload 树；因此不存在「因缺少 writer manifest 而重读全部历史 payload」的路径。
 
 Hook 安装器只在当前仓库为未自定义 multiplex 的 SSH 命令追加短生命周期 `ControlMaster=auto`，保留原命令和 identity 参数；已有 `ControlMaster` 或 `ControlPath` 不得覆盖。自有 wrapper 每次执行前重建并收紧 repo-scoped socket 目录，永久配置不得依赖安装时的易失目录；须迁移旧版自有的过长 repo-local 和易失 tmp socket 路径。
 

@@ -93,8 +93,10 @@ try {
           : await Strength.durabilityAppend(durability, requested)
     } catch (error) { thrown = error }
     assert.equal(removals, 1)
-    assert.equal(releaseCalls, scenario === 'prepared' ? 2 : 1,
-      'Prepared payload publication releases once before the actual event append releases')
+    // durable-events-012: staging inline payload bytes takes no store lock, so a
+    // published Prepared releases the append gate exactly once, on its own
+    // append. Payload publication no longer has a separate physical release.
+    assert.equal(releaseCalls, 1)
     assert.equal(appendCalls, scenario === 'duplicate' ? 0 : 1)
     assert.deepEqual(appendedTypes, scenario === 'duplicate' ? []
       : [scenario === 'prepared' ? 'StrengthCandidatePrepared' : 'DelegationRequested'])

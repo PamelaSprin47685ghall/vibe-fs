@@ -376,7 +376,9 @@ for (const scenario of ['store', 'append', 'prepared', 'duplicate']) {
     try {
       const measured = await probe('measure', sourceWriter, {})
       assert.equal(measured.removals, 1)
-      assert.equal(measured.releaseCalls, scenario === 'prepared' ? 2 : 1)
+      // durable-events-012: inline payload staging takes no store lock, so the
+      // published Prepared releases the append gate exactly once on its own append.
+      assert.equal(measured.releaseCalls, 1)
       assert.equal(measured.appendCalls, scenario === 'duplicate' ? 0 : 1)
       assert.deepEqual(measured.appendedTypes, scenario === 'duplicate' ? []
         : [scenario === 'prepared' ? 'StrengthCandidatePrepared' : 'DelegationRequested'])

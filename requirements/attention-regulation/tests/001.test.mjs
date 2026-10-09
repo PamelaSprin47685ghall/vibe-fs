@@ -16,4 +16,4 @@ test('WHAT[attention-regulation-001] enough accepts nonblank decisions without r
   assert.deepEqual(fixture.appends, [])
 })
 
-test.todo('WHAT[attention-regulation-001] GAP-118 review prompt meaning and actual participant behavior at materially new evidence; no word scan proves cognitive stopping')
+test.todo('WHAT[attention-regulation-001] GAP-118 review prompt meaning and actual participant behavior at materially new facts; no word scan proves cognitive stopping')

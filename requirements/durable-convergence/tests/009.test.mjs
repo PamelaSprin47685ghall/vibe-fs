@@ -36,7 +36,7 @@ test('WHAT[durable-convergence-009] actual writer sync preserves gateway identit
     assert.equal(result.repeat.root, result.first.root)
     assert.equal(result.repeat.root, writtenRoot(result.repeat.protocol))
     assert.equal(result.invalid.ok, false)
-    assert.match(result.invalid.error, /sync root must contain writers\/ and payloads\//)
+    assert.match(result.invalid.error, /sync root must contain writers\//)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -55,7 +55,9 @@ test('WHAT[durable-convergence-009] absent remote materializes a valid local-onl
     assert.equal(result.ok, true, JSON.stringify(result))
     const entries = execFileSync('git', ['-C', repo, 'ls-tree', result.root], { encoding: 'utf8' })
     assert.match(entries, /\twriters$/m)
-    assert.match(entries, /\tpayloads$/m)
+    // durable-events-012: payload bytes live inline in each writer line, so the
+    // remote snapshot carries writers plus the manifest and no payloads tree.
+    assert.doesNotMatch(entries, /\tpayloads$/m)
     assert.match(entries, /\twriter-manifest$/m)
     assert.deepEqual(retainedWriterIdsAt(commonDir, nowMs), ['writer-local'])
   } finally {
