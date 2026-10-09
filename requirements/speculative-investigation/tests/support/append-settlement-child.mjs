@@ -6,8 +6,8 @@ import {syncBuiltinESMExports} from 'node:module'
 
 const [mode, commonDir, writerId, scenario, input] = process.argv.slice(2)
 const H = text => createHash('sha256').update(text).digest('hex')
-const file = path.join(commonDir, 'wanxiang', 'events', `${writerId}.ndjson`)
-const lock = path.join(commonDir, 'wanxiang.lock')
+const file = path.join(commonDir, 'wanxiangshu', 'events', `${writerId}.ndjson`)
+const lock = path.join(commonDir, 'wanxiangshu.lock')
 const EventStore = await import('../../../../dist/Persistence/EventStore/Surface.js')
 const Strength = await import('../../../../dist/Strength/Surface.js')
 const handle = EventStore.create(commonDir, writerId)
@@ -29,7 +29,7 @@ try {
   if (mode === 'cold') {
     const request = JSON.parse(input)
     assert.notEqual(writerId, request.sourceWriter)
-    const source = path.join(commonDir, 'wanxiang', 'events', `${request.sourceWriter}.ndjson`)
+    const source = path.join(commonDir, 'wanxiangshu', 'events', `${request.sourceWriter}.ndjson`)
     assert.equal(fs.readFileSync(source, 'base64'), request.bytes)
     assert.deepEqual(EventStore.read(handle, request.event.id), request.event)
     assert.equal(EventStore.head(handle, request.event.stream), request.event.id)

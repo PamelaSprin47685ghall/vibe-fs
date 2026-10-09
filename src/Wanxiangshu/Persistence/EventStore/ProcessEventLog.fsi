@@ -21,6 +21,9 @@ module ProcessEventLog =
         | BeforeAppend of AppendFault
         | AfterAppend of primary: AppendFault * cleanupFailures: AppendFault list
 
+    [<Literal>]
+    val WanxiangshuRootName: string = "wanxiangshu"
+
     type WriterPhysicalMetadata =
         { Name: string
           StatIdentity: string

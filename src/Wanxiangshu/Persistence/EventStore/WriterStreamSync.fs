@@ -90,7 +90,7 @@ module WriterStreamSync =
         ConvergeError.StorageInvalid(StorageInvalid.NonCanonical reason)
 
     let private materializationCachePath commonDir =
-        joinPath (joinPath commonDir "wanxiang") "sync-materialization-cache"
+        joinPath (joinPath commonDir ProcessEventLog.WanxiangshuRootName) "sync-materialization-cache"
 
     let private validHex length (value: string) =
         value.Length = length

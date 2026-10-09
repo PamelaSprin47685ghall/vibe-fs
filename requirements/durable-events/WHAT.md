@@ -18,7 +18,7 @@
 
 ## [005] Process 对应 single writer 与单个不分段文件
 
-每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.git/wanxiang/events/<WriterId>.ndjson` 文件。该文件不按体积、事件数或时间进行分段切片。进程退出后该文件封存且不得被新进程接管；超过统一 writer-retention TTL 后允许整文件删除。新启动进程必须创建新的 `WriterId`。业务流标识、机器标识与角色均不得作为物理写者划分依据。
+每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.git/wanxiangshu/events/<WriterId>.ndjson` 文件。该文件不按体积、事件数或时间进行分段切片。进程退出后该文件封存且不得被新进程接管；超过统一 writer-retention TTL 后允许整文件删除。新启动进程必须创建新的 `WriterId`。业务流标识、机器标识与角色均不得作为物理写者划分依据。
 
 ## [006] commit outcome 只由本地事实存在性判定
 
@@ -40,7 +40,7 @@
 
 ## [010] 单一 universal durable substrate 位于 .git 内本地事件文件
 
-动态事件的运行时物理载体唯一限定在 `.git/wanxiang/events/*.ndjson` 及其引用的 `.git/wanxiang/payloads/*` 大对象中。所有业务领域的信封全部进入这套通用文件体系，禁止任何模块维护私有 journal 文件或私有数据库。
+动态事件的运行时物理载体唯一限定在统一根目录 `<git-common-dir>/wanxiangshu/` 下的 `.git/wanxiangshu/events/*.ndjson` 及其引用的 `.git/wanxiangshu/payloads/*` 大对象中。所有业务领域的信封全部进入这套通用文件体系，禁止任何模块维护私有 journal 文件或私有数据库。历史遗留的 `.git/wanxiang/` 布局按 [009] leave-unread 处理：不读、不写、不自动迁移。
 
 ## [011] Git blob 只存在于 remote sync 边界且单文件对应单 blob
 
@@ -48,7 +48,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## [012] PayloadRef 与本地 payload closure
 
-体积庞大的正文内容首先按内容哈希生成不透明的 `PayloadRef`，并落盘在 `.git/wanxiang/payloads/<PayloadRef>`。事件追加成功前，其引用的所有 payload 必须已完成落盘且哈希完全匹配；引用缺失构成 `StorageInvalid`。
+体积庞大的正文内容首先按内容哈希生成不透明的 `PayloadRef`，并落盘在 `.git/wanxiangshu/payloads/<PayloadRef>`。事件追加成功前，其引用的所有 payload 必须已完成落盘且哈希完全匹配；引用缺失构成 `StorageInvalid`。
 
 ## [013] 查询只读正规 Integrator 的 Current 且先 commit 后 integrate
 

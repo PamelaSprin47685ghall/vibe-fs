@@ -203,7 +203,10 @@ module ProcessEventLog =
     [<Emit("$0.digest('hex')")>]
     let private hashHex (hash: obj) : string = jsNative
 
-    let private wanxiangDirectory commonDir = join2 commonDir "wanxiang"
+    [<Literal>]
+    let WanxiangshuRootName = "wanxiangshu"
+
+    let private wanxiangDirectory commonDir = join2 commonDir WanxiangshuRootName
 
     let private eventsDirectory commonDir =
         join2 (wanxiangDirectory commonDir) "events"

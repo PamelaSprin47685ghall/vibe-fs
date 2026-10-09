@@ -111,7 +111,7 @@ const originalMaterials = [
 const originalMaterialCarrier = body => `${body}\n\nrequirement_source_path = "requirements/alpha/WHAT.md"\n`
 
 const sessionHostFacts = (directory, sessionID) => {
-  const events = join(directory, '.git', 'wanxiang', 'events')
+  const events = join(directory, '.git', 'wanxiangshu', 'events')
   return readdirSync(events).flatMap(name => readFileSync(join(events, name), 'utf8').split('\n').filter(Boolean).map(JSON.parse))
     .flatMap(event => {
       const fact = event.payload?.Fact
@@ -406,7 +406,7 @@ for (const damage of ['missing', 'changed']) {
       await hooks['experimental.chat.messages.transform']({}, projected)
       const captured = trace.orderedSemanticParts(trace.snapshot(runtime.journal, sessionID)).find(part => part.kind === 'tool_result')
       assert.equal(captured.hostToolPartId, `part-${damage}`)
-      const payloadPath = join(directory, '.git', 'wanxiang', 'payloads', captured.textRef.slice('blobs/'.length))
+      const payloadPath = join(directory, '.git', 'wanxiangshu', 'payloads', captured.textRef.slice('blobs/'.length))
       assert.equal(readFileSync(payloadPath, 'utf8'), output, 'the fixture damages the actual captured result payload')
       await withPresentationJournals(directory, async (pairJournal, groundingJournal) => {
         if (damage === 'missing') rmSync(payloadPath)

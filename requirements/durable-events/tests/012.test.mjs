@@ -34,7 +34,7 @@ test('WHAT[durable-events-012] BlobWriter_uses_local_content_addressed_payloads_
     assert.match(receipt.blobRef, /^blobs\/[0-9a-f]{64}$/)
 
     const handle = receipt.blobRef.slice('blobs/'.length)
-    assert.equal(existsSync(join(commonDir, 'wanxiang', 'payloads', handle)), true)
+    assert.equal(existsSync(join(commonDir, 'wanxiangshu', 'payloads', handle)), true)
 
     const read = mustOk(await journal.JournalSurface_readPayload(booted.journal, receipt.blobRef), 'read')
     assert.equal(read.content, 'large-body\n')
@@ -66,7 +66,7 @@ test('WHAT[durable-events-012] appended_fact_lifts_real_blob_digest_into_persist
     )
     assert.ok(appended.projection)
 
-    const ndjson = readFileSync(join(commonDir, 'wanxiang', 'events', 'journal-closure-proof.ndjson'), 'utf8')
+    const ndjson = readFileSync(join(commonDir, 'wanxiangshu', 'events', 'journal-closure-proof.ndjson'), 'utf8')
     assert.match(ndjson, new RegExp(`"payload_refs":\\["${handle}"\\]`))
     journal.JournalSurface_dispose(booted.journal)
   })
@@ -134,7 +134,7 @@ const lifeOpened = (session, ref, digest) => ({
   },
 })
 const payloadRefsFromFile = (commonDir, writerId) => {
-  const file = join(commonDir, 'wanxiang', 'events', `${writerId}.ndjson`)
+  const file = join(commonDir, 'wanxiangshu', 'events', `${writerId}.ndjson`)
   return readFileSync(file, 'utf8')
     .trim()
     .split('\n')
@@ -220,7 +220,7 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
       const commonDir = join(root, '.git')
       const sourceWriterId = randomUUID()
       const measureWriter = randomUUID()
-      const sourceFile = join(commonDir, 'wanxiang', 'events', `${sourceWriterId}.ndjson`)
+      const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriterId}.ndjson`)
       const request = { sourceWriterId, sessionId: 'payload-g1-existing-session',
         oldBody: '原有非空payload\r\nNUL:\u0000；雪 😀 保留尾空格  ',
         incomingBody: '新的非空payload\r\nNUL:\u0000；é 😀 保留尾空格  ' }
@@ -296,8 +296,8 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
         assert.deepEqual(cold.incomingRead, measured.incomingRead)
         assert.deepEqual(cold.physical, measured.physical)
         assert.equal(readFileSync(sourceFile, 'base64'), measured.before.sourceBytes)
-        assert.deepEqual(readFileSync(join(commonDir, 'wanxiang', 'payloads', oldDigest)), Buffer.from(request.oldBody, 'utf8'))
-        if (success) assert.deepEqual(readFileSync(join(commonDir, 'wanxiang', 'payloads', incomingDigest)),
+        assert.deepEqual(readFileSync(join(commonDir, 'wanxiangshu', 'payloads', oldDigest)), Buffer.from(request.oldBody, 'utf8'))
+        if (success) assert.deepEqual(readFileSync(join(commonDir, 'wanxiangshu', 'payloads', incomingDigest)),
           Buffer.from(request.incomingBody, 'utf8'))
         t.diagnostic(JSON.stringify({ scenario, measurePid: measured.pid, coldPid: cold.pid,
           actualPayloadAndCold: true, ...measured.observed }))

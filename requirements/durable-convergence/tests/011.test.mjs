@@ -25,7 +25,7 @@ const canonicalLine = (event) => JSON.stringify({
 }) + '\n'
 
 const writeCanonicalEvents = (commonDir, writerId, events) => {
-  const directory = join(commonDir, 'wanxiang', 'events')
+  const directory = join(commonDir, 'wanxiangshu', 'events')
   mkdirSync(directory, { recursive: true })
   const path = join(directory, `${writerId}.ndjson`)
   writeFileSync(path, events.map(canonicalLine).join(''))
@@ -51,7 +51,7 @@ const writeEvent = async (commonDir, writerId, event) => {
   } finally {
     eventStore.dispose(handle)
   }
-  return join(commonDir, 'wanxiang', 'events', `${writerId}.ndjson`)
+  return join(commonDir, 'wanxiangshu', 'events', `${writerId}.ndjson`)
 }
 
 test('WHAT[durable-convergence-011] reverse tail read is exact across block boundaries', () => {
@@ -314,7 +314,7 @@ test('WHAT[durable-convergence-011] writer lifecycle observes active, expiry, an
   await withRepo(async (repo, commonDir) => {
     const HOUR = 60 * 60 * 1000
     const born = Date.parse('2026-08-20T00:00:00Z')
-    const eventsDir = join(commonDir, 'wanxiang', 'events')
+    const eventsDir = join(commonDir, 'wanxiangshu', 'events')
     const writerPath = join(eventsDir, 'writer-lifecycle.ndjson')
 
     const writeJournalLine = (event) => {

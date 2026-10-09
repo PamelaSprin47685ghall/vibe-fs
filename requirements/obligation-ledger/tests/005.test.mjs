@@ -13,7 +13,7 @@ const { countFactCase } = await import("../../verification-system/tests/e2e/supp
 // Count the durable TodoCheckpointCommitted facts in the plugin workspace's
 // event log — the projection deduping alone cannot prove append idempotence.
 const countCheckpointFacts = (directory) => {
-  const eventsDir = join(directory, '.git', 'wanxiang', 'events')
+  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
   let count = 0
   for (const file of readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
     const content = readFileSync(join(eventsDir, file), 'utf8')
@@ -181,7 +181,7 @@ const { renameSync, writeFileSync } = await import("node:fs");
 // Refuse physical appends in the fixture workspace, restoring its events
 // directory even when the tested operation fails.
 const withBlockedEvents = async (directory, action) => {
-  const eventsDir = join(directory, '.git', 'wanxiang', 'events')
+  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
   const { mkdtempSync: mkStash, rmSync: rmStash } = await import("node:fs")
   const osModule = await import('node:os')
   const stash = mkStash(join(osModule.tmpdir(), 'wxs-005-stash-'))

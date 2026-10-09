@@ -410,7 +410,7 @@ const journalTreeContainsMarker = (directory) => {
     }
     return false
   }
-  return walk(join(directory, '.git', 'wanxiang', 'events'))
+  return walk(join(directory, '.git', 'wanxiangshu', 'events'))
 }
 
 test('WHAT[cognitive-environment-015] registered companion projection keeps the original execution model gate', async () => {
@@ -500,7 +500,7 @@ test('WHAT[cognitive-environment-015] registered companion projection keeps the 
 test('WHAT[cognitive-environment-015] durable marker oracle observes Git-private event bytes', () => {
   const directory = mkdtempSync(join(tmpdir(), 'chronicle-marker-oracle-'))
   try {
-    const events = join(directory, '.git', 'wanxiang', 'events')
+    const events = join(directory, '.git', 'wanxiangshu', 'events')
     mkdirSync(events, { recursive: true })
     const log = join(events, 'all.ndjson')
     writeFileSync(log, '{}\n')

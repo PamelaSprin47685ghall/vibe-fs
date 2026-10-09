@@ -384,7 +384,7 @@ for (const scenario of ['store', 'append', 'prepared', 'duplicate']) {
       assert.notEqual(cold.pid, measured.pid)
       assert.deepEqual(cold.event, measured.event)
       assert.deepEqual(cold.candidate, measured.candidate)
-      assert.equal(readFileSync(join(commonDir, 'wanxiang', 'events', `${sourceWriter}.ndjson`), 'base64'), measured.bytes)
+      assert.equal(readFileSync(join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}.ndjson`), 'base64'), measured.bytes)
       t.diagnostic(JSON.stringify({scenario, physicalAndCold: true, measurePid: measured.pid, coldPid: cold.pid}))
       assert.equal(measured.threw, false, 'The consumer returns the settled outcome after the original Release failure')
       assert.equal(measured.causeSame, true)

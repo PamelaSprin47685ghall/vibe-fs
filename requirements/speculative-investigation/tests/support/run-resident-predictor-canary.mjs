@@ -189,8 +189,8 @@ try {
   assert.deepEqual(transcripts[0].prompts, [instruction, instruction, instruction])
   assert.doesNotMatch(currentHost.stderrLog, /ActiveRunIdentityConflict|prompt_async failed|failed ref=|fuse|bundle invalid/i)
 
-  const eventFiles = fs.readdirSync(path.join(workspace, '.git/wanxiang/events'))
-  const events = eventFiles.flatMap(file => fs.readFileSync(path.join(workspace, '.git/wanxiang/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)))
+  const eventFiles = fs.readdirSync(path.join(workspace, '.git/wanxiangshu/events'))
+  const events = eventFiles.flatMap(file => fs.readFileSync(path.join(workspace, '.git/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)))
   const bound = events.filter(event => event.event_type === 'DelegationBound')
   assert.equal(bound.length, 3, 'exactly 3 Bound decisions')
 
@@ -201,7 +201,7 @@ try {
   assert.equal(requested.length, 3, 'each real source batch authorizes one decision')
   const byDecision = new Map(requested.map(row => [row.payload.decision_id, row.payload]))
   const ownerMessages = await request(currentHost, 'GET', `/session/${session}/message`)
-  const payloadsDir = path.join(workspace, '.git/wanxiang/payloads')
+  const payloadsDir = path.join(workspace, '.git/wanxiangshu/payloads')
   for (const row of prepared) {
     const authorization = byDecision.get(row.payload.decision_id)
     assert.ok(authorization, 'Prepared has durable authorization')
@@ -272,8 +272,8 @@ try {
   const subResult = await promptOwner('msg_assignment_sub_owner', 'Review the fixture from this sub-session.', subOwner, 'engineer')
   assert.ok(subResult.info.time.completed)
   assert.ok(subResult.parts.some(part => part.text === 'Sub-owner smoke complete.'))
-  const finalEvents = fs.readdirSync(path.join(workspace, '.git/wanxiang/events')).flatMap(file =>
-    fs.readFileSync(path.join(workspace, '.git/wanxiang/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
+  const finalEvents = fs.readdirSync(path.join(workspace, '.git/wanxiangshu/events')).flatMap(file =>
+    fs.readFileSync(path.join(workspace, '.git/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
   )
   const subRequested = finalEvents.filter(row =>
     row.event_type === 'DelegationRequested' && row.payload.owner_session_id === subOwner,

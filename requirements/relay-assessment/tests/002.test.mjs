@@ -97,7 +97,7 @@ test('WHAT[relay-assessment-002] changed public narrative binding rejects replay
     assert.ok(narrative)
     const original = narrative.text
     const accepted = structuredClone(JournalSurface_snapshot(runtime.journal))
-    const eventDirectory = join(directory, '.git', 'wanxiang', 'events')
+    const eventDirectory = join(directory, '.git', 'wanxiangshu', 'events')
     const facts = () => readdirSync(eventDirectory).filter(name => name.endsWith('.ndjson')).sort()
       .map(name => ({ name, bytes: readFileSync(join(eventDirectory, name)) }))
     const acceptedFacts = facts()

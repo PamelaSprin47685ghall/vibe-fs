@@ -20,7 +20,7 @@ test('WHAT[durable-convergence-009] actual writer sync preserves gateway identit
   const commonDir = join(root, '.git')
   const nowMs = Date.now()
   try {
-    const events = join(commonDir, 'wanxiang', 'events')
+    const events = join(commonDir, 'wanxiangshu', 'events')
     mkdirSync(events, { recursive: true })
     writeFileSync(join(events, 'writer-local.ndjson'), canonicalLine('a'.repeat(40), '1'.repeat(40)))
     const result = await writerSyncAdapterScenario({
@@ -48,7 +48,7 @@ test('WHAT[durable-convergence-009] absent remote materializes a valid local-onl
   const commonDir = join(repo, '.git')
   const nowMs = Date.now()
   try {
-    const events = join(commonDir, 'wanxiang', 'events')
+    const events = join(commonDir, 'wanxiangshu', 'events')
     mkdirSync(events, { recursive: true })
     writeFileSync(join(events, 'writer-local.ndjson'), canonicalLine('a'.repeat(40), '1'.repeat(40)))
     const result = await syncAt(repo, commonDir, null, nowMs)

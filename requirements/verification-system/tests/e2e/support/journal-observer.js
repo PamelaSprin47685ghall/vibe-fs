@@ -658,7 +658,7 @@ export function journalFactTail(workDir, limit) {
 }
 
 /**
- * Watch `.git/wanxiang/events` directly. The directory may not exist at watcher
+ * Watch `.git/wanxiangshu/events` directly. The directory may not exist at watcher
  * creation time, so attach upward and descend when runtime truth appears.
  */
 export function watchJournal(workDir, onChange) {

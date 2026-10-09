@@ -62,7 +62,7 @@ test('WHAT[work-record-001] corruption after a frame commit cannot become a sile
       { role: 'assistant', parts: [{ kind: 'text', text: 'work done' }] },
     ] })
     const written = await commitFrame(handle, session, { from: 0, through: 2, body: 'settled work', id: 'bad' })
-    writeFileSync(join(directory, 'wanxiang', 'payloads', written.blobDigest), 'tampered after commit')
+    writeFileSync(join(directory, 'wanxiangshu', 'payloads', written.blobDigest), 'tampered after commit')
     assert.equal(await record.lifecycleWorkRecord(handle, session, true), null)
     assert.equal(await record.lifecycleWorkRecordBounded(handle, session, {
       StartInclusive: { Sequence: 1 }, EndExclusive: { Sequence: 3 },

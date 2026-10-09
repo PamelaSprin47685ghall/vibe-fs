@@ -123,7 +123,7 @@ test('WHAT[knowledge-reuse-016] missing, corrupt and unreadable old payloads can
         const originalText = failure === 'invalid-utf8' ? '\uFFFD' : 'version-B'
         const { identity, baseline, shelfmark } = await createCase(local, 'case-1', originalText)
         const stored = JSON.parse(baseline)['subject.txt']
-        const payload = join(local.dir, 'wanxiang', 'payloads', stored.payloadRef)
+        const payload = join(local.dir, 'wanxiangshu', 'payloads', stored.payloadRef)
         if (failure === 'corrupt') writeFileSync(payload, 'different old bytes')
         else if (failure === 'added-bom') writeFileSync(payload, '\uFEFFversion-B')
         else if (failure === 'invalid-utf8') writeFileSync(payload, Buffer.from([0xFF]))

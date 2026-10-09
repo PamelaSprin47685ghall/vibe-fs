@@ -123,7 +123,7 @@ const canonicalEvent = event => ({
 })
 
 const journalBytes = commonDir => {
-  const directory = join(commonDir, 'wanxiang', 'events')
+  const directory = join(commonDir, 'wanxiangshu', 'events')
   if (!existsSync(directory)) return []
   return readdirSync(directory).sort().map(name => ({
     name, bytes: readFileSync(join(directory, name)).toString('base64'),

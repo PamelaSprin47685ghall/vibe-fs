@@ -141,7 +141,7 @@ const withDurableChildRuns = async (body) => {
 const durableEvents = async (commonDir) => {
   const { readdirSync, readFileSync } = await import('node:fs')
   const { join } = await import('node:path')
-  const events = join(commonDir, 'wanxiang', 'events')
+  const events = join(commonDir, 'wanxiangshu', 'events')
   return readdirSync(events).filter(name => name.endsWith('.ndjson')).sort().flatMap(name => {
     const content = readFileSync(join(events, name), 'utf8')
     assert.ok(content === '' || content.endsWith('\n'), 'every durable event must be a complete line')
@@ -194,8 +194,8 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagat
   await withDurableChildRuns(async ({ handle, commonDir, reopen, dispatch }) => {
     const { renameSync, writeFileSync, rmSync } = await import('node:fs')
     const { join } = await import('node:path')
-    const events = join(commonDir, 'wanxiang', 'events')
-    const saved = join(commonDir, 'wanxiang', 'saved-events')
+    const events = join(commonDir, 'wanxiangshu', 'events')
+    const saved = join(commonDir, 'wanxiangshu', 'saved-events')
     // Activate the fresh writer before the fault, so the failed physical append
     // is the child void itself rather than its preceding RuntimeStarted watermark.
     const admitted = await dispatch.acceptHumanRootSelection(handle, 'current-manager', 'root-current-manager', managerRootSelection)
