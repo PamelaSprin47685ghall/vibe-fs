@@ -183,6 +183,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 src/           生产源码
 resources/     随包运行时资源
 requirements/  56 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
+spec/          过程规范：对 opencode 功能增强的伪代码阅读地图（000-999）
 proposals/     现行施工计划、未来提案与 archive 历史记录（用户管理）
 万象体系/     投资人材料（DOC.html、PPT.html）
 scripts/       构建与少量仓库检查

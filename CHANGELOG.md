@@ -1,5 +1,9 @@
 # Changelog — 版本历史
 
+## Unreleased — spec/000 过程规范
+
+- 新增 `spec/000.md`（Knuth 式伪代码、简体短句）：记录本插件对 OpenCode 的全部实质性增强，27 节加附录，覆盖装载期到发布验证的完整链路；附录 A 如实登记三处观察（`sphinx` 原生工具与 `query-shell` 未在 `ToolRegistry` 注册，`CHANGELOG` 的 obligations 改名条目已被 `c8a742d23` 撤销）。README 仓库结构补 `spec/` 一行。本文是阅读地图，不是权威规范；与 `requirements/` 冲突时以后者与源码为准。
+
 ## Unreleased — S03 源码目录身份与 NuGet 协议夹具
 
 - gen112完整Node22/npm11.12.1/SDKroot仍5003ms静默、17/18排空；缺SDKroot的436/0/7skip/2TODO只属较窄截面，误名单仅setup。npm第一正例拆真实准备完成与实际install/assert判决叶，保原强断言/held负例/预算，gen113最终待附件，不提前记绿；Archive本批未施工。
