@@ -1,5 +1,9 @@
 # Changelog — 版本历史
 
+## Unreleased — 开发者意见实现手册
+
+- 新增 `人工审订语义指南的保姆级多人协作实现法/000.md`（Knuth 式伪代码、ASD-STE100 风格短句）：把《用于人工审订的当前语义指南.md》中全部 42 条 `> {开发者…}` 意见逐条落成工作包（WP-001—WP-042），含波次划分（W0—W6）、顺序约束、冲突面、每卡算法与验收、42 行台账与覆盖率校验。本文是施工流程，不是产品规范；与 `requirements/` 冲突时以后者与源码为准。
+
 ## Unreleased — spec/000 过程规范
 
 - 新增 `spec/000.md`（Knuth 式伪代码、简体短句）：记录本插件对 OpenCode 的全部实质性增强，27 节加附录，覆盖装载期到发布验证的完整链路；附录 A 如实登记三处观察（`sphinx` 原生工具与 `query-shell` 未在 `ToolRegistry` 注册，`CHANGELOG` 的 obligations 改名条目已被 `c8a742d23` 撤销）。README 仓库结构补 `spec/` 一行。本文是阅读地图，不是权威规范；与 `requirements/` 冲突时以后者与源码为准。
