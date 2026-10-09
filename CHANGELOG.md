@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — WP-021 / WP-026（ndjson 内嵌载荷与措辞清理）
+
+- `durable-events-012`：取消旁挂 payloads 目录，事件行自包含载荷。`EventEnvelope` 增内嵌 `Payloads`；`CanonicalEventCodec` 仅在事件确实引用载荷时写出 `payloads` 键（无载荷事件的 canonical 字节不变）；`IEventStore.WritePayload` 改为进程内暂存、`Append` 内嵌；`ICanonicalIntegrator.TryPayload` 成为已提交内嵌载荷的唯一读口，Store 不再自行 `readStreams` 重建缓存。删除 `ProcessEventLog` 的 payload 文件 API、`WriterStreamSync` 与 `RetentionSurface` 的远端 payload 树及缓存。条款同步 `durable-events` [002]/[003]/[010]/[012]、`durable-convergence` [010]、`speculative-investigation` [006]。
+- `WP-026`：provider 可见文案统一改称「事实 / 事实链 / facts」；`证据 / evidence` 只保留在 `evidence` 字段名与「举证责任」法律用语上。双语同步，语言对等门绿。
+- 修复两处测试加载器：`007-composition-loader.mjs` 与 `prefix-digest-mutation-loader.mjs` 原先对 `Uint8Array` 源做 `String()`，且在同一模块上重复应用 mutation。现按 Node 版本正确解码，并保证每个模块只改一次。
+- 证据：Node 25（CI pin 为 Node 22）下 `requirements/verification-system/tests/run.mjs` 4895 passed / 0 failed；`node scripts/check.mjs` 与 `node scripts/build.mjs` 绿；`fantomas --check src/Wanxiangshu` 全树绿。
+
 ## Unreleased — 开发者意见实现手册
 
 - 新增 `人工审订语义指南的保姆级多人协作实现法/000.md`（Knuth 式伪代码、ASD-STE100 风格短句）：把《用于人工审订的当前语义指南.md》中全部 42 条 `> {开发者…}` 意见逐条落成工作包（WP-001—WP-042），含波次划分（W0—W6）、顺序约束、冲突面、每卡算法与验收、42 行台账与覆盖率校验。本文是施工流程，不是产品规范；与 `requirements/` 冲突时以后者与源码为准。

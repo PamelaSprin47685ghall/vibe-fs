@@ -2143,3 +2143,47 @@ npm run verify:release                    # 发布验证
    - 新增一个 tracked `.md` 文件会改变派生值。
    - 该文件即属此类。
 > {开发者认为可以派生，但不要自动派生，也不要检查是否改变，应该只允许手动更新。}
+
+# 施工进度（checkpoint，2026-10-10）
+
+本节记录已落地的产品变更与验证证据。产品语义只由 `requirements/<包>/WHAT.md` 定义；本节只记进度，不复述条款。
+
+## 已完成并已提交
+
+| WP | 内容 | 提交 |
+|---|---|---|
+| WP-001 | 插件路径统一到 `<git-common-dir>/wanxiangshu/` | `d5f0c9366` |
+| WP-042 | envelope 改为显式命令手动更新，构建不再自动派生 | `c557749c5` |
+
+## 本轮完成，待提交
+
+### WP-021 · ndjson 内嵌 payload
+
+- `EventEnvelope` 新增内嵌 `Payloads` 索引；`CanonicalEventCodec` 在事件行内写出 `payloads`（仅当事件确实引用载荷时才出现该键，避免无载荷事件字节被改写）。
+- `EventStore.WritePayload` 改为进程内暂存，`Append` 把暂存字节内嵌进事件行；`ReadPayload` 先查暂存，再查 Integrator 的已提交索引。
+- 删除 `.git/wanxiangshu/payloads/` 目录的全部读写点：`ProcessEventLog` 的 payload 文件 API、`WriterStreamSync` 的 payload 树与缓存、`RetentionSurface` 的远端 payload 树。
+- `ICanonicalIntegrator` 新增 `TryPayload`：已提交内嵌载荷的唯一读口。Store 不再自行 `readStreams` 重建缓存（该路径本来也被统一 store 门禁判为第二权威）。
+- 条款：`durable-events` [002] [003] [010] [012]、`durable-convergence` [010]、`speculative-investigation` [006] 已同步。
+- 证据：`node --test requirements/durable-events/tests/012.test.mjs` 11/11；`knowledge-reuse` 016、`work-record` 001、`host-boundary` 029 全绿；`node scripts/check.mjs` 与 `node scripts/build.mjs` 绿。
+
+### WP-026 · provider 可见文本不再出现「证据」
+
+- `resources/provider/**` 的模型可见文案与 `resources/provider/tool/js-program/**` 的付费失败教训统一改称「事实 / 事实链 / facts」，`证据 / evidence` 只保留在 `evidence` 字段名与「举证责任」这一法律用语上。
+- 双语同步；`node scripts/checks/language-parity-gate.mjs` 绿（346 个语义资源）。
+- 断言随合同更新：`cognitive-environment/tests/015`、`repository-programming/tests/022`。
+
+### WP-003 / WP-023 的验证缺口
+
+- WP-003（漂移校验退役）与 WP-023（性能排查）的条款与实现已在批次内，但修复前后同输入的数字对比、以及 `execution-model-routing` 性质测试的口径说明尚未成文。见下节。
+
+## 尚未完成
+
+1. **WP-003 收尾**：`execution-model-routing` [009] 的 fast-check 性质已入 `tests/009` 并通过，但条款里尚未写明「漂移若真实发生将静默通过」这一取舍，也未在 `proposals/` 留下裁决与性质测试的对应记录。
+2. **WP-023 收尾**：性能修复（流式读、去掉双重全量解码、去掉无限锁等待）已成，但缺「修复前后同输入」的数字对比记录；未测的部分必须写「未验证」。
+3. **W0 剩余裁决卡**：WP-002、008、010、012、013、017、019、039 的讨论记录已落 `proposals/`，但其中裁定为「实施」的条目尚未逐条施工。
+4. **W1—W6 其余工作包**：见本手册 §4 台账。
+
+## 环境提示
+
+- CI pin 在 Node 22（`.github/workflows/ci.yml`）。`verification-system/tests/016` 校验的是本机 Node/npm 工具链，在本机 Node 26 + npm 12 下必然失败，在 Node 25 下通过；这不是产品缺陷。本机完整套件请在 Node 25 或 CI 的 Node 22 下运行。
+- `node_modules/opencode-ai` 的 postinstall 必须执行；缺失会让 `host-boundary` 023 失败。
