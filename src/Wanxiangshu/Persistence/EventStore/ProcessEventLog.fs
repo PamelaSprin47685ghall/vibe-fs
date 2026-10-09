@@ -211,9 +211,6 @@ module ProcessEventLog =
     let private eventsDirectory commonDir =
         join2 (wanxiangDirectory commonDir) "events"
 
-    let private payloadsDirectory commonDir =
-        join2 (wanxiangDirectory commonDir) "payloads"
-
     let private ensureDirectory path =
         mkdirSync path (createObj [ "recursive" ==> true ])
 
@@ -648,14 +645,6 @@ module ProcessEventLog =
             |> Array.sort
             |> Array.toList
 
-    let private payloadFileNames commonDir =
-        let directory = payloadsDirectory commonDir
-
-        if not (existsSync directory) then
-            []
-        else
-            readdirSync directory |> Array.sort |> Array.toList
-
     let private fingerprintFiles hash label directory names =
         names
         |> List.iter (fun name ->
@@ -684,7 +673,6 @@ module ProcessEventLog =
     let physicalFingerprint (commonDir: string) : string =
         let hash = createHash "sha256"
         fingerprintFiles hash "writers" (eventsDirectory commonDir) (writerFileNames commonDir)
-        fingerprintFiles hash "payloads" (payloadsDirectory commonDir) (payloadFileNames commonDir)
         hashHex hash
 
     let writerPhysicalStats (commonDir: string) : (string * string) list =
@@ -693,14 +681,8 @@ module ProcessEventLog =
     let writerPhysicalMetadata (commonDir: string) : WriterPhysicalMetadata list =
         writerFileNames commonDir |> writerMetadata (eventsDirectory commonDir)
 
-    let payloadPhysicalStats (commonDir: string) : (string * string) list =
-        payloadFileNames commonDir |> physicalStats (payloadsDirectory commonDir)
-
     let readWriterFileBytes (commonDir: string) (name: string) : byte[] =
         readBytesFileSync (join2 (eventsDirectory commonDir) name)
-
-    let readPayloadFileBytes (commonDir: string) (name: string) : byte[] =
-        readBytesFileSync (join2 (payloadsDirectory commonDir) name)
 
     let private writeExtendedWriter (path: string) (existing: string) (incoming: string) =
         if incoming.Length > existing.Length then
@@ -795,70 +777,7 @@ module ProcessEventLog =
     let readStreams (commonDir: string) : Result<(string * EventEnvelope list) list, StorageInvalid> =
         readStreamsAt commonDir (currentTimeMs ())
 
-    let private payloadDigest (content: byte[]) =
+    /// Public content digest for inline payload staging (durable-events-012).
+    /// The digest IS the PayloadRef content address.
+    let payloadDigest (content: byte[]) : string =
         createHash "sha256" |> fun hash -> hashUpdate hash content |> hashHex
-
-    let private ensurePayloadBytes path digest content =
-        if not (existsSync path) then
-            writeBytesFileSync path content
-            durabilityBarrier path
-        elif readBytesFileSync path <> content then
-            failwith (sprintf "payload digest collision: %s" digest)
-
-    let writePayload (commonDir: string) (content: byte[]) : PayloadRef =
-        let directory = payloadsDirectory commonDir
-        ensureDirectory directory
-        let digest = payloadDigest content
-        let path = join2 directory digest
-        ensurePayloadBytes path digest content
-        PayloadRef.create digest
-
-    let readPayload (commonDir: string) (payloadRef: PayloadRef) : byte[] option =
-        let path = join2 (payloadsDirectory commonDir) (PayloadRef.value payloadRef)
-
-        if existsSync path then
-            Some(readBytesFileSync path)
-        else
-            None
-
-    let payloadExists commonDir payloadRef =
-        existsSync (join2 (payloadsDirectory commonDir) (PayloadRef.value payloadRef))
-
-    let readPayloadFiles (commonDir: string) : (string * byte[]) list =
-        let directory = payloadsDirectory commonDir
-        ensureDirectory directory
-
-        payloadFileNames commonDir
-        |> List.map (fun name -> name, readBytesFileSync (join2 directory name))
-
-    let private writeOrReusePayload path name content =
-        if not (existsSync path) then
-            writeBytesFileSync path content
-            durabilityBarrier path
-            Ok()
-        elif readBytesFileSync path = content then
-            Ok()
-        else
-            Error(sprintf "payload identity collision: %s" name)
-
-    let mergePayloadFile (commonDir: string) (name: string) (content: byte[]) : Result<unit, string> =
-        result {
-            do!
-                if String.IsNullOrWhiteSpace name || name.IndexOfAny([| '/'; '\\' |]) >= 0 then
-                    Error "invalid payload filename"
-                else
-                    Ok()
-
-            let expected = payloadDigest content
-
-            do!
-                if expected <> name then
-                    Error(sprintf "payload filename/digest mismatch: %s" name)
-                else
-                    Ok()
-
-            let directory = payloadsDirectory commonDir
-            ensureDirectory directory
-            let path = join2 directory name
-            return! writeOrReusePayload path name content
-        }

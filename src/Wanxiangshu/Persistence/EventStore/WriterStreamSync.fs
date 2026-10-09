@@ -33,8 +33,7 @@ module WriterStreamSync =
         { Fingerprint: string
           Root: StoreSnapshot
           NextExpiryMs: float option
-          Writers: Map<string, CachedFile>
-          Payloads: Map<string, CachedFile> }
+          Writers: Map<string, CachedFile> }
 
     type private MaterializedWriter =
         { Entry: TreeEntry
@@ -116,25 +115,15 @@ module WriterStreamSync =
         | [| "w"; encodedName; statIdentity; oid; activity |] when validHex 40 oid ->
             tryParseFiniteFloat activity
             |> Option.map (fun lastActivity ->
-                true,
                 decodeFileName encodedName,
                 { StatIdentity = statIdentity
                   Oid = GitObjectId.create oid
                   LastActivityMs = Some lastActivity })
-        | [| "p"; encodedName; statIdentity; oid |] when validHex 40 oid ->
-            Some(
-                false,
-                decodeFileName encodedName,
-                { StatIdentity = statIdentity
-                  Oid = GitObjectId.create oid
-                  LastActivityMs = None }
-            )
         | _ -> None
 
     let private parseCacheEntry state (line: string) =
         match state, parseCacheLine line with
-        | Some(writers, payloads), Some(true, name, file) -> Some(Map.add name file writers, payloads)
-        | Some(writers, payloads), Some(false, name, file) -> Some(writers, Map.add name file payloads)
+        | Some writers, Some(name, file) -> Some(Map.add name file writers)
         | _ -> None
 
     let private parseCacheHeader (line: string) =
@@ -155,13 +144,12 @@ module WriterStreamSync =
         | Some(fingerprint, root, nextExpiry) ->
             lines
             |> Array.skip 1
-            |> Array.fold parseCacheEntry (Some(Map.empty, Map.empty))
-            |> Option.map (fun (writers, payloads) ->
+            |> Array.fold parseCacheEntry (Some Map.empty)
+            |> Option.map (fun writers ->
                 { Fingerprint = fingerprint
                   Root = { RootOid = RootOid.create (GitObjectId.create root) }
                   NextExpiryMs = nextExpiry
-                  Writers = writers
-                  Payloads = payloads })
+                  Writers = writers })
         | None -> None
 
     let private tryReadTextFile (path: string) : string option =
@@ -358,28 +346,15 @@ module WriterStreamSync =
               GitObjectId.value writer.Entry.Oid
               formatFloat writer.LastActivityMs ]
 
-    let private cachePayloadLine statByName (entry: TreeEntry) =
-        let statIdentity = Map.find entry.Name statByName
-        String.concat "\t" [ "p"; encodeFileName entry.Name; statIdentity; GitObjectId.value entry.Oid ]
-
-    let private writeMaterializationCache
-        commonDir
-        (snapshot: StoreSnapshot)
-        (writers: MaterializedWriter list)
-        payloadStats
-        payloadEntries
-        =
+    let private writeMaterializationCache commonDir (snapshot: StoreSnapshot) (writers: MaterializedWriter list) =
         try
             let fingerprint = ProcessEventLog.physicalFingerprint commonDir
             let root = RootOid.value snapshot.RootOid |> GitObjectId.value
-            let payloadStatByName = Map.ofList payloadStats
-
             let expiry = nextExpiry writers |> Option.map formatFloat |> Option.defaultValue "-"
 
             let body =
                 [ yield String.concat "\t" [ materializationCacheVersion; fingerprint; root; expiry ]
-                  yield! writers |> List.map cacheWriterLine
-                  yield! payloadEntries |> List.map (cachePayloadLine payloadStatByName) ]
+                  yield! writers |> List.map cacheWriterLine ]
                 |> String.concat "\n"
                 |> fun value -> value + "\n"
 
@@ -401,20 +376,11 @@ module WriterStreamSync =
         task {
             let cache = readMaterializationCache commonDir
             let writerMetadata = ProcessEventLog.writerPhysicalMetadata commonDir
-            let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir
 
             let! resolvedWriters = materializeWriters raw commonDir cache writerMetadata
             let writers = removeExpiredLocalWriters nowMs resolvedWriters commonDir
 
-            let! payloadEntries =
-                materializeFileEntries
-                    raw
-                    (ProcessEventLog.readPayloadFileBytes commonDir)
-                    (cacheFiles (fun value -> value.Payloads) cache)
-                    payloadStats
-
             let! writerTree = raw.WriteTree(writers |> List.map (fun writer -> writer.Entry))
-            let! payloadTree = raw.WriteTree payloadEntries
             let! manifestBlob = writerManifestText writers |> Encoding.UTF8.GetBytes |> raw.WriteBlob
 
             let! root =
@@ -422,9 +388,6 @@ module WriterStreamSync =
                     [ { Mode = treeMode
                         Name = "writers"
                         Oid = writerTree }
-                      { Mode = treeMode
-                        Name = "payloads"
-                        Oid = payloadTree }
                       { Mode = blobMode
                         Name = "writer-manifest"
                         Oid = manifestBlob } ]
@@ -447,7 +410,7 @@ module WriterStreamSync =
                         { writer with
                             StatIdentity = stat.StatIdentity }))
 
-            writeMaterializationCache commonDir snapshot retainedWriters payloadStats payloadEntries
+            writeMaterializationCache commonDir snapshot retainedWriters
             return snapshot
         }
 
@@ -566,41 +529,6 @@ module WriterStreamSync =
         =
         entries |> List.filter (remoteEntryNeeded cacheFiles currentStats manifest)
 
-    let payloadNeedsRemoteRead
-        (cachedStatIdentity: string option)
-        (cachedOid: GitObjectId option)
-        (currentStatIdentity: string option)
-        (remoteOid: GitObjectId)
-        (isBlob: bool)
-        : bool =
-        match cachedStatIdentity, cachedOid, currentStatIdentity with
-        | Some cachedStat, Some cachedObject, Some currentStat when
-            isBlob && cachedStat = currentStat && cachedObject = remoteOid
-            ->
-            false
-        | _ -> true
-
-    let private remotePayloadEntryNeeded
-        (cacheFiles: Map<string, CachedFile>)
-        (currentStats: Map<string, string>)
-        (entry: TreeEntry)
-        =
-        let cached = Map.tryFind entry.Name cacheFiles
-
-        payloadNeedsRemoteRead
-            (cached |> Option.map _.StatIdentity)
-            (cached |> Option.map _.Oid)
-            (Map.tryFind entry.Name currentStats)
-            entry.Oid
-            (entry.Mode = blobMode)
-
-    let private changedRemotePayloadEntries
-        (cacheFiles: Map<string, CachedFile>)
-        (currentStats: Map<string, string>)
-        (entries: TreeEntry list)
-        =
-        entries |> List.filter (remotePayloadEntryNeeded cacheFiles currentStats)
-
     let private writerFromBlob
         (manifest: Map<string, WriterManifestEntry>)
         (entryByName: Map<string, TreeEntry>)
@@ -634,7 +562,6 @@ module WriterStreamSync =
         (commonDir: string)
         nowMs
         (writerTree: TreeEntry)
-        (payloadTree: TreeEntry)
         manifestEntry
         =
         taskResult {
@@ -672,15 +599,7 @@ module WriterStreamSync =
                 retainedEntries |> List.map (fun entry -> entry.Name, entry) |> Map.ofList
 
             let! remoteWriters = writerBlobs |> List.traverseResultM (writerFromBlob manifest entryByName)
-
-            let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
-            let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList
-
-            let neededPayloadEntries =
-                changedRemotePayloadEntries (cacheFiles (fun value -> value.Payloads) cache) payloadStats payloadEntries
-
-            let! payloadBlobs = readBlobList raw neededPayloadEntries
-            return remoteWriters, payloadBlobs
+            return remoteWriters
         }
 
     let private readRemote
@@ -689,7 +608,7 @@ module WriterStreamSync =
         (commonDir: string)
         nowMs
         (snapshot: StoreSnapshot)
-        : Task<Result<RemoteWriter list * (string * byte[]) list, ConvergeError>> =
+        : Task<Result<RemoteWriter list, ConvergeError>> =
         taskResult {
             let! rootEntries = readRequiredTree raw (RootOid.value snapshot.RootOid) "root"
 
@@ -697,17 +616,12 @@ module WriterStreamSync =
                 rootEntries
                 |> List.tryFind (fun entry -> entry.Name = "writers" && entry.Mode = treeMode)
 
-            let payloads =
-                rootEntries
-                |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
-
             let manifest =
                 rootEntries |> List.tryFind (fun entry -> entry.Name = "writer-manifest")
 
-            match writers, payloads with
-            | Some writerTree, Some payloadTree ->
-                return! readRemoteTrees raw cache commonDir nowMs writerTree payloadTree manifest
-            | _ -> return! Error(asStorage "sync root must contain writers/ and payloads/")
+            match writers with
+            | Some writerTree -> return! readRemoteTrees raw cache commonDir nowMs writerTree manifest
+            | None -> return! Error(asStorage "sync root must contain writers/")
         }
 
     let private decodeOneRemoteWriter (writer: RemoteWriter) =
@@ -720,13 +634,16 @@ module WriterStreamSync =
         : Result<(string * Wanxiangshu.Persistence.EventStore.EventEnvelope list) list, ConvergeError> =
         writers |> List.traverseResultM decodeOneRemoteWriter
 
-    let private missingPayloadRef (commonDir: string) (ordered: EventEnvelope list) =
+    let private missingInlinePayload (ordered: EventEnvelope list) =
         ordered
-        |> List.collect (fun event -> event.PayloadRefs)
-        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
+        |> List.tryPick (fun event ->
+            event.PayloadRefs
+            |> List.tryPick (fun payloadRef ->
+                match event.Payloads |> Map.tryFind payloadRef with
+                | Some _ -> None
+                | None -> Some payloadRef))
 
     let private validateMergedStreams
-        (commonDir: string)
         (local: (string * EventEnvelope list) list)
         (remote: (string * EventEnvelope list) list)
         =
@@ -738,7 +655,7 @@ module WriterStreamSync =
                 EventKWayMerge.mergeRetained (taggedLocal @ remote)
                 |> Result.mapError ConvergeError.StorageInvalid
 
-            match missingPayloadRef commonDir ordered with
+            match missingInlinePayload ordered with
             | Some payloadRef -> return! Error(ConvergeError.StorageInvalid(StorageInvalid.MissingPayload payloadRef))
             | None -> return ()
         }
@@ -754,31 +671,16 @@ module WriterStreamSync =
                 |> Result.mapError ConvergeError.StorageInvalid
 
             let! remote = decodeRemoteWriters remoteWriters
-            return! validateMergedStreams commonDir local remote
+            return! validateMergedStreams local remote
         }
-
-    let private mergeOnePayload commonDir (name, bytes) =
-        ProcessEventLog.mergePayloadFile commonDir name bytes
-        |> Result.mapError asStorage
 
     let private mergeOneWriter commonDir (writer: RemoteWriter) =
         ProcessEventLog.mergeWriterTextWithActivity commonDir writer.WriterId writer.Text writer.LastActivityMs
         |> Result.mapError asStorage
 
-    let private importRemote
-        (commonDir: string)
-        nowMs
-        (writers: RemoteWriter list)
-        (payloads: (string * byte[]) list)
-        : Result<unit, ConvergeError> =
-        // Payloads are content-addressed and may be safely imported before facts.
+    let private importRemote (commonDir: string) nowMs (writers: RemoteWriter list) : Result<unit, ConvergeError> =
         // Validate the retained combined k-way history/closure before changing writer truth.
         result {
-            do!
-                payloads
-                |> List.traverseResultM (mergeOnePayload commonDir)
-                |> Result.map ignore
-
             do! validateUnion commonDir nowMs writers
             do! writers |> List.traverseResultM (mergeOneWriter commonDir) |> Result.map ignore
             return ()
@@ -802,8 +704,8 @@ module WriterStreamSync =
                 // before remote change detection. The second one captures imports.
                 let! _ = materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
                 let cache = readMaterializationCache commonDir
-                let! writers, payloads = readRemote raw cache commonDir nowMs snapshot
-                do! importRemote commonDir nowMs writers payloads
+                let! writers = readRemote raw cache commonDir nowMs snapshot
+                do! importRemote commonDir nowMs writers
                 return! materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
             }
 

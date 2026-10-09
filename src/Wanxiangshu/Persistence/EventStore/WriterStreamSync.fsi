@@ -10,14 +10,6 @@ module WriterStreamSync =
     val materializeLocalAt: raw: IGitRawStore -> commonDir: string -> nowMs: float -> Task<StoreSnapshot>
     val materializeLocal: raw: IGitRawStore -> commonDir: string -> Task<StoreSnapshot>
 
-    val payloadNeedsRemoteRead:
-        cachedStatIdentity: string option ->
-        cachedOid: GitObjectId option ->
-        currentStatIdentity: string option ->
-        remoteOid: GitObjectId ->
-        isBlob: bool ->
-            bool
-
     val syncWriterStreamsAt:
         raw: IGitRawStore ->
         commonDir: string ->
