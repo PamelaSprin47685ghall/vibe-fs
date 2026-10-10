@@ -376,13 +376,9 @@ module SessionRecoveryHostSurface =
     /// provider-attempt-recovery-024: the load phase abandoned a stale Blogger
     /// open request; settle the same-source Accepted-without-ProviderStarted
     /// executions and report the counts.
-    let settleStaleBloggerAcceptedExecutions
-        (handle: RecoveryHostHandle)
-        (sessionId: string)
-        : Task<obj> =
+    let settleStaleBloggerAcceptedExecutions (handle: RecoveryHostHandle) (sessionId: string) : Task<obj> =
         task {
-            let! settled, alreadyTerminal =
-                handle.Host.SettleStaleBloggerAcceptedExecutions(SessionId.create sessionId)
+            let! settled, alreadyTerminal = handle.Host.SettleStaleBloggerAcceptedExecutions(SessionId.create sessionId)
 
             return
                 box

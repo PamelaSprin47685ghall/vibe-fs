@@ -122,5 +122,8 @@ module BloggerAbandon =
             for mainSessionId, openReq in stale do
                 do! byRequestId journal openReq.RequestId mainSessionId openReq.BloggerSessionId "stale-open-at-load"
 
-            return stale |> List.map (fun (_, openReq) -> openReq.BloggerSessionId) |> List.distinct
+            return
+                stale
+                |> List.map (fun (_, openReq) -> openReq.BloggerSessionId)
+                |> List.distinct
         }

@@ -520,9 +520,7 @@ module ModelRoutingSurface =
         match leaseOf token with
         | None -> invalidArg "token" "retention requires an opaque admission lease"
         | Some lease ->
-            ModelRouting.retainContinuationInputForPhysical
-                lease
-                (PhysicalUserMessageId.create physicalUserMessageId)
+            ModelRouting.retainContinuationInputForPhysical lease (PhysicalUserMessageId.create physicalUserMessageId)
             |> targetObject
 
     /// Release only the process-shared execution proven to belong to this exact

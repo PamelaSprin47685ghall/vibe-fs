@@ -2095,8 +2095,7 @@ module ModelRouting =
         (physicalUserMessageId: PhysicalUserMessageId)
         =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime ->
-            runtime.RetainContinuationInput(previous, PhysicalUserMessageId.value physicalUserMessageId)
+        | Some runtime -> runtime.RetainContinuationInput(previous, PhysicalUserMessageId.value physicalUserMessageId)
         | None -> invalidOp "model-routing runtime is unavailable"
 
     let internal tryContinuationInput (key: ChatExecutionKey) =
@@ -2119,8 +2118,7 @@ module ModelRouting =
     /// this session owns on the process-shared runtime.
     let internal cancelRetainedInputsForSession (sessionId: SessionId) =
         lock sharedGate (fun () -> sharedRuntime)
-        |> Option.iter (fun runtime ->
-            runtime.CancelRetainedInputsForSession(SessionId.value sessionId))
+        |> Option.iter (fun runtime -> runtime.CancelRetainedInputsForSession(SessionId.value sessionId))
 
     /// Read-only exact committed lease query on the process-shared runtime; an
     /// unloaded runtime observes nothing.

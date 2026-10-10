@@ -230,11 +230,13 @@ module StrengthDelegate =
                 "rejected:no-bindable-run"
             | ProviderRunBinding.Observation.Rejected(ProviderRunBinding.Rejection.AmbiguousRun count) ->
                 sprintf "rejected:ambiguous-run:%d" count
-            | ProviderRunBinding.Observation.Rejected ProviderRunBinding.Rejection.NotLatestRun -> "rejected:not-latest-run"
+            | ProviderRunBinding.Observation.Rejected ProviderRunBinding.Rejection.NotLatestRun ->
+                "rejected:not-latest-run"
             | ProviderRunBinding.Observation.Rejected ProviderRunBinding.Rejection.InsufficientSequence ->
                 "rejected:insufficient-sequence"
 
-        let countWhere predicate values = values |> List.filter predicate |> List.length
+        let countWhere predicate values =
+            values |> List.filter predicate |> List.length
 
         String.concat
             ";"
@@ -247,7 +249,8 @@ module StrengthDelegate =
                   (countWhere (fun message -> message.Completed && message.ParentId = parent) assistants)
               sprintf
                   "compaction_parent=%b"
-                  (incomplete |> List.exists (fun message -> message.IsCompaction && message.ParentId = parent))
+                  (incomplete
+                   |> List.exists (fun message -> message.IsCompaction && message.ParentId = parent))
               sprintf "sequence_complete=%b" (assistants |> List.forall (fun message -> message.CreatedAt.IsSome)) ]
 
     let private emitProviderRunUnbound
@@ -883,7 +886,10 @@ module StrengthDelegate =
         let rawTools = tailAssistant |> Option.map rawToolParts |> Option.defaultValue []
         let completedTools = rawTools |> List.filter isToolPartCompleted
         let tailComplete = tailBatchIsComplete rawMessages wire
-        let noRawAssistant = rawMessages |> List.filter isAssistantRawMessage |> List.isEmpty
+
+        let noRawAssistant =
+            rawMessages |> List.filter isAssistantRawMessage |> List.isEmpty
+
         let wireBatch = tryExtractWireCompletedBatch wire
 
         let wireResultsOfCalls (calls: SourceToolCall list) (index: int) : string =

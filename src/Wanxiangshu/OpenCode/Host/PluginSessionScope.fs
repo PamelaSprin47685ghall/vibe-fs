@@ -190,9 +190,7 @@ type PluginSessionScope
         task {
             for execution in executions do
                 match
-                    ModelRouting.releasePhysicalExecution
-                        execution.key.SessionId
-                        execution.key.PhysicalUserMessageId
+                    ModelRouting.releasePhysicalExecution execution.key.SessionId execution.key.PhysicalUserMessageId
                 with
                 | PhysicalExecutionReleaseOutcome.HeldForInput
                 | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Applied
@@ -228,7 +226,7 @@ type PluginSessionScope
             // execution of its durable linked Attached InternalLeaf before the
             // leaf's registry entries are dropped.
             for leaf in this.LinkedLeafSessions sessionId do
-                do! this.SettleSessionExecutions (SessionId.value leaf)
+                do! this.SettleSessionExecutions(SessionId.value leaf)
                 ModelRouting.cancelRetainedInputsForSession leaf
                 do! this.ReleaseLeafCustody leaf
 

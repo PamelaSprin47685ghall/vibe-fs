@@ -260,9 +260,7 @@ module PluginTransforms =
             | _ -> None
 
         let signalProviderStartBoundaryRejection (key: ChatExecutionKey) (reason: string) () : Task =
-            scope.SignalChatRecovery(
-                ChatExecutionRecoveryLifecycleEvent.ProviderStartBoundaryRejected(key, reason)
-            )
+            scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.ProviderStartBoundaryRejected(key, reason))
 
         /// managed-chat-execution-015: report a refused provider start boundary
         /// for the exact execution to the settlement owner. The report must
@@ -284,8 +282,7 @@ module PluginTransforms =
                 with reportError ->
                     Diagnostic.emit
                         "provider-start-boundary-rejection-report-failed"
-                        [ "provider_error", reason
-                          "result", reportError.Message ]
+                        [ "provider_error", reason; "result", reportError.Message ]
             }
 
         let observeProviderRun (key: ChatExecutionKey) =
@@ -442,10 +439,7 @@ module PluginTransforms =
 
                     return
                         invalidOp (
-                            sprintf
-                                "HOST-BOUNDARY-008: provider attempt plan freeze failed (%s): %A"
-                                reason
-                                error
+                            sprintf "HOST-BOUNDARY-008: provider attempt plan freeze failed (%s): %A" reason error
                         )
             }
 

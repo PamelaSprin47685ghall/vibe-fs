@@ -87,7 +87,8 @@ module PluginRecoveryWiring =
                             try
                                 do!
                                     scope.SignalChatRecovery(
-                                        ChatExecutionRecoveryLifecycleEvent.BloggerStaleRequestAbandoned bloggerSessionId
+                                        ChatExecutionRecoveryLifecycleEvent.BloggerStaleRequestAbandoned
+                                            bloggerSessionId
                                     )
                             with error ->
                                 Diagnostic.emit
@@ -106,8 +107,7 @@ module PluginRecoveryWiring =
                             let bloggerHost = scope.BloggerRuntimeHost
                             let liveFlight = isFlightActive bloggerHost
 
-                            let! staleBloggerSessions =
-                                BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
+                            let! staleBloggerSessions = BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
 
                             for bloggerSessionId in staleBloggerSessions do
                                 do! settleStaleBloggerSession bloggerSessionId

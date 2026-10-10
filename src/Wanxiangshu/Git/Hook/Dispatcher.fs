@@ -253,15 +253,25 @@ module HookDispatcher =
         shellQuote (managedSshWrapperPath commonDir)
 
     let private isLegacyWrapperCommand commonDir (command: string) =
-        command = legacyManagedSshWrapperCommand commonDir || command = legacyManagedSshWrapperPath commonDir
+        command = legacyManagedSshWrapperCommand commonDir
+        || command = legacyManagedSshWrapperPath commonDir
 
     let private normalizeBaseCommand commonDir baseCommand =
-        if isLegacyWrapperCommand commonDir baseCommand then "ssh" else baseCommand
+        if isLegacyWrapperCommand commonDir baseCommand then
+            "ssh"
+        else
+            baseCommand
 
     let private stripSuffixToBase commonDir (command: string) controlPath =
         let suffix = " " + multiplexSuffix controlPath
         let hit = command.EndsWith(suffix, StringComparison.Ordinal)
-        let baseCommand = if hit then command.Substring(0, command.Length - suffix.Length) else ""
+
+        let baseCommand =
+            if hit then
+                command.Substring(0, command.Length - suffix.Length)
+            else
+                ""
+
         (hit, baseCommand)
 
     let private pickSuffixBase commonDir (command: string) (hit: bool, baseCommand: string) =
@@ -331,7 +341,9 @@ module HookDispatcher =
     let private wrapperBodyReferencesLegacyRoot commonDir =
         try
             let body = readFileSync (managedSshWrapperPath commonDir) "utf8"
-            body.Contains("/wanxiang/ssh-") || body.Contains(legacyManagedSshWrapperPath commonDir)
+
+            body.Contains("/wanxiang/ssh-")
+            || body.Contains(legacyManagedSshWrapperPath commonDir)
         with _ ->
             false
 

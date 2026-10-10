@@ -371,8 +371,7 @@ type SessionRecoveryHost
         (accepted: AcceptedChatExecutionEvidence)
         : Task<string> =
         task {
-            let! settled =
-                PreProviderSettlement.settle journal key accepted ChatExecutionTerminalDisposition.Failed
+            let! settled = PreProviderSettlement.settle journal key accepted ChatExecutionTerminalDisposition.Failed
 
             match settled with
             | Ok _ ->
@@ -403,7 +402,9 @@ type SessionRecoveryHost
                 |> List.filter (fun state -> state.startedEvidence.IsNone && state.terminalDisposition.IsNone)
 
             let alreadyTerminal =
-                current |> List.filter (fun state -> state.terminalDisposition.IsSome) |> List.length
+                current
+                |> List.filter (fun state -> state.terminalDisposition.IsSome)
+                |> List.length
 
             for state in accepted do
                 let! _ = settleAcceptedBoundaryRejection state.key state.acceptedEvidence
@@ -426,8 +427,7 @@ type SessionRecoveryHost
             let! result =
                 match current with
                 | None -> Task.FromResult "no-execution"
-                | Some(ChatExecutionState.Accepted accepted) ->
-                    settleAcceptedBoundaryRejection key accepted
+                | Some(ChatExecutionState.Accepted accepted) -> settleAcceptedBoundaryRejection key accepted
                 | Some(ChatExecutionState.Started _) -> Task.FromResult "ignored"
                 | Some(ChatExecutionState.EndedBeforeStart _)
                 | Some(ChatExecutionState.EndedAfterStart _) ->
