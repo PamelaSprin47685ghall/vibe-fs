@@ -19,9 +19,9 @@ module AttentionSurface =
         |> AttentionProjection.record (SessionId.create session) occurrence text
         |> boxed
 
-    let resurface (session: string) (learningOccurrence: string) (workIds: string array) (state: obj) =
+    let consume (session: string) (workIds: string array) (state: obj) =
         stateOf state
-        |> AttentionProjection.resurface (SessionId.create session) learningOccurrence (Array.toList workIds)
+        |> AttentionProjection.consume (SessionId.create session) (Array.toList workIds)
         |> boxed
 
     let pending (session: string) (state: obj) : obj =

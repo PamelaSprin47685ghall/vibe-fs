@@ -4,8 +4,7 @@ open Wanxiangshu.Foundation.Identity
 
 type DeferredWorkItem =
     { OccurrenceId: string
-      Text: string
-      ResurfacedBy: string option }
+      Text: string }
 
 type AttentionProjectionState =
     { BySession: Map<SessionId, DeferredWorkItem list> }
@@ -25,9 +24,8 @@ module AttentionProjection =
         state: AttentionProjectionState ->
             AttentionProjectionState
 
-    val resurface:
+    val consume:
         sessionId: SessionId ->
-        learningOccurrence: string ->
         workIds: string list ->
         state: AttentionProjectionState ->
             AttentionProjectionState

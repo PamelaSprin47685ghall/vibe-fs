@@ -4,8 +4,7 @@ open Wanxiangshu.Foundation.Identity
 
 type DeferredWorkItem =
     { OccurrenceId: string
-      Text: string
-      ResurfacedBy: string option }
+      Text: string }
 
 type AttentionProjectionState =
     { BySession: Map<SessionId, DeferredWorkItem list> }
@@ -18,8 +17,7 @@ module AttentionProjection =
     let private items sessionId state =
         Map.tryFind sessionId state.BySession |> Option.defaultValue []
 
-    let pending sessionId state =
-        items sessionId state |> List.filter (fun item -> item.ResurfacedBy.IsNone)
+    let pending sessionId state = items sessionId state
 
     let tryFind sessionId occurrenceId state =
         items sessionId state
@@ -37,26 +35,23 @@ module AttentionProjection =
                         sessionId
                         (current
                          @ [ { OccurrenceId = occurrenceId
-                               Text = text
-                               ResurfacedBy = None } ])
+                               Text = text } ])
                         state.BySession }
 
-    let resurface sessionId learningOccurrence workIds state =
+    /// Consume (and thereby extinguish) the named DeferredWork occurrences. A
+    /// consumed occurrence leaves the projection; unknown ids are ignored, so
+    /// replay is idempotent.
+    let consume sessionId workIds state =
         let selected = Set.ofList workIds
 
-        let updated =
+        let remaining =
             items sessionId state
-            |> List.map (fun item ->
-                if Set.contains item.OccurrenceId selected && item.ResurfacedBy.IsNone then
-                    { item with
-                        ResurfacedBy = Some learningOccurrence }
-                else
-                    item)
+            |> List.filter (fun item -> not (Set.contains item.OccurrenceId selected))
 
         { state with
-            BySession = Map.add sessionId updated state.BySession }
+            BySession = Map.add sessionId remaining state.BySession }
 
-    /// ATTENTION-004: a life that ends before resurfacing takes its remaining
+    /// ATTENTION-004: a life that ends before consumption takes its remaining
     /// entries with it — a reused SessionId starts a fresh life and must not
     /// inherit the closed life's pending work.
     let closeLife sessionId state =
