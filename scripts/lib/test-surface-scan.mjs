@@ -63,6 +63,8 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   // Physical-exit canary: the child must reach the real Diagnostic.fatal and
   // FatalProcess.trip links — a wire-level invariant, not a test seam.
   'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',
+  // Plan relay host canary: continuous three-tenure relay in a single physical session
+  'requirements/planning/tests/host-canary-plan-relay.test.mjs',
 ])
 
 /**
