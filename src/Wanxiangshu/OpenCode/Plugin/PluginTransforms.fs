@@ -689,7 +689,19 @@ module PluginTransforms =
                            WorkId = workId
                            IncumbencyId = incumbencyId |}
 
-                AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
+                let appendTask =
+                    AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
+
+                task {
+                    match! appendTask with
+                    | Ok _ -> ()
+                    | Error failure ->
+                        Diagnostic.emit
+                            "plan-tenure-reanchor-append-failed"
+                            [ "work_id", workId
+                              "incumbency_id", incumbencyId
+                              "result", JournalAppendFailure.describe failure ]
+                }
                 |> ignore
 
         let isTenureReanchorRequested (result: obj) : bool =

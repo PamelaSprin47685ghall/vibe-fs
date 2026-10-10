@@ -4,7 +4,7 @@
 
 同一 PrefixEpoch 内，前一次 provider wire 必须是后一次的精确字节前缀。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。
 
-## [002] 冷边界只有三种已提交证据
+## [002] 冷边界只有四种已提交证据
 
 Epoch 只由成功 prefix probe、Host compaction 重锚、Plan tenure 交接重锚或 context-compression-028/029 规定的阶段窗口 rebase 推进，且每次恰好加一。不得按容量或 Token 数主动切换。Plan tenure 交接重锚：Planner 任期交接触发 TenureReanchored 事件，epoch 加一、清除 Snapshot、PrefixCoverage 归零。同一 incumbencyId 不重锚两次。
 
