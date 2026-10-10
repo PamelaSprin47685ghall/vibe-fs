@@ -304,6 +304,32 @@ module SuicideTool =
             return retiredResult ()
         }
 
+    let private runRetirementOrBlocked (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
+        let blockers = scope.RetirementBlockersFor context.SessionId
+
+        if List.isEmpty blockers then
+            runRetirement prepared
+        else
+            runBlocked prepared blockers
+
+    let private runConfirmed
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedRetirement)
+        pending
+        toolCallId
+        providerRunId
+        confirmFirst
+        =
+        match prepared.View.RetirementConfirmation with
+        | None -> confirmFirst ()
+        | Some(confirmedRun, confirmedCall) when confirmedCall = toolCallId && confirmedRun = providerRunId ->
+            scope.UnfreezeRetirement context.SessionId
+            Task.FromResult(Ok(confirmationResult prepared pending))
+        | Some(_, confirmedCall) when confirmedCall = toolCallId ->
+            Task.FromResult(Error "RetirementConfirmationReplayConflict")
+        | Some _ -> runRetirementOrBlocked scope context prepared
+
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
         let hasAssessment = prepared.View.AcceptedAssessmentTransport |> Option.isSome
         let toolCallId = ToolCallId.value prepared.Bound.ToolCallId
@@ -331,20 +357,7 @@ module SuicideTool =
             scope.UnfreezeRetirement context.SessionId
             Task.FromResult(Ok(assessmentRequiredResult ()))
         else
-            match prepared.View.RetirementConfirmation with
-            | None -> confirmFirst ()
-            | Some(confirmedRun, confirmedCall) when confirmedCall = toolCallId && confirmedRun = providerRunId ->
-                scope.UnfreezeRetirement context.SessionId
-                Task.FromResult(Ok(confirmationResult prepared pending))
-            | Some(_, confirmedCall) when confirmedCall = toolCallId ->
-                Task.FromResult(Error "RetirementConfirmationReplayConflict")
-            | Some _ ->
-                let blockers = scope.RetirementBlockersFor context.SessionId
-
-                if List.isEmpty blockers then
-                    runRetirement prepared
-                else
-                    runBlocked prepared blockers
+            runConfirmed scope context prepared pending toolCallId providerRunId confirmFirst
 
     let private unfreezeUnlessRetired (scope: ToolRuntimeScope) (context: HostToolContext) =
         let facts = scope.ManagerCapabilityFactsFor context.SessionId

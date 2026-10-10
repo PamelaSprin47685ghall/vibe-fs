@@ -880,7 +880,7 @@ type HostForkRuntime
     member _.List() = runtime.List()
 
     member _.TryFindAgent(agentId: string) =
-        runtime.List() |> fst |> List.tryFind (fun a -> AgentHandleId.value a.AgentId = agentId)
+        runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
 
     member internal _.OwnsAgent(agentId: string) =
         lock gate (fun () -> processOwnedAgents.Contains agentId)

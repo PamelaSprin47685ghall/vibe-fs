@@ -42,7 +42,7 @@ module ChildRunProjection =
             else
                 None
 
-        { AgentId = AgentHandleId.create agentId
+        { AgentId = agentId
           Agent = run.AgentName
           Role = run.Role
           Status = status runtimeCancelled run

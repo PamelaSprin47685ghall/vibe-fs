@@ -136,7 +136,7 @@ module HorizonTool =
             match HandleId.tryAgent handle.Handle with
             | None -> ()
             | Some handleId ->
-                agentLines.Add(lineForHandle language handle (Map.tryFind handleId runtimeByAgentId))
+                agentLines.Add(lineForHandle language handle (Map.tryFind (AgentHandleId.value handleId) runtimeByAgentId))
                 let! workRecord = workRecordForHandle language journal snapshot handle
                 agentLines.Add workRecord
         }

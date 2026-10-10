@@ -35,7 +35,7 @@ type PtyRecord =
       StartedAt: DateTimeOffset }
 
 type AgentRecord =
-    { AgentId: AgentHandleId
+    { AgentId: string
       Agent: string
       Role: Role
       Status: AgentStatus

@@ -1385,6 +1385,37 @@ module PairProgrammingThoughtTransform =
             }
         | None -> Task.FromResult()
 
+    let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
+        // crash-reconciliation-018: the restart guidance is delivered
+        // exactly once; a replayed placement never consumes it.
+        if anchored && Option.isSome restartGuidance then
+            markRestartGuidanceDelivered ()
+
+    let private failClosedInject terminateSession projectionSessionIdOpt reason =
+        task {
+            Diagnostic.emit
+                "host-013-fail-closed"
+                [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
+
+            do! terminateSessionIfPresent terminateSession projectionSessionIdOpt reason
+        }
+
+    let private applyInjectResult
+        outObj
+        projectionSessionIdOpt
+        restartGuidance
+        markRestartGuidanceDelivered
+        terminateSession
+        injectResult
+        =
+        task {
+            match injectResult with
+            | Ok(newMessages, anchored) ->
+                markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored
+                HostMessageProjection.replaceMessagesInPlace outObj newMessages
+            | Error reason -> do! failClosedInject terminateSession projectionSessionIdOpt reason
+        }
+
     let private injectPairProgrammingGuideline
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
@@ -1422,20 +1453,7 @@ module PairProgrammingThoughtTransform =
 
             let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
 
-            match injectResult with
-            | Ok(newMessages, anchored) ->
-                // crash-reconciliation-018: the restart guidance is delivered
-                // exactly once; a replayed placement never consumes it.
-                if anchored && Option.isSome restartGuidance then
-                    markRestartGuidanceDelivered ()
-
-                HostMessageProjection.replaceMessagesInPlace outObj newMessages
-            | Error reason ->
-                Diagnostic.emit
-                    "host-013-fail-closed"
-                    [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
-
-                do! terminateSessionIfPresent terminateSession projectionSessionIdOpt reason
+            do! applyInjectResult outObj projectionSessionIdOpt restartGuidance markRestartGuidanceDelivered terminateSession injectResult
         }
 
     let maybeInjectGuideline

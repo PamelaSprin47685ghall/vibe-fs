@@ -46,7 +46,7 @@ type PtyRecord =
 /// process-local ChildRun resource; it is not a durable workflow cursor.
 type AgentRecord =
     {
-        AgentId: AgentHandleId
+        AgentId: string
         /// Managed agent name. Required; empty is refused at reuse.
         Agent: string
         Role: Role

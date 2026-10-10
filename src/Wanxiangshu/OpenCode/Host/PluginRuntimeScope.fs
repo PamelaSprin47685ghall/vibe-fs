@@ -59,6 +59,7 @@ type PluginRuntimeScope(journal: AgentJournal option, isModelLeaseExternallyOwne
     // is owed to the next real user instruction after this process's load-phase
     // normalization; consumed once, never persisted (the delivered bytes are
     // frozen by the pair-guideline anchor).
+    // DSL-MUTABLE: single-flight — one-shot restart guidance latch
     let mutable restartGuidancePending = false
 
     /// HOST-006: the first compaction setting the config hook could not establish.

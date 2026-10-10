@@ -930,7 +930,7 @@ module ProcessSurface =
 
     let agentView (agent: AgentRecord) : obj =
         box
-            {| agentId = AgentHandleId.value agent.AgentId
+            {| agentId = agent.AgentId
                agent = agent.Agent
                completionCellSettled = agent.CompletionCellSettled |}
 

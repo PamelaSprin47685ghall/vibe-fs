@@ -594,6 +594,38 @@ module ForkTool =
         | Some handleId ->
             reuseResolvedAgent scope runtime context request language handles handle (AgentHandleId.value handleId)
 
+    let private callingConflictsWithDerived (request: Request) derived =
+        not (String.IsNullOrWhiteSpace request.Calling)
+        && not (String.Equals(request.Calling.Trim(), derived, StringComparison.OrdinalIgnoreCase))
+
+    let private placeDerivedManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        derived
+        =
+        match tryCalling managerCallingBindings derived with
+        | None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
+        | Some managed -> placeNewManagerFork scope runtime context request language handles managed
+
+    let private createNewManagerFork
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        =
+        let derived = derivedForkCalling request.Name
+
+        if callingConflictsWithDerived request derived then
+            Task.FromResult(consequence (prose language Path.Fork.CallingConflict))
+        else
+            placeDerivedManagerFork scope runtime context request language handles derived
+
     let private executeManagerNewCalling
         (scope: ToolRuntimeScope)
         (runtime: HostForkRuntime)
@@ -605,18 +637,7 @@ module ForkTool =
         =
         match existingByname with
         | Some _ -> Task.FromResult(consequence (prose language Path.Fork.NameAlreadyBelongs))
-        | None ->
-            let derived = derivedForkCalling request.Name
-
-            if
-                not (String.IsNullOrWhiteSpace request.Calling)
-                && not (String.Equals(request.Calling.Trim(), derived, StringComparison.OrdinalIgnoreCase))
-            then
-                Task.FromResult(consequence (prose language Path.Fork.CallingConflict))
-            else
-                match tryCalling managerCallingBindings derived with
-                | None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
-                | Some managed -> placeNewManagerFork scope runtime context request language handles managed
+        | None -> createNewManagerFork scope runtime context request language handles
 
     let private executeManagerExistingPerson
         (scope: ToolRuntimeScope)

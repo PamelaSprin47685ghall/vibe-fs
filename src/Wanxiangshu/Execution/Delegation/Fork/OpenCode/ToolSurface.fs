@@ -41,7 +41,7 @@ module ForkToolSurface =
           Text: string
           Options: SessionPromptOptions }
 
-    type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>) =
+    type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>, existingChildIds: Set<string>) =
         let children = ResizeArray<OpenCodeChildInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
@@ -328,8 +328,18 @@ module ForkToolSurface =
                 |> Task.FromResult
 
             member _.CreateChildSession(parent, options) =
-                let childId =
-                    SessionId.create (sprintf "%s-fork-child-%d" (SessionId.value parent) (children.Count + 1))
+                let prefix = sprintf "%s-fork-child-" (SessionId.value parent)
+
+                let isTaken (candidate: SessionId) =
+                    (children |> Seq.exists (fun child -> child.SessionId = candidate))
+                    || Set.contains (SessionId.value candidate) existingChildIds
+
+                let rec pick index =
+                    let candidate = SessionId.create (sprintf "%s%d" prefix index)
+
+                    if isTaken candidate then pick (index + 1) else candidate
+
+                let childId = pick (children.Count + 1)
 
                 children.Add
                     { SessionId = childId
@@ -503,7 +513,13 @@ module ForkToolSurface =
             for (sessionId, _, _, agent) in admissions do
                 ownerAgents.Add(SessionId.value sessionId, agent)
 
-            let sessionPort = ForkSessionPort(abortSession)
+            let existingChildIds =
+                (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
+                |> Map.toSeq
+                |> Seq.map (fun (childId, _) -> SessionId.value childId)
+                |> Set.ofSeq
+
+            let sessionPort = ForkSessionPort(abortSession, existingChildIds)
             let sessions = sessionPort :> ISessionHostPort
 
             let childWorkRecordForRun sessionId range providerRun =
@@ -990,7 +1006,7 @@ module ForkToolSurface =
                                 runtime.List()
                                 |> fst
                                 |> List.tryFind (fun a ->
-                                    match runtime.TryChildSession (AgentHandleId.value a.AgentId) with
+                                    match runtime.TryChildSession a.AgentId with
                                     | Some sid -> sid = childId
                                     | None -> false)
                             with
@@ -1016,7 +1032,7 @@ module ForkToolSurface =
                         match runtime.List() |> fst |> List.tryHead with
                         | None -> return false
                         | Some agent ->
-                            match! runtime.AwaitCurrentWorkRecord (AgentHandleId.value agent.AgentId) with
+                            match! runtime.AwaitCurrentWorkRecord agent.AgentId with
                             | Ok _ -> return true
                             | Error _ -> return false
         }

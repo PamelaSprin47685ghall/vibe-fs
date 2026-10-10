@@ -557,7 +557,7 @@ module HostForkAgent =
             let recordOpt =
                 runtime.Runtime.List()
                 |> fst
-                |> List.tryFind (fun agent -> AgentHandleId.value agent.AgentId = agentId)
+                |> List.tryFind (fun agent -> agent.AgentId = agentId)
 
             let boundAgent = HostForkBinding.managedAgent runtime.Journal childId
 
