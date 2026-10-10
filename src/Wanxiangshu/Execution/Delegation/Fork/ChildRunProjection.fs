@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Agent
+open Wanxiangshu.Foundation.Identity
 
 /// Pure view of one ChildRun's physical completion/cancellation state.
 module ChildRunProjection =
@@ -41,7 +42,7 @@ module ChildRunProjection =
             else
                 None
 
-        { AgentId = agentId
+        { AgentId = AgentHandleId.create agentId
           Agent = run.AgentName
           Role = run.Role
           Status = status runtimeCancelled run

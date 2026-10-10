@@ -880,7 +880,7 @@ type HostForkRuntime
     member _.List() = runtime.List()
 
     member _.TryFindAgent(agentId: string) =
-        runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
+        runtime.List() |> fst |> List.tryFind (fun a -> AgentHandleId.value a.AgentId = agentId)
 
     member internal _.OwnsAgent(agentId: string) =
         lock gate (fun () -> processOwnedAgents.Contains agentId)
@@ -1006,7 +1006,6 @@ type HostForkRuntime
     member this.RegisterPtySnapshot (id: PtyId) (command: string) =
         runtime.RegisterPty
             { PtyId = id.Value
-              AgentId = id.Value
               Command = command
               StartedAt = this.Now() }
 

@@ -990,7 +990,7 @@ module ForkToolSurface =
                                 runtime.List()
                                 |> fst
                                 |> List.tryFind (fun a ->
-                                    match runtime.TryChildSession a.AgentId with
+                                    match runtime.TryChildSession (AgentHandleId.value a.AgentId) with
                                     | Some sid -> sid = childId
                                     | None -> false)
                             with
@@ -1016,7 +1016,7 @@ module ForkToolSurface =
                         match runtime.List() |> fst |> List.tryHead with
                         | None -> return false
                         | Some agent ->
-                            match! runtime.AwaitCurrentWorkRecord agent.AgentId with
+                            match! runtime.AwaitCurrentWorkRecord (AgentHandleId.value agent.AgentId) with
                             | Ok _ -> return true
                             | Error _ -> return false
         }
@@ -1413,25 +1413,19 @@ module ForkToolSurface =
                       RequirementSetDigest = sprintf "req:%s" sessionStr
                       EvidenceFrontierDigest = sprintf "evidence:%s" sessionStr }
 
-                let scores =
-                    ScoreVector.tryCreate
-                        [ ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Perfect
-                          ScoreGrade.Revise ]
+                let findings =
+                    AssessmentFindings.tryCreate
+                        [ { AcceptanceCriteria = "the delivery reaches the requested target state"
+                            WorkPlan = "close the remaining gap before the next review" } ]
                     |> Result.defaultWith (fun _ ->
-                        failwith "injectAcceptedAssessment: failed to construct score vector")
+                        failwith "injectAcceptedAssessment: failed to construct assessment findings")
 
                 let events =
                     match existingRoad with
                     | None ->
                         [ RelayEvent.RoadOpened(roadId, authRev, physUser)
                           RelayEvent.IncumbencyOpened(incId, snapId)
-                          RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, authRev, scores) ]
+                          RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, authRev, findings) ]
                     | Some road ->
                         match road.ActiveIncumbency, road.ActiveSnapshotId, road.ActiveAuthorityRevision with
                         | Some activeInc, Some activeSnap, Some activeRev ->
@@ -1441,7 +1435,7 @@ module ForkToolSurface =
                                   binding,
                                   activeSnap,
                                   activeRev,
-                                  scores
+                                  findings
                               ) ]
                         | _ ->
                             let currentRev =
@@ -1458,7 +1452,7 @@ module ForkToolSurface =
 
                             roadOpened
                             @ [ RelayEvent.IncumbencyOpened(incId, snapId)
-                                RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, currentRev, scores) ]
+                                RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, currentRev, findings) ]
 
                 match RelayTransaction.create events with
                 | Error error ->
