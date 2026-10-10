@@ -664,7 +664,48 @@ module PluginTransforms =
             |> Option.filter (fun state -> state.Active.IsSome)
             |> Option.map (fun state -> buildTenureOf state fresh)
 
-        let assembleAndRewrite (outObj: obj) (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo) : unit =
+        let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch option =
+            match AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections with
+            | None -> None
+            | Some session -> session.PrefixEpoch
+
+        let emitTenureReanchorSkipped (reason: string) : unit =
+            Diagnostic.emit "plan-tenure-reanchor-skipped" [ "result", reason ]
+
+        let fireTenureReanchor
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (workId: string)
+            (incumbencyId: string)
+            : unit =
+            match tenureReanchorEpoch durable sessionId with
+            | None -> emitTenureReanchorSkipped "no-epoch"
+            | Some epoch ->
+                let fact =
+                    ContextFact.TenureReanchored
+                        {| SessionId = sessionId
+                           PreviousEpochId = epoch.EpochId
+                           NextEpochId = PrefixEpochId.next epoch.EpochId
+                           WorkId = workId
+                           IncumbencyId = incumbencyId |}
+
+                AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
+                |> ignore
+
+        let isTenureReanchorRequested (result: obj) : bool =
+            if isNull result then
+                false
+            else
+                try
+                    unbox<bool> result?reanchorRequested
+                with _ ->
+                    false
+
+        let assembleAndRewrite
+            (sidOpt: string option)
+            (outObj: obj)
+            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
+            : unit =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
 
             let result =
@@ -676,16 +717,32 @@ module PluginTransforms =
             let assembled = unbox<obj array> result?messages |> Array.toList
             HostMessageProjection.replaceMessagesInPlace outObj assembled
 
-        let applyResolvedTenure (outObj: obj) : unit =
+            let requested = isTenureReanchorRequested result
+
+            let target =
+                match journal, sidOpt, requested with
+                | Some durable, Some sid, true when not (String.IsNullOrWhiteSpace sid) ->
+                    Some(durable, SessionId.create sid)
+                | _ -> None
+
+            match target with
+            | None ->
+                if requested then
+                    emitTenureReanchorSkipped "no-journal-or-session"
+                else
+                    ()
+            | Some(durable, sessionId) -> fireTenureReanchor durable sessionId tenure.WorkId tenure.IncumbencyId
+
+        let applyResolvedTenure (sidOpt: string option) (outObj: obj) : unit =
             match resolveTenure outObj with
             | None -> ()
-            | Some tenure -> assembleAndRewrite outObj tenure
+            | Some tenure -> assembleAndRewrite sidOpt outObj tenure
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =
             task {
                 match planSessionOf sidOpt with
                 | None -> ()
-                | Some _ -> applyResolvedTenure outObj
+                | Some _ -> applyResolvedTenure sidOpt outObj
             }
 
         { BeginPhysicalProviderAttempt =
