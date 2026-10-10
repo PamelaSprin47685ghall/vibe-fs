@@ -47,6 +47,7 @@ module AttentionTools =
 
             match AttentionProjection.tryFind sessionId occurrence projection with
             | Some _ -> return ()
+            | None when AttentionProjection.wasConsumed sessionId occurrence projection -> return ()
             | None ->
                 let fact =
                     AttentionFactCases.DeferredWorkRecorded

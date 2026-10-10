@@ -7,7 +7,8 @@ type DeferredWorkItem =
       Text: string }
 
 type AttentionProjectionState =
-    { BySession: Map<SessionId, DeferredWorkItem list> }
+    { BySession: Map<SessionId, DeferredWorkItem list>
+      ConsumedBySession: Map<SessionId, Set<string>> }
 
 [<RequireQualifiedAccess>]
 module AttentionProjection =
@@ -16,6 +17,9 @@ module AttentionProjection =
 
     val tryFind:
         sessionId: SessionId -> occurrenceId: string -> state: AttentionProjectionState -> DeferredWorkItem option
+
+    val wasConsumed:
+        sessionId: SessionId -> occurrenceId: string -> state: AttentionProjectionState -> bool
 
     val record:
         sessionId: SessionId ->
