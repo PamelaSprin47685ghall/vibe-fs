@@ -113,3 +113,14 @@ Finalize 恒带 exact Inspector identity，commitment 闭合为 `Finalized | Not
 ## [025] DevOps 每次工作返回即排空 PTY
 
 固定 DevOps 每次 run 终态结算，立即收束其拥有的全部 PTY：TERM 后等待真实退出，必要时升级 KILL，随后清除记账。不得留到下次 resume，不因 Manager 退休触发，不影响其他会话的资源和生命周期。
+
+## [026] Main 收束级联 Attached InternalLeaf 的 execution 结算
+
+Main session 收束（宿主 `SessionDeleted` 事件，且存在 durable Attached Companion 关联 `CompanionBloggerLinked` 作为 linked InternalLeaf 证据）时，lifecycle owner 除排空 Main 自身已准入 execution 外，还必须对每个 linked Attached InternalLeaf（Blogger）名下全部已准入 execution 逐一完成 typed terminal 与 exact capacity 归还：
+
+- 未终态 execution 先写 typed `Cancelled` terminal：pre-provider 阶段复用 `PreProviderSettlement.settle`，after-provider-start 阶段复用 `ManagedChatProviderLifecycle.terminal`；两者都等待 durable 提交确认后才可归还。
+- 已 terminal 但物理容量仍 held 的 execution 直接请求 exact release（`ModelRouting.releasePhysicalExecution`）；`AlreadyApplied` 与 `StaleFence` 按幂等结果接受，`Conflict` 不得吞没。
+- 只允许 exact per-execution fence 释放。禁止 session-wide blind release、计数减一、以错误文本或超时猜测释放。
+- 归还完成后，该 execution 不得再出现在 shared capacity 快照中。
+- 重复收束幂等：重放不得产生第二份 terminal、第二次释放副作用或抛错；已归还容量的 execution 再次处理为 no-op。
+- Main 自身与 linked InternalLeaf 各自的 execution 只由自己的 exact key 结算；本条款不改变 Main 自身容量的既有结算路径。

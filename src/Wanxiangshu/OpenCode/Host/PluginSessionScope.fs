@@ -155,6 +155,58 @@ type PluginSessionScope
                 do! this.SettleExecution(durable, execution)
         }
 
+    /// managed-session-lifecycle-026: the linked Attached InternalLeaf (Blogger)
+    /// sessions of a Main, proven by the durable CompanionBloggerLinked
+    /// projection. The process-local Companion registry is a cache; the durable
+    /// projection is the existence truth (crash-reconciliation-021).
+    member private _.LinkedLeafSessions(sessionId: string) : SessionId list =
+        let sid = SessionId.create sessionId
+
+        journal
+        |> Option.bind (fun durable ->
+            (AgentJournal.snapshot durable).AgentProjections.Sessions
+            |> Map.tryFind sid
+            |> Option.bind (fun session -> session.Companion)
+            |> Option.bind (fun companion -> companion.BloggerSessionId))
+        |> Option.filter (fun leaf -> leaf <> sid)
+        |> Option.toList
+
+    /// managed-session-lifecycle-026: return a linked leaf's remaining exact
+    /// custody. SettleSessionExecutions already returned what it just settled;
+    /// an unheld key answers AlreadyApplied, so a repeated close stays a no-op.
+    /// HeldForInput is the documented delayed return for a retained
+    /// continuation credit; a Conflict is a real ownership violation and is
+    /// exposed, never swallowed.
+    member private _.ReleaseLeafCustody(leaf: SessionId) : Task =
+        let executions =
+            journal
+            |> Option.map (fun durable ->
+                AgentJournal.snapshot durable
+                |> fun projection -> projection.AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.current
+                |> List.filter (fun execution -> execution.key.SessionId = leaf))
+            |> Option.defaultValue []
+
+        task {
+            for execution in executions do
+                match
+                    ModelRouting.releasePhysicalExecution
+                        execution.key.SessionId
+                        execution.key.PhysicalUserMessageId
+                with
+                | PhysicalExecutionReleaseOutcome.HeldForInput
+                | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Applied
+                | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.AlreadyApplied
+                | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.StaleFence -> ()
+                | PhysicalExecutionReleaseOutcome.Released CapacityTransitionOutcome.Conflict ->
+                    invalidOp (
+                        sprintf
+                            "managed-session-lifecycle-026: linked leaf exact capacity release was rejected (%s/%s)"
+                            (SessionId.value execution.key.SessionId)
+                            (PhysicalUserMessageId.value execution.key.PhysicalUserMessageId)
+                    )
+        }
+
     /// No-op: language follows the live global preference, so there is no
     /// per-session identity left to drop. Kept as the deletion boundary's
     /// stable call shape.
@@ -166,6 +218,13 @@ type PluginSessionScope
     member this.ClearSession(sessionId: string) : Task =
         task {
             do! this.SettleSessionExecutions sessionId
+
+            // managed-session-lifecycle-026: a Main close also settles every
+            // execution of its durable linked Attached InternalLeaf before the
+            // leaf's registry entries are dropped.
+            for leaf in this.LinkedLeafSessions sessionId do
+                do! this.SettleSessionExecutions (SessionId.value leaf)
+                do! this.ReleaseLeafCustody leaf
 
             match this.Companions.TryGetValue sessionId with
             | true, companion ->
