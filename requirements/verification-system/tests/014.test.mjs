@@ -26,7 +26,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { compileScenario } from './e2e/support/scenario-schema.js'
 import { resolveEntry } from './e2e/support/runtime-key.js'
 import { fileURLToPath } from 'node:url'
@@ -46,7 +46,7 @@ import {
   INVESTIGATION_OUTLOOK_MARKERS,
   matchInvestigationOutlookMarker,
 } from './e2e/support/long-stroke-oracles.mjs'
-import { factPayloads } from './e2e/support/journal-observer.js'
+import { eventsDir, factPayloads, gitCommonDir } from './e2e/support/journal-observer.js'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
 import {
   getOpencodeSpawnCount,
@@ -241,10 +241,32 @@ const preFlowCanaries = async (scenario) => {
   // binding exactly once each; the recovery decision does not exist yet. Bound
   // is written before the bootstrap prompt is sent, so the first observed
   // delivery already proves it is durable.
+  // Failure-site self-evidence: when this durable barrier fails, collect the
+  // resolved journal directories, writer-file inventory, per-fact grep counts
+  // and the relevant stderr lines, without changing the assertion itself.
+  const journalDiagnosis = () => {
+    const commonDir = gitCommonDir(scenario.host.workDir)
+    const eventsPath = eventsDir(scenario.host.workDir)
+    let files = []
+    try {
+      files = readdirSync(eventsPath).map((name) => `${name}(${statSync(join(eventsPath, name)).size}B)`)
+    } catch (error) {
+      files = [`<unreadable: ${error.message}>`]
+    }
+    const factCounts = {}
+    for (const name of ['DelegationRequested', 'DelegationBound', 'StrengthFramesTraced']) {
+      factCounts[name] = factPayloads(scenario.host.workDir, name).length
+    }
+    const stderrLines = String(scenario.host.stderrLog ?? '')
+      .split('\n')
+      .filter((line) => /strength-delegation-requested|strength-delegation-skip|strength-replica-prepare-failed/.test(line))
+      .slice(-12)
+    return JSON.stringify({ commonDir, eventsPath, eventsFiles: files, factCounts, stderrLines }, null, 2)
+  }
   assert.equal(
     factPayloads(scenario.host.workDir, 'DelegationRequested').length,
     1,
-    'the canary decision must own exactly one DelegationRequested before recovery exists',
+    `the canary decision must own exactly one DelegationRequested before recovery exists\n${journalDiagnosis()}`,
   )
   assert.equal(
     factPayloads(scenario.host.workDir, 'DelegationBound').length,
