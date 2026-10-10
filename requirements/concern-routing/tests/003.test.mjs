@@ -35,3 +35,26 @@ test('WHAT[concern-routing-003] message projection distinguishes replay, conflic
 })
 
 test.todo('WHAT[concern-routing-003] actual publish routes the reserved user address to a user-visible notification and copies to root (integration rework pending)')
+
+test('WHAT[concern-routing-003] reserved user address has no live mailbox at projection level', () => {
+  let state = concern.subscribe('root-owner', 'gen-root', 'root', 'user-facing session', concern.empty()).state
+  const toUser = concern.publish('sender', 'msg-user', 'user', 'hello human', state)
+  assert.equal(toUser.ok, false)
+  assert.deepEqual(concern.prepare('root-owner', toUser.state), concern.prepare('root-owner', state))
+})
+
+test('WHAT[concern-routing-003] publish to root without a live mailbox is rejected with a diagnosis', () => {
+  const before = concern.empty()
+  const result = concern.publish('sender', 'msg-root', 'root', 'hello root', before)
+  assert.equal(result.ok, false)
+  assert.match(result.error, /no live mailbox/)
+  assert.deepEqual(concern.prepare('sender', result.state), concern.prepare('sender', before))
+})
+
+test('WHAT[concern-routing-003] publish to a live root mailbox is accepted and routed only to the root owner', () => {
+  let state = concern.subscribe('root-owner', 'gen-root', 'root', 'user-facing session', concern.empty()).state
+  const result = concern.publish('sender', 'msg-copy', 'root', 'hello root', state)
+  assert.equal(result.ok, true)
+  assert.deepEqual(concern.prepare('root-owner', result.state).messages, [{ id: 'root', message: 'hello root' }])
+  assert.deepEqual(concern.prepare('bystander', result.state).messages, [])
+})

@@ -96,17 +96,25 @@ module ConcernTools =
     /// concern-routing-003: the reserved user address is not a session mailbox.
     /// Publishing to it raises a user-visible notification and copies the same
     /// message to the reserved root address when that mailbox is live.
+    /// The durable copy settles first: the toast renders only after the copy
+    /// attempt settles, and never when the store itself is unavailable or the
+    /// occurrence conflicts. A missing live `root` mailbox only skips the copy.
     let private publishToUser durable occurrence message toast (ctx: HostToolContext) =
         task {
-            toast
-            |> Option.iter (fun show -> show (render ctx Path.UserNotificationTitle Map.empty) message)
-
             let sender = SessionId.create ctx.SessionId
 
-            let! _ =
+            let! copy =
                 persistPublication durable sender (occurrence + ":root") ReservedAddress.Root message ctx.ProviderRunId
 
-            return render ctx Path.PublishAccepted (Map [ "id", ReservedAddress.User ])
+            match copy with
+            | Ok()
+            | Error PublishFailure.UnknownMailbox ->
+                toast
+                |> Option.iter (fun show -> show (render ctx Path.UserNotificationTitle Map.empty) message)
+
+                return render ctx Path.PublishAccepted (Map [ "id", ReservedAddress.User ])
+            | Error PublishFailure.OccurrenceConflict -> return render ctx Path.PublishConflict Map.empty
+            | Error PublishFailure.DurableUnavailable -> return render ctx Path.DurableUnavailable Map.empty
         }
 
     let private dispatchPublication durable occurrence id message toast ctx =
