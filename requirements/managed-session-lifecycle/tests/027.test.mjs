@@ -1,0 +1,208 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as recoveryHost from '../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
+import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
+import * as ownership from '../../verification-system/tests/support/blogger-ownership.mjs'
+import { startPluginIncarnation } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+// WHAT[managed-session-lifecycle-027]: closing a session scope must cancel the
+// continuation-input retention the scope still owns. When an exact credit is
+// held only by a retained continuation input (the `HeldForInput` shape of
+// execution-model-routing-006), the close must run the retention's own
+// cleanup — cancel the retained input, then complete the delayed exact
+// release — instead of leaving the credit in shared capacity forever.
+//
+// Driving face: recoveryHost.clearSession is the same delete-drain owner the
+// runtime's DisposeSession awaits (SessionRecoveryHostSurface.clearSession).
+// Both the Main close (linked-leaf cascade, WHAT[managed-session-lifecycle-026])
+// and the leaf's own close go through PluginSessionScope.ClearSession, so the
+// retention cleanup must be observable through it.
+//
+// Construction: the retained-input window is created through the exact
+// ModelRouting surface operation the production HostSignalBootstrap path uses
+// (`retainContinuationInput`, EMR-006). The shared runtime is the one
+// clearSession releases against, so the construction calls the shared wrapper
+// (`sharedRetainContinuationInput`): the isolated wrapper only reaches an
+// isolated runtime and cannot build this window on the process-shared runtime
+// that clearSession owns. This shared wrapper is the test-constructible face of
+// the same operation already executed on the shared runtime in production.
+//
+// Oracle: the real shared capacity snapshot, exact owner only (mirrors 026).
+// `heldPhysicalReleases` / `continuationInputs` are process-internal, so the
+// observable consequence is the exact credit's presence in shared capacity.
+const executionCount = (session, physical) =>
+  routing.sharedCapacitySnapshot().executions.filter(
+    (execution) => execution.sessionId === session && execution.physicalUserMessageId === physical,
+  ).length
+
+const withPlugin = async (action) => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-leaf-retained-'))
+  const incarnation = await startPluginIncarnation(workspace)
+  try {
+    await action()
+  } finally {
+    await incarnation.hooks.dispose()
+    rmSync(workspace, { recursive: true, force: true })
+  }
+}
+
+const withHost = async (action) => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-leaf-retained-journal-'))
+  const host = await recoveryHost.bootRecoveryHost(directory, 'absent')
+  try {
+    await action(host)
+  } finally {
+    recoveryHost.disposeRecoveryHost(host)
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+// Durable Main -> leaf link (the production CompanionBloggerLinked fact) plus
+// one admitted execution holding an exact committed lease on the shared
+// runtime. Returns the opaque lease token used to retain a continuation input.
+const seedLinkedLeafExecution = async (host, main, leaf, physical) => {
+  await ownership.linkBlogger(host.Journal, main, leaf)
+  await recoveryHost.seedAccepted(host, leaf, physical)
+
+  const acquisition = await routing.acquireSharedExecutionAdmission(
+    leaf,
+    physical,
+    'engineer',
+    'engineer',
+    null,
+    'normal',
+  )
+  assert.equal(acquisition.kind, 'Acquired', 'construction: the leaf execution must acquire its exact lease')
+
+  const target = routing.sharedExecutionAdmissionTarget(acquisition.lease)
+  const committed = routing.commitSharedExecutionAdmission(acquisition.lease, {
+    sessionId: leaf,
+    physicalUserMessageId: physical,
+    role: 'engineer',
+    participant: 'engineer',
+    target,
+  })
+  assert.ok(
+    ['Applied', 'AlreadyApplied'].includes(committed.kind),
+    'construction: the leaf exact lease must commit before the retention is built',
+  )
+  return acquisition.lease
+}
+
+// The retained-input window: an accepted-but-not-yet-selected material key
+// owns the old exact credit. Retaining it then releasing the old physical
+// execution must produce `HeldForInput` (the delayed return), never a release.
+const retainGuidance = (token, guidance) => {
+  assert.equal(
+    typeof routing.sharedRetainContinuationInput,
+    'function',
+    'the shared runtime retention wrapper must exist: production retains on the process-shared runtime (HostSignalBootstrap PublishInput), and clearSession releases against that same runtime',
+  )
+  routing.sharedRetainContinuationInput(token, guidance)
+}
+
+test('WHAT[managed-session-lifecycle-027] closing the Main cancels the linked leaf retention and returns the held exact credit', async () => {
+  await withPlugin(async () => {
+    await withHost(async (host) => {
+      const main = 'ses-main-retained'
+      const leaf = 'ses-blogger-retained'
+      const physical = 'msg-blogger-retained'
+      const guidance = 'msg-blogger-retained-guidance'
+      const decoyMain = 'ses-main-retained-decoy'
+      const decoyLeaf = 'ses-blogger-retained-decoy'
+      const decoyPhysical = 'msg-blogger-retained-decoy'
+      const decoyGuidance = 'msg-blogger-retained-decoy-guidance'
+
+      const token = await seedLinkedLeafExecution(host, main, leaf, physical)
+      retainGuidance(token, guidance)
+      assert.deepEqual(
+        routing.releasePhysical(leaf, physical),
+        { kind: 'HeldForInput' },
+        'construction: with a retained continuation input the old exact release must be delayed, never applied',
+      )
+      assert.equal(
+        executionCount(leaf, physical),
+        1,
+        'construction: the held credit must still be visible in shared capacity before the Main closes',
+      )
+
+      const decoyToken = await seedLinkedLeafExecution(host, decoyMain, decoyLeaf, decoyPhysical)
+      retainGuidance(decoyToken, decoyGuidance)
+      assert.deepEqual(
+        routing.releasePhysical(decoyLeaf, decoyPhysical),
+        { kind: 'HeldForInput' },
+        'construction: the decoy retained input must also delay its old exact release',
+      )
+      assert.equal(executionCount(decoyLeaf, decoyPhysical), 1, 'construction: the decoy held credit must be visible')
+
+      await recoveryHost.clearSession(host, main)
+
+      assert.equal(
+        executionCount(leaf, physical),
+        0,
+        'WHAT[managed-session-lifecycle-027]: closing the Main must cancel the linked leaf retention and return the delayed exact credit; a HeldForInput credit must not remain in shared capacity',
+      )
+      assert.equal(
+        executionCount(decoyLeaf, decoyPhysical),
+        1,
+        'an unrelated Main close must not touch another held leaf retention',
+      )
+    })
+  })
+})
+
+test('WHAT[managed-session-lifecycle-027] closing the leaf itself cancels its own retention and returns the held exact credit', async () => {
+  await withPlugin(async () => {
+    await withHost(async (host) => {
+      const main = 'ses-main-retained-leaf-close'
+      const leaf = 'ses-blogger-retained-leaf-close'
+      const physical = 'msg-blogger-retained-leaf-close'
+      const guidance = 'msg-blogger-retained-leaf-close-guidance'
+
+      const token = await seedLinkedLeafExecution(host, main, leaf, physical)
+      retainGuidance(token, guidance)
+      assert.deepEqual(
+        routing.releasePhysical(leaf, physical),
+        { kind: 'HeldForInput' },
+        'construction: the leaf retention must delay the old exact release',
+      )
+
+      // The leaf itself is recursively deleted: no Main cascade runs here, so
+      // the scope close on the leaf must cancel its own retention.
+      await recoveryHost.clearSession(host, leaf)
+
+      assert.equal(
+        executionCount(leaf, physical),
+        0,
+        'WHAT[managed-session-lifecycle-027]: closing the leaf scope must cancel its own retention and return the delayed exact credit',
+      )
+    })
+  })
+})
+
+test('WHAT[managed-session-lifecycle-027] repeated scope close remains idempotent for the cancelled retention', async () => {
+  await withPlugin(async () => {
+    await withHost(async (host) => {
+      const main = 'ses-main-retained-repeat'
+      const leaf = 'ses-blogger-retained-repeat'
+      const physical = 'msg-blogger-retained-repeat'
+      const guidance = 'msg-blogger-retained-repeat-guidance'
+
+      const token = await seedLinkedLeafExecution(host, main, leaf, physical)
+      retainGuidance(token, guidance)
+      assert.deepEqual(routing.releasePhysical(leaf, physical), { kind: 'HeldForInput' }, 'construction: the retention must delay the old exact release')
+
+      await recoveryHost.clearSession(host, main)
+      assert.equal(executionCount(leaf, physical), 0, 'the first Main close must return the held exact credit')
+
+      // The repeated close must resolve cleanly: the retention is already
+      // cancelled, so the second pass is a no-op rather than a second release
+      // side effect or a thrown ownership violation.
+      await recoveryHost.clearSession(host, main)
+      assert.equal(executionCount(leaf, physical), 0, 'the repeated close must not leave a second held credit')
+    })
+  })
+})

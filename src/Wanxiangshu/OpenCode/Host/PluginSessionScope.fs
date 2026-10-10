@@ -219,11 +219,17 @@ type PluginSessionScope
         task {
             do! this.SettleSessionExecutions sessionId
 
+            // managed-session-lifecycle-027: scope close cancels the retained
+            // continuation inputs this session owns; the last cancellation
+            // completes the delayed exact return of the held credit.
+            ModelRouting.cancelRetainedInputsForSession (SessionId.create sessionId)
+
             // managed-session-lifecycle-026: a Main close also settles every
             // execution of its durable linked Attached InternalLeaf before the
             // leaf's registry entries are dropped.
             for leaf in this.LinkedLeafSessions sessionId do
                 do! this.SettleSessionExecutions (SessionId.value leaf)
+                ModelRouting.cancelRetainedInputsForSession leaf
                 do! this.ReleaseLeafCustody leaf
 
             match this.Companions.TryGetValue sessionId with
