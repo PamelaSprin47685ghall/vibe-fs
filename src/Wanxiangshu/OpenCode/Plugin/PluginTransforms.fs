@@ -617,6 +617,73 @@ module PluginTransforms =
                 |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sid projections))
             |> Option.map (fun profile -> profile.CanonicalRole)
 
+        let planSessionOf (sidOpt: string option) : string option =
+            match sidOpt with
+            | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
+            | _ -> None
+
+        let tenureHasAssistantOrTool (rawMessages: obj list) : bool =
+            rawMessages
+            |> List.exists (fun raw ->
+                let tm = Wanxiangshu.Mission.Planning.TenureIsolation.messageOfRaw raw
+                tm.Role = "assistant" || tm.Role = "tool")
+
+        let tryReadActivePlanState () : Wanxiangshu.Mission.Planning.PlanWorkState option =
+            journal
+            |> Option.bind (fun durable ->
+                Wanxiangshu.Mission.Planning.PlanEventStore.tryActiveWorkState (fun key ->
+                    durable.Writer.TryCurrent key))
+
+        let buildTenureOf
+            (state: Wanxiangshu.Mission.Planning.PlanWorkState)
+            (fresh: bool)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
+            let active = state.Active.Value
+
+            let workId =
+                state.WorkId
+                |> Option.map Wanxiangshu.Mission.Planning.PlanWorkId.value
+                |> Option.defaultValue ""
+
+            { WorkId = workId
+              IncumbencyId = Wanxiangshu.Mission.Planning.PlanIncumbencyId.value active.Id
+              Stage = Wanxiangshu.Mission.Planning.PlanStage.render active.Stage
+              OpeningCursor = XTraceCursor.sequence active.OpeningCursor
+              PreviousRange = None
+              IsFreshHandover = fresh }
+
+        let resolveTenure (outObj: obj) : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+            let fresh = not (tenureHasAssistantOrTool rawMessages)
+
+            tryReadActivePlanState ()
+            |> Option.filter (fun state -> state.Active.IsSome)
+            |> Option.map (fun state -> buildTenureOf state fresh)
+
+        let assembleAndRewrite (outObj: obj) (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo) : unit =
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+            let result =
+                Wanxiangshu.Mission.Planning.PlanningSurface.assembleTenureMessages
+                    (box (rawMessages |> List.toArray))
+                    (box tenure)
+                    (fun _ -> "")
+
+            let assembled = unbox<obj array> result?messages |> Array.toList
+            HostMessageProjection.replaceMessagesInPlace outObj assembled
+
+        let applyResolvedTenure (outObj: obj) : unit =
+            match resolveTenure outObj with
+            | None -> ()
+            | Some tenure -> assembleAndRewrite outObj tenure
+
+        let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =
+            task {
+                match planSessionOf sidOpt with
+                | None -> ()
+                | Some _ -> applyResolvedTenure outObj
+            }
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
@@ -699,13 +766,7 @@ module PluginTransforms =
                             sidOpt
                             outObj
                 }
-          ApplyTenureIsolation =
-            fun sidOpt outObj ->
-                task {
-                    match sidOpt with
-                    | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> ()
-                    | _ -> ()
-                }
+          ApplyTenureIsolation = applyTenureIsolation
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
                 task {

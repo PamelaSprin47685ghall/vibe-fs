@@ -60,6 +60,23 @@ module PlanEventStore =
         | Some obj -> resolveWorkViews obj
         | None -> []
 
+    let private stateOfPackedFields (obj: obj) : PlanWorkState option =
+        let works = emitJsExpr<Map<string, PlanWorkState>> obj "$0.fields[0]"
+        works |> Map.toList |> List.tryHead |> Option.map snd
+
+    let private stateOfCurrent (obj: obj) : PlanWorkState option =
+        if isNull obj then
+            None
+        elif emitJsExpr obj "$0.fields !== undefined && Array.isArray($0.fields)" then
+            stateOfPackedFields obj
+        else
+            Some(unbox<PlanWorkState> obj)
+
+    let tryActiveWorkState (tryCurrent: string -> obj option) : PlanWorkState option =
+        tryCurrent "Plan"
+        |> Option.bind stateOfCurrent
+        |> Option.filter (fun st -> st.Active.IsSome)
+
     let private executeAppend (store: IEventStore) (envelope: EventEnvelope) : Task<Result<EventId, string>> =
         task {
             match! store.Append [ envelope ] with

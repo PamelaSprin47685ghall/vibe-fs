@@ -14,3 +14,4 @@ module PlanEventStore =
     val workStateFromIntegrator: integrator: ICanonicalIntegrator -> workId: PlanWorkId -> PlanWorkState option
     val viewFromIntegrator: integrator: ICanonicalIntegrator -> workId: PlanWorkId -> PlanWorkView option
     val allWorkViewsFromIntegrator: integrator: ICanonicalIntegrator -> PlanWorkView list
+    val tryActiveWorkState: tryCurrent: (string -> obj option) -> PlanWorkState option
