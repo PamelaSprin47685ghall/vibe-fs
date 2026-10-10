@@ -80,14 +80,7 @@ module ExecutionFailurePolicy =
         : ExecutionFailureResolution =
         match lifecycle, requestCanRecover facts.RequestKind with
         | DurableExecutionLifecycle.ProviderStarted, true -> retryProviderResolution key facts
-        | DurableExecutionLifecycle.NoAcceptedFact, true
-        | DurableExecutionLifecycle.AcceptedBeforeProvider, true
-        | DurableExecutionLifecycle.Terminal, true
-        | DurableExecutionLifecycle.NoAcceptedFact, false
-        | DurableExecutionLifecycle.AcceptedBeforeProvider, false
-        | DurableExecutionLifecycle.ProviderStarted, false
-        | DurableExecutionLifecycle.Terminal, false ->
-            terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
+        | _ -> terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
 
     let private deriveBreaker =
         function
@@ -151,9 +144,9 @@ module ExecutionFailurePolicy =
 
     let decideSupersession key lifecycle capacity : ExecutionFailureDecision =
         { Resolution = terminalResolution key ChatExecutionTerminalDisposition.Cancelled lifecycle
-          Breaker = BreakerDecision.NoBreakerTransition
-          CapacitySettlement = releaseCapacity lifecycle capacity
-          Fatality = FatalityDecision.NoFatality }
+          Breaker = deriveBreaker ExecutionFailure.Superseded
+          CapacitySettlement = deriveCapacitySettlement ExecutionFailure.Superseded lifecycle capacity
+          Fatality = deriveFatality ExecutionFailure.Superseded }
 
     let decide (input: ExecutionFailureInput) : ExecutionFailureDecision =
         let breaker = deriveBreaker input.Failure
@@ -163,34 +156,25 @@ module ExecutionFailurePolicy =
 
         failureDecision {
             match input.Failure with
-            | ExecutionFailure.LocalInvariant ->
+            | ExecutionFailure.LocalInvariant
+            | ExecutionFailure.CapacityQueueFull
+            | ExecutionFailure.StreamInterruptedAfterFirstToken ->
                 return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
-            | ExecutionFailure.ProtocolRejection ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Rejected input.Lifecycle
+            | ExecutionFailure.ProtocolRejection
             | ExecutionFailure.AuthorizationDenied ->
                 return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Rejected input.Lifecycle
-            | ExecutionFailure.UserCancelled ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Cancelled input.Lifecycle
+            | ExecutionFailure.UserCancelled
             | ExecutionFailure.Superseded ->
-                return
-                    (decideSupersession input.ExecutionKey input.Lifecycle input.Capacity)
-                        .Resolution
-            | ExecutionFailure.CapacityQueueFull ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
-            | ExecutionFailure.ProviderTransient ->
-                return providerResolution input.Lifecycle input.ExecutionKey input.Provider
+                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Cancelled input.Lifecycle
+            | ExecutionFailure.ProviderTransient
             | ExecutionFailure.ProviderPermanent ->
                 return providerResolution input.Lifecycle input.ExecutionKey input.Provider
             | ExecutionFailure.AcceptanceUnknown ->
                 return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
-            | ExecutionFailure.StreamInterruptedAfterFirstToken ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted ->
-                return ExecutionFailureResolution.PreserveCurrentFact
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed ->
+            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
+            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
                 return ExecutionFailureResolution.PreserveCurrentFact
             | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
                 return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
-                return ExecutionFailureResolution.PreserveCurrentFact
         }

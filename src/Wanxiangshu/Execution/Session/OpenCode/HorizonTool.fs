@@ -147,19 +147,11 @@ module HorizonTool =
         else
             lines
 
-    let private isAbandonedHandle (handle: HandleRecord) =
-        match handle.Lifecycle with
-        | HandleLifecycle.Abandoned _ -> true
-        | _ -> false
-
-    let private shouldIncludeHandleInRoster runtime handle =
-        HostForkJoin.currentProcessHandle runtime handle || isAbandonedHandle handle
-
     let private appendHandleLinesForRoster language journal snapshot runtimeByAgentId runtime agentLines handles =
         task {
             let eligibleHandles =
                 HandleProjection.horizonVisible handles
-                |> List.filter (shouldIncludeHandleInRoster runtime)
+                |> List.filter (HostForkJoin.currentProcessHandle runtime)
 
             for handle in eligibleHandles do
                 do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
