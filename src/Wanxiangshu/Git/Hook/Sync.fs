@@ -60,7 +60,7 @@ module HookSync =
                 let run = GitGateway.createDefaultRunner repo
 
                 let clockPort = NodeTiming.nodeClockPort ()
-                let clock () = clockPort.UtcNow ()
+                let clock () = clockPort.UtcNow()
 
                 let deadline =
                     Deadline.ofBudget (clock ()) (TimeSpan.FromSeconds ConvergeBudgetSeconds)

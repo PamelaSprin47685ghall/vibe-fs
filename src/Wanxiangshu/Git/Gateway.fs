@@ -155,7 +155,9 @@ module GitGateway =
         (deadline: Deadline)
         (clock: unit -> DateTimeOffset)
         : Task<Result<StoreSnapshot, ConvergeError>> =
-        let currentTimeMs () = (clock ()).ToUnixTimeMilliseconds() |> float
+        let currentTimeMs () =
+            (clock ()).ToUnixTimeMilliseconds() |> float
+
         let budgetExhausted () = Deadline.isExpired clock deadline
 
         let readRemoteAndMerge snapshot nowMs =
