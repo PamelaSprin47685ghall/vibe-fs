@@ -36,17 +36,10 @@ module ExecutionFailurePolicy =
 
     let private releaseCapacity lifecycle capacity =
         match lifecycle, capacity with
-        | DurableExecutionLifecycle.NoAcceptedFact, CapacityOwnership.NoCapacityFence
-        | DurableExecutionLifecycle.AcceptedBeforeProvider, CapacityOwnership.NoCapacityFence
-        | DurableExecutionLifecycle.ProviderStarted, CapacityOwnership.NoCapacityFence
-        | DurableExecutionLifecycle.Terminal, CapacityOwnership.NoCapacityFence ->
-            CapacitySettlement.NoCapacitySettlement
+        | _, CapacityOwnership.NoCapacityFence -> CapacitySettlement.NoCapacitySettlement
         | DurableExecutionLifecycle.NoAcceptedFact, CapacityOwnership.OwnsExactFence _ownedFence ->
             CapacitySettlement.NoCapacitySettlement
-        | DurableExecutionLifecycle.AcceptedBeforeProvider, CapacityOwnership.OwnsExactFence fence
-        | DurableExecutionLifecycle.ProviderStarted, CapacityOwnership.OwnsExactFence fence
-        | DurableExecutionLifecycle.Terminal, CapacityOwnership.OwnsExactFence fence ->
-            CapacitySettlement.ReleaseExactFence fence
+        | _, CapacityOwnership.OwnsExactFence fence -> CapacitySettlement.ReleaseExactFence fence
 
     let private retainCapacity capacity =
         match capacity with
@@ -68,9 +61,7 @@ module ExecutionFailurePolicy =
         match facts.Breaker, facts.RetryBudget with
         | ProviderBreakerState.Closed, ProviderRecoveryBudget.Available ->
             ExecutionFailureResolution.RetryFreshAttempt licence
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Exhausted
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Available
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Exhausted ->
+        | _, _ ->
             terminalResolution key ChatExecutionTerminalDisposition.Failed DurableExecutionLifecycle.ProviderStarted
 
     let private providerResolution
@@ -169,12 +160,11 @@ module ExecutionFailurePolicy =
             | ExecutionFailure.ProviderTransient
             | ExecutionFailure.ProviderPermanent ->
                 return providerResolution input.Lifecycle input.ExecutionKey input.Provider
-            | ExecutionFailure.AcceptanceUnknown ->
+            | ExecutionFailure.AcceptanceUnknown
+            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
                 return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
             | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
             | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
             | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
                 return ExecutionFailureResolution.PreserveCurrentFact
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
-                return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
         }
