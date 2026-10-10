@@ -1,5 +1,9 @@
 # Changelog — 版本历史
 
+## Unreleased — 接力式规划协议（Plan 模式）完整实现
+
+- 接力式规划协议完整实现（Role.Plan、三阶段 handoff、tenure-isolation、ask 两段式、崩溃恢复；requirements/planning 包 19 条条款、40 项测试）。
+
 ## Unreleased — Blogger Provider 容量泄漏修复（GAP1 / GAP2）
 
 - `managed-session-lifecycle` [026]（`e0527f7bb`）：Main 会话收束（宿主 `SessionDeleted` 且有 durable `CompanionBloggerLinked`）时，级联结算每个 linked Blogger 名下全部已准入 execution——pre-provider 复用 `PreProviderSettlement.settle`、after-provider-start 复用 `ManagedChatProviderLifecycle.terminal`，durable 提交确认后逐个 exact 归还容量；`AlreadyApplied`/`StaleFence` 幂等接受，`Conflict` 不吞没。
