@@ -576,107 +576,109 @@ module PlanningSurface =
                    output = null
                    error = err |}
 
+    let private extractPlanWorkView (viewVal: obj) : PlanWorkView option =
+        match viewVal with
+        | :? PlanWorkView as v -> Some v
+        | null -> None
+        | _ ->
+            try
+                let wid =
+                    if isNull viewVal?WorkId then
+                        None
+                    else
+                        Some(unbox<string> viewVal?WorkId)
+
+                let activeInc =
+                    if isNull viewVal?ActiveIncumbencyId then
+                        None
+                    else
+                        Some(unbox<string> viewVal?ActiveIncumbencyId)
+
+                let activeStage =
+                    if isNull viewVal?ActiveStage then
+                        None
+                    else
+                        Some(unbox<string> viewVal?ActiveStage)
+
+                let activePhase =
+                    if isNull viewVal?ActivePhase then
+                        None
+                    else
+                        Some(unbox<string> viewVal?ActivePhase)
+
+                let retiredCount =
+                    if isNull viewVal?RetiredCount then
+                        0
+                    else
+                        unbox<int> viewVal?RetiredCount
+
+                let latestRetOutcome =
+                    if isNull viewVal?LatestRetirementOutcome then
+                        None
+                    else
+                        Some(unbox<string> viewVal?LatestRetirementOutcome)
+
+                let delivered =
+                    if isNull viewVal?Delivered then
+                        false
+                    else
+                        unbox<bool> viewVal?Delivered
+
+                let deliveryDigest =
+                    if isNull viewVal?DeliveryDigest then
+                        None
+                    else
+                        Some(unbox<string> viewVal?DeliveryDigest)
+
+                let deliveryPath =
+                    if isNull viewVal?DeliveryPath then
+                        None
+                    else
+                        Some(unbox<string> viewVal?DeliveryPath)
+
+                let boundDevOpsId =
+                    if isNull viewVal?BoundDevOpsId then
+                        None
+                    else
+                        Some(unbox<string> viewVal?BoundDevOpsId)
+
+                let pendingAskQ =
+                    if isNull viewVal?PendingAskQuestion then
+                        None
+                    else
+                        Some(unbox<string> viewVal?PendingAskQuestion)
+
+                let pendingAskInc =
+                    if isNull viewVal?PendingAskIncumbencyId then
+                        None
+                    else
+                        Some(unbox<string> viewVal?PendingAskIncumbencyId)
+
+                let pendingAskCur =
+                    if isNull viewVal?PendingAskCursor then
+                        None
+                    else
+                        Some(unbox<int64> viewVal?PendingAskCursor)
+
+                Some
+                    { WorkId = wid
+                      ActiveIncumbencyId = activeInc
+                      ActiveStage = activeStage
+                      ActivePhase = activePhase
+                      RetiredCount = retiredCount
+                      LatestRetirementOutcome = latestRetOutcome
+                      Delivered = delivered
+                      DeliveryDigest = deliveryDigest
+                      DeliveryPath = deliveryPath
+                      BoundDevOpsId = boundDevOpsId
+                      PendingAskQuestion = pendingAskQ
+                      PendingAskIncumbencyId = pendingAskInc
+                      PendingAskCursor = pendingAskCur }
+            with _ ->
+                None
+
     let planRecoveryPosition (viewVal: obj) (readPlanFile: string -> string option) : obj =
-        let viewOpt: PlanWorkView option =
-            match viewVal with
-            | :? PlanWorkView as v -> Some v
-            | null -> None
-            | _ ->
-                try
-                    let wid =
-                        if isNull viewVal?WorkId then
-                            None
-                        else
-                            Some(unbox<string> viewVal?WorkId)
-
-                    let activeInc =
-                        if isNull viewVal?ActiveIncumbencyId then
-                            None
-                        else
-                            Some(unbox<string> viewVal?ActiveIncumbencyId)
-
-                    let activeStage =
-                        if isNull viewVal?ActiveStage then
-                            None
-                        else
-                            Some(unbox<string> viewVal?ActiveStage)
-
-                    let activePhase =
-                        if isNull viewVal?ActivePhase then
-                            None
-                        else
-                            Some(unbox<string> viewVal?ActivePhase)
-
-                    let retiredCount =
-                        if isNull viewVal?RetiredCount then
-                            0
-                        else
-                            unbox<int> viewVal?RetiredCount
-
-                    let latestRetOutcome =
-                        if isNull viewVal?LatestRetirementOutcome then
-                            None
-                        else
-                            Some(unbox<string> viewVal?LatestRetirementOutcome)
-
-                    let delivered =
-                        if isNull viewVal?Delivered then
-                            false
-                        else
-                            unbox<bool> viewVal?Delivered
-
-                    let deliveryDigest =
-                        if isNull viewVal?DeliveryDigest then
-                            None
-                        else
-                            Some(unbox<string> viewVal?DeliveryDigest)
-
-                    let deliveryPath =
-                        if isNull viewVal?DeliveryPath then
-                            None
-                        else
-                            Some(unbox<string> viewVal?DeliveryPath)
-
-                    let boundDevOpsId =
-                        if isNull viewVal?BoundDevOpsId then
-                            None
-                        else
-                            Some(unbox<string> viewVal?BoundDevOpsId)
-
-                    let pendingAskQ =
-                        if isNull viewVal?PendingAskQuestion then
-                            None
-                        else
-                            Some(unbox<string> viewVal?PendingAskQuestion)
-
-                    let pendingAskInc =
-                        if isNull viewVal?PendingAskIncumbencyId then
-                            None
-                        else
-                            Some(unbox<string> viewVal?PendingAskIncumbencyId)
-
-                    let pendingAskCur =
-                        if isNull viewVal?PendingAskCursor then
-                            None
-                        else
-                            Some(unbox<int64> viewVal?PendingAskCursor)
-
-                    Some
-                        { WorkId = wid
-                          ActiveIncumbencyId = activeInc
-                          ActiveStage = activeStage
-                          ActivePhase = activePhase
-                          RetiredCount = retiredCount
-                          LatestRetirementOutcome = latestRetOutcome
-                          Delivered = delivered
-                          DeliveryDigest = deliveryDigest
-                          DeliveryPath = deliveryPath
-                          BoundDevOpsId = boundDevOpsId
-                          PendingAskQuestion = pendingAskQ
-                          PendingAskIncumbencyId = pendingAskInc
-                          PendingAskCursor = pendingAskCur }
-                with _ ->
-                    None
+        let viewOpt = extractPlanWorkView viewVal
 
         match viewOpt with
         | None ->
@@ -699,6 +701,61 @@ module PlanningSurface =
                        planExists = planExists |}
             | PlanRecoveryPosition.Nothing -> box {| kind = "Nothing" |}
             | PlanRecoveryPosition.Conflict reason -> box {| kind = "Conflict"; reason = reason |}
+
+    let private parseViews (v: obj) : PlanWorkView list =
+        if isNull v then
+            []
+        elif emitJsExpr v "Array.isArray($0)" then
+            let arr = unbox<obj array> v
+
+            arr
+            |> Array.toList
+            |> List.map (fun item ->
+                extractPlanWorkView item
+                |> Option.defaultValue
+                    { WorkId = None
+                      ActiveIncumbencyId = None
+                      ActiveStage = None
+                      ActivePhase = None
+                      RetiredCount = 0
+                      LatestRetirementOutcome = None
+                      Delivered = false
+                      DeliveryDigest = None
+                      DeliveryPath = None
+                      BoundDevOpsId = None
+                      PendingAskQuestion = None
+                      PendingAskIncumbencyId = None
+                      PendingAskCursor = None })
+        else
+            match v with
+            | :? (PlanWorkView list) as l -> l
+            | :? (PlanWorkView array) as arr -> Array.toList arr
+            | _ -> []
+
+    let evaluateRecoveryEffects (viewsVal: obj) (readPlanFile: string -> string option) : obj array =
+        let views = parseViews viewsVal
+        let effects = PlanRecovery.evaluateRecoveryEffects views readPlanFile
+
+        effects
+        |> List.map (function
+            | PlanRecoveryEffect.DeliveredIdempotent(workId, path) ->
+                box
+                    {| kind = "DeliveredIdempotent"
+                       workId = workId
+                       path = path |}
+            | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, planExists) ->
+                box
+                    {| kind = "ActiveRebound"
+                       workId = workId
+                       incumbencyId = incumbencyId
+                       stage = stage
+                       planExists = planExists |}
+            | PlanRecoveryEffect.Conflict(workId, reason) ->
+                box
+                    {| kind = "Conflict"
+                       workId = workId
+                       reason = reason |})
+        |> List.toArray
 
     let allWorkViews (store: IEventStore) : PlanWorkView list = PlanEventStore.allWorkViews store
 
@@ -768,6 +825,7 @@ module PlanningSurface =
                executeResume = executeResume
                executeJsPlan = executeJsPlan
                planRecoveryPosition = planRecoveryPosition
+               evaluateRecoveryEffects = evaluateRecoveryEffects
                allWorkViews = allWorkViews
                allWorkViewsFromIntegrator = allWorkViewsFromIntegrator
                workOpened = workOpened

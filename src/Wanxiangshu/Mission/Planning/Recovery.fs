@@ -9,6 +9,12 @@ type PlanRecoveryPosition =
     | Nothing
     | Conflict of reason: string
 
+[<RequireQualifiedAccess>]
+type PlanRecoveryEffect =
+    | DeliveredIdempotent of workId: string * path: string
+    | ActiveRebound of workId: string * incumbencyId: string * stage: string * planExists: bool
+    | Conflict of workId: string * reason: string
+
 module PlanRecovery =
 
     let private resolveDeliveredPosition (view: PlanWorkView) =
@@ -64,3 +70,26 @@ module PlanRecovery =
             resolveActiveOrConflict view readPlanFile
         else
             PlanRecoveryPosition.Nothing
+
+    let private effectFromPosition (wid: string) (pos: PlanRecoveryPosition) : PlanRecoveryEffect option =
+        match pos with
+        | PlanRecoveryPosition.Delivered(_receipt, path, _digest) ->
+            Some(PlanRecoveryEffect.DeliveredIdempotent(wid, path))
+        | PlanRecoveryPosition.Active(incumbencyId, stage, planExists) ->
+            Some(PlanRecoveryEffect.ActiveRebound(wid, incumbencyId, stage, planExists))
+        | PlanRecoveryPosition.Conflict reason -> Some(PlanRecoveryEffect.Conflict(wid, reason))
+        | PlanRecoveryPosition.Nothing -> None
+
+    let private evaluateSingleEffect
+        (readPlanFile: string -> string option)
+        (view: PlanWorkView)
+        : PlanRecoveryEffect option =
+        match view.WorkId with
+        | None -> Some(PlanRecoveryEffect.Conflict("", "视图缺少 WorkId"))
+        | Some wid -> effectFromPosition wid (planRecoveryPosition view readPlanFile)
+
+    let evaluateRecoveryEffects
+        (views: PlanWorkView list)
+        (readPlanFile: string -> string option)
+        : PlanRecoveryEffect list =
+        views |> List.choose (evaluateSingleEffect readPlanFile)

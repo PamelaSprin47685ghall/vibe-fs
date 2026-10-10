@@ -63,6 +63,7 @@ module PlanningSurface =
     val executeResume: store: IEventStore -> workId: string -> charge: string -> name: obj -> Task<obj>
     val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj
     val planRecoveryPosition: viewVal: obj -> readPlanFile: (string -> string option) -> obj
+    val evaluateRecoveryEffects: viewsVal: obj -> readPlanFile: (string -> string option) -> obj array
     val allWorkViews: store: IEventStore -> PlanWorkView list
     val allWorkViewsFromIntegrator: integrator: ICanonicalIntegrator -> PlanWorkView list
     val PlanStage: obj

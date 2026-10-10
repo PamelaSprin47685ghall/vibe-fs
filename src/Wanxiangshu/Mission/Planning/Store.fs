@@ -28,9 +28,18 @@ module PlanEventStore =
     let view (store: IEventStore) (workId: PlanWorkId) : PlanWorkView option =
         workState store workId |> Option.map PlanFold.viewOf
 
+    let private resolveWorkViews (obj: obj) : PlanWorkView list =
+        if isNull obj then
+            []
+        elif emitJsExpr obj "$0.fields !== undefined && Array.isArray($0.fields)" then
+            let works = emitJsExpr<Map<string, PlanWorkState>> obj "$0.fields[0]"
+            works |> Map.toList |> List.map (fun (_, st) -> PlanFold.viewOf st)
+        else
+            [ PlanFold.viewOf (unbox<PlanWorkState> obj) ]
+
     let allWorkViews (store: IEventStore) : PlanWorkView list =
-        match currentPlanState store with
-        | Some(PlanState map) -> map |> Map.toList |> List.map (fun (_, st) -> PlanFold.viewOf st)
+        match store.TryCurrent "Plan" with
+        | Some obj -> resolveWorkViews obj
         | None -> []
 
     let workStateFromIntegrator (integrator: ICanonicalIntegrator) (workId: PlanWorkId) : PlanWorkState option =
@@ -45,15 +54,6 @@ module PlanEventStore =
 
     let viewFromIntegrator (integrator: ICanonicalIntegrator) (workId: PlanWorkId) : PlanWorkView option =
         workStateFromIntegrator integrator workId |> Option.map PlanFold.viewOf
-
-    let private resolveWorkViews (obj: obj) : PlanWorkView list =
-        if isNull obj then
-            []
-        elif emitJsExpr obj "$0.fields !== undefined && Array.isArray($0.fields)" then
-            let works = emitJsExpr<Map<string, PlanWorkState>> obj "$0.fields[0]"
-            works |> Map.toList |> List.map (fun (_, st) -> PlanFold.viewOf st)
-        else
-            [ PlanFold.viewOf (unbox<PlanWorkState> obj) ]
 
     let allWorkViewsFromIntegrator (integrator: ICanonicalIntegrator) : PlanWorkView list =
         match integrator.TryCurrent "Plan" with

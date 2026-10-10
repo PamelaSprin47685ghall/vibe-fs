@@ -9,7 +9,9 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 module PluginRecoveryWiring =
@@ -72,12 +74,48 @@ module PluginRecoveryWiring =
         with _ ->
             None
 
-    let private evaluatePlanRecovery (rootOpt: string option) : unit =
-        match rootOpt with
-        | None -> ()
-        | Some root ->
-            let _readPlan = tryReadPlanFile root
-            ()
+    let private emitRecoveryEffect (effect: PlanRecoveryEffect) : unit =
+        match effect with
+        | PlanRecoveryEffect.DeliveredIdempotent(workId, path) ->
+            Diagnostic.emit "plan-work-delivered-idempotent" [ "work_id", workId; "path", path ]
+        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, true) ->
+            Diagnostic.emit
+                "plan-work-active-rebound"
+                [ "work_id", workId
+                  "incumbency_id", incumbencyId
+                  "stage", stage
+                  "plan_exists", "true" ]
+        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, false) ->
+            Diagnostic.emit
+                "plan-work-active-file-missing"
+                [ "work_id", workId
+                  "incumbency_id", incumbencyId
+                  "stage", stage
+                  "plan_exists", "false" ]
+        | PlanRecoveryEffect.Conflict(workId, reason) ->
+            Diagnostic.emit "plan-recovery-conflict" [ "work_id", workId; "reason", reason ]
+
+    let private evaluatePlanRecovery (viewsOpt: PlanWorkView list option) (workspaceDirOpt: string option) : unit =
+        match viewsOpt, workspaceDirOpt with
+        | Some views, Some root ->
+            let readPlan = tryReadPlanFile root
+            let effects = PlanRecovery.evaluateRecoveryEffects views readPlan
+            effects |> List.iter emitRecoveryEffect
+        | _ -> ()
+
+    let private tryResolveViews (workspace: string) : PlanWorkView list option =
+        try
+            let commonDir = RuntimePath.gitCommonDir workspace
+
+            WorkspaceEventStore.tryCurrent commonDir
+            |> Option.map PlanEventStore.allWorkViews
+        with _ ->
+            None
+
+    let private tryResolveWorkspaceViews (workspaceDirOpt: string option) : PlanWorkView list option =
+        match workspaceDirOpt with
+        | Some workspace when not (String.IsNullOrWhiteSpace workspace) -> tryResolveViews workspace
+        | _ -> None
 
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
@@ -155,7 +193,8 @@ module PluginRecoveryWiring =
                     // Recover Plan position from durable projection without text guessing.
                     // Delivered remains final; Active rebinds without recreating work or resuming uninvited DevOps.
                     try
-                        evaluatePlanRecovery boot.WorkspaceDirectory
+                        let viewsOpt = tryResolveWorkspaceViews boot.WorkspaceDirectory
+                        evaluatePlanRecovery viewsOpt boot.WorkspaceDirectory
                     with ex ->
                         Diagnostic.emit "plan-crash-recovery-failed" [ "error", ex.Message ]
 
