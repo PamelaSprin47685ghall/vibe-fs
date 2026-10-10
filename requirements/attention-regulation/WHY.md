@@ -6,7 +6,7 @@
 
 暂存项需要跨重启保留，却不应成为跨参与者、跨 life 的永久负担。成功学习后一起露出，给参与者一次重新选择的机会；稳定 occurrence 和消费记录用于避免重放制造新工作。
 
-长期角色规范归 cognitive-environment，真实义务归 obligation-ledger，推理证据归 epistemic-reasoning，经验沉淀归 institutional-learning。本包只提供有限的注意力动作，不接管通用规划。
+长期角色规范归 cognitive-environment，真实义务归 obligation-ledger，推理证据归 epistemic-reasoning。本包只提供有限的注意力动作，不接管通用规划。
 
 ## DEPENDS ON
 

@@ -38,4 +38,3 @@ integrationTest('WHAT[behavior-diagnosis-005] missing or blank Chinese leaves ne
   })
 })
 
-test.todo('WHAT[behavior-diagnosis-005] GAP-112 institutional BIRTH rejects either missing locale before durable append')

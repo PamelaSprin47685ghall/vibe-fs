@@ -7,7 +7,7 @@ test('WHAT[attention-regulation-006] deferred projection stores natural-language
   state = attention.record('session-a', 'first', 'deadline tomorrow; priority high is ordinary text', state)
   state = attention.record('session-a', 'second', 'look later', state)
   state = attention.record('session-b', 'first', 'independent work', state)
-  const after = attention.resurface('session-a', 'celebrate-1', ['first'], state)
+  const after = attention.resurface('session-a', 'resurface-1', ['first'], state)
   assert.deepEqual(attention.pending('session-a', after), [{ occurrence: 'second', text: 'look later' }])
   assert.deepEqual(attention.pending('session-b', after), [{ occurrence: 'first', text: 'independent work' }])
   assert.equal(attention.pending('session-a', state).length, 2)

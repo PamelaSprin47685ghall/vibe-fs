@@ -114,10 +114,8 @@ const COGNITIVE_UTILITY_ALLOW = [
   'enough',
   'abandon',
   'defer',
-  'subscribe',
+  
   'publish',
-  'celebrate',
-  'regret',
 ]
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
@@ -311,7 +309,7 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
 test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission', () => {
   // Native todowrite has no plugin ToolSpec; its role boundary is asserted from
   // the Host permission matrix in capability-enforcement-006.
-  for (const tool of ['assume', 'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']) {
+  for (const tool of ['assume', 'enough', 'abandon', 'defer',  'publish']) {
     assert.equal(rolePredicate(tool, 'engineer'), true, `${tool} should be allowed for engineer`)
     assert.equal(rolePredicate(tool, 'devops'), true, `${tool} should be allowed for devops`)
     assert.equal(rolePredicate(tool, 'manager'), true, `${tool} should be allowed for manager`)

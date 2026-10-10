@@ -88,10 +88,7 @@ module StaticTools =
           "enough"
           "abandon"
           "defer"
-          "subscribe"
           "publish"
-          "celebrate"
-          "regret"
           "mv"
           "rm"
           "bash-honeypot"
@@ -125,10 +122,7 @@ module StaticTools =
              || name = "enough"
              || name = "abandon"
              || name = "defer"
-             || name = "subscribe"
              || name = "publish"
-             || name = "celebrate"
-             || name = "regret"
              || Set.contains name allowedNames))
         |> Map.ofList
         |> AblationGate.filterToolPermissionMap registry
@@ -161,9 +155,9 @@ module StaticTools =
         | true, "skill", _ -> "allow"
         | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"
         | true, ("assume" | "todowrite"), _ -> "allow"
-        | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger ->
+        | true, ("enough" | "abandon" | "defer" | "publish"), Role.Blogger ->
             "deny"
-        | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"
+        | true, ("enough" | "abandon" | "defer" | "publish"), _ -> "allow"
         | true, "js-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "js-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed name

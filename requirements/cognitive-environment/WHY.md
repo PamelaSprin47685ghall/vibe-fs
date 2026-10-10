@@ -10,7 +10,7 @@ Pair Hint 每回合只重申最容易漂移的当前全局语言；其余工作�
 
 ## 边界与关系
 
-participant-identity 定义身份，office-capability 定义权能，本包组织两者面向模型的呈现。微原语的行为归 attention-regulation、concern-routing 和 institutional-learning；Pair Hint 只承载语言锚定。提示的承载与重放归 prefix-stability，语言资源归 provider-language。
+participant-identity 定义身份，office-capability 定义权能，本包组织两者面向模型的呈现。微原语的行为归 attention-regulation 和 concern-routing；Pair Hint 只承载语言锚定。提示的承载与重放归 prefix-stability，语言资源归 provider-language。
 
 ## DEPENDS ON
 
@@ -18,4 +18,3 @@ participant-identity 定义身份，office-capability 定义权能，本包组�
 - `office-capability`
 - `attention-regulation`
 - `concern-routing`
-- `institutional-learning`

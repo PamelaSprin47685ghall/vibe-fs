@@ -22,4 +22,3 @@ for (const locale of ['en', 'zh-CN']) {
   })
 }
 
-test.todo('WHAT[behavior-diagnosis-004] GAP-112 actual institutional live Rulebook projection remains memory-only')

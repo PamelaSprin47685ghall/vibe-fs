@@ -16,10 +16,10 @@
 
 DeferredWork 有稳定 occurrence 标识，归属特定 participant life；重启、重放不丢失、不重复、不跨参与者泄漏。life 在 resurface 前终止时，剩余条目随之结束，不继承到新 life 或自动变成持久任务债务。
 
-## [005] celebrate 尾部 resurface
+## [005] resurface 载体已退役
 
-成功 celebrate 完成经验沉淀后，在结果尾部一次性呈现该 participant 尚未露出的 DeferredWork 并记录消费；同一 celebration occurrence 重放返回相同结果。露出不激活义务，participant 可选择处理、再次 defer、正式立项或 abandon。
+`celebrate` 已随 WP-036 退役，DeferredWork 的 resurface 载体不再由本包运行时提供；重定义见后续工作（WP-030）。重定义前本包不呈现待办。露出不激活义务，participant 可选择处理、再次 defer、正式立项或 abandon。
 
 ## [006] 最小持久状态
 
-本包只持久化 DeferredWork 的追加投影与 celebration 消费凭据，不引入阶段、优先级、截止期、依赖图、自动恢复、后台执行器或通用认知状态机。
+本包只持久化 DeferredWork 的追加投影与消费凭据，不引入阶段、优先级、截止期、依赖图、自动恢复、后台执行器或通用认知状态机。

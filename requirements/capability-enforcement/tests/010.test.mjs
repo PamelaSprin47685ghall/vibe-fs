@@ -330,7 +330,7 @@ const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'todowrite',
-  'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
+  'enough', 'abandon', 'defer',  'publish',
   'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'review', 'chronicle', 'fetch', 'suicide',
 ]
@@ -338,13 +338,13 @@ const PLUGIN_TOOL_NAMES = [
   'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'review', 'suicide', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
-  'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
+  'enough', 'abandon', 'defer',  'publish',
   'js-engineer', 'js-devops', 'js-manager', 'js-predictor',
 ]
 const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
 ]
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
-const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
+const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer',  'publish']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   manager: ['fork', 'resume', 'join', 'horizon', 'review', 'suicide', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
@@ -402,8 +402,6 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
       defer: ['new_work'],
       subscribe: ['id', 'concern'],
       publish: ['id', 'message'],
-      celebrate: ['experience'],
-      regret: ['experience'],
     }
     for (const toolName in expected) {
       for (const argument of expected[toolName]) {

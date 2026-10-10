@@ -113,7 +113,7 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
 
     // 驱动 malformed review 尝试：传入无效评分或缺少规范字段
     const reviewResult = await hooks.tool.review.execute(
-      { scores: 'invalid-scores-malformed' },
+      { findings: 'invalid-findings-malformed' },
       { sessionID, agent: 'manager' },
     )
     // 评审未被接纳（返回 recorded = false 或拒绝提示）

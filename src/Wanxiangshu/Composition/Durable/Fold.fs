@@ -104,9 +104,6 @@ module Fold =
         | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation
         | AgentFact.Attention attention -> ProjectionUpdate.applyAttention projection attention
         | AgentFact.Concern concern -> ProjectionUpdate.applyConcern projection concern
-        | AgentFact.InstitutionalLearning learning ->
-            ProjectionUpdate.applyInstitutionalLearning projection learning
-            |> Result.bind (fun updated -> ProjectionUpdate.applyAttentionLearning updated learning)
 
     /// Fact-only fold for callers that do not need envelope metadata.
     /// RuntimeStarted needs no envelope field (RuntimeId is in the payload).

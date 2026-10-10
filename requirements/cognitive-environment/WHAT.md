@@ -60,7 +60,7 @@ Office Library 遵循三轴分类：
 
 ## [012] 独立评审指引不灌输隐藏流程机制
 
-Manager assessment 的提示由 Role Law、Quality Ledger（八维准则）与上下文组成。评审只依据当前工作的事实独立、诚实打分，不为影响后续而调分；不得向模型透露双重确认、多 Reviewer 循环或隐藏 barrier 等内部编排。
+Manager assessment 的提示由 Role Law、Quality Ledger（八维观察抓手）与上下文组成。评审只依据当前工作的事实独立、诚实判断，不为影响后续而调 findings；不得向模型透露双重确认、多 Reviewer 循环或隐藏 barrier 等内部编排。
 
 ## [013] Pair Hint 是每回合语言锚定
 
