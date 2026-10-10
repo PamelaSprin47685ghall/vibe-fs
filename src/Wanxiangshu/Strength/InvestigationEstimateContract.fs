@@ -54,7 +54,6 @@ module InvestigationEstimateContract =
         | "signal-terminal"
         | "skill"
         | "todowrite"
-        | "sphinx"
         | "assume"
         | "defer"
         | "publish"

@@ -27,8 +27,6 @@ type ToolPermission =
     | Finality
     /// Engineer honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
-    /// Program-owned inquiry through the native sphinx(question) tool.
-    | Sphinx
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -48,7 +46,7 @@ module OfficeCapability =
     /// capability-enforcement-025 / relay-assessment-005: the final incumbent's
     /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
     /// suicide finality, and drops every new-work capability (fork, resume,
-    /// review, sphinx).
+    /// review).
     let managerFinishPermissions: ToolPermission Set =
         set
             [ ToolPermission.Read
@@ -68,7 +66,6 @@ module OfficeCapability =
                   ToolPermission.Horizon
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality
-                  ToolPermission.Sphinx
                   ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep ]
@@ -76,8 +73,7 @@ module OfficeCapability =
             set
                 [ ToolPermission.Fork
                   ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Sphinx ]
+                  ToolPermission.Horizon ]
         | Role.Engineer ->
             set
                 [ ToolPermission.Read
@@ -89,8 +85,7 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Fetch
-                  ToolPermission.Fission
-                  ToolPermission.Sphinx ]
+                  ToolPermission.Fission ]
         | Role.Coder -> Set.empty
         | Role.Inspector -> Set.empty
         | Role.Browser -> Set.empty
@@ -160,7 +155,6 @@ module OfficeCapability =
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
-        | ToolPermission.Sphinx -> "Sphinx"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -184,5 +178,4 @@ module OfficeCapability =
         | "Fetch" -> Some ToolPermission.Fetch
         | "Finality" -> Some ToolPermission.Finality
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot
-        | "Sphinx" -> Some ToolPermission.Sphinx
         | _ -> None

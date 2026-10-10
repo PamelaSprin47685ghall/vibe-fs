@@ -26,7 +26,6 @@ module StaticTools =
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
         | ToolPermission.Exec -> [ "run" ]
         | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
-        | ToolPermission.Sphinx -> [ "sphinx" ]
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
@@ -91,7 +90,6 @@ module StaticTools =
           "rm"
           "bash-honeypot"
           "run"
-          "sphinx"
           "review"
           "chronicle"
           "fetch"

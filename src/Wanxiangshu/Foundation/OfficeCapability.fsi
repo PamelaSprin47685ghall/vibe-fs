@@ -21,7 +21,6 @@ type ToolPermission =
     | Fetch
     | Finality
     | BashHoneypot
-    | Sphinx
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =

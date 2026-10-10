@@ -330,7 +330,6 @@ test('WHAT[capability-enforcement-006] inquiry_role_is_revoked_and_permissions_f
 })
 test('WHAT[capability-enforcement-006] inquiry_isAllowed_denies_all_tools', () => {
   assert.equal(surfaceIsAllowed('inquiry', 'Inspect'), false)
-  assert.equal(surfaceIsAllowed('inquiry', 'Sphinx'), false)
   assert.equal(surfaceIsAllowed('inquiry', 'Fission'), false)
   assert.equal(surfaceIsAllowed('inquiry', 'Read'), false)
 })
