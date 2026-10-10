@@ -1402,8 +1402,7 @@ module ModelRouting =
                 )
             | CapacityTransitionOutcome.Applied
             | CapacityTransitionOutcome.AlreadyApplied
-            | CapacityTransitionOutcome.StaleFence ->
-                heldPhysicalReleases.Remove oldKey |> ignore
+            | CapacityTransitionOutcome.StaleFence -> heldPhysicalReleases.Remove oldKey |> ignore
 
         let releaseUnretainedPhysical oldKey =
             if not (hasContinuationInput oldKey) && heldPhysicalReleases.Contains oldKey then

@@ -274,3 +274,91 @@ test('WHAT[managed-session-lifecycle-027] a rejected delayed release surfaces as
     })
   })
 })
+
+// Failure isolation on the close chain. Four questions:
+// - What fails: the Main's own retained-input replay meets the
+//   OppositeTerminalConflict (same construction as the case above, on `main`),
+//   so PluginSessionScope.ClearSession raises at the self cancellation step.
+// - Which state must hold after: the linked leaf's admitted execution must
+//   still be settled (durable Cancelled terminal) and its exact capacity
+//   returned (executionCount(leaf, physical) === 0); one step's failure must
+//   not skip the remaining scope obligations.
+// - Which cleanup must happen: the leaf settle -> retention cancel -> exact
+//   release chain. The unconditional per-session registry teardown has no
+//   public observation face yet, so this test covers the observable scope
+//   obligations and the registry gap is recorded instead of faked.
+// - Which side effect must never happen: the Conflict must not be swallowed
+//   (clearSession must reject) and the leaf credit must not remain held.
+test('WHAT[managed-session-lifecycle-027] a failed self cancellation does not skip the linked leaf obligations and still surfaces the conflict', async () => {
+  await withPlugin(async () => {
+    await withHost(async (host) => {
+      const main = 'ses-main-isolation'
+      const mainPhysical = 'msg-main-isolation'
+      const mainGuidance = 'msg-main-isolation-guidance'
+      const leaf = 'ses-blogger-isolation'
+      const leafPhysical = 'msg-blogger-isolation'
+      const leafGuidance = 'msg-blogger-isolation-guidance'
+
+      await ownership.linkBlogger(host.Journal, main, leaf)
+
+      // Main conflict fixture: pending lease + retention + before-provider
+      // settlement, so the self cancellation replay meets the opposite terminal.
+      await recoveryHost.seedAccepted(host, main, mainPhysical)
+      const mainAcquisition = await routing.acquireSharedExecutionAdmission(
+        main,
+        mainPhysical,
+        'engineer',
+        'engineer',
+        null,
+        'normal',
+      )
+      assert.equal(mainAcquisition.kind, 'Acquired', 'construction: the Main conflict fixture must hold its exact lease')
+
+      const mainObserved = {
+        sessionId: main,
+        physicalUserMessageId: mainPhysical,
+        role: 'engineer',
+        participant: 'engineer',
+        target: routing.sharedExecutionAdmissionTarget(mainAcquisition.lease),
+      }
+      retainGuidance(mainAcquisition.lease, mainGuidance)
+      assert.deepEqual(
+        routing.releasePhysical(main, mainPhysical),
+        { kind: 'HeldForInput' },
+        'construction: the Main retention must delay the old exact release',
+      )
+      assert.equal(
+        routing.releaseSharedExecutionAdmissionBeforeProvider(mainAcquisition.lease, mainObserved).kind,
+        'Applied',
+        'construction: the pending Main execution must settle on the before-provider path',
+      )
+
+      // The linked leaf obligation is still outstanding when the close starts.
+      const leafToken = await seedLinkedLeafExecution(host, main, leaf, leafPhysical)
+      retainGuidance(leafToken, leafGuidance)
+      assert.deepEqual(
+        routing.releasePhysical(leaf, leafPhysical),
+        { kind: 'HeldForInput' },
+        'construction: the leaf retention must delay the old exact release',
+      )
+      assert.equal(executionCount(leaf, leafPhysical), 1, 'construction: the leaf credit must still be held before the close')
+
+      // The close: the self step raises (the Conflict stays surfaced), and the
+      // failure must not skip the linked leaf settle/cancel/release obligations.
+      await assert.rejects(
+        () => recoveryHost.clearSession(host, main),
+        /managed-session-lifecycle-027: retained continuation input release was rejected/,
+        'WHAT[managed-session-lifecycle-027]: the Conflict must still be surfaced after the remaining obligations run',
+      )
+
+      assert.equal(
+        executionCount(leaf, leafPhysical),
+        0,
+        'WHAT[managed-session-lifecycle-027]: a failed self step must not skip the linked leaf exact release; the leaf credit must not remain held',
+      )
+      const leafStatus = recoveryHost.executionStatus(host, leaf, leafPhysical)
+      assert.equal(leafStatus.phase, 'Terminal', 'the linked leaf execution must still be settled despite the self failure')
+      assert.equal(leafStatus.disposition, 'Cancelled', 'the linked leaf terminal must be Cancelled')
+    })
+  })
+})

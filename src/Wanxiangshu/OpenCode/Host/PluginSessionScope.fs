@@ -213,41 +213,75 @@ type PluginSessionScope
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup). Always drops
     /// session identity.
+    ///
+    /// managed-session-lifecycle-027: teardown is best-effort-complete but
+    /// never error-silent — remember the first real failure, continue every
+    /// safe independent obligation (Main self, each linked leaf, the
+    /// unconditional per-session registry group), rethrow last.
     member this.ClearSession(sessionId: string) : Task =
         task {
-            do! this.SettleSessionExecutions sessionId
+            // DSL-MUTABLE: algorithm-scratch — first close failure accumulator.
+            let mutable firstFailure: exn option = None
+
+            let remember (failure: exn) =
+                firstFailure <- Option.orElse firstFailure (Some failure)
+
+            let attempt (work: unit -> Task) =
+                task {
+                    try
+                        do! work ()
+                    with failure ->
+                        remember failure
+                }
+
+            let attemptSync (work: unit -> unit) =
+                try
+                    work ()
+                with failure ->
+                    remember failure
+
+            do! attempt (fun () -> this.SettleSessionExecutions sessionId)
 
             // managed-session-lifecycle-027: scope close cancels the retained
             // continuation inputs this session owns; the last cancellation
             // completes the delayed exact return of the held credit.
-            ModelRouting.cancelRetainedInputsForSession (SessionId.create sessionId)
+            attemptSync (fun () -> ModelRouting.cancelRetainedInputsForSession (SessionId.create sessionId))
 
             // managed-session-lifecycle-026: a Main close also settles every
             // execution of its durable linked Attached InternalLeaf before the
             // leaf's registry entries are dropped.
-            for leaf in this.LinkedLeafSessions sessionId do
-                do! this.SettleSessionExecutions(SessionId.value leaf)
-                ModelRouting.cancelRetainedInputsForSession leaf
-                do! this.ReleaseLeafCustody leaf
+            let leaves =
+                try
+                    this.LinkedLeafSessions sessionId
+                with failure ->
+                    remember failure
+                    []
+
+            for leaf in leaves do
+                do! attempt (fun () -> this.SettleSessionExecutions(SessionId.value leaf))
+                attemptSync (fun () -> ModelRouting.cancelRetainedInputsForSession leaf)
+                do! attempt (fun () -> this.ReleaseLeafCustody leaf)
 
             match this.Companions.TryGetValue sessionId with
             | true, companion ->
                 this.Companions.Remove sessionId |> ignore
-                (companion :> IDisposable).Dispose()
+                attemptSync (fun () -> (companion :> IDisposable).Dispose())
             | false, _ -> ()
 
-            this.OwnedSessions.Remove sessionId |> ignore
-            this.ModelRoutingSessions.Remove sessionId |> ignore
-            this.SessionParents.Remove sessionId |> ignore
-            this.SessionDirectories.Remove sessionId |> ignore
+            attemptSync (fun () -> this.OwnedSessions.Remove sessionId |> ignore)
+            attemptSync (fun () -> this.ModelRoutingSessions.Remove sessionId |> ignore)
+            attemptSync (fun () -> this.SessionParents.Remove sessionId |> ignore)
+            attemptSync (fun () -> this.SessionDirectories.Remove sessionId |> ignore)
             let sid = SessionId.create sessionId
 
-            this.DropSessionIdentity sessionId
+            attemptSync (fun () -> this.DropSessionIdentity sessionId)
 
             // HOST-004 Q-10: a deleted session's idle permits die forever.
-            this.Quiescence.DropSession sid
+            attemptSync (fun () -> this.Quiescence.DropSession sid)
             // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
-            this.JoinInterrupts.ClearSession sid
+            attemptSync (fun () -> this.JoinInterrupts.ClearSession sid)
+
+            firstFailure |> Option.iter raise
         }
 
     /// Instance disposal releases local leases, not leases owned by a shared coordinator.
