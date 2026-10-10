@@ -1,6 +1,6 @@
 # Package index
 
-当前索引包含 **56 个活跃规范包**与 **1 个历史包**（epistemic-reasoning）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
+当前索引包含 **55 个活跃规范包**与 **2 个历史包**（epistemic-reasoning、institutional-learning）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
 
 ## 1. Requirement system
 
@@ -101,7 +101,7 @@
 |---|---|
 | `behavior-diagnosis` | 工程病理只能在满足明确 trigger / negative / distinction 的证据上成立。 |
 | `guidance-delivery` | diagnosis 成立不等于必须立刻重复告知；反馈需要独立的 occurrence、coverage、dedupe 与 horizon-relative delivery 语义。 |
-| `institutional-learning` | celebrate/regret 必须把一次经历压成 ABSORB/BIRTH/DISCARD，使成功与教训能改变 canonical Enforcer 而不让规则库只增不减。 |
+| `institutional-learning` | 已随 WP-036 退役的历史包；celebrate/regret 不再注册，保留设计沿革，不参与当前验收。 |
 
 ## 11. Repository knowledge / programming
 
@@ -180,7 +180,7 @@
 | 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（前任工作与交互对继任可见，固定 DevOps 执行事实如实呈现） |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
-| 48 | `institutional-learning` | 8 | institutional-learning-001 ~ 008 |
+| 48 | `institutional-learning` | 0 | 已随 WP-036 退役；旧001 ~ 008仅保留历史 |
 | 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
 | 50 | `knowledge-reuse` | 16 | knowledge-reuse-001 ~ 016 |
 | 51 | `repository-programming` | 27 | repository-programming-001 ~ 025、repository-programming-026（事务 ReadSnapshots 与案例实质访问严格分离）、repository-programming-027（Engineer 与 DevOps 统一文件工具与编程面生成） |
@@ -208,9 +208,9 @@ host-boundary            → 无
 participant-identity     → session-ontology
 execution-model-routing  → participant-identity, managed-session-lifecycle, managed-chat-execution, execution-failure-policy, host-boundary
 office-capability        → participant-identity
-capability-enforcement   → office-capability, participant-identity, attention-regulation, concern-routing, institutional-learning
+capability-enforcement   → office-capability, participant-identity, attention-regulation, concern-routing
 participant-horizon      → 无
-cognitive-environment    → participant-identity, office-capability, attention-regulation, concern-routing, institutional-learning
+cognitive-environment    → participant-identity, office-capability, attention-regulation, concern-routing
 attention-regulation     → participant-identity, durable-events
 action-affordance        → office-capability, participant-horizon, cognitive-workspace, obligation-ledger
 provider-language        → session-ontology
@@ -242,7 +242,7 @@ relay-retirement         → relay-incumbency, relay-assessment, relay-context-p
 relay-context-projection → relay-incumbency, participant-identity, provider-projection, host-boundary
 behavior-diagnosis       → semantic-trace, durable-events, prefix-stability, managed-session-lifecycle
 guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events, concern-routing
-institutional-learning   → attention-regulation, behavior-diagnosis, durable-events
+institutional-learning   → 已退役，不再定义当前依赖
 repository-investigation → office-capability, participant-horizon
 knowledge-reuse          → repository-investigation, durable-events, durable-convergence
 repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon

@@ -262,6 +262,7 @@ GAP-050 仍 OPEN：公理地位按语义人工审阅，旧关键词最小断言�
 | GAP-221 | cognitive-workspace、action-affordance-014 | CLOSED | 持久 canvas/jq/TodoSink/CognitiveRuntime 已从生产编译图删除；assume 收敛为单一 assumption 输入与固定不回显结果，legacy Cognition journal 仅兼容解码后 no-op。 |
 | GAP-222 | sphinx-v2替代合同 | OPEN | SUPERSEDES称部分旧Bayes合格条件、标准算法退化与全链取消仍保留，但新条款承接边界不完整。需在现行WHAT明确必要的一致性，不能仅改测试锚点便继承旧隐藏规则。 |
 | GAP-223 | Host自动Manager接续与新用户消息交错；host-boundary-033、execution-model-routing、managed-chat-execution、dispatch-protocol | CLOSED | 2026-10-03新H先持久Accepted并取得容量owner的exact Admitted/Queued准入，再持久结算旧G并排空物理attempt，之后才允许H的Host保存/provider effect；排队H可被J替代，QueueFull拒绝保全G，取消失败/未知提交只处理exact资源。实际ManagerWorkflow拒绝旧idle许可且零SDK发送；旧coarse abort/idle不撤新输入。OpenCode1.18.29六个独立Host场景覆盖暂停transform、实际provider及H接受后J交错，在默认/单槽容量均验证新回答身份、G/H持久终态和零错误ProviderRetry。最终integration35文件376 pass/0 fail/15 TODO，文件排空及清理accepted=true；入口因TODO退出1。证明与正式红例见[交付记录](../proposals/archive/2026-10-03/Host就绪与Guard替代修复-2026-10-03.md)。GAP-139的无assistant/boot sweep与T180不在关闭范围。 |
+| GAP-224 | institutional-learning整包 | RETIRED | 已随 WP-036 整包退役：celebrate/regret 不再注册，不留兼容层；Blogger 的 chronicle 路径保留，不受影响。旧 GAP-180/181/182 保留历史，不再作为现行缺口。 |
 
 ## 2026-10-03：upstream b7768f478 增量
 

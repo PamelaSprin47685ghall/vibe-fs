@@ -117,7 +117,8 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [behavior-diagnosis](behavior-diagnosis/WHAT.md) | pathology 只有满足 trigger/negative/distinction 的 evidence 才成立。 |
 | [guidance-delivery](guidance-delivery/WHAT.md) | diagnosis 与何时/如何再次告知分离。 |
-| [institutional-learning](institutional-learning/WHAT.md) | celebrate/regret 经 Enhancer 压成 ABSORB/BIRTH/DISCARD，让经验进入 canonical Enforcer 而不制造 scar tissue。 |
+
+`institutional-learning` 已随 WP-036 退役，不再是现行包。
 
 ### 11. Repository knowledge / programming
 | Package | 一句话 WHY |
