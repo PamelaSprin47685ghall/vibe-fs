@@ -385,6 +385,12 @@ module ToolHostCodec =
     ).describe($1)""")>]
     let private rawTodoArraySchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
+    [<Emit("$0.schema.object($1)")>]
+    let private rawObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
+
+    [<Emit("$0.schema.array($1).describe($2)")>]
+    let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
+
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
 
@@ -536,6 +542,17 @@ module ToolHostCodec =
 
     let todoArraySchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawTodoArraySchemaDescribed factory description)
+
+    let objectSchemaOf fields (HostToolFactory factory) =
+        let fieldsObj =
+            fields
+            |> List.map (fun (name, HostSchema schema) -> name, schema)
+            |> createObj
+
+        HostSchema(rawObjectSchemaOf factory fieldsObj)
+
+    let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
+        HostSchema(rawArraySchemaOf factory item description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

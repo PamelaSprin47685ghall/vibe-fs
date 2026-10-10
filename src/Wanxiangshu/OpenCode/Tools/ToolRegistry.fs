@@ -77,10 +77,7 @@ module ToolRegistry =
           "enough", AttentionTools.admission
           "abandon", AttentionTools.admission
           "defer", AttentionTools.admission
-          "subscribe", ConcernTools.admission
           "publish", ConcernTools.admission
-          "celebrate", InstitutionalLearningTools.admission
-          "regret", InstitutionalLearningTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
           "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
           "js-bookkeeper", JsBookkeeperTool.admission ]
@@ -157,6 +154,7 @@ module ToolRegistry =
         (childWorkRecordForRun:
             (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
         (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
+        (userNotify: (string -> string -> unit) option)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
@@ -259,12 +257,7 @@ module ToolRegistry =
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
               yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
-              yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern)
-
-              yield!
-                  InstitutionalLearningTools.specs
-                      factory
-                      (journal |> Option.map AgentJournalPortAdapter.forInstitutionalLearning)
+              yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern) userNotify
 
               yield
                   ChronicleTool.spec

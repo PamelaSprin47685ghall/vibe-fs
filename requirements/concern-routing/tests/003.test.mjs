@@ -2,10 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
-// 语言锚定：断言依赖英文投递回执文案（/Message accepted/）；
-// WANXIANGSHU_PROVIDER_LANGUAGE 是语言阶梯最高优先级，显式设为英文，使断言不随宿主环境语言漂移。
-process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
-
 test('WHAT[concern-routing-003] publish fails closed for unknown and stale generations instead of retargeting', () => {
   assert.equal(concern.publish('sender', 'msg-0', 'missing', 'x', concern.empty()).ok, false)
 
@@ -14,28 +10,6 @@ test('WHAT[concern-routing-003] publish fails closed for unknown and stale gener
   state = concern.subscribe('owner-b', 'gen-2', 'build', 'build health', state).state
   const stale = concern.applyPublishedClaim('sender', 'msg-1', 'build', 'gen-1', 'old generation', state)
   assert.equal(stale.ok, false)
-})
-
-const { withExecutablePlugin, acceptAuthorityRoot, activateLife } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
-
-test('WHAT[concern-routing-003] actual publish accepts exact replay but rejects changed material under the same occurrence', async () => {
-  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
-    for (const session of ['mail-owner', 'mail-sender']) {
-      await acceptAuthorityRoot(runtime, session, 'engineer', `root-${session}`)
-      await activateLife(runtime, session, `root-${session}`)
-    }
-    const context = { sessionID: 'mail-sender', agent: 'engineer', messageID: 'run-sender', callID: 'mail-1' }
-    await hooks.tool.subscribe.execute({ id: 'build', concern: 'build health' }, { ...context, sessionID: 'mail-owner', callID: 'subscription-1' })
-    const accepted = await hooks.tool.publish.execute({ id: 'build', message: 'first evidence' }, context)
-    assert.match(accepted, /Message accepted/)
-    assert.equal(await hooks.tool.publish.execute({ id: 'build', message: 'first evidence' }, context), accepted)
-    for (const mutation of [{ id: 'build', message: 'changed evidence' }, { id: 'unknown', message: 'first evidence' }]) {
-      const rejected = await hooks.tool.publish.execute(mutation, context)
-      assert.notEqual(rejected, accepted)
-      assert.doesNotMatch(rejected, /Message accepted/)
-    }
-    assert.notEqual(await hooks.tool.publish.execute({ id: 'build', message: 'first evidence' }, { ...context, sessionID: 'mail-owner' }), accepted)
-  })
 })
 
 test('WHAT[concern-routing-003] message projection distinguishes replay, conflicting material and distinct occurrences with identical text', () => {
@@ -60,4 +34,4 @@ test('WHAT[concern-routing-003] message projection distinguishes replay, conflic
   assert.equal(concern.prepare('owner', second.state).messages.length, 2)
 })
 
-test.todo('WHAT[concern-routing-003] real concurrent retirement between resolution and append rejects the stale generation without redirecting or losing accepted evidence (GAP-155)')
+test.todo('WHAT[concern-routing-003] actual publish routes the reserved user address to a user-visible notification and copies to root (integration rework pending)')

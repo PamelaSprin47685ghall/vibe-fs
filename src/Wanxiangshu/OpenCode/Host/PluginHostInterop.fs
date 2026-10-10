@@ -469,6 +469,7 @@ module PluginHostInterop =
         (casebookToolSpecs: ToolSpec list)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
+        (userNotify: (string -> string -> unit) option)
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
@@ -506,6 +507,7 @@ module PluginHostInterop =
                 captureWorktreeSnapshot
                 (Some childWorkRecordForRun)
                 (Some workRecordCapability)
+                userNotify
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.
         registration.Runtime.AttachCurrentProcessJoin(fun root -> scope.RequireCurrentProcessJoin root)
