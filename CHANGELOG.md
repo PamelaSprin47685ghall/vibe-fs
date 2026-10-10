@@ -7,7 +7,6 @@
 - 对应测试：`requirements/managed-session-lifecycle/tests/026.test.mjs`、`requirements/managed-session-lifecycle/tests/027.test.mjs`、`requirements/managed-chat-execution/tests/015.test.mjs`、`requirements/provider-attempt-recovery/tests/024.test.mjs`；运行结果见提交时的工作记录。
 - `managed-chat-execution` [015]（`fa40d6fbb`）：transform 在 provider 启动边界拒绝执行（attempt plan freeze 失败）时，对 exact `Accepted ∧ ¬ProviderStarted ∧ ¬Terminal` 执行写 typed pre-provider `Failed` terminal，durable 提交确认后精确归还其容量；projection 中无该 key 时不伪造结算、交准入侧；原拒绝异常仍照常上报。
 - `provider-attempt-recovery` [024]（`2da1be87e`）：加载归位废弃 stale Blogger open request（`stale-open-at-load`）时，同源 `Accepted ∧ ¬ProviderStarted` 执行一并定夺为 `Failed` 并在 boot 场景发出幂等 release 请求；已启动/已终态与其他 session 不动，重复加载幂等。
-- 对应测试：`requirements/managed-session-lifecycle/tests/026.test.mjs`、`requirements/managed-chat-execution/tests/015.test.mjs`、`requirements/provider-attempt-recovery/tests/024.test.mjs`；运行结果见提交时的工作记录。
 - 剩余边界：终态拒绝分支显式化（GAP-227）、全量 boot sweep（GAP-228）登记于 `requirements/GAP.md`。
 
 ## Unreleased — 开发者意见 W1–W6 施工
