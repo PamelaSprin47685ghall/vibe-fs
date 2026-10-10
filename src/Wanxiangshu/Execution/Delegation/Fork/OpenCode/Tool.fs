@@ -850,6 +850,9 @@ module ForkTool =
     let managerAdmission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager)
 
+    let resumeAdmission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager || r = Role.Plan)
+
     let orchestratorAdmission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> r = Role.Orchestrator)
 
@@ -891,7 +894,7 @@ module ForkTool =
               "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory
               "attach", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgAttach) factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
-          Admission = managerAdmission
+          Admission = resumeAdmission
           Execute =
             fun args context ->
                 task {

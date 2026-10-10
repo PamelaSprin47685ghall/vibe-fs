@@ -177,6 +177,10 @@ module CompressionSurface =
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
+        | ToolPermission.JsPlan -> "JsPlan"
+        | ToolPermission.Ask -> "Ask"
+        | ToolPermission.Handoff -> "Handoff"
+        | ToolPermission.Deliver -> "Deliver"
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box

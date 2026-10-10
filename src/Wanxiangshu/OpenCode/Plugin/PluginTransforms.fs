@@ -135,6 +135,7 @@ module PluginTransforms =
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
           RestoreProtocolArguments: obj -> Task<unit>
           ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
+          ApplyTenureIsolation: string option -> obj -> Task<unit>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
@@ -606,6 +607,16 @@ module PluginTransforms =
                 (Some boot.Timer)
                 outObj
 
+        let ownerRole (sessionId: string) =
+            journal
+            |> Option.bind (fun durable ->
+                let projections = (AgentJournal.snapshot durable).AgentProjections
+                let sid = SessionId.create sessionId
+
+                PromptAuthorityProjectionQueries.activeProfile sid projections
+                |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sid projections))
+            |> Option.map (fun profile -> profile.CanonicalRole)
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
@@ -625,17 +636,6 @@ module PluginTransforms =
             // The owner-facing replay must name the projected readonly exchange
             // with the owner's own `js-<role>` surface. Resolve that role from the
             // live authority projection for the session being transformed.
-            let ownerRole (sessionId: string) =
-                journal
-                |> Option.bind (fun durable ->
-                    let projections = (AgentJournal.snapshot durable).AgentProjections
-                    let sid = SessionId.create sessionId
-
-                    PromptAuthorityProjectionQueries.activeProfile sid projections
-                    |> Option.orElseWith (fun () ->
-                        PromptAuthorityProjectionQueries.lastAuthorityProfile sid projections))
-                |> Option.map (fun profile -> profile.CanonicalRole)
-
             StrengthReplay.applyBeforeXTrace journal snapshotOpt strengthDurability strengthFailFuse ownerRole
           RestoreProtocolArguments = restoreProtocolArguments
           ApplyRelayProjection =
@@ -698,6 +698,13 @@ module PluginTransforms =
                                     sid)
                             sidOpt
                             outObj
+                }
+          ApplyTenureIsolation =
+            fun sidOpt outObj ->
+                task {
+                    match sidOpt with
+                    | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> ()
+                    | _ -> ()
                 }
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
@@ -984,7 +991,17 @@ module PluginTransforms =
                               else
                                   return Some frame
                           } }
-                  // 4. StrengthReplay.applyBeforeXTrace
+                  // 4. Tenure isolation (baton handover). Isolates message set for
+                  // active tenures (currently Plan); strips prior assistant/tool messages,
+                  // and reanchors prefix on fresh handover.
+                  { Name = "tenure-isolation"
+                    Run =
+                      fun frame ->
+                          task {
+                              do! caps.ApplyTenureIsolation frame.SessionId frame.OutObj
+                              return Some frame
+                          } }
+                  // 5. StrengthReplay.applyBeforeXTrace
                   { Name = "strength-replay"
                     Run =
                       fun frame ->

@@ -27,6 +27,10 @@ type ToolPermission =
     | Finality
     /// Engineer honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
+    | JsPlan
+    | Ask
+    | Handoff
+    | Deliver
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -102,6 +106,13 @@ module OfficeCapability =
                   ToolPermission.Join
                   ToolPermission.Horizon ]
         | Role.Distiller -> Set.empty
+        | Role.Plan ->
+            set
+                [ ToolPermission.JsPlan
+                  ToolPermission.Ask
+                  ToolPermission.Resume
+                  ToolPermission.Handoff
+                  ToolPermission.Deliver ]
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
         | Role.Blogger -> set [ ToolPermission.Chronicle ]
 
@@ -153,6 +164,10 @@ module OfficeCapability =
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
+        | ToolPermission.JsPlan -> "JsPlan"
+        | ToolPermission.Ask -> "Ask"
+        | ToolPermission.Handoff -> "Handoff"
+        | ToolPermission.Deliver -> "Deliver"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -176,4 +191,8 @@ module OfficeCapability =
         | "Fetch" -> Some ToolPermission.Fetch
         | "Finality" -> Some ToolPermission.Finality
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot
+        | "JsPlan" -> Some ToolPermission.JsPlan
+        | "Ask" -> Some ToolPermission.Ask
+        | "Handoff" -> Some ToolPermission.Handoff
+        | "Deliver" -> Some ToolPermission.Deliver
         | _ -> None

@@ -21,6 +21,10 @@ type ToolPermission =
     | Fetch
     | Finality
     | BashHoneypot
+    | JsPlan
+    | Ask
+    | Handoff
+    | Deliver
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =

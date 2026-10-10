@@ -16,13 +16,14 @@ test('WHAT[host-boundary-019] a tentative prefix suppresses historical auxiliari
 test('WHAT[host-boundary-019] the ordinary transform runs the full static stage sequence in contract order', async () => {
   const current = await ordinaryEffects(false)
 
-  // 16 步合同的全量 effect 序列：第 3 步与第 15 步各结算一次 deferred，
-  // 13.1/13.2/13.3 三段只在 Current horizon 出现，第 16 步 sanitize 收尾。
+  // 17 步合同的全量 effect 序列：第 3 步与第 16 步各结算一次 deferred，
+  // 14.1/14.2/14.3 三段只在 Current horizon 出现，第 17 步 sanitize 收尾。
   assert.deepEqual(current, [
     'begin',
     'session-time',
     'deferred',
     'relay',
+    'tenure-isolation',
     'replay',
     'restore-arguments',
     'capture',
@@ -42,9 +43,9 @@ test('WHAT[host-boundary-019] the ordinary transform runs the full static stage 
   assert.equal(
     current.filter((effect) => effect === 'deferred').length,
     2,
-    'steps 3 and 15 must each settle deferred inspections',
+    'steps 3 and 16 must each settle deferred inspections',
   )
-  assert.equal(current.at(-1), 'sanitize', 'step 16 must close the ordinary pipeline')
+  assert.equal(current.at(-1), 'sanitize', 'step 17 must close the ordinary pipeline')
 
   const tentative = await ordinaryEffects(true)
   assert.deepEqual(tentative, [
@@ -52,6 +53,7 @@ test('WHAT[host-boundary-019] the ordinary transform runs the full static stage 
     'session-time',
     'deferred',
     'relay',
+    'tenure-isolation',
     'replay',
     'restore-arguments',
     'capture',

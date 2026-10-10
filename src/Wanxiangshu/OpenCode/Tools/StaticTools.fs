@@ -30,6 +30,10 @@ module StaticTools =
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "suicide" ]
+        | ToolPermission.JsPlan -> [ "js-plan" ]
+        | ToolPermission.Ask -> [ "ask" ]
+        | ToolPermission.Handoff -> [ "handoff" ]
+        | ToolPermission.Deliver -> [ "deliver" ]
 
     /// Primary name for permissions with a single verb (tests / simple maps).
     let toolName (p: ToolPermission) =
@@ -59,7 +63,11 @@ module StaticTools =
           ToolPermission.Chronicle
           ToolPermission.Fetch
           ToolPermission.Finality
-          ToolPermission.BashHoneypot ]
+          ToolPermission.BashHoneypot
+          ToolPermission.JsPlan
+          ToolPermission.Ask
+          ToolPermission.Handoff
+          ToolPermission.Deliver ]
 
     /// capability-enforcement-012: the sole reverse lookup for tool name →
     /// permission. The schema projection, the dispatch tool map and the
@@ -138,7 +146,11 @@ module StaticTools =
           "js-orchestrator"
           "js-devops"
           "js-blogger"
-          "js-bookkeeper" ]
+          "js-bookkeeper"
+          "js-plan"
+          "ask"
+          "handoff"
+          "deliver" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools keep
@@ -169,6 +181,8 @@ module StaticTools =
     let private jsPermission role name =
         if name = "js-manager" && role = Role.Manager then
             "allow"
+        elif name = "js-plan" && role = Role.Plan then
+            "allow"
         elif name = jsToolName role && hasFsCapability role then
             "allow"
         else
@@ -177,6 +191,8 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
+        | true, ("ask" | "handoff" | "deliver" | "js-plan"), Role.Plan -> "allow"
+        | true, "resume", Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
         | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"
@@ -266,3 +282,5 @@ module StaticTools =
               "options", box (createObj [ "temperature", box 1.0 ]) ]
 
     let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt
+
+    let planAgentConfig (prompt: string option) : obj = primaryAgent Role.Plan prompt

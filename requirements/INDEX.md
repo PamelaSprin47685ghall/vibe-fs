@@ -125,6 +125,12 @@
 |---|---|
 | `distribution` | 可安装 artifact 必须携带运行所需代码与 semantic resources，同时排除不属于交付面的源码/开发资产；打包资源与活动注册严格同步。 |
 
+## 14. Planning
+
+| Package | 一句话 WHY |
+|---|---|
+| `planning` | SWELoop 自评死锁改成交接而非阻塞，多任期跑者在同一物理会话内接力推进单一底稿 P。 |
+
 # 规范条款索引
 
 本节汇总活跃条款，历史包单独标记；以各包 `WHAT.md` 实际文本为准。序号只作导航，不是人工巡检站号。
@@ -188,6 +194,7 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
+| 58 | `planning` | 18 | planning-001 ~ 018（五条轮换事实与自查游标、三阶段单向推进、动作许可矩阵、持久化与任期隔离、崩溃恢复判定） |
 
 # 依赖骨架
 
@@ -250,6 +257,7 @@ speculative-investigation→ repository-investigation, participant-identity, exe
 epistemic-reasoning      → 历史包，不再定义当前依赖
 sphinx-v2                → 取代关系及当前合同见本包，完整依赖待审
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
+planning                 → participant-identity, semantic-trace, office-capability
 ```
 
 Phase E 审计结论：3 条 coupling edge 已删（见 `AUDIT.md` Phase E）：

@@ -482,6 +482,32 @@ module ToolRegistry =
                 jsTransactionPersistence
                 (Some groundingObservation)
 
+        let planningAdmission: ToolAdmission =
+            ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
+
+        let planningSpecs () =
+            [ { Name = "ask"
+                Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+                Arguments = [ "question", ToolHostCodec.stringSchemaDescribed "Question for the user" factory ]
+                Admission = planningAdmission
+                Execute = fun _ _ -> Task.FromResult("ask accepted") }
+              { Name = "handoff"
+                Description = ProviderProse.render providerLanguage "tool/handoff" Map.empty
+                Arguments =
+                  [ "note", ToolHostCodec.optionalStringSchemaDescribed "Handoff note for the next runner" factory ]
+                Admission = planningAdmission
+                Execute = fun _ _ -> Task.FromResult("handoff accepted") }
+              { Name = "deliver"
+                Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
+                Arguments = [ "note", ToolHostCodec.optionalStringSchemaDescribed "Final delivery summary" factory ]
+                Admission = planningAdmission
+                Execute = fun _ _ -> Task.FromResult("deliver accepted") }
+              { Name = "js-plan"
+                Description = ProviderProse.render providerLanguage "tool/js-plan" Map.empty
+                Arguments = []
+                Admission = planningAdmission
+                Execute = fun _ _ -> Task.FromResult("js-plan accepted") } ]
+
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
               yield ForkTool.resumeSpec factory runtime
@@ -522,7 +548,8 @@ module ToolRegistry =
 
               yield! casebookToolSpecs
               yield predictorJsSpec ()
-              yield! generatedJsSpecs () ]
+              yield! generatedJsSpecs ()
+              yield! planningSpecs () ]
 
         let isStrengthReplica (ctx: HostToolContext) =
             match isReplicaSession with

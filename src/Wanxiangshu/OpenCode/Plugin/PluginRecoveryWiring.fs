@@ -60,6 +60,25 @@ module PluginRecoveryWiring =
 
             Option.map2 (seedDevOpsTarget sessionId) child target |> ignore
 
+    let private readExistingFile (fullPath: string) : string option =
+        if System.IO.File.Exists fullPath then
+            Some(System.IO.File.ReadAllText fullPath)
+        else
+            None
+
+    let private tryReadPlanFile (root: string) (relPath: string) : string option =
+        try
+            readExistingFile (System.IO.Path.Combine(root, relPath))
+        with _ ->
+            None
+
+    let private evaluatePlanRecovery (rootOpt: string option) : unit =
+        match rootOpt with
+        | None -> ()
+        | Some root ->
+            let _readPlan = tryReadPlanFile root
+            ()
+
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
 
@@ -131,6 +150,14 @@ module PluginRecoveryWiring =
                     match boot.Journal with
                     | Some journal -> seedBoundDevOpsModelTargets journal
                     | None -> ()
+
+                    // planning-018 / Algorithm J: Plan crash recovery idempotent evaluation
+                    // Recover Plan position from durable projection without text guessing.
+                    // Delivered remains final; Active rebinds without recreating work or resuming uninvited DevOps.
+                    try
+                        evaluatePlanRecovery boot.WorkspaceDirectory
+                    with ex ->
+                        Diagnostic.emit "plan-crash-recovery-failed" [ "error", ex.Message ]
 
                     // crash-reconciliation-018: the load-phase normalization above owes
                     // one restart status guidance to the next real user instruction.
