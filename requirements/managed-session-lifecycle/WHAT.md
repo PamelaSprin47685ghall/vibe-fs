@@ -132,4 +132,4 @@ Session 收束（`PluginSessionScope.ClearSession`，覆盖宿主 `SessionDelete
 - 触发：作用域收束调用发生时，该 session 名下仍存在 retained continuation input（含其保留键没有对应 durable execution 的残余形态）。取消在自身与每个 linked leaf 上各自先于该 leaf 的 exact release 请求执行。
 - 允许后果：取消只移除该 session 名下的保留，并以 exact `admissionOwner.ReleasePhysical` 路径回放其挂起的旧 key 归还；最后一份保留撤销后旧 credit 立即归还，borrowed credit 不退休 lender。归还完成后旧 execution 不得再出现在 shared capacity 快照中。
 - 禁止后果：不得使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不得 session-wide blind release、计数减一或以时间猜测释放；保留未取消时不得宣称归还完成；取消操作不得取消无关的 pending demand 或触碰其他 session 的保留。
-- 失败后果：`AlreadyApplied` 与 `StaleFence` 按幂等结果接受；`Conflict` 显式暴露，不吞没（沿用 [026] 的暴露纪律）。重复收束幂等：保留已取消时再次处理为 no-op，不产生第二次释放副作用或抛错。
+- 失败后果：取消回放对 `AlreadyApplied` 与 `StaleFence` 按幂等结果接受，视同归还完成并清除挂起记录；对 `Conflict` 不得吞没——以带 exact key 信息文本的 `InvalidOperationException` 显式暴露（风格对齐 [026] 的 `SessionRecoveryHost.release`），且暴露时保留挂起记录，使「取消已完成、归还未完成」的状态不被静默吞掉。重复收束幂等：保留已取消时不产生第二次释放副作用；除真实所有权冲突外不抛错。

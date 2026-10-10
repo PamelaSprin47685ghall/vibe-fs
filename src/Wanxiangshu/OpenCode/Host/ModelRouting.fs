@@ -1383,9 +1383,31 @@ module ModelRouting =
                 lease.Identity.SessionId = sessionId
                 && lease.Identity.PhysicalUserMessageId = physicalId)
 
+        /// managed-session-lifecycle-027: the delayed return accepts the
+        /// idempotent outcomes and clears the pending record. A Conflict is a
+        /// real ownership violation: it must surface instead of silently
+        /// dropping the held credit, and the pending record stays in place so
+        /// the cancelled-retention / not-yet-returned state is not rewritten.
+        /// Callers already hold the gate.
+        let releaseUnretainedOutcome oldKey =
+            match releasePhysicalExecutionExactLocked oldKey with
+            | CapacityTransitionOutcome.Conflict ->
+                let sessionId, physicalUserMessageId = oldKey
+
+                invalidOp (
+                    sprintf
+                        "managed-session-lifecycle-027: retained continuation input release was rejected (%s/%s)"
+                        sessionId
+                        physicalUserMessageId
+                )
+            | CapacityTransitionOutcome.Applied
+            | CapacityTransitionOutcome.AlreadyApplied
+            | CapacityTransitionOutcome.StaleFence ->
+                heldPhysicalReleases.Remove oldKey |> ignore
+
         let releaseUnretainedPhysical oldKey =
-            if not (hasContinuationInput oldKey) && heldPhysicalReleases.Remove oldKey then
-                releasePhysicalExecutionExactLocked oldKey |> ignore
+            if not (hasContinuationInput oldKey) && heldPhysicalReleases.Contains oldKey then
+                releaseUnretainedOutcome oldKey
 
         let releaseContinuationInputLocked key =
             match continuationInputs.TryGetValue key with

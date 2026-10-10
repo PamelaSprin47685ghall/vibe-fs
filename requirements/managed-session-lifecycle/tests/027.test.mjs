@@ -206,3 +206,71 @@ test('WHAT[managed-session-lifecycle-027] repeated scope close remains idempoten
     })
   })
 })
+
+// A Conflict on the delayed return: the old execution settles on the
+// pre-provider path while its material is still retained, so the replay's
+// physical-completion release meets the opposite terminal. The ownership
+// violation must surface as a raised error, never be swallowed as "handled"
+// while the credit is still held.
+test('WHAT[managed-session-lifecycle-027] a rejected delayed release surfaces as an ownership violation instead of silently dropping the credit', async () => {
+  await withPlugin(async () => {
+    await withHost(async (host) => {
+      const main = 'ses-main-retained-conflict'
+      const leaf = 'ses-blogger-retained-conflict'
+      const physical = 'msg-blogger-retained-conflict'
+      const guidance = 'msg-blogger-retained-conflict-guidance'
+
+      await ownership.linkBlogger(host.Journal, main, leaf)
+      await recoveryHost.seedAccepted(host, leaf, physical)
+
+      const acquisition = await routing.acquireSharedExecutionAdmission(
+        leaf,
+        physical,
+        'engineer',
+        'engineer',
+        null,
+        'normal',
+      )
+      assert.equal(acquisition.kind, 'Acquired', 'construction: the conflict fixture must hold its exact lease')
+
+      // Pending lease: the pre-provider settlement below only accepts the
+      // pending shape, so this fixture deliberately skips the commit.
+      const observed = {
+        sessionId: leaf,
+        physicalUserMessageId: physical,
+        role: 'engineer',
+        participant: 'engineer',
+        target: routing.sharedExecutionAdmissionTarget(acquisition.lease),
+      }
+      retainGuidance(acquisition.lease, guidance)
+      assert.deepEqual(
+        routing.releasePhysical(leaf, physical),
+        { kind: 'HeldForInput' },
+        'construction: the retention must delay the old exact release',
+      )
+
+      // The old execution settles pre-provider while the material is retained:
+      // the capacity lifecycle moves to Releasing(BeforeProvider) -> Released.
+      const settled = routing.releaseSharedExecutionAdmissionBeforeProvider(acquisition.lease, observed)
+      assert.equal(settled.kind, 'Applied', 'construction: the pending old execution must settle on the before-provider path')
+
+      // Cancelling the retention replays the delayed return as a
+      // physical-completion release against that opposite terminal: the
+      // ownership violation must be raised, not silently dropped.
+      assert.throws(
+        () => routing.releasePhysical(leaf, guidance),
+        /managed-session-lifecycle-027: retained continuation input release was rejected/,
+        'WHAT[managed-session-lifecycle-027]: a Conflict on the delayed return must be raised, not silently dropped',
+      )
+
+      // The cancellation itself completed (the retention key is gone), so the
+      // repeated call has no retention left to replay; the guidance key's own
+      // release is an idempotent stale-fence no-op.
+      assert.deepEqual(
+        routing.releasePhysical(leaf, guidance),
+        { kind: 'StaleFence' },
+        'the repeated cancellation of an already-cancelled retention is idempotent',
+      )
+    })
+  })
+})
