@@ -381,7 +381,17 @@ module WriterStreamSync =
             let cache = readMaterializationCache commonDir
             let writerMetadata = ProcessEventLog.writerPhysicalMetadata commonDir
 
-            let! resolvedWriters = materializeWriters raw commonDir cache writerMetadata
+            // GC BEFORE blobbing: expired writers are deleted by metadata only,
+            // so their multi-MB bytes are never read or hashed. Retention is a
+            // UTC-day group on LastActivityMs; it needs no file content.
+            let activeMetadata, expiredMetadata =
+                writerMetadata
+                |> List.partition (fun metadata -> isWriterActiveAt nowMs metadata.LastActivityMs)
+
+            expiredMetadata
+            |> List.iter (fun metadata -> ProcessEventLog.removeWriterFile commonDir metadata.Name)
+
+            let! resolvedWriters = materializeWriters raw commonDir cache activeMetadata
             let writers = removeExpiredLocalWriters nowMs resolvedWriters commonDir
 
             let! writerTree = raw.WriteTree(writers |> List.map (fun writer -> writer.Entry))
