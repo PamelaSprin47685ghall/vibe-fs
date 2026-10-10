@@ -1446,6 +1446,8 @@ Participant/Provider/LanguageSurface.fsi
 Participant/Provider/LanguageSurface.fs
 OpenCode/Host/ProtocolArgumentVault.fsi
 OpenCode/Host/ProtocolArgumentVault.fs
+OpenCode/Host/ProtocolArgumentStash.fsi
+OpenCode/Host/ProtocolArgumentStash.fs
 OpenCode/Host/ToolSchemaJson.fsi
 OpenCode/Host/ToolSchemaJson.fs
 OpenCode/Plugin/PluginBoot.fsi
