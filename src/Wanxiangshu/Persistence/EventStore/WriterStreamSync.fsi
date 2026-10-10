@@ -8,6 +8,7 @@ module WriterStreamSync =
         { WriterId: string
           Text: string
           LastActivityMs: float option }
+
     val retentionMilliseconds: unit -> float
     val isWriterActiveAt: nowMs: float -> lastActivityMs: float -> bool
     val tryCachedLocalSnapshot: commonDir: string -> StoreSnapshot option
@@ -37,10 +38,7 @@ module WriterStreamSync =
     val tryCachedMergedAt: commonDir: string -> nowMs: float -> remote: StoreSnapshot -> StoreSnapshot option
 
     val syncWithoutRemoteUnderLock:
-        raw: IGitRawStore ->
-        commonDir: string ->
-        nowMs: float ->
-            Task<Result<StoreSnapshot, ConvergeError>>
+        raw: IGitRawStore -> commonDir: string -> nowMs: float -> Task<Result<StoreSnapshot, ConvergeError>>
 
     val mergeRemoteStreamsUnderLock:
         raw: IGitRawStore ->

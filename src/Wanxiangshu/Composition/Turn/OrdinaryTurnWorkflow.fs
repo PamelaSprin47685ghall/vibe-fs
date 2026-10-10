@@ -203,10 +203,7 @@ module OrdinaryTurnWorkflow =
         task {
             let attention = AttentionConcernJournalAdapter.forAttention journal
 
-            let prompt =
-                items
-                |> List.map (fun item -> "- " + item.Text)
-                |> String.concat "\n"
+            let prompt = items |> List.map (fun item -> "- " + item.Text) |> String.concat "\n"
 
             let! sent =
                 HostSessionNudge.sendContinuation

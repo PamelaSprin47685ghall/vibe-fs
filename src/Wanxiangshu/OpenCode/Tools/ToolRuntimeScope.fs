@@ -473,9 +473,7 @@ type ToolRuntimeScope
                 let facts: ManagerCapabilityFacts =
                     { HasActiveIncumbency = true
                       HasAssessment = road.AcceptedAssessmentTransport.IsSome
-                      IsFinalIncumbent =
-                        road.AcceptedAssessmentFindings
-                        |> Option.exists AssessmentFindings.isEmpty
+                      IsFinalIncumbent = road.AcceptedAssessmentFindings |> Option.exists AssessmentFindings.isEmpty
                       CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
 
                 Some facts)

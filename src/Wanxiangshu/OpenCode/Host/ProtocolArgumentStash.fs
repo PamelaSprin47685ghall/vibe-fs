@@ -35,9 +35,7 @@ type HiddenProtocolArguments =
 /// or central runtime.
 module ProtocolArgumentStash =
 
-    type StashField =
-        { Name: string
-          SavedKey: string }
+    type StashField = { Name: string; SavedKey: string }
 
     type StashSpec =
         { Symbol: obj
@@ -90,7 +88,8 @@ module ProtocolArgumentStash =
     /// The saved key order starts at the first hidden field and runs to the
     /// end of the own property names; a missing field table contributes no keys.
     let private captureKeyOrder (spec: StashSpec) (args: obj) : string array =
-        ownPropertyNames args |> Array.skipWhile (fun key -> not (isStashField spec key))
+        ownPropertyNames args
+        |> Array.skipWhile (fun key -> not (isStashField spec key))
 
     let private requireRestorable (spec: StashSpec) (args: obj) (keys: string array) : unit =
         let canRestore =
@@ -122,11 +121,13 @@ module ProtocolArgumentStash =
         let fields = fieldsArray spec
 
         let descriptors =
-            fields |> Array.map (fun field -> field, getOwnPropertyDescriptor args field.Name)
+            fields
+            |> Array.map (fun field -> field, getOwnPropertyDescriptor args field.Name)
 
         let canHold =
             isExtensible args
-            && descriptors |> Array.forall (fun (_, descriptor) -> isDescriptorConfigurable descriptor)
+            && descriptors
+               |> Array.forall (fun (_, descriptor) -> isDescriptorConfigurable descriptor)
 
         if not canHold then
             throwTypeError spec.HoldMessage
@@ -137,7 +138,8 @@ module ProtocolArgumentStash =
         let saved =
             createObj (
                 [ for field, descriptor in descriptors -> field.SavedKey, descriptor ]
-                @ [ "keyOrder", box keyOrder ])
+                @ [ "keyOrder", box keyOrder ]
+            )
 
         let symbolDescriptor =
             createObj [ "value", saved; "enumerable", box false; "configurable", box true ]

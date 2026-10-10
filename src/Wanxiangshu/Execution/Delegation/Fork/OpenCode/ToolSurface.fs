@@ -767,7 +767,9 @@ module ForkToolSurface =
         : Task<string> =
         task {
             let harness = unbox<ForkHarness> value
-            let spec = ForkTool.orchestratorSpec (ToolHostCodec.factory toolModule) harness.Scope
+
+            let spec =
+                ForkTool.orchestratorSpec (ToolHostCodec.factory toolModule) harness.Scope
 
             let args =
                 HostToolArguments(

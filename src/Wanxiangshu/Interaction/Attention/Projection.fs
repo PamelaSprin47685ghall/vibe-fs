@@ -2,9 +2,7 @@ namespace Wanxiangshu.Interaction.Attention
 
 open Wanxiangshu.Foundation.Identity
 
-type DeferredWorkItem =
-    { OccurrenceId: string
-      Text: string }
+type DeferredWorkItem = { OccurrenceId: string; Text: string }
 
 type AttentionProjectionState =
     { BySession: Map<SessionId, DeferredWorkItem list>

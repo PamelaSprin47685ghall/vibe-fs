@@ -904,151 +904,155 @@ module PluginTransforms =
                 [ // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform (durable-evidence gate)
                   { Name = "begin-physical-provider-attempt"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.BeginPhysicalProviderAttempt frame.SessionId frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.BeginPhysicalProviderAttempt frame.SessionId frame.OutObj
+                              return Some frame
+                          } }
                   // 2. SessionStartedAtLedger.tryBindOrAbort
                   { Name = "bind-session-started-at"
                     Run =
-                        fun frame ->
-                            task {
-                                let! sessionStartedAt = caps.BindSessionStartedAt frame.SessionId
-                                return Some { frame with SessionStartedAt = sessionStartedAt }
-                            } }
+                      fun frame ->
+                          task {
+                              let! sessionStartedAt = caps.BindSessionStartedAt frame.SessionId
+
+                              return
+                                  Some
+                                      { frame with
+                                          SessionStartedAt = sessionStartedAt }
+                          } }
                   // 3. Relay projection cut + manager-loop opening. This MUST run
                   // before every trace/compaction owner so retired raw history
                   // cannot be reintroduced later in the composition.
                   { Name = "relay-projection-cut"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
-                                let! disposition = caps.ApplyRelayProjection frame.SessionId frame.OutObj
+                      fun frame ->
+                          task {
+                              do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
+                              let! disposition = caps.ApplyRelayProjection frame.SessionId frame.OutObj
 
-                                if disposition = RelayProjectionDisposition.RetiredAttemptStopped then
-                                    return None
-                                else
-                                    return Some frame
-                            } }
+                              if disposition = RelayProjectionDisposition.RetiredAttemptStopped then
+                                  return None
+                              else
+                                  return Some frame
+                          } }
                   // 4. StrengthReplay.applyBeforeXTrace
                   { Name = "strength-replay"
                     Run =
-                        fun frame ->
-                            task {
-                                let! plans = caps.ApplyStrengthReplay frame.SessionId frame.OutObj
-                                return Some { frame with ReplayPlans = plans }
-                            } }
+                      fun frame ->
+                          task {
+                              let! plans = caps.ApplyStrengthReplay frame.SessionId frame.OutObj
+                              return Some { frame with ReplayPlans = plans }
+                          } }
                   // 5. host-boundary-032 / restore the protocol fields the Host
                   // persisted away into the provider-facing request BEFORE
                   // delegation capture (13.3) reads the same history; without
                   // this the capture never sees the budget the model signed.
                   { Name = "restore-protocol-arguments"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.RestoreProtocolArguments frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.RestoreProtocolArguments frame.OutObj
+                              return Some frame
+                          } }
                   // 6. XTraceCapture.captureObservedMessagesWithReceipt
                   { Name = "capture-xtrace"
                     Run =
-                        fun frame ->
-                            task {
-                                let! capture = caps.CaptureXTraceMessages frame.SessionId frame.OutObj
-                                return Some { frame with TracedXTrace = capture.Current }
-                            } }
+                      fun frame ->
+                          task {
+                              let! capture = caps.CaptureXTraceMessages frame.SessionId frame.OutObj
+
+                              return
+                                  Some
+                                      { frame with
+                                          TracedXTrace = capture.Current }
+                          } }
                   // 7. StrengthReplay.commitTracedAfterCapture
                   { Name = "commit-strength-trace"
                     Run =
-                        fun frame ->
-                            task {
-                                do!
-                                    caps.CommitStrengthTrace
-                                        frame.SessionId
-                                        frame.TracedXTrace
-                                        frame.ReplayPlans
+                      fun frame ->
+                          task {
+                              do! caps.CommitStrengthTrace frame.SessionId frame.TracedXTrace frame.ReplayPlans
 
-                                return Some frame
-                            } }
+                              return Some frame
+                          } }
                   // 8. CompanionHost.RefreshXTrace
                   { Name = "refresh-companion-xtrace"
                     Run =
-                        fun frame ->
-                            caps.RefreshCompanionXTrace frame.SessionId frame.TracedXTrace
-                            Task.FromResult(Some frame) }
+                      fun frame ->
+                          caps.RefreshCompanionXTrace frame.SessionId frame.TracedXTrace
+                          Task.FromResult(Some frame) }
                   // 9. applyCompanionForOrdinaryMaterial
                   { Name = "apply-companion"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.ApplyCompanion frame.SessionId frame.InObj frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.ApplyCompanion frame.SessionId frame.InObj frame.OutObj
+                              return Some frame
+                          } }
                   // 10. XWire.applyTransform. A selected prefix probe creates a
                   // tentative cold horizon for this physical request; downstream
                   // historical auxiliaries must not replay the old horizon into it.
                   { Name = "apply-xwire"
                     Run =
-                        fun frame ->
-                            task {
-                                let! horizon = caps.ApplyXWire frame.OutObj
-                                return Some { frame with Horizon = horizon }
-                            } }
+                      fun frame ->
+                          task {
+                              let! horizon = caps.ApplyXWire frame.OutObj
+                              return Some { frame with Horizon = horizon }
+                          } }
                   // 11. ProviderLifecycle.freezeProviderAttemptPlanForTransform.
                   // Freeze the exact plan, then confirm the Host's real assistant
                   // identity and durable ProviderStarted before returning its body.
                   { Name = "freeze-provider-attempt-plan"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.FreezeProviderAttemptPlan frame.SessionId frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.FreezeProviderAttemptPlan frame.SessionId frame.OutObj
+                              return Some frame
+                          } }
                   // 12. EnforcerContinuation.applyContinuation
                   { Name = "apply-enforcer-continuation"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.ApplyEnforcerContinuation frame.SessionId frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.ApplyEnforcerContinuation frame.SessionId frame.OutObj
+                              return Some frame
+                          } }
                   // 13.1 PairProgrammingThoughtTransform.maybeInjectGuideline
                   // 13.2 RequirementGroundingTransform.projectOrTerminate
                   // 13.3 Capture and start on the final outgoing request so the
                   //      preparation owns the same mirror and provider attempt plan.
                   { Name = "current-horizon-auxiliaries"
                     Run =
-                        fun frame ->
-                            task {
-                                if frame.Horizon = PrefixPresentationHorizon.Current then
-                                    do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
-                                    do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
-                                    do! caps.ApplyReadonlyDelegation frame.SessionId frame.OutObj
+                      fun frame ->
+                          task {
+                              if frame.Horizon = PrefixPresentationHorizon.Current then
+                                  do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
+                                  do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
+                                  do! caps.ApplyReadonlyDelegation frame.SessionId frame.OutObj
 
-                                return Some frame
-                            } }
+                              return Some frame
+                          } }
                   // 14. BloggerChronicleText.maybeInject
                   { Name = "inject-blogger-chronicle"
                     Run =
-                        fun frame ->
-                            caps.InjectBloggerChronicle frame.SessionId frame.PhysicalUserMessageId frame.OutObj
-                            Task.FromResult(Some frame) }
+                      fun frame ->
+                          caps.InjectBloggerChronicle frame.SessionId frame.PhysicalUserMessageId frame.OutObj
+                          Task.FromResult(Some frame) }
                   // 15. Re-apply replaced inspection results after any intermediate insertions
                   { Name = "reapply-deferred-inspections"
                     Run =
-                        fun frame ->
-                            task {
-                                do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
-                                return Some frame
-                            } }
+                      fun frame ->
+                          task {
+                              do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
+                              return Some frame
+                          } }
                   // 16. HostMessageProjection.sanitizeMessages
                   { Name = "sanitize-output-messages"
                     Run =
-                        fun frame ->
-                            caps.SanitizeMessages frame.OutObj
-                            Task.FromResult(Some frame) } ]
+                      fun frame ->
+                          caps.SanitizeMessages frame.OutObj
+                          Task.FromResult(Some frame) } ]
 
             let frame: TransformFrame =
                 { SessionId = projectionSessionIdOpt

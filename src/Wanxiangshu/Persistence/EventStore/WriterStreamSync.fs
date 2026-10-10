@@ -336,7 +336,8 @@ module WriterStreamSync =
         // the first instant it becomes "the day before yesterday" and is collected.
         writers
         |> List.map (fun writer ->
-            (ProcessEventLog.utcDayOf writer.LastActivityMs + 2.0) * retentionMilliseconds ())
+            (ProcessEventLog.utcDayOf writer.LastActivityMs + 2.0)
+            * retentionMilliseconds ())
         |> List.sort
         |> List.tryHead
 

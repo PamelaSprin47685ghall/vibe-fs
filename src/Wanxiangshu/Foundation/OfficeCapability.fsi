@@ -24,12 +24,14 @@ type ToolPermission =
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
-    { HasActiveIncumbency: bool
-      HasAssessment: bool
-      /// True when the active incumbency's accepted assessment has empty
-      /// findings: the final incumbent who settles and retires with no successor.
-      IsFinalIncumbent: bool
-      CleanupBlockerDigest: string option }
+    {
+        HasActiveIncumbency: bool
+        HasAssessment: bool
+        /// True when the active incumbency's accepted assessment has empty
+        /// findings: the final incumbent who settles and retires with no successor.
+        IsFinalIncumbent: bool
+        CleanupBlockerDigest: string option
+    }
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =

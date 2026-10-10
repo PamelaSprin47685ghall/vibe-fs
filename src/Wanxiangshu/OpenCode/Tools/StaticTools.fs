@@ -66,7 +66,8 @@ module StaticTools =
     /// execute gate all read this, so no consumer keeps a second
     /// name→permission table.
     let permissionOfToolName (name: string) : ToolPermission option =
-        allPermissions |> List.tryFind (fun permission -> toolNames permission |> List.contains name)
+        allPermissions
+        |> List.tryFind (fun permission -> toolNames permission |> List.contains name)
 
     /// The office projection of one name: true only when the role's permission
     /// set owns the permission this exact name maps to.

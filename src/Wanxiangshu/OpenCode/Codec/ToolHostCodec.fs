@@ -531,9 +531,7 @@ module ToolHostCodec =
 
     let objectSchemaOf fields (HostToolFactory factory) =
         let fieldsObj =
-            fields
-            |> List.map (fun (name, HostSchema schema) -> name, schema)
-            |> createObj
+            fields |> List.map (fun (name, HostSchema schema) -> name, schema) |> createObj
 
         HostSchema(rawObjectSchemaOf factory fieldsObj)
 

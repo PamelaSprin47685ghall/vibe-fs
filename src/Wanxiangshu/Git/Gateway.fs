@@ -137,7 +137,8 @@ module GitGateway =
                 return! pushSnapshot run remote expectedRemote merged
         }
 
-    let private currentTimeMs () = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() |> float
+    let private currentTimeMs () =
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() |> float
 
     /// Full bidirectional convergence. `observedRemote` is only an optimization
     /// for reference-transaction: the algorithm after root discovery is identical
@@ -235,8 +236,7 @@ module GitGateway =
 
                 match discovered with
                 | Error error -> return Error error
-                | Ok(nextSnapshot, nextExpected) ->
-                    return! loop nextSnapshot nextExpected true (retriesLeft - 1)
+                | Ok(nextSnapshot, nextExpected) -> return! loop nextSnapshot nextExpected true (retriesLeft - 1)
             }
 
         let convergeWithoutObservedRemote () =

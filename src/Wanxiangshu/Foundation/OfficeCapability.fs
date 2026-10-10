@@ -30,12 +30,14 @@ type ToolPermission =
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
-    { HasActiveIncumbency: bool
-      HasAssessment: bool
-      /// True when the active incumbency's accepted assessment has empty
-      /// findings: the final incumbent who settles and retires with no successor.
-      IsFinalIncumbent: bool
-      CleanupBlockerDigest: string option }
+    {
+        HasActiveIncumbency: bool
+        HasAssessment: bool
+        /// True when the active incumbency's accepted assessment has empty
+        /// findings: the final incumbent who settles and retires with no successor.
+        IsFinalIncumbent: bool
+        CleanupBlockerDigest: string option
+    }
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =
@@ -69,11 +71,7 @@ module OfficeCapability =
                   ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep ]
-        | Role.Orchestrator ->
-            set
-                [ ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon ]
+        | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
         | Role.Engineer ->
             set
                 [ ToolPermission.Read

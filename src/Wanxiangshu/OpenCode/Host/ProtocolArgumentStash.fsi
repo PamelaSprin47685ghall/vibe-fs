@@ -27,9 +27,7 @@ module ProtocolArgumentStash =
 
     /// One hidden protocol field: the JavaScript property name and the key
     /// its original property descriptor is saved under.
-    type StashField =
-        { Name: string
-          SavedKey: string }
+    type StashField = { Name: string; SavedKey: string }
 
     /// One static stash definition: the private Symbol singleton, the hidden
     /// field table, the field set whose reappearance marks a changed call,

@@ -164,11 +164,7 @@ module ToolRegistry =
     /// capability-enforcement-005 / STRENGTH-004: Host-native read/glob/grep are
     /// the entire replica surface. js-predictor is the single plugin tool a live
     /// replica may execute; every other plugin tool stays denied.
-    let private replicaStage
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (ctx: HostToolContext)
-        : Task<string option> =
+    let private replicaStage (gate: ToolGateFacts) (spec: ToolSpec) (ctx: HostToolContext) : Task<string option> =
         Task.FromResult(
             if not (gate.IsStrengthReplica ctx) then
                 None
@@ -234,7 +230,8 @@ module ToolRegistry =
                 | None -> gate.EnsureRoleFor ctx
 
             match resolvedRole with
-            | Some role when officeAdmission ctx role -> return! executeAdmittedRole gate spec managerPermission args ctx role
+            | Some role when officeAdmission ctx role ->
+                return! executeAdmittedRole gate spec managerPermission args ctx role
             | Some role -> return denyRole ctx spec.Name role
             | None ->
                 return
@@ -271,8 +268,7 @@ module ToolRegistry =
         (ctx: HostToolContext)
         : Task<string> =
         match spec.Admission with
-        | ToolAdmission.OfficeRole officeAdmission ->
-            officeStage gate spec managerPermission officeAdmission args ctx
+        | ToolAdmission.OfficeRole officeAdmission -> officeStage gate spec managerPermission officeAdmission args ctx
         | ToolAdmission.PrivateAttachment attachmentAdmission -> attachmentStage spec attachmentAdmission args ctx
 
     let private runAfterAblation

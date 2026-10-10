@@ -75,8 +75,7 @@ module SuicideTool =
 
     let private qualityCandidate (view: RoadView) incumbent =
         view.Certificate
-        |> Option.filter (fun certificate ->
-            certificate.Valid && certificate.IncumbencyId = incumbent)
+        |> Option.filter (fun certificate -> certificate.Valid && certificate.IncumbencyId = incumbent)
 
     let private retirementTransaction roadId incumbent providerRun toolCallId snapshot authority (view: RoadView) =
         let candidate = qualityCandidate view incumbent
@@ -254,8 +253,7 @@ module SuicideTool =
             |> Option.map AssessmentFindings.values
             |> Option.defaultValue []
             |> List.mapi (fun index finding ->
-                string index,
-                ToolHostCodec.TString(finding.AcceptanceCriteria + " => " + finding.WorkPlan))
+                string index, ToolHostCodec.TString(finding.AcceptanceCriteria + " => " + finding.WorkPlan))
 
         let deferred =
             pending
@@ -339,7 +337,11 @@ module SuicideTool =
             | Error error -> return Error error
         }
 
-    let private runRetirementOrBlocked (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
+    let private runRetirementOrBlocked
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedRetirement)
+        =
         let blockers = scope.RetirementBlockersFor context.SessionId
 
         if List.isEmpty blockers then
@@ -376,11 +378,7 @@ module SuicideTool =
             taskResult {
                 let! transaction =
                     RelayTransaction.create
-                        [ RelayEvent.RetirementConfirmationCommitted(
-                              prepared.Incumbent,
-                              providerRunId,
-                              toolCallId
-                          ) ]
+                        [ RelayEvent.RetirementConfirmationCommitted(prepared.Incumbent, providerRunId, toolCallId) ]
                     |> Result.mapError (fun _ -> text Path.FinishFailed)
 
                 let! _ = appendPrepared prepared transaction

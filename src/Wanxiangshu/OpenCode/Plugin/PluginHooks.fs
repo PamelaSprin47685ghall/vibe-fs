@@ -691,7 +691,13 @@ module PluginHooks =
                     do! beforeStageRequirementGrounding toolInput toolOutput
                     let toolName = toolField toolInput "tool"
                     beforeStageReviewPermission toolName toolInput
-                    do! beforeStagePrepareProtocolArguments toolName (beforeStageDelegationActive toolName) toolInput toolOutput
+
+                    do!
+                        beforeStagePrepareProtocolArguments
+                            toolName
+                            (beforeStageDelegationActive toolName)
+                            toolInput
+                            toolOutput
                 }
 
             // 先 Delegation（仅参与工具）后 Manager，两个字段族互不覆盖。

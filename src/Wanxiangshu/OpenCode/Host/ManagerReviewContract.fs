@@ -12,7 +12,9 @@ module ManagerReviewContract =
     /// deletes the saved record again before the error propagates.
     let private stash: ProtocolArgumentStash.StashSpec =
         { Symbol = emitJsExpr () "Symbol('manager-review-contract')"
-          Fields = [ { Name = "contract"; SavedKey = "descriptor" } ]
+          Fields =
+            [ { Name = "contract"
+                SavedKey = "descriptor" } ]
           ReappearanceFields = [ "contract" ]
           HoldMessage = "Tool arguments cannot hold or modify the review contract"
           RestoreOrderMessage = "Tool arguments cannot restore the review contract's original key order"
@@ -35,7 +37,8 @@ module ManagerReviewContract =
     let classifyHiddenArguments (owner: ProtocolArgumentCall option) (args: obj) : HiddenProtocolArguments =
         ProtocolArgumentStash.classifyHiddenArguments stash owner args
 
-    let restore (args: obj) : unit = ProtocolArgumentStash.restore stash args
+    let restore (args: obj) : unit =
+        ProtocolArgumentStash.restore stash args
 
     let restoreForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
         ProtocolArgumentStash.restoreForCall stash owner args

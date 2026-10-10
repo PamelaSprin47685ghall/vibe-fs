@@ -122,14 +122,14 @@ module ReadonlyDelegationContract =
     let private stash: ProtocolArgumentStash.StashSpec =
         { Symbol = emitJsExpr () "Symbol('readonly-delegation-args')"
           Fields =
-            [ { Name = roundsField; SavedKey = "rounds" }
+            [ { Name = roundsField
+                SavedKey = "rounds" }
               { Name = noteField; SavedKey = "note" } ]
           ReappearanceFields = [ roundsField; noteField; "delegate_readonly_rounds" ]
           HoldMessage = "Tool arguments cannot hold or modify the readonly delegation fields"
           RestoreOrderMessage = "Tool arguments cannot restore the readonly delegation fields' original key order"
           RestoreFrozenMessage = "Tool arguments are frozen or not extensible during readonly delegation restore"
-          FieldDeleteFailure =
-            fun field -> sprintf "Tool arguments cannot hide the readonly delegation field %s" field
+          FieldDeleteFailure = fun field -> sprintf "Tool arguments cannot hide the readonly delegation field %s" field
           RestoreDeleteFailure =
             fun field -> sprintf "Tool arguments cannot hide the readonly delegation field %s" field
           SymbolDeleteFailure = "Failed to delete the saved readonly delegation key"
@@ -143,7 +143,8 @@ module ReadonlyDelegationContract =
     let classifyHiddenArguments (owner: ProtocolArgumentCall option) (args: obj) : HiddenProtocolArguments =
         ProtocolArgumentStash.classifyHiddenArguments stash owner args
 
-    let restore (args: obj) : unit = ProtocolArgumentStash.restore stash args
+    let restore (args: obj) : unit =
+        ProtocolArgumentStash.restore stash args
 
     let restoreForCall (owner: ProtocolArgumentCall option) (args: obj) : unit =
         ProtocolArgumentStash.restoreForCall stash owner args

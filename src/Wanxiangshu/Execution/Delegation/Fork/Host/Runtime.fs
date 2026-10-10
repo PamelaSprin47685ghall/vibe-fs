@@ -901,7 +901,7 @@ type HostForkRuntime
     member internal _.EstablishedByProcess(agentId: string) =
         lock gate (fun () -> processEstablishedAgents.Contains agentId)
 
-    member internal _.EstablishedAgentIds : string list =
+    member internal _.EstablishedAgentIds: string list =
         lock gate (fun () -> processEstablishedAgents |> Seq.toList)
 
     member internal _.RestoreEstablishedAgents(agentIds: string list) =
