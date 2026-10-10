@@ -1404,7 +1404,10 @@ Z5. [终止.] 算法终止。
        - 选中前缀探针 → 本次请求为 tentative cold horizon。（prefix-stability-003）
    11. 冻结 provider attempt plan；确认宿主真实 assistant 身份与 durable `ProviderStarted`。
    12. 应用 Enforcer 续行决策。
-   13. 仅当 horizon 为 Current 时，依次做：注入 Pair 指引、投影 requirement grounding、捕获并启动只读委托。
+   13. 仅当 horizon 为 Current 时，依次做：
+       1. 注入 Pair 指引。
+       2. 投影 requirement grounding。
+       3. 捕获并启动只读委托。
        - horizon 为 TentativeCold → 跳过本步，避免旧 horizon 材料穿透新前缀。（context-compression-019）
    14. 注入 Blogger 纪事文本。
    15. 重放替换后的检查结果。

@@ -430,7 +430,7 @@ module PluginTransforms =
         // provider request is built from stripped history. The before hook
         // recorded the wire originals in the process-local vault; this step
         // merges them back into the request's assistant tool-call parts before
-        // delegation capture (4.5) or the replica batch collector reads the
+        // delegation capture (13.3) or the replica batch collector reads the
         // same history. Pure per part: business arguments verbatim, protocol
         // keys appended when missing or different, results untouched, no vault
         // entry means fail-open.
@@ -851,6 +851,41 @@ module PluginTransforms =
                 }
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages }
 
+    /// 普通分支请求的静态管道上下文：预读的物理消息 id 与各 stage 产出的
+    /// 会话起点、Strength 重放计划、已捕获 XTrace、horizon 只经这份 frame 传递。
+    type private TransformFrame =
+        { SessionId: string option
+          InObj: obj
+          OutObj: obj
+          PhysicalUserMessageId: PhysicalUserMessageId option
+          SessionStartedAt: DateTimeOffset option
+          ReplayPlans: StrengthReplayPlan list
+          TracedXTrace: XTraceProjectionState option
+          Horizon: PrefixPresentationHorizon }
+
+    /// 普通分支 stage：具名、静态列出，Run 直接调用一个或一段 caps 入口。
+    /// 返回 None 表示本次请求到此终止（退休旧 attempt 已被拦截）。
+    type private TransformStage =
+        { Name: string
+          Run: TransformFrame -> Task<TransformFrame option> }
+
+    let private runOrdinaryStages (stages: TransformStage list) (frame: TransformFrame) : Task<unit> =
+        let rec runStages stages frame =
+            task {
+                match stages with
+                | [] -> ()
+                | stage :: rest -> return! runOneStage stage rest frame
+            }
+
+        and runOneStage (stage: TransformStage) rest frame =
+            task {
+                match! stage.Run frame with
+                | Some next -> return! runStages rest next
+                | None -> return ()
+            }
+
+        runStages stages frame
+
     let normalTransform
         (caps: NormalTransformCapabilities)
         (projectionSessionIdOpt: string option)
@@ -858,80 +893,174 @@ module PluginTransforms =
         (outObj: obj)
         : Task<unit> =
         task {
+            // 预读：在 Relay 投影改写消息数组之前捕获原始物理用户消息 id。
             let physicalUserMessageId =
                 ProviderWireDecode.messagesFromTransformOutput outObj
                 |> ProviderWireCapture.lastUserMessageId
 
-            // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform (durable-evidence gate)
-            do! caps.BeginPhysicalProviderAttempt projectionSessionIdOpt outObj
+            // host-boundary-019 的普通分支固定次序，不得重排；每个 stage 直接调用
+            // 对应 caps 入口，Run 返回 None 时本次请求到此终止。
+            let stages: TransformStage list =
+                [ // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform (durable-evidence gate)
+                  { Name = "begin-physical-provider-attempt"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.BeginPhysicalProviderAttempt frame.SessionId frame.OutObj
+                                return Some frame
+                            } }
+                  // 2. SessionStartedAtLedger.tryBindOrAbort
+                  { Name = "bind-session-started-at"
+                    Run =
+                        fun frame ->
+                            task {
+                                let! sessionStartedAt = caps.BindSessionStartedAt frame.SessionId
+                                return Some { frame with SessionStartedAt = sessionStartedAt }
+                            } }
+                  // 3. Relay projection cut + manager-loop opening. This MUST run
+                  // before every trace/compaction owner so retired raw history
+                  // cannot be reintroduced later in the composition.
+                  { Name = "relay-projection-cut"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
+                                let! disposition = caps.ApplyRelayProjection frame.SessionId frame.OutObj
 
-            // 2. SessionStartedAtLedger.tryBindOrAbort
-            let! sessionStartedAt = caps.BindSessionStartedAt projectionSessionIdOpt
+                                if disposition = RelayProjectionDisposition.RetiredAttemptStopped then
+                                    return None
+                                else
+                                    return Some frame
+                            } }
+                  // 4. StrengthReplay.applyBeforeXTrace
+                  { Name = "strength-replay"
+                    Run =
+                        fun frame ->
+                            task {
+                                let! plans = caps.ApplyStrengthReplay frame.SessionId frame.OutObj
+                                return Some { frame with ReplayPlans = plans }
+                            } }
+                  // 5. host-boundary-032 / restore the protocol fields the Host
+                  // persisted away into the provider-facing request BEFORE
+                  // delegation capture (13.3) reads the same history; without
+                  // this the capture never sees the budget the model signed.
+                  { Name = "restore-protocol-arguments"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.RestoreProtocolArguments frame.OutObj
+                                return Some frame
+                            } }
+                  // 6. XTraceCapture.captureObservedMessagesWithReceipt
+                  { Name = "capture-xtrace"
+                    Run =
+                        fun frame ->
+                            task {
+                                let! capture = caps.CaptureXTraceMessages frame.SessionId frame.OutObj
+                                return Some { frame with TracedXTrace = capture.Current }
+                            } }
+                  // 7. StrengthReplay.commitTracedAfterCapture
+                  { Name = "commit-strength-trace"
+                    Run =
+                        fun frame ->
+                            task {
+                                do!
+                                    caps.CommitStrengthTrace
+                                        frame.SessionId
+                                        frame.TracedXTrace
+                                        frame.ReplayPlans
 
-            // 3. Relay projection cut + manager-loop opening. This MUST run
-            // before every trace/compaction owner so retired raw history cannot
-            // be reintroduced later in the composition.
-            do! caps.SettleAndReplaceDeferredInspections projectionSessionIdOpt outObj
-            let! relayProjection = caps.ApplyRelayProjection projectionSessionIdOpt outObj
+                                return Some frame
+                            } }
+                  // 8. CompanionHost.RefreshXTrace
+                  { Name = "refresh-companion-xtrace"
+                    Run =
+                        fun frame ->
+                            caps.RefreshCompanionXTrace frame.SessionId frame.TracedXTrace
+                            Task.FromResult(Some frame) }
+                  // 9. applyCompanionForOrdinaryMaterial
+                  { Name = "apply-companion"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.ApplyCompanion frame.SessionId frame.InObj frame.OutObj
+                                return Some frame
+                            } }
+                  // 10. XWire.applyTransform. A selected prefix probe creates a
+                  // tentative cold horizon for this physical request; downstream
+                  // historical auxiliaries must not replay the old horizon into it.
+                  { Name = "apply-xwire"
+                    Run =
+                        fun frame ->
+                            task {
+                                let! horizon = caps.ApplyXWire frame.OutObj
+                                return Some { frame with Horizon = horizon }
+                            } }
+                  // 11. ProviderLifecycle.freezeProviderAttemptPlanForTransform.
+                  // Freeze the exact plan, then confirm the Host's real assistant
+                  // identity and durable ProviderStarted before returning its body.
+                  { Name = "freeze-provider-attempt-plan"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.FreezeProviderAttemptPlan frame.SessionId frame.OutObj
+                                return Some frame
+                            } }
+                  // 12. EnforcerContinuation.applyContinuation
+                  { Name = "apply-enforcer-continuation"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.ApplyEnforcerContinuation frame.SessionId frame.OutObj
+                                return Some frame
+                            } }
+                  // 13.1 PairProgrammingThoughtTransform.maybeInjectGuideline
+                  // 13.2 RequirementGroundingTransform.projectOrTerminate
+                  // 13.3 Capture and start on the final outgoing request so the
+                  //      preparation owns the same mirror and provider attempt plan.
+                  { Name = "current-horizon-auxiliaries"
+                    Run =
+                        fun frame ->
+                            task {
+                                if frame.Horizon = PrefixPresentationHorizon.Current then
+                                    do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
+                                    do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
+                                    do! caps.ApplyReadonlyDelegation frame.SessionId frame.OutObj
 
-            if relayProjection = RelayProjectionDisposition.RetiredAttemptStopped then
-                return ()
+                                return Some frame
+                            } }
+                  // 14. BloggerChronicleText.maybeInject
+                  { Name = "inject-blogger-chronicle"
+                    Run =
+                        fun frame ->
+                            caps.InjectBloggerChronicle frame.SessionId frame.PhysicalUserMessageId frame.OutObj
+                            Task.FromResult(Some frame) }
+                  // 15. Re-apply replaced inspection results after any intermediate insertions
+                  { Name = "reapply-deferred-inspections"
+                    Run =
+                        fun frame ->
+                            task {
+                                do! caps.SettleAndReplaceDeferredInspections frame.SessionId frame.OutObj
+                                return Some frame
+                            } }
+                  // 16. HostMessageProjection.sanitizeMessages
+                  { Name = "sanitize-output-messages"
+                    Run =
+                        fun frame ->
+                            caps.SanitizeMessages frame.OutObj
+                            Task.FromResult(Some frame) } ]
 
-            // 4. StrengthReplay.applyBeforeXTrace
-            let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
+            let frame: TransformFrame =
+                { SessionId = projectionSessionIdOpt
+                  InObj = inObj
+                  OutObj = outObj
+                  PhysicalUserMessageId = physicalUserMessageId
+                  SessionStartedAt = None
+                  ReplayPlans = []
+                  TracedXTrace = None
+                  Horizon = PrefixPresentationHorizon.Current }
 
-            // 4.4 host-boundary-032 / restore the protocol
-            // fields the Host persisted away into the provider-facing request
-            // BEFORE delegation capture (4.5) reads the same history; without
-            // this the capture never sees the budget the model signed.
-            do! caps.RestoreProtocolArguments outObj
-
-            // 5. XTraceCapture.captureObservedMessagesWithReceipt
-            let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
-
-            // 6. StrengthReplay.commitTracedAfterCapture
-            do! caps.CommitStrengthTrace projectionSessionIdOpt traceCapture.Current strengthReplayPlans
-
-            // 7. CompanionHost.RefreshXTrace
-            caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
-
-            // 8. applyCompanionForOrdinaryMaterial
-            do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
-
-            // 9. XWire.applyTransform. A selected prefix probe creates a
-            // tentative cold horizon for this physical request; downstream
-            // historical auxiliaries must not replay the old horizon into it.
-            let! prefixHorizon = caps.ApplyXWire outObj
-
-            // 10. ProviderLifecycle.freezeProviderAttemptPlanForTransform
-            // Freeze the exact plan, then confirm the Host's real assistant
-            // identity and durable ProviderStarted before returning its body.
-            do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
-
-            // 11. EnforcerContinuation.applyContinuation
-            do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
-
-            if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 12. PairProgrammingThoughtTransform.maybeInjectGuideline
-                do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
-
-                // 13. RequirementGroundingTransform.projectOrTerminate
-                do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
-
-                // Capture and start on the final outgoing request so the
-                // preparation owns the same mirror and provider attempt plan.
-                do! caps.ApplyReadonlyDelegation projectionSessionIdOpt outObj
-
-            // 15. BloggerChronicleText.maybeInject
-            caps.InjectBloggerChronicle projectionSessionIdOpt physicalUserMessageId outObj
-
-            // 15.1 Re-apply replaced inspection results after any intermediate insertions
-            do! caps.SettleAndReplaceDeferredInspections projectionSessionIdOpt outObj
-
-            // 16. HostMessageProjection.sanitizeMessages
-            caps.SanitizeMessages outObj
-
-            ()
+            do! runOrdinaryStages stages frame
         }
 
     let createWithCaps
