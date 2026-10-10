@@ -52,19 +52,14 @@ module AttentionProjection =
                                Text = text } ])
                         state.BySession }
 
-    /// Consume (and thereby extinguish) the named DeferredWork occurrences. A
-    /// consumed occurrence leaves the projection and records a consumption
-    /// receipt, so a replayed record cannot resurrect it; unknown ids are
-    /// ignored, so replay is idempotent.
+    /// Consume (and thereby extinguish) the named DeferredWork occurrences.
+    /// Every named occurrence leaves a consumption receipt, present or not:
+    /// a receipt for an occurrence that is still absent is a no-op today, and
+    /// a receipt replayed before its `DeferredWorkRecorded` still suppresses
+    /// the record. Consumption is therefore order-independent across k-way
+    /// journal replay and repeated consumption stays idempotent.
     let consume sessionId workIds state =
         let selected = Set.ofList workIds
-        let current = items sessionId state
-
-        let consumedNow =
-            current
-            |> List.filter (fun item -> Set.contains item.OccurrenceId selected)
-            |> List.map (fun item -> item.OccurrenceId)
-            |> Set.ofList
 
         let remaining =
             items sessionId state
@@ -73,15 +68,25 @@ module AttentionProjection =
         let consumed =
             Map.tryFind sessionId state.ConsumedBySession
             |> Option.defaultValue Set.empty
-            |> Set.union consumedNow
+            |> Set.union selected
 
         { state with
             BySession = Map.add sessionId remaining state.BySession
             ConsumedBySession = Map.add sessionId consumed state.ConsumedBySession }
 
-    /// ATTENTION-004: a life that ends before consumption takes its remaining
-    /// entries with it — a reused SessionId starts a fresh life and must not
-    /// inherit the closed life's pending work.
+    /// ATTENTION-004/005: a life that ends before consumption takes its
+    /// remaining entries with it — a reused SessionId starts a fresh life and
+    /// must not inherit the closed life's pending work. The remaining ids stay
+    /// as consumption receipts, so a replayed `DeferredWorkRecorded` cannot
+    /// resurrect them.
     let closeLife sessionId state =
+        let pending = items sessionId state
+
+        let consumed =
+            Map.tryFind sessionId state.ConsumedBySession
+            |> Option.defaultValue Set.empty
+            |> Set.union (pending |> List.map (fun item -> item.OccurrenceId) |> Set.ofList)
+
         { state with
-            BySession = Map.remove sessionId state.BySession }
+            BySession = Map.remove sessionId state.BySession
+            ConsumedBySession = Map.add sessionId consumed state.ConsumedBySession }
