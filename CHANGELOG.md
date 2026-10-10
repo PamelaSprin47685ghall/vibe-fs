@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+## Unreleased — 开发者意见 W1–W6 施工
+
+- W1 持久化与工具链：插件路径统一 `<git-common-dir>/wanxiangshu/`（WP-001）；ndjson 事件行内嵌载荷、取消旁挂 payloads（WP-021）；UTC 日期分组 GC（WP-022）；writer 增量读与有界锁等待（WP-023，修复前后数字对比未验证）；git hook 修复后默认重开（WP-024）。
+- W2 provider 与恢复：运行时漂移校验退役、交测试期性质保证（WP-003）；重启后首个新指令 prepend 状态指导（WP-020）；horizon 崩溃后不泄露未决工作（WP-025）；provider 可见文案改称「事实」（WP-026）；失败恢复去刻板实现（WP-027）；assume 穿透 LWR 核对（WP-028）。
+- W3 工具面与通信：celebrate/regret 整包退役（WP-036）；enough/abandon 合入 assume（WP-029）；defer 新消费语义与 Pair Hint 鼓励（WP-030、WP-031、WP-032）；会话自动订阅自身名字（WP-033）；publish 至 user 弹窗并复制 root（WP-034）；邮箱语义双语解释（WP-035）；fork/commission calling 可选（WP-009、WP-011）；底层 id 可见面收敛核对（WP-012）。
+- W4 relay：评审对象改为 findings pairs（WP-014、WP-015）；两段式 suicide 确认（WP-018）；末任收尾（WP-016）；快照去形式化（WP-017）；证书只作历史（WP-019）。
+- W5 重构与遗骸：normalTransform 具名 stage 管线（WP-004）；共享 ProtocolArgumentStash 原语（WP-005）；tool.execute 具名 stage 序列（WP-006）；工具门链具名化与 capability 单源（WP-007）；Sphinx 收敛 MCP-only（WP-039）；query-shell 遗骸丢弃（WP-040）；CHANGELOG 遗骸清理（WP-041）。
+- W6 文档收尾：环境变量 KISS（WP-037）；验证入口 KISS（WP-038）；指南 42 条状态标注与文档同步（算法 F）。
+- 证据：各包套件与门禁由 DevOps 实跑，数字见 `proposals/` 施工记录；WP-023 修复前后同输入的数字对比未验证。
+
 ## Unreleased — WP-021 / WP-026（ndjson 内嵌载荷与措辞清理）
 
 - `durable-events-012`：取消旁挂 payloads 目录，事件行自包含载荷。`EventEnvelope` 增内嵌 `Payloads`；`CanonicalEventCodec` 仅在事件确实引用载荷时写出 `payloads` 键（无载荷事件的 canonical 字节不变）；`IEventStore.WritePayload` 改为进程内暂存、`Append` 内嵌；`ICanonicalIntegrator.TryPayload` 成为已提交内嵌载荷的唯一读口，Store 不再自行 `readStreams` 重建缓存。删除 `ProcessEventLog` 的 payload 文件 API、`WriterStreamSync` 与 `RetentionSurface` 的远端 payload 树及缓存。条款同步 `durable-events` [002]/[003]/[010]/[012]、`durable-convergence` [010]、`speculative-investigation` [006]。

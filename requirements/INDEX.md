@@ -118,7 +118,7 @@
 |---|---|
 | `speculative-investigation` | 可丢弃 speculation 只有在 authoritative world 零影响时才可换取调查成本下降。 |
 | `epistemic-reasoning` | 已由 sphinx-v2 取代的历史包；保留设计沿革和旧证据，不参与当前验收。 |
-| `sphinx-v2` | clean-break 后的 Sphinx 内核：LLM 负责语义判断，程序负责科学问法、作用域估值与资源内调度；旧手写语义评分表整类删除。 |
+| `sphinx-v2` | clean-break 后的 Sphinx 内核：LLM 负责语义判断，程序负责科学问法、作用域估值与资源内调度；旧手写语义评分表整类删除；WP-039 后收敛为 MCP-only 单一入口，原生工具面不恢复。 |
 
 ## 13. Delivery
 
