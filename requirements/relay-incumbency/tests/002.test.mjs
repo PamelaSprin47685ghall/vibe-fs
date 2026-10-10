@@ -5,6 +5,8 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const open = (state, road = 'road-1', incumbent = 'inc-1') =>
   relay.openIncumbency(state, road, incumbent, 'snapshot-1', 'authority-1')
 
+const gap = [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
+
 test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending algebra', () => {
   const first = open(relay.empty())
   assert.deepEqual(relay.view(first.state, 'road-1'), {
@@ -21,7 +23,7 @@ test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending 
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
+    gap,
   )
   assert.equal(assessed.ok, true)
   const retired = relay.retireContinue(
@@ -54,11 +56,11 @@ test('WHAT[relay-incumbency-002] repeat-round has same meaning, assessment repla
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill('PERFECT'),
+    [],
   )
   assert.equal(assessed.ok, true)
 
-  // Assessment replay with exact same binding/scores is idempotent (Ok)
+  // Assessment replay with exact same binding/findings is idempotent (Ok)
   const replay = relay.assess(
     assessed.state,
     'road-1',
@@ -66,7 +68,7 @@ test('WHAT[relay-incumbency-002] repeat-round has same meaning, assessment repla
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill('PERFECT'),
+    [],
   )
   assert.equal(replay.ok, true)
 
@@ -78,7 +80,7 @@ test('WHAT[relay-incumbency-002] repeat-round has same meaning, assessment repla
     'assessment-conflict',
     'snapshot-stale',
     'authority-1',
-    ...Array(8).fill('PERFECT'),
+    [],
   )
   assert.equal(conflict.ok, false)
 

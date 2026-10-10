@@ -11,7 +11,7 @@ type RelayEvent =
         AssessmentBinding *
         WorkspaceSnapshotId *
         AuthorityRevision *
-        ScoreVector
+        AssessmentFindings
     | AuthorityRevisionAdvanced of
         IncumbencyId *
         expected: AuthorityRevision *

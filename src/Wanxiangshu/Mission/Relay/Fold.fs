@@ -7,7 +7,7 @@ type private AssessmentRecord =
       Binding: AssessmentBinding
       SnapshotId: WorkspaceSnapshotId
       AuthorityRevision: AuthorityRevision
-      Scores: ScoreVector }
+      Findings: AssessmentFindings }
 
 type private ActiveIncumbency =
     { Id: IncumbencyId
@@ -99,9 +99,9 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
-        let perfect = ScoreVector.allPerfect scores
+        let perfect = AssessmentFindings.isEmpty findings
 
         let certificate =
             newCertificate perfect assessmentId active snapshotId authorityRevision binding
@@ -115,7 +115,7 @@ module private Internal =
                           // Always record latest snapshot from the assessment
                           SnapshotId = snapshotId
                           AuthorityRevision = authorityRevision
-                          Scores = scores }
+                          Findings = findings }
                 Phase = phaseAfterAssessment perfect }
 
         { current with
@@ -138,13 +138,13 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
         accepted.Id = assessmentId
         && accepted.Binding = binding
         && accepted.SnapshotId = snapshotId
         && accepted.AuthorityRevision = authorityRevision
-        && accepted.Scores = scores
+        && accepted.Findings = findings
 
     let private isConflictingAssessment
         (accepted: AssessmentRecord)
@@ -153,7 +153,7 @@ module private Internal =
         =
         accepted.Id = assessmentId || accepted.Binding.ToolCallId = binding.ToolCallId
 
-    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision findings =
         result {
             let! current = road roadId state |> require "RoadNotOpen"
             let! active = current.Active |> require "NoActiveIncumbency"
@@ -163,9 +163,9 @@ module private Internal =
             if
                 current.AuthorityRevision = authorityRevision
                 && active.AuthorityRevision = authorityRevision
-                && isExactAssessment accepted accepted.Id binding snapshotId authorityRevision scores
+                && isExactAssessment accepted accepted.Id binding snapshotId authorityRevision findings
             then
-                return accepted.Scores
+                return accepted.Findings
             else
                 return! Error "AssessmentReplayConflict"
         }
@@ -177,9 +177,9 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
-        if isExactAssessment accepted assessmentId binding snapshotId authorityRevision scores then
+        if isExactAssessment accepted assessmentId binding snapshotId authorityRevision findings then
             Ok state
         elif isConflictingAssessment accepted assessmentId binding then
             Error "AssessmentReplayConflict"
@@ -216,13 +216,13 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
         result {
             do! validateFreshAssessment active current snapshotId authorityRevision assessmentId binding
 
             return!
-                acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
+                acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision findings
         }
 
     let private decideAssessment
@@ -234,13 +234,13 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
         match active.Assessment with
         | Some accepted ->
-            decideStoredAssessment accepted state assessmentId binding snapshotId authorityRevision scores
+            decideStoredAssessment accepted state assessmentId binding snapshotId authorityRevision findings
         | None ->
-            commitFreshAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
+            commitFreshAssessment roadId state current active assessmentId binding snapshotId authorityRevision findings
 
     let private assess
         roadId
@@ -252,13 +252,13 @@ module private Internal =
         binding
         snapshotId
         authorityRevision
-        scores
+        findings
         =
         result {
             do! requireMatchingIncumbency active incumbencyId
 
             return!
-                decideAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
+                decideAssessment roadId state current active assessmentId binding snapshotId authorityRevision findings
         }
 
     let private authorityReplay exactReplay state =
@@ -695,7 +695,7 @@ module private Internal =
         | RelayEvent.RoadDevOpsBound(eventRoadId, devopsId, modelTarget) ->
             bindDevOps roadId state eventRoadId devopsId modelTarget
         | RelayEvent.IncumbencyOpened(incumbentId, snapshotId) -> openIncumbency roadId state incumbentId snapshotId
-        | RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, scores) ->
+        | RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, findings) ->
             result {
                 let! current = road roadId state |> require "RoadNotOpen"
                 let! active = current.Active |> require "NoActiveIncumbency"
@@ -711,7 +711,7 @@ module private Internal =
                         binding
                         snapshotId
                         authorityRevision
-                        scores
+                        findings
             }
         | RelayEvent.AuthorityRevisionAdvanced(incumbentId, expected, next, authorityMessageId, snapshotId) ->
             result {
@@ -734,8 +734,8 @@ module private Internal =
 module Fold =
     let empty = RelayState Map.empty
 
-    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores =
-        Internal.tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision scores
+    let tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision findings =
+        Internal.tryReplayAssessment state roadId incumbencyId binding snapshotId authorityRevision findings
 
     let apply state roadId transaction =
         RelayTransaction.events transaction
@@ -831,7 +831,7 @@ module Decision =
             roadId
             [ RelayEvent.AuthorityRevisionAdvanced(incumbentId, expected, next, authorityMessageId, snapshotId) ]
 
-    let assess state roadId incumbentId assessmentId binding snapshotId authorityRevision scores =
+    let assess state roadId incumbentId assessmentId binding snapshotId authorityRevision findings =
         match Fold.view state roadId with
         | None -> Error "RoadNotOpen"
         | Some view when view.ActiveIncumbency = Some incumbentId ->
@@ -844,7 +844,7 @@ module Decision =
                       binding,
                       snapshotId,
                       authorityRevision,
-                      scores
+                      findings
                   ) ]
         | Some _ -> Error "IncumbencyNotActive"
 

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
-const openAssessed = (scores) => {
+const gap = [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
+
+const openAssessed = (findings) => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(opened.ok, true)
   const assessed = relay.assess(
@@ -12,7 +14,7 @@ const openAssessed = (scores) => {
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...scores,
+    findings,
   )
   assert.equal(assessed.ok, true)
   return assessed.state
@@ -26,7 +28,7 @@ test('WHAT[relay-retirement-007] Continue retirement commits a closed Continue o
     { ok: false, error: 'AssessmentRequired' },
   )
 
-  const state = openAssessed(['REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT'])
+  const state = openAssessed(gap)
   const retired = relay.retireContinue(state, 'road-1', 'inc-1', 'ret-1', 'run-1', 'tool-1', 'snapshot-1')
   assert.equal(retired.ok, true)
   assert.deepEqual(relay.retirement(retired.state, 'road-1'), {
@@ -43,7 +45,7 @@ test('WHAT[relay-retirement-007] Continue retirement commits a closed Continue o
 })
 
 test('WHAT[relay-retirement-007] Accepted retirement commits a closed Accepted outcome with certificate binding', () => {
-  const state = openAssessed(Array(8).fill('PERFECT'))
+  const state = openAssessed([])
   const retired = relay.retireAccepted(
     state,
     'road-1',
@@ -69,7 +71,7 @@ test('WHAT[relay-retirement-007] Accepted retirement commits a closed Accepted o
 })
 
 test('WHAT[relay-retirement-007] Accepted with a stale different snapshot fails', () => {
-  const state = openAssessed(Array(8).fill('PERFECT'))
+  const state = openAssessed([])
   const stale = relay.retireAccepted(
     state,
     'road-1',
@@ -84,7 +86,7 @@ test('WHAT[relay-retirement-007] Accepted with a stale different snapshot fails'
 })
 
 test('WHAT[relay-retirement-007] cleanup-blocked fold accepts a subsequent exact certificate retirement transaction', () => {
-  const state = openAssessed(Array(8).fill('PERFECT'))
+  const state = openAssessed([])
   const blocked = relay.blockCleanup(state, 'road-1', 'inc-1', 'blocker-digest-1')
   assert.equal(blocked.ok, true)
   assert.equal(relay.view(blocked.state, 'road-1').phase, 'RetirementCleanupBlocked')
@@ -117,7 +119,7 @@ test('WHAT[relay-retirement-007] Accepted road cannot reopen new incumbency whil
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill('PERFECT'),
+    [],
   )
   assert.equal(assessed.ok, true)
 

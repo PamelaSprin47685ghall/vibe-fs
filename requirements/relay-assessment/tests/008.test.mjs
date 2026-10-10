@@ -9,6 +9,8 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const relay = await import("../../../dist/Mission/Relay/Surface.js");
 
+const gap = [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
+
 
 test('WHAT[relay-assessment-008] Road fold distinguishes repair and finish facts for subsequent instruction selection', () => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
@@ -24,7 +26,7 @@ test('WHAT[relay-assessment-008] Road fold distinguishes repair and finish facts
     'assessment-repair',
     'snapshot-1',
     'authority-1',
-    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
+    gap,
   )
   assert.equal(repaired.ok, true)
   assert.equal(relay.view(repaired.state, 'road-1').phase, 'WorkOwned')
@@ -44,7 +46,7 @@ test('WHAT[relay-assessment-008] Road fold distinguishes repair and finish facts
     'assessment-finish',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill('PERFECT'),
+    [],
   )
   assert.equal(finished.ok, true)
   assert.equal(relay.view(finished.state, 'road-1').phase, 'PerfectAwaitingRetirement')

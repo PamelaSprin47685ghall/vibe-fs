@@ -58,20 +58,17 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
     // Step 1: Submit PERFECT review
-    const scores = Object.fromEntries([
-      'language_algorithms', 'simplicity', 'structure', 'granularity',
-      'tests_evidence', 'logic_reliability_boundaries', 'caller_ergonomics', 'completeness',
-    ].map((name) => [name, 'PERFECT']))
+    const findings = []
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
         { type: 'text', text: 'All criteria perfect.' },
-        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: scores } },
+        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
       ],
     }
     runtime.pushHostMessage(sessionID, review)
     const context = (callID, messageID) => ({ sessionID, agent: 'manager', callID, messageID })
-    const reviewResult = await hooks.tool.review.execute(scores, context('call-review', review.id))
+    const reviewResult = await hooks.tool.review.execute(findings, context('call-review', review.id))
     assert.match(reviewResult, /recorded = true/)
 
     // Step 2: Suicide commits Accepted retirement

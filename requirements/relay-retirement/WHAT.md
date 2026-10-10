@@ -6,7 +6,7 @@
 
 ## [002] 评级前提
 
-Suicide 前须提交八维 assessment；尚未提交时返回先调用 review 的明确提示。提交后，REVISE、测试失败、未结义务、dirty 或 unmerged 工作区均不得成为退场阻塞项。
+Suicide 前须提交 assessment；尚未提交时返回先调用 review 的明确提示。提交后，REVISE、测试失败、未结义务、dirty 或 unmerged 工作区均不得成为退场阻塞项。
 
 ## [003] 资源阻塞
 

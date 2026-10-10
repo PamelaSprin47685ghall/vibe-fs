@@ -36,8 +36,8 @@ module Fold =
         binding: AssessmentBinding ->
         snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
-        scores: ScoreVector ->
-            Result<ScoreVector, string>
+        findings: AssessmentFindings ->
+            Result<AssessmentFindings, string>
 
     /// obligation-ledger-004: enumerate every durable road id for read-only
     /// projection forwarding (owner-provided accessor; no private state escapes).
@@ -67,7 +67,7 @@ module Decision =
         binding: AssessmentBinding ->
         snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
-        scores: ScoreVector ->
+        findings: AssessmentFindings ->
             Result<RelayState, string>
 
     val advanceAuthority:
