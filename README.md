@@ -214,17 +214,25 @@ npm run format-build-test
 
 ### 常用命令
 
+验证入口只有两个：
+
 ```bash
 npm ci
 dotnet tool restore
-npm run format-build-test
+npm run format-build-test   # 日常验证
+npm run verify:release      # 发布验证
 ```
 
 | 命令 | 作用 |
 |------|------|
 | `npm run format-build-test` | 日常验证（入口 `node scripts/verify.mjs`）：Fantomas 检查（`format:check`）→ `check` → 编译 → unit → integration（warmup 与 distribution package 子步骤随 integration 调度） |
-| `npm run format` | Fantomas 写盘（与 `format:check` 的相对面：一个改文件，一个只判失败） |
 | `npm run verify:release` | 发布验证：在日常阶梯基础上追加 clean build（`--clean`）、Long Stroke e2e（`tests/014.test.mjs`）与真实 package 校验 |
+
+辅助命令（不是验证入口）：
+
+| 命令 | 作用 |
+|------|------|
+| `npm run format` | Fantomas 写盘（与 `format:check` 的相对面：一个改文件，一个只判失败） |
 | `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
 | `node scripts/derive-envelope.mjs` | 手动派生 loop detector envelope 到 `dist/Execution/Session/LoopDetectorEnvelope.js`。构建不自动派生；产物缺失时构建会提示运行本命令 |
 
