@@ -106,7 +106,7 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide'];
   // The Manager provider surface carries independent assume + native todowrite.
   const managerTools = [
-    'abandon', 'assume', 'defer', 'enough',
+    'assume', 'defer',
     'fork', 'horizon', 'join', 'js-manager', 'publish', 'resume',
     'review', 'skill',  'suicide', 'todowrite',
   ];

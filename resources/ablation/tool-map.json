@@ -13,8 +13,6 @@
     "horizon": "participant-horizon",
     "assume": "cognitive-environment",
     "todowrite": "obligation-ledger",
-    "enough": "attention-regulation",
-    "abandon": "attention-regulation",
     "defer": "attention-regulation",
     "open-terminal": "process-execution",
     "send-terminal": "process-execution",

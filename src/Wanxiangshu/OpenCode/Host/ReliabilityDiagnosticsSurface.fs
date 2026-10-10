@@ -30,7 +30,7 @@ module ReliabilityDiagnosticsSurface =
     let private deepFreeze (value: obj) : obj = jsNative
 
     [<Emit("process.env.WANXIANGSHU_DIAG === '1'")>]
-    let private diagnosticsVisible () : bool = jsNative
+    let internal diagnosticsVisible () : bool = jsNative
 
     [<Emit("console.error(JSON.stringify($0))")>]
     let private writeRecord (value: obj) : unit = jsNative

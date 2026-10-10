@@ -56,8 +56,6 @@ module InvestigationEstimateContract =
         | "todowrite"
         | "sphinx"
         | "assume"
-        | "enough"
-        | "abandon"
         | "defer"
         | "publish"
         | "chronicle"

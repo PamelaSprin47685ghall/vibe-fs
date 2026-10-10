@@ -147,7 +147,7 @@ test('WHAT[speculative-investigation-016] the production classifier admits exact
   const noEstimate = [
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'suicide',
     'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'skill', 'todowrite', 'sphinx', 'assume', 'enough', 'abandon', 'defer', 
+    'skill', 'todowrite', 'sphinx', 'assume', 'defer', 
     'publish', 'chronicle', 'js-bookkeeper',
     'bash-honeypot', 'invalid', 'js-orchestrator', 'js-blogger'
   ];

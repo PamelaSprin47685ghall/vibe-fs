@@ -570,7 +570,7 @@ const createRawManagerTools = () => [
         attach: { type: 'string' },
         expected_tool_calls: { type: 'integer' },
       },
-      required: ['calling', 'name', 'charge'],
+      required: ['name', 'charge'],
     },
   },
   {

@@ -49,7 +49,7 @@ module Fold =
             let sessionId = SessionId.create (RoadId.value payload.RoadId)
             let events = RelayTransaction.events payload.Transaction
 
-            // ATTENTION-004: a completed life takes its un-resurfaced deferred
+            // ATTENTION-004: a completed life takes its un-consumed deferred
             // work with it, so a reused SessionId cannot inherit it.
             let attentionAfterClosure =
                 settleAttentionLife events sessionId projection.Attention

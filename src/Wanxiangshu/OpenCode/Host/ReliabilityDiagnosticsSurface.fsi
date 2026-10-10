@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode.Host
 
 module ReliabilityDiagnosticsSurface =
     val internal redactText: value: string -> string
+    val internal diagnosticsVisible: unit -> bool
     val internal projectTyped: record: CausalDiagnosticRecord -> obj
     val projectRecord: value: obj -> obj
     val tryEmit: value: obj -> bool
