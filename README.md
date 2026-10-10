@@ -273,7 +273,6 @@ resources/provider/
   casebook/<step>/{en,zh-CN}.md
   attention-regulation/<entry>/{en,zh-CN}.md
   concern-routing/<entry>/{en,zh-CN}.md
-  institutional-learning/<entry>/{en,zh-CN}.md
   README.md
 resources/ablation/{fact-map,nodes,profiles,tool-map}.json
 resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md
