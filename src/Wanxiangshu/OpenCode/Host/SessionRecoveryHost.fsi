@@ -34,3 +34,8 @@ type SessionRecoveryHost =
     /// `no-execution` | `ignored`。
     member SettleProviderStartBoundaryRejected:
         key: ChatExecutionKey * reason: string -> Task<string>
+
+    /// provider-attempt-recovery-024：加载期同源 stale Blogger execution 的定夺入口。
+    /// 返回（本次定夺数, 该 session 已 terminal 数）；无 Accepted 的执行不伪造。
+    member SettleStaleBloggerAcceptedExecutions:
+        sessionId: SessionId -> Task<int * int>

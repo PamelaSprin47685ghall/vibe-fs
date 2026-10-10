@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -76,19 +77,46 @@ module PluginRecoveryWiring =
                     // crash-reconciliation-020: settle the child work runs the
                     // previous runtime left active, so the next handoff to that
                     // child is a fresh root instead of a refused identity.
+                    // provider-attempt-recovery-024: the abandoned stale requests
+                    // owed one more settlement — their same-source accepted
+                    // executions never reached a provider. Decide them before the
+                    // runtime reload signal; one failed session must not block the
+                    // others, and a boot-time release is an idempotent request.
+                    let settleStaleBloggerSession (bloggerSessionId: SessionId) : Task =
+                        task {
+                            try
+                                do!
+                                    scope.SignalChatRecovery(
+                                        ChatExecutionRecoveryLifecycleEvent.BloggerStaleRequestAbandoned bloggerSessionId
+                                    )
+                            with error ->
+                                Diagnostic.emit
+                                    "stale-blogger-execution-settlement-failed"
+                                    [ "blogger_session_id", SessionId.value bloggerSessionId
+                                      "error", error.Message ]
+                        }
+
+                    // ... and the Blog materializations it left open. No live
+                    // execution can own one, and while it stays open the
+                    // coordinator never materializes a fresh request — the
+                    // Blogger would never ingest the raw tail again
+                    // (crash-reconciliation-020 / context-compression-024).
+                    let settleAbandonedStaleBloggerSessions (journal: AgentJournal) =
+                        task {
+                            let bloggerHost = scope.BloggerRuntimeHost
+                            let liveFlight = isFlightActive bloggerHost
+
+                            let! staleBloggerSessions =
+                                BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
+
+                            for bloggerSessionId in staleBloggerSessions do
+                                do! settleStaleBloggerSession bloggerSessionId
+                        }
+
                     match boot.Journal with
                     | Some journal ->
                         do! ChildWorkRecovery.settleOrphanedChildRuns journal
-
-                        // ... and the Blog materializations it left open. No live
-                        // execution can own one, and while it stays open the
-                        // coordinator never materializes a fresh request — the
-                        // Blogger would never ingest the raw tail again
-                        // (crash-reconciliation-020 / context-compression-024).
-                        let bloggerHost = scope.BloggerRuntimeHost
-                        let liveFlight = isFlightActive bloggerHost
-
-                        do! BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
+                        do! settleAbandonedStaleBloggerSessions journal
                     | None -> ()
 
                     do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PluginRuntimeReloaded)
