@@ -58,7 +58,7 @@ module ForkTool =
             let ChargeRequired = "tool/fork/charge-required"
 
             [<Literal>]
-            let CallingRequired = "tool/fork/calling-required"
+            let CallingConflict = "tool/fork/calling-conflict"
 
             [<Literal>]
             let UnknownCalling = "tool/fork/unknown-calling"
@@ -133,9 +133,6 @@ module ForkTool =
 
             [<Literal>]
             let RoadNotOpened = "tool/commission/road-not-opened"
-
-            [<Literal>]
-            let RoadUnknown = "tool/commission/road-unknown"
 
             [<Literal>]
             let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
@@ -218,6 +215,15 @@ module ForkTool =
             |> Option.bind (fun wanted ->
                 bindings
                 |> List.tryPick (fun (identity, managed) -> if identity = wanted then Some managed else None))
+
+    /// delegation-003: a blank fork calling derives from the name. `devops` is
+    /// the fixed execution operator and cannot be forked, so it derives to a
+    /// value the fork bindings reject.
+    let private derivedForkCalling (byname: string) =
+        if String.Equals(byname.Trim(), "devops", StringComparison.OrdinalIgnoreCase) then
+            "devops"
+        else
+            "engineer"
 
     let private hasKeywords (request: Request) =
         not (String.IsNullOrWhiteSpace request.Keywords)
@@ -597,10 +603,20 @@ module ForkTool =
         handles
         existingByname
         =
-        match existingByname, tryCalling managerCallingBindings request.Calling with
-        | Some _, _ -> Task.FromResult(consequence (prose language Path.Fork.NameAlreadyBelongs))
-        | None, None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
-        | None, Some managed -> placeNewManagerFork scope runtime context request language handles managed
+        match existingByname with
+        | Some _ -> Task.FromResult(consequence (prose language Path.Fork.NameAlreadyBelongs))
+        | None ->
+            let derived = derivedForkCalling request.Name
+
+            if
+                not (String.IsNullOrWhiteSpace request.Calling)
+                && not (String.Equals(request.Calling.Trim(), derived, StringComparison.OrdinalIgnoreCase))
+            then
+                Task.FromResult(consequence (prose language Path.Fork.CallingConflict))
+            else
+                match tryCalling managerCallingBindings derived with
+                | None -> Task.FromResult(consequence (prose language Path.Fork.UnknownCalling))
+                | Some managed -> placeNewManagerFork scope runtime context request language handles managed
 
     let private executeManagerExistingPerson
         (scope: ToolRuntimeScope)
@@ -705,8 +721,6 @@ module ForkTool =
                 return consequence (prose language Path.Fork.ChargeRequired)
             elif isSelfAttachment request then
                 return consequence (prose language Path.Fork.AttachSelf)
-            elif String.IsNullOrWhiteSpace request.Calling then
-                return consequence (prose language Path.Fork.CallingRequired)
             else
                 return! executeManagerAfterGuards scope request context language
         }
@@ -742,17 +756,19 @@ module ForkTool =
             | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
         }
 
+    /// delegation-004: Orchestrator only commissions a Manager, so a blank
+    /// commission calling derives to the single Manager persona.
+    let private derivedCommissionCalling = "lead"
+
     let private commissionNewCalling
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
         (request: Request)
         language
-        existingByname
         =
-        match existingByname, tryCalling orchestratorCallingBindings request.Calling with
-        | Some _, _ -> Task.FromResult(consequence (prose language Path.Commission.NameAlreadyBelongs))
-        | None, None -> Task.FromResult(consequence (prose language Path.Commission.UnknownCalling))
-        | None, Some managed -> finishCommissionNew scope context request language managed
+        match tryCalling orchestratorCallingBindings derivedCommissionCalling with
+        | None -> Task.FromResult(consequence (prose language Path.Commission.UnknownCalling))
+        | Some managed -> finishCommissionNew scope context request language managed
 
     let private continueExistingCommission
         (scope: ToolRuntimeScope)
@@ -781,17 +797,6 @@ module ForkTool =
             | _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
         }
 
-    let private commissionExistingByname
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (request: Request)
-        language
-        existingByname
-        =
-        match existingByname with
-        | None -> Task.FromResult(consequence (prose language Path.Commission.RoadUnknown))
-        | Some job -> continueExistingCommission scope context request language job
-
     let private executeOrchestratorAfterGuards
         (scope: ToolRuntimeScope)
         (request: Request)
@@ -799,11 +804,19 @@ module ForkTool =
         language
         =
         let existingByname = orchestratorExistingByname scope request
+        let hasCalling = not (String.IsNullOrWhiteSpace request.Calling)
 
-        if not (String.IsNullOrWhiteSpace request.Calling) then
-            commissionNewCalling scope context request language existingByname
+        if
+            hasCalling
+            && not (String.Equals(request.Calling.Trim(), derivedCommissionCalling, StringComparison.OrdinalIgnoreCase))
+        then
+            Task.FromResult(consequence (prose language Path.Commission.UnknownCalling))
         else
-            commissionExistingByname scope context request language existingByname
+            match existingByname with
+            | Some _ when hasCalling ->
+                Task.FromResult(consequence (prose language Path.Commission.NameAlreadyBelongs))
+            | Some job -> continueExistingCommission scope context request language job
+            | None -> commissionNewCalling scope context request language
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -832,7 +845,7 @@ module ForkTool =
           Description = prose language Path.Fork.Description
           Arguments =
             [ "calling",
-              ToolHostCodec.enumSchemaDescribed
+              ToolHostCodec.optionalEnumSchemaDescribed
                   (callingNames managerCallingBindings)
                   (prose language Path.Fork.ArgCalling)
                   factory
