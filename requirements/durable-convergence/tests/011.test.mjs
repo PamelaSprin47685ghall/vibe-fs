@@ -363,3 +363,59 @@ test('WHAT[durable-convergence-011] writer lifecycle observes active, expiry, an
     assert.match(writers3, /writer-lifecycle\.ndjson/, 'reactivated writer rematerialized in snapshot')
   })
 })
+
+test('WHAT[durable-convergence-011] today, yesterday, and the day before resolve as three distinct UTC day groups', async () => {
+  const now = Date.parse('2026-08-21T00:30:00Z')
+  await withRepo(async (repo, commonDir) => {
+    const journal = (id, stream, observedAt) => ({ ...make(id, stream), type: 'JournalEnvelope', payload: { ObservedAt: new Date(observedAt).toISOString() } })
+    const todayPath = writeCanonicalEvents(commonDir, 'writer-today', [journal(A, 'retention/day-groups/today', Date.parse('2026-08-21T00:10:00Z'))])
+    const yesterdayPath = writeCanonicalEvents(commonDir, 'writer-yesterday', [journal(B, 'retention/day-groups/yesterday', Date.parse('2026-08-20T00:10:00Z'))])
+    const beforePath = writeCanonicalEvents(commonDir, 'writer-before-yesterday', [journal('c'.repeat(40), 'retention/day-groups/before', Date.parse('2026-08-19T23:50:00Z'))])
+
+    assert.deepEqual(
+      retention.retainedWriterIdsAt(commonDir, now),
+      ['writer-today', 'writer-yesterday'],
+      'one UTC midnight boundary decides, not a rolling 24h window: yesterday is retained although its activity is over 24h old, the day before is collected although it is under 48h old',
+    )
+
+    const snapshot = await retention.syncAt(repo, commonDir, null, now)
+    assert.equal(snapshot.ok, true, JSON.stringify(snapshot.error))
+    assert.equal(existsSync(todayPath), true)
+    assert.equal(existsSync(yesterdayPath), true)
+    assert.equal(existsSync(beforePath), false, 'the day-before writer leaves local disk as a whole')
+    const writers = execFileSync('git', ['-C', repo, 'ls-tree', `${snapshot.root}:writers`], { encoding: 'utf8' })
+    assert.match(writers, /writer-today\.ndjson/)
+    assert.match(writers, /writer-yesterday\.ndjson/)
+    assert.doesNotMatch(writers, /writer-before-yesterday\.ndjson/)
+  })
+})
+
+test('WHAT[durable-convergence-011] advancing a writer activity from yesterday to today pushes its expiry one UTC day later', async () => {
+  const day0 = Date.parse('2026-08-21T00:00:00Z')
+  await withRepo(async (repo, commonDir) => {
+    const journal = (id, observedAt, parents = []) => ({ ...make(id, 'retention/moving', parents), type: 'JournalEnvelope', payload: { ObservedAt: new Date(observedAt).toISOString() } })
+    const writerPath = writeCanonicalEvents(commonDir, 'writer-moving', [journal(A, Date.parse('2026-08-20T12:00:00Z'))])
+
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, day0 + DAY), [],
+      'without movement, yesterday activity is collected once its UTC day is the day before yesterday')
+    assert.equal(existsSync(writerPath), true, 'retainedWriterIdsAt filters; it never deletes bytes')
+
+    writeFileSync(writerPath, canonicalLine(journal(B, Date.parse('2026-08-21T12:00:00Z'), [A])), { flag: 'a' })
+
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, day0 + DAY), ['writer-moving'],
+      'the same expiry instant retains the writer because its activity moved to the previous UTC day')
+    const retained = await retention.syncAt(repo, commonDir, null, day0 + DAY)
+    assert.equal(retained.ok, true, JSON.stringify(retained.error))
+    assert.equal(existsSync(writerPath), true, 'the moved writer survives the sync at its former expiry point')
+    const retainedWriters = execFileSync('git', ['-C', repo, 'ls-tree', `${retained.root}:writers`], { encoding: 'utf8' })
+    assert.match(retainedWriters, /writer-moving\.ndjson/)
+
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, day0 + 2 * DAY), [],
+      'once the moved activity is two UTC days old, the writer expires as a whole')
+    const expired = await retention.syncAt(repo, commonDir, retained.root, day0 + 2 * DAY)
+    assert.equal(expired.ok, true, JSON.stringify(expired.error))
+    assert.equal(existsSync(writerPath), false, 'expiry removes the local writer')
+    const expiredWriters = execFileSync('git', ['-C', repo, 'ls-tree', `${expired.root}:writers`], { encoding: 'utf8' })
+    assert.doesNotMatch(expiredWriters, /writer-moving\.ndjson/)
+  })
+})
