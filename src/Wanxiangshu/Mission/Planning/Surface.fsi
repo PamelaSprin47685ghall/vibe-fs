@@ -13,6 +13,7 @@ module PlanningSurface =
     val askPending: workId: string -> incumbencyId: string -> question: string -> cursor: int64 -> PlanEvent
     val askResolved: incumbencyId: string -> cursor: int64 -> PlanEvent
     val applyWorkEvent: event: PlanEvent -> state: PlanWorkState -> obj
+    val latestRetirementRange: state: PlanWorkState -> (int64 * int64) option
     val activeStage: state: PlanWorkState -> string option
     val retiredCount: state: PlanWorkState -> int
     val isDelivered: state: PlanWorkState -> bool

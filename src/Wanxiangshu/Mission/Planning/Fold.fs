@@ -46,7 +46,7 @@ type PlanWorkState =
       Root: string option
       Active: ActivePlanIncumbency option
       Retired: PlanIncumbencyId list
-      LatestRetirement: (PlanIncumbencyId * PlanRetirementOutcome * XTraceCursor) option
+      LatestRetirement: (PlanIncumbencyId * PlanRetirementOutcome * XTraceCursor * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
       PreviousIncumbencyStage: PlanStage option
@@ -95,7 +95,7 @@ module PlanFold =
           RetiredCount = state.Retired.Length
           LatestRetirementOutcome =
             state.LatestRetirement
-            |> Option.map (fun (_, o, _) -> PlanRetirementOutcome.render o)
+            |> Option.map (fun (_, o, _, _) -> PlanRetirementOutcome.render o)
           Delivered = state.Delivered.IsSome
           DeliveryDigest = state.Delivered |> Option.map (fun d -> d.Digest)
           DeliveryPath = state.Delivered |> Option.map (fun d -> d.Path)
@@ -198,7 +198,7 @@ module PlanFold =
         let isRetired = List.contains incumbencyId state.Retired
 
         match state.Active, isRetired, state.LatestRetirement with
-        | None, true, Some(retId, retOutcome, retCursor) when
+        | None, true, Some(retId, retOutcome, _, retCursor) when
             retId = incumbencyId
             && retOutcome = outcome
             && XTraceCursor.sequence retCursor = XTraceCursor.sequence retirementCursor
@@ -212,7 +212,7 @@ module PlanFold =
             Error "Retirement cursor cannot precede incumbency opening cursor"
         | Some active, _, _ ->
             let retired = active.Id :: state.Retired
-            let latest = Some(active.Id, outcome, retirementCursor)
+            let latest = Some(active.Id, outcome, active.OpeningCursor, retirementCursor)
 
             Ok
                 { state with
@@ -250,16 +250,16 @@ module PlanFold =
         | Some id, _, _, _ when id <> workId -> Error "Work ID mismatch on plan delivery"
         | Some _, true, _, _ ->
             Error "Cannot deliver while an active incumbency exists; incumbency must retire with Delivered first"
-        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _), Some receipt when
+        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _, _), Some receipt when
             retId = incumbencyId
             && receipt.IncumbencyId = incumbencyId
             && receipt.Digest = digest
             && receipt.Path = path
             ->
             Ok state
-        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _), Some _ when retId = incumbencyId ->
+        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _, _), Some _ when retId = incumbencyId ->
             Error "Delivery already recorded with conflicting digest or path"
-        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _), None when retId = incumbencyId ->
+        | Some _, false, Some(retId, PlanRetirementOutcome.Delivered, _, _), None when retId = incumbencyId ->
             validateReceipt incumbencyId workId digest path state
         | _ -> Error "Delivery requires the incumbency to be retired with Delivered outcome"
 

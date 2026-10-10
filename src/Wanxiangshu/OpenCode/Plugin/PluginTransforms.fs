@@ -645,11 +645,15 @@ module PluginTransforms =
                 |> Option.map Wanxiangshu.Mission.Planning.PlanWorkId.value
                 |> Option.defaultValue ""
 
+            let previousRange =
+                state.LatestRetirement
+                |> Option.map (fun (_, _, startC, endC) -> (XTraceCursor.sequence startC, XTraceCursor.sequence endC))
+
             { WorkId = workId
               IncumbencyId = Wanxiangshu.Mission.Planning.PlanIncumbencyId.value active.Id
               Stage = Wanxiangshu.Mission.Planning.PlanStage.render active.Stage
               OpeningCursor = XTraceCursor.sequence active.OpeningCursor
-              PreviousRange = None
+              PreviousRange = previousRange
               IsFreshHandover = fresh }
 
         let resolveTenure (outObj: obj) : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =

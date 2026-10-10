@@ -63,6 +63,10 @@ module PlanningSurface =
 
     let retiredCount (state: PlanWorkState) : int = state.Retired.Length
 
+    let latestRetirementRange (state: PlanWorkState) : (int64 * int64) option =
+        state.LatestRetirement
+        |> Option.map (fun (_, _, startC, endC) -> (XTraceCursor.sequence startC, XTraceCursor.sequence endC))
+
     let isDelivered (state: PlanWorkState) : bool = state.Delivered.IsSome
 
     let deliveredDigest (state: PlanWorkState) : string option =
@@ -828,6 +832,7 @@ module PlanningSurface =
                evaluateRecoveryEffects = evaluateRecoveryEffects
                allWorkViews = allWorkViews
                allWorkViewsFromIntegrator = allWorkViewsFromIntegrator
+               latestRetirementRange = latestRetirementRange
                workOpened = workOpened
                devOpsBound = devOpsBound
                incumbencyOpened = incumbencyOpened
