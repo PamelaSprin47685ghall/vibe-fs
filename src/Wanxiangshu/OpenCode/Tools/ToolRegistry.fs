@@ -74,8 +74,6 @@ module ToolRegistry =
           "rm", FileMutationTools.rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
-          "enough", AttentionTools.admission
-          "abandon", AttentionTools.admission
           "defer", AttentionTools.admission
           "publish", ConcernTools.admission
           "chronicle", ChronicleTool.admission bloggerHost

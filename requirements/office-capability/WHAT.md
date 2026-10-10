@@ -42,7 +42,7 @@ Review 接纳前不得向固定 DevOps 派工，已有只读 Engineer 的合法 
 
 ## [012] Orchestrator
 
-Orchestrator 只委任或接续顶层道路的 Manager，不直接委任其他 Office，不介入具体执行，不使用 Fission。
+Orchestrator 只委任或接续顶层道路的 Manager，不直接委任其他 Office，不介入具体执行，不使用 Fission。`commission` 的 `calling` 可选，省略时推导为 Manager persona；显式 `calling` 与推导不一致须 typed 拒绝。
 
 ## [015] Predictor
 

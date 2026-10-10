@@ -85,8 +85,6 @@ module StaticTools =
           "skill"
           "todowrite"
           "assume"
-          "enough"
-          "abandon"
           "defer"
           "publish"
           "mv"
@@ -119,8 +117,6 @@ module StaticTools =
             (name = "skill"
              || name = "todowrite"
              || name = "assume"
-             || name = "enough"
-             || name = "abandon"
              || name = "defer"
              || name = "publish"
              || Set.contains name allowedNames))
@@ -155,9 +151,8 @@ module StaticTools =
         | true, "skill", _ -> "allow"
         | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"
         | true, ("assume" | "todowrite"), _ -> "allow"
-        | true, ("enough" | "abandon" | "defer" | "publish"), Role.Blogger ->
-            "deny"
-        | true, ("enough" | "abandon" | "defer" | "publish"), _ -> "allow"
+        | true, ("defer" | "publish"), Role.Blogger -> "deny"
+        | true, ("defer" | "publish"), _ -> "allow"
         | true, "js-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "js-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed name

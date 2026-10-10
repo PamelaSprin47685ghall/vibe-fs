@@ -34,7 +34,9 @@ type ToolPermission =
 type ManagerCapabilityFacts =
     { HasActiveIncumbency: bool
       HasAssessment: bool
-      HasValidBoundCertificate: bool
+      /// True when the active incumbency's accepted assessment has empty
+      /// findings: the final incumbent who settles and retires with no successor.
+      IsFinalIncumbent: bool
       CleanupBlockerDigest: string option }
 
 [<RequireQualifiedAccess>]
@@ -42,6 +44,19 @@ module OfficeCapability =
 
     let managerReviewReadOnlyPermissions: ToolPermission Set =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
+
+    /// capability-enforcement-025 / relay-assessment-005: the final incumbent's
+    /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
+    /// suicide finality, and drops every new-work capability (fork, resume,
+    /// review, sphinx).
+    let managerFinishPermissions: ToolPermission Set =
+        set
+            [ ToolPermission.Read
+              ToolPermission.Glob
+              ToolPermission.Grep
+              ToolPermission.Horizon
+              ToolPermission.Join
+              ToolPermission.Finality ]
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
@@ -105,18 +120,16 @@ module OfficeCapability =
 
     /// Manager gate over exact RoadView facts. No phase enum crosses this
     /// boundary: retired/no-active grants nothing, a cleanup blocker confines
-    /// to the Join+Finality finish window, a valid bound certificate confines
-    /// to the same finish window, and all other active facts keep the full
-    /// Manager set. A mismatched or stale certificate leaves
-    /// HasValidBoundCertificate false, so it never confines to (or grants)
-    /// the finish window.
+    /// to the Join+Finality finish window, the final incumbent keeps the
+    /// read/cleanup/close-out surface but loses every new-work capability, and
+    /// all other active facts keep the full Manager set.
     let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
         if not facts.HasActiveIncumbency then
             Set.empty
         elif facts.CleanupBlockerDigest.IsSome then
             set [ ToolPermission.Join; ToolPermission.Finality ]
-        elif facts.HasValidBoundCertificate then
-            set [ ToolPermission.Join; ToolPermission.Finality ]
+        elif facts.IsFinalIncumbent then
+            managerFinishPermissions
         elif facts.HasAssessment then
             Set.difference (permissions Role.Manager) managerReviewReadOnlyPermissions
         else
