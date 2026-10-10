@@ -137,9 +137,6 @@ module GitGateway =
                 return! pushSnapshot run remote expectedRemote merged
         }
 
-    let private currentTimeMs () =
-        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() |> float
-
     /// Full bidirectional convergence. `observedRemote` is only an optimization
     /// for reference-transaction: the algorithm after root discovery is identical
     /// to pre-push. Lease races refetch and repeat boundedly.
@@ -156,8 +153,9 @@ module GitGateway =
         (observedRemote: StoreSnapshot option)
         (withLocalLock: GitGatewayLocalStage -> Task<Result<StoreSnapshot, ConvergeError>>)
         (deadline: Deadline)
+        (clock: unit -> DateTimeOffset)
         : Task<Result<StoreSnapshot, ConvergeError>> =
-        let clock () = DateTimeOffset.UtcNow
+        let currentTimeMs () = (clock ()).ToUnixTimeMilliseconds() |> float
         let budgetExhausted () = Deadline.isExpired clock deadline
 
         let readRemoteAndMerge snapshot nowMs =

@@ -59,8 +59,11 @@ module HookSync =
                 let raw = ProcessGitRawStore.create repo
                 let run = GitGateway.createDefaultRunner repo
 
+                let clockPort = NodeTiming.nodeClockPort ()
+                let clock () = clockPort.UtcNow ()
+
                 let deadline =
-                    Deadline.ofBudget (DateTimeOffset.UtcNow) (TimeSpan.FromSeconds ConvergeBudgetSeconds)
+                    Deadline.ofBudget (clock ()) (TimeSpan.FromSeconds ConvergeBudgetSeconds)
 
                 let! result =
                     GitGateway.converge
@@ -72,6 +75,7 @@ module HookSync =
                         observed
                         (fun stage -> ProcessEventLog.withStoreLock gitCommonDir stage)
                         deadline
+                        clock
 
                 return failureMessage remote result
             with ex ->

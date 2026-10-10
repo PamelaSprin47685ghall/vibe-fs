@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Git
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Process
@@ -21,6 +22,7 @@ module GitGateway =
         observedRemote: StoreSnapshot option ->
         withLocalLock: (GitGatewayLocalStage -> Task<Result<StoreSnapshot, ConvergeError>>) ->
         deadline: Deadline ->
+        clock: (unit -> DateTimeOffset) ->
             Task<Result<StoreSnapshot, ConvergeError>>
 
     val createDefaultRunner: repoPath: string -> GitGatewayRunner
