@@ -47,6 +47,17 @@ module SessionRecoveryHostSurface =
     /// `ProviderStarted` 的执行；返回值是完整可观察效果（port 调用 + manual）。
     val signalSessionQuiesced: handle: RecoveryHostHandle -> sessionId: string -> Task<obj>
 
+    /// managed-chat-execution-015：transform 在 provider 启动边界拒绝 exact 执行。
+    /// 返回该拒绝的可观察结局：`terminalized`（pre-provider Failed + 精确释放）、
+    /// `already-terminal`（幂等；容量仍 held 时精确释放）、`no-execution`（无 Accepted
+    /// 投影，不伪造）、`ignored`（已 ProviderStarted，不由 pre-provider 路径终结）。
+    val signalProviderStartBoundaryRejected:
+        handle: RecoveryHostHandle ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        reason: string ->
+            Task<obj>
+
     val disposeRecoveryHost: handle: RecoveryHostHandle -> unit
 
     /// managed-chat-execution-006：受控 terminal barrier boot。terminalMode 为

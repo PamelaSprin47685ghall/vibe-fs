@@ -351,6 +351,28 @@ module SessionRecoveryHostSurface =
                        manuals = manualsOf handle.Scope |}
         }
 
+    /// managed-chat-execution-015: the transform refused the provider start
+    /// boundary for this exact execution. The returned view is the whole
+    /// observable decision: the settlement result plus the remaining manuals.
+    let signalProviderStartBoundaryRejected
+        (handle: RecoveryHostHandle)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (reason: string)
+        : Task<obj> =
+        task {
+            let key: ChatExecutionKey =
+                { SessionId = SessionId.create sessionId
+                  PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId }
+
+            let! result = handle.Host.SettleProviderStartBoundaryRejected(key, reason)
+
+            return
+                box
+                    {| result = result
+                       manuals = manualsOf handle.Scope |}
+        }
+
     /// managed-chat-execution-006 B1 seam: a transparent pass-through writer that
     /// holds or fails only ChatExecution Terminal appends. Every other fact,
     /// read and lifecycle call forwards to the real writer unchanged; a held

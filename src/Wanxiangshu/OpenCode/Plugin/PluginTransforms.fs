@@ -242,6 +242,52 @@ module PluginTransforms =
             if ModelRouting.readExecutionAdmission key |> Option.isNone then
                 rejectProviderStartBoundary (ProviderStartBoundaryFailure.CommittedAdmissionUnavailable key)
 
+        /// managed-chat-execution-015: the exact execution key a refused
+        /// provider start boundary addresses; a missing wire identity means
+        /// the refusal carries no exact key and is never guessed.
+        let exactProviderStartBoundaryKey
+            (projectionSessionIdOpt: string option)
+            (outObj: obj)
+            : ChatExecutionKey option =
+            match projectionSessionIdOpt with
+            | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
+                outObj
+                |> ProviderWireDecode.messagesFromTransformOutput
+                |> ProviderWireCapture.lastUserMessageId
+                |> Option.map (fun physical ->
+                    { SessionId = SessionId.create sessionText
+                      PhysicalUserMessageId = physical })
+            | _ -> None
+
+        let signalProviderStartBoundaryRejection (key: ChatExecutionKey) (reason: string) () : Task =
+            scope.SignalChatRecovery(
+                ChatExecutionRecoveryLifecycleEvent.ProviderStartBoundaryRejected(key, reason)
+            )
+
+        /// managed-chat-execution-015: report a refused provider start boundary
+        /// for the exact execution to the settlement owner. The report must
+        /// never replace the original refusal: a failed report is emitted as a
+        /// diagnostic and the caller still raises the hook failure below.
+        let reportProviderStartBoundaryRejected
+            (projectionSessionIdOpt: string option)
+            (outObj: obj)
+            (reason: string)
+            : Task =
+            task {
+                let report () =
+                    match exactProviderStartBoundaryKey projectionSessionIdOpt outObj with
+                    | Some key -> signalProviderStartBoundaryRejection key reason ()
+                    | None -> Task.FromResult(()) :> Task
+
+                try
+                    do! report ()
+                with reportError ->
+                    Diagnostic.emit
+                        "provider-start-boundary-rejection-report-failed"
+                        [ "provider_error", reason
+                          "result", reportError.Message ]
+            }
+
         let observeProviderRun (key: ChatExecutionKey) =
             task {
                 let snapshot =
@@ -386,11 +432,19 @@ module PluginTransforms =
                 with
                 | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt outObj
                 | Error error ->
+                    let reason = ProviderLifecycle.providerStartObservationErrorCode error
+
+                    // managed-chat-execution-015: the refused start boundary must be
+                    // reported to the settlement owner for the exact execution. The
+                    // report never replaces the original refusal: a failed report is
+                    // emitted as a diagnostic and the hook failure is raised below.
+                    do! reportProviderStartBoundaryRejected projectionSessionIdOpt outObj reason
+
                     return
                         invalidOp (
                             sprintf
                                 "HOST-BOUNDARY-008: provider attempt plan freeze failed (%s): %A"
-                                (ProviderLifecycle.providerStartObservationErrorCode error)
+                                reason
                                 error
                         )
             }
