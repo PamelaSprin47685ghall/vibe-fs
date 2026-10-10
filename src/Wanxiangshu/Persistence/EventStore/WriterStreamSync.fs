@@ -700,9 +700,12 @@ module WriterStreamSync =
         | Some cached when sameRoot cached.Root snapshot -> taskResult { return cached.Root }
         | _ ->
             taskResult {
-                // First materialization applies local expiry and refreshes the cache
-                // before remote change detection. The second one captures imports.
-                let! _ = materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
+                // Remote change detection reuses the existing materialization cache.
+                // A stale or absent cache only causes extra remote reads, never a
+                // missed import: the cache-hit test also requires the current stat
+                // identity and OID to match. A single materialization after import
+                // then owns local expiry deletion and the final snapshot, so one
+                // convergence pass decodes each writer at most once.
                 let cache = readMaterializationCache commonDir
                 let! writers = readRemote raw cache commonDir nowMs snapshot
                 do! importRemote commonDir nowMs writers

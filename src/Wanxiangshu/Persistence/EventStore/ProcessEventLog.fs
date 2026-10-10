@@ -142,6 +142,9 @@ module ProcessEventLog =
     [<Import("readFileSync", "node:fs")>]
     let private readBytesFileSync (path: string) : byte[] = jsNative
 
+    [<Import("readFileSync", "node:fs")>]
+    let private readTextFileSync (path: string) (encoding: string) : string = jsNative
+
     [<Import("readdirSync", "node:fs")>]
     let private readdirSync (path: string) : string[] = jsNative
 
@@ -200,6 +203,12 @@ module ProcessEventLog =
     [<Emit("$0.size")>]
     let private statSize (stat: obj) : int = jsNative
 
+    [<Emit("$0.dev")>]
+    let private statDev (stat: obj) : float = jsNative
+
+    [<Emit("$0.ino")>]
+    let private statIno (stat: obj) : float = jsNative
+
     [<Emit("$0.digest('hex')")>]
     let private hashHex (hash: obj) : string = jsNative
 
@@ -237,6 +246,15 @@ module ProcessEventLog =
                 return None
         }
 
+    /// Typed physical diagnosis: the store lock stayed contended past the
+    /// acquisition budget. It carries no history meaning.
+    exception StoreLockAcquireTimeout of attempts: int * waitedMs: float
+
+    /// Total wall-clock budget for one physical lock acquisition. Each retry
+    /// delay is already bounded; this bounds the whole wait so a stuck peer
+    /// surfaces as a typed timeout instead of an unbounded block.
+    let private storeLockAcquireBudgetMs = 30000.0
+
     let private acquireAvailableLock (target: string) : Task<obj> =
         task {
             let options =
@@ -251,13 +269,19 @@ module ProcessEventLog =
             let mutable acquired: obj option = None
             // DSL-MUTABLE: algorithm-scratch — index in the original ten-delay retry cycle.
             let mutable waitStep = 0
+            // DSL-MUTABLE: algorithm-scratch — bounded acquisition attempt count.
+            let mutable attempts = 0
+            let started = currentTimeMs ()
 
-            while acquired.IsNone do
+            while acquired.IsNone && currentTimeMs () - started < storeLockAcquireBudgetMs do
                 let! release = tryAcquireLock target options waitStep
                 acquired <- release
                 waitStep <- (waitStep + 1) % 10
+                attempts <- attempts + 1
 
-            return acquired.Value
+            match acquired with
+            | Some release -> return release
+            | None -> return raise (StoreLockAcquireTimeout(attempts, currentTimeMs () - started))
         }
 
     /// Cross-process physical serialization shared by runtime append and the
@@ -411,6 +435,37 @@ module ProcessEventLog =
     let private decodeFile (path: string) : Result<EventEnvelope list, StorageInvalid> =
         decodeWriterBytes path (readBytesFileSync path)
 
+    type private WriterDecodeCacheEntry =
+        { Dev: float
+          Ino: float
+          StatIdentity: string
+          ByteLength: int
+          Events: EventEnvelope list }
+
+    /// durable-events-014/017: a process-local decoded-prefix cache. A writer file
+    /// is append-only and owned by one process (durable-events-005), so a decode
+    /// for an exact (dev, ino, length) is reused verbatim, and a same-inode
+    /// extension decodes only the appended complete lines. The cache is never a
+    /// second authority: every entry comes from the canonical decoder, and the
+    /// Integrator still derives Current from the returned envelopes.
+    // DSL-MUTABLE: resource — process-local decoded writer prefix keyed by path.
+    let private writerDecodeCache =
+        System.Collections.Generic.Dictionary<string, WriterDecodeCacheEntry>()
+
+    let private pruneDecodeCache () =
+        writerDecodeCache.Keys
+        |> Seq.filter (fun path -> not (existsSync path))
+        |> Seq.toList
+        |> List.iter (fun path -> writerDecodeCache.Remove path |> ignore)
+
+    let private storeDecodeCache path dev ino identity size events =
+        writerDecodeCache.[path] <-
+            { Dev = dev
+              Ino = ino
+              StatIdentity = identity
+              ByteLength = size
+              Events = events }
+
     let private lastIndexOfLf (buffer: byte[]) count =
         buffer
         |> Array.take count
@@ -510,6 +565,46 @@ module ProcessEventLog =
             tryPhysical (fun () -> action fd) onError
         finally
             closeSync fd
+
+    /// durable-events-014/017: decode a writer through the process-local prefix
+    /// cache. An exact (dev, ino, mode, size, mtime, ctime) hit reuses the decoded
+    /// envelopes verbatim; a same-inode extension decodes only the appended
+    /// complete lines; any other change (truncation, replacement, rewrite) falls
+    /// back to the canonical full decode. The cache never becomes a second
+    /// authority: entries only ever hold canonical decoder output, and a miss or
+    /// changed stat always re-reads the file.
+    let private decodeFileCached (path: string) : Result<EventEnvelope list, StorageInvalid> =
+        let stat = statSync path
+        let dev = statDev stat
+        let ino = statIno stat
+        let identity = statIdentity stat
+        let size = statSize stat
+
+        let fullDecode () =
+            decodeFile path
+            |> Result.map (fun events ->
+                storeDecodeCache path dev ino identity size events
+                events)
+
+        let incrementalDecode (cached: WriterDecodeCacheEntry) =
+            result {
+                let! bytes =
+                    withReadFd
+                        path
+                        (fun ex -> Error(StorageInvalid.NonCanonical(sprintf "writer read failed: %s" ex.Message)))
+                        (fun fd -> Ok(readExactAt fd cached.ByteLength (size - cached.ByteLength)))
+
+                let! text = CanonicalEventCodec.tryDecodeUtf8Text bytes
+                let! appendedEvents = decodeWriterText path text
+                let events = cached.Events @ appendedEvents
+                storeDecodeCache path dev ino identity size events
+                return events
+            }
+
+        match writerDecodeCache.TryGetValue path with
+        | true, cached when cached.StatIdentity = identity -> Ok cached.Events
+        | true, cached when cached.Dev = dev && cached.Ino = ino && cached.ByteLength < size -> incrementalDecode cached
+        | _ -> fullDecode ()
 
     let private nonEmptyFileSize path =
         let exists = existsSync path
@@ -758,13 +853,15 @@ module ProcessEventLog =
     /// enumeration. Retention is whole-writer physical policy; the canonical
     /// Integrator still owns cross-stream ordering and interpretation.
     let readStreamsAt (commonDir: string) (nowMs: float) : Result<(string * EventEnvelope list) list, StorageInvalid> =
+        pruneDecodeCache ()
+
         let rec read remaining acc =
             result {
                 match remaining with
                 | [] -> return List.rev acc
                 | name :: tail ->
                     let path = join2 (eventsDirectory commonDir) name
-                    let! events = decodeFile path
+                    let! events = decodeFileCached path
                     let writer = name.Substring(0, name.Length - ".ndjson".Length)
                     return! read tail ((writer, events) :: acc)
             }
