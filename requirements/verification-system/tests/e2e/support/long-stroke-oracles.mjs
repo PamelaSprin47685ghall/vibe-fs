@@ -476,6 +476,47 @@ export async function bindManagerLoopSequence(scenario) {
   };
 }
 
+/**
+ * Script the companion's per-delivery responses across both delegation decisions.
+ *
+ * The companion's trailing readonly-investigation prose is rendered at the END
+ * of every outbound request (the frozen owner mirror, then the companion's own
+ * completed exchange, then the prose), so the bootstrap and the continuation
+ * land on the SAME step-0 entry (`strength-canary-replica.0`) and a static
+ * declaration cannot vary the response by delivery. This binder mirrors the
+ * bindManagerLoopSequence pattern: delivery 1 (canary bootstrap) and delivery 3
+ * (recovery bootstrap) read the large-probe marker, while delivery 2 (the
+ * canary continuation) ends in prose — the early-end leg
+ * (WHAT[speculative-investigation-003]/[005]). Delivery order across the two
+ * decisions is fixed by the run: canary decision first, recovery decision in
+ * the flow.
+ */
+export async function bindReplicaSequence(scenario) {
+  const runtime = scenario.provider?._scenario;
+  assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for replica sequence bind');
+
+  const bootstrap = runtime.scenario.entries.find(
+    (entry) => entry.id === 'strength-canary-replica.0',
+  );
+  assert.ok(bootstrap, 'long-stroke: strength-canary-replica.0 entry is required');
+  const readProbe = bootstrap.respond;
+  const earlyEnd = {
+    type: 'text',
+    text: 'Read-only survey complete; returning the gathered evidence.',
+  };
+
+  const consume = runtime.consume;
+  const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
+  runtime.consume = (body, selection, context) => {
+    const { entry, attempt } = selection ?? {};
+    if (entry?.id === 'strength-canary-replica.0') {
+      // 1 = canary bootstrap, 2 = canary continuation, 3 = recovery bootstrap.
+      entry.respond = attempt === 2 ? earlyEnd : readProbe;
+    }
+    originalConsume(body, selection, context);
+  };
+}
+
 const lastUserText = (body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -1238,17 +1279,18 @@ export async function assertDelegationMaterialOnWire(scenario) {
       `DELEGATE 14.5: owner ${ownerId} must receive the companion's real readonly result in a later provider request`,
     );
   }
- // R6: bounded delivery. The canary owner walks three chat requests (investigation estimate
- // call, injected continuation, successor); the recovery owner four (investigation estimate
- // call, faulted delivery, retried delivery, successor). An unbounded
- // redelivery loop after injection fails this equality.
+ // R6: bounded delivery. The canary owner walks four chat requests (investigation estimate
+ // call, injected continuation, successor, XTrace-capture carrier); the recovery owner five
+ // (investigation estimate call, faulted delivery, retried delivery, successor, capture
+ // carrier). The capture carrier is the physical step whose transform commits
+ // StrengthFramesTraced; an unbounded redelivery loop after injection fails this equality.
   const ownerChatCounts = [...ownerSessions]
     .map((ownerId) => chatRequestsOfSession(requests, ownerId).length)
     .sort((left, right) => left - right);
   assert.deepEqual(
     ownerChatCounts,
-    [3, 4],
-    `DELEGATE 14.5: owner delivery must be bounded at 3 and 4 chat requests, got ${JSON.stringify(ownerChatCounts)}`,
+    [4, 5],
+    `DELEGATE 14.5: owner delivery must be bounded at 4 and 5 chat requests, got ${JSON.stringify(ownerChatCounts)}`,
   );
 
   console.log(`[delegation] material returned to owners=${[...ownerSessions].length} chatCounts=${JSON.stringify(ownerChatCounts)}`);
@@ -1837,6 +1879,7 @@ export async function assertDelegationPurposeOnWire(scenario) {
 export const CUSTOMS = {
   holdChildC1UntilLabor,
   bindManagerLoopSequence,
+  bindReplicaSequence,
   oracleLongStroke,
   bindDelegationReplicas,
   assertDelegationMaterialOnWire,
