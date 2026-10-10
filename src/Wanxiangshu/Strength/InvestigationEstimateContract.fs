@@ -59,6 +59,7 @@ module InvestigationEstimateContract =
         | "publish"
         | "chronicle"
         | "js-bookkeeper"
+        | "js-predictor"
         | "bash-honeypot"
         | "invalid"
         | "js-orchestrator"

@@ -1500,19 +1500,19 @@ Z5. [终止.] 算法终止。
 | 编排 | `commission` | Orchestrator |
 | 编排 | `fork`、`resume` | Manager |
 | 编排 | `join`、`horizon` | Manager、DevOps |
+| 评审 | `review`、`suicide` | Manager（按当前 facts 收口） |
 | 分裂 | `fission` | 仅 Engineer |
 | 执行 | `run` | 仅 DevOps |
 | 执行 | `open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal` | 仅 DevOps |
 | 文件 | `mv`、`rm` | Engineer、DevOps |
-| 认知 | `assume` | 除 Blogger、Distiller 外 |
-| 认知 | `enough`、`abandon`、`defer` | 除 Blogger、Distiller 外 |
-| 通信 | `subscribe`、`publish` | 除 Blogger、Distiller 外 |
-| 学习 | `celebrate`、`regret` | 除 Blogger、Distiller 外 |
+| 认知 | `assume`、`defer` | 除 Blogger、Distiller 外 |
+| 通信 | `publish` | 除 Blogger、Distiller 外 |
 | 监督 | `chronicle` | 仅 Blogger（按附着） |
 | 记忆 | `fetch` | Engineer（有 Fetch 权能） |
 | 记忆 | `js-bookkeeper` | 私有附着 |
-| 编程 | `js-engineer`、`js-devops`、`js-manager`、`js-orchestrator`、`js-blogger` | 按角色能力生成 |
-| 编程 | `js-predictor` | 仅只读副本 |
+| 编程 | `js-engineer`、`js-devops`、`js-manager` | 按角色能力生成 |
+| 编程 | `js-orchestrator`、`js-blogger` | deny 投影（保留在权限映射，不生成工具） |
+| 编程 | `js-predictor` | 仅只读副本（私有附着） |
 | 陷阱 | `bash-honeypot` | 有该权能的角色 |
 
 1. `bash-honeypot` 只返回明确拒绝。永不执行 shell。
