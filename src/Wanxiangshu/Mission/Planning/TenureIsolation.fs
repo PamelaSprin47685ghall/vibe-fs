@@ -264,3 +264,127 @@ module TenureIsolation =
         box
             {| messages = assembled |> List.toArray
                reanchorRequested = reanchorRequested |}
+
+    let private isSyntheticUserMessage (raw: obj) (tm: TenureMessage) : bool =
+        let syn = readField raw "synthetic"
+        let isSyn = not (isNull syn) && unbox<bool> syn
+        let idStr = defaultArg tm.Id ""
+        isSyn || idStr.StartsWith "lwr-prev-"
+
+    let private hasCursorAfter (pendingCursor: int64) (tm: TenureMessage) : bool =
+        match tm.Cursor with
+        | Some c -> c > pendingCursor
+        | None -> false
+
+    let private isUserAnswer (pendingCursor: int64) (raw: obj, tm: TenureMessage) : bool =
+        tm.Role = "user"
+        && not (isSyntheticUserMessage raw tm)
+        && hasCursorAfter pendingCursor tm
+
+    let private createAskToolMessage (replyTm: TenureMessage) : obj =
+        let userText = replyTm.Content
+        let msgId = "ask-result-" + (defaultArg replyTm.Id (Guid.NewGuid().ToString("N")))
+
+        box
+            {| id = msgId
+               role = "tool"
+               name = "ask"
+               content = userText
+               parts =
+                [| box
+                       {| ``type`` = "tool_result"
+                          tool = "ask"
+                          text = userText |} |]
+               info = {| role = "tool"; name = "ask" |} |}
+
+    let private filterOrReplaceMessage
+        (replyIdx: int)
+        (toolMsg: obj)
+        (i: int, raw: obj, tm: TenureMessage)
+        : obj option =
+        if i = replyIdx then Some toolMsg
+        elif i < replyIdx && tm.Role = "assistant" then None
+        else Some raw
+
+    let private extractPendingAskRecord (q: obj) (cur: obj) (inc: obj) =
+        if isNull q || emitJsExpr q "$0 == null" then
+            None
+        else
+            Some
+                {| Question = unbox<string> q
+                   Cursor = if isNull cur then 0L else toInt64 cur
+                   IncumbencyId = if isNull inc then "" else unbox<string> inc |}
+
+    let private parsePendingAsk (pendingAskObj: obj) =
+        if isNull pendingAskObj || emitJsExpr pendingAskObj "$0 == null" then
+            None
+        else
+            let q =
+                getProp pendingAskObj [ "question"; "Question"; "pendingAskQuestion"; "PendingAskQuestion" ]
+
+            let cur =
+                getProp pendingAskObj [ "cursor"; "Cursor"; "pendingAskCursor"; "PendingAskCursor" ]
+
+            let inc =
+                getProp
+                    pendingAskObj
+                    [ "incumbencyId"
+                      "IncumbencyId"
+                      "pendingAskIncumbencyId"
+                      "PendingAskIncumbencyId" ]
+
+            extractPendingAskRecord q cur inc
+
+    let private resolveAskWithPending
+        (rawMessages: obj list)
+        (pending:
+            {| Question: string
+               Cursor: int64
+               IncumbencyId: string |})
+        : obj =
+        let parsed = rawMessages |> List.map messageOfRaw
+
+        let userReplyIndex =
+            List.zip rawMessages parsed |> List.tryFindIndex (isUserAnswer pending.Cursor)
+
+        match userReplyIndex with
+        | None ->
+            box
+                {| messages = rawMessages |> List.toArray
+                   resolved = false
+                   resolvedCursor = pending.Cursor
+                   answer = null |}
+        | Some idx ->
+            let replyTm = List.item idx parsed
+            let userText = replyTm.Content
+            let ansCursor = defaultArg replyTm.Cursor (pending.Cursor + 1L)
+
+            let toolResultMessage = createAskToolMessage replyTm
+
+            let indexed =
+                List.zip rawMessages parsed |> List.mapi (fun i (raw, tm) -> (i, raw, tm))
+
+            let newMessages =
+                indexed
+                |> List.choose (filterOrReplaceMessage idx toolResultMessage)
+                |> List.toArray
+
+            box
+                {| messages = newMessages
+                   resolved = true
+                   resolvedCursor = ansCursor
+                   answer = userText |}
+
+    let assembleAskContinuation (rawMessagesInput: obj) (pendingAskObj: obj) (tenureInput: obj) : obj =
+        let rawMessages = parseRawMessages rawMessagesInput
+
+        let pendingOpt = parsePendingAsk pendingAskObj
+
+        match pendingOpt with
+        | None ->
+            box
+                {| messages = rawMessages |> List.toArray
+                   resolved = false
+                   resolvedCursor = 0L
+                   answer = null |}
+        | Some pending -> resolveAskWithPending rawMessages pending

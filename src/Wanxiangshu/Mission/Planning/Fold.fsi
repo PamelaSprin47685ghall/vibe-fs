@@ -34,7 +34,9 @@ type PlanWorkState =
       LatestRetirement: (PlanIncumbencyId * PlanRetirementOutcome * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
-      PreviousIncumbencyStage: PlanStage option }
+      PreviousIncumbencyStage: PlanStage option
+      PendingAsk: (PlanIncumbencyId * string * XTraceCursor) option
+      LatestResolvedAsk: (PlanIncumbencyId * XTraceCursor) option }
 
 module PlanWorkState =
     val empty: PlanWorkState
@@ -49,7 +51,10 @@ type PlanWorkView =
       Delivered: bool
       DeliveryDigest: string option
       DeliveryPath: string option
-      BoundDevOpsId: string option }
+      BoundDevOpsId: string option
+      PendingAskQuestion: string option
+      PendingAskIncumbencyId: string option
+      PendingAskCursor: int64 option }
 
 type PlanState = private PlanState of Map<string, PlanWorkState>
 

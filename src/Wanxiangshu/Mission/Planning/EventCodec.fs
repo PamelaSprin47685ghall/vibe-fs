@@ -58,6 +58,23 @@ module PlanEventCodec =
               "path", Encode.string path
               "workId", Encode.string (PlanWorkId.value workId) ]
 
+    let private encodeAskPending
+        (workId: PlanWorkId)
+        (incumbencyId: PlanIncumbencyId)
+        (question: string)
+        (cursor: XTraceCursor)
+        : JsonValue =
+        Encode.object
+            [ "cursor", Encode.int64 (XTraceCursor.sequence cursor)
+              "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId)
+              "question", Encode.string question
+              "workId", Encode.string (PlanWorkId.value workId) ]
+
+    let private encodeAskResolved (incumbencyId: PlanIncumbencyId) (cursor: XTraceCursor) : JsonValue =
+        Encode.object
+            [ "cursor", Encode.int64 (XTraceCursor.sequence cursor)
+              "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId) ]
+
     let encodePayload (event: PlanEvent) : JsonValue =
         match event with
         | PlanEvent.PlanWorkOpened(workId, root) -> encodeWorkOpened workId root
@@ -67,6 +84,9 @@ module PlanEventCodec =
         | PlanEvent.PlanIncumbencyRetired(incumbencyId, outcome, retirementCursor) ->
             encodeIncumbencyRetired incumbencyId outcome retirementCursor
         | PlanEvent.PlanDelivered(incumbencyId, workId, digest, path) -> encodeDelivered incumbencyId workId digest path
+        | PlanEvent.PlanAskPending(workId, incumbencyId, question, cursor) ->
+            encodeAskPending workId incumbencyId question cursor
+        | PlanEvent.PlanAskResolved(incumbencyId, cursor) -> encodeAskResolved incumbencyId cursor
 
     // --- Decoders ---
 
@@ -119,6 +139,26 @@ module PlanEventCodec =
             let workId = get.Required.Field "workId" Decode.string |> PlanWorkId.create
             PlanEvent.PlanDelivered(incumbencyId, workId, digest, path))
 
+    let private decodeAskPending: Decoder<PlanEvent> =
+        Decode.object (fun get ->
+            let cursorSeq = get.Required.Field "cursor" Decode.int64
+
+            let incumbencyId =
+                get.Required.Field "incumbencyId" Decode.string |> PlanIncumbencyId.create
+
+            let question = get.Required.Field "question" Decode.string
+            let workId = get.Required.Field "workId" Decode.string |> PlanWorkId.create
+            PlanEvent.PlanAskPending(workId, incumbencyId, question, XTraceCursor.create cursorSeq))
+
+    let private decodeAskResolved: Decoder<PlanEvent> =
+        Decode.object (fun get ->
+            let cursorSeq = get.Required.Field "cursor" Decode.int64
+
+            let incumbencyId =
+                get.Required.Field "incumbencyId" Decode.string |> PlanIncumbencyId.create
+
+            PlanEvent.PlanAskResolved(incumbencyId, XTraceCursor.create cursorSeq))
+
     let decodePayload (eventType: string) (payload: JsonValue) : Result<PlanEvent, string> =
         if eventType = PlanEventTypes.WorkOpened then
             Decode.fromValue "$" decodeWorkOpened payload
@@ -130,6 +170,10 @@ module PlanEventCodec =
             Decode.fromValue "$" decodeIncumbencyRetired payload
         elif eventType = PlanEventTypes.Delivered then
             Decode.fromValue "$" decodeDelivered payload
+        elif eventType = PlanEventTypes.AskPending then
+            Decode.fromValue "$" decodeAskPending payload
+        elif eventType = PlanEventTypes.AskResolved then
+            Decode.fromValue "$" decodeAskResolved payload
         else
             Error(sprintf "Unknown plan event type: %s" eventType)
 
@@ -140,6 +184,8 @@ module PlanEventCodec =
         | PlanEvent.PlanIncumbencyOpened _ -> PlanEventTypes.IncumbencyOpened
         | PlanEvent.PlanIncumbencyRetired _ -> PlanEventTypes.IncumbencyRetired
         | PlanEvent.PlanDelivered _ -> PlanEventTypes.Delivered
+        | PlanEvent.PlanAskPending _ -> PlanEventTypes.AskPending
+        | PlanEvent.PlanAskResolved _ -> PlanEventTypes.AskResolved
 
     let toEnvelope (workId: PlanWorkId) (event: PlanEvent) (parents: EventId list) : EventEnvelope =
         let eventId = EventId.create (Guid.NewGuid().ToString("N"))

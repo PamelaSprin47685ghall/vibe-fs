@@ -279,6 +279,15 @@ module PlanTools =
                 return! performDeliverEvents store pid workId incumbencyId active digest planPath retirementCursor
         }
 
+    let private checkPendingAsk
+        (pendingAskOpt: (PlanIncumbencyId * string * XTraceCursor) option)
+        (question: string)
+        : Result<unit, string> =
+        match pendingAskOpt with
+        | Some(_, pQ, _) when pQ = question -> Ok()
+        | Some _ -> Error "An ask is already pending for this incumbency; only one question can be pending at a time"
+        | None -> Ok()
+
     let executeAsk (store: IEventStore) (workId: string) (question: string) : Result<AskResult, string> =
         let pid = PlanWorkId.create workId
 
@@ -291,10 +300,11 @@ module PlanTools =
         elif String.IsNullOrWhiteSpace question then
             Error "Question cannot be empty"
         else
-            Ok
+            checkPendingAsk state.PendingAsk question
+            |> Result.map (fun () ->
                 { Kind = "waiting_for_user"
                   Question = question
-                  Status = "pending" }
+                  Status = "pending" })
 
     let private ensureDevOpsBound
         (store: IEventStore)

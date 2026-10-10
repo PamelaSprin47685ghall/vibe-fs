@@ -6,8 +6,16 @@ module PlanEventTypes =
     let IncumbencyOpened = "PlanIncumbencyOpened"
     let IncumbencyRetired = "PlanIncumbencyRetired"
     let Delivered = "PlanDelivered"
+    let AskPending = "PlanAskPending"
+    let AskResolved = "PlanAskResolved"
 
     let all =
-        [ WorkOpened; DevOpsBound; IncumbencyOpened; IncumbencyRetired; Delivered ]
+        [ WorkOpened
+          DevOpsBound
+          IncumbencyOpened
+          IncumbencyRetired
+          Delivered
+          AskPending
+          AskResolved ]
 
     let isPlanEvent (eventType: string) : bool = all |> List.contains eventType

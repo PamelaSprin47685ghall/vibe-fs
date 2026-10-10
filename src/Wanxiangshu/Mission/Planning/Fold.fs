@@ -49,7 +49,9 @@ type PlanWorkState =
       LatestRetirement: (PlanIncumbencyId * PlanRetirementOutcome * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
-      PreviousIncumbencyStage: PlanStage option }
+      PreviousIncumbencyStage: PlanStage option
+      PendingAsk: (PlanIncumbencyId * string * XTraceCursor) option
+      LatestResolvedAsk: (PlanIncumbencyId * XTraceCursor) option }
 
 module PlanWorkState =
     let empty: PlanWorkState =
@@ -60,7 +62,9 @@ module PlanWorkState =
           LatestRetirement = None
           BoundDevOps = None
           Delivered = None
-          PreviousIncumbencyStage = None }
+          PreviousIncumbencyStage = None
+          PendingAsk = None
+          LatestResolvedAsk = None }
 
 type PlanWorkView =
     { WorkId: string option
@@ -72,7 +76,10 @@ type PlanWorkView =
       Delivered: bool
       DeliveryDigest: string option
       DeliveryPath: string option
-      BoundDevOpsId: string option }
+      BoundDevOpsId: string option
+      PendingAskQuestion: string option
+      PendingAskIncumbencyId: string option
+      PendingAskCursor: int64 option }
 
 type PlanState = private PlanState of Map<string, PlanWorkState>
 
@@ -92,7 +99,10 @@ module PlanFold =
           Delivered = state.Delivered.IsSome
           DeliveryDigest = state.Delivered |> Option.map (fun d -> d.Digest)
           DeliveryPath = state.Delivered |> Option.map (fun d -> d.Path)
-          BoundDevOpsId = state.BoundDevOps |> Option.map fst }
+          BoundDevOpsId = state.BoundDevOps |> Option.map fst
+          PendingAskQuestion = state.PendingAsk |> Option.map (fun (_, q, _) -> q)
+          PendingAskIncumbencyId = state.PendingAsk |> Option.map (fun (i, _, _) -> PlanIncumbencyId.value i)
+          PendingAskCursor = state.PendingAsk |> Option.map (fun (_, _, c) -> XTraceCursor.sequence c) }
 
     let private applyWorkOpened
         (workId: PlanWorkId)
@@ -253,6 +263,74 @@ module PlanFold =
             validateReceipt incumbencyId workId digest path state
         | _ -> Error "Delivery requires the incumbency to be retired with Delivered outcome"
 
+    let private resolvePendingAskTransition
+        (incumbencyId: PlanIncumbencyId)
+        (question: string)
+        (cursor: XTraceCursor)
+        (state: PlanWorkState)
+        : Result<PlanWorkState, string> =
+        match state.PendingAsk with
+        | Some(pInc, pQ, pCur) when
+            pInc = incumbencyId
+            && pQ = question
+            && XTraceCursor.sequence pCur = XTraceCursor.sequence cursor
+            ->
+            Ok state
+        | Some _ -> Error "An ask is already pending for this incumbency; only one question can be pending at a time"
+        | None ->
+            Ok
+                { state with
+                    PendingAsk = Some(incumbencyId, question, cursor) }
+
+    let private applyAskPending
+        (workId: PlanWorkId)
+        (incumbencyId: PlanIncumbencyId)
+        (question: string)
+        (cursor: XTraceCursor)
+        (state: PlanWorkState)
+        : Result<PlanWorkState, string> =
+        match state.WorkId, state.Delivered.IsSome, state.Active with
+        | None, _, _ -> Error "Cannot ask before work is opened"
+        | Some wid, _, _ when wid <> workId -> Error "Work ID mismatch on ask pending"
+        | _, true, _ -> Error "The planning artifact has already been delivered. No further questions are permitted."
+        | _, _, None -> Error "No active incumbency found to ask question"
+        | _, _, Some active when active.Id <> incumbencyId -> Error "Active incumbency ID does not match ask target"
+        | _, _, Some active -> resolvePendingAskTransition incumbencyId question cursor state
+
+    let private resolveLatestAsk
+        (incumbencyId: PlanIncumbencyId)
+        (cursor: XTraceCursor)
+        (state: PlanWorkState)
+        : Result<PlanWorkState, string> =
+        match state.LatestResolvedAsk with
+        | Some(resInc, resCur) when
+            resInc = incumbencyId
+            && XTraceCursor.sequence resCur = XTraceCursor.sequence cursor
+            ->
+            Ok state
+        | Some(resInc, _) when resInc = incumbencyId -> Error "Conflicting ask resolved payload for incumbency"
+        | _ -> Error(sprintf "No pending ask found to resolve for incumbency %s" (PlanIncumbencyId.value incumbencyId))
+
+    let private applyAskResolved
+        (incumbencyId: PlanIncumbencyId)
+        (cursor: XTraceCursor)
+        (state: PlanWorkState)
+        : Result<PlanWorkState, string> =
+        match state.PendingAsk with
+        | Some(pInc, _, _) when pInc = incumbencyId ->
+            Ok
+                { state with
+                    PendingAsk = None
+                    LatestResolvedAsk = Some(incumbencyId, cursor) }
+        | Some(pInc, _, _) ->
+            Error(
+                sprintf
+                    "Pending ask incumbency '%s' does not match resolution target '%s'"
+                    (PlanIncumbencyId.value pInc)
+                    (PlanIncumbencyId.value incumbencyId)
+            )
+        | None -> resolveLatestAsk incumbencyId cursor state
+
     let applyWorkEvent (event: PlanEvent) (state: PlanWorkState) : Result<PlanWorkState, string> =
         match event with
         | PlanEvent.PlanWorkOpened(workId, root) -> applyWorkOpened workId root state
@@ -263,6 +341,9 @@ module PlanFold =
             applyIncumbencyRetired incumbencyId outcome retirementCursor state
         | PlanEvent.PlanDelivered(incumbencyId, workId, digest, path) ->
             applyDelivered incumbencyId workId digest path state
+        | PlanEvent.PlanAskPending(workId, incumbencyId, question, cursor) ->
+            applyAskPending workId incumbencyId question cursor state
+        | PlanEvent.PlanAskResolved(incumbencyId, cursor) -> applyAskResolved incumbencyId cursor state
 
     let private workKey (event: PlanEvent) : string =
         match event with
@@ -270,7 +351,9 @@ module PlanFold =
         | PlanEvent.PlanDevOpsBound(workId, _, _) -> PlanWorkId.value workId
         | PlanEvent.PlanIncumbencyOpened(workId, _, _, _) -> PlanWorkId.value workId
         | PlanEvent.PlanDelivered(_, workId, _, _) -> PlanWorkId.value workId
+        | PlanEvent.PlanAskPending(workId, _, _, _) -> PlanWorkId.value workId
         | PlanEvent.PlanIncumbencyRetired(incumbencyId, _, _) -> PlanIncumbencyId.value incumbencyId
+        | PlanEvent.PlanAskResolved(incumbencyId, _) -> PlanIncumbencyId.value incumbencyId
 
     let private applyRetiredToState
         (incumbencyId: PlanIncumbencyId)
@@ -304,6 +387,7 @@ module PlanFold =
     let applyEvent (event: PlanEvent) (PlanState works) : Result<PlanState, string> =
         match event with
         | PlanEvent.PlanIncumbencyRetired(incumbencyId, _, _) -> applyRetiredToState incumbencyId event works
+        | PlanEvent.PlanAskResolved(incumbencyId, _) -> applyRetiredToState incumbencyId event works
         | _ -> applyKeyedEventToState (workKey event) event works
 
     let rec applyEvents (events: PlanEvent list) (state: PlanState) : Result<PlanState, string> =

@@ -10,6 +10,8 @@ module PlanningSurface =
     val incumbencyOpened: workId: string -> incumbencyId: string -> stageVal: obj -> openingCursor: int64 -> PlanEvent
     val incumbencyRetired: incumbencyId: string -> outcomeVal: obj -> retirementCursor: int64 -> PlanEvent
     val delivered: incumbencyId: string -> workId: string -> digest: string -> path: string -> PlanEvent
+    val askPending: workId: string -> incumbencyId: string -> question: string -> cursor: int64 -> PlanEvent
+    val askResolved: incumbencyId: string -> cursor: int64 -> PlanEvent
     val applyWorkEvent: event: PlanEvent -> state: PlanWorkState -> obj
     val activeStage: state: PlanWorkState -> string option
     val retiredCount: state: PlanWorkState -> int
@@ -56,6 +58,8 @@ module PlanningSurface =
             Task<obj>
 
     val executeAsk: store: IEventStore -> workId: string -> question: string -> obj
+    val executeAskAsync: store: IEventStore -> workId: string -> question: string -> Task<obj>
+    val assembleAskContinuation: messages: obj -> pendingAskObj: obj -> tenureObj: obj -> obj
     val executeResume: store: IEventStore -> workId: string -> charge: string -> name: obj -> Task<obj>
     val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj
     val planRecoveryPosition: viewVal: obj -> readPlanFile: (string -> string option) -> obj

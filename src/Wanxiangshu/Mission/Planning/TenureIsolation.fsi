@@ -25,3 +25,4 @@ module TenureIsolation =
     val messageOfRaw: raw: obj -> TenureMessage
     val tenureOfRaw: raw: obj -> ActiveTenureInfo
     val assembleTenureMessages: rawMessagesInput: obj -> tenureInput: obj -> materializePrev: (obj -> string) -> obj
+    val assembleAskContinuation: rawMessagesInput: obj -> pendingAskObj: obj -> tenureInput: obj -> obj

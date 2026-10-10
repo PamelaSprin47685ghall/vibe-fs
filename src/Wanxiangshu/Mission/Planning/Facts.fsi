@@ -55,6 +55,8 @@ type PlanEvent =
         outcome: PlanRetirementOutcome *
         retirementCursor: XTraceCursor
     | PlanDelivered of incumbencyId: PlanIncumbencyId * workId: PlanWorkId * digest: string * path: string
+    | PlanAskPending of workId: PlanWorkId * incumbencyId: PlanIncumbencyId * question: string * cursor: XTraceCursor
+    | PlanAskResolved of incumbencyId: PlanIncumbencyId * cursor: XTraceCursor
 
 module PlanEvents =
     val workOpened: string -> string -> PlanEvent
@@ -62,3 +64,5 @@ module PlanEvents =
     val incumbencyOpened: string -> string -> PlanStage -> int64 -> PlanEvent
     val incumbencyRetired: string -> PlanRetirementOutcome -> int64 -> PlanEvent
     val delivered: string -> string -> string -> string -> PlanEvent
+    val askPending: string -> string -> string -> int64 -> PlanEvent
+    val askResolved: string -> int64 -> PlanEvent

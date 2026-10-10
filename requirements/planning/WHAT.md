@@ -182,3 +182,14 @@ Plan 的生命周期事实接入 EventStore 统一持久化存储与 CanonicalIn
   4. 若工作视图既无活跃任期亦未交付，恢复位置为 `Nothing`，系统不执行猜测与推断。
 - 禁止后果：严禁根据底稿文件内部的文本内容、标题或关键词推测任期阶段。严禁在恢复期间无故创建新任务、私自开启新任期，或在未获授权时自动派发 DevOps 命令。严禁在 `Delivered` 状态下重新激活会话或重试。
 - 失败后果：若视图数据损坏或出现冲突（例如 Delivered 状态与 Active 任期同时并存），恢复函数必须 fail-closed 返回 `Conflict` 错误状态，保留原始证据，拒绝进入任何执行分支。
+## [019] ask 两段式挂起与 Continuation 回送
+
+系统遵循算法 G 执行 `ask` 的两段式挂起与 Continuation 回送协议：受理（追加待回答事实）→ 呈现问题 → 停驻模型输出（不轮询不催问）→ 等待合法真实用户输入 → 原文作为 Durable Accepted 事实绑定 → 回送合法 Continuation 或工具结果，二者严格互斥。
+
+- 触发条件：处于活跃任期的跑者调用 `ask` 工具，或系统在任期隔离后检测到针对未决 `ask` 的真实用户新输入。
+- 允许后果：
+  1. 跑者首次发起提问时，系统在底盘原子追加 `PlanAskPending(workId, incumbencyId, question, cursor)` 事实，并在当前投影中登记未决提问（`PendingAsk`）；工具执行立即返回 `{ kind: "waiting_for_user", question }` 提示模型收束本次物理输出并停驻，不占用长期模型连接；
+  2. 当处于 `PendingAsk` 状态时，若组装出的消息集中存在开问游标之后的新真实用户输入（`role=user` 且非合成记录），系统将其识别为回答，通过 `assembleAskContinuation` 将首条命中用户输入组装为 `role=tool`、`name=ask` 的合法工具结果 Continuation，携带调用身份回送给模型，并向底盘原子追加 `PlanAskResolved(incumbencyId, cursor)` 事实消灭未决状态；
+  3. 同一任期内相同载荷的重复 `ask` 调用或相同游标的 `PlanAskResolved` 事件重放保持幂等。
+- 禁止后果：同一任期内同时至多存在一个未决问题（`PendingAsk`）；在前序未决提问未被 `PlanAskResolved` 消灭前，严禁发起第二次 `ask`，违者必须返回强类型拒绝错误。已标记为 `Delivered` 的规划任务严禁再次调用 `ask`。系统严禁依据用户回答的具体文本内容（如是否为“是/否”）推测有效性，任何非合成用户原文均属于合法回答。
+- 失败后果：若在无活跃任期、无未决提问或载荷冲突时触发解析与解决，Fold 状态机与工具门禁必须返回强类型错误并拒绝状态跃迁，底层存储零变更。

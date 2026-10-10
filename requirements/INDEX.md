@@ -194,7 +194,7 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
-| 58 | `planning` | 18 | planning-001 ~ 018（五条轮换事实与自查游标、三阶段单向推进、动作许可矩阵、持久化与任期隔离、崩溃恢复判定） |
+| 58 | `planning` | 19 | planning-001 ~ 019（五条轮换事实与自查游标、三阶段单向推进、动作许可矩阵、持久化与任期隔离、崩溃恢复判定、ask两段式挂起与回送） |
 
 # 依赖骨架
 

@@ -91,6 +91,8 @@ type PlanEvent =
         outcome: PlanRetirementOutcome *
         retirementCursor: XTraceCursor
     | PlanDelivered of incumbencyId: PlanIncumbencyId * workId: PlanWorkId * digest: string * path: string
+    | PlanAskPending of workId: PlanWorkId * incumbencyId: PlanIncumbencyId * question: string * cursor: XTraceCursor
+    | PlanAskResolved of incumbencyId: PlanIncumbencyId * cursor: XTraceCursor
 
 module PlanEvents =
     let workOpened (workId: string) (root: string) : PlanEvent =
@@ -120,3 +122,14 @@ module PlanEvents =
 
     let delivered (incumbencyId: string) (workId: string) (digest: string) (path: string) : PlanEvent =
         PlanEvent.PlanDelivered(PlanIncumbencyId.create incumbencyId, PlanWorkId.create workId, digest, path)
+
+    let askPending (workId: string) (incumbencyId: string) (question: string) (cursor: int64) : PlanEvent =
+        PlanEvent.PlanAskPending(
+            PlanWorkId.create workId,
+            PlanIncumbencyId.create incumbencyId,
+            question,
+            XTraceCursor.create cursor
+        )
+
+    let askResolved (incumbencyId: string) (cursor: int64) : PlanEvent =
+        PlanEvent.PlanAskResolved(PlanIncumbencyId.create incumbencyId, XTraceCursor.create cursor)

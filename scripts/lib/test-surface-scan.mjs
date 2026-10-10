@@ -1793,6 +1793,7 @@ export const SURFACE_MANIFEST = [
       'planning-016',
       'planning-017',
       'planning-018',
+      'planning-019',
     ],
     source: 'src/Wanxiangshu/Mission/Planning/Surface.fs',
     representation: 'json',

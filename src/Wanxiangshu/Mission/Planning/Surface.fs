@@ -48,6 +48,12 @@ module PlanningSurface =
     let delivered (incumbencyId: string) (workId: string) (digest: string) (path: string) : PlanEvent =
         PlanEvents.delivered incumbencyId workId digest path
 
+    let askPending (workId: string) (incumbencyId: string) (question: string) (cursor: int64) : PlanEvent =
+        PlanEvents.askPending workId incumbencyId question cursor
+
+    let askResolved (incumbencyId: string) (cursor: int64) : PlanEvent =
+        PlanEvents.askResolved incumbencyId cursor
+
     let applyWorkEvent (event: PlanEvent) (state: PlanWorkState) : obj = PlanFold.applyWorkEventJs event state
 
     let activeStage (state: PlanWorkState) : string option =
@@ -155,6 +161,15 @@ module PlanningSurface =
              null)
         | PlanEvent.PlanDelivered(iid, wid, dig, p) ->
             (PlanEventTypes.Delivered, PlanWorkId.value wid, PlanIncumbencyId.value iid, dig, 0L, p)
+        | PlanEvent.PlanAskPending(wid, iid, q, cur) ->
+            (PlanEventTypes.AskPending,
+             PlanWorkId.value wid,
+             PlanIncumbencyId.value iid,
+             q,
+             XTraceCursor.sequence cur,
+             null)
+        | PlanEvent.PlanAskResolved(iid, cur) ->
+            (PlanEventTypes.AskResolved, null, PlanIncumbencyId.value iid, null, XTraceCursor.sequence cur, null)
 
     let tryDecodeEnvelopeJson (envelopeJson: string) : obj =
         let textWithLf =
@@ -505,6 +520,12 @@ module PlanningSurface =
                    status = null
                    error = err |}
 
+    let executeAskAsync (store: IEventStore) (workId: string) (question: string) : Task<obj> =
+        Task.FromResult(executeAsk store workId question)
+
+    let assembleAskContinuation (messages: obj) (pendingAskObj: obj) (tenureObj: obj) : obj =
+        TenureIsolation.assembleAskContinuation messages pendingAskObj tenureObj
+
     let executeResume (store: IEventStore) (workId: string) (charge: string) (name: obj) : Task<obj> =
         let nameOpt = extractStringOpt name
 
@@ -622,6 +643,24 @@ module PlanningSurface =
                         else
                             Some(unbox<string> viewVal?BoundDevOpsId)
 
+                    let pendingAskQ =
+                        if isNull viewVal?PendingAskQuestion then
+                            None
+                        else
+                            Some(unbox<string> viewVal?PendingAskQuestion)
+
+                    let pendingAskInc =
+                        if isNull viewVal?PendingAskIncumbencyId then
+                            None
+                        else
+                            Some(unbox<string> viewVal?PendingAskIncumbencyId)
+
+                    let pendingAskCur =
+                        if isNull viewVal?PendingAskCursor then
+                            None
+                        else
+                            Some(unbox<int64> viewVal?PendingAskCursor)
+
                     Some
                         { WorkId = wid
                           ActiveIncumbencyId = activeInc
@@ -632,7 +671,10 @@ module PlanningSurface =
                           Delivered = delivered
                           DeliveryDigest = deliveryDigest
                           DeliveryPath = deliveryPath
-                          BoundDevOpsId = boundDevOpsId }
+                          BoundDevOpsId = boundDevOpsId
+                          PendingAskQuestion = pendingAskQ
+                          PendingAskIncumbencyId = pendingAskInc
+                          PendingAskCursor = pendingAskCur }
                 with _ ->
                     None
 
@@ -680,7 +722,9 @@ module PlanningSurface =
                devOpsBound = devOpsBound
                incumbencyOpened = incumbencyOpened
                incumbencyRetired = incumbencyRetired
-               delivered = delivered |}
+               delivered = delivered
+               askPending = askPending
+               askResolved = askResolved |}
 
     let PlanFold: obj =
         box
@@ -719,8 +763,19 @@ module PlanningSurface =
                executeHandoff = executeHandoff
                executeDeliver = executeDeliver
                executeAsk = executeAsk
+               executeAskAsync = executeAskAsync
+               assembleAskContinuation = assembleAskContinuation
                executeResume = executeResume
                executeJsPlan = executeJsPlan
                planRecoveryPosition = planRecoveryPosition
                allWorkViews = allWorkViews
-               allWorkViewsFromIntegrator = allWorkViewsFromIntegrator |}
+               allWorkViewsFromIntegrator = allWorkViewsFromIntegrator
+               workOpened = workOpened
+               devOpsBound = devOpsBound
+               incumbencyOpened = incumbencyOpened
+               incumbencyRetired = incumbencyRetired
+               delivered = delivered
+               askPending = askPending
+               askResolved = askResolved
+               PlanRetirementOutcome = PlanRetirementOutcome
+               PlanStage = PlanStage |}
