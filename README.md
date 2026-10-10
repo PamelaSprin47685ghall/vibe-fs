@@ -164,7 +164,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 
 领域事实写入 Git common directory 下插件私有 `wanxiangshu-next/runtimes/` 路径中的 journal（按 runtime 的 NDJSON；取不到 common dir 时回退 XDG state home），不在业务 workspace 强制创建插件私有目录。随包资源：
 
-- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
+- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）；`resources/degeneration-guard/envelope/LoopDetectorEnvelope.js`（入库的 loop detector envelope；构建复制到 `dist/`）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
 
@@ -237,7 +237,7 @@ npm run verify:release      # 发布验证
 |------|------|
 | `npm run format` | Fantomas 写盘（与 `format:check` 的相对面：一个改文件，一个只判失败） |
 | `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
-| `node scripts/derive-envelope.mjs` | 手动派生 loop detector envelope 到 `dist/Execution/Session/LoopDetectorEnvelope.js`。构建不自动派生；产物缺失时构建会提示运行本命令 |
+| `node scripts/derive-envelope.mjs` | 手动派生 loop detector envelope，更新入库产物 `resources/degeneration-guard/envelope/LoopDetectorEnvelope.js`。构建不自动派生，把入库产物复制到 `dist/Execution/Session/LoopDetectorEnvelope.js`；入库产物缺失时构建会提示运行本命令 |
 
 ### 测试分层
 
@@ -288,7 +288,7 @@ resources/wanxiangshu.mjs
 
 ### 构建与打包
 
-- **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / full / clean 四模式，plan 与 run 共用判定；非源码输入或工具链变化进入 full 编译但不清空 `dist/`；仅源图删除、重命名或显式 `--clean` 时清空输出目录后重建；其余情况按受影响分片增量聚焦编译；随后校验入口与资源）。不把 `resources/` 复制进 `dist/`。
+- **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / full / clean 四模式，plan 与 run 共用判定；非源码输入或工具链变化进入 full 编译但不清空 `dist/`；仅源图删除、重命名或显式 `--clean` 时清空输出目录后重建；其余情况按受影响分片增量聚焦编译；随后把入库的 loop detector envelope 复制到 `dist/` 并校验入口与资源）。除这一处 runtime import 产物外，不把 `resources/` 复制进 `dist/`。
 - **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
 
 发布预检：`npm run verify:release`（干净工作树；验证日志默认写 `.fable-build/verify-logs/`，已被 .gitignore 忽略；CI 工作流 `.github/workflows/ci.yml` 运行同一命令，但无 artifact 上传，runner 结束后只剩余作业控制台输出）。
