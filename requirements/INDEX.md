@@ -139,7 +139,7 @@
 | 6 | `time-capability` | 8 | time-capability-001 ~ 008 |
 | 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
 | 8 | `session-ontology` | 14 | session-ontology-001 ~ 012、014 ~ 015 |
-| 9 | `managed-session-lifecycle` | 25 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理） |
+| 9 | `managed-session-lifecycle` | 26 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理）、managed-session-lifecycle-026（Main 收束级联 Attached InternalLeaf 的 execution 结算） |
 | 10 | `host-boundary` | 32 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
@@ -154,7 +154,7 @@
 | 20 | `provider-projection` | 14 | provider-projection-001 ~ 014 |
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
 | 22 | `interaction-authority` | 23 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威）、interaction-authority-023（ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效） |
-| 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
+| 23 | `managed-chat-execution` | 15 | managed-chat-execution-001 ~ 014、managed-chat-execution-015（Provider 启动边界拒绝的精确定夺） |
 | 24 | `dispatch-protocol` | 15 | dispatch-protocol-001 ~ 015 |
 | 25 | `durable-events` | 25 | durable-events-001 ~ 025 |
 | 26 | `effect-accounting` | 10 | effect-accounting-001 ~ 008、010、012 |
@@ -168,7 +168,7 @@
 | 34 | `context-compression` | 30 | context-compression-001 ~ 027、context-compression-028（逐次 todowrite K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR） |
 | 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；todowrite checkpoint 窗口见 context-compression-028 |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
-| 37 | `provider-attempt-recovery` | 23 | provider-attempt-recovery-001 ~ 023 |
+| 37 | `provider-attempt-recovery` | 24 | provider-attempt-recovery-001 ~ 023、provider-attempt-recovery-024（加载期 Blogger stale 请求的同源未启动执行定夺） |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
 | 39 | `crash-reconciliation` | 21 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重）、crash-reconciliation-021（进程本地表是缓存，durable 投影是存在性真源） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
