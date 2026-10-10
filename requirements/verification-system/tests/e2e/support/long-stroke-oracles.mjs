@@ -374,16 +374,9 @@ export async function bindManagerLoopSequence(scenario) {
   );
   assert.ok(humanAudit, 'long-stroke: humanroot-loop audit entry is required');
 
-  const scores = (completeness) => ({
-    language_algorithms: 'PERFECT',
-    simplicity: 'PERFECT',
-    structure: 'PERFECT',
-    granularity: 'PERFECT',
-    tests_evidence: 'PERFECT',
-    logic_reliability_boundaries: 'PERFECT',
-    caller_ergonomics: 'PERFECT',
-    completeness,
-  });
+  const scores = (grade) => grade === 'REVISE'
+    ? [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
+    : [];
   const candidatePerfect = () => ({
     type: 'tool-call',
     tool: 'review',

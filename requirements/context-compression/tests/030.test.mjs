@@ -63,3 +63,36 @@ test('WHAT[context-compression-030] modern single-message assume tool parts surv
   assert.deepEqual(projected.map((message) => message.info.id), ['lwr-prefix-2', 'assume-modern', 'tail'])
   assert.equal(projected[1], raw[0])
 })
+
+test('WHAT[context-compression-030] a covered physical message mixing an assume part with other parts survives whole', () => {
+  const raw = [
+    {
+      info: { id: 'mixed-assume', role: 'assistant' },
+      parts: [
+        {
+          type: 'tool',
+          tool: 'assume',
+          callID: 'assume-3',
+          state: { status: 'completed', input: { assumption: 'Keep the whole message.' }, output: 'Committed.' },
+        },
+        { type: 'text', text: 'same physical message prose' },
+      ],
+    },
+    {
+      info: { id: 'ordinary-covered', role: 'assistant' },
+      parts: [{ type: 'tool', tool: 'read', callID: 'read-9', state: { status: 'completed', input: { path: 'y' }, output: 'old' } }],
+    },
+    { info: { id: 'tail', role: 'user' }, parts: [{ type: 'text', text: 'tail' }] },
+  ]
+
+  const projected = xwire.replacePrefixByHostIds(
+    raw,
+    ['mixed-assume', 'ordinary-covered'],
+    null,
+    'lwr-prefix-3',
+    'summary',
+  )
+
+  assert.deepEqual(projected.map((message) => message.info.id), ['lwr-prefix-3', 'mixed-assume', 'tail'])
+  assert.equal(projected[1], raw[0], 'a message carrying an assume call must be kept whole, not split into parts')
+})
