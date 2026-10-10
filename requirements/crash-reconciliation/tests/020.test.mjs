@@ -53,6 +53,19 @@ test('WHAT[crash-reconciliation-020] production load decision voids active child
   }
 })
 
+test('WHAT[crash-reconciliation-020] an active child work run leaves the horizon projection only after load settlement voids it', () => {
+  for (const agent of ['engineer', 'devops']) {
+    const state = recovery.create()
+    link(state, { agent })
+    acceptRun(state, { agent })
+    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1)
+    const settlements = recovery.childSettlements(state)
+    assert.equal(settlements.length, 1)
+    fold(state, settlements[0])
+    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 0)
+  }
+})
+
 test('WHAT[crash-reconciliation-020] human roots and child runs without a durable handle are not selected for load settlement', () => {
   const human = recovery.create()
   const manager = acceptRun(human, { child: 'parent', agent: 'manager', human: true })
