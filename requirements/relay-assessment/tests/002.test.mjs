@@ -170,7 +170,7 @@ const renderedInstruction = name => readFileSync(new URL(`../../../resources/pro
 
 test('WHAT[relay-assessment-001] empty findings terminate the assessment with the finish instruction', async () => {
   await withReview(async ({execute}) => {
-    const result = await execute([])
+    const result = await execute({ findings: [] })
     assert.equal(result, renderedInstruction('manager-finish') + '\n\nrecorded = true\n')
   })
 })

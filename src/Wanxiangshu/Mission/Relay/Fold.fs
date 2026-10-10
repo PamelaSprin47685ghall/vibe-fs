@@ -9,13 +9,18 @@ type private AssessmentRecord =
       AuthorityRevision: AuthorityRevision
       Findings: AssessmentFindings }
 
+type private RetirementConfirmation =
+    { ProviderRunId: string
+      ToolCallId: string }
+
 type private ActiveIncumbency =
     { Id: IncumbencyId
       SnapshotId: WorkspaceSnapshotId
       AuthorityRevision: AuthorityRevision
       Phase: IncumbencyPhase
       Assessment: AssessmentRecord option
-      CleanupBlockerDigest: string option }
+      CleanupBlockerDigest: string option
+      Confirmation: RetirementConfirmation option }
 
 type private RoadState =
     { AuthorityRevision: AuthorityRevision
@@ -47,6 +52,13 @@ type RoadView =
         ActiveAuthorityRevision: AuthorityRevision option
         ActiveCleanupBlockerDigest: string option
         AcceptedAssessmentTransport: (string * string) option
+        /// The first end-of-work confirmation recorded for the active
+        /// incumbency: (providerRunId, toolCallId). None before the first
+        /// suicide call. A second call with a different toolCallId retires.
+        RetirementConfirmation: (string * string) option
+        /// The active incumbency's accepted findings, exposed so the first
+        /// suicide confirmation can return the review commitments verbatim.
+        AcceptedAssessmentFindings: AssessmentFindings option
         RetiredIncumbencies: IncumbencyId list
         RetiredProviderRunIds: Set<string>
         Certificate: QualityCertificate option
@@ -391,18 +403,12 @@ module private Internal =
         else
             Ok()
 
-    let private checkAcceptedPrerequisites
-        (active: ActiveIncumbency)
-        (assessment: AssessmentRecord)
-        (retirement: RetirementSummary)
-        =
+    let private checkAcceptedPrerequisites (active: ActiveIncumbency) =
         if
             active.Phase <> IncumbencyPhase.PerfectAwaitingRetirement
             && active.Phase <> IncumbencyPhase.RetirementCleanupBlocked
         then
             Error "RetirementRequiresPerfectAssessment"
-        elif retirement.SnapshotId <> assessment.SnapshotId then
-            Error "RetirementSnapshotStale"
         else
             Ok()
 
@@ -410,8 +416,6 @@ module private Internal =
         (certificate: QualityCertificate)
         (certificateId: QualityCertificateId)
         (active: ActiveIncumbency)
-        (assessment: AssessmentRecord)
-        (retirement: RetirementSummary)
         =
         if certificate.Id <> certificateId then
             Error "QualityCertificateMismatch"
@@ -419,14 +423,6 @@ module private Internal =
             Error "QualityCertificateInvalid"
         elif certificate.IncumbencyId <> active.Id then
             Error "QualityCertificateIncumbencyMismatch"
-        elif certificate.SnapshotId <> assessment.SnapshotId then
-            Error "QualityCertificateSnapshotMismatch"
-        elif certificate.SnapshotId <> retirement.SnapshotId then
-            Error "QualityCertificateSnapshotMismatch"
-        elif certificate.AuthorityRevision <> retirement.AuthorityRevision then
-            Error "QualityCertificateAuthorityMismatch"
-        elif certificate.AuthorityRevision <> active.AuthorityRevision then
-            Error "QualityCertificateAuthorityMismatch"
         else
             Ok()
 
@@ -434,47 +430,38 @@ module private Internal =
         (current: RoadState)
         (certificateId: QualityCertificateId)
         (active: ActiveIncumbency)
-        (assessment: AssessmentRecord)
-        (retirement: RetirementSummary)
         =
         match current.Certificate with
         | None -> Error "QualityCertificateNotFound"
-        | Some certificate -> checkAcceptedCertificateBindings certificate certificateId active assessment retirement
+        | Some certificate -> checkAcceptedCertificateBindings certificate certificateId active
 
     let private admitAcceptedOutcome
         (current: RoadState)
         (active: ActiveIncumbency)
-        (assessment: AssessmentRecord)
         (certificateId: QualityCertificateId)
-        (retirement: RetirementSummary)
         =
         result {
-            do! checkAcceptedPrerequisites active assessment retirement
-            return! decideAcceptedCertificate current certificateId active assessment retirement
+            do! checkAcceptedPrerequisites active
+            return! decideAcceptedCertificate current certificateId active
         }
 
-    let private admitContinueOutcome (current: RoadState) (active: ActiveIncumbency) =
-        match current.Certificate with
-        | Some certificate when certificate.Valid && certificate.IncumbencyId = active.Id ->
-            Error "ValidCertificateRemains"
-        | _ -> Ok()
+    let private admitContinueOutcome () = Ok()
 
     let private admitOutcomeForAssessment
         (current: RoadState)
         (active: ActiveIncumbency)
-        (assessment: AssessmentRecord)
         (retirement: RetirementSummary)
         =
         match retirement.Outcome with
         | RetirementOutcome.Accepted certificateId ->
-            admitAcceptedOutcome current active assessment certificateId retirement
-        | RetirementOutcome.Continue -> admitContinueOutcome current active
+            admitAcceptedOutcome current active certificateId
+        | RetirementOutcome.Continue -> admitContinueOutcome ()
 
     let private admitOutcome (current: RoadState) (active: ActiveIncumbency) (retirement: RetirementSummary) =
         result {
-            let! assessment = requireRetirementAssessment active
+            let! _ = requireRetirementAssessment active
             do! checkRetirementAuthority current active retirement
-            return! admitOutcomeForAssessment current active assessment retirement
+            return! admitOutcomeForAssessment current active retirement
         }
 
     let private replayedRetirement (current: RoadState) state (retirement: RetirementSummary) =
@@ -595,7 +582,8 @@ module private Internal =
           AuthorityRevision = current.AuthorityRevision
           Phase = IncumbencyPhase.AuditPending
           Assessment = None
-          CleanupBlockerDigest = None }
+          CleanupBlockerDigest = None
+          Confirmation = None }
 
     let private commitPendingIncumbency roadId state (current: RoadState) incumbentId snapshotId =
         update
@@ -605,17 +593,14 @@ module private Internal =
             state
         |> Ok
 
-    let private decideAcceptedReopen roadId state (current: RoadState) incumbentId snapshotId certificateId =
-        match current.Certificate with
-        | Some certificate when certificate.Id = certificateId && not certificate.Valid ->
-            commitPendingIncumbency roadId state current incumbentId snapshotId
-        | _ -> Error "RoadAlreadyAccepted"
+    let private decideAcceptedReopen roadId state (current: RoadState) incumbentId snapshotId =
+        commitPendingIncumbency roadId state current incumbentId snapshotId
 
     let private decideRetirementReopen roadId state (current: RoadState) incumbentId snapshotId retirement =
         match retirement.Outcome with
         | RetirementOutcome.Continue -> commitPendingIncumbency roadId state current incumbentId snapshotId
-        | RetirementOutcome.Accepted certificateId ->
-            decideAcceptedReopen roadId state current incumbentId snapshotId certificateId
+        | RetirementOutcome.Accepted _ ->
+            decideAcceptedReopen roadId state current incumbentId snapshotId
 
     let private decideInactiveReopen roadId state (current: RoadState) incumbentId snapshotId =
         match current.LatestRetirement with
@@ -688,6 +673,29 @@ module private Internal =
             return! commitBlockedCleanup roadId state current active blockerDigest
         }
 
+    let private confirmRetirement roadId state incumbencyId providerRunId toolCallId =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+            let! active = requireBlockTarget current incumbencyId
+
+            match active.Confirmation with
+            | Some existing when existing.ProviderRunId = providerRunId && existing.ToolCallId = toolCallId -> return state
+            | Some _ -> return! Error "RetirementConfirmationReplayConflict"
+            | None ->
+                return
+                    update
+                        roadId
+                        { current with
+                            Active =
+                                Some
+                                    { active with
+                                        Confirmation =
+                                            Some
+                                                { ProviderRunId = providerRunId
+                                                  ToolCallId = toolCallId } } }
+                        state
+        }
+
     let applyEvent roadId state event =
         match event with
         | RelayEvent.RoadOpened(eventRoadId, authorityRevision, authorityMessageId) ->
@@ -725,6 +733,8 @@ module private Internal =
             invalidateCertificate roadId state certificateId reason
         | RelayEvent.RetirementCleanupBlocked(incumbencyId, blockerDigest) ->
             blockRetirementCleanup roadId state incumbencyId blockerDigest
+        | RelayEvent.RetirementConfirmationCommitted(incumbencyId, providerRunId, toolCallId) ->
+            confirmRetirement roadId state incumbencyId providerRunId toolCallId
         | RelayEvent.RetirementCommitted retirement ->
             result {
                 let! current = road roadId state |> require "RoadNotOpen"
@@ -773,6 +783,14 @@ module Fold =
                 |> Option.bind (fun active ->
                     active.Assessment
                     |> Option.map (fun assessment -> assessment.Binding.ToolCallId, assessment.Binding.PayloadDigest))
+              RetirementConfirmation =
+                road.Active
+                |> Option.bind (fun active ->
+                    active.Confirmation
+                    |> Option.map (fun confirmation -> confirmation.ProviderRunId, confirmation.ToolCallId))
+              AcceptedAssessmentFindings =
+                road.Active
+                |> Option.bind (fun active -> active.Assessment |> Option.map (fun assessment -> assessment.Findings))
               RetiredIncumbencies = road.Retired
               RetiredProviderRunIds = road.RetiredProviderRunIds
               Certificate = road.Certificate
@@ -857,6 +875,16 @@ module Decision =
 
     let blockCleanup state roadId incumbentId blockerDigest =
         commit state roadId [ RelayEvent.RetirementCleanupBlocked(incumbentId, blockerDigest) ]
+
+    let confirmRetirement state roadId incumbentId providerRunId toolCallId =
+        match Fold.view state roadId with
+        | None -> Error "RoadNotOpen"
+        | Some view when view.ActiveIncumbency = Some incumbentId ->
+            commit
+                state
+                roadId
+                [ RelayEvent.RetirementConfirmationCommitted(incumbentId, providerRunId, toolCallId) ]
+        | Some _ -> Error "IncumbencyNotActive"
 
     let retire state roadId incumbentId retirement =
         match Fold.view state roadId with

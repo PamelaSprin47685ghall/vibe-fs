@@ -4,8 +4,8 @@ import * as journal from '../../../../dist/Persistence/Journal/ObligationJournal
 
 // A non-empty findings array is the only failing shape; an empty array passes.
 export const findings = grade => grade === 'REVISE'
-  ? [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
-  : []
+  ? { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
+  : { findings: [] }
 export const scores = findings
 export const withReview = async body => withExecutablePlugin(async (hooks, directory, created, runtime) => {
   const session = 'review-manager'

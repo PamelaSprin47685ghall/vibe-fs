@@ -1,1 +1,1 @@
-Your review has been accepted and the target state is reached. The review-only read tools are now disabled; do not read, search, or process repository code yourself anymore. Confirm owned execution resources are settled, then call suicide to finish.
+Your review has been accepted and findings is empty: you are the final Manager, with no successor. The review-only read tools are disabled, but you may still read, clean up, and close out your owned execution resources; do not start new work. Once owned resources are settled, call suicide to finish.

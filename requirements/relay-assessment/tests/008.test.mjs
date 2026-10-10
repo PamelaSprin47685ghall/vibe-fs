@@ -66,8 +66,9 @@ test('WHAT[relay-assessment-008] Road fold distinguishes repair and finish facts
   assert.equal(relay.retirement(accepted.state, 'road-1').outcome, 'Accepted')
   assert.equal(relay.view(accepted.state, 'road-1').activeIncumbency, null)
 
-  const blocked = relay.openIncumbency(accepted.state, 'road-1', 'inc-2', 'snapshot-2', 'authority-1')
-  assert.equal(blocked.ok, false)
+  // relay-assessment-005: a valid certificate no longer blocks a successor.
+  const allowed = relay.openIncumbency(accepted.state, 'road-1', 'inc-2', 'snapshot-2', 'authority-1')
+  assert.equal(allowed.ok, true)
 
   const invalidated = relay.invalidateCertificate(accepted.state, 'road-1', 'WorkspaceChanged')
   assert.equal(invalidated.ok, true)

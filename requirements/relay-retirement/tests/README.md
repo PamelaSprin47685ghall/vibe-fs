@@ -7,5 +7,6 @@ WHAT保留评审前提、资源收束和不可逆退休，并承接完整历史�
 - `007`：真实Decision/Fold的Continue、Accepted、快照冲突和CleanupBlocked转换；纯fold不证明磁盘原子性，也不把退休误写成上下文压缩或待办清空。
 - `008`：真实Accepted退出与Continue后继的transform，观察旧请求清空、一次中断/派发和后继历史保留。最终观察顺序不能代替受控暂停端口证明“中断完成前绝不派发”；该义务仍TODO。
 - `009`：保留上游真实ToolRuntimeScope资源登记/分类的三项正反例，包括名称带devops的Engineer PTY。没有启动真实进程，也不证明跨任期物理交接与最终收束。旧 `decideWithRoadResources` 自建决策断言未沿用。
+- `010`：真实两段式 suicide。第一次在已提交 assessment 后返回评审承诺与延后待办、重放幂等且不退休；第二次以不同 tool call 退休，资源 blocker 在第二次检查。未覆盖 `DeferredWork` 的 durable 消费凭据（归 WP-030）。
 
 GAP-197按上述边界保留。兼容生产API的存在不计行为证据。相关schema/fold与执行入口均需统一新构建后测试；本轮完成语法检查，尚未行为验收。

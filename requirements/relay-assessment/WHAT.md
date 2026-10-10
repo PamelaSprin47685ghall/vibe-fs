@@ -16,9 +16,9 @@ Accepted assessment 绑定 Road、Incumbency、WorkspaceSnapshot 与 AuthorityRe
 
 findings 非空即不通过；每条 finding 直接定义一项修复义务，空 findings 不产生义务。义务从唯一 findings 集合查询，不另存第二份状态。AssessmentCommitted 同时确立 WorkOwned；后续账目推进属于执行行为。
 
-## [005] 证书与降权
+## [005] 末任收尾
 
-findings 为空时生成证书，精确绑定 assessment、snapshot、authority、root request digest、requirement set digest、narrative digest、evidence frontier 和 target horizon。本任立即失去工作区修改能力，仅可读、清理和 suicide。Accepted 退休后，证书有效期间禁止新任；显式失效后由普通新任重新独立评估。
+findings 为空时本任即成为末任，生成证书并立即失去开新工作的能力：只能读、清理和 suicide，明知后继无人，负责把工作收口。证书仍记录 assessment、root request digest、requirement set digest、narrative digest、evidence frontier 和 target horizon，供历史与发布门使用，但不再以「证书有效期间禁止新任」约束后继；运行时一致性由流程与 fast-check 承担。
 
 ## [006] 禁止同任自证
 
@@ -38,4 +38,4 @@ Manager 可亲自使用评审专用只读工具，也可委派只读 Engineer �
 
 ## [010] 改动使旧证据过期
 
-DevOps 验证可包含其角色授权内的非架构源码修复，不得假定其只读。快照一旦改变，旧测试结果、评估和证书立即失效，不得作为新改动的验证；须由下一独立任期在最新快照重新评估。
+DevOps 验证可包含其角色授权内的非架构源码修复，不得假定其只读。工作区改变后，旧测试结果与评估不再代表当前工作区；发布门仍比对当前快照与评估快照，退休匹配仍要求当前证书。不再以「快照一变旧评估立即失效」在运行时阻断评审与收口；并发一致性由流程与 fast-check 承担。

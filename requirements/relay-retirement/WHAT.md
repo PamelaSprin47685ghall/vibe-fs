@@ -16,6 +16,10 @@ Suicide 前须提交 assessment；尚未提交时返回先调用 review 的明�
 
 先冻结本任新工作准入，再读取精确递归 ownership。冻结前已接受资源须纳入检查，冻结后创建须被 fence 拒绝。Fence 绑定 IncumbencyId，不随复用 SessionId 传给后继；阻塞时只恢复本任清理能力，不恢复新工作准入。
 
+## [005] 两段式结束确认
+
+正常退休须经两次 `suicide` 调用。已提交 assessment 后，第一次调用不退休：它返回本任评审承诺（`findings` 的 `(acceptance_criteria, work_plan)` 对）与尚未消费的 `DeferredWork` 待办，供调用方核对，并追加 durable `RetirementConfirmationCommitted`。同一精确 `(providerRun, toolCall)` 的重放幂等返回同一确认；同一 `toolCall` 的异 `providerRun` 拒绝。第二次以不同 `toolCall` 调用才进入正常退休流程，资源阻塞检查在此时进行。确认不解除义务、不改变 office 权限，也不构成退休。
+
 ## [007] 原子退休
 
 同一 durable transaction 提交不可逆退休事实与闭合记录：任期、快照、authority revision、精确 provider-run/tool-call cut 和 `Continue | Accepted certificateId`。崩溃后不得永久处于已退休但缺 outcome/cut 的状态；循环信号仅从 outcome 派生。

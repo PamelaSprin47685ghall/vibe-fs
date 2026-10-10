@@ -14,6 +14,7 @@ test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending 
     iterationOrdinal: 1,
     phase: 'AuditPending',
     retired: [],
+    retirementConfirmed: false,
   })
 
   const assessed = relay.assess(
@@ -44,6 +45,7 @@ test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending 
     iterationOrdinal: 2,
     phase: 'AuditPending',
     retired: ['inc-1'],
+    retirementConfirmed: false,
   })
 })
 

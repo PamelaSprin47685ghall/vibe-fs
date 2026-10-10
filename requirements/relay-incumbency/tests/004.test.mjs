@@ -24,5 +24,6 @@ test('WHAT[relay-incumbency-004] low-score assessor takes work ownership in plac
     iterationOrdinal: 1,
     phase: 'WorkOwned',
     retired: [],
+    retirementConfirmed: false,
   })
 })

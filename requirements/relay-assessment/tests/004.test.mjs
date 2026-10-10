@@ -16,6 +16,7 @@ test('WHAT[relay-assessment-004] revise assessment fold enters WorkOwned without
     iterationOrdinal: 1,
     phase: 'WorkOwned',
     retired: [],
+    retirementConfirmed: false,
   })
   assert.equal(relay.certificate(assessed.state, 'road-1'), null)
 })

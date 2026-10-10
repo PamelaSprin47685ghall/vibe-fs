@@ -7,6 +7,8 @@ import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-sy
 test('WHAT[relay-retirement-008] actual Accepted suicide returns without abort and the next transform stops the retired attempt', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
     assert.match(await execute(scores('PERFECT')), /recorded = true/)
+    const confirmation = await hooks.tool.suicide.execute({}, {sessionID: session, callID: 'suicide-confirm', messageID: 'retirement-confirm', agent: 'manager'})
+    assert.match(confirmation, /confirmation_required = true/)
     const result = await hooks.tool.suicide.execute({}, {sessionID: session, callID: 'suicide-call', messageID: 'retirement-run', agent: 'manager'})
     assert.match(result, /finished = true/)
     assert.deepEqual(runtime.abortedIds, [])
@@ -58,7 +60,7 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
     // Step 1: Submit PERFECT review
-    const findings = []
+    const findings = { findings: [] }
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
@@ -77,6 +79,8 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
       parts: [{ type: 'tool', tool: 'suicide', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
+    const confirmation = await hooks.tool.suicide.execute({}, context('call-suicide-confirm', 'confirm-run'))
+    assert.match(confirmation, /confirmation_required = true/)
     const suicideResult = await hooks.tool.suicide.execute({}, context('call-suicide', retiredRun.id))
     assert.match(suicideResult, /finished = true/)
 

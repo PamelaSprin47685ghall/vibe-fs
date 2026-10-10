@@ -30,6 +30,9 @@ module SuicideTool =
         let Retired = "tool/suicide/finished"
 
         [<Literal>]
+        let Confirmation = "tool/suicide/confirmation"
+
+        [<Literal>]
         let NonManagerRole = "tool/suicide/non-manager-role"
 
         [<Literal>]
@@ -55,6 +58,9 @@ module SuicideTool =
     let private text (path: string) =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
 
+    let private pendingDeferred (journal: AgentJournal) (sessionId: SessionId) =
+        AgentProjection.pendingAttentionWorkPairs sessionId (AgentJournal.snapshot journal).AgentProjections
+
     let private currentState (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.Relay)
@@ -66,16 +72,13 @@ module SuicideTool =
         HostDigest.sha256Hex (prefix + "\n" + payload)
         |> fun digest -> create (prefix + ":" + digest)
 
-    let private qualityCandidate (view: RoadView) incumbent snapshot authority =
+    let private qualityCandidate (view: RoadView) incumbent =
         view.Certificate
         |> Option.filter (fun certificate ->
-            certificate.Valid
-            && certificate.IncumbencyId = incumbent
-            && certificate.SnapshotId = snapshot
-            && certificate.AuthorityRevision = authority)
+            certificate.Valid && certificate.IncumbencyId = incumbent)
 
     let private retirementTransaction roadId incumbent providerRun toolCallId snapshot authority (view: RoadView) =
-        let candidate = qualityCandidate view incumbent snapshot authority
+        let candidate = qualityCandidate view incumbent
 
         let outcome =
             match candidate with
@@ -244,6 +247,32 @@ module SuicideTool =
         |> Option.bind (fun road -> road.LatestRetirement)
         |> requireSome (text Path.NoRetirementProjection)
 
+    let private confirmationResult (prepared: PreparedRetirement) pending =
+        let commitments =
+            prepared.View.AcceptedAssessmentFindings
+            |> Option.map AssessmentFindings.values
+            |> Option.defaultValue []
+            |> List.mapi (fun index finding ->
+                string index,
+                ToolHostCodec.TString(finding.AcceptanceCriteria + " => " + finding.WorkPlan))
+
+        let deferred =
+            pending
+            |> List.mapi (fun index (_, itemText) -> string index, ToolHostCodec.TString itemText)
+
+        let optionalFields =
+            [ if not (List.isEmpty commitments) then
+                  yield "commitments", ToolHostCodec.TTable commitments
+
+              if not (List.isEmpty deferred) then
+                  yield "deferred", ToolHostCodec.TTable deferred ]
+
+        ToolHostCodec.tomlObjectWithInstructions
+            [ text Path.Confirmation ]
+            ([ "finished", ToolHostCodec.TBool false
+               "confirmation_required", ToolHostCodec.TBool true ]
+             @ optionalFields)
+
     let private runBlocked (prepared: PreparedRetirement) blockers =
         let blockerDigest = HostDigest.sha256Hex (String.concat "\n" blockers)
 
@@ -277,16 +306,45 @@ module SuicideTool =
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
         let hasAssessment = prepared.View.AcceptedAssessmentTransport |> Option.isSome
+        let toolCallId = ToolCallId.value prepared.Bound.ToolCallId
+        let providerRunId = ProviderRunIdentity.value prepared.Bound.ProviderRun
 
-        let blockers = scope.RetirementBlockersFor context.SessionId
+        let pending = pendingDeferred prepared.Bound.Journal prepared.SessionId
+
+        let confirmFirst () =
+            taskResult {
+                let! transaction =
+                    RelayTransaction.create
+                        [ RelayEvent.RetirementConfirmationCommitted(
+                              prepared.Incumbent,
+                              providerRunId,
+                              toolCallId
+                          ) ]
+                    |> Result.mapError (fun _ -> text Path.FinishFailed)
+
+                let! _ = appendPrepared prepared transaction
+                scope.UnfreezeRetirement context.SessionId
+                return confirmationResult prepared pending
+            }
 
         if not hasAssessment then
             scope.UnfreezeRetirement context.SessionId
             Task.FromResult(Ok(assessmentRequiredResult ()))
-        elif List.isEmpty blockers then
-            runRetirement prepared
         else
-            runBlocked prepared blockers
+            match prepared.View.RetirementConfirmation with
+            | None -> confirmFirst ()
+            | Some(confirmedRun, confirmedCall) when confirmedCall = toolCallId && confirmedRun = providerRunId ->
+                scope.UnfreezeRetirement context.SessionId
+                Task.FromResult(Ok(confirmationResult prepared pending))
+            | Some(_, confirmedCall) when confirmedCall = toolCallId ->
+                Task.FromResult(Error "RetirementConfirmationReplayConflict")
+            | Some _ ->
+                let blockers = scope.RetirementBlockersFor context.SessionId
+
+                if List.isEmpty blockers then
+                    runRetirement prepared
+                else
+                    runBlocked prepared blockers
 
     let private unfreezeUnlessRetired (scope: ToolRuntimeScope) (context: HostToolContext) =
         let facts = scope.ManagerCapabilityFactsFor context.SessionId

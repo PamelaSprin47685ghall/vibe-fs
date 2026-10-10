@@ -108,6 +108,15 @@ module Surface =
         Decision.blockCleanup state (RoadId.create road) (IncumbencyId.create incumbent) blockerDigest
         |> result
 
+    let confirmRetirement state road incumbent providerRunId toolCallId =
+        Decision.confirmRetirement
+            state
+            (RoadId.create road)
+            (IncumbencyId.create incumbent)
+            providerRunId
+            toolCallId
+        |> result
+
     let private normalize (value: string) = if isNull value then "" else value
 
     let private activeRetirementContext state road incumbent =
@@ -189,6 +198,7 @@ module Surface =
                 {| activeIncumbency = roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString
                    iterationOrdinal = roadView.IterationOrdinal
                    phase = roadView.ActivePhase |> Option.map phaseName |> nullableString
+                   retirementConfirmed = Option.isSome roadView.RetirementConfirmation
                    retired = roadView.RetiredIncumbencies |> List.map IncumbencyId.value |> List.toArray |}
 
     let authority state road =

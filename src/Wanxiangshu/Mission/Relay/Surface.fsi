@@ -33,6 +33,14 @@ module Surface =
 
     val blockCleanup: state: RelayState -> road: string -> incumbent: string -> blockerDigest: string -> obj
 
+    val confirmRetirement:
+        state: RelayState ->
+        road: string ->
+        incumbent: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+            obj
+
     val retireContinue:
         state: RelayState ->
         road: string ->

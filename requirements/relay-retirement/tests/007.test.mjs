@@ -70,19 +70,20 @@ test('WHAT[relay-retirement-007] Accepted retirement commits a closed Accepted o
   assert.equal(relay.view(retired.state, 'road-1').activeIncumbency, null)
 })
 
-test('WHAT[relay-retirement-007] Accepted with a stale different snapshot fails', () => {
+test('WHAT[relay-retirement-007] Accepted retirement no longer requires the retirement snapshot to equal the assessment snapshot', () => {
   const state = openAssessed([])
-  const stale = relay.retireAccepted(
+  const retired = relay.retireAccepted(
     state,
     'road-1',
     'inc-1',
-    'ret-stale',
+    'ret-next-snapshot',
     'run-1',
     'tool-1',
     'certificate:assessment-1',
     'snapshot-2',
   )
-  assert.deepEqual(stale, { ok: false, error: 'RetirementSnapshotStale' })
+  assert.equal(retired.ok, true)
+  assert.equal(relay.retirement(retired.state, 'road-1').snapshotId, 'snapshot-2')
 })
 
 test('WHAT[relay-retirement-007] cleanup-blocked fold accepts a subsequent exact certificate retirement transaction', () => {
@@ -109,7 +110,7 @@ test('WHAT[relay-retirement-007] real durable retirement is atomic across crash 
 
 test.todo('WHAT[relay-retirement-007] retirement ends incumbent obligations without rewriting independent context-compression history')
 
-test('WHAT[relay-retirement-007] Accepted road cannot reopen new incumbency while certificate is valid', () => {
+test('WHAT[relay-retirement-007] Accepted road reopens the next incumbency without invalidating the certificate', () => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(opened.ok, true)
   const assessed = relay.assess(
@@ -135,14 +136,9 @@ test('WHAT[relay-retirement-007] Accepted road cannot reopen new incumbency whil
   )
   assert.equal(retired.ok, true)
 
-  // Direct attempt to reopen incumbency while certificate is still valid fails with RoadAlreadyAccepted
+  // WP-019: a valid certificate is historical evidence; it no longer blocks the
+  // next iteration, so the reopen succeeds directly without invalidation.
   const reopened = relay.openIncumbency(retired.state, 'road-1', 'inc-2', 'snapshot-1', 'authority-1')
-  assert.deepEqual(reopened, { ok: false, error: 'RoadAlreadyAccepted' })
-
-  // After explicit invalidation of the certificate, reopen succeeds
-  const invalidated = relay.invalidateCertificate(retired.state, 'road-1', 'NewHumanInputAdvancesPhase')
-  assert.equal(invalidated.ok, true)
-  const reopenedAfterInvalidate = relay.openIncumbency(invalidated.state, 'road-1', 'inc-2', 'snapshot-1', 'authority-1')
-  assert.equal(reopenedAfterInvalidate.ok, true)
-  assert.equal(relay.view(reopenedAfterInvalidate.state, 'road-1').activeIncumbency, 'inc-2')
+  assert.equal(reopened.ok, true)
+  assert.equal(relay.view(reopened.state, 'road-1').activeIncumbency, 'inc-2')
 })
