@@ -228,12 +228,19 @@ module ProcessEventLog =
           StatIdentity: string
           LastActivityMs: float }
 
-    let private writerRetentionMs = 24.0 * 60.0 * 60.0 * 1000.0
+    /// durable-convergence-011: writer retention is a UTC calendar-day group,
+    /// not a rolling 24h window. A writer stays while its last-activity UTC date
+    /// is today or yesterday; the day before and earlier are collected. The date
+    /// is a GC grouping only — it carries no history meaning, and a writer's
+    /// activity may move it to a later day.
+    let private utcDayMilliseconds = 24.0 * 60.0 * 60.0 * 1000.0
 
-    let writerRetentionMilliseconds () = writerRetentionMs
+    let utcDayOf (timeMs: float) = floor (timeMs / utcDayMilliseconds)
+
+    let writerRetentionMilliseconds () = utcDayMilliseconds
 
     let isWriterActiveAt nowMs lastActivityMs =
-        lastActivityMs >= nowMs - writerRetentionMs
+        utcDayOf lastActivityMs >= utcDayOf nowMs - 1.0
 
     let private tryAcquireLock (target: string) (options: obj) waitStep : Task<obj option> =
         task {

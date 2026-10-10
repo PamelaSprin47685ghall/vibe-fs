@@ -169,7 +169,7 @@ module WriterStreamSync =
     let private cacheTimeValid (nowMs: float) (cache: MaterializationCache) =
         match cache.NextExpiryMs with
         | None -> true
-        | Some expiry -> nowMs <= expiry
+        | Some expiry -> nowMs < expiry
 
     let private tryCachedLocal commonDir nowMs =
         let fingerprint = ProcessEventLog.physicalFingerprint commonDir
@@ -332,8 +332,11 @@ module WriterStreamSync =
             parseManifestLines lines
 
     let private nextExpiry (writers: MaterializedWriter list) =
+        // durable-convergence-011: a writer's UTC activity date plus two days is
+        // the first instant it becomes "the day before yesterday" and is collected.
         writers
-        |> List.map (fun writer -> writer.LastActivityMs + retentionMilliseconds ())
+        |> List.map (fun writer ->
+            (ProcessEventLog.utcDayOf writer.LastActivityMs + 2.0) * retentionMilliseconds ())
         |> List.sort
         |> List.tryHead
 
