@@ -212,14 +212,20 @@ test('WHAT[feature-ablation-002] ABL_002_ablated_package_tool_is_refused_at_the_
 
   // 单点覆盖 repository-programming：mv/rm 映射到该节点。消融门在 admission 与工具体之前
   // 拒绝，因此本用例不依赖 Engineer 的具体授权，也不产生任何文件副作用。
-  const override = 'WANXIANGSHU_ABLATION_repository_programming'
+  // station-05 marks repository-programming ablated, which also ablates its
+  // downstream interaction-authority (the Prompt fact). The registry is
+  // therefore switched after the authority root is admitted: the fixture
+  // precondition writes under the active default, then the rm execute gate
+  // reads the ablated profile at call time.
+  const override = 'WANXIANGSHU_ABLATION_PROFILE'
   const previous = process.env[override]
-  process.env[override] = 'ablated'
   Ablation.resetRegistry()
   try {
     await integrationTest('WHAT[feature-ablation-002] ABL_002_ablated_package_tool_is_refused_at_the_real_execute_gate', async () => {
       await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
         await acceptAuthorityRoot(runtime, 'ses-ablation-gate', 'engineer')
+        process.env[override] = 'station-05'
+        Ablation.resetRegistry()
         const result = await hooks.tool.rm.execute(
           { path: 'ablation-probe' },
           { sessionID: 'ses-ablation-gate', agent: 'engineer' },
