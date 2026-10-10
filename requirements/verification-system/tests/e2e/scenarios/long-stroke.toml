@@ -1193,8 +1193,10 @@ optional = true
 # 走角色池 test/test-model，角色与参与者身份不变。
 #
 # 腿1 正常完成 + 腿2 提前结束 + 腿3 自然截断：preflow 的 strength-canary-owner
-# 由 014.test.mjs preFlowCanaries 创建驱动，其同伴 bootstrap 交付数由该文件
-# matchCount('strength-canary-replica.0') === 1 钉住。budget=2：同伴第 1 轮经
+# 由 014.test.mjs preFlowCanaries 创建驱动，其同伴第 1 次交付由该文件的
+# waitForExpectationAttempt 等待并以 >= 1 钉住；完整两轮交付与恰一次口径由主流程
+# 覆盖（replica chats [1, 2]、owner chats [4, 5]、Requested/Bound == 2）。
+# budget=2：同伴第 1 轮经
 # 唯一只读面 js-predictor 读 large_probe.txt（工具既有截断由宿主掌握；帧只保存
 # 实际返回字节，marker 在头部，截断也存活），第 2 轮以纯文本提前结束；材料经
 # Prepared → Promoted 回传 owner 的后续请求。两个 companion 的每次请求 wire
@@ -1288,8 +1290,11 @@ tools = ["js-manager"]
 #                                          transform gate, no physical send)
 # bindReplicaSequence supplies the per-delivery respond (the same pattern
 # bindManagerLoopSequence uses); a static step cannot vary by delivery.
-# 014.test.mjs pins this step's delivery count at 1 during the preflow, before
-# the recovery companion exists.
+# 014.test.mjs waits for this step's first delivery during the preflow and
+# asserts the canary decision's DelegationRequested/Bound are exactly 1; the
+# second delivery (the companion's continuation) is design behavior, and exact
+# repetition is covered downstream (main-flow replica chats [1, 2], owner
+# counts [4, 5], requested/bound == 2).
 [[turn]]
 id = "strength-canary-replica"
 internal = true

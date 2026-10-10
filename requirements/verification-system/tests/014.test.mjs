@@ -224,10 +224,32 @@ const preFlowCanaries = async (scenario) => {
   await CUSTOMS.bindReplicaSequence(scenario)
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'manager')
 
-  assert.equal(
-    scenario.provider.matchCount('strength-canary-replica.0'),
-    1,
+  // The bootstrap delivery is the canary decision's physical start. Wait for it
+  // (removing the race with `awaitTerminal`) and require at least one delivery:
+  // one entry carries both the bootstrap and the companion's own continuation,
+  // and the second delivery may legitimately be in flight here — that is design
+  // behavior, not a repeated start. Exact repetition is covered downstream by
+  // stronger oracles: main-flow replica chat counts [1, 2], owner counts [4, 5],
+  // and DelegationRequested/Bound == 2. This barrier proves only what the
+  // preflow owes: the Replica physically started and the owner was not blocked.
+  await scenario.provider.waitForExpectationAttempt('strength-canary-replica.0', 1, WAIT_FACT_WINDOW_MS)
+  assert.ok(
+    scenario.provider.matchCount('strength-canary-replica.0') >= 1,
     `Strength dry-run must physically start its Replica without blocking the owner. Host stderr tail:\n${scenario.host.stderrLog.slice(-4000)}`,
+  )
+  // Durable side of the same barrier: the canary decision crossed capture and
+  // binding exactly once each; the recovery decision does not exist yet. Bound
+  // is written before the bootstrap prompt is sent, so the first observed
+  // delivery already proves it is durable.
+  assert.equal(
+    factPayloads(scenario.host.workDir, 'DelegationRequested').length,
+    1,
+    'the canary decision must own exactly one DelegationRequested before recovery exists',
+  )
+  assert.equal(
+    factPayloads(scenario.host.workDir, 'DelegationBound').length,
+    1,
+    'the canary decision must own exactly one DelegationBound before recovery exists',
   )
 
   const humanrootCreated = await scenario.client.createSession({ agent: 'manager' })
