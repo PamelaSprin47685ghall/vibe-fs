@@ -26,7 +26,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { compileScenario } from './e2e/support/scenario-schema.js'
 import { resolveEntry } from './e2e/support/runtime-key.js'
 import { fileURLToPath } from 'node:url'
@@ -46,7 +46,13 @@ import {
   INVESTIGATION_OUTLOOK_MARKERS,
   matchInvestigationOutlookMarker,
 } from './e2e/support/long-stroke-oracles.mjs'
-import { factPayloads } from './e2e/support/journal-observer.js'
+import {
+  eventsDir,
+  factPayloads,
+  gitCommonDir,
+  journalEnvelopeFromEventText,
+  journalEventLines,
+} from './e2e/support/journal-observer.js'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
 import {
   getOpencodeSpawnCount,
@@ -241,10 +247,139 @@ const preFlowCanaries = async (scenario) => {
   // binding exactly once each; the recovery decision does not exist yet. Bound
   // is written before the bootstrap prompt is sent, so the first observed
   // delivery already proves it is durable.
+  // Failure-site self-evidence: when this durable barrier fails, collect the
+  // resolved journal directories, writer-file inventory, per-fact grep counts
+  // and the relevant stderr lines, without changing the assertion itself.
+  const journalDiagnosis = () => {
+    const commonDir = gitCommonDir(scenario.host.workDir)
+    const eventsPath = eventsDir(scenario.host.workDir)
+    let files = []
+    try {
+      files = readdirSync(eventsPath).map((name) => `${name}(${statSync(join(eventsPath, name)).size}B)`)
+    } catch (error) {
+      files = [`<unreadable: ${error.message}>`]
+    }
+    const factCounts = {}
+    for (const name of ['DelegationRequested', 'DelegationBound', 'StrengthFramesTraced']) {
+      factCounts[name] = factPayloads(scenario.host.workDir, name).length
+    }
+
+    // Full fact-label histogram over every local writer line, all nesting levels.
+    let lines = []
+    try {
+      lines = journalEventLines(scenario.host.workDir)
+    } catch {
+      lines = []
+    }
+    const labelsOfLine = (text) => {
+      const labels = []
+      const walk = (value) => {
+        if (Array.isArray(value)) {
+          if (typeof value[0] === 'string') labels.push(value[0])
+          for (const item of value) walk(item)
+        } else if (value && typeof value === 'object') {
+          for (const child of Object.values(value)) walk(child)
+        }
+      }
+      walk(journalEnvelopeFromEventText(text)?.Fact)
+      return labels
+    }
+    const labelCounts = {}
+    for (const text of lines) {
+      for (const label of labelsOfLine(text)) labelCounts[label] = (labelCounts[label] ?? 0) + 1
+    }
+    const allFactLabels = Object.fromEntries(
+      Object.entries(labelCounts).sort((left, right) => right[1] - left[1]),
+    )
+
+    // Every stderr line carrying the strength- prefix family, in arrival order.
+    const stderrAll = String(scenario.host.stderrLog ?? '').split('\n')
+    const strengthLines = stderrAll
+      .filter((line) => line.includes('strength-'))
+      .map((line) => (line.length > 300 ? `${line.slice(0, 300)}…` : line))
+    const strengthShown =
+      strengthLines.length > 120
+        ? [
+            ...strengthLines.slice(0, 20),
+            `… ${strengthLines.length - 80} more strength- lines omitted …`,
+            ...strengthLines.slice(-60),
+          ]
+        : strengthLines
+
+    // Session-id mapping: every id mentioned on a strength- stderr line, then
+    // its presence and fact labels inside the journal.
+    const referenced = new Set()
+    for (const line of strengthLines) {
+      for (const match of line.matchAll(/ses_[A-Za-z0-9]+/g)) referenced.add(match[0])
+    }
+    const sessionTrace = {}
+    for (const sid of [...referenced].slice(0, 10)) {
+      const journalHits = lines.filter((text) => text.includes(sid))
+      const labels = new Set()
+      for (const text of journalHits) for (const label of labelsOfLine(text)) labels.add(label)
+      sessionTrace[sid] = {
+        knownLane: (scenario.sessionIds ?? []).includes(sid),
+        journalLines: journalHits.length,
+        journalFactLabels: [...labels].slice(0, 20),
+        stderrLines: stderrAll.filter((line) => line.includes(sid)).length,
+      }
+    }
+
+    // Any other events directories (legacy wanxiang/ path, worktree/state copies).
+    const otherEventsDirs = []
+    const scanForEvents = (dir, depth) => {
+      if (depth > 5 || otherEventsDirs.length >= 10) return
+      let entries = []
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue
+        if (entry.name === 'node_modules' || entry.name === 'objects' || entry.name === 'lfs') continue
+        const next = join(dir, entry.name)
+        if (entry.name === 'events') {
+          if (next !== eventsPath && !otherEventsDirs.includes(next)) otherEventsDirs.push(next)
+          continue
+        }
+        scanForEvents(next, depth + 1)
+      }
+    }
+    scanForEvents(scenario.host.workDir, 0)
+    scanForEvents(commonDir, 0)
+    const stateRoot =
+      process.env.XDG_STATE_HOME ||
+      (process.env.HOME ? join(process.env.HOME, '.local', 'state') : null)
+    const stateDirs = []
+    if (stateRoot) {
+      try {
+        for (const name of readdirSync(stateRoot)) {
+          if (name.includes('wanxiang')) stateDirs.push(join(stateRoot, name))
+        }
+      } catch {}
+    }
+
+    return JSON.stringify(
+      {
+        commonDir,
+        eventsPath,
+        eventsFiles: files,
+        factCounts,
+        allFactLabels,
+        strengthLines: strengthShown,
+        sessionTrace,
+        otherEventsDirs,
+        stateDirs,
+      },
+      null,
+      2,
+    )
+  }
   assert.equal(
     factPayloads(scenario.host.workDir, 'DelegationRequested').length,
     1,
-    'the canary decision must own exactly one DelegationRequested before recovery exists',
+    `the canary decision must own exactly one DelegationRequested before recovery exists\n${journalDiagnosis()}`,
   )
   assert.equal(
     factPayloads(scenario.host.workDir, 'DelegationBound').length,
