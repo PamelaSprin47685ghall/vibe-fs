@@ -87,12 +87,12 @@ supports it: which component emits what, which boundary accepts what, and where
 the value is rejected, ignored, or changed. Prefer “A emits X; B accepts only Y;
 X is dropped at Z” over “a comparison of A and B revealed a format mismatch.”
 
-When a literal exhibit would make that chain materially harder to dispute, use
+When a literal excerpt would make that chain materially harder to dispute, use
 the optional evidence field for the smallest decisive raw excerpt only. It may
 quote code, data, a wire fragment, a log line, or another source fragment.
 Evidence is not commentary: do not explain it, paraphrase it, or paste a large
 surrounding block. It is rendered once at the end of the Chronicle paragraph
-inside `[...]`; line breaks are escaped so the exhibit remains one line.
+inside `[...]`; line breaks are escaped so the excerpt remains one line.
 
 Each field answers one sharp question:
 

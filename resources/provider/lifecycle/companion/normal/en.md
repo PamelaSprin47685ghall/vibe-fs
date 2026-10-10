@@ -12,6 +12,6 @@ concrete entity, fact chain, conclusion, or constraint and remain intelligible
 when read outside the current transcript.
 Write a determination, not a diary: occurrence proves, settlement rules,
 consequence gates.
-If a literal raw excerpt materially strengthens the proof, put only the smallest
+If a literal raw excerpt materially strengthens the fact chain, put only the smallest
 decisive excerpt in optional evidence; otherwise omit it. Never paste a large block.
 Output no ordinary assistant prose.

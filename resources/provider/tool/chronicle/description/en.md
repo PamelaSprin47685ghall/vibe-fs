@@ -34,7 +34,7 @@ smallest decisive verbatim excerpt from raw code/data/wire/log/source material.
 Never paraphrase evidence and never dump a large block. The system appends the
 excerpt once at the paragraph end as `[...]`, escaping embedded line breaks so
 the bracket remains on one line. Omit evidence when the four-sentence verdict
-already stands without a literal exhibit.
+already stands without a literal excerpt.
 
 A successful return means the Chronicle accepted this transition. It does not
 schedule work, grant authority, or prove more than the supplied facts earned.
