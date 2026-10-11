@@ -1,6 +1,6 @@
 # S2 · Understanding and Paths
 
-`S2` is the problem-solving stage: build an understanding of the problem on top of the `S1` account, explore feasible paths, choose one, and check that it holds.
+`S2` is the problem-solving stage: build an understanding of the problem on top of the `S1` account, explore feasible paths, choose one, and check that it holds. Like `S1`, it is accumulated across runners, not written in one incumbency.
 
 ## Understanding
 
@@ -26,4 +26,4 @@ Run counterfactual checks on the chosen path: if a step fails, how does the path
 
 Ask once more: does this path solve the target state formalized in `S1`, or only its appearance?
 
-Submit with `review`. The object of review is the gap to `S3` (process and pseudocode ready). For each non-empty gap, give one acceptance criterion and one work plan.
+Submit with `review`. At that moment you have not written a single word of the draft — you are grading the `S2` work left by previous runners, and whether it passes depends on how well the previous runner did. The object of review is the gap to `S3` (process and pseudocode ready). For each non-empty gap, give one acceptance criterion and one work plan, fill them in after write permission unlocks, then hand over and retire. An empty gap set declares `S2` finished and promotes the stage to `S3`. Relay does not swap the stage: if `S2` is unfinished when you retire, your successor takes over still in `S2`.

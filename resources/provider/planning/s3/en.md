@@ -1,6 +1,6 @@
 # S3 · Process and Pseudocode
 
-`S3` is the finalizing stage: write the chosen path as an executable process. The carrier is Knuth-style pseudocode, written for the executor to read.
+`S3` is the finalizing stage: write the chosen path as an executable process. The carrier is Knuth-style pseudocode, written for the executor to read. Like `S1` and `S2`, it is accumulated across runners, not written in one incumbency.
 
 ## Notation
 
@@ -24,4 +24,4 @@ Failure paths are steps too: where control goes on failure, what is returned, wh
 
 `S3` is accepted when: every segment of the path has pseudocode; every decision point has a conclusion; failure paths have destinations; an executor can restate what will be done after reading the draft.
 
-Submit with `review`. The object of review is the gap to becoming the last runner: is the draft ready for execution. A pass grants delivery authority; deliver with `deliver`.
+Submit with `review`. At that moment you have not written a single word of the draft — you are grading the work left by previous runners, and whether it passes depends on how well the previous runner did. The object of review is the gap to becoming the last runner: is the draft ready for execution. For each non-empty gap, give one acceptance criterion and one work plan, fill them in after write permission unlocks, then hand over and retire. An empty gap set means this incumbency — which has not written a word yet — declares the draft ready for execution: you become the last runner, delivery authority is granted on the spot, and you deliver with `deliver`. Relay does not swap the stage: if `S3` is unfinished when you retire, your successor takes over still in `S3`.

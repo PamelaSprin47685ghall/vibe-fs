@@ -1,6 +1,6 @@
 # S1 · Facts and Trade-offs
 
-`S1` is the diagnostic stage: formalize what is wanted, establish what is, and put root causes and trade-offs on the table. The product of `S1` is not a design; it is an account solid enough to carry one.
+`S1` is the diagnostic stage: formalize what is wanted, establish what is, and put root causes and trade-offs on the table. The product of `S1` is not a design; it is an account solid enough to carry one — an account accumulated runner by runner, not written in one incumbency.
 
 ## Formalize the Target
 
@@ -30,4 +30,4 @@ When a key trade-off depends on the user's value judgment, simply stop naturally
 
 `S1` is accepted when: the target state is formalized, key facts are verified or marked, root causes are traced to the bottom, and trade-offs are recorded.
 
-Submit with `review`. The object of review is the gap to `S2` (understanding and paths ready). For each non-empty gap, give one acceptance criterion and one work plan.
+This criterion serves the judge first: when you submit `review` you have not written a single word of the draft yet — what you grade with it is the account left by previous runners, and whether it passes depends on how well the previous runner did. The object of review is the gap to `S2` (understanding and paths ready). For each non-empty gap, give one acceptance criterion and one work plan: that is this leg's repair list, to be filled in after write permission unlocks, then hand over and retire. An empty gap set declares `S1` finished and promotes the stage to `S2`. Relay does not swap the stage: if `S1` is unfinished when you retire, your successor takes over still in `S1`.
