@@ -161,12 +161,7 @@ module ForkTool =
         ProviderProse.render language path (Map [ "name", byname ])
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = SessionProviderLanguage.languageOf sessionId
-
-        { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
-          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
-          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
-          Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
+        Wanxiangshu.Execution.Delegation.SyncDelegate.HostForkProse.forkInstructions sessionId
 
     type Request =
         { Calling: string

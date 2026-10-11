@@ -45,6 +45,23 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 
+module HostForkProse =
+    let forkInstructions (sessionId: SessionId) : ForkChildInstructions =
+        let lang = SessionProviderLanguage.languageOf sessionId
+
+        { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
+          Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
+
+    /// delegation-019: the default charge prompt is the fork-child convention —
+    /// the assignment instruction plus the shared fork-child Base guidance — so a
+    /// plain charge delegation reads exactly like a fork first prompt. The parent
+    /// delta rides along at send time as `commissioner_record` (DelegationHandoff).
+    let chargeDocument (owner: SessionId) (charge: string) : LlmFacing.Document =
+        let prose = forkInstructions owner
+        LlmFacing.instructions [ charge ] |> LlmFacing.withInstructions prose.Base
+
 /// Host-observable exact identity for a reusable SyncDelegate child. The title
 /// is compared as a whole; escaped fields make distinct scope/role/agent tuples
 /// unambiguous even when an identity contains title delimiters.
@@ -331,7 +348,13 @@ type SyncDelegateRuntime
                 inv.StartCursor <- Some startCursor
 
             let providerPrompt =
-                DelegationHandoff.appendParentDelta request.ProviderPrompt prepared.ParentRecord
+                // delegation-019: the parent delta rides the shared fork-child
+                // convention — localized CommissionerRecord prose header plus a
+                // `commissioner_record` TOML data field.
+                let commissionerProse =
+                    (HostForkProse.forkInstructions call.Owner).CommissionerRecord
+
+                DelegationHandoff.appendParentDelta commissionerProse request.ProviderPrompt prepared.ParentRecord
                 |> LlmFacing.render
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
@@ -728,15 +751,17 @@ type SyncDelegateRuntime
     member _.Invoke
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
+        let owner = SessionId.create ownerSessionKey
+
         SyncDelegateWorkflow.invoke
             store
             deps
-            (SessionId.create ownerSessionKey)
+            owner
             role
             charge
             expectedToolCalls
             None
-            (fun () -> Task.FromResult(LlmFacing.instruction charge))
+            (fun () -> Task.FromResult(HostForkProse.chargeDocument owner charge))
             None
             None
             (fun () -> false)
@@ -876,10 +901,13 @@ type SyncDelegateRuntime
         (turn: ReconciledTurn, failure: ExecutionFailure option, permit: QuiescencePermit option)
         : Task<bool> =
         task {
+            // planning-010 / delegation-024: every dedicated delegate role —
+            // Inspector, Coder, Engineer and DevOps — is claimable here. A
+            // missing role would leave the caller's answer pending forever.
             match turn.Role, turn.Outcome with
-            | Some(Role.Inspector | Role.Coder | Role.Engineer), ReconcileProgram.TurnCompleted ->
+            | Some(Role.Inspector | Role.Coder | Role.Engineer | Role.DevOps), ReconcileProgram.TurnCompleted ->
                 return! handleCompletedRoleTurn turn
-            | Some(Role.Inspector | Role.Coder | Role.Engineer), ReconcileProgram.TurnFailed error ->
+            | Some(Role.Inspector | Role.Coder | Role.Engineer | Role.DevOps), ReconcileProgram.TurnFailed error ->
                 return! handleFailedAttemptTurn turn failure error
             | _ ->
                 // TurnInProgress and TurnNeedsContinuation remain child-local;
