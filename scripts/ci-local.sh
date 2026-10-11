@@ -30,6 +30,7 @@ docker run --rm \
     -e WXS_ACCEPT_TODO=1 \
     -e NODE_TEST_CONCURRENCY=2 \
     -e UNIT_VERDICT_SILENCE_MS=30000 \
+    -e SUITE_BACKSTOP_MS=900000 \
     "${IMAGE_NAME}" \
     /bin/bash -c "rm -rf /workspace/dist /workspace/node_modules /workspace/artifacts /workspace/.fable-build && npm ci && dotnet tool restore && node scripts/derive-envelope.mjs && npm run verify:release"
 
