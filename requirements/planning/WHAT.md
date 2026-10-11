@@ -53,18 +53,6 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 - 禁止后果：stage 不作为动作门：任何 stage 下四个工具的许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 ask 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在许可矩阵中，任何调用一律拒绝。
 - 失败后果：凡不满足许可矩阵条件的调用，一律返回强类型 typed 错误，并保持原状态不变。
 
-## [006] 任期隔离与前缀重锚
-
-当为 Plan 角色组装 Provider 请求消息集时，应用通用的 Baton 隔离策略。
-
-- 允许后果：组装出的消息集严格由以下部分按序构成：
-  1. 当前任务因果范围内的全部真实用户输入原文（`U`），按原顺序逐字保留；
-  2. 若当前任期非首任，追加上一任期的生命周期记录（`LWR_prev`）；
-  3. 本任期开始后的真实 assistant 与 tool 交互消息。
-  任期内的第一次 Provider 请求被视为新任期起点，触发前缀重锚（TenureReanchored），开启全新的前缀 epoch。
-- 禁止后果：上一任期及更早任期的全部 assistant 消息与 tool 消息必须全部剥除，不得进入消息集。`P` 的全文不得直接拼装入消息集。非 Plan 角色严禁触发该隔离逻辑。
-- 失败后果：若任期消息切分失败或边界重叠，系统必须停止本次请求组装，不得向下游发送污染的上下文。
-
 ## [007] 接力契约（deliver 无权路径）
 
 当跑者调用 `deliver` 且本任未获授权（`Authorized = false`）时，系统执行任期接力。`handoff` 不再是独立工具。
@@ -72,7 +60,7 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 - 允许后果：系统首先核查当前任期的递归活跃资源（包括 child、后台作业、未决工具调用与租约）。确认无 blocker 后，以单个原子事务追加两条事件：
   1. `PlanIncumbencyRetired(incumbencyId, Relayed)`；
   2. `PlanIncumbencyOpened(workId, nextIncumbencyId, stage, openingCursor)`，其中 stage 等于退休时的 stage（接力不推进阶段）。
-  当前活跃任期更新为新任期，阶段不变，下一次 Provider 请求触发前缀重锚并重启上下文（新任期按 [006] 重新装配 `U + LWR_prev + 本任交互`）。
+  当前活跃任期更新为新任期，阶段不变，下一次 Provider 请求触发前缀重锚并重启上下文（新任期按 [017] 重新装配 `U + LWR_prev + 本任交互`）。
 - 禁止后果：若存在活跃阻塞资源（blocker），禁止退休任期；系统必须记录 `CleanupBlocked` 并向模型返回 blocker 摘要。接力严禁改写 `stage`、严禁产生 `PlanReviewed`、严禁影响 `Delivered` 投影。禁止在未成功持久化新任期前注销当前任期。
 - 失败后果：事务写入失败时，当前任期保持活跃，不产生状态漂移。
 
@@ -110,14 +98,6 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 - 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。编程面工具 `js-plan` 仅作用于该单一路径，提供 `read`、`edit`（局部补丁）与 `rewrite`（全量覆盖）能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
 - 禁止后果：模型不得在参数中自定义或传递路径。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`js-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
 - 失败后果：检测到路径异常或目标文件被外部非法篡改时，操作必须立即拒绝。
-
-## [012] 恢复契约
-
-当系统崩溃或重启恢复时，Plan 状态必须从 Durable 事实完全重建。
-
-- 允许后果：系统按顺序重放事件，重绑当前任务的 `Active` 任期、阶段（`stage`）、授权（`Authorized`）、固定 DevOps 绑定以及已落盘的 `P`。若已存在 `PlanDelivered` 事实，系统幂等呈现交付成果，不再拉起模型；此后用户 reprompt 经 `PlanReopened` 回 active（见 [021]），恢复本身不执行重开。ask 为同步委派，崩溃恢复不存在悬挂的 ask 状态。
-- 禁止后果：系统严禁通过分析自然语言文本内容猜测当前阶段。严禁凭同名物理会话猜测 DevOps 绑定。严禁在恢复期间自动执行 `PlanReopened` 或开启新任期。
-- 失败后果：若 Durable 事实不自洽、损坏或缺少关键绑定，系统必须停留在恢复失败状态（fail-closed），严禁进行任何猜测性自愈。
 
 ## [013] 工具注册与分类
 
@@ -179,9 +159,10 @@ Plan 的生命周期事实接入 EventStore 统一持久化存储与 CanonicalIn
 - 触发条件：进程启动激活持久化层后，对已存在的全部 Plan 工作视图进行状态判定与恢复。
 - 允许后果：
   1. 若工作视图标记为 `Delivered`（且持有合法的交付凭据与摘要），恢复位置为 `Delivered`，幂等呈现交付回执与底稿路径，绝不再调用模型，亦不开启新任期；此后用户 reprompt 经 `PlanReopened` 回 active（[021]），该路径属于运行时交互，不属于恢复；
-  2. 若工作视图处于 `Active(incumbencyId, stage)` 且底稿文件（`plan.md`）存在，恢复位置为 `Active`，准确重绑当前任期与阶段，并将底稿存在标志设为 true；
+  2. 若工作视图处于 `Active(incumbencyId, stage)` 且底稿文件（`plan.md`）存在，恢复位置为 `Active`，准确重绑当前任期、阶段与授权（`Authorized`），并将底稿存在标志设为 true；
   3. 若工作视图处于 `Active(incumbencyId, stage)` 但底稿文件尚未创建，恢复位置仍为 `Active` 并标记底稿不存在，系统视为可继续推进（模型可从头编写底稿），绝对不得凭空假定已交付；
   4. 若工作视图既无活跃任期亦未交付，恢复位置为 `Nothing`，系统不执行猜测与推断。
+  5. ask 为同步委派（[010]），不存在悬挂的 ask 状态，恢复判定无需处理 ask。
 - 禁止后果：严禁根据底稿文件内部的文本内容、标题或关键词推测任期阶段。严禁在恢复期间无故创建新任务、私自开启新任期、自动派发 DevOps 命令或自动执行 `PlanReopened`。严禁在恢复路径把 `Delivered` 工作重新激活为 `Active`（重开只由用户 reprompt 触发）。
 - 失败后果：若视图数据损坏或出现冲突（例如 Delivered 状态与 Active 任期同时并存），恢复函数必须 fail-closed 返回 `Conflict` 错误状态，保留原始证据，拒绝进入任何执行分支。
 

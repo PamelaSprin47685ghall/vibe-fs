@@ -194,7 +194,7 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
-| 58 | `planning` | 22 | planning-001 ~ 018、020 ~ 023（七条轮换事实含 Reviewed/Reopened、review 驱动的阶段推进与授权、四工具动作许可矩阵、deliver 接力与持权交付、自然停止、ask 同步委派 DevOps、入口与 reprompt 状态机、review 晋级门、deliver 起执行会话；019 已删除，编号不复用） |
+| 58 | `planning` | 20 | planning-001 ~ 005、007 ~ 011、013 ~ 018、020 ~ 023（七条轮换事实含 Reviewed/Reopened、review 驱动的阶段推进与授权、四工具动作许可矩阵、deliver 接力与持权交付、自然停止、ask 同步委派 DevOps、入口与 reprompt 状态机、review 晋级门、deliver 起执行会话；006 并入 017、012 并入 018，019 已删除，编号均不复用） |
 
 # 依赖骨架
 

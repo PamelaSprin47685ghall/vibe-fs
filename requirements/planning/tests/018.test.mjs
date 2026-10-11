@@ -30,12 +30,13 @@ test('WHAT[planning-018] Delivered view idempotently recovers delivered receipt 
   assert.equal(pos.receipt.Path, 'plan/work-rec-1/plan.md');
 });
 
-test('WHAT[planning-018] Active incumbency with existing plan file rebinds stage and marks planExists', () => {
+test('WHAT[planning-018] Active incumbency with existing plan file rebinds stage, authorization and marks planExists', () => {
   const view = {
     WorkId: 'work-rec-2',
     ActiveIncumbencyId: 'inc-rec-2',
     ActiveStage: 'S2',
     ActivePhase: 'WorkOwned',
+    ActiveAuthorized: true,
     RetiredCount: 1,
     LatestRetirementOutcome: 'Continue',
     Delivered: false,
@@ -53,6 +54,7 @@ test('WHAT[planning-018] Active incumbency with existing plan file rebinds stage
   assert.equal(pos.kind, 'Active');
   assert.equal(pos.incumbencyId, 'inc-rec-2');
   assert.equal(pos.stage, 'S2');
+  assert.equal(pos.authorized, true);
   assert.equal(pos.planExists, true);
 });
 
