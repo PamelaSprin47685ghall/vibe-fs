@@ -1,8 +1,9 @@
 # Changelog — 版本历史
 
-## Unreleased — 接力式规划协议（Plan 模式）完整实现
+## Unreleased — Plan 模式（接力式规划协议）完整实现
 
-- 接力式规划协议完整实现（Role.Plan、三阶段 handoff、tenure-isolation、ask 两段式、崩溃恢复；requirements/planning 包 19 条条款、40 项测试）。
+- Plan 模式按 `feat-PLANNER/001.md` D1–D20 重写交付（`24babfac8`）：Role.Plan 四工具集 `js-plan`/`ask`/`review`/`deliver`（handoff 并入 deliver、resume 退役）；`review` 晋级硬门（与 Manager 共用同一工具、每任一次、评审目标 = 下一里程碑）；`deliver` 双路径（无权接力退休开下任、持权交付并起无 parent 的 Manager 执行会话）；`ask` 同步委派固定 DevOps（取代两段式）；自然停止（Plan 空停等用户 prompt）；tenure-isolation 与前缀重锚、崩溃恢复保留。
+- 后续 `8af4fc11c` 合并重复条款并补齐测试锚点：requirements/planning 包现为 20 条条款、74 项测试（73 过 + 1 canary todo 设计内）。
 
 ## Unreleased — Blogger Provider 容量泄漏修复（GAP1 / GAP2）
 

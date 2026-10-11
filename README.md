@@ -157,7 +157,7 @@ Blogger、Bookkeeper、Predictor 等内部角色由编排路径调用，不作�
 | Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `js-engineer`, `bash-honeypot`, `fission` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
 | DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `js-devops`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `join`, `horizon` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
 | Blogger | `chronicle` | Companion 叶子，记录工作历史与认知上下文 |
-| Plan | `js-plan`, `ask`, `resume`, `handoff`, `deliver` | 接力式规划跑者，负责产出保姆级底稿 P；三阶段交接、任期隔离与崩溃恢复 |
+| Plan | `js-plan`, `ask`, `review`, `deliver` | 接力式规划跑者，负责产出保姆级底稿 P；review 晋级、deliver 接力或交付、任期隔离与崩溃恢复 |
 
 Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 
@@ -256,7 +256,7 @@ npm run verify:release      # 发布验证
 
 规范是万象术的语义根：每条行为命题有稳定 ID、测试落点和 owner 包。规范不跟踪实现进度，只定义正确性。
 
-- **规范**：`requirements/<package>/`（56 包 normative 树，另 2 个历史包；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)；含 `planning`（planning-001~019）：Plan 角色的接力式规划——三阶段交接、任期隔离、崩溃恢复）。
+- **规范**：`requirements/<package>/`（56 包 normative 树，另 2 个历史包；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)；含 `planning`（planning-001~005、007~011、013~018、020~023）：Plan 角色的接力式规划——review 晋级、deliver 接力、任期隔离、崩溃恢复）。
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
