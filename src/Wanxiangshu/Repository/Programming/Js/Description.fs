@@ -259,11 +259,8 @@ module JsCanonicalDescription =
           "comment_anchor_own_search", prose.CommentAnchorOwnSearch
           "comment_ignore_gy", prose.CommentIgnoreGy ]
 
-    /// Proposal §16 canonical file() body (description uses HOST_READ).
-    /// `raiseFailure` closes over `code` and `reason`.
-    let fileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        fill
-            """  async file(path, matches = []) {
+    let private fileAlgorithmTemplate =
+        """
     const fail = (code, reason) => {
       {{raise_failure}}
     };
@@ -401,9 +398,32 @@ module JsCanonicalDescription =
       },
     });
   }"""
+
+    let private fileAlgorithmCore (prose: Prose) (header: string) (readSourceLine: string) (raiseFailure: string) =
+        let template = header + fileAlgorithmTemplate
+
+        fill
+            template
             (("raise_failure", raiseFailure)
              :: ("read_source", readSourceLine)
              :: fileReasons prose)
+
+    /// Proposal §16 canonical file() body (description uses HOST_READ).
+    /// `raiseFailure` closes over `code` and `reason`.
+    let fileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        fileAlgorithmCore prose "  async file(path, matches = []) {" readSourceLine raiseFailure
+
+    let planFileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        let prologue =
+            """  async file(matches = []) {
+    if (typeof matches === "string" || arguments.length > 1) {
+      const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call file(matches) without a path.");
+      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
+      throw err;
+    }
+    const path = "plan.md";"""
+
+        fileAlgorithmCore prose prologue readSourceLine raiseFailure
 
     let private globStub (prose: Prose) =
         fill
@@ -503,14 +523,8 @@ class JsProgram {"""
 const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             .Trim()
 
-    /// High-level Edit affordance. It deliberately lives in the generated SDK
-    /// rather than a second Host mutation primitive: matching is pure and the
-    /// only effect remains the existing guarded js.edit staging executor.
-    /// Every change addresses the same immutable snapshot; approximate
-    /// similarity is diagnostic-only and can never authorize a write.
-    let private editAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        fill
-            """  edit(path, changes) {
+    let private editPrologue =
+        """(path, changes) {
     const fail = (code, reason) => {
       {{raise_failure}}
     };
@@ -533,8 +547,42 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
     if (typeof path !== "string" || path.length === 0) {
       failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", 1);
-    }
+    }"""
 
+    let private planEditPrologue =
+        """(changes) {
+    const fail = (code, reason) => {
+      {{raise_failure}}
+    };
+    if (typeof changes === "string" || arguments.length > 1) {
+      const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call edit(changes) without a path.");
+      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
+      throw err;
+    }
+    const path = "plan.md";
+    const bounded = (value, limit = 240) => {
+      let text;
+      try {
+        text = typeof value === "string" ? value : String(value);
+      } catch {
+        text = "<unprintable>";
+      }
+      return text.length > limit ? text.slice(0, limit) + "…" : text;
+    };
+    const shownPath = "\"plan.md\"";
+    const atomicity = "{{reason_edit_atomicity}}";
+    const failEdit = (code, message, operation, details = []) => {
+      const location = `path=${shownPath}; change ${operation}.`;
+      fail(code, [message, location, ...details, atomicity].join("\n"));
+    };"""
+
+    /// High-level Edit affordance. It deliberately lives in the generated SDK
+    /// rather than a second Host mutation primitive: matching is pure and the
+    /// only effect remains the existing guarded js.edit staging executor.
+    /// Every change addresses the same immutable snapshot; approximate
+    /// similarity is diagnostic-only and can never authorize a write.
+    let private editAlgorithmBody =
+        """
     const declarations = Array.isArray(changes) ? changes : [changes];
 
     if (declarations.length === 0) {
@@ -919,6 +967,12 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
       replacements: planned.length,
     });
   }"""
+
+    let private editAlgorithmCore (prose: Prose) (prologue: string) (readSourceLine: string) (raiseFailure: string) =
+        let template = "  edit" + prologue + "\n" + editAlgorithmBody
+
+        fill
+            template
             [ "raise_failure", raiseFailure
               "read_source", readSourceLine
               "rethrow_host", rethrowHost
@@ -934,6 +988,61 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               "reason_edit_candidate", prose.ReasonEditCandidate
               "reason_edit_line", prose.ReasonEditLine
               "reason_edit_overlaps", prose.ReasonEditOverlaps ]
+
+    let editAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        editAlgorithmCore prose editPrologue readSourceLine raiseFailure
+
+    let planEditAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        editAlgorithmCore prose planEditPrologue readSourceLine raiseFailure
+
+    let planRewriteAlgorithm (prose: Prose) (raiseFailure: string) =
+        fill
+            """  rewrite(newText) {
+    const fail = (code, reason) => {
+      {{raise_failure}}
+    };
+    if (typeof newText !== "string" || arguments.length > 1) {
+      fail("PATH_DENIED", "js-plan operates strictly on the plan artifact; passing a path is forbidden. Call rewrite(newText) without a path.");
+    }
+    const result = this._api.js.edit("plan.md", newText);
+    {{rethrow_host}}
+  }"""
+            [ "raise_failure", raiseFailure; "rethrow_host", rethrowHost ]
+
+    let planRewriteStub (prose: Prose) =
+        fill
+            """  rewrite(newText) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private runtimePlanReadSource (prose: Prose) =
+        fill
+            """const snapshot = this._api.js.read("plan.md");
+    if (snapshot && snapshot.ok === false) fail(snapshot.code || "FILE_READ_FAILED", snapshot.reason || snapshot.code || "{{reason_file_read_failed}}");
+    const source = typeof snapshot === "string" ? snapshot : (snapshot.text || "");"""
+            [ "reason_file_read_failed", prose.ReasonFileReadFailed ]
+
+    let runtimePlanBaseClass (prose: Prose) : string =
+        let methods =
+            [ """
+  constructor(api) { this._api = api; }"""
+                  .TrimStart()
+              planFileAlgorithm prose (runtimePlanReadSource prose) runtimeRaiseFailure
+              planEditAlgorithm prose (runtimePlanReadSource prose) runtimeRaiseFailure
+              planRewriteAlgorithm prose runtimeRaiseFailure
+              runStub prose ]
+
+        String.concat "\n\n" (classOpen :: methods @ [ "}" ])
+
+    let publicPlanBaseClass (prose: Prose) : string =
+        let methods =
+            [ planFileAlgorithm prose publicReadSource publicRaiseFailure
+              planEditAlgorithm prose publicReadSource publicRaiseFailure
+              planRewriteStub prose
+              runStub prose ]
+
+        String.concat "\n\n" (classOpen :: methods @ [ "}" ])
 
     let runtimeBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
         let methods =

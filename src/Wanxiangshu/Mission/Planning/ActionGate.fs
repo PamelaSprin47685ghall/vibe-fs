@@ -10,6 +10,7 @@ type ActionGateRejection =
     | HandoffRetired
     | ResumeRetired
     | BlockedByLiveResources of blocker: string option
+    | ReviewRequired
     | ActionDenied of action: string * reason: string
 
 module ActionGateRejection =
@@ -22,6 +23,8 @@ module ActionGateRejection =
         | ActionGateRejection.ResumeRetired -> "The resume tool is retired and is not part of the planning surface."
         | ActionGateRejection.BlockedByLiveResources(Some b) -> sprintf "Action blocked by live resources: %s" b
         | ActionGateRejection.BlockedByLiveResources None -> "Action blocked by live resources."
+        | ActionGateRejection.ReviewRequired ->
+            "Review is required before modifying the plan artifact. You must call review first."
         | ActionGateRejection.ActionDenied(act, reason) -> sprintf "Action '%s' denied: %s" act reason
 
 module ActionGate =
@@ -48,21 +51,26 @@ module ActionGate =
         (normAction: string)
         (hasDelivered: bool)
         (hasBlocker: bool)
+        (hasReviewed: bool)
         : Result<unit, ActionGateRejection> =
         match hasDelivered, hasBlocker, normAction with
         | true, _, ("read" | "js-plan.read" | "js-plan") -> Ok()
         | true, _, _ -> Error ActionGateRejection.AlreadyDelivered
         | false, true, "deliver" -> Error(ActionGateRejection.BlockedByLiveResources None)
         | false, _, ("ask" | "review" | "deliver") -> Ok()
-        | false, _, ("read" | "edit" | "rewrite") -> Ok()
-        | false, _, ("js-plan" | "js-plan.read" | "js-plan.edit" | "js-plan.rewrite") -> Ok()
+        | false, _, ("read" | "js-plan.read") -> Ok()
+        | false, _, ("edit" | "rewrite" | "js-plan.edit" | "js-plan.rewrite") when not hasReviewed ->
+            Error ActionGateRejection.ReviewRequired
+        | false, _, ("edit" | "rewrite" | "js-plan.edit" | "js-plan.rewrite") -> Ok()
+        | false, _, "js-plan" -> Ok()
         | false, _, _ -> Error(ActionGateRejection.ActionDenied(action, "Unrecognized planning action"))
 
-    let decideAction
+    let decideActionWithReview
         (stage: PlanStage)
         (action: string)
         (hasDelivered: bool)
         (hasBlocker: bool)
+        (hasReviewed: bool)
         : Result<unit, ActionGateRejection> =
         let normAction = action.ToLowerInvariant()
 
@@ -71,7 +79,23 @@ module ActionGate =
         match normAction with
         | "handoff" -> Error ActionGateRejection.HandoffRetired
         | "resume" -> Error ActionGateRejection.ResumeRetired
-        | _ -> decideActiveAction action normAction hasDelivered hasBlocker
+        | _ -> decideActiveAction action normAction hasDelivered hasBlocker hasReviewed
+
+    let decideAction
+        (stage: PlanStage)
+        (action: string)
+        (hasDelivered: bool)
+        (hasBlocker: bool)
+        : Result<unit, ActionGateRejection> =
+        decideActionWithReview stage action hasDelivered hasBlocker true
+
+    let private extractHasReviewed (request: obj) : bool =
+        let v = request?hasReviewed
+
+        if isNull v || jsTypeof v = "undefined" then
+            true
+        else
+            unbox<bool> v
 
     let isActionAllowed (request: obj) : bool =
         if isNull request then
@@ -81,5 +105,7 @@ module ActionGate =
 
             stageOpt
             |> Option.exists (fun stage ->
-                decideAction stage request?action request?hasDelivered request?hasBlocker
+                let hasReviewed = extractHasReviewed request
+
+                decideActionWithReview stage request?action request?hasDelivered request?hasBlocker hasReviewed
                 |> Result.isOk)

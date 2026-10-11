@@ -45,12 +45,13 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`（读、写 `P`）、`ask`、`review`、`deliver`；
-  2. 工作处于 `delivered` 时，仅允许 `js-plan` 的 `read`，`ask`、`review`、`deliver` 一律拒绝（再次动作必须先经用户 reprompt 与 `PlanReopened` 回 active，见 [021]）；
-  3. `review` 为硬门：本任已有 `PlanReviewed` 事实时拒绝再次调用（每任恰好一次，见 [022]）；
-  4. `ask` 在同一 work 已有一个未决委派时拒绝新委派（见 [010]）；
-  5. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[008]），无权走接力（[007]）。
-- 禁止后果：stage 不作为动作门：任何 stage 下四个工具的许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 ask 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在许可矩阵中，任何调用一律拒绝。
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`ask`、`review`、`deliver`；
+  2. 每一任期在调用 `review` 工具之前，`js-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
+  3. 工作处于 `delivered` 时，仅允许 `js-plan` 的 `read`，`ask`、`review`、`deliver` 一律拒绝（再次动作必须先经用户 reprompt 与 `PlanReopened` 回 active，见 [021]）；
+  4. `review` 为硬门：本任已有 `PlanReviewed` 事实时拒绝再次调用（每任恰好一次，见 [022]）；
+  5. `ask` 在同一 work 已有一个未决委派时拒绝新委派（见 [010]）；
+  6. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[008]），无权走接力（[007]）。
+- 禁止后果：stage 不作为动作门：任何 stage 下四个工具的许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 ask 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在许可矩阵中，任何调用一律拒绝。禁止在当前任期完成 review 之前向底稿 `P` 写入任何改动。
 - 失败后果：凡不满足许可矩阵条件的调用，一律返回强类型 typed 错误，并保持原状态不变。
 
 ## [007] 接力契约（deliver 无权路径）
@@ -91,13 +92,13 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 - 禁止后果：模型在调用参数中只传 `intent`，不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 ask 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
 - 失败后果：若固定 DevOps 处于忙碌状态或响应失败，返回强类型错误，不静默丢弃，不新建替代操作员。
 
-## [011] P 路径推导与访问受限
+## [011] P 路径推导与编程面工具
 
 底稿 `P` 是模型唯一可读写的持久化文件产物，其路径由系统确定性派生。
 
-- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。编程面工具 `js-plan` 仅作用于该单一路径，提供 `read`、`edit`（局部补丁）与 `rewrite`（全量覆盖）能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
-- 禁止后果：模型不得在参数中自定义或传递路径。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`js-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
-- 失败后果：检测到路径异常或目标文件被外部非法篡改时，操作必须立即拒绝。
+- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。`js-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
+- 禁止后果：模型不得在工具参数中使用多余字段，只传递 `program`。在 `JsProgram` 的 `file`、`edit`、`rewrite` 方法中严禁传入任何路径参数，若调用时尝试传入路径参数，沙箱必须直接报错拒绝。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`js-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
+- 失败后果：检测到路径异常、传入路径参数、尝试访问 `P` 之外的文件或目标文件被外部非法篡改时，操作必须立即拒绝。
 
 ## [013] 工具注册与分类
 

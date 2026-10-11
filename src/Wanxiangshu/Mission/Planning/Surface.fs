@@ -101,12 +101,25 @@ module PlanningSurface =
         | ActionGateRejection.HandoffRetired -> "HandoffRetired"
         | ActionGateRejection.ResumeRetired -> "ResumeRetired"
         | ActionGateRejection.BlockedByLiveResources _ -> "BlockedByLiveResources"
+        | ActionGateRejection.ReviewRequired -> "ReviewRequired"
         | ActionGateRejection.ActionDenied _ -> "ActionDenied"
 
-    let decideAction (stageStr: string) (action: string) (hasDelivered: bool) (hasBlocker: bool) : obj =
+    let decideAction
+        (stageStr: string)
+        (action: string)
+        (hasDelivered: bool)
+        (hasBlocker: bool)
+        (hasReviewedVal: obj)
+        : obj =
         match PlanStage.ofString stageStr with
         | Some stage ->
-            match ActionGate.decideAction stage action hasDelivered hasBlocker with
+            let hasReviewed =
+                if isNull hasReviewedVal || jsTypeof hasReviewedVal = "undefined" then
+                    true
+                else
+                    unbox<bool> hasReviewedVal
+
+            match ActionGate.decideActionWithReview stage action hasDelivered hasBlocker hasReviewed with
             | Ok() -> box {| ok = true; rejection = null |}
             | Error rej ->
                 box

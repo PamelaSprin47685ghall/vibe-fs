@@ -1271,10 +1271,7 @@ module SyncDelegateSurface =
         harness.Runtime.InvokeObservedPrepared(
             harness.OwnerSession owner,
             charge,
-            (fun () ->
-                Task.FromResult(
-                    HostForkProse.chargeDocument (harness.OwnerSession owner) charge
-                ))
+            (fun () -> Task.FromResult(HostForkProse.chargeDocument (harness.OwnerSession owner) charge))
         )
         |> box
 
@@ -2056,10 +2053,7 @@ module SyncDelegateSurface =
                         role,
                         charge,
                         batch,
-                        (fun () ->
-                            Task.FromResult(
-                                HostForkProse.chargeDocument (harness.OwnerSession owner) charge
-                            ))
+                        (fun () -> Task.FromResult(HostForkProse.chargeDocument (harness.OwnerSession owner) charge))
                     )
 
                 return

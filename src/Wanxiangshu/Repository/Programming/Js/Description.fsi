@@ -231,6 +231,11 @@ module JsCanonicalDescription =
           ReasonEditOverlaps: string }
 
     val fileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
+    val planFileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
+    val planEditAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
+    val planRewriteAlgorithm: prose: Prose -> raiseFailure: string -> string
+    val runtimePlanBaseClass: prose: Prose -> string
+    val publicPlanBaseClass: prose: Prose -> string
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
     val publicBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
     val runtimeBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string

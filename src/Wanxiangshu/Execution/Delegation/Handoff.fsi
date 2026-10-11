@@ -62,6 +62,7 @@ module DelegationHandoff =
     val key: parent: SessionId -> route: DelegationHandoffRoute -> string
     val window: previousEnd: XTraceCursor option -> currentEnd: XTraceCursor -> DelegationHandoffWindow
     val childRange: startInclusive: XTraceCursor -> endExclusive: XTraceCursor -> XTraceRange
+
     val appendParentDelta:
         commissionerRecordProse: string ->
         providerPrompt: LlmFacing.Document ->

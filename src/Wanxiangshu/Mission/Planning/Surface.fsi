@@ -23,7 +23,10 @@ module PlanningSurface =
     val deliveredDigest: state: PlanWorkState -> string option
     val deliveryReceipt: state: PlanWorkState -> PlanDeliveryReceipt option
     val isActionAllowed: request: obj -> bool
-    val decideAction: stageStr: string -> action: string -> hasDelivered: bool -> hasBlocker: bool -> obj
+
+    val decideAction:
+        stageStr: string -> action: string -> hasDelivered: bool -> hasBlocker: bool -> hasReviewedVal: obj -> obj
+
     val allowedPermissions: stageStr: string -> hasDelivered: bool -> hasBlocker: bool -> string array
     val encodeEventJson: event: PlanEvent -> string
     val decodeEventJson: eventType: string -> json: string -> obj

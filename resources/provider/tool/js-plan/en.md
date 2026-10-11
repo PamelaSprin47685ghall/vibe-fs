@@ -1,10 +1,27 @@
 # Tool · js-plan
 
-The programming surface for reading and writing the planning draft `P`. `P` is the only persistently readable and writable file of this task; the system derives its path, and you never pass a path in arguments.
+The programming surface for reading and writing the planning draft `P`. `P` is the only readable and writable file of this task; its path is bound implicitly by the system, and passing any path argument in method calls is strictly forbidden.
+
+You must define exactly one class named `Js` that extends `JsProgram` and implements `async run()`.
 
 ## Contract and Usage
 
-1. **Sole Target**: operates only on the current task's draft `P`. No directory listing; no other file is readable or writable.
-2. **Capability Primitives**: `read()` for the full content; `edit(patches)` for precise local patches; `rewrite(content)` for full replacement. Modifications stage first and commit atomically.
-3. **No Repository Access**: this surface has no glob, no grep, and no access to repository files. For repository facts use `ask`.
-4. **The Draft Is the State**: the current content of `P` is the single truth. Read before writing at the start of each incumbency; do not rely on memory of the previous runner's content.
+1. **Sole Target & Forbidden Paths**: operates strictly and solely on the planning draft `P`. All methods (`file`, `edit`, `rewrite`) take no path argument; passing any path will be rejected immediately with `PATH_DENIED`.
+2. **Capability Primitives**:
+   - `await this.file(matches = [])`: reads the current draft and resolves ordered anchors, returning an immutable FileView with `text(from, to)`.
+   - `this.edit(changes)`: applies local find-and-replace patches on the draft snapshot (`changes` is `{ find, put, all? }` or an array of them).
+   - `this.rewrite(newText)`: replaces the entire draft text.
+3. **Review Required Before Write**: in each incumbency, `js-plan` is strictly read-only before calling the `review` tool. Any attempt to modify the draft via `edit` or `rewrite` prior to review will be rejected with an error instructing you to call Review first.
+4. **No Repository Access**: this surface has no glob, no grep, and no access to repository files. For repository facts use `ask`.
+
+## Example
+
+```javascript
+class Js extends JsProgram {
+  async run() {
+    const p = await this.file([["h1", "h1end", "# Plan"]]);
+    this.edit({ find: "old step", put: "new step" });
+    return { updated: true };
+  }
+}
+```

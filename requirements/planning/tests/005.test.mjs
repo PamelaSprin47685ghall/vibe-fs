@@ -87,6 +87,43 @@ test('WHAT[planning-005] decideAction provides typed rejections for disallowed a
   const postDeliveredAsk = planning.decideAction('S3', 'ask', true, false)
   assert.equal(postDeliveredAsk.ok, false)
   assert.equal(postDeliveredAsk.rejection, 'AlreadyDelivered')
+
+  // Unreviewed tenure mutation -> ReviewRequired
+  for (const action of ['edit', 'rewrite', 'js-plan.edit', 'js-plan.rewrite']) {
+    const unreviewedMutation = planning.decideAction('S1', action, false, false, false)
+    assert.equal(unreviewedMutation.ok, false, `unreviewed tenure must reject mutation ${action}`)
+    assert.equal(unreviewedMutation.rejection, 'ReviewRequired')
+
+    assert.equal(
+      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: false }),
+      false,
+      `isActionAllowed must reject mutation ${action} when hasReviewed is false`,
+    )
+  }
+
+  // Unreviewed tenure read -> Allowed
+  for (const action of ['read', 'js-plan.read', 'js-plan']) {
+    const unreviewedRead = planning.decideAction('S1', action, false, false, false)
+    assert.equal(unreviewedRead.ok, true, `unreviewed tenure must permit read ${action}`)
+
+    assert.equal(
+      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: false }),
+      true,
+      `isActionAllowed must permit read ${action} when hasReviewed is false`,
+    )
+  }
+
+  // Reviewed tenure mutation -> Allowed
+  for (const action of ['edit', 'rewrite', 'js-plan.edit', 'js-plan.rewrite']) {
+    const reviewedMutation = planning.decideAction('S1', action, false, false, true)
+    assert.equal(reviewedMutation.ok, true, `reviewed tenure must permit mutation ${action}`)
+
+    assert.equal(
+      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: true }),
+      true,
+      `isActionAllowed must permit mutation ${action} when hasReviewed is true`,
+    )
+  }
 })
 
 test('WHAT[planning-005] allowedPermissions maps to the new ToolPermission set uniformly per stage', () => {

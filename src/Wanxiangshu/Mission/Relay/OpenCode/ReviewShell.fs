@@ -36,7 +36,9 @@ module ReviewShell =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
 
     let admission =
-        ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.ReviewAssessment)
+        ToolAdmission.OfficeRole(fun _ role ->
+            OfficeCapability.isAllowed role ToolPermission.ReviewAssessment
+            || OfficeCapability.isAllowed role ToolPermission.Review)
 
     let private planRejected path =
         ToolHostCodec.tomlObjectWithInstructions

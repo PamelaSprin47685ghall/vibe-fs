@@ -57,6 +57,7 @@ module ProcessEventLog =
     val internal withSegmentCap: cap: int -> work: (unit -> 'T) -> 'T
     val internal withSegmentCapTask: cap: int -> work: (unit -> Task<'T>) -> Task<'T>
     val internal convergeWriterFiles: commonDir: string -> writerId: string -> Result<unit, string>
+
     [<Literal>]
     val DefaultSegmentCapBytes: int = 67108864
 

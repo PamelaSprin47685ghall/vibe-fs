@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 
 const facts = { PlanEvents: surface.PlanEvents, PlanStage: surface.PlanStage }
 const fold = { PlanFold: surface.PlanFold }
@@ -92,4 +93,12 @@ test('WHAT[planning-022] a fresh tenure with empty findings is promoted', async 
   assert.equal(promoted.ok, true)
   assert.equal(promoted.outcome, 'Promoted', 'empty findings must promote the tenure')
   assert.equal(surface.PlanningSurface.activeStage(state), 'S2', 'the S1 tenure advances to S2')
+})
+
+test('WHAT[planning-022] ReviewShell admission admits both Manager (ReviewAssessment) and Plan (Review) roles', () => {
+  assert.equal(rolePredicate('review', 'plan'), true, 'Plan role must be admitted to review via ToolPermission.Review')
+  assert.equal(rolePredicate('review', 'manager'), true, 'Manager role must be admitted to review via ToolPermission.ReviewAssessment')
+  for (const role of ['engineer', 'devops', 'orchestrator', 'blogger']) {
+    assert.equal(rolePredicate('review', role), false, `${role} must be denied admission to review`)
+  }
 })

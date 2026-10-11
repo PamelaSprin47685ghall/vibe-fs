@@ -119,7 +119,11 @@ module DelegationHandoff =
     /// bare prose. Child → parent join is the opposite plane — do not conflate.
     /// Warm-start and other typed provider documents keep their own
     /// instruction/data structure.
-    let appendParentDelta (commissionerRecordProse: string) (providerPrompt: LlmFacing.Document) (parentRecord: string option) =
+    let appendParentDelta
+        (commissionerRecordProse: string)
+        (providerPrompt: LlmFacing.Document)
+        (parentRecord: string option)
+        =
         match
             parentRecord
             |> Option.map (fun record -> record.Trim())

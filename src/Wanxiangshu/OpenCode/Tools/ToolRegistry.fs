@@ -25,6 +25,7 @@ open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Ablation
+open Wanxiangshu.Process
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
 /// per-session resources live in ToolRuntimeScope.
@@ -385,6 +386,106 @@ module ToolRegistry =
         | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
+    let private createPlanSandboxApi (currentContent: string) (stagedMutation: string option ref) =
+        createObj
+            [ "js"
+              ==> createObj
+                      [ "read" ==> fun (_: obj) -> currentContent
+                        "edit"
+                        ==> fun (_path: string) (newText: string) ->
+                            stagedMutation.Value <- Some newText
+                            createObj [ "ok" ==> true ] ] ]
+
+    let private writePlanFile root sessionId newText value =
+        match PlanPath.rewritePlanAtomic root sessionId newText with
+        | Ok(_path, _digest) -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], []))
+        | Error err ->
+            JsToolsResult.render (
+                JsToolWorkflow.JsToolOutcome.Failed(
+                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err)
+                )
+            )
+
+    let private commitPlanMutation root sessionId hasReviewed newTextOpt value =
+        match newTextOpt with
+        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], []))
+        | Some _ when not hasReviewed ->
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.PlanReviewRequired)
+        | Some newText -> writePlanFile root sessionId newText value
+
+    let private renderPlanParseOutcome root sessionId hasReviewed stagedMutation json =
+        match JsToolsData.parse json with
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Ok value -> commitPlanMutation root sessionId hasReviewed stagedMutation value
+
+    let private renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation runOutcome =
+        match runOutcome with
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Ok json -> renderPlanParseOutcome root sessionId hasReviewed stagedMutation json
+
+    let private executePlanSandbox prose root sessionId hasReviewed programSource =
+        task {
+            let currentContent =
+                match PlanPath.readPlan root sessionId with
+                | Ok c -> c
+                | Error _ -> ""
+
+            let stagedMutation = ref None
+            let api = createPlanSandboxApi currentContent stagedMutation
+            let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
+            let deadlineMs = 10000
+            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+            let outputBoundBytes = 1 <<< 20
+
+            let! runOutcome =
+                JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs outputBoundBytes
+
+            return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
+        }
+
+    let private resolveActiveTenure store sessionId =
+        let pid = PlanWorkId.create sessionId
+
+        let state =
+            PlanEventStore.workState store pid
+            |> Option.defaultValue PlanFold.initialWorkState
+
+        match state.Active with
+        | None -> Error "No active incumbency found for this work"
+        | Some active ->
+            let hasReviewed =
+                state.Reviewed |> Option.exists (fun (reviewedId, _) -> reviewedId = active.Id)
+
+            Ok hasReviewed
+
+    let private executeTenureSandbox prose root store sessionId programSource =
+        match resolveActiveTenure store sessionId with
+        | Error reason ->
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
+            |> Task.FromResult
+        | Ok hasReviewed -> executePlanSandbox prose root sessionId hasReviewed programSource
+
+    let private runPlanProgramCore
+        (prose: JsCanonicalDescription.Prose)
+        storeOpt
+        (rootOpt: string option)
+        (sessionId: string)
+        (programSourceOpt: string option)
+        : Task<string> =
+        if Option.isNone programSourceOpt then
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.InvalidProgram)
+            |> Task.FromResult
+        elif Option.isNone rootOpt || Option.isNone storeOpt then
+            JsToolsResult.render (
+                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed "The plan workspace is unavailable")
+            )
+            |> Task.FromResult
+        else
+            executeTenureSandbox prose rootOpt.Value storeOpt.Value sessionId programSourceOpt.Value
+
+    let runPlanProgram prose store root sessionId program =
+        runPlanProgramCore prose (Some store) (Some root) sessionId (Some program)
+
     let create
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
@@ -500,40 +601,8 @@ module ToolRegistry =
         let planningAdmission: ToolAdmission =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
 
-        let planPatchesOf (args: HostToolArguments) : (string * string) list option =
-            let raw = args.Raw
-            let patchesVal: obj = if isNull raw then null else raw?patches
-
-            if isNull patchesVal then
-                None
-            else
-                unbox<obj array> patchesVal
-                |> Array.toList
-                |> List.map (fun p -> (unbox<string> p?find, unbox<string> p?put))
-                |> Some
-
-        let runJsPlan (root: string) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
-            task {
-                let outcome =
-                    PlanTools.executeJsPlan
-                        root
-                        ctx.SessionId
-                        (args.Text "action")
-                        (args.OptionalText "content")
-                        (planPatchesOf args)
-
-                return
-                    match outcome with
-                    | Ok output -> output
-                    | Error err -> sprintf "js-plan failed: %s" err
-            }
-
-        let executeJsPlanTool (rootOpt: string option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
-            task {
-                match rootOpt with
-                | None -> return "js-plan failed: the plan workspace is unavailable"
-                | Some root -> return! runJsPlan root args ctx
-            }
+        let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+            runPlanProgramCore jsProse planStore planRoot ctx.SessionId (args.OptionalText "program")
 
         // planning-010: the real delegation capability — the SyncDelegate
         // runtime runs the bound fixed DevOps for this work synchronously and
@@ -623,12 +692,7 @@ module ToolRegistry =
                     | Error err -> sprintf "deliver failed: %s" err
             }
 
-        let runDeliver
-            store
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            : Task<string> =
+        let runDeliver store (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
                 match activeIncumbencyOf store ctx.SessionId with
                 | None -> return "deliver failed: no active incumbency found for this work"
@@ -651,22 +715,12 @@ module ToolRegistry =
             [ { Name = "js-plan"
                 Description = ProviderProse.render providerLanguage "tool/js-plan" Map.empty
                 Arguments =
-                  [ "action",
-                    ToolHostCodec.enumSchemaDescribed
-                        [ "read"; "edit"; "rewrite" ]
-                        "Plan artifact action: read the current plan, apply local patches, or rewrite it in full"
-                        factory
-                    "content", ToolHostCodec.optionalStringSchema factory
-                    "patches",
-                    ToolHostCodec.arraySchemaOf
-                        (ToolHostCodec.objectSchemaOf
-                            [ "find", ToolHostCodec.stringSchema factory
-                              "put", ToolHostCodec.stringSchema factory ]
-                            factory)
-                        "Local patches for the edit action, each an exact find/put pair"
+                  [ "program",
+                    ToolHostCodec.stringSchemaDescribed
+                        (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                         factory ]
                 Admission = planningAdmission
-                Execute = fun args ctx -> executeJsPlanTool planRoot args ctx }
+                Execute = fun args ctx -> executeJsPlanTool args ctx }
               { Name = "ask"
                 Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
                 Arguments =

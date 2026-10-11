@@ -208,10 +208,18 @@ module WriterStreamSync =
         : Task<TreeEntry> =
         task {
             match cachedOid cacheFiles name statIdentity with
-            | Some oid -> return { Mode = blobMode; Name = name; Oid = oid }
+            | Some oid ->
+                return
+                    { Mode = blobMode
+                      Name = name
+                      Oid = oid }
             | None ->
                 let! oid = raw.WriteBlob(readBytes name)
-                return { Mode = blobMode; Name = name; Oid = oid }
+
+                return
+                    { Mode = blobMode
+                      Name = name
+                      Oid = oid }
         }
 
     /// durable-events-005: one writer materializes as its segment blob list.
@@ -226,7 +234,9 @@ module WriterStreamSync =
         : Task<MaterializedWriter list> =
         let cached = cacheFiles (fun value -> value.Writers) cache
         let stats = ProcessEventLog.writerPhysicalStats commonDir |> Map.ofList
-        let readBytes name = ProcessEventLog.readWriterFileBytes commonDir name
+
+        let readBytes name =
+            ProcessEventLog.readWriterFileBytes commonDir name
 
         let statIdentityOf name =
             match Map.tryFind name stats with
@@ -394,9 +404,8 @@ module WriterStreamSync =
                 |> List.fold
                     (fun state metadata ->
                         state
-                        |> Result.bind (fun () ->
-                            ProcessEventLog.convergeWriterFiles commonDir metadata.WriterId))
-                    (Ok ())
+                        |> Result.bind (fun () -> ProcessEventLog.convergeWriterFiles commonDir metadata.WriterId))
+                    (Ok())
 
             match convergence with
             | Error reason -> raise (exn reason)
@@ -576,9 +585,7 @@ module WriterStreamSync =
                 ordered
                 |> List.tryHead
                 |> Option.bind (fun (name, _) ->
-                    entryByName
-                    |> Map.tryFind name
-                    |> Option.bind (manifestForEntry manifest))
+                    entryByName |> Map.tryFind name |> Option.bind (manifestForEntry manifest))
                 |> Option.map (fun info -> info.LastActivityMs)
 
             let! texts =
@@ -607,8 +614,7 @@ module WriterStreamSync =
         | None ->
             blobs
             |> List.groupBy (fun (name, _) -> ProcessEventLog.writerKeyOfFileName name)
-            |> List.traverseResultM (fun (writerId, group) ->
-                remoteWriterOfGroup manifest entryByName writerId group)
+            |> List.traverseResultM (fun (writerId, group) -> remoteWriterOfGroup manifest entryByName writerId group)
 
     let private readRemoteTrees
         (raw: IGitRawStore)

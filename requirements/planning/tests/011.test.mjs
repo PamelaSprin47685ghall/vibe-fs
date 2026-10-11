@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import * as registry from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 
 test('WHAT[planning-011] Plan path derivation resolves deterministically and rejects path traversal', () => {
   const root = '/workspace/test-repo/.git/wanxiangshu'
@@ -76,6 +77,171 @@ test('WHAT[planning-011] P is read, rewritten atomically with exclusive temp fil
     const badEdit = surface.PlanningSurface.editPlanAtomic(tmpRoot, workId, badPatch)
     assert.equal(badEdit.ok, false)
     assert.match(badEdit.error, /Patch find target not found/)
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[planning-011] js-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-prog-test-'))
+  const workId = 'work-jsplan-paths'
+
+  try {
+    const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
+    surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
+
+    let state = surface.PlanFold.initialWorkState
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.workOpened(workId, tmpRoot), state).state
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-1', surface.PlanStage.S1, 0n), state).state
+
+    const mockStore = {
+      TryCurrent: (key) => (key === 'Plan' ? state : null),
+      TryHead: () => null,
+      Append: async () => ({ tag: 0 }),
+    }
+
+    // 1. Passing a path to this.file('plan.md') MUST fail with PATH_DENIED
+    const fileWithPath = `class Js extends JsProgram {
+      async run() {
+        const f = await this.file('plan.md');
+        return { text: f.text() };
+      }
+    }`
+    const resFileWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, fileWithPath)
+    assert.match(resFileWithPath, /# failed/)
+    assert.match(resFileWithPath, /code = "PATH_DENIED"/)
+
+    // 2. Passing a path to this.edit('plan.md', ...) MUST fail with PATH_DENIED
+    const editWithPath = `class Js extends JsProgram {
+      async run() {
+        this.edit('plan.md', { find: 'Draft', put: 'Rewrite' });
+        return { ok: true };
+      }
+    }`
+    const resEditWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, editWithPath)
+    assert.match(resEditWithPath, /# failed/)
+    assert.match(resEditWithPath, /code = "PATH_DENIED"/)
+
+    // 3. Passing a path to this.rewrite('plan.md', ...) MUST fail with PATH_DENIED
+    const rewriteWithPath = `class Js extends JsProgram {
+      async run() {
+        this.rewrite('plan.md', 'new content');
+        return { ok: true };
+      }
+    }`
+    const resRewriteWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteWithPath)
+    assert.match(resRewriteWithPath, /# failed/)
+    assert.match(resRewriteWithPath, /code = "PATH_DENIED"/)
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[planning-011] unreviewed tenure permits js-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-review-gate-test-'))
+  const workId = 'work-jsplan-review-gate'
+
+  try {
+    const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
+    surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
+
+    let state = surface.PlanFold.initialWorkState
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.workOpened(workId, tmpRoot), state).state
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-1', surface.PlanStage.S1, 0n), state).state
+
+    const mockStore = {
+      TryCurrent: (key) => (key === 'Plan' ? state : null),
+      TryHead: () => null,
+      Append: async () => ({ tag: 0 }),
+    }
+
+    // 1. In unreviewed tenure: read without path succeeds
+    const readProgram = `class Js extends JsProgram {
+      async run() {
+        const f = await this.file([['step1', 'step1end', 'Step 1']]);
+        return { slice: f.text('step1', '$') };
+      }
+    }`
+    const readRes = await registry.runJsPlan(mockStore, tmpRoot, workId, readProgram)
+    assert.match(readRes, /# ok/)
+    assert.match(readRes, /Step 1: Draft/)
+
+    // 2. In unreviewed tenure: edit without path fails with PLAN_REVIEW_REQUIRED
+    const editProgram = `class Js extends JsProgram {
+      async run() {
+        this.edit({ find: 'Draft', put: 'Final' });
+        return { edited: true };
+      }
+    }`
+    const editRes = await registry.runJsPlan(mockStore, tmpRoot, workId, editProgram)
+    assert.match(editRes, /# failed/)
+    assert.match(editRes, /code = "PLAN_REVIEW_REQUIRED"/)
+    assert.match(editRes, /Review is required before modifying the plan artifact/)
+
+    // Verify file content is unchanged on disk
+    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, initialContent)
+
+    // 3. In unreviewed tenure: rewrite without path fails with PLAN_REVIEW_REQUIRED
+    const rewriteProgram = `class Js extends JsProgram {
+      async run() {
+        this.rewrite('# Completely New Plan');
+        return { done: true };
+      }
+    }`
+    const rewriteRes = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteProgram)
+    assert.match(rewriteRes, /# failed/)
+    assert.match(rewriteRes, /code = "PLAN_REVIEW_REQUIRED"/)
+    assert.match(rewriteRes, /Review is required before modifying the plan artifact/)
+    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, initialContent)
+
+    // 4. Submit review for current tenure inc-1
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.reviewed('inc-1', surface.PlanStage.S1, surface.PlanReviewedOutcome.Stayed), state).state
+
+    // 5. Now tenure inc-1 has been reviewed -> rewrite succeeds!
+    const rewriteAfterReviewRes = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteProgram)
+    assert.match(rewriteAfterReviewRes, /# ok/)
+    assert.match(rewriteAfterReviewRes, /plan\.md/)
+    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Completely New Plan')
+
+    // 6. Now edit succeeds as well
+    const editAfterReviewProgram = `class Js extends JsProgram {
+      async run() {
+        this.edit({ find: 'Completely New', put: 'Reviewed' });
+        return { edited: true };
+      }
+    }`
+    const editAfterReviewRes = await registry.runJsPlan(mockStore, tmpRoot, workId, editAfterReviewProgram)
+    assert.match(editAfterReviewRes, /# ok/)
+    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
+
+    // 7. Relay to next tenure: inc-1 retires Relayed, inc-2 opens at S1
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyRetired('inc-1', surface.PlanRetirementOutcome.Relayed, 10n), state).state
+    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-2', surface.PlanStage.S1, 11n), state).state
+
+    // 8. Next tenure inc-2 has NOT yet submitted review -> mutation MUST be blocked again!
+    const writeInInc2 = `class Js extends JsProgram {
+      async run() {
+        this.rewrite('# Attempt In Second Tenure Before Review');
+        return { done: true };
+      }
+    }`
+    const resWriteInInc2 = await registry.runJsPlan(mockStore, tmpRoot, workId, writeInInc2)
+    assert.match(resWriteInInc2, /# failed/)
+    assert.match(resWriteInInc2, /code = "PLAN_REVIEW_REQUIRED"/)
+    assert.match(resWriteInInc2, /Review is required before modifying the plan artifact/)
+    // File remains unchanged
+    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
+
+    // 9. Reading in inc-2 succeeds
+    const readInInc2Program = `class Js extends JsProgram {
+      async run() {
+        const f = await this.file([['h1', 'h1end', '# Reviewed Plan']]);
+        return { text: f.text('^', '$') };
+      }
+    }`
+    const readInInc2Res = await registry.runJsPlan(mockStore, tmpRoot, workId, readInInc2Program)
+    assert.match(readInInc2Res, /# ok/)
+    assert.match(readInInc2Res, /# Reviewed Plan/)
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true })
   }

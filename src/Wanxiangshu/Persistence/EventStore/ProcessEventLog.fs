@@ -329,8 +329,7 @@ module ProcessEventLog =
     [<Literal>]
     let DefaultSegmentCapBytes = 67108864
 
-    type private SegmentCapState =
-        { mutable Override: int option }
+    type private SegmentCapState = { mutable Override: int option }
 
     // DSL-MUTABLE: resource — test-injected segment cap for the
     // materialization boundary; production always reads the default.
@@ -501,10 +500,7 @@ module ProcessEventLog =
     /// segment always accepts the batch; a batch larger than the cap
     /// occupies its own segment; a legacy file is never rolled here.
     let private segmentSizeOf (path: string) : int =
-        if existsSync path then
-            statSync path |> statSize
-        else
-            0
+        if existsSync path then statSync path |> statSize else 0
 
     let private nextOrdinalOf (currentFile: string) : int =
         let ordinal = ordinalOfSegmentFileName currentFile + 1
@@ -931,10 +927,7 @@ module ProcessEventLog =
 
         match scanDescending (List.rev paths) with
         | Some observedAt -> observedAt
-        | None ->
-            paths
-            |> List.map (fun path -> statSync path |> fileActivityMs)
-            |> List.max
+        | None -> paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max
 
     let private writerFileNames commonDir =
         let directory = eventsDirectory commonDir
@@ -982,10 +975,7 @@ module ProcessEventLog =
             None
 
     let private parseSegmentStem (stem: string) : (string * int) option =
-        if stem.Length >= 6 then
-            parseSegmentTail stem
-        else
-            None
+        if stem.Length >= 6 then parseSegmentTail stem else None
 
     let private contiguousSegmentGroups (names: string list) =
         names
@@ -996,7 +986,9 @@ module ProcessEventLog =
         |> List.map (fun (writerId, entries) ->
             let ordinals = entries |> List.map (fun (_, ordinal, _) -> ordinal) |> Set.ofList
             let highest = Set.maxElement ordinals
-            let contiguous = [ 0 .. highest ] |> List.forall (fun ordinal -> Set.contains ordinal ordinals)
+
+            let contiguous =
+                [ 0..highest ] |> List.forall (fun ordinal -> Set.contains ordinal ordinals)
 
             writerId, entries, contiguous)
         |> List.filter (fun (_, _, contiguous) -> contiguous)
@@ -1017,7 +1009,10 @@ module ProcessEventLog =
     let private writerFileGroups (commonDir: string) : WriterFileGroup list =
         let names = writerFileNames commonDir
         let segments = contiguousSegmentGroups names
-        let segmentWriters = segments |> List.map (fun group -> group.WriterId) |> Set.ofList
+
+        let segmentWriters =
+            segments |> List.map (fun group -> group.WriterId) |> Set.ofList
+
         let legacy = legacyGroupsOf names segmentWriters
 
         (segments @ legacy)
@@ -1042,8 +1037,7 @@ module ProcessEventLog =
         writerFileGroups commonDir
         |> List.map (fun group ->
             let paths =
-                group.FileNames
-                |> List.map (fun name -> join2 (eventsDirectory commonDir) name)
+                group.FileNames |> List.map (fun name -> join2 (eventsDirectory commonDir) name)
 
             { WriterId = group.WriterId
               FileNames = group.FileNames
@@ -1113,7 +1107,11 @@ module ProcessEventLog =
         match decodeWriterText "coexistence" text with
         | Error _ -> None
         | Ok events ->
-            Some(events |> List.map (fun envelope -> EventId.value envelope.EventId) |> Set.ofList)
+            Some(
+                events
+                |> List.map (fun envelope -> EventId.value envelope.EventId)
+                |> Set.ofList
+            )
 
     /// durable-events-005: the event-id set of one physical form, or None
     /// when the bytes are not complete canonical NDJSON (invalid UTF-8, a
@@ -1166,7 +1164,10 @@ module ProcessEventLog =
 
     let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<string list, string> =
         let directory = eventsDirectory commonDir
-        let legacy = group.FileNames |> List.filter (fun name -> not (isSegmentFileName name))
+
+        let legacy =
+            group.FileNames |> List.filter (fun name -> not (isSegmentFileName name))
+
         let segments = group.FileNames |> List.filter isSegmentFileName |> List.sort
 
         match legacy, segments with
@@ -1216,10 +1217,7 @@ module ProcessEventLog =
         if List.isEmpty assembly.CurrentLines then
             sealEmptyAssembly assembly
         else
-            let body =
-                assembly.CurrentLines
-                |> List.rev
-                |> String.concat "\n"
+            let body = assembly.CurrentLines |> List.rev |> String.concat "\n"
 
             { CurrentLines = []
               CurrentBytes = 0
@@ -1245,11 +1243,7 @@ module ProcessEventLog =
     /// larger than the cap occupies its own piece; empty text produces no
     /// pieces; an exhausted headroom emits one leading empty marker piece
     /// meaning "start at a fresh segment".
-    let internal splitTextIntoSegmentsWithHeadroom
-        (text: string)
-        (cap: int)
-        (headroom: int)
-        : string list =
+    let internal splitTextIntoSegmentsWithHeadroom (text: string) (cap: int) (headroom: int) : string list =
         if text.Length = 0 then
             []
         else
@@ -1258,7 +1252,9 @@ module ProcessEventLog =
             let final =
                 Array.fold
                     (fun assembly line -> absorbLine cap assembly line)
-                    { CurrentLines = []; CurrentBytes = headroom; Completed = [] }
+                    { CurrentLines = []
+                      CurrentBytes = headroom
+                      Completed = [] }
                     lines
 
             (sealAssembly final).Completed |> List.rev
@@ -1272,7 +1268,9 @@ module ProcessEventLog =
     let private writeSegmentSeries (commonDir: string) (writerId: string) (text: string) : string list =
         let directory = eventsDirectory commonDir
         let segments = splitTextIntoSegments text (segmentCapBytes ())
-        let names = List.init (List.length segments) (fun index -> segmentFileOf writerId index)
+
+        let names =
+            List.init (List.length segments) (fun index -> segmentFileOf writerId index)
 
         segments
         |> List.iteri (fun index body ->
@@ -1305,7 +1303,10 @@ module ProcessEventLog =
         ensureDirectory directory
 
         result {
-            let group = { WriterId = writer; FileNames = writerFilesOf commonDir writer }
+            let group =
+                { WriterId = writer
+                  FileNames = writerFilesOf commonDir writer }
+
             let! existing =
                 localLogicalText commonDir group
                 |> Result.mapError (fun reason -> sprintf "writer history is not valid UTF-8: %s" reason)
@@ -1337,7 +1338,10 @@ module ProcessEventLog =
             let path = join2 (eventsDirectory commonDir) name
             someWhen (existsSync path) path |> Option.iter unlinkSync)
 
-    let private decodeWriterFiles (commonDir: string) (group: WriterFileGroup) : Result<EventEnvelope list, StorageInvalid> =
+    let private decodeWriterFiles
+        (commonDir: string)
+        (group: WriterFileGroup)
+        : Result<EventEnvelope list, StorageInvalid> =
         result {
             let! files =
                 logicalStreamFiles commonDir group
@@ -1364,7 +1368,7 @@ module ProcessEventLog =
             let legacyActivity = statSync legacyFile |> fileActivityMs
             setWriterActivity (join2 directory (List.last names)) legacyActivity
             unlinkSync legacyFile
-            Ok ()
+            Ok()
 
     /// durable-events-005: materialization-boundary convergence for one
     /// writer. An oversized legacy file is reorganized into segments; a
@@ -1372,15 +1376,11 @@ module ProcessEventLog =
     /// import) is reconciled by byte-prefix validation — the longer stream
     /// wins and the shorter physical form is removed. Diverged bytes fail
     /// closed; nothing is deleted before every replacement byte has landed.
-    let private convergeLegacyOnly
-        (commonDir: string)
-        (writerId: string)
-        (legacyFile: string)
-        : Result<unit, string> =
+    let private convergeLegacyOnly (commonDir: string) (writerId: string) (legacyFile: string) : Result<unit, string> =
         if not (existsSync legacyFile) then
-            Ok ()
+            Ok()
         elif statSync legacyFile |> statSize <= segmentCapBytes () then
-            Ok ()
+            Ok()
         else
             reorganizeLegacy commonDir writerId
 
@@ -1398,20 +1398,21 @@ module ProcessEventLog =
         if statSync legacyFile |> statSize > segmentCapBytes () then
             reorganizeLegacy commonDir writerId
         else
-            Ok ()
+            Ok()
 
     /// durable-events-005: line-continuation convergence — append the
     /// legacy file's canonical lines verbatim onto the series tail (rolling
     /// fresh segments at the cap), then remove the legacy file only after
     /// every appended byte has landed.
-    let private seriesTailOf
-        (directory: string)
-        (writerId: string)
-        (segments: string list)
-        : string * int =
+    let private seriesTailOf (directory: string) (writerId: string) (segments: string list) : string * int =
         match List.rev segments |> List.tryHead with
         | Some latest -> latest, statSync (join2 directory latest) |> statSize
         | None -> segmentFileOf writerId 0, 0
+
+    let private fileNameForPiece (tailName: string) (writerId: string) (index: int) : string =
+        match index with
+        | 0 -> tailName
+        | _ -> segmentFileOf writerId (ordinalOfSegmentFileName tailName + index)
 
     let private appendLegacyPiece
         (directory: string)
@@ -1421,10 +1422,7 @@ module ProcessEventLog =
         (piece: string)
         : unit =
         if piece.Length > 0 then
-            let fileName =
-                if index = 0 then tailName
-                else segmentFileOf writerId (ordinalOfSegmentFileName tailName + index)
-
+            let fileName = fileNameForPiece tailName writerId index
             let path = join2 directory fileName
             AppendAllText path piece "utf8"
             durabilityBarrier path
@@ -1447,7 +1445,7 @@ module ProcessEventLog =
             |> List.iteri (fun index piece -> appendLegacyPiece directory writerId tailName index piece)
 
             unlinkSync legacyFile
-            Ok ()
+            Ok()
 
     let private reconcileCoexistingForms
         (commonDir: string)
@@ -1467,7 +1465,7 @@ module ProcessEventLog =
             // The segment series extends (or equals) the legacy bytes:
             // the series is authoritative; drop the legacy file.
             unlinkSync legacyFile
-            Ok ()
+            Ok()
         elif isPrefixOf segmentBytes legacyBytes then
             dropSeriesAndReassign commonDir writerId legacyFile segments
         elif isLineContinuation legacyBytes segmentBytes then
@@ -1483,7 +1481,7 @@ module ProcessEventLog =
         if List.isEmpty segments then
             convergeLegacyOnly commonDir writerId legacyFile
         elif not (existsSync legacyFile) then
-            Ok ()
+            Ok()
         else
             reconcileCoexistingForms commonDir writerId legacyFile segments
 
@@ -1505,11 +1503,14 @@ module ProcessEventLog =
 
         writerPhysicalMetadata commonDir
         |> List.filter (fun writer -> isWriterActiveAt nowMs writer.LastActivityMs)
-        |> List.map (fun writer -> { WriterId = writer.WriterId; FileNames = writer.FileNames })
+        |> List.map (fun writer ->
+            { WriterId = writer.WriterId
+              FileNames = writer.FileNames })
         |> fun groups -> read groups []
 
     let readStreams (commonDir: string) : Result<(string * EventEnvelope list) list, StorageInvalid> =
         readStreamsAt commonDir (currentTimeMs ())
+
     /// Public content digest for inline payload staging (durable-events-012).
     /// The digest IS the PayloadRef content address.
     let payloadDigest (content: byte[]) : string =
