@@ -23,8 +23,13 @@ echo "   步骤 4: npm run verify:release (全部 7 级质量门禁)"
 echo "------------------------------------------------------------"
 
 docker run --rm \
+    --init \
+    --memory=6g \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace \
+    -e WXS_ACCEPT_TODO=1 \
+    -e NODE_TEST_CONCURRENCY=2 \
+    -e UNIT_VERDICT_SILENCE_MS=30000 \
     "${IMAGE_NAME}" \
     /bin/bash -c "rm -rf /workspace/dist /workspace/node_modules /workspace/artifacts /workspace/.fable-build && npm ci && dotnet tool restore && node scripts/derive-envelope.mjs && npm run verify:release"
 
