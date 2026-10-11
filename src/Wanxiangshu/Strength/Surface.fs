@@ -125,8 +125,8 @@ module StrengthSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
-        | ToolPermission.Handoff -> "Handoff"
         | ToolPermission.Deliver -> "Deliver"
+        | ToolPermission.Review -> "Review"
 
     let private permissionsToJs permissions =
         permissions

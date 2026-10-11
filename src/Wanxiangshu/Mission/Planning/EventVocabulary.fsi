@@ -6,7 +6,7 @@ module PlanEventTypes =
     val IncumbencyOpened: string
     val IncumbencyRetired: string
     val Delivered: string
-    val AskPending: string
-    val AskResolved: string
+    val Reviewed: string
+    val Reopened: string
     val all: string list
     val isPlanEvent: string -> bool

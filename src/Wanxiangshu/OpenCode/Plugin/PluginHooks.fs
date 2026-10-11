@@ -119,7 +119,31 @@ module PluginHooks =
             let isReplica (sessionId: SessionId) =
                 boot.StrengthScope.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome
 
-            let systemTransform = ProviderSystemTransform.createWith roleFor isReplica
+            // planning-014: resolve the stage-method semantic path for the
+            // session's active plan incumbency. Non-plan sessions, missing
+            // stores and delivered works resolve None and append nothing, so
+            // the non-plan system prompt path stays byte-identical.
+            let stagePathOf (stage: Wanxiangshu.Mission.Planning.PlanStage) =
+                match stage with
+                | Wanxiangshu.Mission.Planning.PlanStage.S1 -> "planning/s1"
+                | Wanxiangshu.Mission.Planning.PlanStage.S2 -> "planning/s2"
+                | Wanxiangshu.Mission.Planning.PlanStage.S3 -> "planning/s3"
+
+            let planStageFor (sessionId: SessionId) : string option =
+                match roleFor sessionId with
+                | Some Role.Plan ->
+                    workspaceDirectory
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                    |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
+                    |> Option.bind (fun store ->
+                        Wanxiangshu.Mission.Planning.PlanEventStore.activeWorkState
+                            store
+                            (Wanxiangshu.Mission.Planning.PlanWorkId.create (SessionId.value sessionId)))
+                    |> Option.bind (fun state -> state.Active |> Option.map (fun active -> stagePathOf active.Stage))
+                | _ -> None
+
+            let systemTransform =
+                ProviderSystemTransform.createWith roleFor isReplica planStageFor
 
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.

@@ -129,7 +129,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `planning` | SWELoop 自评死锁改成交接而非阻塞，多任期跑者在同一物理会话内接力推进单一底稿 P。 |
+| `planning` | SWELoop 自评死锁改成 review 硬门：每任评离下一里程碑的 gap，空集晋级、非空留任；接力只换人不换阶段，持权交付把底稿交给真实 Manager 执行会话，Plan 是唯一允许空停等用户 prompt 的 role。 |
 
 # 规范条款索引
 
@@ -149,7 +149,7 @@
 | 10 | `host-boundary` | 32 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
-| 13 | `office-capability` | 12 | office-capability-001、003 ~ 007、011 ~ 012、015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer） |
+| 13 | `office-capability` | 13 | office-capability-001、003 ~ 007、011 ~ 012、015 ~ 016、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer）、office-capability-019（Plan 规划角色与四工具权限集） |
 | 14 | `capability-enforcement` | 23 | capability-enforcement-001 ~ 007、009 ~ 020、023 ~ 026；008/021/022 已归相应所有者，编号不复用 |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 15 | cognitive-environment-001 ~ 013、015 ~ 016 |
@@ -180,7 +180,7 @@
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
 | 42 | `relay-incumbency` | 12 | relay-incumbency-001 ~ 006、008 ~ 013 |
-| 43 | `relay-assessment` | 10 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
+| 43 | `relay-assessment` | 11 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证）、relay-assessment-011（review 共享壳与 Manager/Plan 角色后端） |
 | 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界） |
 | 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（前任工作与交互对继任可见，固定 DevOps 执行事实如实呈现） |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
@@ -194,7 +194,7 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
-| 58 | `planning` | 19 | planning-001 ~ 019（五条轮换事实与自查游标、三阶段单向推进、动作许可矩阵、持久化与任期隔离、崩溃恢复判定、ask两段式挂起与回送） |
+| 58 | `planning` | 22 | planning-001 ~ 018、020 ~ 023（七条轮换事实含 Reviewed/Reopened、review 驱动的阶段推进与授权、四工具动作许可矩阵、deliver 接力与持权交付、自然停止、ask 同步委派 DevOps、入口与 reprompt 状态机、review 晋级门、deliver 起执行会话；019 已删除，编号不复用） |
 
 # 依赖骨架
 

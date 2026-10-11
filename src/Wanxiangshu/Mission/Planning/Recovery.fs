@@ -5,14 +5,14 @@ open System
 [<RequireQualifiedAccess>]
 type PlanRecoveryPosition =
     | Delivered of receipt: PlanDeliveryReceipt * path: string * digest: string
-    | Active of incumbencyId: string * stage: string * planExists: bool
+    | Active of incumbencyId: string * stage: string * authorized: bool * planExists: bool
     | Nothing
     | Conflict of reason: string
 
 [<RequireQualifiedAccess>]
 type PlanRecoveryEffect =
     | DeliveredIdempotent of workId: string * path: string
-    | ActiveRebound of workId: string * incumbencyId: string * stage: string * planExists: bool
+    | ActiveRebound of workId: string * incumbencyId: string * stage: string * authorized: bool * planExists: bool
     | Conflict of workId: string * reason: string
 
 module PlanRecovery =
@@ -24,7 +24,8 @@ module PlanRecovery =
                 { IncumbencyId = PlanIncumbencyId.create (defaultArg view.ActiveIncumbencyId "")
                   WorkId = PlanWorkId.create (defaultArg view.WorkId "")
                   Digest = digest
-                  Path = path }
+                  Path = path
+                  ExecSessionId = defaultArg view.DeliveryExecSessionId "" }
 
             PlanRecoveryPosition.Delivered(receipt, path, digest)
         | _ -> PlanRecoveryPosition.Conflict "Delivered view missing delivery digest or path"
@@ -44,6 +45,7 @@ module PlanRecovery =
         (readPlanFile: string -> string option)
         (incumbencyId: string)
         (stage: string)
+        (authorized: bool)
         =
         let targetPath = resolveActivePath view
 
@@ -54,11 +56,12 @@ module PlanRecovery =
                 readPlanFile targetPath
 
         let planExists = planContentOpt.IsSome
-        PlanRecoveryPosition.Active(incumbencyId, stage, planExists)
+        PlanRecoveryPosition.Active(incumbencyId, stage, authorized, planExists)
 
     let private resolveActiveOrConflict (view: PlanWorkView) (readPlanFile: string -> string option) =
         match view.ActiveIncumbencyId, view.ActiveStage with
-        | Some incumbencyId, Some stage -> resolveActivePosition view readPlanFile incumbencyId stage
+        | Some incumbencyId, Some stage ->
+            resolveActivePosition view readPlanFile incumbencyId stage (defaultArg view.ActiveAuthorized false)
         | _ -> PlanRecoveryPosition.Conflict "Active incumbency missing stage in projection"
 
     let planRecoveryPosition (view: PlanWorkView) (readPlanFile: string -> string option) : PlanRecoveryPosition =
@@ -75,8 +78,8 @@ module PlanRecovery =
         match pos with
         | PlanRecoveryPosition.Delivered(_receipt, path, _digest) ->
             Some(PlanRecoveryEffect.DeliveredIdempotent(wid, path))
-        | PlanRecoveryPosition.Active(incumbencyId, stage, planExists) ->
-            Some(PlanRecoveryEffect.ActiveRebound(wid, incumbencyId, stage, planExists))
+        | PlanRecoveryPosition.Active(incumbencyId, stage, authorized, planExists) ->
+            Some(PlanRecoveryEffect.ActiveRebound(wid, incumbencyId, stage, authorized, planExists))
         | PlanRecoveryPosition.Conflict reason -> Some(PlanRecoveryEffect.Conflict(wid, reason))
         | PlanRecoveryPosition.Nothing -> None
 

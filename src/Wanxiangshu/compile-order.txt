@@ -464,8 +464,12 @@ Mission/Planning/Store.fsi
 Mission/Planning/Store.fs
 Mission/Planning/PlanPath.fsi
 Mission/Planning/PlanPath.fs
+Mission/Planning/PlanWorkOpen.fsi
+Mission/Planning/PlanWorkOpen.fs
 Mission/Planning/PlanTools.fsi
 Mission/Planning/PlanTools.fs
+Mission/Planning/ReviewPlanBackend.fsi
+Mission/Planning/ReviewPlanBackend.fs
 Mission/Planning/Surface.fsi
 Mission/Planning/Surface.fs
 Strength/Persistence/Store.fsi
@@ -1226,8 +1230,10 @@ OpenCode/JoinResultRendererSurface.fsi
 OpenCode/JoinResultRendererSurface.fs
 OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
-Mission/Relay/OpenCode/ReviewTool.fsi
-Mission/Relay/OpenCode/ReviewTool.fs
+Mission/Relay/OpenCode/ReviewBackendManager.fsi
+Mission/Relay/OpenCode/ReviewBackendManager.fs
+Mission/Relay/OpenCode/ReviewShell.fsi
+Mission/Relay/OpenCode/ReviewShell.fs
 Mission/Relay/OpenCode/SuicideTool.fsi
 Mission/Relay/OpenCode/SuicideTool.fs
 Mission/Relay/OpenCode/NarrativeTransform.fsi
@@ -1496,6 +1502,8 @@ OpenCode/Host/BloggerChronicleText.fsi
 OpenCode/Host/BloggerChronicleText.fs
 OpenCode/Host/BloggerChronicleSurface.fsi
 OpenCode/Host/BloggerChronicleSurface.fs
+OpenCode/Plugin/PlanWorkOpenWiring.fsi
+OpenCode/Plugin/PlanWorkOpenWiring.fs
 OpenCode/Plugin/PluginTransforms.fsi
 OpenCode/Plugin/PluginTransforms.fs
 OpenCode/Host/PluginTransformSurface.fsi

@@ -154,6 +154,7 @@ type SyncDelegateRuntime
         | SyncDelegateRole.Inspector -> Role.Inspector
         | SyncDelegateRole.Coder -> Role.Coder
         | SyncDelegateRole.Engineer -> Role.Engineer
+        | SyncDelegateRole.DevOps -> Role.DevOps
 
     // EXEC-031: SyncDelegate uses ordinary WorkMain tools — no Return permission.
     let toolMap role =
@@ -516,7 +517,11 @@ type SyncDelegateRuntime
             projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
 
     let noteDelegateIfRole (call: SyncDelegateCall) turnSessionId record =
-        if call.Role = SyncDelegateRole.Inspector || call.Role = SyncDelegateRole.Engineer then
+        if
+            call.Role = SyncDelegateRole.Inspector
+            || call.Role = SyncDelegateRole.Engineer
+            || call.Role = SyncDelegateRole.DevOps
+        then
             noteDelegateAnswer (sessionKey turnSessionId) record
 
     let finishCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) workRecord =
@@ -680,11 +685,16 @@ type SyncDelegateRuntime
         attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
         |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
         |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer))
+        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.DevOps))
 
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
         | Some sessionId -> Some sessionId
-        | None when role = SyncDelegateRole.Engineer || role = SyncDelegateRole.Inspector ->
+        | None when
+            role = SyncDelegateRole.Engineer
+            || role = SyncDelegateRole.Inspector
+            || role = SyncDelegateRole.DevOps
+            ->
             let ownerScope = ReuseScope.ofSession ownerSessionId
             store.TryGetDeletedDelegate ownerScope
         | None -> None
@@ -939,7 +949,8 @@ type SyncDelegateRuntime
         for role in
             [ SyncDelegateRole.Inspector
               SyncDelegateRole.Coder
-              SyncDelegateRole.Engineer ] do
+              SyncDelegateRole.Engineer
+              SyncDelegateRole.DevOps ] do
             attached.Remove(sessionId, role) |> ignore
 
         delegateOwned |> Option.iter (fun id -> cleanupDelegateDraft (sessionKey id))

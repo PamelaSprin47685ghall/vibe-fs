@@ -21,22 +21,22 @@ module PlanPhase =
     val render: PlanPhase -> string
 
 type ActivePlanIncumbency =
-    { Id: PlanIncumbencyId
+    { Id: string
       Stage: PlanStage
       Phase: PlanPhase
+      Authorized: bool
       OpeningCursor: XTraceCursor }
 
 type PlanWorkState =
-    { WorkId: PlanWorkId option
+    { WorkId: string option
       Root: string option
       Active: ActivePlanIncumbency option
-      Retired: PlanIncumbencyId list
-      LatestRetirement: (PlanIncumbencyId * PlanRetirementOutcome * XTraceCursor * XTraceCursor) option
+      Retired: string list
+      LatestRetirement: (string * PlanRetirementOutcome * XTraceCursor * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
       PreviousIncumbencyStage: PlanStage option
-      PendingAsk: (PlanIncumbencyId * string * XTraceCursor) option
-      LatestResolvedAsk: (PlanIncumbencyId * XTraceCursor) option }
+      Reviewed: (string * PlanReviewedOutcome) option }
 
 module PlanWorkState =
     val empty: PlanWorkState
@@ -46,15 +46,15 @@ type PlanWorkView =
       ActiveIncumbencyId: string option
       ActiveStage: string option
       ActivePhase: string option
+      ActiveAuthorized: bool option
       RetiredCount: int
       LatestRetirementOutcome: string option
+      LatestReviewOutcome: string option
       Delivered: bool
       DeliveryDigest: string option
       DeliveryPath: string option
-      BoundDevOpsId: string option
-      PendingAskQuestion: string option
-      PendingAskIncumbencyId: string option
-      PendingAskCursor: int64 option }
+      DeliveryExecSessionId: string option
+      BoundDevOpsId: string option }
 
 type PlanState = private PlanState of Map<string, PlanWorkState>
 

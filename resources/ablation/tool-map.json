@@ -36,7 +36,6 @@
     "js-bookkeeper": "knowledge-reuse",
     "js-plan": "planning",
     "ask": "planning",
-    "handoff": "planning",
     "deliver": "planning"
   }
 }

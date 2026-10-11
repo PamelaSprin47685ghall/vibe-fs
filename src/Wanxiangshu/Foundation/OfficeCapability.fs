@@ -29,8 +29,10 @@ type ToolPermission =
     | BashHoneypot
     | JsPlan
     | Ask
-    | Handoff
     | Deliver
+    /// planning-002: Plan's review hard gate. Shares the `review` tool name
+    /// with Manager's ReviewAssessment; the label stays distinct.
+    | Review
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -107,11 +109,12 @@ module OfficeCapability =
                   ToolPermission.Horizon ]
         | Role.Distiller -> Set.empty
         | Role.Plan ->
+            // planning-002: the plan toolset is exactly { js-plan, ask,
+            // review, deliver }; resume and handoff are retired.
             set
                 [ ToolPermission.JsPlan
                   ToolPermission.Ask
-                  ToolPermission.Resume
-                  ToolPermission.Handoff
+                  ToolPermission.Review
                   ToolPermission.Deliver ]
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
         | Role.Blogger -> set [ ToolPermission.Chronicle ]
@@ -166,8 +169,8 @@ module OfficeCapability =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
-        | ToolPermission.Handoff -> "Handoff"
         | ToolPermission.Deliver -> "Deliver"
+        | ToolPermission.Review -> "Review"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -193,6 +196,6 @@ module OfficeCapability =
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot
         | "JsPlan" -> Some ToolPermission.JsPlan
         | "Ask" -> Some ToolPermission.Ask
-        | "Handoff" -> Some ToolPermission.Handoff
         | "Deliver" -> Some ToolPermission.Deliver
+        | "Review" -> Some ToolPermission.Review
         | _ -> None

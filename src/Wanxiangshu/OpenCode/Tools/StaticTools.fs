@@ -32,8 +32,11 @@ module StaticTools =
         | ToolPermission.Finality -> [ "suicide" ]
         | ToolPermission.JsPlan -> [ "js-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
-        | ToolPermission.Handoff -> [ "handoff" ]
         | ToolPermission.Deliver -> [ "deliver" ]
+        // planning-002: Plan's review permission shares the `review` verb with
+        // Manager's ReviewAssessment. Listed after it so the reverse lookup
+        // keeps resolving `review` to the Manager-owned contract.
+        | ToolPermission.Review -> [ "review" ]
 
     /// Primary name for permissions with a single verb (tests / simple maps).
     let toolName (p: ToolPermission) =
@@ -66,8 +69,8 @@ module StaticTools =
           ToolPermission.BashHoneypot
           ToolPermission.JsPlan
           ToolPermission.Ask
-          ToolPermission.Handoff
-          ToolPermission.Deliver ]
+          ToolPermission.Deliver
+          ToolPermission.Review ]
 
     /// capability-enforcement-012: the sole reverse lookup for tool name →
     /// permission. The schema projection, the dispatch tool map and the
@@ -112,6 +115,9 @@ module StaticTools =
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
+    /// planning-013: `handoff` is fully retired — no permission owns it and it
+    /// left this catalog. `resume` stays: Manager's delegation surface owns the
+    /// verb, so every role's permission object keeps its explicit entry.
     let knownToolNames =
         [ "fork"
           "resume"
@@ -149,7 +155,6 @@ module StaticTools =
           "js-bookkeeper"
           "js-plan"
           "ask"
-          "handoff"
           "deliver" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
@@ -191,8 +196,8 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        | true, ("ask" | "handoff" | "deliver" | "js-plan"), Role.Plan -> "allow"
-        | true, "resume", Role.Plan -> "allow"
+        // planning-002: the plan toolset is { js-plan, ask, review, deliver }.
+        | true, ("ask" | "review" | "deliver" | "js-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
         | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"

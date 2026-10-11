@@ -78,19 +78,21 @@ module PluginRecoveryWiring =
         match effect with
         | PlanRecoveryEffect.DeliveredIdempotent(workId, path) ->
             Diagnostic.emit "plan-work-delivered-idempotent" [ "work_id", workId; "path", path ]
-        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, true) ->
+        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, authorized, true) ->
             Diagnostic.emit
                 "plan-work-active-rebound"
                 [ "work_id", workId
                   "incumbency_id", incumbencyId
                   "stage", stage
+                  "authorized", (if authorized then "true" else "false")
                   "plan_exists", "true" ]
-        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, false) ->
+        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, authorized, false) ->
             Diagnostic.emit
                 "plan-work-active-file-missing"
                 [ "work_id", workId
                   "incumbency_id", incumbencyId
                   "stage", stage
+                  "authorized", (if authorized then "true" else "false")
                   "plan_exists", "false" ]
         | PlanRecoveryEffect.Conflict(workId, reason) ->
             Diagnostic.emit "plan-recovery-conflict" [ "work_id", workId; "reason", reason ]

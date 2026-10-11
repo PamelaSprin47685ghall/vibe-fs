@@ -28,18 +28,28 @@ module PlanStage =
 
 [<RequireQualifiedAccess>]
 type PlanRetirementOutcome =
-    | Continue
+    | Relayed
     | Delivered
 
 module PlanRetirementOutcome =
     val ofString: string -> PlanRetirementOutcome option
     val render: PlanRetirementOutcome -> string
 
+[<RequireQualifiedAccess>]
+type PlanReviewedOutcome =
+    | Promoted
+    | Stayed
+
+module PlanReviewedOutcome =
+    val ofString: string -> PlanReviewedOutcome option
+    val render: PlanReviewedOutcome -> string
+
 type PlanDeliveryReceipt =
     { IncumbencyId: PlanIncumbencyId
       WorkId: PlanWorkId
       Digest: string
-      Path: string }
+      Path: string
+      ExecSessionId: string }
 
 [<RequireQualifiedAccess>]
 type PlanEvent =
@@ -54,15 +64,20 @@ type PlanEvent =
         incumbencyId: PlanIncumbencyId *
         outcome: PlanRetirementOutcome *
         retirementCursor: XTraceCursor
-    | PlanDelivered of incumbencyId: PlanIncumbencyId * workId: PlanWorkId * digest: string * path: string
-    | PlanAskPending of workId: PlanWorkId * incumbencyId: PlanIncumbencyId * question: string * cursor: XTraceCursor
-    | PlanAskResolved of incumbencyId: PlanIncumbencyId * cursor: XTraceCursor
+    | PlanDelivered of
+        incumbencyId: PlanIncumbencyId *
+        workId: PlanWorkId *
+        digest: string *
+        path: string *
+        execSessionId: string
+    | PlanReviewed of incumbencyId: PlanIncumbencyId * stage: PlanStage * outcome: PlanReviewedOutcome
+    | PlanReopened of incumbencyId: PlanIncumbencyId
 
 module PlanEvents =
     val workOpened: string -> string -> PlanEvent
     val devOpsBound: string -> string -> string option -> PlanEvent
     val incumbencyOpened: string -> string -> PlanStage -> int64 -> PlanEvent
     val incumbencyRetired: string -> PlanRetirementOutcome -> int64 -> PlanEvent
-    val delivered: string -> string -> string -> string -> PlanEvent
-    val askPending: string -> string -> string -> int64 -> PlanEvent
-    val askResolved: string -> int64 -> PlanEvent
+    val delivered: string -> string -> string -> string -> string -> PlanEvent
+    val reviewed: string -> PlanStage -> PlanReviewedOutcome -> PlanEvent
+    val reopened: string -> PlanEvent

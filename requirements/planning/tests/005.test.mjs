@@ -2,70 +2,100 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 
-test('WHAT[planning-005] action gate permits handoff only in S1, handoff and deliver in S2, deliver only in S3', () => {
+test('WHAT[planning-005] action gate permits the four tools uniformly across stages; stage is not an action gate', () => {
   assert.ok(typeof planning.isActionAllowed === 'function', 'gate.isActionAllowed must be an exported function')
 
-  // In S1: only handoff is allowed; deliver is strictly rejected
-  assert.equal(planning.isActionAllowed({ stage: 'S1', action: 'handoff', hasDelivered: false, hasBlocker: false }), true)
-  assert.equal(planning.isActionAllowed({ stage: 'S1', action: 'deliver', hasDelivered: false, hasBlocker: false }), false)
+  // The new toolset is { js-plan, ask, review, deliver }; every stage treats them alike.
+  for (const stage of ['S1', 'S2', 'S3']) {
+    assert.equal(
+      planning.isActionAllowed({ stage, action: 'js-plan', hasDelivered: false, hasBlocker: false }),
+      true,
+      `${stage}: js-plan must be allowed on an active tenure`,
+    )
+    assert.equal(
+      planning.isActionAllowed({ stage, action: 'ask', hasDelivered: false, hasBlocker: false }),
+      true,
+      `${stage}: ask must be allowed on an active tenure`,
+    )
+    assert.equal(
+      planning.isActionAllowed({ stage, action: 'review', hasDelivered: false, hasBlocker: false }),
+      true,
+      `${stage}: review must be allowed on an active tenure`,
+    )
+    assert.equal(
+      planning.isActionAllowed({ stage, action: 'deliver', hasDelivered: false, hasBlocker: false }),
+      true,
+      `${stage}: deliver must be allowed on an active tenure (relay when unauthorized)`,
+    )
+    // Retired tools must be denied on every stage
+    for (const action of ['handoff', 'resume']) {
+      assert.equal(
+        planning.isActionAllowed({ stage, action, hasDelivered: false, hasBlocker: false }),
+        false,
+        `${stage}: retired tool ${action} must be denied`,
+      )
+    }
+  }
 
-  // In S2: both handoff and deliver are allowed
-  assert.equal(planning.isActionAllowed({ stage: 'S2', action: 'handoff', hasDelivered: false, hasBlocker: false }), true)
-  assert.equal(planning.isActionAllowed({ stage: 'S2', action: 'deliver', hasDelivered: false, hasBlocker: false }), true)
+  // Blocker presence rejects deliver
+  for (const stage of ['S1', 'S2', 'S3']) {
+    assert.equal(
+      planning.isActionAllowed({ stage, action: 'deliver', hasDelivered: false, hasBlocker: true }),
+      false,
+      `${stage}: deliver must be denied when a blocker exists`,
+    )
+  }
+})
 
-  // In S3: deliver is allowed; handoff is strictly rejected
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'handoff', hasDelivered: false, hasBlocker: false }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'deliver', hasDelivered: false, hasBlocker: false }), true)
-
-  // Blocker presence rejects both handoff and deliver
-  assert.equal(planning.isActionAllowed({ stage: 'S1', action: 'handoff', hasDelivered: false, hasBlocker: true }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S2', action: 'handoff', hasDelivered: false, hasBlocker: true }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S2', action: 'deliver', hasDelivered: false, hasBlocker: true }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'deliver', hasDelivered: false, hasBlocker: true }), false)
-
-  // After Delivered: all mutation actions (handoff, deliver, ask, resume) rejected; only js-plan.read permitted
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'deliver', hasDelivered: true, hasBlocker: false }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'handoff', hasDelivered: true, hasBlocker: false }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'ask', hasDelivered: true, hasBlocker: false }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'resume', hasDelivered: true, hasBlocker: false }), false)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'read', hasDelivered: true, hasBlocker: false }), true)
-  assert.equal(planning.isActionAllowed({ stage: 'S3', action: 'js-plan.read', hasDelivered: true, hasBlocker: false }), true)
+test('WHAT[planning-005] delivered state permits only js-plan read and rejects ask, review, deliver until reopened', () => {
+  // After Delivered: only js-plan.read is permitted; mutation tools are rejected
+  for (const action of ['deliver', 'ask', 'review', 'js-plan.edit', 'js-plan.rewrite']) {
+    assert.equal(
+      planning.isActionAllowed({ stage: 'S3', action, hasDelivered: true, hasBlocker: false }),
+      false,
+      `delivered work must reject action ${action} until reopened`,
+    )
+  }
+  assert.equal(
+    planning.isActionAllowed({ stage: 'S3', action: 'js-plan.read', hasDelivered: true, hasBlocker: false }),
+    true,
+    'delivered work must still permit js-plan.read',
+  )
+  assert.equal(
+    planning.isActionAllowed({ stage: 'S3', action: 'read', hasDelivered: true, hasBlocker: false }),
+    true,
+    'delivered work must still permit read',
+  )
 })
 
 test('WHAT[planning-005] decideAction provides typed rejections for disallowed actions', () => {
-  // S1 deliver -> DeliverForbiddenInS1
-  const s1Deliver = planning.decideAction('S1', 'deliver', false, false)
-  assert.equal(s1Deliver.ok, false)
-  assert.equal(s1Deliver.rejection, 'DeliverForbiddenInS1')
+  // Retired tool -> typed rejection
+  const handoff = planning.decideAction('S1', 'handoff', false, false)
+  assert.equal(handoff.ok, false)
+  assert.equal(handoff.rejection, 'HandoffRetired')
 
-  // S3 handoff -> HandoffForbiddenInS3
-  const s3Handoff = planning.decideAction('S3', 'handoff', false, false)
-  assert.equal(s3Handoff.ok, false)
-  assert.equal(s3Handoff.rejection, 'HandoffForbiddenInS3')
+  const resume = planning.decideAction('S2', 'resume', false, false)
+  assert.equal(resume.ok, false)
+  assert.equal(resume.rejection, 'ResumeRetired')
+
+  // Blocker -> BlockedByLiveResources
+  const blockedDeliver = planning.decideAction('S1', 'deliver', false, true)
+  assert.equal(blockedDeliver.ok, false)
+  assert.equal(blockedDeliver.rejection, 'BlockedByLiveResources')
 
   // Delivered mutation -> AlreadyDelivered
   const postDeliveredAsk = planning.decideAction('S3', 'ask', true, false)
   assert.equal(postDeliveredAsk.ok, false)
   assert.equal(postDeliveredAsk.rejection, 'AlreadyDelivered')
-
-  // Blocker -> BlockedByLiveResources
-  const blockedHandoff = planning.decideAction('S1', 'handoff', false, true)
-  assert.equal(blockedHandoff.ok, false)
-  assert.equal(blockedHandoff.rejection, 'BlockedByLiveResources')
 })
 
-test('WHAT[planning-005] allowedPermissions maps to ToolPermission set for each stage', () => {
-  // S1 without blocker: JsPlan, Ask, Resume, Handoff
-  const s1Perms = planning.allowedPermissions('S1', false, false)
-  assert.deepEqual(s1Perms, ['Ask', 'Handoff', 'JsPlan', 'Resume'])
-
-  // S2 without blocker: JsPlan, Ask, Resume, Handoff, Deliver
-  const s2Perms = planning.allowedPermissions('S2', false, false)
-  assert.deepEqual(s2Perms, ['Ask', 'Deliver', 'Handoff', 'JsPlan', 'Resume'])
-
-  // S3 without blocker: JsPlan, Ask, Resume, Deliver
-  const s3Perms = planning.allowedPermissions('S3', false, false)
-  assert.deepEqual(s3Perms, ['Ask', 'Deliver', 'JsPlan', 'Resume'])
+test('WHAT[planning-005] allowedPermissions maps to the new ToolPermission set uniformly per stage', () => {
+  // Every stage carries the same permission set: Ask, Deliver, JsPlan, Review
+  const expected = ['Ask', 'Deliver', 'JsPlan', 'Review']
+  for (const stage of ['S1', 'S2', 'S3']) {
+    const perms = planning.allowedPermissions(stage, false, false)
+    assert.deepEqual(perms, expected, `${stage} permissions must be the new four-tool set`)
+  }
 
   // Delivered: only JsPlan
   const deliveredPerms = planning.allowedPermissions('S3', true, false)

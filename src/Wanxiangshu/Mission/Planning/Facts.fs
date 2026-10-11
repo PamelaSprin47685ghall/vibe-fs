@@ -54,28 +54,48 @@ module PlanStage =
 
 [<RequireQualifiedAccess>]
 type PlanRetirementOutcome =
-    | Continue
+    | Relayed
     | Delivered
 
 module PlanRetirementOutcome =
     let ofString (value: string) : PlanRetirementOutcome option =
         match value with
-        | "Continue"
-        | "continue" -> Some PlanRetirementOutcome.Continue
+        | "Relayed"
+        | "relayed" -> Some PlanRetirementOutcome.Relayed
         | "Delivered"
         | "delivered" -> Some PlanRetirementOutcome.Delivered
         | _ -> None
 
     let render (outcome: PlanRetirementOutcome) : string =
         match outcome with
-        | PlanRetirementOutcome.Continue -> "Continue"
+        | PlanRetirementOutcome.Relayed -> "Relayed"
         | PlanRetirementOutcome.Delivered -> "Delivered"
+
+[<RequireQualifiedAccess>]
+type PlanReviewedOutcome =
+    | Promoted
+    | Stayed
+
+module PlanReviewedOutcome =
+    let ofString (value: string) : PlanReviewedOutcome option =
+        match value with
+        | "Promoted"
+        | "promoted" -> Some PlanReviewedOutcome.Promoted
+        | "Stayed"
+        | "stayed" -> Some PlanReviewedOutcome.Stayed
+        | _ -> None
+
+    let render (outcome: PlanReviewedOutcome) : string =
+        match outcome with
+        | PlanReviewedOutcome.Promoted -> "Promoted"
+        | PlanReviewedOutcome.Stayed -> "Stayed"
 
 type PlanDeliveryReceipt =
     { IncumbencyId: PlanIncumbencyId
       WorkId: PlanWorkId
       Digest: string
-      Path: string }
+      Path: string
+      ExecSessionId: string }
 
 [<RequireQualifiedAccess>]
 type PlanEvent =
@@ -90,9 +110,14 @@ type PlanEvent =
         incumbencyId: PlanIncumbencyId *
         outcome: PlanRetirementOutcome *
         retirementCursor: XTraceCursor
-    | PlanDelivered of incumbencyId: PlanIncumbencyId * workId: PlanWorkId * digest: string * path: string
-    | PlanAskPending of workId: PlanWorkId * incumbencyId: PlanIncumbencyId * question: string * cursor: XTraceCursor
-    | PlanAskResolved of incumbencyId: PlanIncumbencyId * cursor: XTraceCursor
+    | PlanDelivered of
+        incumbencyId: PlanIncumbencyId *
+        workId: PlanWorkId *
+        digest: string *
+        path: string *
+        execSessionId: string
+    | PlanReviewed of incumbencyId: PlanIncumbencyId * stage: PlanStage * outcome: PlanReviewedOutcome
+    | PlanReopened of incumbencyId: PlanIncumbencyId
 
 module PlanEvents =
     let workOpened (workId: string) (root: string) : PlanEvent =
@@ -120,16 +145,23 @@ module PlanEvents =
             XTraceCursor.create retirementCursor
         )
 
-    let delivered (incumbencyId: string) (workId: string) (digest: string) (path: string) : PlanEvent =
-        PlanEvent.PlanDelivered(PlanIncumbencyId.create incumbencyId, PlanWorkId.create workId, digest, path)
-
-    let askPending (workId: string) (incumbencyId: string) (question: string) (cursor: int64) : PlanEvent =
-        PlanEvent.PlanAskPending(
-            PlanWorkId.create workId,
+    let delivered
+        (incumbencyId: string)
+        (workId: string)
+        (digest: string)
+        (path: string)
+        (execSessionId: string)
+        : PlanEvent =
+        PlanEvent.PlanDelivered(
             PlanIncumbencyId.create incumbencyId,
-            question,
-            XTraceCursor.create cursor
+            PlanWorkId.create workId,
+            digest,
+            path,
+            execSessionId
         )
 
-    let askResolved (incumbencyId: string) (cursor: int64) : PlanEvent =
-        PlanEvent.PlanAskResolved(PlanIncumbencyId.create incumbencyId, XTraceCursor.create cursor)
+    let reviewed (incumbencyId: string) (stage: PlanStage) (outcome: PlanReviewedOutcome) : PlanEvent =
+        PlanEvent.PlanReviewed(PlanIncumbencyId.create incumbencyId, stage, outcome)
+
+    let reopened (incumbencyId: string) : PlanEvent =
+        PlanEvent.PlanReopened(PlanIncumbencyId.create incumbencyId)

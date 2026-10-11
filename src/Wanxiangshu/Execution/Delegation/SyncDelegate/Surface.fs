@@ -653,6 +653,7 @@ module SyncDelegateSurface =
         | SyncDelegateRole.Coder -> Role.Coder
         | SyncDelegateRole.Inspector -> Role.Inspector
         | SyncDelegateRole.Engineer -> Role.Engineer
+        | SyncDelegateRole.DevOps -> Role.DevOps
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {

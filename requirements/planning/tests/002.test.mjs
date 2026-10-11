@@ -9,21 +9,27 @@ test('WHAT[planning-002] Role catalog contains Plan and wire label is plan', () 
   assert.ok(allPublicRoleLabels.includes('plan'), 'allPublicRoleLabels must contain "plan"')
 })
 
-test('WHAT[planning-002] Plan role permission projection permits js-plan, ask, resume, handoff, deliver and denies repository and execution actions', () => {
+test('WHAT[planning-002] Plan role permission projection permits exactly js-plan, ask, review, deliver and denies repository and execution actions', () => {
   const allowed = permissions('plan')
   assert.ok(Array.isArray(allowed), 'permissions("plan") must return an array')
 
-  // Expected permitted tools / capabilities for Plan role: js-plan, ask, resume, handoff, deliver
-  const expectedPermissions = ['Ask', 'Deliver', 'Handoff', 'JsPlan', 'Resume']
+  // WHAT[planning-002]: the plan toolset is { js-plan, ask, review, deliver }.
+  // resume and handoff are no longer part of the plan surface.
+  const expectedPermissions = ['Ask', 'Deliver', 'JsPlan', 'Review']
   assert.deepEqual(
     [...allowed].sort(),
     expectedPermissions.sort(),
-    'Plan role must have exactly the 5 allowed permissions: ask, deliver, handoff, js-plan, resume',
+    'Plan role must have exactly the 4 allowed permissions: ask, deliver, js-plan, review',
   )
 
-  // Must strictly allow the 5 designated capabilities
+  // Must strictly allow the 4 designated capabilities
   for (const perm of expectedPermissions) {
     assert.equal(isAllowed('plan', perm), true, `Plan must be allowed ${perm}`)
+  }
+
+  // Retired plan tools must be strictly denied
+  for (const perm of ['Handoff', 'Resume']) {
+    assert.equal(isAllowed('plan', perm), false, `Plan must be denied retired tool ${perm}`)
   }
 
   // Must strictly deny repository, execution and orchestration tools
@@ -39,7 +45,6 @@ test('WHAT[planning-002] Plan role permission projection permits js-plan, ask, r
     'Pty',
     'Fork',
     'Fission',
-    'ReviewAssessment',
     'Chronicle',
     'Fetch',
     'Finality',

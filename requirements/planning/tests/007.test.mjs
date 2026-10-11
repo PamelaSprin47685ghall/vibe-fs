@@ -5,24 +5,25 @@ import * as surface from '../../../dist/Mission/Planning/Surface.js'
 const facts = { PlanEvents: surface.PlanEvents, PlanStage: surface.PlanStage }
 const fold = { PlanFold: surface.PlanFold }
 
-test('WHAT[planning-007] handoff transitions stage S1 to S2 and opens next incumbency without blocker', async () => {
+test('WHAT[planning-007] deliver without authorization relays: retires Relayed and opens the next tenure at the same stage', async () => {
   let state = fold.PlanFold.initialWorkState
 
-  // Setup opened work and S1 incumbency
-  const evOpen = facts.PlanEvents.workOpened('work-h1', '/repo/root')
-  state = fold.PlanFold.applyWorkEventJs(evOpen, state).state
+  // Setup an opened work and an S2 incumbency that has not been authorized.
+  // The fold requires the first tenure to open at S1 (planning-020), so the
+  // S2 tenure is reached the legal way: an in-place review promotion.
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-h1', '/repo/root'), state).state
+  state = fold.PlanFold.applyWorkEventJs(
+    facts.PlanEvents.incumbencyOpened('work-h1', 'inc-1', facts.PlanStage.S1, 0n),
+    state,
+  ).state
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-1', 'S1', 'Promoted'), state).state
 
-  const evInc1 = facts.PlanEvents.incumbencyOpened('work-h1', 'inc-1', facts.PlanStage.S1, 0n)
-  state = fold.PlanFold.applyWorkEventJs(evInc1, state).state
-
-  // Mock store holding current state and accumulating appended events
   const appended = []
   const mockStore = {
     TryCurrent: (key) => (key === 'Plan' ? state : null),
     TryHead: () => null,
     Append: async (envs) => {
       appended.push(...envs)
-      // apply into state
       for (const env of envs) {
         const decoded = surface.PlanningSurface.tryDecodeEnvelopeJson(JSON.stringify(env))
         if (decoded.ok) {
@@ -33,52 +34,53 @@ test('WHAT[planning-007] handoff transitions stage S1 to S2 and opens next incum
     },
   }
 
-  // 1. S1 Handoff
-  const res1 = await surface.PlanningSurface.executeHandoff(
+  // The spawn capability must never be invoked on the relay path
+  let spawnCalls = 0
+  const spawn = async () => {
+    spawnCalls += 1
+    throw new Error('spawn must not be called on the relay path')
+  }
+
+  // Unauthorized deliver in S1 -> relay (handoff is no longer an independent tool)
+  const res1 = await surface.PlanningSurface.executeDeliver(
     mockStore,
+    '/repo/root',
     'work-h1',
     'inc-1',
     false,
-    ['S1 complete note'],
+    spawn,
     [10n],
   )
-  assert.equal(res1.ok, true)
+
+  assert.equal(res1.ok, true, `relay deliver failed: ${res1.error}`)
+  assert.equal(res1.relayed, true, 'unauthorized deliver must take the relay path')
   assert.equal(res1.retiredIncumbencyId, 'inc-1')
-  assert.equal(res1.nextStage, 'S2')
-  assert.ok(typeof res1.nextIncumbencyId === 'string' && res1.nextIncumbencyId.startsWith('inc-'))
+  assert.equal(res1.retirementOutcome, 'Relayed')
+  assert.ok(typeof res1.nextIncumbencyId === 'string' && res1.nextIncumbencyId.length > 0)
+  assert.equal(spawnCalls, 0, 'relay must not spawn an execution session')
 
-  // State in store now has S2 active
-  assert.equal(state.Active.Stage.name, 'S2')
+  // The next tenure keeps the stage of the retired tenure
+  assert.equal(state.Active.Stage.name, 'S2', 'relay must keep the stage')
   assert.equal(surface.retiredCount(state), 1)
+  assert.equal(surface.PlanningSurface.isDelivered(state), false, 'relay must not set Delivered')
 
-  // 2. S2 Handoff to S3
-  const res2 = await surface.PlanningSurface.executeHandoff(
+  // A second relay keeps advancing tenures without ever advancing the stage
+  const res2 = await surface.PlanningSurface.executeDeliver(
     mockStore,
+    '/repo/root',
     'work-h1',
-    res1.nextIncumbencyId,
+    state.Active.Id,
     false,
-    ['S2 complete note'],
+    spawn,
     [20n],
   )
-  assert.equal(res2.ok, true, `res2 failed: ${res2.error}`)
-  assert.equal(res2.nextStage, 'S3')
-  assert.equal(state.Active.Stage.name, 'S3')
+  assert.equal(res2.ok, true, `second relay failed: ${res2.error}`)
+  assert.equal(res2.relayed, true)
+  assert.equal(state.Active.Stage.name, 'S2')
   assert.equal(surface.retiredCount(state), 2)
-
-  // 3. S3 Handoff is forbidden
-  const res3 = await surface.PlanningSurface.executeHandoff(
-    mockStore,
-    'work-h1',
-    res2.nextIncumbencyId,
-    false,
-    ['S3 attempt handoff'],
-    [30n],
-  )
-  assert.equal(res3.ok, false)
-  assert.match(res3.error, /Handoff is forbidden; deliver only|cannot hand off/i)
 })
 
-test('WHAT[planning-007] handoff is blocked when active blocker resources exist or wrong incumbency id is provided', async () => {
+test('WHAT[planning-007] relay is blocked by live resources or a wrong incumbency id', async () => {
   let state = fold.PlanFold.initialWorkState
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-h2', '/repo/root'), state).state
   state = fold.PlanFold.applyWorkEventJs(
@@ -92,13 +94,17 @@ test('WHAT[planning-007] handoff is blocked when active blocker resources exist 
     Append: async () => ({ tag: 0 }),
   }
 
-  // Blocker presence rejects handoff
-  const resBlocked = await surface.PlanningSurface.executeHandoff(mockStore, 'work-h2', 'inc-1', true, null, [10n])
+  const spawn = async () => {
+    throw new Error('spawn must not be called')
+  }
+
+  // Blocker presence rejects the relay
+  const resBlocked = await surface.PlanningSurface.executeDeliver(mockStore, '/repo/root', 'work-h2', 'inc-1', true, spawn, [10n])
   assert.equal(resBlocked.ok, false)
   assert.match(resBlocked.error, /blocked by live resources/i)
 
-  // Wrong incumbency ID rejects handoff
-  const resWrongId = await surface.PlanningSurface.executeHandoff(mockStore, 'work-h2', 'wrong-inc', false, null, [10n])
+  // Wrong incumbency ID rejects the relay
+  const resWrongId = await surface.PlanningSurface.executeDeliver(mockStore, '/repo/root', 'work-h2', 'wrong-inc', false, spawn, [10n])
   assert.equal(resWrongId.ok, false)
-  assert.match(resWrongId.error, /does not match invocation target/i)
+  assert.match(resWrongId.error, /does not match invocation target|unknown incumbency/i)
 })

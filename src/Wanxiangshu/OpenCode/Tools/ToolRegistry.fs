@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -12,11 +13,14 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
@@ -324,7 +328,7 @@ module ToolRegistry =
           "join", JoinTool.admission
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
-          "review", ReviewTool.admission
+          "review", ReviewShell.admission
           "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
@@ -482,31 +486,199 @@ module ToolRegistry =
                 jsTransactionPersistence
                 (Some groundingObservation)
 
+        // planning-016: the plan store and plan root resolve from the
+        // workspace the same way the js-transaction persistence does; the
+        // plan store is shared by the planning tools and the review shell.
+        let planStore =
+            workspaceDirectory
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
+
+        let planRoot =
+            workspaceDirectory
+            |> Option.map (fun workspace -> RuntimePath.gitCommonDir workspace + "/wanxiangshu")
+
         let planningAdmission: ToolAdmission =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
 
+        let planPatchesOf (args: HostToolArguments) : (string * string) list option =
+            let raw = args.Raw
+            let patchesVal: obj = if isNull raw then null else raw?patches
+
+            if isNull patchesVal then
+                None
+            else
+                unbox<obj array> patchesVal
+                |> Array.toList
+                |> List.map (fun p -> (unbox<string> p?find, unbox<string> p?put))
+                |> Some
+
+        let runJsPlan (root: string) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+            task {
+                let outcome =
+                    PlanTools.executeJsPlan
+                        root
+                        ctx.SessionId
+                        (args.Text "action")
+                        (args.OptionalText "content")
+                        (planPatchesOf args)
+
+                return
+                    match outcome with
+                    | Ok output -> output
+                    | Error err -> sprintf "js-plan failed: %s" err
+            }
+
+        let executeJsPlanTool (rootOpt: string option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+            task {
+                match rootOpt with
+                | None -> return "js-plan failed: the plan workspace is unavailable"
+                | Some root -> return! runJsPlan root args ctx
+            }
+
+        // planning-010: the real delegation capability — the SyncDelegate
+        // runtime runs the bound fixed DevOps for this work synchronously and
+        // hands back its complete work record. A missing runtime fails closed.
+        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
+            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
+                task {
+                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
+
+                    return
+                        match outcome with
+                        | Ok record -> record
+                        | Error reason ->
+                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
+                }
+
+            fun (intent: string) ->
+                task {
+                    match syncRuntime with
+                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
+                    | Some runtime -> return! invokeRuntime runtime intent
+                }
+
+        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
+            match outcome with
+            | Ok res -> res.WorkRecord
+            | Error err -> sprintf "ask failed: %s" err
+
+        // The plan store flows through these helpers by inference only: an
+        // explicit IEventStore annotation would make this module carry both
+        // the EventStore and the Journal surface token (unified-store
+        // dual-write gate). The store itself is resolved once below.
+        let executeAskTool
+            storeOpt
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
+            task {
+                match storeOpt with
+                | None -> return "ask failed: the plan workspace is unavailable"
+                | Some store ->
+                    let delegateTo = devopsDelegateOf syncRuntime ctx
+                    let! outcome = PlanTools.executeAsk store ctx.SessionId (args.Text "intent") delegateTo
+                    return renderAskOutcome outcome
+            }
+
+        let activeIncumbencyOf store (sessionId: string) : ActivePlanIncumbency option =
+            PlanEventStore.activeWorkState store (PlanWorkId.create sessionId)
+            |> Option.bind (fun state -> state.Active)
+
+        // planning-008: the receipt names the artifact path and the fact that
+        // an execution session started; the spawned session id stays out of
+        // the provider-visible text.
+        let renderDeliverReceipt (res: DeliverResult) : string =
+            if res.Relayed then
+                res.Message
+            else
+                sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
+
+        let deliverActiveIncumbency
+            store
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (active: ActivePlanIncumbency)
+            : Task<string> =
+            task {
+                let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
+
+                let spawn (agent: string) (prompt: string) =
+                    task {
+                        let! spawned = runtime.SpawnExecutionSession(agent, prompt)
+
+                        return
+                            match spawned with
+                            | Ok sessionId -> sessionId
+                            | Error reason ->
+                                raise (InvalidOperationException(sprintf "Execution session spawn failed: %s" reason))
+                    }
+
+                let! outcome = PlanTools.executeDeliver store root ctx.SessionId active.Id hasBlocker spawn None
+
+                return
+                    match outcome with
+                    | Ok res -> renderDeliverReceipt res
+                    | Error err -> sprintf "deliver failed: %s" err
+            }
+
+        let runDeliver
+            store
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            : Task<string> =
+            task {
+                match activeIncumbencyOf store ctx.SessionId with
+                | None -> return "deliver failed: no active incumbency found for this work"
+                | Some active -> return! deliverActiveIncumbency store root runtime ctx active
+            }
+
+        let executeDeliverTool
+            storeOpt
+            (rootOpt: string option)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            : Task<string> =
+            task {
+                match storeOpt, rootOpt with
+                | Some store, Some root -> return! runDeliver store root runtime ctx
+                | _ -> return "deliver failed: the plan workspace is unavailable"
+            }
+
         let planningSpecs () =
-            [ { Name = "ask"
-                Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
-                Arguments = [ "question", ToolHostCodec.stringSchemaDescribed "Question for the user" factory ]
-                Admission = planningAdmission
-                Execute = fun _ _ -> Task.FromResult("ask accepted") }
-              { Name = "handoff"
-                Description = ProviderProse.render providerLanguage "tool/handoff" Map.empty
+            [ { Name = "js-plan"
+                Description = ProviderProse.render providerLanguage "tool/js-plan" Map.empty
                 Arguments =
-                  [ "note", ToolHostCodec.optionalStringSchemaDescribed "Handoff note for the next runner" factory ]
+                  [ "action",
+                    ToolHostCodec.enumSchemaDescribed
+                        [ "read"; "edit"; "rewrite" ]
+                        "Plan artifact action: read the current plan, apply local patches, or rewrite it in full"
+                        factory
+                    "content", ToolHostCodec.optionalStringSchema factory
+                    "patches",
+                    ToolHostCodec.arraySchemaOf
+                        (ToolHostCodec.objectSchemaOf
+                            [ "find", ToolHostCodec.stringSchema factory
+                              "put", ToolHostCodec.stringSchema factory ]
+                            factory)
+                        "Local patches for the edit action, each an exact find/put pair"
+                        factory ]
                 Admission = planningAdmission
-                Execute = fun _ _ -> Task.FromResult("handoff accepted") }
+                Execute = fun args ctx -> executeJsPlanTool planRoot args ctx }
+              { Name = "ask"
+                Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+                Arguments =
+                  [ "intent",
+                    ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
+                Admission = planningAdmission
+                Execute = fun args ctx -> executeAskTool planStore syncDelegateRuntime args ctx }
               { Name = "deliver"
                 Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
-                Arguments = [ "note", ToolHostCodec.optionalStringSchemaDescribed "Final delivery summary" factory ]
+                Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
                 Admission = planningAdmission
-                Execute = fun _ _ -> Task.FromResult("deliver accepted") }
-              { Name = "js-plan"
-                Description = ProviderProse.render providerLanguage "tool/js-plan" Map.empty
-                Arguments = []
-                Admission = planningAdmission
-                Execute = fun _ _ -> Task.FromResult("js-plan accepted") } ]
+                Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx } ]
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
@@ -530,7 +702,10 @@ module ToolRegistry =
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
-              yield ReviewTool.spec factory runtime
+              // relay-assessment-011 / planning-022: the shared review shell.
+              // The plan store only activates the Plan backend; every other
+              // admitted caller keeps the Manager backend's byte behavior.
+              yield ReviewShell.spec factory runtime planStore
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory

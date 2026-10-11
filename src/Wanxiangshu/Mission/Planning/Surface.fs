@@ -40,19 +40,36 @@ module PlanningSurface =
             | :? PlanRetirementOutcome as o -> o
             | :? string as s ->
                 PlanRetirementOutcome.ofString s
-                |> Option.defaultValue PlanRetirementOutcome.Continue
-            | _ -> PlanRetirementOutcome.Continue
+                |> Option.defaultValue PlanRetirementOutcome.Relayed
+            | _ -> PlanRetirementOutcome.Relayed
 
         PlanEvents.incumbencyRetired incumbencyId outcome retirementCursor
 
-    let delivered (incumbencyId: string) (workId: string) (digest: string) (path: string) : PlanEvent =
-        PlanEvents.delivered incumbencyId workId digest path
+    let delivered
+        (incumbencyId: string)
+        (workId: string)
+        (digest: string)
+        (path: string)
+        (execSessionId: string)
+        : PlanEvent =
+        PlanEvents.delivered incumbencyId workId digest path execSessionId
 
-    let askPending (workId: string) (incumbencyId: string) (question: string) (cursor: int64) : PlanEvent =
-        PlanEvents.askPending workId incumbencyId question cursor
+    let reviewed (incumbencyId: string) (stageVal: obj) (outcomeVal: obj) : PlanEvent =
+        let stage =
+            match stageVal with
+            | :? PlanStage as s -> s
+            | :? string as s -> PlanStage.ofString s |> Option.defaultValue PlanStage.S1
+            | _ -> PlanStage.S1
 
-    let askResolved (incumbencyId: string) (cursor: int64) : PlanEvent =
-        PlanEvents.askResolved incumbencyId cursor
+        let outcome =
+            match outcomeVal with
+            | :? PlanReviewedOutcome as o -> o
+            | :? string as s -> PlanReviewedOutcome.ofString s |> Option.defaultValue PlanReviewedOutcome.Stayed
+            | _ -> PlanReviewedOutcome.Stayed
+
+        PlanEvents.reviewed incumbencyId stage outcome
+
+    let reopened (incumbencyId: string) : PlanEvent = PlanEvents.reopened incumbencyId
 
     let applyWorkEvent (event: PlanEvent) (state: PlanWorkState) : obj = PlanFold.applyWorkEventJs event state
 
@@ -81,8 +98,8 @@ module PlanningSurface =
     let private rejectionCode (rejection: ActionGateRejection) : string =
         match rejection with
         | ActionGateRejection.AlreadyDelivered -> "AlreadyDelivered"
-        | ActionGateRejection.DeliverForbiddenInS1 -> "DeliverForbiddenInS1"
-        | ActionGateRejection.HandoffForbiddenInS3 -> "HandoffForbiddenInS3"
+        | ActionGateRejection.HandoffRetired -> "HandoffRetired"
+        | ActionGateRejection.ResumeRetired -> "ResumeRetired"
         | ActionGateRejection.BlockedByLiveResources _ -> "BlockedByLiveResources"
         | ActionGateRejection.ActionDenied _ -> "ActionDenied"
 
@@ -108,8 +125,7 @@ module PlanningSurface =
             |> Array.choose (function
                 | ToolPermission.JsPlan -> Some "JsPlan"
                 | ToolPermission.Ask -> Some "Ask"
-                | ToolPermission.Resume -> Some "Resume"
-                | ToolPermission.Handoff -> Some "Handoff"
+                | ToolPermission.Review -> Some "Review"
                 | ToolPermission.Deliver -> Some "Deliver"
                 | _ -> None)
             |> Array.sort
@@ -163,17 +179,16 @@ module PlanningSurface =
              PlanRetirementOutcome.render outc,
              XTraceCursor.sequence cur,
              null)
-        | PlanEvent.PlanDelivered(iid, wid, dig, p) ->
-            (PlanEventTypes.Delivered, PlanWorkId.value wid, PlanIncumbencyId.value iid, dig, 0L, p)
-        | PlanEvent.PlanAskPending(wid, iid, q, cur) ->
-            (PlanEventTypes.AskPending,
-             PlanWorkId.value wid,
+        | PlanEvent.PlanDelivered(iid, wid, dig, p, execSid) ->
+            (PlanEventTypes.Delivered, PlanWorkId.value wid, PlanIncumbencyId.value iid, dig, 0L, p + " exec=" + execSid)
+        | PlanEvent.PlanReviewed(iid, st, outc) ->
+            (PlanEventTypes.Reviewed,
+             null,
              PlanIncumbencyId.value iid,
-             q,
-             XTraceCursor.sequence cur,
-             null)
-        | PlanEvent.PlanAskResolved(iid, cur) ->
-            (PlanEventTypes.AskResolved, null, PlanIncumbencyId.value iid, null, XTraceCursor.sequence cur, null)
+             PlanReviewedOutcome.render outc,
+             0L,
+             PlanStage.render st)
+        | PlanEvent.PlanReopened(iid) -> (PlanEventTypes.Reopened, null, PlanIncumbencyId.value iid, null, 0L, null)
 
     let tryDecodeEnvelopeJson (envelopeJson: string) : obj =
         let textWithLf =
@@ -440,37 +455,18 @@ module PlanningSurface =
         else
             None
 
-    let executeHandoff
-        (store: IEventStore)
-        (workId: string)
-        (incumbencyId: string)
-        (hasBlocker: bool)
-        (note: obj)
-        (retirementCursor: obj)
-        : Task<obj> =
-        let noteOpt = extractStringOpt note
-        let retCursorOpt = extractInt64Opt retirementCursor
+    let private spawnOfJs (spawnVal: obj) : string -> string -> Task<string> =
+        fun (agent: string) (prompt: string) ->
+            // The spawn argument arrives as a plain JavaScript function
+            // (agent, prompt) => Promise<sessionId>; call it through JS interop
+            // so currying never gets in the way.
+            unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
 
+    let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) : Task<obj> =
         task {
-            match! PlanTools.executeHandoff store workId incumbencyId hasBlocker noteOpt retCursorOpt with
-            | Ok res ->
-                return
-                    box
-                        {| ok = true
-                           retiredIncumbencyId = res.RetiredIncumbencyId
-                           nextIncumbencyId = res.NextIncumbencyId
-                           nextStage = res.NextStage
-                           message = res.Message
-                           error = null |}
-            | Error err ->
-                return
-                    box
-                        {| ok = false
-                           retiredIncumbencyId = null
-                           nextIncumbencyId = null
-                           nextStage = null
-                           message = null
-                           error = err |}
+            match! PlanWorkOpen.ensurePlanWorkOpened store root sessionId with
+            | Ok() -> return box {| ok = true; error = null |}
+            | Error err -> return box {| ok = false; error = err |}
         }
 
     let executeDeliver
@@ -479,79 +475,75 @@ module PlanningSurface =
         (workId: string)
         (incumbencyId: string)
         (hasBlocker: bool)
-        (note: obj)
+        (spawn: obj)
         (retirementCursor: obj)
         : Task<obj> =
-        let noteOpt = extractStringOpt note
+        let spawnFn = spawnOfJs spawn
         let retCursorOpt = extractInt64Opt retirementCursor
 
         task {
-            match! PlanTools.executeDeliver store root workId incumbencyId hasBlocker noteOpt retCursorOpt with
+            match! PlanTools.executeDeliver store root workId incumbencyId hasBlocker spawnFn retCursorOpt with
             | Ok res ->
                 return
                     box
                         {| ok = true
-                           delivered = res.Ok
+                           relayed = res.Relayed
+                           delivered = res.Delivered
+                           retiredIncumbencyId = res.RetiredIncumbencyId
+                           retirementOutcome = res.RetirementOutcome
                            digest = res.Digest
                            path = res.Path
+                           execSessionId = res.ExecSessionId
+                           nextIncumbencyId = res.NextIncumbencyId
                            message = res.Message
                            error = null |}
             | Error err ->
                 return
                     box
                         {| ok = false
+                           relayed = false
                            delivered = false
+                           retiredIncumbencyId = null
+                           retirementOutcome = null
                            digest = null
                            path = null
+                           execSessionId = null
+                           nextIncumbencyId = null
                            message = null
                            error = err |}
         }
 
-    let executeAsk (store: IEventStore) (workId: string) (question: string) : obj =
-        match PlanTools.executeAsk store workId question with
-        | Ok res ->
-            box
-                {| ok = true
-                   kind = res.Kind
-                   question = res.Question
-                   status = res.Status
-                   error = null |}
-        | Error err ->
-            box
-                {| ok = false
-                   kind = null
-                   question = null
-                   status = null
-                   error = err |}
+    // The delegate argument arrives as a plain JavaScript function
+    // (intent) => Promise<workRecord>; call it through JS interop so currying
+    // never gets in the way.
+    let private delegateOfJs (delegateVal: obj) : string -> Task<string> =
+        fun (intent: string) -> unbox<Task<string>> (emitJsExpr (delegateVal, intent) "$0($1)")
 
-    let executeAskAsync (store: IEventStore) (workId: string) (question: string) : Task<obj> =
-        Task.FromResult(executeAsk store workId question)
-
-    let assembleAskContinuation (messages: obj) (pendingAskObj: obj) (tenureObj: obj) : obj =
-        TenureIsolation.assembleAskContinuation messages pendingAskObj tenureObj
-
-    let executeResume (store: IEventStore) (workId: string) (charge: string) (name: obj) : Task<obj> =
-        let nameOpt = extractStringOpt name
+    let executeAsk (store: IEventStore) (workId: string) (intent: string) (delegateTo: obj) : Task<obj> =
+        let delegateFn = delegateOfJs delegateTo
 
         task {
-            match! PlanTools.executeResume store workId charge nameOpt with
+            match! PlanTools.executeAsk store workId intent delegateFn with
             | Ok res ->
                 return
                     box
                         {| ok = true
+                           kind = res.Kind
+                           workRecord = res.WorkRecord
                            status = res.Status
-                           target = res.Target
-                           charge = res.Charge
                            error = null |}
             | Error err ->
                 return
                     box
                         {| ok = false
+                           kind = null
+                           workRecord = null
                            status = null
-                           target = null
-                           charge = null
                            error = err |}
         }
+
+    let assembleAskContinuation (messages: obj) (pendingAskObj: obj) (tenureObj: obj) : obj =
+        TenureIsolation.assembleAskContinuation messages pendingAskObj tenureObj
 
     let executeJsPlan (root: string) (workId: string) (action: string) (content: obj) (patches: obj) : obj =
         let contentOpt = extractStringOpt content
@@ -610,6 +602,12 @@ module PlanningSurface =
                     else
                         Some(unbox<string> viewVal?ActivePhase)
 
+                let activeAuthorized =
+                    if isNull viewVal?ActiveAuthorized then
+                        None
+                    else
+                        Some(unbox<bool> viewVal?ActiveAuthorized)
+
                 let retiredCount =
                     if isNull viewVal?RetiredCount then
                         0
@@ -621,6 +619,12 @@ module PlanningSurface =
                         None
                     else
                         Some(unbox<string> viewVal?LatestRetirementOutcome)
+
+                let latestReviewOutcome =
+                    if isNull viewVal?LatestReviewOutcome then
+                        None
+                    else
+                        Some(unbox<string> viewVal?LatestReviewOutcome)
 
                 let delivered =
                     if isNull viewVal?Delivered then
@@ -640,44 +644,32 @@ module PlanningSurface =
                     else
                         Some(unbox<string> viewVal?DeliveryPath)
 
+                let deliveryExecSessionId =
+                    if isNull viewVal?DeliveryExecSessionId then
+                        None
+                    else
+                        Some(unbox<string> viewVal?DeliveryExecSessionId)
+
                 let boundDevOpsId =
                     if isNull viewVal?BoundDevOpsId then
                         None
                     else
                         Some(unbox<string> viewVal?BoundDevOpsId)
 
-                let pendingAskQ =
-                    if isNull viewVal?PendingAskQuestion then
-                        None
-                    else
-                        Some(unbox<string> viewVal?PendingAskQuestion)
-
-                let pendingAskInc =
-                    if isNull viewVal?PendingAskIncumbencyId then
-                        None
-                    else
-                        Some(unbox<string> viewVal?PendingAskIncumbencyId)
-
-                let pendingAskCur =
-                    if isNull viewVal?PendingAskCursor then
-                        None
-                    else
-                        Some(unbox<int64> viewVal?PendingAskCursor)
-
                 Some
                     { WorkId = wid
                       ActiveIncumbencyId = activeInc
                       ActiveStage = activeStage
                       ActivePhase = activePhase
+                      ActiveAuthorized = activeAuthorized
                       RetiredCount = retiredCount
                       LatestRetirementOutcome = latestRetOutcome
+                      LatestReviewOutcome = latestReviewOutcome
                       Delivered = delivered
                       DeliveryDigest = deliveryDigest
                       DeliveryPath = deliveryPath
-                      BoundDevOpsId = boundDevOpsId
-                      PendingAskQuestion = pendingAskQ
-                      PendingAskIncumbencyId = pendingAskInc
-                      PendingAskCursor = pendingAskCur }
+                      DeliveryExecSessionId = deliveryExecSessionId
+                      BoundDevOpsId = boundDevOpsId }
             with _ ->
                 None
 
@@ -697,11 +689,12 @@ module PlanningSurface =
                        receipt = receipt
                        path = path
                        digest = digest |}
-            | PlanRecoveryPosition.Active(incumbencyId, stage, planExists) ->
+            | PlanRecoveryPosition.Active(incumbencyId, stage, authorized, planExists) ->
                 box
                     {| kind = "Active"
                        incumbencyId = incumbencyId
                        stage = stage
+                       authorized = authorized
                        planExists = planExists |}
             | PlanRecoveryPosition.Nothing -> box {| kind = "Nothing" |}
             | PlanRecoveryPosition.Conflict reason -> box {| kind = "Conflict"; reason = reason |}
@@ -721,15 +714,15 @@ module PlanningSurface =
                       ActiveIncumbencyId = None
                       ActiveStage = None
                       ActivePhase = None
+                      ActiveAuthorized = None
                       RetiredCount = 0
                       LatestRetirementOutcome = None
+                      LatestReviewOutcome = None
                       Delivered = false
                       DeliveryDigest = None
                       DeliveryPath = None
-                      BoundDevOpsId = None
-                      PendingAskQuestion = None
-                      PendingAskIncumbencyId = None
-                      PendingAskCursor = None })
+                      DeliveryExecSessionId = None
+                      BoundDevOpsId = None })
         else
             match v with
             | :? (PlanWorkView list) as l -> l
@@ -747,12 +740,13 @@ module PlanningSurface =
                     {| kind = "DeliveredIdempotent"
                        workId = workId
                        path = path |}
-            | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, planExists) ->
+            | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, authorized, planExists) ->
                 box
                     {| kind = "ActiveRebound"
                        workId = workId
                        incumbencyId = incumbencyId
                        stage = stage
+                       authorized = authorized
                        planExists = planExists |}
             | PlanRecoveryEffect.Conflict(workId, reason) ->
                 box
@@ -766,6 +760,85 @@ module PlanningSurface =
     let allWorkViewsFromIntegrator (integrator: ICanonicalIntegrator) : PlanWorkView list =
         PlanEventStore.allWorkViewsFromIntegrator integrator
 
+    let reviewTargetFor (stage: string) : string = ReviewPlanBackend.reviewTargetFor stage
+
+    let private parseFindings (findingsVal: obj) : Result<(string * string) list, string> =
+        if isNull findingsVal then
+            Error "findings must be an array of {acceptance_criteria, work_plan} pairs"
+        elif emitJsExpr findingsVal "Array.isArray($0)" then
+            let arr = unbox<obj array> findingsVal
+
+            let items =
+                arr
+                |> Array.toList
+                |> List.map (fun (item: obj) ->
+                    let acceptance: obj = item?acceptance_criteria
+                    let workPlan: obj = item?work_plan
+
+                    if
+                        isNull acceptance
+                        || isNull workPlan
+                        || not (emitJsExpr acceptance "typeof $0 === 'string'")
+                        || not (emitJsExpr workPlan "typeof $0 === 'string'")
+                        || String.IsNullOrEmpty(unbox<string> acceptance)
+                        || String.IsNullOrWhiteSpace(unbox<string> workPlan)
+                    then
+                        None
+                    else
+                        Some(unbox<string> acceptance, unbox<string> workPlan))
+
+            let valid = items |> List.choose id
+
+            if valid.Length <> items.Length then
+                Error "each finding requires non-empty acceptance_criteria and work_plan strings"
+            else
+                Ok valid
+        else
+            Error "findings must be an array of {acceptance_criteria, work_plan} pairs"
+
+    let private gapsToJs (gaps: (string * string) list) : obj array =
+        gaps
+        |> List.map (fun (acceptance, workPlan) ->
+            box
+                {| acceptance_criteria = acceptance
+                   work_plan = workPlan |})
+        |> Array.ofList
+
+    let executeReview
+        (store: IEventStore)
+        (workId: string)
+        (incumbencyId: string)
+        (findings: obj)
+        (note: obj)
+        : Task<obj> =
+        // note is accepted for writing and never returned (relay-assessment-001).
+        task {
+            match parseFindings findings with
+            | Error err ->
+                return
+                    box
+                        {| ok = false
+                           outcome = null
+                           gaps = null
+                           error = err |}
+            | Ok gaps ->
+                match! ReviewPlanBackend.executeReview store workId incumbencyId gaps with
+                | Error err ->
+                    return
+                        box
+                            {| ok = false
+                               outcome = null
+                               gaps = null
+                               error = PlanReviewError.render err |}
+                | Ok review ->
+                    return
+                        box
+                            {| ok = true
+                               outcome = PlanReviewedOutcome.render review.Outcome
+                               gaps = gapsToJs review.Gaps
+                               error = Unchecked.defaultof<string> |}
+        }
+
     let PlanStage: obj =
         box
             {| S1 = PlanStage.S1
@@ -774,8 +847,13 @@ module PlanningSurface =
 
     let PlanRetirementOutcome: obj =
         box
-            {| Continue = PlanRetirementOutcome.Continue
+            {| Relayed = PlanRetirementOutcome.Relayed
                Delivered = PlanRetirementOutcome.Delivered |}
+
+    let PlanReviewedOutcome: obj =
+        box
+            {| Promoted = PlanReviewedOutcome.Promoted
+               Stayed = PlanReviewedOutcome.Stayed |}
 
     let PlanEvents: obj =
         box
@@ -784,8 +862,8 @@ module PlanningSurface =
                incumbencyOpened = incumbencyOpened
                incumbencyRetired = incumbencyRetired
                delivered = delivered
-               askPending = askPending
-               askResolved = askResolved |}
+               reviewed = reviewed
+               reopened = reopened |}
 
     let PlanFold: obj =
         box
@@ -814,6 +892,7 @@ module PlanningSurface =
                getPlanWorkView = getPlanWorkView
                getPlanWorkStateFromIntegrator = getPlanWorkStateFromIntegrator
                getPlanWorkViewFromIntegrator = getPlanWorkViewFromIntegrator
+               ensurePlanWorkOpened = ensurePlanWorkOpened
                assembleTenureMessages = assembleTenureMessages
                validateWorkId = validateWorkId
                canonicalWorkKey = canonicalWorkKey
@@ -821,24 +900,32 @@ module PlanningSurface =
                readPlan = readPlan
                rewritePlanAtomic = rewritePlanAtomic
                editPlanAtomic = editPlanAtomic
-               executeHandoff = executeHandoff
                executeDeliver = executeDeliver
                executeAsk = executeAsk
-               executeAskAsync = executeAskAsync
                assembleAskContinuation = assembleAskContinuation
-               executeResume = executeResume
                executeJsPlan = executeJsPlan
+               executeReview = executeReview
+               reviewTargetFor = reviewTargetFor
                planRecoveryPosition = planRecoveryPosition
                evaluateRecoveryEffects = evaluateRecoveryEffects
                allWorkViews = allWorkViews
                allWorkViewsFromIntegrator = allWorkViewsFromIntegrator
                latestRetirementRange = latestRetirementRange
+               activeStage = activeStage
+               retiredCount = retiredCount
+               isDelivered = isDelivered
+               deliveredDigest = deliveredDigest
+               deliveryReceipt = deliveryReceipt
+               isActionAllowed = isActionAllowed
+               decideAction = decideAction
+               allowedPermissions = allowedPermissions
                workOpened = workOpened
                devOpsBound = devOpsBound
                incumbencyOpened = incumbencyOpened
                incumbencyRetired = incumbencyRetired
                delivered = delivered
-               askPending = askPending
-               askResolved = askResolved
+               reviewed = reviewed
+               reopened = reopened
                PlanRetirementOutcome = PlanRetirementOutcome
+               PlanReviewedOutcome = PlanReviewedOutcome
                PlanStage = PlanStage |}

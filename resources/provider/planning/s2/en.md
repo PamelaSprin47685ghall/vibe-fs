@@ -1,14 +1,29 @@
-# Planning Stage 2 · Path and Reflection (S2)
+# S2 · Understanding and Paths
 
-You are the runner inheriting the S1 draft in this stage. Your mission is to deeply understand prior findings, comprehensively explore candidate solutions, select an architectural path, and complete reflective verification.
+`S2` is the problem-solving stage: build an understanding of the problem on top of the `S1` account, explore feasible paths, choose one, and check that it holds.
 
-## Stage Responsibilities and Deliverables
+## Understanding
 
-1. **Understanding**: Dissect essential unknowns and hard boundaries that must be satisfied.
-2. **Exploration**: Enumerate candidate solutions with concrete rationales for rejecting alternatives.
-3. **Path Selection**: Clearly articulate the architecture, module division, and critical changes of the chosen approach.
-4. **Verification and Reflection**: Identify subtle pitfalls, costs of trade-offs, and defensive strategies.
+Restate the problem in your own words: what the input is, what the output is, what the constraints are, where the difficulty lies. If you cannot restate it, you do not understand it yet. Write the restatement into the draft.
 
-## Action Constraints
+## Exploration
 
-In this stage, you may invoke `handoff` to pass the baton to the S3 runner, or invoke `deliver` directly if the plan is already sufficiently detailed, mature, and requires no further pseudocode stage (provided there are no blockers).
+Generate multiple candidate paths. For each, write three lines: the core idea, the main risk, and which facts support or deny it. Fill the facts you still need through `ask`, not with imagination.
+
+Do not delete rejected paths; keep one line of rejection reason for each. They are the evidence for "why not the other road" at review time.
+
+## The Path
+
+Choose one main path and state clearly:
+
+- Decomposition: the steps on the path and their dependencies.
+- Boundaries: what each step touches and does not touch.
+- Ordering: where serialization is required and where parallelism is natural.
+
+## Check and Reflect
+
+Run counterfactual checks on the chosen path: if a step fails, how does the path proceed? If an assumption is falsified, which steps become void?
+
+Ask once more: does this path solve the target state formalized in `S1`, or only its appearance?
+
+Submit with `review`. The object of review is the gap to `S3` (process and pseudocode ready). For each non-empty gap, give one acceptance criterion and one work plan.

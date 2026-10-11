@@ -51,29 +51,27 @@ module PlanEventCodec =
         (workId: PlanWorkId)
         (digest: string)
         (path: string)
+        (execSessionId: string)
         : JsonValue =
         Encode.object
             [ "digest", Encode.string digest
+              "execSessionId", Encode.string execSessionId
               "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId)
               "path", Encode.string path
               "workId", Encode.string (PlanWorkId.value workId) ]
 
-    let private encodeAskPending
-        (workId: PlanWorkId)
+    let private encodeReviewed
         (incumbencyId: PlanIncumbencyId)
-        (question: string)
-        (cursor: XTraceCursor)
+        (stage: PlanStage)
+        (outcome: PlanReviewedOutcome)
         : JsonValue =
         Encode.object
-            [ "cursor", Encode.int64 (XTraceCursor.sequence cursor)
-              "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId)
-              "question", Encode.string question
-              "workId", Encode.string (PlanWorkId.value workId) ]
+            [ "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId)
+              "outcome", Encode.string (PlanReviewedOutcome.render outcome)
+              "stage", Encode.string (PlanStage.render stage) ]
 
-    let private encodeAskResolved (incumbencyId: PlanIncumbencyId) (cursor: XTraceCursor) : JsonValue =
-        Encode.object
-            [ "cursor", Encode.int64 (XTraceCursor.sequence cursor)
-              "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId) ]
+    let private encodeReopened (incumbencyId: PlanIncumbencyId) : JsonValue =
+        Encode.object [ "incumbencyId", Encode.string (PlanIncumbencyId.value incumbencyId) ]
 
     let encodePayload (event: PlanEvent) : JsonValue =
         match event with
@@ -83,10 +81,10 @@ module PlanEventCodec =
             encodeIncumbencyOpened workId incumbencyId stage openingCursor
         | PlanEvent.PlanIncumbencyRetired(incumbencyId, outcome, retirementCursor) ->
             encodeIncumbencyRetired incumbencyId outcome retirementCursor
-        | PlanEvent.PlanDelivered(incumbencyId, workId, digest, path) -> encodeDelivered incumbencyId workId digest path
-        | PlanEvent.PlanAskPending(workId, incumbencyId, question, cursor) ->
-            encodeAskPending workId incumbencyId question cursor
-        | PlanEvent.PlanAskResolved(incumbencyId, cursor) -> encodeAskResolved incumbencyId cursor
+        | PlanEvent.PlanDelivered(incumbencyId, workId, digest, path, execSessionId) ->
+            encodeDelivered incumbencyId workId digest path execSessionId
+        | PlanEvent.PlanReviewed(incumbencyId, stage, outcome) -> encodeReviewed incumbencyId stage outcome
+        | PlanEvent.PlanReopened(incumbencyId) -> encodeReopened incumbencyId
 
     // --- Decoders ---
 
@@ -131,33 +129,34 @@ module PlanEventCodec =
     let private decodeDelivered: Decoder<PlanEvent> =
         Decode.object (fun get ->
             let digest = get.Required.Field "digest" Decode.string
+            let execSessionId = get.Required.Field "execSessionId" Decode.string
 
             let incumbencyId =
                 get.Required.Field "incumbencyId" Decode.string |> PlanIncumbencyId.create
 
             let path = get.Required.Field "path" Decode.string
             let workId = get.Required.Field "workId" Decode.string |> PlanWorkId.create
-            PlanEvent.PlanDelivered(incumbencyId, workId, digest, path))
+            PlanEvent.PlanDelivered(incumbencyId, workId, digest, path, execSessionId))
 
-    let private decodeAskPending: Decoder<PlanEvent> =
+    let private decodeReviewed: Decoder<PlanEvent> =
         Decode.object (fun get ->
-            let cursorSeq = get.Required.Field "cursor" Decode.int64
-
             let incumbencyId =
                 get.Required.Field "incumbencyId" Decode.string |> PlanIncumbencyId.create
 
-            let question = get.Required.Field "question" Decode.string
-            let workId = get.Required.Field "workId" Decode.string |> PlanWorkId.create
-            PlanEvent.PlanAskPending(workId, incumbencyId, question, XTraceCursor.create cursorSeq))
+            let outcomeStr = get.Required.Field "outcome" Decode.string
+            let stageStr = get.Required.Field "stage" Decode.string
 
-    let private decodeAskResolved: Decoder<PlanEvent> =
+            match PlanReviewedOutcome.ofString outcomeStr, PlanStage.ofString stageStr with
+            | Some outcome, Some stage -> PlanEvent.PlanReviewed(incumbencyId, stage, outcome)
+            | None, _ -> failwith (sprintf "Unrecognized plan review outcome: %s" outcomeStr)
+            | _, None -> failwith (sprintf "Unrecognized plan stage: %s" stageStr))
+
+    let private decodeReopened: Decoder<PlanEvent> =
         Decode.object (fun get ->
-            let cursorSeq = get.Required.Field "cursor" Decode.int64
-
             let incumbencyId =
                 get.Required.Field "incumbencyId" Decode.string |> PlanIncumbencyId.create
 
-            PlanEvent.PlanAskResolved(incumbencyId, XTraceCursor.create cursorSeq))
+            PlanEvent.PlanReopened(incumbencyId))
 
     let decodePayload (eventType: string) (payload: JsonValue) : Result<PlanEvent, string> =
         if eventType = PlanEventTypes.WorkOpened then
@@ -170,22 +169,22 @@ module PlanEventCodec =
             Decode.fromValue "$" decodeIncumbencyRetired payload
         elif eventType = PlanEventTypes.Delivered then
             Decode.fromValue "$" decodeDelivered payload
-        elif eventType = PlanEventTypes.AskPending then
-            Decode.fromValue "$" decodeAskPending payload
-        elif eventType = PlanEventTypes.AskResolved then
-            Decode.fromValue "$" decodeAskResolved payload
+        elif eventType = PlanEventTypes.Reviewed then
+            Decode.fromValue "$" decodeReviewed payload
+        elif eventType = PlanEventTypes.Reopened then
+            Decode.fromValue "$" decodeReopened payload
         else
             Error(sprintf "Unknown plan event type: %s" eventType)
 
-    let private eventTypeOf (event: PlanEvent) : string =
+    let eventTypeOf (event: PlanEvent) : string =
         match event with
         | PlanEvent.PlanWorkOpened _ -> PlanEventTypes.WorkOpened
         | PlanEvent.PlanDevOpsBound _ -> PlanEventTypes.DevOpsBound
         | PlanEvent.PlanIncumbencyOpened _ -> PlanEventTypes.IncumbencyOpened
         | PlanEvent.PlanIncumbencyRetired _ -> PlanEventTypes.IncumbencyRetired
         | PlanEvent.PlanDelivered _ -> PlanEventTypes.Delivered
-        | PlanEvent.PlanAskPending _ -> PlanEventTypes.AskPending
-        | PlanEvent.PlanAskResolved _ -> PlanEventTypes.AskResolved
+        | PlanEvent.PlanReviewed _ -> PlanEventTypes.Reviewed
+        | PlanEvent.PlanReopened _ -> PlanEventTypes.Reopened
 
     let toEnvelope (workId: PlanWorkId) (event: PlanEvent) (parents: EventId list) : EventEnvelope =
         let eventId = EventId.create (Guid.NewGuid().ToString("N"))

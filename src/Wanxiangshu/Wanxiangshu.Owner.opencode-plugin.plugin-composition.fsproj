@@ -131,6 +131,8 @@
 
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
+    <Compile Include="OpenCode/Plugin/PlanWorkOpenWiring.fsi"/>
+    <Compile Include="OpenCode/Plugin/PlanWorkOpenWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Host/PluginTransformSurface.fsi"/>

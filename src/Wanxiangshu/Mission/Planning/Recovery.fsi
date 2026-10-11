@@ -3,14 +3,14 @@ namespace Wanxiangshu.Mission.Planning
 [<RequireQualifiedAccess>]
 type PlanRecoveryPosition =
     | Delivered of receipt: PlanDeliveryReceipt * path: string * digest: string
-    | Active of incumbencyId: string * stage: string * planExists: bool
+    | Active of incumbencyId: string * stage: string * authorized: bool * planExists: bool
     | Nothing
     | Conflict of reason: string
 
 [<RequireQualifiedAccess>]
 type PlanRecoveryEffect =
     | DeliveredIdempotent of workId: string * path: string
-    | ActiveRebound of workId: string * incumbencyId: string * stage: string * planExists: bool
+    | ActiveRebound of workId: string * incumbencyId: string * stage: string * authorized: bool * planExists: bool
     | Conflict of workId: string * reason: string
 
 module PlanRecovery =

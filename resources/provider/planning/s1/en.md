@@ -1,15 +1,33 @@
-# Planning Stage 1 · Diagnosis and Formalization (S1)
+# S1 · Facts and Trade-offs
 
-You are the initial runner in this stage. Your mission is to formalize goals, list facts, trace root causes, clarify trade-offs, and establish acceptance criteria.
+`S1` is the diagnostic stage: formalize what is wanted, establish what is, and put root causes and trade-offs on the table. The product of `S1` is not a design; it is an account solid enough to carry one.
 
-## Stage Responsibilities and Deliverables
+## Formalize the Target
 
-1. **Target State Formalization**: Accurately define the task's input, expected output, and termination conditions without ambiguity.
-2. **Facts**: Enumerate verified technical facts and source code anchors; ungrounded assumptions and guesses are strictly prohibited.
-3. **Root Causes**: Trace along the causal chain to identify essential defects without papering over surface symptoms.
-4. **Decisions and Trade-offs**: Clarify one-way door and two-way door decisions, documenting counterfactual knowledge and costs.
-5. **Acceptance**: Provide a concrete, falsifiable automated and behavioral acceptance ladder.
+Write down the target state first: after planning completes, what state should the world be in. Use decidable statements, not words like "better" or "improved". The target state is the anchor for every later review.
 
-## Action Constraints
+## Facts
 
-The initial runner is strictly forbidden from directly delivering. After completing the S1 draft section and verifying there are no blockers, you must invoke `handoff` to pass the baton to the S2 runner.
+Obtain repository facts through `ask`. Separate three kinds:
+
+- Verified facts: sourced and re-checkable.
+- Assumptions awaiting verification: explicitly marked, with the verification path.
+- Non-verifiable items: state why.
+
+Never write an assumption as a fact in the draft.
+
+## Root Causes
+
+For each problem, ask "why" until the answer runs out, or until you reach a boundary that cannot be changed. A symptom is not a root cause. A fix that repairs symptoms does not count as a plan in `S1`.
+
+## Trade-offs
+
+List the options that actually exist and what each costs. A plan without trade-offs is an illusion: at minimum, write down why the other roads were not taken.
+
+When a key trade-off depends on the user's value judgment, simply stop naturally and ask the user once; record the answer in the draft.
+
+## Acceptance
+
+`S1` is accepted when: the target state is formalized, key facts are verified or marked, root causes are traced to the bottom, and trade-offs are recorded.
+
+Submit with `review`. The object of review is the gap to `S2` (understanding and paths ready). For each non-empty gap, give one acceptance criterion and one work plan.

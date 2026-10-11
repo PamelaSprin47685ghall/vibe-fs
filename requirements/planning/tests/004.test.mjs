@@ -2,94 +2,101 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 
-test('WHAT[planning-004] three-stage state machine enforces S1 start and strictly sequential progression', () => {
-  const empty = planning.empty()
-  const open = planning.applyWorkEvent(planning.workOpened('work-1', '/root'), empty)
-  assert.equal(open.ok, true)
+const openActive = (workId, incId, stage) => {
+  let state = planning.empty()
+  state = planning.applyWorkEvent(planning.workOpened(workId, '/root'), state).state
+  state = planning.applyWorkEvent(planning.incumbencyOpened(workId, incId, stage, 0n), state).state
+  return state
+}
 
-  // Initial incumbency cannot start at S2 or S3
-  const badStartS2 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-1', 'S2', 0n),
-    open.state,
-  )
-  assert.equal(badStartS2.ok, false, 'initial incumbency cannot start at S2')
+test('WHAT[planning-004] stage advances only through PlanReviewed(Promoted): S1 -> S2 -> S3 -> authorized', () => {
+  // S1 incumbency
+  let state = openActive('work-1', 'inc-1', 'S1')
+  assert.equal(planning.activeStage(state), 'S1')
 
-  const badStartS3 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-1', 'S3', 0n),
-    open.state,
-  )
-  assert.equal(badStartS3.ok, false, 'initial incumbency cannot start at S3')
+  // PlanReviewed(Stayed) leaves the stage unchanged
+  const stayed = planning.applyWorkEvent(planning.reviewed('inc-1', 'S1', 'Stayed'), state)
+  assert.equal(stayed.ok, true)
+  assert.equal(planning.activeStage(stayed.state), 'S1', 'Stayed must not advance the stage')
 
-  // Initial incumbency starts at S1
-  const inc1 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-1', 'S1', 0n),
-    open.state,
-  )
-  assert.equal(inc1.ok, true)
-  assert.equal(planning.activeStage(inc1.state), 'S1')
+  // PlanReviewed(Promoted) advances the active tenure S1 -> S2
+  const promoted1 = planning.applyWorkEvent(planning.reviewed('inc-1', 'S1', 'Promoted'), state)
+  assert.equal(promoted1.ok, true)
+  assert.equal(planning.activeStage(promoted1.state), 'S2')
+  assert.notEqual(promoted1.state.Active.Authorized, true, 'S1 promotion grants a stage, not authorization')
 
-  // Retire S1
-  const ret1 = planning.applyWorkEvent(
-    planning.incumbencyRetired('inc-1', 'Continue', 10n),
-    inc1.state,
-  )
-  assert.equal(ret1.ok, true)
+  // The same incumbency cannot review a second time; a relay swaps the tenure
+  let s2 = planning.applyWorkEvent(
+    planning.incumbencyRetired('inc-1', 'Relayed', 10n),
+    promoted1.state,
+  ).state
+  s2 = planning.applyWorkEvent(planning.incumbencyOpened('work-1', 'inc-2', 'S2', 11n), s2).state
+  assert.equal(planning.activeStage(s2), 'S2', 'relay must keep the stage of the retired tenure')
 
-  // Stage cannot skip from S1 to S3
-  const skipToS3 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-2', 'S3', 11n),
-    ret1.state,
-  )
-  assert.equal(skipToS3.ok, false, 'cannot skip stage S2 directly to S3')
+  // PlanReviewed(Promoted) advances the second tenure S2 -> S3
+  const promoted2 = planning.applyWorkEvent(planning.reviewed('inc-2', 'S2', 'Promoted'), s2)
+  assert.equal(promoted2.ok, true)
+  assert.equal(planning.activeStage(promoted2.state), 'S3')
+  assert.notEqual(promoted2.state.Active.Authorized, true, 'S3 tenure must be unauthorized before its own review')
 
-  // Stage cannot repeat S1
-  const repeatS1 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-2', 'S1', 11n),
-    ret1.state,
-  )
-  assert.equal(repeatS1.ok, false, 'cannot repeat stage S1')
+  // A second relay brings a third tenure at S3
+  let s3 = planning.applyWorkEvent(
+    planning.incumbencyRetired('inc-2', 'Relayed', 20n),
+    promoted2.state,
+  ).state
+  s3 = planning.applyWorkEvent(planning.incumbencyOpened('work-1', 'inc-3', 'S3', 21n), s3).state
 
-  // Succession to S2 is valid
-  const inc2 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-2', 'S2', 11n),
-    ret1.state,
-  )
-  assert.equal(inc2.ok, true)
-  assert.equal(planning.activeStage(inc2.state), 'S2')
+  // PlanReviewed(Promoted) at S3 grants delivery authorization instead of a fourth stage
+  const promoted3 = planning.applyWorkEvent(planning.reviewed('inc-3', 'S3', 'Promoted'), s3)
+  assert.equal(promoted3.ok, true)
+  assert.equal(planning.activeStage(promoted3.state), 'S3', 'S3 promotion grants authorization, not a new stage')
+  assert.equal(promoted3.state.Active.Authorized, true, 'S3 promotion must set Authorized = true')
+})
 
-  // Retire S2
-  const ret2 = planning.applyWorkEvent(
-    planning.incumbencyRetired('inc-2', 'Continue', 20n),
-    inc2.state,
-  )
-  assert.equal(ret2.ok, true)
+test('WHAT[planning-004] state is orthogonal to stage: delivered and reopened do not touch the stage', () => {
+  // Build an authorized S3 tenure through the full ladder and deliver it
+  let state = openActive('work-2', 'inc-9', 'S1')
+  state = planning.applyWorkEvent(planning.reviewed('inc-9', 'S1', 'Promoted'), state).state
+  state = planning.applyWorkEvent(planning.incumbencyRetired('inc-9', 'Relayed', 10n), state).state
+  state = planning.applyWorkEvent(planning.incumbencyOpened('work-2', 'inc-10', 'S2', 11n), state).state
+  state = planning.applyWorkEvent(planning.reviewed('inc-10', 'S2', 'Promoted'), state).state
+  state = planning.applyWorkEvent(planning.incumbencyRetired('inc-10', 'Relayed', 20n), state).state
+  state = planning.applyWorkEvent(planning.incumbencyOpened('work-2', 'inc-11', 'S3', 21n), state).state
+  state = planning.applyWorkEvent(planning.reviewed('inc-11', 'S3', 'Promoted'), state).state
+  assert.equal(state.Active.Authorized, true)
 
-  // Stage cannot regress from S2 back to S1
-  const regressToS1 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-3', 'S1', 21n),
-    ret2.state,
-  )
-  assert.equal(regressToS1.ok, false, 'stage cannot regress backwards')
+  state = planning.applyWorkEvent(planning.incumbencyRetired('inc-11', 'Delivered', 30n), state).state
+  state = planning.applyWorkEvent(
+    planning.delivered('inc-11', 'work-2', 'sha256-x', 'plan.md', 'exec-1'),
+    state,
+  ).state
+  assert.equal(planning.isDelivered(state), true)
 
-  // Succession to S3 is valid
-  const inc3 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-3', 'S3', 21n),
-    ret2.state,
-  )
-  assert.equal(inc3.ok, true)
-  assert.equal(planning.activeStage(inc3.state), 'S3')
+  // Reopen restores the same tenure at the same stage with the same authorization
+  const reopened = planning.applyWorkEvent(planning.reopened('inc-11'), state)
+  assert.equal(reopened.ok, true)
+  assert.equal(planning.isDelivered(reopened.state), false)
+  assert.equal(planning.activeStage(reopened.state), 'S3')
+  assert.equal(reopened.state.Active.Id, 'inc-11')
+  assert.equal(reopened.state.Active.Authorized, true, 'reopened tenure must keep its authorization')
+})
 
-  // Retire S3
-  const ret3 = planning.applyWorkEvent(
-    planning.incumbencyRetired('inc-3', 'Delivered', 30n),
-    inc3.state,
-  )
-  assert.equal(ret3.ok, true)
+test('WHAT[planning-004] illegal stage and review transitions are rejected by the fold', () => {
+  // Reviewed against an unknown incumbency is rejected
+  const state = openActive('work-3', 'inc-1', 'S1')
+  const ghost = planning.applyWorkEvent(planning.reviewed('inc-ghost', 'S1', 'Promoted'), state)
+  assert.equal(ghost.ok, false, 'review of an unknown incumbency must be rejected')
 
-  // S3 has no successor stage
-  const pastS3 = planning.applyWorkEvent(
-    planning.incumbencyOpened('work-1', 'inc-4', 'S3', 31n),
-    ret3.state,
+  // Reviewed against a retired incumbency is rejected
+  let retired = planning.applyWorkEvent(planning.reviewed('inc-1', 'S1', 'Promoted'), state).state
+  retired = planning.applyWorkEvent(planning.incumbencyRetired('inc-1', 'Relayed', 10n), retired).state
+  const lateReview = planning.applyWorkEvent(planning.reviewed('inc-1', 'S1', 'Promoted'), retired)
+  assert.equal(lateReview.ok, false, 'review of a retired incumbency must be rejected')
+
+  // A successor opened at a stage different from the retired stage is rejected
+  const successorWrongStage = planning.applyWorkEvent(
+    planning.incumbencyOpened('work-3', 'inc-2', 'S3', 11n),
+    retired,
   )
-  assert.equal(pastS3.ok, false, 'S3 has no further successor stage')
+  assert.equal(successorWrongStage.ok, false, 'relay successor must open at the retired stage (S2), not skip to S3')
 })

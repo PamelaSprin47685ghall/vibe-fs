@@ -24,8 +24,12 @@
     <Compile Include="Mission/Planning/Store.fs"/>
     <Compile Include="Mission/Planning/PlanPath.fsi"/>
     <Compile Include="Mission/Planning/PlanPath.fs"/>
+    <Compile Include="Mission/Planning/PlanWorkOpen.fsi"/>
+    <Compile Include="Mission/Planning/PlanWorkOpen.fs"/>
     <Compile Include="Mission/Planning/PlanTools.fsi"/>
     <Compile Include="Mission/Planning/PlanTools.fs"/>
+    <Compile Include="Mission/Planning/ReviewPlanBackend.fsi"/>
+    <Compile Include="Mission/Planning/ReviewPlanBackend.fs"/>
     <Compile Include="Mission/Planning/Surface.fsi"/>
     <Compile Include="Mission/Planning/Surface.fs"/>
   </ItemGroup>

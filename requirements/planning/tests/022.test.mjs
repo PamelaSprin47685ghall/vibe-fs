@@ -2,59 +2,94 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 
-const openWork = (workId) => surface.PlanningSurface.workOpened(workId, '/tmp/plan-test')
-const openInc = (workId, incId, stage, cursor) =>
-  surface.PlanningSurface.incumbencyOpened(workId, incId, stage, cursor)
-const retireInc = (incId, outcome, cursor) =>
-  surface.PlanningSurface.incumbencyRetired(incId, outcome, cursor)
+const facts = { PlanEvents: surface.PlanEvents, PlanStage: surface.PlanStage }
+const fold = { PlanFold: surface.PlanFold }
 
-const firstStateOf = (events) => {
-  let st = surface.PlanningSurface.empty()
-  for (const ev of events) {
-    const res = surface.PlanningSurface.applyWorkEvent(ev, st)
-    assert.equal(res.ok, true, JSON.stringify(res))
-    st = res.state
+test('WHAT[planning-022] the review target is the next milestone derived from the current stage', () => {
+  assert.ok(
+    typeof surface.PlanningSurface.reviewTargetFor === 'function',
+    'PlanningSurface must export reviewTargetFor (the plan backend derives its review target from the stage)',
+  )
+
+  // S1 reviews toward S2 (understanding & paths ready)
+  assert.equal(surface.PlanningSurface.reviewTargetFor('S1'), 'S2')
+  // S2 reviews toward S3 (procedure & pseudocode ready)
+  assert.equal(surface.PlanningSurface.reviewTargetFor('S2'), 'S3')
+  // S3 reviews toward becoming the final tenure (delivery authorization)
+  assert.equal(surface.PlanningSurface.reviewTargetFor('S3'), 'authorized')
+})
+
+test('WHAT[planning-022] empty findings promote the tenure; non-empty findings keep it with the gaps returned', async () => {
+  assert.ok(
+    typeof surface.PlanningSurface.executeReview === 'function',
+    'PlanningSurface must export executeReview (the shared review shell dispatches to the plan backend)',
+  )
+
+  let state = fold.PlanFold.initialWorkState
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-22a', '/root'), state).state
+  state = fold.PlanFold.applyWorkEventJs(
+    facts.PlanEvents.incumbencyOpened('work-22a', 'inc-1', facts.PlanStage.S1, 0n),
+    state,
+  ).state
+
+  const mockStore = {
+    TryCurrent: (key) => (key === 'Plan' ? state : null),
+    TryHead: () => null,
+    Append: async (envs) => {
+      for (const env of envs) {
+        const decoded = surface.PlanningSurface.tryDecodeEnvelopeJson(JSON.stringify(env))
+        if (decoded.ok) {
+          state = fold.PlanFold.applyWorkEventJs(decoded.event, state).state
+        }
+      }
+      return { tag: 0 }
+    },
   }
-  return st
-}
 
-test('WHAT[planning-022] S1 with no retirement carries no previous range', () => {
-  const st = firstStateOf([openWork('w1'), openInc('w1', 'inc-1', 'S1', 0n)])
-  assert.equal(surface.PlanningSurface.latestRetirementRange(st), undefined)
-})
-
-test('WHAT[planning-022] S1 retirement preserves its opening range for the next tenure', () => {
-  const st = firstStateOf([
-    openWork('w1'),
-    openInc('w1', 'inc-1', 'S1', 7n),
-    retireInc('inc-1', 'Continue', 25n),
-  ])
-  assert.deepEqual(surface.PlanningSurface.latestRetirementRange(st), [7n, 25n])
-})
-
-test('WHAT[planning-022] tenure assembly consumes PreviousRange into LWR_prev', () => {
-  const rawMessages = [
-    { id: 'u1', role: 'user', content: 'go' },
-    { id: 'a-old', role: 'assistant', content: 'old work', cursor: 9n },
-    { id: 'a-new', role: 'assistant', content: 'new work', cursor: 30n },
+  // Non-empty findings: the tenure stays and the gaps come back to the model
+  const findings = [
+    {
+      acceptance_criteria: 'The tradeoff table covers storage engines',
+      work_plan: 'Add a storage engine comparison to the plan',
+    },
   ]
-  const tenure = {
-    workId: 'w1',
-    incumbencyId: 'inc-2',
-    stage: 'S2',
-    openingCursor: 20n,
-    previousRange: [7n, 25n],
-    isFreshHandover: false,
+  const stayed = await surface.PlanningSurface.executeReview(mockStore, 'work-22a', 'inc-1', findings, null)
+  assert.equal(stayed.ok, true)
+  assert.equal(stayed.outcome, 'Stayed', 'non-empty findings must keep the tenure in place')
+  assert.ok(Array.isArray(stayed.gaps) && stayed.gaps.length === 1, 'the gaps must be returned to the model')
+  assert.equal(surface.PlanningSurface.activeStage(state), 'S1', 'a stayed review must not advance the stage')
+  assert.ok(state.Reviewed != null, 'a PlanReviewed fact must be recorded')
+
+  // The same incumbency cannot review a second time
+  const second = await surface.PlanningSurface.executeReview(mockStore, 'work-22a', 'inc-1', [], null)
+  assert.equal(second.ok, false, 'each incumbency has exactly one review')
+  assert.match(second.error, /already|once|submitted/i)
+})
+
+test('WHAT[planning-022] a fresh tenure with empty findings is promoted', async () => {
+  let state = fold.PlanFold.initialWorkState
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-22b', '/root'), state).state
+  state = fold.PlanFold.applyWorkEventJs(
+    facts.PlanEvents.incumbencyOpened('work-22b', 'inc-1', facts.PlanStage.S1, 0n),
+    state,
+  ).state
+
+  const mockStore = {
+    TryCurrent: (key) => (key === 'Plan' ? state : null),
+    TryHead: () => null,
+    Append: async (envs) => {
+      for (const env of envs) {
+        const decoded = surface.PlanningSurface.tryDecodeEnvelopeJson(JSON.stringify(env))
+        if (decoded.ok) {
+          state = fold.PlanFold.applyWorkEventJs(decoded.event, state).state
+        }
+      }
+      return { tag: 0 }
+    },
   }
-  let seen = null
-  const result = surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, (range) => {
-    seen = range
-    return 'prev record'
-  })
-  assert.equal(seen.start, 7n)
-  assert.equal(seen.end, 25n)
-  const ids = result.messages.map((m) => m.id)
-  assert.ok(!ids.includes('a-old'))
-  assert.ok(ids.includes('a-new'))
-  assert.ok(ids.some((id) => String(id).startsWith('lwr-prev-')))
+
+  const promoted = await surface.PlanningSurface.executeReview(mockStore, 'work-22b', 'inc-1', [], null)
+  assert.equal(promoted.ok, true)
+  assert.equal(promoted.outcome, 'Promoted', 'empty findings must promote the tenure')
+  assert.equal(surface.PlanningSurface.activeStage(state), 'S2', 'the S1 tenure advances to S2')
 })

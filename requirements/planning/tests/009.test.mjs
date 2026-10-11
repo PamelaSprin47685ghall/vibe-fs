@@ -1,62 +1,48 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import * as completedTurn from '../../../dist/Interaction/Repair/CompletedTurnSurface.js'
 
-const facts = {
-  PlanEvents: surface.PlanEvents,
-  PlanStage: surface.PlanStage,
-  PlanRetirementOutcome: surface.PlanRetirementOutcome,
-}
-const fold = { PlanFold: surface.PlanFold }
+test('WHAT[planning-009] plan empty-stop needs no interaction repair: natural stop waits for the user prompt', () => {
+  assert.ok(
+    typeof completedTurn.needsInteractionRepair === 'function',
+    'CompletedTurnSurface.needsInteractionRepair must be exported',
+  )
 
-test('WHAT[planning-009] ask returns waiting-for-user record immediately without blocking', () => {
-  let state = fold.PlanFold.initialWorkState
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-ask-1', '/root'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyOpened('work-ask-1', 'inc-1', facts.PlanStage.S1, 0n),
-    state,
-  ).state
-
-  const mockStore = {
-    TryCurrent: () => state,
-  }
-
-  // 1. Valid question returns waiting marker immediately
-  const qText = 'Should the plan support PostgreSQL or SQLite?'
-  const res = surface.PlanningSurface.executeAsk(mockStore, 'work-ask-1', qText)
-
-  assert.equal(res.ok, true)
-  assert.equal(res.kind, 'waiting_for_user')
-  assert.equal(res.question, qText)
-  assert.equal(res.status, 'pending')
-
-  // 2. Empty question is rejected
-  const resEmpty = surface.PlanningSurface.executeAsk(mockStore, 'work-ask-1', '   ')
-  assert.equal(resEmpty.ok, false)
-  assert.match(resEmpty.error, /cannot be empty/i)
+  // A plan turn that finished with 'stop' and no usable formal text is an
+  // empty stop. Plan is the only role allowed to stop empty and wait for the
+  // next user prompt: no continuation, no repair.
+  assert.equal(
+    completedTurn.needsInteractionRepair('plan', true, 'stop', []),
+    false,
+    'plan empty-stop must not trigger continuation or repair',
+  )
 })
 
-test('WHAT[planning-009] ask is rejected when planning artifact has already been delivered', () => {
-  let state = fold.PlanFold.initialWorkState
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-ask-2', '/root'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyOpened('work-ask-2', 'inc-1', facts.PlanStage.S1, 0n),
-    state,
-  ).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyRetired('inc-1', facts.PlanRetirementOutcome.Delivered, 10n),
-    state,
-  ).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.delivered('inc-1', 'work-ask-2', 'sha256-hash', 'path.md'),
-    state,
-  ).state
+test('WHAT[planning-009] other roles keep their empty-stop repair behavior unchanged', () => {
+  // The natural-stop exemption applies to plan only; an engineer empty stop
+  // still requires interaction repair, byte-for-byte as before.
+  assert.equal(
+    completedTurn.needsInteractionRepair('engineer', true, 'stop', []),
+    true,
+    'engineer empty-stop must keep requiring interaction repair',
+  )
+  assert.equal(
+    completedTurn.needsInteractionRepair('manager', true, 'stop', []),
+    true,
+    'manager empty-stop must keep requiring interaction repair',
+  )
+})
 
-  const mockStore = {
-    TryCurrent: () => state,
+test('WHAT[planning-009] provider failures and length stops are not natural stops for plan', () => {
+  // The plan exemption covers empty stops only. Provider errors and length
+  // truncation follow the existing recovery paths for every role alike.
+  for (const finish of ['error', 'length']) {
+    const planNeeds = completedTurn.needsInteractionRepair('plan', true, finish, [])
+    const engineerNeeds = completedTurn.needsInteractionRepair('engineer', true, finish, [])
+    assert.equal(
+      planNeeds,
+      engineerNeeds,
+      `finish=${finish}: plan must share the existing recovery classification with other roles`,
+    )
   }
-
-  const res = surface.PlanningSurface.executeAsk(mockStore, 'work-ask-2', 'Any question?')
-  assert.equal(res.ok, false)
-  assert.match(res.error, /already been delivered/i)
 })

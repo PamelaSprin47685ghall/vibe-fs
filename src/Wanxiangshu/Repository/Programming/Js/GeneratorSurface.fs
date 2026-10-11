@@ -39,8 +39,8 @@ module JsGeneratorSurface =
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot
         | "JsPlan" -> Some ToolPermission.JsPlan
         | "Ask" -> Some ToolPermission.Ask
-        | "Handoff" -> Some ToolPermission.Handoff
         | "Deliver" -> Some ToolPermission.Deliver
+        | "Review" -> Some ToolPermission.Review
         | _ -> None
 
     let private permissionLabel permission =
@@ -66,8 +66,8 @@ module JsGeneratorSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
-        | ToolPermission.Handoff -> "Handoff"
         | ToolPermission.Deliver -> "Deliver"
+        | ToolPermission.Review -> "Review"
 
     let private capabilityLabel capability =
         match capability with

@@ -2,11 +2,12 @@ namespace Wanxiangshu.Mission.Planning
 
 open Wanxiangshu.Foundation
 
+/// planning-005: typed rejections of the plan action gate.
 [<RequireQualifiedAccess>]
 type ActionGateRejection =
     | AlreadyDelivered
-    | DeliverForbiddenInS1
-    | HandoffForbiddenInS3
+    | HandoffRetired
+    | ResumeRetired
     | BlockedByLiveResources of blocker: string option
     | ActionDenied of action: string * reason: string
 
@@ -14,8 +15,13 @@ module ActionGateRejection =
     val render: ActionGateRejection -> string
 
 module ActionGate =
+    /// planning-005: stage is not a gate. The permission set depends on the
+    /// work state (delivered) and the deliver blocker only.
     val allowedPermissions: stage: PlanStage -> hasDelivered: bool -> hasBlocker: bool -> ToolPermission Set
 
+    /// planning-005: single decision for one planning action. The four tools
+    /// pass uniformly on an active tenure; delivered keeps only js-plan.read;
+    /// handoff/resume are retired and always rejected.
     val decideAction:
         stage: PlanStage ->
         action: string ->

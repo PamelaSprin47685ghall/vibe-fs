@@ -628,11 +628,18 @@ module PluginTransforms =
                 let tm = Wanxiangshu.Mission.Planning.TenureIsolation.messageOfRaw raw
                 tm.Role = "assistant" || tm.Role = "tool")
 
-        let tryReadActivePlanState () : Wanxiangshu.Mission.Planning.PlanWorkState option =
-            journal
-            |> Option.bind (fun durable ->
-                Wanxiangshu.Mission.Planning.PlanEventStore.tryActiveWorkState (fun key ->
-                    durable.Writer.TryCurrent key))
+        let tryReadActivePlanState (sidOpt: string option) : Wanxiangshu.Mission.Planning.PlanWorkState option =
+            // Resolve the plan work by the session id (workId = sessionId) so
+            // multiple plan sessions never read each other's state.
+            sidOpt
+            |> Option.bind (fun sid ->
+                workspaceDirectory
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
+                |> Option.bind (fun store ->
+                    Wanxiangshu.Mission.Planning.PlanEventStore.activeWorkState
+                        store
+                        (Wanxiangshu.Mission.Planning.PlanWorkId.create sid)))
 
         let buildTenureOf
             (state: Wanxiangshu.Mission.Planning.PlanWorkState)
@@ -640,27 +647,24 @@ module PluginTransforms =
             : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
             let active = state.Active.Value
 
-            let workId =
-                state.WorkId
-                |> Option.map Wanxiangshu.Mission.Planning.PlanWorkId.value
-                |> Option.defaultValue ""
+            let workId = defaultArg state.WorkId ""
 
             let previousRange =
                 state.LatestRetirement
                 |> Option.map (fun (_, _, startC, endC) -> (XTraceCursor.sequence startC, XTraceCursor.sequence endC))
 
             { WorkId = workId
-              IncumbencyId = Wanxiangshu.Mission.Planning.PlanIncumbencyId.value active.Id
+              IncumbencyId = active.Id
               Stage = Wanxiangshu.Mission.Planning.PlanStage.render active.Stage
               OpeningCursor = XTraceCursor.sequence active.OpeningCursor
               PreviousRange = previousRange
               IsFreshHandover = fresh }
 
-        let resolveTenure (outObj: obj) : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
+        let resolveTenure (sidOpt: string option) (outObj: obj) : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
             let fresh = not (tenureHasAssistantOrTool rawMessages)
 
-            tryReadActivePlanState ()
+            tryReadActivePlanState sidOpt
             |> Option.filter (fun state -> state.Active.IsSome)
             |> Option.map (fun state -> buildTenureOf state fresh)
 
@@ -671,6 +675,30 @@ module PluginTransforms =
 
         let emitTenureReanchorSkipped (reason: string) : unit =
             Diagnostic.emit "plan-tenure-reanchor-skipped" [ "result", reason ]
+
+        // The reanchor fact is appended fire-and-forget; an append failure is
+        // diagnosed so the transform is never blocked by journal health.
+        let appendTenureReanchorFact
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (workId: string)
+            (incumbencyId: string)
+            (fact: AgentFact)
+            : unit =
+            let appendTask =
+                AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
+
+            task {
+                match! appendTask with
+                | Ok _ -> ()
+                | Error failure ->
+                    Diagnostic.emit
+                        "plan-tenure-reanchor-append-failed"
+                        [ "work_id", workId
+                          "incumbency_id", incumbencyId
+                          "result", JournalAppendFailure.describe failure ]
+            }
+            |> ignore
 
         let fireTenureReanchor
             (durable: AgentJournal)
@@ -689,29 +717,25 @@ module PluginTransforms =
                            WorkId = workId
                            IncumbencyId = incumbencyId |}
 
-                let appendTask =
-                    AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
+                appendTenureReanchorFact durable sessionId workId incumbencyId fact
 
-                task {
-                    match! appendTask with
-                    | Ok _ -> ()
-                    | Error failure ->
-                        Diagnostic.emit
-                            "plan-tenure-reanchor-append-failed"
-                            [ "work_id", workId
-                              "incumbency_id", incumbencyId
-                              "result", JournalAppendFailure.describe failure ]
-                }
-                |> ignore
+        // The reanchor flag is read defensively: a malformed payload means
+        // "not requested", never a transform failure.
+        let readReanchorFlag (result: obj) : bool =
+            try
+                unbox<bool> result?reanchorRequested
+            with _ ->
+                false
 
         let isTenureReanchorRequested (result: obj) : bool =
-            if isNull result then
-                false
-            else
-                try
-                    unbox<bool> result?reanchorRequested
-                with _ ->
-                    false
+            if isNull result then false else readReanchorFlag result
+
+        // A reanchor was requested but the journal or the session id is
+        // missing: the request is diagnosed and dropped, never silently
+        // ignored.
+        let reportUnreachableReanchor (requested: bool) : unit =
+            if requested then
+                emitTenureReanchorSkipped "no-journal-or-session"
 
         let assembleAndRewrite
             (sidOpt: string option)
@@ -738,15 +762,11 @@ module PluginTransforms =
                 | _ -> None
 
             match target with
-            | None ->
-                if requested then
-                    emitTenureReanchorSkipped "no-journal-or-session"
-                else
-                    ()
+            | None -> reportUnreachableReanchor requested
             | Some(durable, sessionId) -> fireTenureReanchor durable sessionId tenure.WorkId tenure.IncumbencyId
 
         let applyResolvedTenure (sidOpt: string option) (outObj: obj) : unit =
-            match resolveTenure outObj with
+            match resolveTenure sidOpt outObj with
             | None -> ()
             | Some tenure -> assembleAndRewrite sidOpt outObj tenure
 
@@ -754,7 +774,13 @@ module PluginTransforms =
             task {
                 match planSessionOf sidOpt with
                 | None -> ()
-                | Some _ -> applyResolvedTenure sidOpt outObj
+                | Some sid ->
+                    // planning-020: the entry hook runs before resolveTenure so
+                    // the first tenure exists when the isolation is assembled.
+                    // The EventStore write lives in PlanWorkOpenWiring; this
+                    // module writes its facts through AgentJournal only.
+                    do! PlanWorkOpenWiring.ensurePlanWorkOpenedForSession workspaceDirectory sid
+                    applyResolvedTenure sidOpt outObj
             }
 
         { BeginPhysicalProviderAttempt =

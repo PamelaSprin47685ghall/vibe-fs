@@ -6,28 +6,23 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
-type HandoffResult =
-    { Ok: bool
-      RetiredIncumbencyId: string
-      NextIncumbencyId: string
-      NextStage: string
-      Message: string }
-
 type DeliverResult =
     { Ok: bool
+      Relayed: bool
+      Delivered: bool
+      RetiredIncumbencyId: string
+      RetirementOutcome: string
       Digest: string
       Path: string
+      ExecSessionId: string
+      NextIncumbencyId: string
       Message: string }
 
+/// planning-010: the outcome of one synchronous ask delegation.
 type AskResult =
     { Kind: string
-      Question: string
+      WorkRecord: string
       Status: string }
-
-type ResumeResult =
-    { Status: string
-      Target: string
-      Charge: string }
 
 module PlanTools =
 
@@ -41,30 +36,45 @@ module PlanTools =
         (expectedId: string)
         : Result<ActivePlanIncumbency, string> =
         match activeOpt with
-        | None -> Error "No active incumbency found for this work to hand off"
-        | Some active when PlanIncumbencyId.value active.Id <> expectedId ->
-            Error(
-                sprintf
-                    "Active incumbency ID '%s' does not match invocation target '%s'"
-                    (PlanIncumbencyId.value active.Id)
-                    expectedId
-            )
+        | None -> Error "No active incumbency found for this work"
+        | Some active when active.Id <> expectedId ->
+            Error(sprintf "Active incumbency ID '%s' does not match invocation target '%s'" active.Id expectedId)
         | Some active -> Ok active
 
-    let private validateDeliverIncumbency
-        (activeOpt: ActivePlanIncumbency option)
-        (expectedId: string)
-        : Result<ActivePlanIncumbency, string> =
-        match activeOpt with
-        | None -> Error "No active incumbency found for this work to deliver"
-        | Some active when PlanIncumbencyId.value active.Id <> expectedId ->
-            Error(
-                sprintf
-                    "Active incumbency ID '%s' does not match invocation target '%s'"
-                    (PlanIncumbencyId.value active.Id)
-                    expectedId
-            )
-        | Some active -> Ok active
+    // planning-005: the work-state gate for deliver. A live blocker rejects
+    // retirement before any other check.
+    let private checkDeliverEligibility
+        (active: ActivePlanIncumbency)
+        (isDelivered: bool)
+        (hasBlocker: bool)
+        : Result<unit, string> =
+        ActionGate.decideAction active.Stage "deliver" isDelivered hasBlocker
+        |> Result.mapError ActionGateRejection.render
+
+    // The deliver decision resolved before any effect: which tenure acts, and
+    // which of the two paths it takes.
+    type private DeliverDecision =
+        | AuthorizedDelivery of active: ActivePlanIncumbency
+        | RelayToSuccessor of active: ActivePlanIncumbency
+
+    let private decisionOfAuthorization (active: ActivePlanIncumbency) : DeliverDecision =
+        if active.Authorized then
+            AuthorizedDelivery active
+        else
+            RelayToSuccessor active
+
+    let private resolveDeliverDecision
+        (state: PlanWorkState)
+        (incumbencyId: string)
+        (hasBlocker: bool)
+        : Result<DeliverDecision, string> =
+        if hasBlocker then
+            Error "Deliver is blocked by live resources; the tenure cannot retire yet"
+        else
+            validateActiveIncumbency state.Active incumbencyId
+            |> Result.bind (fun active ->
+                checkDeliverEligibility active state.Delivered.IsSome hasBlocker
+                |> Result.map (fun () -> decisionOfAuthorization active))
 
     let private appendOpenOnly
         (store: IEventStore)
@@ -73,7 +83,7 @@ module PlanTools =
         : Task<Result<unit, string>> =
         task {
             match! PlanEventStore.append store pid openEvent with
-            | Error err -> return Error(sprintf "Failed to open next incumbency during handoff: %s" err)
+            | Error err -> return Error(sprintf "Failed to open next incumbency: %s" err)
             | Ok _ -> return Ok()
         }
 
@@ -85,109 +95,9 @@ module PlanTools =
         : Task<Result<unit, string>> =
         task {
             match! PlanEventStore.append store pid retEvent with
-            | Error err -> return Error(sprintf "Failed to retire incumbency during handoff: %s" err)
+            | Error err -> return Error(sprintf "Failed to retire incumbency: %s" err)
             | Ok _ -> return! appendOpenOnly store pid openEvent
         }
-
-    let private performHandoffEvents
-        (store: IEventStore)
-        (pid: PlanWorkId)
-        (workId: string)
-        (incumbencyId: string)
-        (active: ActivePlanIncumbency)
-        (nextStage: PlanStage)
-        (retirementCursor: int64 option)
-        : Task<Result<HandoffResult, string>> =
-        task {
-            let openCurSeq = XTraceCursor.sequence active.OpeningCursor
-            let retCurSeq = defaultArg retirementCursor (openCurSeq + 10L)
-            let nextOpenCurSeq = retCurSeq + 1L
-
-            let nextIncumbencyId =
-                "inc-"
-                + (HostDigest.sha256Hex (
-                    sprintf "handoff:%s:%s:%d" incumbencyId (PlanStage.render nextStage) nextOpenCurSeq
-                )).[0..15]
-
-            let retEvent =
-                PlanEvents.incumbencyRetired incumbencyId PlanRetirementOutcome.Continue retCurSeq
-
-            let openEvent =
-                PlanEvents.incumbencyOpened workId nextIncumbencyId nextStage nextOpenCurSeq
-
-            match! appendRetireAndOpen store pid retEvent openEvent with
-            | Error err -> return Error err
-            | Ok() ->
-                return
-                    Ok
-                        { Ok = true
-                          RetiredIncumbencyId = incumbencyId
-                          NextIncumbencyId = nextIncumbencyId
-                          NextStage = PlanStage.render nextStage
-                          Message =
-                            sprintf
-                                "Handed off from stage %s to %s"
-                                (PlanStage.render active.Stage)
-                                (PlanStage.render nextStage) }
-        }
-
-    let private resolveNextStage (stage: PlanStage) : Result<PlanStage, string> =
-        match PlanStage.next stage with
-        | None -> Error "Stage S3 cannot hand off (no successor stage; S3 must deliver)"
-        | Some nextStage -> Ok nextStage
-
-    let private checkHandoffEligibility
-        (active: ActivePlanIncumbency)
-        (isDelivered: bool)
-        (hasBlocker: bool)
-        : Result<PlanStage, string> =
-        ActionGate.decideAction active.Stage "handoff" isDelivered hasBlocker
-        |> Result.mapError ActionGateRejection.render
-        |> Result.bind (fun () -> resolveNextStage active.Stage)
-
-    let executeHandoff
-        (store: IEventStore)
-        (workId: string)
-        (incumbencyId: string)
-        (hasBlocker: bool)
-        (note: string option)
-        (retirementCursor: int64 option)
-        : Task<Result<HandoffResult, string>> =
-        task {
-            let pid = PlanWorkId.create workId
-
-            let state =
-                PlanEventStore.workState store pid
-                |> Option.defaultValue PlanFold.initialWorkState
-
-            let planResult =
-                validateActiveIncumbency state.Active incumbencyId
-                |> Result.bind (fun active ->
-                    checkHandoffEligibility active state.Delivered.IsSome hasBlocker
-                    |> Result.map (fun nextStage -> (active, nextStage)))
-
-            match planResult with
-            | Error err -> return Error err
-            | Ok(active, nextStage) ->
-                return! performHandoffEvents store pid workId incumbencyId active nextStage retirementCursor
-        }
-
-    let private resolvePathAndDigest
-        (content: string)
-        (root: string)
-        (workId: string)
-        : Result<string * string, string> =
-        match PlanPath.resolvePlanPath root workId with
-        | Error err -> Error(sprintf "Cannot resolve plan path: %s" err)
-        | Ok planPath ->
-            let digest = HostDigest.sha256Hex content
-            Ok(digest, planPath)
-
-    let private readAndValidatePlan (root: string) (workId: string) : Result<string * string, string> =
-        match PlanPath.readPlan root workId with
-        | Error err -> Error(sprintf "Cannot deliver: %s" err)
-        | Ok content when String.IsNullOrWhiteSpace content -> Error "Cannot deliver: plan artifact is empty"
-        | Ok content -> resolvePathAndDigest content root workId
 
     let private appendDeliverOnly
         (store: IEventStore)
@@ -212,24 +122,60 @@ module PlanTools =
             | Ok _ -> return! appendDeliverOnly store pid delEvent
         }
 
-    let private performDeliverEvents
+    let private retirementSequence (active: ActivePlanIncumbency) (retirementCursor: int64 option) : int64 =
+        let openCurSeq = XTraceCursor.sequence active.OpeningCursor
+        defaultArg retirementCursor (openCurSeq + 10L)
+
+    let private resolvePathAndDigest
+        (content: string)
+        (root: string)
+        (workId: string)
+        : Result<string * string, string> =
+        match PlanPath.resolvePlanPath root workId with
+        | Error err -> Error(sprintf "Cannot resolve plan path: %s" err)
+        | Ok planPath ->
+            let digest = HostDigest.sha256Hex content
+            Ok(digest, planPath)
+
+    let private readAndValidatePlan (root: string) (workId: string) : Result<string * string * string, string> =
+        match PlanPath.readPlan root workId with
+        | Error err -> Error(sprintf "Cannot deliver: plan artifact is empty or missing (%s)" err)
+        | Ok content when String.IsNullOrWhiteSpace content -> Error "Cannot deliver: plan artifact is empty"
+        | Ok content ->
+            resolvePathAndDigest content root workId
+            |> Result.map (fun (digest, planPath) -> (content, digest, planPath))
+
+    let private spawnExecutionSessionFor
+        (spawn: string -> string -> Task<string>)
+        (planContent: string)
+        : Task<Result<string, string>> =
+        task {
+            try
+                let! execSessionId = spawn "manager" planContent
+                return Ok execSessionId
+            with ex ->
+                return Error(sprintf "Execution session spawn failed: %s" ex.Message)
+        }
+
+    let private commitAuthorizedDelivery
         (store: IEventStore)
         (pid: PlanWorkId)
         (workId: string)
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
+        (retirementCursor: int64 option)
         (digest: string)
         (planPath: string)
-        (retirementCursor: int64 option)
+        (execSessionId: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            let openCurSeq = XTraceCursor.sequence active.OpeningCursor
-            let retCurSeq = defaultArg retirementCursor (openCurSeq + 10L)
+            let retCurSeq = retirementSequence active retirementCursor
 
             let retEvent =
                 PlanEvents.incumbencyRetired incumbencyId PlanRetirementOutcome.Delivered retCurSeq
 
-            let delEvent = PlanEvents.delivered incumbencyId workId digest planPath
+            let delEvent =
+                PlanEvents.delivered incumbencyId workId digest planPath execSessionId
 
             match! appendRetireAndDeliver store pid retEvent delEvent with
             | Error err -> return Error err
@@ -237,18 +183,141 @@ module PlanTools =
                 return
                     Ok
                         { Ok = true
+                          Relayed = false
+                          Delivered = true
+                          RetiredIncumbencyId = incumbencyId
+                          RetirementOutcome = PlanRetirementOutcome.render PlanRetirementOutcome.Delivered
                           Digest = digest
                           Path = planPath
+                          ExecSessionId = execSessionId
+                          NextIncumbencyId = ""
                           Message = "Plan delivered successfully" }
         }
 
-    let private checkDeliverEligibility
+    // The execution session must start before any durable fact is written: a
+    // failed spawn leaves the tenure active with zero writes (planning-008).
+    let private spawnAndCommitDelivery
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (incumbencyId: string)
         (active: ActivePlanIncumbency)
-        (isDelivered: bool)
-        (hasBlocker: bool)
-        : Result<unit, string> =
-        ActionGate.decideAction active.Stage "deliver" isDelivered hasBlocker
-        |> Result.mapError ActionGateRejection.render
+        (spawn: string -> string -> Task<string>)
+        (retirementCursor: int64 option)
+        (content: string, digest: string, planPath: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match! spawnExecutionSessionFor spawn content with
+            | Error err -> return Error err
+            | Ok execSessionId ->
+                return!
+                    commitAuthorizedDelivery
+                        store
+                        pid
+                        workId
+                        incumbencyId
+                        active
+                        retirementCursor
+                        digest
+                        planPath
+                        execSessionId
+        }
+
+    let private performAuthorizedDelivery
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (root: string)
+        (workId: string)
+        (incumbencyId: string)
+        (active: ActivePlanIncumbency)
+        (spawn: string -> string -> Task<string>)
+        (retirementCursor: int64 option)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match readAndValidatePlan root workId with
+            | Error err -> return Error err
+            | Ok(content, digest, planPath) ->
+                return!
+                    spawnAndCommitDelivery
+                        store
+                        pid
+                        workId
+                        incumbencyId
+                        active
+                        spawn
+                        retirementCursor
+                        (content, digest, planPath)
+        }
+
+    // The two events of one relay: retire Relayed and open the successor at
+    // the same stage (planning-007).
+    type private RelayTransition =
+        { Retire: PlanEvent
+          Open: PlanEvent
+          NextIncumbencyId: string
+          Stage: PlanStage }
+
+    let private buildRelayTransition
+        (workId: string)
+        (incumbencyId: string)
+        (active: ActivePlanIncumbency)
+        (retirementCursor: int64 option)
+        : RelayTransition =
+        let retCurSeq = retirementSequence active retirementCursor
+        let nextOpenCurSeq = retCurSeq + 1L
+
+        let nextIncumbencyId =
+            "inc-"
+            + (HostDigest.sha256Hex (
+                sprintf "plan-relay:%s:%s:%d" incumbencyId (PlanStage.render active.Stage) nextOpenCurSeq
+            )).[0..15]
+
+        { Retire = PlanEvents.incumbencyRetired incumbencyId PlanRetirementOutcome.Relayed retCurSeq
+          Open = PlanEvents.incumbencyOpened workId nextIncumbencyId active.Stage nextOpenCurSeq
+          NextIncumbencyId = nextIncumbencyId
+          Stage = active.Stage }
+
+    let private performRelay
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (incumbencyId: string)
+        (active: ActivePlanIncumbency)
+        (retirementCursor: int64 option)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let relay = buildRelayTransition workId incumbencyId active retirementCursor
+
+            match! appendRetireAndOpen store pid relay.Retire relay.Open with
+            | Error err -> return Error err
+            | Ok() ->
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = true
+                          Delivered = false
+                          RetiredIncumbencyId = incumbencyId
+                          RetirementOutcome = PlanRetirementOutcome.render PlanRetirementOutcome.Relayed
+                          Digest = ""
+                          Path = ""
+                          ExecSessionId = ""
+                          NextIncumbencyId = relay.NextIncumbencyId
+                          Message = sprintf "Relayed to the next incumbency at stage %s" (PlanStage.render relay.Stage) }
+        }
+
+    let private runDeliverDecision
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (root: string)
+        (workId: string)
+        (decision: DeliverDecision)
+        (spawn: string -> string -> Task<string>)
+        (retirementCursor: int64 option)
+        : Task<Result<DeliverResult, string>> =
+        match decision with
+        | AuthorizedDelivery active ->
+            performAuthorizedDelivery store pid root workId active.Id active spawn retirementCursor
+        | RelayToSuccessor active -> performRelay store pid workId active.Id active retirementCursor
 
     let executeDeliver
         (store: IEventStore)
@@ -256,7 +325,7 @@ module PlanTools =
         (workId: string)
         (incumbencyId: string)
         (hasBlocker: bool)
-        (note: string option)
+        (spawn: string -> string -> Task<string>)
         (retirementCursor: int64 option)
         : Task<Result<DeliverResult, string>> =
         task {
@@ -266,89 +335,136 @@ module PlanTools =
                 PlanEventStore.workState store pid
                 |> Option.defaultValue PlanFold.initialWorkState
 
-            let planResult =
-                validateDeliverIncumbency state.Active incumbencyId
-                |> Result.bind (fun active ->
-                    checkDeliverEligibility active state.Delivered.IsSome hasBlocker
-                    |> Result.bind (fun () -> readAndValidatePlan root workId)
-                    |> Result.map (fun (digest, planPath) -> (active, digest, planPath)))
-
-            match planResult with
+            match resolveDeliverDecision state incumbencyId hasBlocker with
             | Error err -> return Error err
-            | Ok(active, digest, planPath) ->
-                return! performDeliverEvents store pid workId incumbencyId active digest planPath retirementCursor
+            | Ok decision -> return! runDeliverDecision store pid root workId decision spawn retirementCursor
         }
 
-    let private checkPendingAsk
-        (pendingAskOpt: (PlanIncumbencyId * string * XTraceCursor) option)
-        (question: string)
-        : Result<unit, string> =
-        match pendingAskOpt with
-        | Some(_, pQ, _) when pQ = question -> Ok()
-        | Some _ -> Error "An ask is already pending for this incumbency; only one question can be pending at a time"
-        | None -> Ok()
+    // planning-010: at most one pending ask delegation per work. The tracker
+    // is process-local memory — crash recovery has no hanging ask state
+    // (planning-012), so this never becomes a durable state machine.
+    // DSL-MUTABLE: resource — in-flight ask delegation gate
+    let private pendingAskGate = obj ()
+    // DSL-MUTABLE: resource — works with one pending ask delegation
+    let private pendingAskWorks = System.Collections.Generic.HashSet<string>()
 
-    let executeAsk (store: IEventStore) (workId: string) (question: string) : Result<AskResult, string> =
+    let private tryBeginPendingAsk (workId: string) : bool =
+        lock pendingAskGate (fun () -> pendingAskWorks.Add workId)
+
+    let private clearPendingAsk (workId: string) : unit =
+        lock pendingAskGate (fun () -> pendingAskWorks.Remove workId |> ignore)
+
+    let private validateAskRequest (state: PlanWorkState) (intent: string) : Result<unit, string> =
+        match state.Delivered, state.Active, String.IsNullOrWhiteSpace intent with
+        | Some _, _, _ -> Error "The planning artifact has already been delivered. No further questions are permitted."
+        | None, _, true -> Error "Intent cannot be empty"
+        | None, None, _ -> Error "No active incumbency found for this work"
+        | None, Some _, false -> Ok()
+
+    let private captureDelegation (delegateTo: string -> Task<string>) (intent: string) : Task<Result<string, string>> =
+        task {
+            try
+                let! record = delegateTo intent
+                return Ok record
+            with ex ->
+                return Error(sprintf "DevOps delegation failed: %s" ex.Message)
+        }
+
+    // The binding is persisted single-flight after the delegation returns;
+    // the fold keeps the append idempotent for replays (planning-010).
+    let private appendDevOpsBound (store: IEventStore) (pid: PlanWorkId) (workId: string) : Task<Result<unit, string>> =
+        task {
+            let boundEvent =
+                PlanEvents.devOpsBound workId (PlanWorkOpen.deriveDevOpsId workId) None
+
+            match! PlanEventStore.append store pid boundEvent with
+            | Error err -> return Error(sprintf "Failed to bind plan DevOps: %s" err)
+            | Ok _ -> return Ok()
+        }
+
+    let private ensureDevOpsBound (store: IEventStore) (pid: PlanWorkId) (workId: string) : Task<Result<unit, string>> =
+        task {
+            match PlanEventStore.workState store pid with
+            | Some state when state.BoundDevOps.IsSome -> return Ok()
+            | _ -> return! appendDevOpsBound store pid workId
+        }
+
+    let private bindDevOpsAndComplete
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (record: string)
+        : Task<Result<AskResult, string>> =
+        task {
+            match! ensureDevOpsBound store pid workId with
+            | Error err -> return Error err
+            | Ok() ->
+                return
+                    Ok
+                        { Kind = "delegated"
+                          WorkRecord = record
+                          Status = "completed" }
+        }
+
+    let private finishPendingAsk
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (delegation: Result<string, string>)
+        : Task<Result<AskResult, string>> =
+        task {
+            match delegation with
+            | Error err -> return Error err
+            | Ok record when String.IsNullOrWhiteSpace record ->
+                return Error "The DevOps delegation returned an empty work record"
+            | Ok record -> return! bindDevOpsAndComplete store pid workId record
+        }
+
+    let private runPendingAsk
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (intent: string)
+        (delegateTo: string -> Task<string>)
+        : Task<Result<AskResult, string>> =
+        task {
+            try
+                let! delegation = captureDelegation delegateTo intent
+                let! completed = finishPendingAsk store pid workId delegation
+                return completed
+            finally
+                clearPendingAsk workId
+        }
+
+    let private beginPendingAsk
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (workId: string)
+        (intent: string)
+        (delegateTo: string -> Task<string>)
+        : Task<Result<AskResult, string>> =
+        if not (tryBeginPendingAsk workId) then
+            Task.FromResult(
+                Error(sprintf "An ask delegation is already pending for this work (%s); wait for it to finish" workId)
+            )
+        else
+            runPendingAsk store pid workId intent delegateTo
+
+    let executeAsk
+        (store: IEventStore)
+        (workId: string)
+        (intent: string)
+        (delegateTo: string -> Task<string>)
+        : Task<Result<AskResult, string>> =
         let pid = PlanWorkId.create workId
 
         let state =
             PlanEventStore.workState store pid
             |> Option.defaultValue PlanFold.initialWorkState
 
-        if state.Delivered.IsSome then
-            Error "The planning artifact has already been delivered. No further questions are permitted."
-        elif String.IsNullOrWhiteSpace question then
-            Error "Question cannot be empty"
-        else
-            checkPendingAsk state.PendingAsk question
-            |> Result.map (fun () ->
-                { Kind = "waiting_for_user"
-                  Question = question
-                  Status = "pending" })
-
-    let private ensureDevOpsBound
-        (store: IEventStore)
-        (pid: PlanWorkId)
-        (workId: string)
-        (target: string)
-        (isBound: bool)
-        : Task<unit> =
-        task {
-            if not isBound then
-                let boundEvent = PlanEvents.devOpsBound workId target None
-                let! _ = PlanEventStore.append store pid boundEvent
-                ()
-        }
-
-    let executeResume
-        (store: IEventStore)
-        (workId: string)
-        (charge: string)
-        (name: string option)
-        : Task<Result<ResumeResult, string>> =
-        task {
-            let pid = PlanWorkId.create workId
-
-            let state =
-                PlanEventStore.workState store pid
-                |> Option.defaultValue PlanFold.initialWorkState
-
-            if state.Delivered.IsSome then
-                return
-                    Error
-                        "The planning artifact has already been delivered. No further DevOps invocations are permitted."
-            elif String.IsNullOrWhiteSpace charge then
-                return Error "Charge cannot be empty"
-            else
-                let target = defaultArg name "devops"
-                do! ensureDevOpsBound store pid workId target state.BoundDevOps.IsSome
-
-                return
-                    Ok
-                        { Status = "dispatched"
-                          Target = target
-                          Charge = charge }
-        }
+        match validateAskRequest state intent with
+        | Error err -> Task.FromResult(Error err)
+        | Ok() -> beginPendingAsk store pid workId intent delegateTo
 
     let executeJsPlan
         (root: string)
