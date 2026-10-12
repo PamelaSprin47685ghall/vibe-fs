@@ -48,6 +48,7 @@ type PlanWorkState =
       Active: ActivePlanIncumbency option
       Retired: string list
       LatestRetirement: (string * PlanRetirementOutcome * XTraceCursor * XTraceCursor) option
+      PredecessorRange: (XTraceCursor * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
       PreviousIncumbencyStage: PlanStage option
@@ -60,6 +61,7 @@ module PlanWorkState =
           Active = None
           Retired = []
           LatestRetirement = None
+          PredecessorRange = None
           BoundDevOps = None
           Delivered = None
           PreviousIncumbencyStage = None
@@ -186,6 +188,9 @@ module PlanFold =
 
                 { state with
                     Active = Some active
+                    PredecessorRange =
+                        state.LatestRetirement
+                        |> Option.map (fun (_, _, startCursor, endCursor) -> startCursor, endCursor)
                     PreviousIncumbencyStage = Some stage })
 
     let private applyIncumbencyRetired
@@ -355,6 +360,7 @@ module PlanFold =
                   Active = Some restored
                   Retired = state.Retired
                   LatestRetirement = state.LatestRetirement
+                  PredecessorRange = state.PredecessorRange
                   BoundDevOps = state.BoundDevOps
                   Delivered = None
                   PreviousIncumbencyStage = state.PreviousIncumbencyStage

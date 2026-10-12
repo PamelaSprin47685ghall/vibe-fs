@@ -19,10 +19,10 @@ const buildAuthorizedS3 = (workId) => {
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-1', facts.PlanStage.S1, 0n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-1', 'S1', 'Promoted'), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-1', 'Relayed', 10n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-2', facts.PlanStage.S2, 11n), state).state
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-2', facts.PlanStage.S2, 10n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-2', 'S2', 'Promoted'), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-2', 'Relayed', 20n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-3', facts.PlanStage.S3, 21n), state).state
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-3', facts.PlanStage.S3, 20n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-3', 'S3', 'Promoted'), state).state
   return state
 }
@@ -69,7 +69,7 @@ test('WHAT[planning-008] authorized deliver records PlanDelivered with execSessi
       'inc-3',
       false,
       spawn,
-      [30n],
+      30n, // explicit scalar bigint retirement evidence
     )
 
     // The delivery receipt carries the execution session
@@ -111,7 +111,7 @@ test('WHAT[planning-008] authorized deliver is rejected when the plan artifact i
     const resMissing = await surface.PlanningSurface.executeDeliver(
       mockStoreMissing, tmpRoot, 'work-missing', 'inc-3', false,
       async () => 'exec-never',
-      [30n],
+      30n,
     )
     assert.equal(resMissing.ok, false)
     assert.match(resMissing.error, /empty or missing|not found/i)
@@ -142,11 +142,47 @@ test('WHAT[planning-008] authorized deliver is rejected when the plan artifact i
     const resSpawnFail = await surface.PlanningSurface.executeDeliver(
       mockStoreSpawnFail, tmpRoot, workId, 'inc-3', false,
       failingSpawn,
-      [30n],
+      30n,
     )
     assert.equal(resSpawnFail.ok, false, 'spawn failure must fail the delivery')
     assert.equal(state2.Active != null ? state2.Active.Id : undefined, 'inc-3', 'tenure must stay active after a failed delivery')
     assert.equal(surface.PlanningSurface.isDelivered(state2), false, 'no PlanDelivered may be recorded after a failed spawn')
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[planning-008] authorized deliver without retirement evidence fails closed with no spawn', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-deliver-evidence-'))
+
+  try {
+    const workId = 'work-d3'
+    const written = surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, '# Plan content')
+    assert.equal(written.ok, true)
+
+    let state = buildAuthorizedS3(workId)
+    const appended = []
+    const mockStore = {
+      TryCurrent: () => state,
+      TryHead: () => null,
+      Append: async (envs) => {
+        appended.push(...envs)
+        return { tag: 0 }
+      },
+    }
+    let spawnCalls = 0
+    const spawn = async () => {
+      spawnCalls += 1
+      return 'exec-never'
+    }
+
+    const res = await surface.PlanningSurface.executeDeliver(
+      mockStore, tmpRoot, workId, 'inc-3', false, spawn, undefined,
+    )
+    assert.equal(res.ok, false, 'authorized deliver must also require retirement evidence')
+    assert.match(res.error, /retirement cursor evidence is required/i)
+    assert.equal(spawnCalls, 0, 'no manager spawn may occur without retirement evidence')
+    assert.equal(appended.length, 0, 'no Plan events may be written without retirement evidence')
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true })
   }

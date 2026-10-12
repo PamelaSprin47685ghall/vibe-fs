@@ -33,6 +33,7 @@ type PlanWorkState =
       Active: ActivePlanIncumbency option
       Retired: string list
       LatestRetirement: (string * PlanRetirementOutcome * XTraceCursor * XTraceCursor) option
+      PredecessorRange: (XTraceCursor * XTraceCursor) option
       BoundDevOps: (string * string option) option
       Delivered: PlanDeliveryReceipt option
       PreviousIncumbencyStage: PlanStage option

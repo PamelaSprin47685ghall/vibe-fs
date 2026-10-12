@@ -35,7 +35,7 @@ module PlanTools =
         incumbencyId: string ->
         hasBlocker: bool ->
         spawn: (string -> string -> Task<string>) ->
-        retirementCursor: int64 option ->
+        retirementCursor: int64 ->
             Task<Result<DeliverResult, string>>
 
     /// planning-010: delegate the intent synchronously to the bound fixed

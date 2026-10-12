@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import {
+  assistantText,
+  cursors,
+  ids,
+  userText,
+} from './support/plan-messages.mjs'
 
 const openWork = (workId) => surface.PlanningSurface.workOpened(workId, '/tmp/plan-test')
 const openInc = (workId, incId, stage, cursor) =>
@@ -18,6 +24,16 @@ const firstStateOf = (events) => {
   return st
 }
 
+const tenureFor = (overrides) => ({
+  workId: 'w1',
+  incumbencyId: 'inc-2',
+  stage: 'S2',
+  openingCursor: 20n,
+  previousRange: [7n, 25n],
+  isFreshHandover: false,
+  ...overrides,
+})
+
 test('WHAT[planning-017] S1 with no retirement carries no previous range', () => {
   const st = firstStateOf([openWork('w1'), openInc('w1', 'inc-1', 'S1', 0n)])
   assert.equal(surface.PlanningSurface.latestRetirementRange(st), undefined)
@@ -34,27 +50,26 @@ test('WHAT[planning-017] S1 retirement preserves its opening range for the next 
 
 test('WHAT[planning-017] tenure assembly consumes PreviousRange into LWR_prev', () => {
   const rawMessages = [
-    { id: 'u1', role: 'user', content: 'go' },
-    { id: 'a-old', role: 'assistant', content: 'old work', cursor: 9n },
-    { id: 'a-new', role: 'assistant', content: 'new work', cursor: 30n },
+    userText('u1', 'go'),
+    assistantText('a-old', 'old work', 'u1'),
+    assistantText('a-new', 'new work', 'u1'),
   ]
-  const tenure = {
-    workId: 'w1',
-    incumbencyId: 'inc-2',
-    stage: 'S2',
-    openingCursor: 20n,
-    previousRange: [7n, 25n],
-    isFreshHandover: false,
-  }
   let seen = null
-  const result = surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, (range) => {
-    seen = range
-    return 'prev record'
-  })
+  const result = surface.PlanningSurface.assembleTenureMessages(
+    rawMessages,
+    tenureFor(),
+    (range) => {
+      seen = range
+      return 'prev record'
+    },
+    cursors({ 'a-old': 9n, 'a-new': 30n }),
+  )
   assert.equal(seen.start, 7n)
   assert.equal(seen.end, 25n)
-  const ids = result.messages.map((m) => m.id)
-  assert.ok(!ids.includes('a-old'))
-  assert.ok(ids.includes('a-new'))
-  assert.ok(ids.some((id) => String(id).startsWith('lwr-prev-')))
+  const assembledIds = ids(result.messages)
+  assert.ok(!assembledIds.includes('a-old'))
+  assert.ok(assembledIds.includes('a-new'))
+  assert.ok(assembledIds.some((id) => id.startsWith('lwr-prev-')))
+  // LWR_prev is injected before the first current interaction (a-new).
+  assert.deepEqual(assembledIds, ['u1', 'lwr-prev-inc-2', 'a-new'])
 })

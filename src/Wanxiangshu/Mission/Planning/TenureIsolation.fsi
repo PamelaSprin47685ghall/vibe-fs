@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Mission.Planning
 
-open Wanxiangshu.Context.Trace
-
 type ActiveTenureInfo =
     { WorkId: string
       IncumbencyId: string
@@ -13,8 +11,8 @@ type ActiveTenureInfo =
 type TenureMessage =
     { Id: string option
       Role: string
-      Content: string
-      Cursor: int64 option
+      IsSynthetic: bool
+      HasSemanticParts: bool
       Raw: obj }
 
 type TenureAssemblyResult =
@@ -22,7 +20,9 @@ type TenureAssemblyResult =
       ReanchorRequested: bool }
 
 module TenureIsolation =
-    val messageOfRaw: raw: obj -> TenureMessage
-    val tenureOfRaw: raw: obj -> ActiveTenureInfo
-    val assembleTenureMessages: rawMessagesInput: obj -> tenureInput: obj -> materializePrev: (obj -> string) -> obj
-    val assembleAskContinuation: rawMessagesInput: obj -> pendingAskObj: obj -> tenureInput: obj -> obj
+    val assemble:
+        messages: TenureMessage list ->
+        tenure: ActiveTenureInfo ->
+        messageCursors: Map<string, int64> ->
+        previousRecord: string option ->
+            TenureAssemblyResult

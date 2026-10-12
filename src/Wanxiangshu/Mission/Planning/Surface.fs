@@ -7,6 +7,7 @@ open Thoth.Json
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 
 module PlanningSurface =
@@ -83,6 +84,17 @@ module PlanningSurface =
     let latestRetirementRange (state: PlanWorkState) : (int64 * int64) option =
         state.LatestRetirement
         |> Option.map (fun (_, _, startC, endC) -> (XTraceCursor.sequence startC, XTraceCursor.sequence endC))
+
+    /// The predecessor range the active tenure inherited at opening: the
+    /// consumed range of the tenure it relays from (planning-017).
+    let predecessorRange (state: PlanWorkState) : (int64 * int64) option =
+        state.PredecessorRange
+        |> Option.map (fun (startCursor, endCursor) ->
+            XTraceCursor.sequence startCursor, XTraceCursor.sequence endCursor)
+
+    let activeOpeningCursor (state: PlanWorkState) : int64 option =
+        state.Active
+        |> Option.map (fun active -> XTraceCursor.sequence active.OpeningCursor)
 
     let isDelivered (state: PlanWorkState) : bool = state.Delivered.IsSome
 
@@ -342,8 +354,67 @@ module PlanningSurface =
                 {| found = false
                    view = Unchecked.defaultof<PlanWorkView> |}
 
-    let assembleTenureMessages (messages: obj) (tenureObj: obj) (materializePrev: obj -> string) : obj =
-        TenureIsolation.assembleTenureMessages messages tenureObj materializePrev
+    let private sequenceOfJs (value: obj) : int64 =
+        if not (emitJsExpr value "typeof $0 === 'bigint' && $0 >= 0n") then
+            invalidArg (nameof value) "Plan cursor must be a nonnegative bigint"
+
+        unbox<int64> value
+
+    let assembleTenureMessages
+        (messages: obj)
+        (tenureObj: obj)
+        (materializePrev: obj -> string)
+        (messageCursors: obj)
+        : obj =
+        let previousRange =
+            if isNull tenureObj?previousRange then
+                None
+            else
+                let range = unbox<obj array> tenureObj?previousRange
+                Some(sequenceOfJs range.[0], sequenceOfJs range.[1])
+
+        let tenure =
+            { WorkId = unbox<string> tenureObj?workId
+              IncumbencyId = unbox<string> tenureObj?incumbencyId
+              Stage = unbox<string> tenureObj?stage
+              OpeningCursor = sequenceOfJs tenureObj?openingCursor
+              PreviousRange = previousRange
+              IsFreshHandover = unbox<bool> tenureObj?isFreshHandover }
+
+        let cursors =
+            emitJsExpr messageCursors "Object.entries($0)"
+            |> unbox<obj array array>
+            |> Array.map (fun entry -> unbox<string> entry.[0], sequenceOfJs entry.[1])
+            |> Map.ofArray
+
+        let previousRecord =
+            previousRange
+            |> Option.map (fun (startCursor, endCursor) ->
+                materializePrev (
+                    box
+                        {| start = startCursor
+                           ``end`` = endCursor |}
+                ))
+
+        let assembled =
+            TenureIsolation.assemble
+                (unbox<obj array> messages
+                 |> Array.toList
+                 |> List.choose (fun raw ->
+                     ProviderWireCapture.decodeCapturedMessage raw
+                     |> Option.map (fun message ->
+                         { Id = ProviderWireDecode.hostMessageId raw
+                           Role = message.Role
+                           IsSynthetic = ProviderWireCapture.isSyntheticMessage raw
+                           HasSemanticParts = not (List.isEmpty message.Parts)
+                           Raw = raw })))
+                tenure
+                cursors
+                previousRecord
+
+        box
+            {| messages = assembled.Messages |> List.toArray
+               reanchorRequested = assembled.ReanchorRequested |}
 
     let validateWorkId (workId: string) : obj =
         match PlanPath.validateWorkId workId with
@@ -445,26 +516,8 @@ module PlanningSurface =
             None
 
     let private extractInt64Opt (v: obj) : int64 option =
-        if isNull v then
-            None
-        elif emitJsExpr v "Array.isArray($0)" then
-            let arr = unbox<obj array> v
-
-            if arr.Length = 0 || isNull arr.[0] then
-                None
-            else
-                let x = arr.[0]
-
-                if emitJsExpr x "typeof $0 === 'bigint'" then
-                    Some(unbox<int64> x)
-                elif emitJsExpr x "typeof $0 === 'number'" then
-                    Some(int64 (unbox<int> x))
-                else
-                    None
-        elif emitJsExpr v "typeof $0 === 'bigint'" then
+        if emitJsExpr v "typeof $0 === 'bigint'" then
             Some(unbox<int64> v)
-        elif emitJsExpr v "typeof $0 === 'number'" then
-            Some(int64 (unbox<int> v))
         else
             None
 
@@ -492,10 +545,14 @@ module PlanningSurface =
         (retirementCursor: obj)
         : Task<obj> =
         let spawnFn = spawnOfJs spawn
-        let retCursorOpt = extractInt64Opt retirementCursor
 
         task {
-            match! PlanTools.executeDeliver store root workId incumbencyId hasBlocker spawnFn retCursorOpt with
+            let! outcome =
+                match extractInt64Opt retirementCursor with
+                | None -> Task.FromResult(Error "Plan retirement cursor evidence is required")
+                | Some cursor -> PlanTools.executeDeliver store root workId incumbencyId hasBlocker spawnFn cursor
+
+            match outcome with
             | Ok res ->
                 return
                     box
@@ -554,9 +611,6 @@ module PlanningSurface =
                            status = null
                            error = err |}
         }
-
-    let assembleAskContinuation (messages: obj) (pendingAskObj: obj) (tenureObj: obj) : obj =
-        TenureIsolation.assembleAskContinuation messages pendingAskObj tenureObj
 
     let executeJsPlan (root: string) (workId: string) (action: string) (content: obj) (patches: obj) : obj =
         let contentOpt = extractStringOpt content
@@ -915,7 +969,6 @@ module PlanningSurface =
                editPlanAtomic = editPlanAtomic
                executeDeliver = executeDeliver
                executeAsk = executeAsk
-               assembleAskContinuation = assembleAskContinuation
                executeJsPlan = executeJsPlan
                executeReview = executeReview
                reviewTargetFor = reviewTargetFor
@@ -924,6 +977,8 @@ module PlanningSurface =
                allWorkViews = allWorkViews
                allWorkViewsFromIntegrator = allWorkViewsFromIntegrator
                latestRetirementRange = latestRetirementRange
+               predecessorRange = predecessorRange
+               activeOpeningCursor = activeOpeningCursor
                activeStage = activeStage
                retiredCount = retiredCount
                isDelivered = isDelivered

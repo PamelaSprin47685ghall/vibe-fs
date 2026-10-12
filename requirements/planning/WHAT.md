@@ -61,9 +61,10 @@ Plan 的轮换生命周期完全由七条不可变 Durable 事件驱动并投影
 - 允许后果：系统首先核查当前任期的递归活跃资源（包括 child、后台作业、未决工具调用与租约）。确认无 blocker 后，以单个原子事务追加两条事件：
   1. `PlanIncumbencyRetired(incumbencyId, Relayed)`；
   2. `PlanIncumbencyOpened(workId, nextIncumbencyId, stage, openingCursor)`，其中 stage 等于退休时的 stage（接力不推进阶段）。
-  当前活跃任期更新为新任期，阶段不变，下一次 Provider 请求触发前缀重锚并重启上下文（新任期按 [017] 重新装配 `U + LWR_prev + 本任交互`）。
-- 禁止后果：若存在活跃阻塞资源（blocker），禁止退休任期；系统必须记录 `CleanupBlocked` 并向模型返回 blocker 摘要。接力严禁改写 `stage`、严禁产生 `PlanReviewed`、严禁影响 `Delivered` 投影。禁止在未成功持久化新任期前注销当前任期。
-- 失败后果：事务写入失败时，当前任期保持活跃，不产生状态漂移。
+  退休游标取自当前 `deliver` 所属物理交互的真实 XTrace 边界，表示已消费到的最后一个语义 part；下一任的 `openingCursor` 等于该游标，首个新 part 从其后开始，不另加一。较新的用户输入或其它 provider run 不得扩大本次退休范围。
+  当前活跃任期更新为新任期，阶段不变，下一次 Provider 请求触发前缀重锚并重启上下文（新任期按 [017] 过滤旧任交互、插入 `LWR_prev`，保留真实对话的因果顺序）。
+- 禁止后果：若存在活跃阻塞资源（blocker），禁止退休任期；系统必须记录 `CleanupBlocked` 并向模型返回 blocker 摘要。接力严禁改写 `stage`、严禁产生 `PlanReviewed`、严禁影响 `Delivered` 投影。禁止在未成功持久化新任期前注销当前任期。禁止使用固定增量、消息数组下标或缺省值伪造退休游标。
+- 失败后果：退休边界不可证明时，在追加 Plan 事件之前拒绝接力；事务写入失败时，当前任期保持活跃，不产生状态漂移。
 
 ## [008] deliver 契约（持权交付路径）
 
@@ -145,13 +146,14 @@ Plan 的生命周期事实接入 EventStore 统一持久化存储与 CanonicalIn
 
 当为处于活跃任期的会话组装 Provider 请求消息集时，系统应用通用的 Baton 隔离策略。
 
-- 允许后果：输入消息集按序由以下部分组成：
-  1. 当前规划任务因果范围内的全部真实用户输入原文（U），按原顺序完整保留；
-  2. 若当前任期非首任，且存在上一任期有效覆盖范围，追加由上一任期记录渲染而成的记录消息（LWR_prev，由 `LifecycleWorkRecord.materialize` 且 `includeOpening = false` 渲染；若为首任则此项为空）；
-  3. 开任游标（`openingCursor`）之后产生的本任期真实 assistant 与 tool 交互消息。
-  若当前请求为任期内的首条请求（消息集中尚不存在当前任期的新生成交互，或任期刚发生切换），系统请求触发前缀重锚（TenureReanchored，reanchorRequested = true），开启全新的前缀 epoch。
-- 禁止后果：上一任期及更早任期的全部 assistant 消息与 tool 消息必须全部剥除，不得进入消息集。规划底稿 P 的正文严禁直接拼装入消息集。用户消息 U 严禁压缩、重排、重编码或篡改。对于非 Plan 角色或无活跃任期的普通会话，严禁触发隔离与剥除。
-- 失败后果：若任期消息装配失败或游标越界，系统必须停止当前请求组装，拒绝发送受污染的上下文。
+- 允许后果：先以稳定 Host 消息及 part 身份捕获本次请求中新观察到的真实交互，再按原消息顺序执行任期过滤：
+  1. 当前规划任务因果范围内的全部真实用户输入原文（U）完整保留；
+  2. 保留本任期真实 assistant 与 tool 交互，不把用户回答移动到它所回答的 assistant 或工具交互之前；
+  3. 非首任存在上任有效范围时，由 `LifecycleWorkRecord.materialize` 且 `includeOpening = false` 渲染 `LWR_prev`，在首条本任期物理消息之前插入一次；尚无本任期消息时，置于保留的历史 U 之后。
+  `openingCursor` 表示已消费到的边界。物理消息的任期归属取其稳定身份在 XTrace 中的首次观察游标，跨前缀 epoch 不变；后续追加的 part 或重锚后的重复捕获不得把旧消息变成新任消息。工具调用及结果按完整物理交互保留或剥除，不切半。
+  每个任期的首条请求按持久化的 `TenureReanchored` 事实触发一次前缀重锚（reanchorRequested = true）；必须等待该事实提交后才继续请求组装。重复请求、空停后的追问和进程重启不得为同一任期重复重锚。
+- 禁止后果：上一任期及更早任期的全部 assistant 消息与 tool 消息必须全部剥除，不得进入消息集。规划底稿 P 的正文严禁直接拼装入消息集。用户消息 U 严禁压缩、重排、重编码或篡改。禁止依赖 Host 消息上并不存在的 `cursor` 字段；缺少稳定归属证据时，禁止静默删除交互或放行旧交互。对于非 Plan 角色或无活跃任期的普通会话，严禁触发隔离与剥除。
+- 失败后果：若任期消息装配失败、游标越界、非空上任范围的记录不可得或必需的重锚提交失败，系统必须停止当前请求组装，拒绝发送残缺或受污染的上下文。
 
 ## [018] 崩溃恢复判定与位置重绑
 
@@ -183,7 +185,7 @@ Plan 的生命周期事实接入 EventStore 统一持久化存储与 CanonicalIn
 
 Plan 工作的状态（state）为 `active | delivered`，由 Durable 事实驱动，与 stage（[004]）正交。
 
-- 允许后果：`PlanDelivered` 把 state 置为 `delivered`；`PlanReopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统追加 `PlanReopened(incumbencyId)`（incumbencyId 取自该 work 的 `Delivered` 退休记录）：投影清除 `Delivered`，并把 `Active` 恢复为该任期——沿用原 incumbencyId、原 stage、原授权，不生成新任期、不重置阶段。恢复后模型在原任期上继续工作（可修改 `P`、可再次 `deliver`）。
+- 允许后果：`PlanDelivered` 把 state 置为 `delivered`；`PlanReopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统追加 `PlanReopened(incumbencyId)`（incumbencyId 取自该 work 的 `Delivered` 退休记录）：投影清除 `Delivered`，并把 `Active` 恢复为该任期——沿用原 incumbencyId、原 stage、原授权，不生成新任期、不重置阶段。恢复后模型在原任期上继续工作（可修改 `P`、可再次 `deliver`）。该任期开任时继承的上任记录范围保持不变；不能把它自己的 `Delivered` 退休记录误当成上一任期。
 - 禁止后果：严禁在无 `Delivered` 事实时追加 `PlanReopened`。严禁借重开推进或回退 stage、生成新任期、清除 `Reviewed` 历史或重置授权。严禁在非 reprompt 场景（如恢复、调度）自动触发重开。`Retired` 列表的历史记录严禁删除。
 - 失败后果：同一身份重放幂等；载荷或 incumbencyId 与 `Delivered` 退休记录不符时拒绝；底层存储零写入。
 

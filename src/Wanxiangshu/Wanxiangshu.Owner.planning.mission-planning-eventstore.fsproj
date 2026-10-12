@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-event-vocabulary-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>

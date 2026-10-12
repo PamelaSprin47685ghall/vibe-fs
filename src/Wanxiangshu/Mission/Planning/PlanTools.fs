@@ -122,10 +122,6 @@ module PlanTools =
             | Ok _ -> return! appendDeliverOnly store pid delEvent
         }
 
-    let private retirementSequence (active: ActivePlanIncumbency) (retirementCursor: int64 option) : int64 =
-        let openCurSeq = XTraceCursor.sequence active.OpeningCursor
-        defaultArg retirementCursor (openCurSeq + 10L)
-
     let private resolvePathAndDigest
         (content: string)
         (root: string)
@@ -163,13 +159,13 @@ module PlanTools =
         (workId: string)
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         (digest: string)
         (planPath: string)
         (execSessionId: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            let retCurSeq = retirementSequence active retirementCursor
+            let retCurSeq = retirementCursor
 
             let retEvent =
                 PlanEvents.incumbencyRetired incumbencyId PlanRetirementOutcome.Delivered retCurSeq
@@ -203,7 +199,7 @@ module PlanTools =
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
         (spawn: string -> string -> Task<string>)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         (content: string, digest: string, planPath: string)
         : Task<Result<DeliverResult, string>> =
         task {
@@ -231,7 +227,7 @@ module PlanTools =
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
         (spawn: string -> string -> Task<string>)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
             match readAndValidatePlan root workId with
@@ -261,10 +257,10 @@ module PlanTools =
         (workId: string)
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         : RelayTransition =
-        let retCurSeq = retirementSequence active retirementCursor
-        let nextOpenCurSeq = retCurSeq + 1L
+        let retCurSeq = retirementCursor
+        let nextOpenCurSeq = retCurSeq
 
         let nextIncumbencyId =
             "inc-"
@@ -283,7 +279,7 @@ module PlanTools =
         (workId: string)
         (incumbencyId: string)
         (active: ActivePlanIncumbency)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
             let relay = buildRelayTransition workId incumbencyId active retirementCursor
@@ -312,12 +308,33 @@ module PlanTools =
         (workId: string)
         (decision: DeliverDecision)
         (spawn: string -> string -> Task<string>)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         match decision with
         | AuthorizedDelivery active ->
             performAuthorizedDelivery store pid root workId active.Id active spawn retirementCursor
         | RelayToSuccessor active -> performRelay store pid workId active.Id active retirementCursor
+
+    let private activeOfDecision =
+        function
+        | AuthorizedDelivery active -> active
+        | RelayToSuccessor active -> active
+
+    // The retirement frontier cannot precede the tenure's own opening: the
+    // boundary check is resolved before any event append or spawn.
+    let private runCheckedDeliver
+        (store: IEventStore)
+        (pid: PlanWorkId)
+        (root: string)
+        (workId: string)
+        (decision: DeliverDecision)
+        (spawn: string -> string -> Task<string>)
+        (retirementCursor: int64)
+        : Task<Result<DeliverResult, string>> =
+        if XTraceCursor.sequence (activeOfDecision decision).OpeningCursor > retirementCursor then
+            Task.FromResult(Error "Retirement cursor cannot precede incumbency opening cursor")
+        else
+            runDeliverDecision store pid root workId decision spawn retirementCursor
 
     let executeDeliver
         (store: IEventStore)
@@ -326,7 +343,7 @@ module PlanTools =
         (incumbencyId: string)
         (hasBlocker: bool)
         (spawn: string -> string -> Task<string>)
-        (retirementCursor: int64 option)
+        (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
             let pid = PlanWorkId.create workId
@@ -337,7 +354,7 @@ module PlanTools =
 
             match resolveDeliverDecision state incumbencyId hasBlocker with
             | Error err -> return Error err
-            | Ok decision -> return! runDeliverDecision store pid root workId decision spawn retirementCursor
+            | Ok decision -> return! runCheckedDeliver store pid root workId decision spawn retirementCursor
         }
 
     // planning-010: at most one pending ask delegation per work. The tracker

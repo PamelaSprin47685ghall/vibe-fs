@@ -607,6 +607,44 @@ module PluginTransforms =
                 (Some boot.Timer)
                 outObj
 
+        let captureXTraceMessages projectionSessionIdOpt (rawMessages: obj list) =
+            task {
+                match projectionSessionIdOpt with
+                | None ->
+                    return
+                        { RawMessages = rawMessages
+                          Current = None }
+                | Some sessionId ->
+                    let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
+
+                    let observations =
+                        canonical
+                        |> Result.defaultWith (raiseFailClosed strengthFailFuse)
+                        |> List.choose (fun rawMessage ->
+                            ProviderWireCapture.decodeCapturedMessage rawMessage
+                            |> Option.map (fun message ->
+                                { Message = message
+                                  HostMessageId = ProviderWireDecode.hostMessageId rawMessage
+                                  Origin =
+                                    ProviderWireDecode.promptOriginOfMessage rawMessage
+                                    |> Option.map decodePromptOrigin }))
+
+                    match!
+                        XTraceCapture.captureObservedMessagesWithReceipt
+                            journal
+                            (SessionId.create sessionId)
+                            observations
+                    with
+                    | Ok captured ->
+                        return
+                            { RawMessages = rawMessages
+                              Current = captured.Current }
+                    | Error(XTraceCaptureError.Refused reason) -> return raiseFailClosed strengthFailFuse reason
+                    | Error(XTraceCaptureError.StorageAppendFailed failure) ->
+                        return raiseFailClosed strengthFailFuse (JournalAppendFailure.describe failure)
+                    | Error(XTraceCaptureError.StorageFailed reason) -> return raiseFailClosed strengthFailFuse reason
+            }
+
         let ownerRole (sessionId: string) =
             journal
             |> Option.bind (fun durable ->
@@ -621,12 +659,6 @@ module PluginTransforms =
             match sidOpt with
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
-
-        let tenureHasAssistantOrTool (rawMessages: obj list) : bool =
-            rawMessages
-            |> List.exists (fun raw ->
-                let tm = Wanxiangshu.Mission.Planning.TenureIsolation.messageOfRaw raw
-                tm.Role = "assistant" || tm.Role = "tool")
 
         let tryReadActivePlanState (sidOpt: string option) : Wanxiangshu.Mission.Planning.PlanWorkState option =
             // Resolve the plan work by the session id (workId = sessionId) so
@@ -647,128 +679,160 @@ module PluginTransforms =
             : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
             let active = state.Active.Value
 
-            let workId = defaultArg state.WorkId ""
-
             let previousRange =
-                state.LatestRetirement
-                |> Option.map (fun (_, _, startC, endC) -> (XTraceCursor.sequence startC, XTraceCursor.sequence endC))
+                state.PredecessorRange
+                |> Option.map (fun (startCursor, endCursor) ->
+                    XTraceCursor.sequence startCursor, XTraceCursor.sequence endCursor)
 
-            { WorkId = workId
+            { WorkId = state.WorkId.Value
               IncumbencyId = active.Id
               Stage = Wanxiangshu.Mission.Planning.PlanStage.render active.Stage
               OpeningCursor = XTraceCursor.sequence active.OpeningCursor
               PreviousRange = previousRange
               IsFreshHandover = fresh }
 
-        let resolveTenure (sidOpt: string option) (outObj: obj) : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
-            let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
-            let fresh = not (tenureHasAssistantOrTool rawMessages)
-
-            tryReadActivePlanState sidOpt
-            |> Option.filter (fun state -> state.Active.IsSome)
-            |> Option.map (fun state -> buildTenureOf state fresh)
-
-        let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch option =
+        let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch =
             match AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections with
-            | None -> None
-            | Some session -> session.PrefixEpoch
+            | None -> invalidOp "Plan session projection is unavailable"
+            | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
-        let emitTenureReanchorSkipped (reason: string) : unit =
-            Diagnostic.emit "plan-tenure-reanchor-skipped" [ "result", reason ]
-
-        // The reanchor fact is appended fire-and-forget; an append failure is
-        // diagnosed so the transform is never blocked by journal health.
-        let appendTenureReanchorFact
+        let reanchorTenure
             (durable: AgentJournal)
             (sessionId: SessionId)
-            (workId: string)
-            (incumbencyId: string)
-            (fact: AgentFact)
-            : unit =
-            let appendTask =
-                AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable
-
+            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
+            (epoch: ActivePrefixEpoch)
+            =
             task {
-                match! appendTask with
-                | Ok _ -> ()
-                | Error failure ->
-                    Diagnostic.emit
-                        "plan-tenure-reanchor-append-failed"
-                        [ "work_id", workId
-                          "incumbency_id", incumbencyId
-                          "result", JournalAppendFailure.describe failure ]
-            }
-            |> ignore
-
-        let fireTenureReanchor
-            (durable: AgentJournal)
-            (sessionId: SessionId)
-            (workId: string)
-            (incumbencyId: string)
-            : unit =
-            match tenureReanchorEpoch durable sessionId with
-            | None -> emitTenureReanchorSkipped "no-epoch"
-            | Some epoch ->
                 let fact =
                     ContextFact.TenureReanchored
                         {| SessionId = sessionId
                            PreviousEpochId = epoch.EpochId
                            NextEpochId = PrefixEpochId.next epoch.EpochId
-                           WorkId = workId
-                           IncumbencyId = incumbencyId |}
+                           WorkId = tenure.WorkId
+                           IncumbencyId = tenure.IncumbencyId |}
 
-                appendTenureReanchorFact durable sessionId workId incumbencyId fact
+                match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact durable with
+                | Ok _ -> ()
+                | Error failure -> return raise (JournalAppendException failure)
+            }
 
-        // The reanchor flag is read defensively: a malformed payload means
-        // "not requested", never a transform failure.
-        let readReanchorFlag (result: obj) : bool =
-            try
-                unbox<bool> result?reanchorRequested
-            with _ ->
-                false
-
-        let isTenureReanchorRequested (result: obj) : bool =
-            if isNull result then false else readReanchorFlag result
-
-        // A reanchor was requested but the journal or the session id is
-        // missing: the request is diagnosed and dropped, never silently
-        // ignored.
-        let reportUnreachableReanchor (requested: bool) : unit =
-            if requested then
-                emitTenureReanchorSkipped "no-journal-or-session"
-
-        let assembleAndRewrite
-            (sidOpt: string option)
-            (outObj: obj)
+        let previousTenureRecord
+            (durable: AgentJournal)
+            (sessionId: SessionId)
             (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
-            : unit =
-            let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+            =
+            match tenure.PreviousRange with
+            | Some(startCursor, endCursor) when endCursor > startCursor ->
+                let range =
+                    XTraceRange.create
+                        (XTraceCursor.create startCursor |> XTraceCursor.nextCursor)
+                        (XTraceCursor.create endCursor |> XTraceCursor.nextCursor)
 
-            let result =
-                Wanxiangshu.Mission.Planning.PlanningSurface.assembleTenureMessages
-                    (box (rawMessages |> List.toArray))
-                    (box tenure)
-                    (fun _ -> "")
+                Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                    durable
+                    (AgentJournal.snapshot durable)
+                    sessionId
+                    range
+            | _ -> Task.FromResult None
 
-            let assembled = unbox<obj array> result?messages |> Array.toList
-            HostMessageProjection.replaceMessagesInPlace outObj assembled
+        // COMPANION-003: the Plan session is a top-level main session; nothing
+        // else owns its opening. Without opening evidence the bounded LWR_prev
+        // of a relay successor materializes to nothing and the handover loses
+        // the previous tenure's semantics. The opening is the first physical
+        // user instruction, captured once; a session that already has opening
+        // evidence is never rewritten.
+        let planOpeningText (rawMessages: obj list) : string option =
+            rawMessages
+            |> List.choose (fun raw ->
+                ProviderWireCapture.decodeCapturedMessage raw
+                |> Option.filter (fun message -> message.Role = "user")
+                |> Option.map (fun _ -> ProviderWireCapture.formalText raw))
+            |> List.tryFind (String.IsNullOrWhiteSpace >> not)
 
-            let requested = isTenureReanchorRequested result
+        let appendPlanOpening (durable: AgentJournal) (sessionId: SessionId) (text: string) =
+            task {
+                match! XTraceCapture.captureOpeningWithReceipt (Some durable) sessionId text [] with
+                | Ok _ -> return ()
+                | Error(XTraceCaptureError.Refused reason) ->
+                    return invalidOp (sprintf "Plan opening capture refused: %s" reason)
+                | Error(XTraceCaptureError.StorageAppendFailed failure) ->
+                    return invalidOp (JournalOutcome.JournalAppendFailure.describe failure)
+                | Error(XTraceCaptureError.StorageFailed reason) ->
+                    return invalidOp (sprintf "Plan opening capture failed: %s" reason)
+            }
 
-            let target =
-                match journal, sidOpt, requested with
-                | Some durable, Some sid, true when not (String.IsNullOrWhiteSpace sid) ->
-                    Some(durable, SessionId.create sid)
-                | _ -> None
+        let capturePlanSessionOpening
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (trace: XTraceProjectionState)
+            (rawMessages: obj list)
+            =
+            match planOpeningText rawMessages with
+            | Some text when XTraceProjection.openingEvidence trace |> Option.isNone ->
+                appendPlanOpening durable sessionId text
+            | _ -> Task.FromResult()
 
-            match target with
-            | None -> reportUnreachableReanchor requested
-            | Some(durable, sessionId) -> fireTenureReanchor durable sessionId tenure.WorkId tenure.IncumbencyId
+        let tenureMessagesOf (rawMessages: obj list) : Wanxiangshu.Mission.Planning.TenureMessage list =
+            rawMessages
+            |> List.choose (fun raw ->
+                ProviderWireCapture.decodeCapturedMessage raw
+                |> Option.map (fun message ->
+                    { Wanxiangshu.Mission.Planning.TenureMessage.Id = ProviderWireDecode.hostMessageId raw
+                      Role = message.Role
+                      IsSynthetic = ProviderWireCapture.isSyntheticMessage raw
+                      HasSemanticParts = not (List.isEmpty message.Parts)
+                      Raw = raw }))
 
-        let applyResolvedTenure (sidOpt: string option) (outObj: obj) : unit =
-            match resolveTenure sidOpt outObj with
-            | None -> ()
-            | Some tenure -> assembleAndRewrite sidOpt outObj tenure
+        let isolatePlanTenure (state: Wanxiangshu.Mission.Planning.PlanWorkState) (sid: string) (outObj: obj) =
+            task {
+                let durable =
+                    journal
+                    |> Option.defaultWith (fun () -> invalidOp "Plan journal is unavailable")
+
+                let sessionId = SessionId.create sid
+                do! restoreProtocolArguments outObj
+                let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+                let! captured =
+                    rawMessages
+                    |> List.filter (ProviderWireCapture.isSyntheticMessage >> not)
+                    |> captureXTraceMessages (Some sid)
+
+                let trace =
+                    captured.Current
+                    |> Option.defaultWith (fun () -> invalidOp "Plan XTrace is unavailable")
+
+                do! capturePlanSessionOpening durable sessionId trace rawMessages
+
+                let epoch = tenureReanchorEpoch durable sessionId
+
+                let tenure =
+                    buildTenureOf state (not (PrefixEpochProjection.isTenureReanchored state.Active.Value.Id epoch))
+
+                if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
+                    invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
+
+                let! previousRecord = previousTenureRecord durable sessionId tenure
+
+                let assembled =
+                    Wanxiangshu.Mission.Planning.TenureIsolation.assemble
+                        (tenureMessagesOf rawMessages)
+                        tenure
+                        (XTraceProjection.hostMessageFirstCursors trace)
+                        previousRecord
+
+                if assembled.ReanchorRequested then
+                    do! reanchorTenure durable sessionId tenure epoch
+
+                HostMessageProjection.replaceMessagesInPlace outObj assembled.Messages
+            }
+
+        let applyResolvedTenure (sid: string) (outObj: obj) =
+            task {
+                match tryReadActivePlanState (Some sid) with
+                | Some state when state.Active.IsSome -> return! isolatePlanTenure state sid outObj
+                | _ -> ()
+            }
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =
             task {
@@ -780,7 +844,7 @@ module PluginTransforms =
                     // The EventStore write lives in PlanWorkOpenWiring; this
                     // module writes its facts through AgentJournal only.
                     do! PlanWorkOpenWiring.ensurePlanWorkOpenedForSession workspaceDirectory sid
-                    applyResolvedTenure sidOpt outObj
+                    do! applyResolvedTenure sid outObj
             }
 
         { BeginPhysicalProviderAttempt =
@@ -868,47 +932,8 @@ module PluginTransforms =
           ApplyTenureIsolation = applyTenureIsolation
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
-                task {
-                    let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                    match projectionSessionIdOpt with
-                    | None ->
-                        return
-                            { RawMessages = rawMessages
-                              Current = None }
-                    | Some sessionId ->
-                        let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
-
-                        let captureMessages =
-                            canonical |> Result.defaultWith (raiseFailClosed strengthFailFuse)
-
-                        let observations =
-                            captureMessages
-                            |> List.choose (fun rawMessage ->
-                                ProviderWireCapture.decodeCapturedMessage rawMessage
-                                |> Option.map (fun message ->
-                                    { Message = message
-                                      HostMessageId = ProviderWireDecode.hostMessageId rawMessage
-                                      Origin =
-                                        ProviderWireDecode.promptOriginOfMessage rawMessage
-                                        |> Option.map decodePromptOrigin }))
-
-                        match!
-                            XTraceCapture.captureObservedMessagesWithReceipt
-                                journal
-                                (SessionId.create sessionId)
-                                observations
-                        with
-                        | Ok captured ->
-                            return
-                                { RawMessages = rawMessages
-                                  Current = captured.Current }
-                        | Error(XTraceCaptureError.Refused reason) -> return raiseFailClosed strengthFailFuse reason
-                        | Error(XTraceCaptureError.StorageAppendFailed failure) ->
-                            return raiseFailClosed strengthFailFuse (JournalAppendFailure.describe failure)
-                        | Error(XTraceCaptureError.StorageFailed reason) ->
-                            return raiseFailClosed strengthFailFuse reason
-                }
+                ProviderWireDecode.messagesFromTransformOutput outObj
+                |> captureXTraceMessages projectionSessionIdOpt
           CommitStrengthTrace =
             fun projectionSessionIdOpt traceState strengthReplayPlans ->
                 match projectionSessionIdOpt with

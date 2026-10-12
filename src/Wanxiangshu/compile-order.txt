@@ -470,8 +470,6 @@ Mission/Planning/PlanTools.fsi
 Mission/Planning/PlanTools.fs
 Mission/Planning/ReviewPlanBackend.fsi
 Mission/Planning/ReviewPlanBackend.fs
-Mission/Planning/Surface.fsi
-Mission/Planning/Surface.fs
 Strength/Persistence/Store.fsi
 Strength/Persistence/Store.fs
 Strength/Migration/DelegationHistoryMigration.fsi
@@ -876,6 +874,8 @@ OpenCode/Codec/ProviderWireCapture.fsi
 OpenCode/Codec/ProviderWireCapture.fs
 OpenCode/Codec/ProjectionMessageEdit.fsi
 OpenCode/Codec/ProjectionMessageEdit.fs
+Mission/Planning/Surface.fsi
+Mission/Planning/Surface.fs
 Participant/Provider/Projection/Surface.fsi
 Participant/Provider/Projection/Surface.fs
 OpenCode/Host/PairProgrammingCalibration.fsi

@@ -1,5 +1,18 @@
 # Changelog — 版本历史
 
+## Unreleased — Plan 最后回合丢失修复（planning-007 / 017 / 021）
+
+- Plan 发给 LLM 的请求在任期隔离阶段丢失最后回合。根因是 `TenureIsolation` 与真实 Host 消息形态脱节：`AssistantMessage` 没有 `cursor` 字段（SDK types.gen.d.ts:213-247）、工具结果挂在 assistant 的 `parts` 上，而隔离把「消息数组下标 + 缺失的 cursor」当任期归属证据；同时把全部 U 提前再拼 assistant/tool 打乱因果顺序，非首任更在无 cursor 时整段丢弃当前 assistant/tool。生产接力另有两处语义缺陷：退休游标用 `openingCursor + 10` 伪造、上一任期 LWR 回调固定返回空串。
+- `src/Wanxiangshu/Mission/Planning/TenureIsolation.fs`：`assemble` 接受规范 `TenureMessage` 列表（Id/Role/IsSynthetic/HasSemanticParts/Raw）与 `messageCursors: Map<string,int64>`；任期归属由稳定 Host 消息身份在 XTrace 中的**首次观察游标**决定，跨 epoch 稳定，工具调用与其结果作为整段物理交互保留或剥除；按原交错顺序输出，`LWR_prev` 注入在首条本任物理消息之前，无本任消息时置于历史 U 之后。合成 LWR 行在装配前剥除，仅注入一条当前记录；非空上任范围缺 LWR、或语义 assistant/tool 无规范身份，一律 fail-closed，不静默丢消息也不放行旧交互。`ReanchorRequested = IsFreshHandover`（每任期一次），不再每次空停重发。
+- `src/Wanxiangshu/Mission/Planning/Surface.fs` + `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`：`assembleTenureMessages` 现取 4 参（末位 id→bigint 游标映射），生产隔离改为在过滤前用 `XTraceCapture` 以稳定 Host 身份捕获本请求全部新观察物理消息（重试 continuation 行保位不产生语义 part），再由 `XTraceProjection.hostMessageFirstCursors` 供游标；`TenureReanchored` 事实改为 await 提交，经 `PrefixEpochProjection.isTenureReanchored` 去重，失败即抛出，不再 fire-and-forget。`executeDeliver` 契约收紧为必填 `int64` 退休游标（不接受 option/缺省），无证据在任何写入或 spawn 前失败。
+- `src/Wanxiangshu/Mission/Planning/PlanTools.fs` + `src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs`：删除 `openingCursor + 10` 猜测。生产 deliver 通过 `ToolRuntimeScope.Snapshot` + `XTraceCapture.captureSessionMessagesWithReceipt` 取本次 deliver 所属**exact** 物理 assistant/tool 交互（`ctx.ProviderRunId`/`ctx.ToolCallId` 身份验证）的 XTrace 消费前沿作退休游标；后继 `openingCursor =` 退休游标（consumed-through，不再 +1），deliver 期间到达的更新用户/其它 provider run 不扩大本次退休范围；快照/journal 缺失、owning 身份不符或捕获失败均拒绝接力、零写入。
+- `src/Wanxiangshu/Mission/Planning/Fold.fs`：新增 `PredecessorRange`（`PlanWorkState` 字段），继任开任时由 `LatestRetirement` 派生，`Delivered`/`Reopened` 原样保留；重开不再把自身交付记录当作上任。`PluginTransforms.buildTenureOf` 改读 `PredecessorRange` 作 LWR 上任范围。
+- `requirements/planning/WHAT.md`：[007] 明确退休游标必须来自 exact 物理交互的 consumed-through XTrace 边界，禁止固定增量/下标/缺省伪造；[017] 重写为规范身份归属、因果顺序保留、LWR 注入点、fail-closed 与每任期一次 await 重锚；[021] 明确 reprompt 保留继承的上任范围。
+- `requirements/semantic-trace/tests/002.test.mjs` 与 `requirements/planning/tests/support/run-plan-request-loss-smoke.mjs`：前者用 canonical XTrace 跨 epoch 事实驱动 Plan 装配（追加 part 与重锚复制都不能把旧消息变成新任消息）；后者用真实安装 OpenCode + 生产插件 + 严格 mock provider 捕获实际 HTTP 请求体，断言最新用户回合与最新工具结果在接力前后完整保留。
+- 退役：`TenureIsolation.assembleAskContinuation`/`messageOfRaw`/`tenureOfRaw`（两段式 ask 协议遗骸）、`extractInt64Opt` 的数组包装与数字回退、`host-canary-plan-relay.test.mjs`（`test.todo` 假 canary，行为并入编号用例）。测试夹具收敛到单一 `{info, parts}` Host 形态加 `msgId`/`msgRole`/`msgText` 访问器，不再依赖消息上的 `cursor`。
+- 修复两处测试自身的语义笔误：`007` 连续三接力实退休 3 个任期（原断 4）、`021` 上任范围继承改走 planning-004 授权的合法三段 ladder。
+- 证据（2026-10-12 终态）：`node scripts/build.mjs` 全量绿（generation 462，1550 items、175 surfaces、845 modules）；planning + semantic-trace-002 + execution-model-routing 45 文件 215 passed / 0 failed / 8 todo（todo 均既有设计内）；host-boundary 集成层（`WXS_TIER_INTEGRATION=1`）33 文件 278 passed / 0 failed / 3 todo（019/029/032 三条设计内 canary todo）；真实安装 OpenCode 1.18.29 + 生产插件冒烟实跑 5 个 provider 请求，最后回合、工具交换与接力后继断言全绿；两债务门（fsharp-control-pyramid、js-boundary-gate）对改动文件 0 违规。
+
 ## Unreleased — Plan 模式（接力式规划协议）完整实现
 
 - Plan 模式按 `feat-PLANNER/001.md` D1–D20 重写交付（`24babfac8`）：Role.Plan 四工具集 `js-plan`/`ask`/`review`/`deliver`（handoff 并入 deliver、resume 退役）；`review` 晋级硬门（与 Manager 共用同一工具、每任一次、评审目标 = 下一里程碑）；`deliver` 双路径（无权接力退休开下任、持权交付并起无 parent 的 Manager 执行会话）；`ask` 同步委派固定 DevOps（取代两段式）；自然停止（Plan 空停等用户 prompt）；tenure-isolation 与前缀重锚、崩溃恢复保留。

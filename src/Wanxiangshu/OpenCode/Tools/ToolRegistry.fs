@@ -663,6 +663,131 @@ module ToolRegistry =
             else
                 sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
 
+        // planning-007/008: the retirement cursor is the exact consumed-through
+        // XTrace frontier of the physical exchange that owns this deliver call.
+        // The snapshot may already contain a newer user/provider message appended
+        // while this deliver tool runs; retirement is fenced to the exact
+        // assistant/tool exchange in ctx (its ProviderRunId message and the
+        // ToolCallId it answers), never the indiscriminate session head. The
+        // whole physical call/result exchange is kept atomic: the frontier lands
+        // after the owning assistant message, so the deliver call's own result
+        // (appended after retirement) belongs to the successor tenure, and no
+        // prior call/result pair is split. A missing snapshot, journal, or
+        // owning-exchange identity fails closed with no Plan writes or spawn.
+        let deliverPorts (runtime: ToolRuntimeScope) =
+            match runtime.Snapshot, runtime.Journal with
+            | Some snapshotPort, Some journal -> Ok(snapshotPort, journal)
+            | None, _ -> Error "deliver failed: session snapshot is unavailable"
+            | _, None -> Error "deliver failed: journal is unavailable"
+
+        let deliverOwnership (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some providerRun, Some toolCall -> Ok(ProviderRunIdentity.value providerRun, ToolCallId.value toolCall)
+            | None, _ -> Error "deliver failed: owning provider message identity is unavailable"
+            | _, None -> Error "deliver failed: owning tool call identity is unavailable"
+
+        let messageOwnsDeliver (message: SessionMessage) (owningCallId: string) =
+            message.ToolParts
+            |> Array.exists (fun part -> ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
+
+        // Fence to the owning exchange: keep every message up to and including
+        // the assistant message that owns this deliver call. The snapshot port
+        // pins `order = "asc"` (HOST 1.18.9 session.messages), so the list is
+        // already physical append order; it is preserved verbatim. Any newer
+        // user/provider message appended while deliver runs stays out of range.
+        let tryOwningExchange (messages: SessionMessage list) (owningMessageId: string) (owningCallId: string) =
+            let owningIndex =
+                messages
+                |> List.tryFindIndex (fun (message: SessionMessage) ->
+                    message.Id = owningMessageId && message.Role = "assistant")
+
+            match owningIndex with
+            | None -> Error "deliver failed: the owning provider message is absent from the session snapshot"
+            | Some index when not (messageOwnsDeliver messages.[index] owningCallId) ->
+                Error "deliver failed: the owning tool call does not match this deliver invocation"
+            | Some index -> Ok(messages.[0..index])
+
+        let readOwningExchange
+            (snapshotPort: ISessionSnapshotPort)
+            (sessionId: SessionId)
+            (owningMessageId: string)
+            (owningCallId: string)
+            =
+            task {
+                match! snapshotPort.GetMessages sessionId with
+                | Error reason -> return Error(sprintf "deliver failed: cannot read the session snapshot: %s" reason)
+                | Ok messages -> return tryOwningExchange messages owningMessageId owningCallId
+            }
+
+        let captureFencedFrontier journal sessionId fenced =
+            task {
+                match!
+                    Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt
+                        (Some journal)
+                        sessionId
+                        fenced
+                with
+                | Ok receipt -> return Ok(Wanxiangshu.Context.Trace.XTraceCursor.sequence receipt.CurrentHead)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.Refused reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture refused: %s" reason)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageAppendFailed failure) ->
+                    return
+                        Error(
+                            sprintf
+                                "deliver failed: XTrace capture append failed: %s"
+                                (JournalOutcome.JournalAppendFailure.describe failure)
+                        )
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
+            }
+
+        let captureOrPropagate journal sessionId =
+            function
+            | Error err -> Task.FromResult(Error err)
+            | Ok fenced -> captureFencedFrontier journal sessionId fenced
+
+        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
+            task {
+                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
+                return! captureOrPropagate journal sessionId exchange
+            }
+
+        let resolveDeliverRetirementCursor
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            : Task<Result<int64, string>> =
+            task {
+                match deliverPorts runtime, deliverOwnership ctx with
+                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
+                    return!
+                        fenceAndCapture
+                            journal
+                            (SessionId.create ctx.SessionId)
+                            snapshotPort
+                            owningMessageId
+                            owningCallId
+                | Error err, _ -> return Error err
+                | _, Error err -> return Error err
+            }
+
+        // The execution session spawn capability handed to PlanTools: the
+        // provider-visible receipt never carries the spawned session id.
+        let deliverSpawn (runtime: ToolRuntimeScope) (agent: string) (prompt: string) =
+            task {
+                let! spawned = runtime.SpawnExecutionSession(agent, prompt)
+
+                return
+                    match spawned with
+                    | Ok sessionId -> sessionId
+                    | Error reason ->
+                        raise (InvalidOperationException(sprintf "Execution session spawn failed: %s" reason))
+            }
+
+        let renderDeliverOutcome outcome =
+            match outcome with
+            | Ok res -> renderDeliverReceipt res
+            | Error err -> sprintf "deliver failed: %s" err
+
         let deliverActiveIncumbency
             store
             (root: string)
@@ -673,23 +798,20 @@ module ToolRegistry =
             task {
                 let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
 
-                let spawn (agent: string) (prompt: string) =
-                    task {
-                        let! spawned = runtime.SpawnExecutionSession(agent, prompt)
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.executeDeliver
+                            store
+                            root
+                            ctx.SessionId
+                            active.Id
+                            hasBlocker
+                            (deliverSpawn runtime)
+                            retirementCursor
 
-                        return
-                            match spawned with
-                            | Ok sessionId -> sessionId
-                            | Error reason ->
-                                raise (InvalidOperationException(sprintf "Execution session spawn failed: %s" reason))
-                    }
-
-                let! outcome = PlanTools.executeDeliver store root ctx.SessionId active.Id hasBlocker spawn None
-
-                return
-                    match outcome with
-                    | Ok res -> renderDeliverReceipt res
-                    | Error err -> sprintf "deliver failed: %s" err
+                    return renderDeliverOutcome outcome
             }
 
         let runDeliver store (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =

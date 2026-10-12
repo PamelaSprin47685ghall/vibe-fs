@@ -17,10 +17,10 @@ const buildAuthorizedS3 = (workId) => {
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-1', facts.PlanStage.S1, 0n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-1', 'S1', 'Promoted'), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-1', 'Relayed', 10n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-2', facts.PlanStage.S2, 11n), state).state
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-2', facts.PlanStage.S2, 10n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-2', 'S2', 'Promoted'), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-2', 'Relayed', 20n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-3', facts.PlanStage.S3, 21n), state).state
+  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened(workId, 'inc-3', facts.PlanStage.S3, 20n), state).state
   state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-3', 'S3', 'Promoted'), state).state
   return state
 }
@@ -59,7 +59,7 @@ test('WHAT[planning-023] the spawned execution session receives the plan artifac
     }
 
     const res = await surface.PlanningSurface.executeDeliver(
-      mockStore, tmpRoot, workId, 'inc-3', false, spawn, [30n],
+      mockStore, tmpRoot, workId, 'inc-3', false, spawn, 30n,
     )
 
     assert.equal(res.ok, true)
@@ -106,7 +106,7 @@ test('WHAT[planning-023] a failed spawn writes zero events and keeps the tenure 
     }
 
     const res = await surface.PlanningSurface.executeDeliver(
-      mockStore, tmpRoot, workId, 'inc-3', false, failingSpawn, [30n],
+      mockStore, tmpRoot, workId, 'inc-3', false, failingSpawn, 30n,
     )
 
     assert.equal(res.ok, false, 'a failed spawn must fail the delivery')

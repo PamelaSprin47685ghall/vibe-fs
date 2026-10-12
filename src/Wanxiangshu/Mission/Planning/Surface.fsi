@@ -17,6 +17,8 @@ module PlanningSurface =
     val reopened: incumbencyId: string -> PlanEvent
     val applyWorkEvent: event: PlanEvent -> state: PlanWorkState -> obj
     val latestRetirementRange: state: PlanWorkState -> (int64 * int64) option
+    val predecessorRange: state: PlanWorkState -> (int64 * int64) option
+    val activeOpeningCursor: state: PlanWorkState -> int64 option
     val activeStage: state: PlanWorkState -> string option
     val retiredCount: state: PlanWorkState -> int
     val isDelivered: state: PlanWorkState -> bool
@@ -38,7 +40,10 @@ module PlanningSurface =
     val getPlanWorkStateFromIntegrator: integrator: ICanonicalIntegrator -> workId: string -> obj
     val getPlanWorkViewFromIntegrator: integrator: ICanonicalIntegrator -> workId: string -> obj
     val ensurePlanWorkOpened: store: IEventStore -> root: string -> sessionId: string -> Task<obj>
-    val assembleTenureMessages: messages: obj -> tenureObj: obj -> materializePrev: (obj -> string) -> obj
+
+    val assembleTenureMessages:
+        messages: obj -> tenureObj: obj -> materializePrev: (obj -> string) -> messageCursors: obj -> obj
+
     val validateWorkId: workId: string -> obj
     val canonicalWorkKey: workId: string -> obj
     val resolvePlanPath: root: string -> workId: string -> obj
@@ -59,7 +64,6 @@ module PlanningSurface =
     /// planning-010: `delegateTo` is a plain JavaScript function
     /// `(intent) => Promise<string>` returning the DevOps work record.
     val executeAsk: store: IEventStore -> workId: string -> intent: string -> delegateTo: obj -> Task<obj>
-    val assembleAskContinuation: messages: obj -> pendingAskObj: obj -> tenureObj: obj -> obj
     val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj
     val reviewTargetFor: stage: string -> string
 
