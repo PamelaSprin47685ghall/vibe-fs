@@ -246,3 +246,54 @@ test('WHAT[planning-011] unreviewed tenure permits js-plan file reading but bloc
     fs.rmSync(tmpRoot, { recursive: true, force: true })
   }
 })
+
+test('WHAT[planning-011] js-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
+  for (const language of ['en', 'zh-CN']) {
+    const description = registry.jsPlanDescription(language)
+    const text = description.replace(/\s+/g, ' ')
+    assert.equal(text.includes('{{'), false, `${language} description retains a placeholder`)
+    assert.equal((description.match(/class Js extends JsProgram/g) ?? []).length, 1)
+    assert.equal(description.includes('_api'), false)
+    assert.equal(description.includes('__jsFailure'), false)
+    assert.doesNotMatch(description, /file\(path/)
+    assert.doesNotMatch(description, /edit\(path/)
+    assert.doesNotMatch(description, /rewrite\(path/)
+    assert.doesNotMatch(description, /this\.edit\("[^"]+",/)
+    assert.doesNotMatch(description, /glob\(/)
+    assert.doesNotMatch(description, /grep\(/)
+  }
+
+  const english = registry.jsPlanDescription('en').replace(/\s+/g, ' ')
+  for (const lesson of [
+    'PATH_DENIED',
+    'review',
+    'file(matches = [])',
+    'edit(changes)',
+    'rewrite(newText)',
+    'ordered anchors',
+    'text(from, to)',
+    'name+N / name-N',
+    'not a line number',
+    'file(matches) + text() + rewrite()',
+    'Near matches are diagnostics, never write authority',
+  ]) {
+    assert.equal(english.includes(lesson), true, `English plan description missing: ${lesson}`)
+  }
+
+  const chinese = registry.jsPlanDescription('zh-CN').replace(/\s+/g, ' ')
+  for (const lesson of [
+    'PATH_DENIED',
+    'review',
+    'file(matches = [])',
+    'edit(changes)',
+    'rewrite(newText)',
+    '有序 anchor',
+    'text(from, to)',
+    'name+N / name-N',
+    '不是行号',
+    'file(matches) + text() + rewrite()',
+    '近似匹配只产生诊断，绝不获得写权限',
+  ]) {
+    assert.equal(chinese.includes(lesson), true, `Chinese plan description missing: ${lesson}`)
+  }
+})

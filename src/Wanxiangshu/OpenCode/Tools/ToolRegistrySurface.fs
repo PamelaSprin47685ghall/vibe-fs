@@ -63,3 +63,13 @@ module ToolRegistrySurface =
             )
 
         ToolRegistry.runPlanProgram prose store root workId program
+
+    let jsPlanDescription (language: string) : string =
+        let parsed = ProviderLanguage.parse language
+
+        let prose =
+            Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load parsed
+
+        Wanxiangshu.Repository.Programming.Js.JsCanonicalDescription.renderPlan
+            prose
+            (ProviderProse.render parsed "tool/js-plan" Map.empty)

@@ -83,6 +83,9 @@ module JsCanonicalDescription =
         val UltraManagerInvestigation: string = "tool/js-program/ultra-manager-investigation"
 
         [<Literal>]
+        val UltraPlan: string = "tool/js-program/ultra-plan"
+
+        [<Literal>]
         val MechanicalSemantic: string = "tool/js-program/mechanical-semantic"
 
         [<Literal>]
@@ -201,6 +204,7 @@ module JsCanonicalDescription =
           UltraInvestigation: string
           UltraDevOps: string
           UltraManagerInvestigation: string
+          UltraPlan: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -243,3 +247,4 @@ module JsCanonicalDescription =
     val rules: prose: Prose -> capabilities: Set<JsCapability> -> string
     val ultraExample: prose: Prose -> roleName: string -> capabilities: Set<JsCapability> -> JsExample option
     val render: prose: Prose -> roleName: string -> toolName: string -> capabilities: Set<JsCapability> -> string
+    val renderPlan: prose: Prose -> scope: string -> string

@@ -25,3 +25,5 @@ module ToolRegistrySurface =
         workId: string ->
         program: string ->
             System.Threading.Tasks.Task<string>
+
+    val jsPlanDescription: language: string -> string

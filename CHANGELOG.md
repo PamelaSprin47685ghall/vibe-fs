@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — js-plan 复用共享锚点教程
+
+- `js-plan` 的模型可见描述不再使用独立短教程。它复用其它 `js-*` 的同一套教程：有序锚点、`text(from, to)`、精确 edit、结构重组和失败记忆。教程签名槽按工具填写，Plan 面为 `file(matches = [])`、`edit(changes)`、`rewrite(newText)`；仓库面仍为带路径签名。
+- `tool/js-plan` 只保留单一底稿、禁路径和写前评审这三项作用域约束。新增一份无路径、按底稿职责成形的双语样例 `tool/js-program/ultra-plan`。公开基类只展示无路径方法签名，不暴露运行时内部失败对象。
+- `requirements/planning` [011] 增加工具描述复用条款；`011.test.mjs` 验收中英文交付描述都包含共享锚点教程且不含路径参数。
+- 证据：`node scripts/build.mjs` 绿（generation 214）；planning-011、planning-014、repository-programming-002、repository-programming-005、repository-programming-022 共 20 项全绿；`language-parity-gate` 334 项资源对等绿。
+
 ## Unreleased — Plan 最后回合丢失修复（planning-007 / 017 / 021）
 
 - Plan 发给 LLM 的请求在任期隔离阶段丢失最后回合。根因是 `TenureIsolation` 与真实 Host 消息形态脱节：`AssistantMessage` 没有 `cursor` 字段（SDK types.gen.d.ts:213-247）、工具结果挂在 assistant 的 `parts` 上，而隔离把「消息数组下标 + 缺失的 cursor」当任期归属证据；同时把全部 U 提前再拼 assistant/tool 打乱因果顺序，非首任更在无 cursor 时整段丢弃当前 assistant/tool。生产接力另有两处语义缺陷：退休游标用 `openingCursor + 10` 伪造、上一任期 LWR 回调固定返回空串。

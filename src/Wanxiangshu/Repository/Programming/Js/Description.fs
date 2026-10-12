@@ -88,6 +88,9 @@ module JsCanonicalDescription =
         let UltraManagerInvestigation = "tool/js-program/ultra-manager-investigation"
 
         [<Literal>]
+        let UltraPlan = "tool/js-program/ultra-plan"
+
+        [<Literal>]
         let MechanicalSemantic = "tool/js-program/mechanical-semantic"
 
         [<Literal>]
@@ -206,6 +209,7 @@ module JsCanonicalDescription =
           UltraInvestigation: string
           UltraDevOps: string
           UltraManagerInvestigation: string
+          UltraPlan: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -244,6 +248,36 @@ module JsCanonicalDescription =
             invalidOp "PROMPT-019:unsubstituted-placeholder"
 
         replaced
+
+    type TutorialSurface =
+        { FileCall: string
+          FileMatches: string
+          EditCall: string
+          EditTarget: string
+          RewriteCall: string }
+
+    let repositoryTutorial =
+        { FileCall = "file(path, matches = [])"
+          FileMatches = "file(matches)"
+          EditCall = "edit(path, changes)"
+          EditTarget = "\"src/config.js\", "
+          RewriteCall = "rewrite(path, newText)" }
+
+    let planTutorial =
+        { FileCall = "file(matches = [])"
+          FileMatches = "file(matches)"
+          EditCall = "edit(changes)"
+          EditTarget = ""
+          RewriteCall = "rewrite(newText)" }
+
+    let private fillTutorial (surface: TutorialSurface) (template: string) =
+        fill
+            template
+            [ "fileCall", surface.FileCall
+              "fileMatches", surface.FileMatches
+              "editCall", surface.EditCall
+              "editTarget", surface.EditTarget
+              "rewriteCall", surface.RewriteCall ]
 
     let private fileReasons (prose: Prose) =
         [ "reason_empty_string_pattern", prose.ReasonEmptyStringPattern
@@ -414,7 +448,8 @@ module JsCanonicalDescription =
         fileAlgorithmCore prose "  async file(path, matches = []) {" readSourceLine raiseFailure
 
     let planFileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        let prologue =
+        fileAlgorithmCore
+            prose
             """  async file(matches = []) {
     if (typeof matches === "string" || arguments.length > 1) {
       const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call file(matches) without a path.");
@@ -422,8 +457,12 @@ module JsCanonicalDescription =
       throw err;
     }
     const path = "plan.md";"""
+            readSourceLine
+            raiseFailure
 
-        fileAlgorithmCore prose prologue readSourceLine raiseFailure
+    let private publicPlanFileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        fileAlgorithmCore prose "  async file(matches = []) {\n    const path = \"plan.md\";" readSourceLine raiseFailure
+
 
     let private globStub (prose: Prose) =
         fill
@@ -523,6 +562,11 @@ class JsProgram {"""
 const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             .Trim()
 
+    let private runtimePathRefusal =
+        """const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call edit(changes) without a path.");
+      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
+      throw err;"""
+
     let private editPrologue =
         """(path, changes) {
     const fail = (code, reason) => {
@@ -555,9 +599,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
       {{raise_failure}}
     };
     if (typeof changes === "string" || arguments.length > 1) {
-      const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call edit(changes) without a path.");
-      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
-      throw err;
+      {{path_refusal}}
     }
     const path = "plan.md";
     const bounded = (value, limit = 240) => {
@@ -993,7 +1035,11 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
         editAlgorithmCore prose editPrologue readSourceLine raiseFailure
 
     let planEditAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        editAlgorithmCore prose planEditPrologue readSourceLine raiseFailure
+        editAlgorithmCore
+            prose
+            (planEditPrologue.Replace("{{path_refusal}}", runtimePathRefusal))
+            readSourceLine
+            raiseFailure
 
     let planRewriteAlgorithm (prose: Prose) (raiseFailure: string) =
         fill
@@ -1037,8 +1083,12 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
     let publicPlanBaseClass (prose: Prose) : string =
         let methods =
-            [ planFileAlgorithm prose publicReadSource publicRaiseFailure
-              planEditAlgorithm prose publicReadSource publicRaiseFailure
+            [ publicPlanFileAlgorithm prose publicReadSource publicRaiseFailure
+              fill
+                  """  edit(changes) {
+    // {{comment_host_capability}}
+  }"""
+                  [ "comment_host_capability", prose.CommentHostCapability ]
               planRewriteStub prose
               runStub prose ]
 
@@ -1089,7 +1139,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
         String.concat "\n\n" (classOpen :: methods @ [ "}" ])
 
-    let contract (prose: Prose) (toolName: string) (capabilities: Set<JsCapability>) =
+    let private contractFor (prose: Prose) (tutorial: TutorialSurface) (toolName: string) (capabilities: Set<JsCapability>) =
         let verbs =
             List.concat
                 [ if has capabilities JsCapability.Read then
@@ -1124,27 +1174,33 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               "verbs", verbs
               "editRecommendation",
               if has capabilities JsCapability.Edit then
-                  prose.ContractEditRecommendation
+                  fillTutorial tutorial prose.ContractEditRecommendation
               else
                   ""
               "parallelLine", fill parallelTemplate [ "toolName", toolName ] ]
 
-    let rules (prose: Prose) (capabilities: Set<JsCapability>) : string =
+    let contract (prose: Prose) (toolName: string) (capabilities: Set<JsCapability>) =
+        contractFor prose repositoryTutorial toolName capabilities
+
+    let private rulesFor (prose: Prose) (tutorial: TutorialSurface) (capabilities: Set<JsCapability>) : string =
         let blocks =
             [ if has capabilities JsCapability.Read then
-                  prose.ReadRules
+                  fillTutorial tutorial prose.ReadRules
               if has capabilities JsCapability.Glob then
                   prose.GlobRules
               if has capabilities JsCapability.Grep then
                   prose.GrepRules
               if has capabilities JsCapability.Edit then
-                  prose.EditRules
+                  fillTutorial tutorial prose.EditRules
               if has capabilities JsCapability.Write then
                   prose.WriteRules
               if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
                   prose.MutationRules ]
 
         String.concat "\n\n" blocks
+
+    let rules (prose: Prose) (capabilities: Set<JsCapability>) : string =
+        rulesFor prose repositoryTutorial capabilities
 
     let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
@@ -1153,6 +1209,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                 Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraEngineering)
             | "engineer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], prose.UltraInvestigation)
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraDevOps)
+            | "plan" when has capabilities JsCapability.Read && has capabilities JsCapability.Edit ->
+                Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraPlan)
             | "manager" when
                 Set.isSubset capabilities (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ])
                 && not (Set.isEmpty capabilities)
@@ -1167,7 +1225,14 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             else
                 None)
 
-    let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
+    let private renderFor
+        (prose: Prose)
+        (tutorial: TutorialSurface)
+        (roleName: string)
+        (toolName: string)
+        (capabilities: Set<JsCapability>)
+        (baseClass: string)
+        : string =
         let ultraBlock =
             match ultraExample prose roleName capabilities with
             | Some example -> prose.UltraFraming + "\n\n```js\n" + example.Source + "\n```"
@@ -1175,15 +1240,39 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
         let blocks =
             [ if has capabilities JsCapability.Edit then
-                  prose.EditPrelude
+                  fillTutorial tutorial prose.EditPrelude
               if has capabilities JsCapability.Edit && has capabilities JsCapability.Read then
-                  prose.EditStructuralGuidance
+                  fillTutorial tutorial prose.EditStructuralGuidance
               prose.Header
-              contract prose toolName capabilities
-              "```js\n" + publicBaseClass prose capabilities + "\n```"
-              rules prose capabilities
+              contractFor prose tutorial toolName capabilities
+              "```js\n" + baseClass + "\n```"
+              rulesFor prose tutorial capabilities
               prose.MechanicalSemantic
               ultraBlock
               prose.Footer ]
+
+        String.concat "\n\n" blocks
+
+    let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
+        renderFor
+            prose
+            repositoryTutorial
+            roleName
+            toolName
+            capabilities
+            (publicBaseClass prose capabilities)
+
+    let renderPlan (prose: Prose) (scope: string) : string =
+        let planCapabilities = set [ JsCapability.Read; JsCapability.Edit ]
+
+        let blocks =
+            [ scope
+              renderFor
+                  prose
+                  planTutorial
+                  "plan"
+                  "js-plan"
+                  planCapabilities
+                  (publicPlanBaseClass prose) ]
 
         String.concat "\n\n" blocks
