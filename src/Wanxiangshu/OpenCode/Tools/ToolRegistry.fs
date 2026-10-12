@@ -836,9 +836,9 @@ module ToolRegistry =
         let planningSpecs () =
             [ { Name = "js-plan"
                 Description =
-                    JsCanonicalDescription.renderPlan
-                        jsProse
-                        (ProviderProse.render providerLanguage "tool/js-plan" Map.empty)
+                  JsCanonicalDescription.renderPlan
+                      jsProse
+                      (ProviderProse.render providerLanguage "tool/js-plan" Map.empty)
                 Arguments =
                   [ "program",
                     ToolHostCodec.stringSchemaDescribed
