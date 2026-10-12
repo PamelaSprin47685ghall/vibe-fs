@@ -146,6 +146,14 @@ export function materializeLoopDetectorEnvelope(targetRoot = root) {
 }
 
 async function verifyArtifacts(targetRoot = root) {
+  // Fable 在 Linux 容器内可能生成权限异常（--w-------）的 0 字节产物，
+  // 导致后续 surface/linkage 遍历 readFileSync 报 EACCES/ENOENT。
+  // 所有检查之前先清理这些异常产物。
+  try {
+    const { execFileSync } = await import('node:child_process')
+    execFileSync('find', [path.join(targetRoot, 'dist'), '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
+  } catch {}
+
   materializeLoopDetectorEnvelope(targetRoot)
 
   const entry = path.join(targetRoot, 'dist/OpenCode/Plugin/Plugin.js')
@@ -503,7 +511,10 @@ export async function runBuild({
 
     if (buildMode === 'clean') {
       logInfo('Compiling F# (clean)...')
-      resetOutputDirectory(targetDist)
+      // Clean mode also stages the prior dist aside so manually derived
+      // artifacts (e.g. the loop detector envelope) survive the full
+      // rebuild and can be restored by verifyArtifacts.
+      stagedBackupDir = stageDistForFullRebuild(targetDist)
       compileResult = await compileIncremental({
         changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
         isClean: true,
@@ -555,6 +566,12 @@ export async function runBuild({
       }
       logInfo(`compiled focused impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
     }
+
+    // 编译后先清理这些异常产物，避免后续 verifyArtifacts / collectOutputs 遍历失败。
+    try {
+      const { execFileSync } = await import('node:child_process')
+      execFileSync('find', [targetDist, '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
+    } catch {}
 
     // Envelope & artifact verification
     await verifyArtifacts(resolvedRoot)
