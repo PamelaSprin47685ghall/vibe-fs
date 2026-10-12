@@ -698,6 +698,12 @@ module PluginTransforms =
                         | Some sid -> tryReadLifecycleWork sid
                         | None -> Task.FromResult None
 
+                    let handleInterruptionError (error: string) : unit =
+                        if error.Contains "MANAGED-SESSION-016" then
+                            ()
+                        else
+                            invalidOp ("MANAGER-LOOP-004: retired attempt interrupt failed: " + error)
+
                     return!
                         RelayNarrativeTransform.apply
                             journal
