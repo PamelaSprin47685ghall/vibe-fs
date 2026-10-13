@@ -26,13 +26,14 @@ test('WHAT[work-011] actual Promoted deliver confirms then retires without abort
     assert.equal(runtime.prompts.length, 0)
     const output = {messages: [
       {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
-      {info: {id: 'retirement-run', role: 'assistant'}, parts: [{type: 'text', text: 'Old closing tail'}]},
+      {info: {id: 'review-run', role: 'assistant', parentID: 'user-root', time: {created: 2, completed: 2}}, parts: [{type: 'text', text: 'review closed'}]},
+      {info: {id: 'retirement-run', role: 'assistant', parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'Old closing tail'}]},
     ]}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
     // Delivered has no successor. The transform must not stop this attempt
     // and must not abort the session.
     assert.notEqual(output.messages.length, 0)
-    assert.deepEqual(runtime.abortedIds, [])
+    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
   })
 })
 
@@ -40,17 +41,19 @@ test('WHAT[work-011] actual Stayed deliver starts one same-session successor, th
   await withSuccessor(async ({hooks, runtime, session, history, gate}) => {
     // withSuccessor is the two-stage Stayed path: first call confirms, the
     // second call with a different callID retires Relayed, and that retirement
-    // already stopped the retired attempt once and started exactly one successor.
-    assert.deepEqual(runtime.abortedIds, [session])
+    // already stopped the retired attempt and started exactly one successor.
+    // The stop clears the request; a root session is not aborted.
+    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
     assert.equal(runtime.prompts.filter(p => p.sessionID === session).length, 1)
     const output = {messages: [...structuredClone(history), gate]}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
-    for (const prior of history) {
-      assert.ok(output.messages.some(message => messageId(message) === messageId(prior)), `lost physical message ${messageId(prior)}`)
-    }
+    // WHAT[008] strips the predecessor's assistant and tool from the successor.
+    // The user root and the successor prompt stay.
+    assert.ok(output.messages.some(message => messageId(message) === 'user-root'))
     assert.ok(output.messages.some(message => messageId(message) === messageId(gate)))
-    // The successor transform keeps the old physical history and does not abort again.
-    assert.deepEqual(runtime.abortedIds, [session])
+    assert.equal(output.messages.some(message => messageId(message) === 'review-run'), false)
+    // The successor keeps the user root, strips the predecessor assistant, and does not abort.
+    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
     assert.equal(runtime.prompts.filter(p => p.sessionID === session).length, 1)
   })
 })
@@ -78,8 +81,8 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
-    // Step 1: Submit PERFECT review
-    const findings = { findings: [] }
+    // Step 1: a non-empty review is Stayed, so the second deliver Relays a successor.
+    const findings = { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
@@ -104,14 +107,9 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     const deliverResult = await hooks.tool.deliver.execute({}, context('call-deliver', retiredRun.id, 'run-retire'))
     assert.match(deliverResult, /Finished\. Do not continue work\./)
 
-    // Prior to human input, manager tools are denied (retirement frozen / Accepted certificate)
-    const forkDuringRetirement = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'alice', charge: 'check' },
-      context('call-fork-stale', 'msg-stale'),
-    )
-    assert.match(forkDuringRetirement, /(当前不可用|is not available right now)/)
-
-    // Step 3: Human inputs new instructions in the continuous session
+    // Step 3: Human inputs new instructions in the continuous session.
+    // A Relayed successor is a new tenure, so the retirement freeze does not
+    // carry over; the denial the old certificate freeze asserted no longer exists.
     const humanNext = {
       id: 'human-phase-2', role: 'user',
       parts: [{ type: 'text', text: 'Plan approved. Please start implementation.' }],
@@ -123,8 +121,8 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     const humanRequest = {
       messages: [
         user,
-        { info: { id: review.id, role: 'assistant', sessionID }, parts: review.parts },
-        { info: { id: retiredRun.id, role: 'assistant', sessionID }, parts: retiredRun.parts },
+        { info: { id: review.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 2, completed: 2 } }, parts: review.parts },
+        { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: retiredRun.parts },
         { info: { id: humanNext.id, role: 'user', sessionID }, parts: humanNext.parts },
       ],
     }
@@ -167,8 +165,8 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
-    // Step 1: Submit review with valid findings
-    const findings = { findings: [] }
+    // Step 1: a non-empty review is Stayed, so the second deliver Relays a successor.
+    const findings = { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
@@ -222,8 +220,8 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     }
     const strayWake = { messages: [
       user,
-      { info: { id: review.id, role: 'assistant', sessionID }, parts: review.parts },
-      { info: { id: retiredRun.id, role: 'assistant', sessionID }, parts: retiredRun.parts },
+      { info: { id: review.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 2, completed: 2 } }, parts: review.parts },
+      { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: retiredRun.parts },
       wake,
     ] }
     const abortsBefore = runtime.abortedIds.length

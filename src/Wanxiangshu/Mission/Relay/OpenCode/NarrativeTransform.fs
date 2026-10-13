@@ -179,9 +179,14 @@ module RelayNarrativeTransform =
             | Some(lifecycle, active) ->
                 let cursors = firstCursors journal sessionId
 
+                // The first tenure has no predecessor to strip. Only a successor
+                // strips the assistant/tool messages observed before its opening.
                 let kept =
-                    messages
-                    |> List.filter (earlierAssistantOrTool active.OpeningCursor cursors >> not)
+                    if List.isEmpty lifecycle.Retirements then
+                        messages
+                    else
+                        messages
+                        |> List.filter (earlierAssistantOrTool active.OpeningCursor cursors >> not)
 
                 let! record =
                     match previousRange lifecycle with
@@ -247,15 +252,18 @@ module RelayNarrativeTransform =
         (outObj: obj)
         : Task<RelayProjectionDisposition> =
         task {
-            match journal, sessionId with
-            | Some durable, Some value when not (String.IsNullOrWhiteSpace value) ->
+            // No unified work means this session is not on the lifecycle track:
+            // the projection must leave the message set untouched rather than
+            // re-encode it.
+            match journal, sessionId, lifecycle with
+            | Some durable, Some value, Some work when not (String.IsNullOrWhiteSpace value) ->
                 return!
                     project
                         durable
                         interruptAttempt
                         (SessionId.create value)
                         acceptedRequest
-                        lifecycle
+                        (Some work)
                         outObj
             | _ -> return RelayProjectionDisposition.Unchanged
         }

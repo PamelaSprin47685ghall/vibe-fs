@@ -25,7 +25,12 @@ export const withReview = async body => withExecutablePlugin(async (hooks, direc
         {type: 'text', text: after},
       ],
     })
-    return hooks.tool.review.execute(input, {sessionID: session, callID: call, messageID: run, agent: 'manager'})
+    const result = await hooks.tool.review.execute(input, {sessionID: session, callID: call, messageID: run, agent: 'manager'})
+    // The review run is finished once its tool returns. A later provider request
+    // of the same user message must not see it as a second unsealed assistant.
+    const pushed = runtime.messages.find(message => (message.info?.id ?? message.id) === run)
+    if (pushed?.info) pushed.info.time = { ...pushed.info.time, completed: createdAt }
+    return result
   }
   await body({hooks, directory, runtime, session, execute, created})
 })

@@ -20,5 +20,7 @@ module LifecycleSurface =
     val seedReview: store: obj -> workId: string -> outcome: string -> Task<obj>
     /// Drive one deliver for a seeded work through the unified kernel.
     val seedDeliver: store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> head: int64 -> Task<obj>
+    /// Seed the illegal fact "confirmation without review" directly.
+    val seedConfirmation: store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> Task<obj>
     /// Read-only folded view of one seeded work.
     val workView: store: obj -> workId: string -> obj

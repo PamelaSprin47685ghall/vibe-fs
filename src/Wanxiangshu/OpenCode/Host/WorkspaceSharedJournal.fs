@@ -42,7 +42,7 @@ module WorkspaceEventStoreSurface =
                 return
                     box
                         {| ok = true
-                           journal = JournalHandle.CreateShared journal |}
+                           journal = JournalHandle.CreateShared(journal, None) |}
             | Error error ->
                 return
                     box

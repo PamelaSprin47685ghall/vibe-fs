@@ -4,8 +4,7 @@ import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 test('WHAT[interaction-authority-022] actual road decision preserves an established DevOps model on a conflicting rebind', () => {
-  const opened = relay.openRoad('road-fixed', 'revision', 'message', 'incumbent', 'snapshot')
-  const bound = relay.bindRoadDevOps(opened, 'road-fixed', 'devops:road-fixed', 'provider/fixed-model:high')
+  const bound = relay.bindRoadDevOps(relay.empty(), 'road-fixed', 'devops:road-fixed', 'provider/fixed-model:high')
   assert.equal(bound.ok, true)
   const original = relay.roadDevOps(bound.state, 'road-fixed')
   assert.equal(original.devopsId, 'devops:road-fixed')

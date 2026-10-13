@@ -109,7 +109,7 @@ module AblationGate =
     /// so the honest answer is a fixed false instead of a lookup that can never match.
     let primaryAgentAllowed (registry: AblationRegistry) (agentName: string) : bool =
         match agentName.ToLowerInvariant() with
-        | "manager" -> AblationRegistry.isActive (AblationNodeId.create "relay-incumbency") registry
+        | "manager" -> AblationRegistry.isActive (AblationNodeId.create "work") registry
         | "orchestrator" -> AblationRegistry.isActive (AblationNodeId.create "change-integration") registry
         | "inquiry" -> AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") registry
         | "browser" -> false

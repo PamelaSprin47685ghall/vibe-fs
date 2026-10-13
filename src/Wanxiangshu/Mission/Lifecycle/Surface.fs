@@ -417,6 +417,34 @@ module LifecycleSurface =
                     | Error reason -> return box {| ok = false; decision = label; error = reason |}
         }
 
+    /// Seed the illegal fact "confirmation without review" directly. The fold
+    /// accepts the event, so a test can prove the execution gate fails closed on
+    /// it. The kernel's own deliver path never writes this.
+    let seedConfirmation
+        (store: obj)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        : Task<obj> =
+        task {
+            let held = heldStore store
+
+            match workOfStore held workId with
+            | None -> return box {| ok = false; error = "lifecycle work is missing" |}
+            | Some work ->
+                match work.Active with
+                | None -> return box {| ok = false; error = "no active incumbency" |}
+                | Some active ->
+                    match!
+                        commitEvents
+                            held
+                            workId
+                            [ LifecycleEvent.ConfirmationCommitted(active.Id, providerRunId, toolCallId) ]
+                    with
+                    | Ok() -> return box {| ok = true; error = "" |}
+                    | Error reason -> return box {| ok = false; error = reason |}
+        }
+
     let workView (store: obj) (workId: string) =
         let held = heldStore store
 

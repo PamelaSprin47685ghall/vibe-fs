@@ -9,7 +9,7 @@ const { default: test } = await import("node:test");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
-const obligationJournal = await import("../../../dist/Persistence/Journal/ObligationJournalSurface.js");
+const lifecycle = await import("../../../dist/Mission/Lifecycle/Surface.js");
 
 const participantIdentity = {
   participant: 'manager',
@@ -42,7 +42,7 @@ const withJournal = async (label, action) => {
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
 
   try {
-    await action(opened.journal)
+    await action(opened.journal, directory)
   } finally {
     journal.JournalSurface_dispose(opened.journal)
     rmSync(directory, { recursive: true, force: true })
@@ -63,25 +63,18 @@ const inheritedSeed = (owner, child = 'engineer') => {
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return issued.value
 }
-const completeManagerLife = async (handle, session) => {
-  const lifeId = `life-${session}`
-  const opened = await obligationJournal.appendManagerLifecycle(handle, session, 'LifeOpened', {
-    sessionId: session,
-    lifeId,
-    openingCursorSequence: 0,
-    openingTextDigest: 'digest-opening',
-    openingTextRef: 'blob-opening',
-    openingUserMessageId: `msg-${session}`,
-  })
-  assert.equal(opened.ok, true, opened.ok ? '' : opened.error)
-  const completed = await obligationJournal.appendManagerLifecycle(handle, session, 'LifeCompleted', {
-    sessionId: session,
-    lifeId,
-    requestId: `finality-${session}`,
-    terminalRef: `terminal-${session}`,
-    terminalDigest: `digest-terminal-${session}`,
-  })
-  assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
+const completeManagerLife = async (handle, session, directory) => {
+  const store = journal.JournalSurface_eventStore(handle)
+  assert.ok(store, 'journal handle has no event store')
+  const opened = await lifecycle.seedOpen(store, 'S4', session, directory, 1n)
+  assert.equal(opened.ok, true, opened.error)
+  const reviewed = await lifecycle.seedReview(store, session, 'Promoted')
+  assert.equal(reviewed.ok, true, reviewed.error)
+  const confirmed = await lifecycle.seedDeliver(store, session, 'run-close', 'call-first', 2n)
+  assert.equal(confirmed.ok, true, confirmed.error)
+  const retired = await lifecycle.seedDeliver(store, session, 'run-close', 'call-second', 3n)
+  assert.equal(retired.ok, true, retired.error)
+  assert.equal(dispatch.projectionObservation(handle, session).activeLogicalRun, null)
 }
 
 test('WHAT[interaction-authority-005] AgentOwnerRoot rejects RootSelection before Host send', async () => {
@@ -161,7 +154,7 @@ test('WHAT[interaction-authority-005] stale owner witness is rejected before Hos
   })
 })
 test('WHAT[interaction-authority-005] owner superseded after claim rejects physical acceptance without child authority', async () => {
-  await withJournal('owner-race', async (handle) => {
+  await withJournal('owner-race', async (handle, directory) => {
     const owner = await acceptOwner(handle, 'ses-race-owner')
     const seed = inheritedSeed(owner)
     let providerSends = 0
@@ -173,7 +166,7 @@ test('WHAT[interaction-authority-005] owner superseded after claim rejects physi
         assert.equal(claimed.pendingClaims.length, 1)
         assert.deepEqual(claimed.pendingClaims[0].identitySeed, seed)
 
-        await completeManagerLife(handle, 'ses-race-owner')
+        await completeManagerLife(handle, 'ses-race-owner', directory)
 
         const superseded = await dispatch.acceptHumanRootSelection(
           handle,

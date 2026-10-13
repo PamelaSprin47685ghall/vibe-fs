@@ -4,14 +4,20 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import * as relayJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import { rootFor, rootSelection, withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
-const completeManagerLife = async (handle, session) => {
-  const opened = await relayJournal.openIncumbency(handle, session, session)
+const completeManagerLife = async (handle, session, directory) => {
+  const store = journal.JournalSurface_eventStore(handle)
+  assert.ok(store, 'journal handle has no event store')
+  const opened = await lifecycle.seedOpen(store, 'S4', session, directory, 1n)
   assert.equal(opened.ok, true, opened.error)
-  const completed = await relayJournal.appendManagerLifecycle(handle, session, 'LifeCompleted', {})
-  assert.equal(completed.ok, true, completed.error)
+  const reviewed = await lifecycle.seedReview(store, session, 'Promoted')
+  assert.equal(reviewed.ok, true, reviewed.error)
+  const confirmed = await lifecycle.seedDeliver(store, session, `run-close-${session}`, 'call-first', 2n)
+  assert.equal(confirmed.ok, true, confirmed.error)
+  const retired = await lifecycle.seedDeliver(store, session, `run-close-${session}`, 'call-second', 3n)
+  assert.equal(retired.ok, true, retired.error)
   assert.equal(dispatch.projectionObservation(handle, session).activeLogicalRun, null)
 }
 
@@ -133,10 +139,10 @@ test('WHAT[interaction-authority-017] dispatcher delivers a continuation to a ta
 })
 
 test('WHAT[interaction-authority-017] dispatcher rejects a durably closed Manager run while its archived profile remains readable', async () => {
-  await withJournal('closed-manager-target', async (handle, reopen) => {
+  await withJournal('closed-manager-target', async (handle, reopen, directory) => {
     const session = 'closed-manager-target'
     const original = await acceptOwner(handle, session)
-    await completeManagerLife(handle, session)
+    await completeManagerLife(handle, session, directory)
     const archived = journal.JournalSurface_snapshot(handle).sessionProjections[session].promptAuthority.lastAuthorityProfile
     assert.equal(archived.logicalRun, original.logicalRun)
     assert.equal(archived.authorityRoot, original.authorityRoot)
@@ -157,7 +163,7 @@ test('WHAT[interaction-authority-017] dispatcher rejects a durably closed Manage
 
 for (const transition of ['active', 'closed', 'replaced']) {
   test(`WHAT[interaction-authority-017] a real durable continuation claim ${transition === 'active' ? 'sends while its original run stays active' : `does not send after its original run is ${transition}`}`, async () => {
-    await withJournal(`claimed-${transition}`, async (handle, reopen) => {
+    await withJournal(`claimed-${transition}`, async (handle, reopen, directory) => {
       const session = `claimed-${transition}`
       const original = await acceptOwner(handle, session)
       const claimed = Promise.withResolvers()
@@ -180,7 +186,7 @@ for (const transition of ['active', 'closed', 'replaced']) {
         assert.equal(persisted[0].promptKey, key)
         assert.equal(persisted[0].logicalRun, original.logicalRun)
         assert.equal(persisted[0].authorityRoot, original.authorityRoot)
-        if (transition !== 'active') await completeManagerLife(handle, session)
+        if (transition !== 'active') await completeManagerLife(handle, session, directory)
         if (transition === 'replaced') await replaceManagerRoot(handle, session, original)
         const current = dispatch.projectionObservation(handle, session).activeLogicalRun
         held.resolve()
@@ -203,7 +209,7 @@ for (const transition of ['active', 'closed', 'replaced']) {
   })
 
   test(`WHAT[interaction-authority-017] a frozen ingress decision ${transition === 'active' ? 'accepts its original active run' : `cannot accept after its original run is ${transition}`}`, async () => {
-    await withJournal(`ingress-${transition}`, async (handle, reopen) => {
+    await withJournal(`ingress-${transition}`, async (handle, reopen, directory) => {
       const session = `ingress-${transition}`
       const physical = `physical-guidance-${transition}`
       const original = await acceptOwner(handle, session)
@@ -218,7 +224,7 @@ for (const transition of ['active', 'closed', 'replaced']) {
       assert.equal(typeof prepared, 'function')
       assert.equal(dispatch.projectionObservation(handle, session).pendingClaims.length, 0)
       assert.equal(executionStatus.query(handle, session, physical).accepted, false)
-      if (transition !== 'active') await completeManagerLife(handle, session)
+      if (transition !== 'active') await completeManagerLife(handle, session, directory)
       if (transition === 'replaced') await replaceManagerRoot(handle, session, original)
       const current = dispatch.projectionObservation(handle, session).activeLogicalRun
       const accepted = await prepared()
@@ -233,7 +239,7 @@ for (const transition of ['active', 'closed', 'replaced']) {
   })
 
   test(`WHAT[interaction-authority-017] durable physical acceptance ${transition === 'active' ? 'establishes managed execution for its original active run' : `does not establish managed execution after its original run is ${transition}`}`, async () => {
-    await withJournal(`physical-${transition}`, async (handle, reopen) => {
+    await withJournal(`physical-${transition}`, async (handle, reopen, directory) => {
       const session = `physical-${transition}`
       const physical = `physical-before-managed-${transition}`
       const original = await acceptOwner(handle, session)
@@ -253,7 +259,7 @@ for (const transition of ['active', 'closed', 'replaced']) {
         assert.equal(dispatch.projectionObservation(handle, session).pendingClaims.length, 0)
         assert.equal(journal.JournalSurface_snapshot(handle).sessionProjections[session].promptAuthority.physicalLandingCount, 1)
         assert.equal(executionStatus.query(handle, session, physical).accepted, false)
-        if (transition !== 'active') await completeManagerLife(handle, session)
+        if (transition !== 'active') await completeManagerLife(handle, session, directory)
         if (transition === 'replaced') await replaceManagerRoot(handle, session, original)
         const current = dispatch.projectionObservation(handle, session).activeLogicalRun
         held.resolve()

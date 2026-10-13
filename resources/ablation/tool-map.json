@@ -5,7 +5,7 @@
     "join": "delegation.async-fork",
     "commission": "change-integration.orchestrator-tools",
     "fission": "intra-participant-parallelism",
-    "review": "relay-assessment",
+    "review": "work",
     "publish": "concern-routing",
     "chronicle": "knowledge-reuse",
     "fetch": "knowledge-reuse",
@@ -27,14 +27,14 @@
     "mv": "repository-programming",
     "rm": "repository-programming",
     "bash-honeypot": "capability-enforcement",
-    "js-manager": "relay-incumbency",
+    "js-manager": "work",
     "js-orchestrator": "change-integration",
     "js-engineer": "repository-programming",
     "js-devops": "process-execution",
     "js-blogger": "context-compression",
     "js-bookkeeper": "knowledge-reuse",
-    "js-plan": "planning",
-    "ask": "planning",
-    "deliver": "planning"
+    "js-plan": "work",
+    "ask": "work",
+    "deliver": "work"
   }
 }

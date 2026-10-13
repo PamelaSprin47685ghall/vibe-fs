@@ -356,34 +356,6 @@
       "borrowed_surface": []
     },
     {
-      "id": "relay-incumbency",
-      "package": "relay-incumbency",
-      "station": 51,
-      "kind": "package",
-      "borrowed_surface": []
-    },
-    {
-      "id": "relay-assessment",
-      "package": "relay-assessment",
-      "station": 52,
-      "kind": "package",
-      "borrowed_surface": []
-    },
-    {
-      "id": "relay-context-projection",
-      "package": "relay-context-projection",
-      "station": 53,
-      "kind": "package",
-      "borrowed_surface": []
-    },
-    {
-      "id": "relay-retirement",
-      "package": "relay-retirement",
-      "station": 54,
-      "kind": "package",
-      "borrowed_surface": []
-    },
-    {
       "id": "change-integration",
       "package": "change-integration",
       "station": 55,
@@ -394,13 +366,6 @@
       "id": "distribution",
       "package": "distribution",
       "station": 56,
-      "kind": "package",
-      "borrowed_surface": []
-    },
-    {
-      "id": "planning",
-      "package": "planning",
-      "station": 57,
       "kind": "package",
       "borrowed_surface": []
     },
@@ -669,22 +634,7 @@
     },
     {
       "from": "requirement-system",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-system",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-system",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-system",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -924,22 +874,7 @@
     },
     {
       "from": "verification-system",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "verification-system",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "verification-system",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "verification-system",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -1174,22 +1109,7 @@
     },
     {
       "from": "js-semantic-surface",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "js-semantic-surface",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "js-semantic-surface",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "js-semantic-surface",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -1419,22 +1339,7 @@
     },
     {
       "from": "structured-workflow",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "structured-workflow",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "structured-workflow",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "structured-workflow",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -1659,22 +1564,7 @@
     },
     {
       "from": "host-boundary",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-boundary",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-boundary",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-boundary",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -1894,22 +1784,7 @@
     },
     {
       "from": "session-ontology",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "session-ontology",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "session-ontology",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "session-ontology",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -2124,22 +1999,7 @@
     },
     {
       "from": "participant-identity",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-identity",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-identity",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-identity",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -2349,22 +2209,7 @@
     },
     {
       "from": "provider-language",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-language",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-language",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-language",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -2569,22 +2414,7 @@
     },
     {
       "from": "office-capability",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "office-capability",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "office-capability",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "office-capability",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -2784,22 +2614,7 @@
     },
     {
       "from": "capability-enforcement",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "capability-enforcement",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "capability-enforcement",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "capability-enforcement",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -2994,22 +2809,7 @@
     },
     {
       "from": "cognitive-environment",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "cognitive-environment",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "cognitive-environment",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "cognitive-environment",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -3199,22 +2999,7 @@
     },
     {
       "from": "action-affordance",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "action-affordance",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "action-affordance",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "action-affordance",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -3399,22 +3184,7 @@
     },
     {
       "from": "participant-horizon",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-horizon",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-horizon",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-horizon",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -3594,22 +3364,7 @@
     },
     {
       "from": "provider-projection",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-projection",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-projection",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-projection",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -3784,22 +3539,7 @@
     },
     {
       "from": "repository-investigation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-investigation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-investigation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-investigation",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -3969,22 +3709,7 @@
     },
     {
       "from": "requirement-grounding",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-grounding",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-grounding",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-grounding",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4149,22 +3874,7 @@
     },
     {
       "from": "repository-programming",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-programming",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-programming",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-programming",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4324,22 +4034,7 @@
     },
     {
       "from": "time-capability",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "time-capability",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "time-capability",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "time-capability",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4494,22 +4189,7 @@
     },
     {
       "from": "process-execution",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "process-execution",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "process-execution",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "process-execution",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4659,22 +4339,7 @@
     },
     {
       "from": "causal-wait",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "causal-wait",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "causal-wait",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "causal-wait",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4819,22 +4484,7 @@
     },
     {
       "from": "durable-events",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-events",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-events",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-events",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -4974,22 +4624,7 @@
     },
     {
       "from": "effect-accounting",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "effect-accounting",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "effect-accounting",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "effect-accounting",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5124,22 +4759,7 @@
     },
     {
       "from": "semantic-trace",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "semantic-trace",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "semantic-trace",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "semantic-trace",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5269,22 +4889,7 @@
     },
     {
       "from": "context-compression",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "context-compression",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "context-compression",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "context-compression",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5409,22 +5014,7 @@
     },
     {
       "from": "prefix-stability",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "prefix-stability",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "prefix-stability",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "prefix-stability",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5544,22 +5134,7 @@
     },
     {
       "from": "work-record",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "work-record",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "work-record",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "work-record",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5674,22 +5249,7 @@
     },
     {
       "from": "behavior-diagnosis",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "behavior-diagnosis",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "behavior-diagnosis",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "behavior-diagnosis",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5799,22 +5359,7 @@
     },
     {
       "from": "guidance-delivery",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "guidance-delivery",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "guidance-delivery",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "guidance-delivery",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -5919,22 +5464,7 @@
     },
     {
       "from": "attention-regulation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "attention-regulation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "attention-regulation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "attention-regulation",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6034,22 +5564,7 @@
     },
     {
       "from": "execution-failure-policy",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-failure-policy",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-failure-policy",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-failure-policy",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6144,22 +5659,7 @@
     },
     {
       "from": "interaction-authority",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "interaction-authority",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "interaction-authority",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "interaction-authority",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6249,22 +5749,7 @@
     },
     {
       "from": "managed-chat-execution",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-chat-execution",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-chat-execution",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-chat-execution",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6349,22 +5834,7 @@
     },
     {
       "from": "execution-model-routing",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-model-routing",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-model-routing",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-model-routing",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6444,22 +5914,7 @@
     },
     {
       "from": "managed-session-lifecycle",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-session-lifecycle",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-session-lifecycle",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-session-lifecycle",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6534,22 +5989,7 @@
     },
     {
       "from": "dispatch-protocol",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "dispatch-protocol",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "dispatch-protocol",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "dispatch-protocol",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6619,22 +6059,7 @@
     },
     {
       "from": "provider-attempt-recovery",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-attempt-recovery",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-attempt-recovery",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-attempt-recovery",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6699,22 +6124,7 @@
     },
     {
       "from": "host-provider-failure-ownership",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-provider-failure-ownership",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-provider-failure-ownership",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-provider-failure-ownership",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6774,22 +6184,7 @@
     },
     {
       "from": "degeneration-guard",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "degeneration-guard",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "degeneration-guard",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "degeneration-guard",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6844,22 +6239,7 @@
     },
     {
       "from": "crash-reconciliation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "crash-reconciliation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "crash-reconciliation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "crash-reconciliation",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6909,22 +6289,7 @@
     },
     {
       "from": "durable-convergence",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-convergence",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-convergence",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-convergence",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -6969,22 +6334,7 @@
     },
     {
       "from": "delegation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "delegation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "delegation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "delegation",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7024,22 +6374,7 @@
     },
     {
       "from": "concern-routing",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "concern-routing",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "concern-routing",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "concern-routing",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7074,22 +6409,7 @@
     },
     {
       "from": "intra-participant-parallelism",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "intra-participant-parallelism",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "intra-participant-parallelism",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "intra-participant-parallelism",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7119,22 +6439,7 @@
     },
     {
       "from": "knowledge-reuse",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "knowledge-reuse",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "knowledge-reuse",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "knowledge-reuse",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7159,22 +6464,7 @@
     },
     {
       "from": "epistemic-reasoning",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "epistemic-reasoning",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "epistemic-reasoning",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "epistemic-reasoning",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7194,22 +6484,7 @@
     },
     {
       "from": "speculative-investigation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "speculative-investigation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "speculative-investigation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "speculative-investigation",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7224,22 +6499,7 @@
     },
     {
       "from": "obligation-ledger",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "obligation-ledger",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "obligation-ledger",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "obligation-ledger",
-      "to": "relay-retirement",
+      "to": "work",
       "kind": "station-order"
     },
     {
@@ -7249,76 +6509,6 @@
     },
     {
       "from": "obligation-ledger",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-incumbency",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-incumbency",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-incumbency",
-      "to": "relay-retirement",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-incumbency",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-incumbency",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-assessment",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-assessment",
-      "to": "relay-retirement",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-assessment",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-assessment",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-context-projection",
-      "to": "relay-retirement",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-context-projection",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-context-projection",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-retirement",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "relay-retirement",
       "to": "distribution",
       "kind": "station-order"
     },

@@ -50,10 +50,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -62,7 +58,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-06": {
@@ -115,10 +111,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -127,7 +119,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-07": {
@@ -180,10 +172,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -192,7 +180,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-08": {
@@ -245,10 +233,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -257,7 +241,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-09": {
@@ -310,10 +294,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -322,7 +302,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-10": {
@@ -375,10 +355,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -387,7 +363,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-11": {
@@ -440,10 +416,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -452,7 +424,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-12": {
@@ -505,10 +477,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -517,7 +485,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-13": {
@@ -570,10 +538,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -582,7 +546,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-14": {
@@ -635,10 +599,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "ablated",
@@ -647,7 +607,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-15": {
@@ -700,10 +660,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -712,7 +668,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-16": {
@@ -765,10 +721,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -777,7 +729,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-17": {
@@ -830,10 +782,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -842,7 +790,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-18": {
@@ -895,10 +843,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -907,7 +851,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-19": {
@@ -960,10 +904,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -972,7 +912,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-20": {
@@ -1025,10 +965,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1037,7 +973,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-21": {
@@ -1090,10 +1026,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1102,7 +1034,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-22": {
@@ -1155,10 +1087,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1167,7 +1095,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-23": {
@@ -1220,10 +1148,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1232,7 +1156,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-24": {
@@ -1285,10 +1209,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1297,7 +1217,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-25": {
@@ -1350,10 +1270,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1362,7 +1278,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-26": {
@@ -1415,10 +1331,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1427,7 +1339,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-27": {
@@ -1480,10 +1392,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1492,7 +1400,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-28": {
@@ -1545,10 +1453,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1557,7 +1461,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-29": {
@@ -1610,10 +1514,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1622,7 +1522,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-30": {
@@ -1675,10 +1575,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1687,7 +1583,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-31": {
@@ -1740,10 +1636,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1752,7 +1644,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-32": {
@@ -1805,10 +1697,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1817,7 +1705,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-33": {
@@ -1870,10 +1758,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1882,7 +1766,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-34": {
@@ -1935,10 +1819,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -1947,7 +1827,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-35": {
@@ -2000,10 +1880,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2012,7 +1888,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-36": {
@@ -2065,10 +1941,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2077,7 +1949,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-37": {
@@ -2130,10 +2002,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2142,7 +2010,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-38": {
@@ -2195,10 +2063,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2207,7 +2071,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-39": {
@@ -2260,10 +2124,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2272,7 +2132,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-40": {
@@ -2325,10 +2185,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2337,7 +2193,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-41": {
@@ -2390,10 +2246,6 @@
         "epistemic-reasoning": "ablated",
         "speculative-investigation": "ablated",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "borrowed",
@@ -2402,7 +2254,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-42": {
@@ -2455,10 +2307,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2467,7 +2315,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-43": {
@@ -2520,10 +2368,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2532,7 +2376,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-44": {
@@ -2585,10 +2429,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2597,7 +2437,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-45": {
@@ -2650,10 +2490,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2662,7 +2498,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-46": {
@@ -2715,10 +2551,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2727,7 +2559,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-47": {
@@ -2780,10 +2612,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2792,7 +2620,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-48": {
@@ -2845,10 +2673,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2857,7 +2681,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-49": {
@@ -2910,10 +2734,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "ablated",
-        "relay-incumbency": "ablated",
-        "relay-assessment": "ablated",
-        "relay-context-projection": "ablated",
-        "relay-retirement": "ablated",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2922,7 +2742,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-50": {
@@ -2975,10 +2795,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -2987,7 +2803,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-51": {
@@ -3040,10 +2856,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -3052,7 +2864,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-52": {
@@ -3105,10 +2917,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -3117,7 +2925,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-53": {
@@ -3170,10 +2978,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -3182,7 +2986,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-54": {
@@ -3235,10 +3039,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "ablated",
         "distribution": "ablated",
         "delegation.sync-delegate": "active",
@@ -3247,7 +3047,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-55": {
@@ -3300,10 +3100,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "active",
         "distribution": "active",
         "delegation.sync-delegate": "active",
@@ -3312,7 +3108,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "station-56": {
@@ -3365,10 +3161,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "active",
         "distribution": "active",
         "delegation.sync-delegate": "active",
@@ -3377,7 +3169,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "ablated"
+        "work": "ablated"
       }
     },
     "production": {
@@ -3430,10 +3222,6 @@
         "epistemic-reasoning": "active",
         "speculative-investigation": "active",
         "obligation-ledger": "active",
-        "relay-incumbency": "active",
-        "relay-assessment": "active",
-        "relay-context-projection": "active",
-        "relay-retirement": "active",
         "change-integration": "active",
         "distribution": "active",
         "delegation.sync-delegate": "active",
@@ -3442,7 +3230,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "planning": "active"
+        "work": "active"
       }
     }
   }

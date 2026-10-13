@@ -1,14 +1,15 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.EventStore
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle =
-    private new: journal: AgentJournal * release: (unit -> unit) -> JournalHandle
+    private new: journal: AgentJournal * release: (unit -> unit) * store: IEventStore option -> JournalHandle
     member internal Journal: AgentJournal
     member internal Dispose: unit -> unit
-    static member internal Create: journal: AgentJournal -> JournalHandle
-    static member internal CreateShared: journal: AgentJournal -> JournalHandle
+    static member internal Create: journal: AgentJournal * store: IEventStore option -> JournalHandle
+    static member internal CreateShared: journal: AgentJournal * store: IEventStore option -> JournalHandle
 
 [<RequireQualifiedAccess>]
 module JournalSurface =
@@ -21,6 +22,8 @@ module JournalSurface =
     val acquireSharedForWorkspace: workspace: string -> processId: int -> startedAt: string -> Task<obj>
     val dispose: handle: JournalHandle -> unit
     val runtimeId: handle: JournalHandle -> string
+    /// The store this handle's writer owns, or null when it has none.
+    val eventStore: handle: JournalHandle -> obj
     val appendAgent: handle: JournalHandle -> stream: obj -> run: obj -> fact: obj -> Task<obj>
     val appendManagerLifecycle: handle: JournalHandle -> stream: obj -> factObj: obj -> Task<obj>
     val writePayload: handle: JournalHandle -> content: string -> Task<obj>

@@ -30,7 +30,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Opaque capability for one journal projection and its local writer.
-type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
+type JournalHandle private (journal: AgentJournal, release: unit -> unit, store: IEventStore option) =
     // DSL-MUTABLE: resource — one-shot physical journal disposal latch
     let mutable disposed = false
 
@@ -40,16 +40,20 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
 
         journal
 
+    /// The store this handle's writer owns, when it was created from one. The
+    /// lifecycle vocabulary is appended through it.
+    member internal _.EventStore = store
+
     member internal _.Dispose() =
         if not disposed then
             disposed <- true
             release ()
 
-    static member internal Create(journal: AgentJournal) =
-        JournalHandle(journal, (fun () -> (journal :> IDisposable).Dispose()))
+    static member internal Create(journal: AgentJournal, store: IEventStore option) =
+        JournalHandle(journal, (fun () -> (journal :> IDisposable).Dispose()), store)
 
-    static member internal CreateShared(journal: AgentJournal) =
-        JournalHandle(journal, (fun () -> SharedAgentJournal.release (Some journal)))
+    static member internal CreateShared(journal: AgentJournal, store: IEventStore option) =
+        JournalHandle(journal, (fun () -> SharedAgentJournal.release (Some journal)), store)
 
 [<RequireQualifiedAccess>]
 module JournalSurface =
@@ -397,21 +401,29 @@ module JournalSurface =
                todoCheckpoints = todoCheckpoints
                sessionProjections = sessionProjections |}
 
-    let private journalOrError (writer: IJournalWriter) (init: Envelope) (projection: ProjectionSet) : obj =
+    let private journalOrError
+        (store: IEventStore option)
+        (writer: IJournalWriter)
+        (init: Envelope)
+        (projection: ProjectionSet)
+        : obj =
         match AgentJournal.createFromProjection writer projection with
         | Ok journal ->
             box
                 {| ok = true
-                   journal = JournalHandle.Create(journal)
+                   journal = JournalHandle.Create(journal, store)
                    localSeq = LocalSeq.value init.LocalSeq |}
         | Error error ->
             box
                 {| ok = false
                    error = $"{error.Fact}: {error.Reason}" |}
 
-    let private bootResult (result: Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>) : obj =
+    let private bootResult
+        (store: IEventStore option)
+        (result: Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>)
+        : obj =
         match result with
-        | Ok(writer, init, projection) -> journalOrError writer init projection
+        | Ok(writer, init, projection) -> journalOrError store writer init projection
         | Error error ->
             box
                 {| ok = false
@@ -426,15 +438,22 @@ module JournalSurface =
             let commonDirectory = RuntimePath.gitCommonDir workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
 
+            // DSL-MUTABLE: resource — the store the callback just created, so the
+            // returned handle can expose the lifecycle append surface.
+            let mutable createdStore: IEventStore option = None
+
             let openJournal (runtimeId: RuntimeId) processIdValue processStartedAt =
                 task {
                     let integrator =
                         CanonicalIntegrator.createWithRules
-                            CanonicalIntegrator.baseRules
+                            (CanonicalIntegrator.baseRules
+                             @ [ Wanxiangshu.Mission.Planning.PlanIntegrationRules.lifecycleRule ])
                             AuthoritativeEventTypes.isKnown
 
                     let store =
                         EventStore.createLocal commonDirectory (Guid.NewGuid().ToString("N")) integrator
+
+                    createdStore <- Some store
 
                     let! result =
                         EventStoreJournalWriter.resumeOrCreate (runtimeId, processIdValue, processStartedAt, store)
@@ -453,7 +472,7 @@ module JournalSurface =
                 return
                     box
                         {| ok = true
-                           journal = JournalHandle.CreateShared journal |}
+                           journal = JournalHandle.CreateShared(journal, createdStore) |}
             | Error error ->
                 return
                     box
@@ -472,7 +491,10 @@ module JournalSurface =
         : Task<obj> =
         task {
             let integrator =
-                CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
+                CanonicalIntegrator.createWithRules
+                    (CanonicalIntegrator.baseRules
+                     @ [ Wanxiangshu.Mission.Planning.PlanIntegrationRules.lifecycleRule ])
+                    AuthoritativeEventTypes.isKnown
 
             let store = EventStore.createLocal (str commonDir) (str writerId) integrator
 
@@ -484,7 +506,7 @@ module JournalSurface =
                     store
                 )
 
-            return bootResult result
+            return bootResult (Some store) result
         }
 
     /// Open a journal with an anonymous process writer.
@@ -497,6 +519,14 @@ module JournalSurface =
     /// Runtime identity is a plain diagnostic value; the journal remains opaque.
     let runtimeId (handle: JournalHandle) : string =
         AgentJournal.runtimeId handle.Journal |> RuntimeId.value
+
+    /// The store this handle's writer owns, when it was created from one. The
+    /// lifecycle vocabulary is appended through it; null when the handle has no
+    /// store of its own.
+    let eventStore (handle: JournalHandle) : obj =
+        match handle.EventStore with
+        | Some store -> box store
+        | None -> null
 
     /// Append an agent fact and return a normalized projection summary.
     let appendAgent (handle: JournalHandle) (stream: obj) (run: obj) (fact: obj) : Task<obj> =

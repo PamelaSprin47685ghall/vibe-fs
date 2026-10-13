@@ -489,7 +489,7 @@ module SessionRecoveryHostSurface =
                     let host = SessionRecoveryHost(journal, snapshot, scope, port)
 
                     return
-                        { Journal = JournalHandle.Create(journal)
+                        { Journal = JournalHandle.Create(journal, None)
                           Scope = scope
                           Sessions = PluginSessionScope(Some journal, (fun _ -> false))
                           Host = host

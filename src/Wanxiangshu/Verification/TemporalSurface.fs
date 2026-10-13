@@ -865,5 +865,60 @@ module TemporalSurface =
         (current :?> ProviderFailureHandle).State |> providerFailureToJs
 
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
-        ignore (firstAccepted, secondAccepted)
-        box {| ok = false; error = "Refused" |}
+        let accept (current: ProjectionSet) (fact: obj) =
+            Fold.foldFact current (factOfJs fact)
+
+        let closeFirst (current: ProjectionSet) (fact: obj) =
+            let sessionId = sessionIdOf (fact?payload?SessionId)
+
+            { current with
+                AgentProjections =
+                    match
+                        AgentProjection.tryUpdate
+                            sessionId
+                            (fun session ->
+                                Ok
+                                    { session with
+                                        PromptAuthority =
+                                            session.PromptAuthority
+                                            |> Option.map PromptAuthorityLedger.closeCompletedHumanRootManager })
+                            current.AgentProjections
+                    with
+                    | Ok updated -> updated
+                    | Error _ -> current.AgentProjections }
+
+        let refused reason =
+            box
+                {| ok = false
+                   error =
+                    {| Fact = "AuthorityRootAccepted"
+                       Reason = reason |} |}
+
+        match accept Fold.empty firstAccepted with
+        | Error rejection -> refused rejection.Reason
+        | Ok afterFirst ->
+            match accept afterFirst secondAccepted with
+            | Ok _ -> refused "second root was admitted before the first run closed"
+            | Error rejection ->
+                let afterLife = closeFirst afterFirst firstAccepted
+
+                match accept afterLife secondAccepted with
+                | Error secondRejection -> refused secondRejection.Reason
+                | Ok online ->
+                    match accept Fold.empty firstAccepted with
+                    | Error replayRejection -> refused replayRejection.Reason
+                    | Ok replayedFirst ->
+                        let replayedLife = closeFirst replayedFirst firstAccepted
+
+                        match accept replayedLife secondAccepted with
+                        | Error replayedRejection -> refused replayedRejection.Reason
+                        | Ok replayed ->
+                            box
+                                {| preCloseSecond =
+                                    box
+                                        {| ok = false
+                                           error = rejectionToJs rejection |}
+                                   afterFirst = projectionToJs afterFirst
+                                   afterLife = projectionToJs afterLife
+                                   online = projectionToJs online
+                                   replayed = projectionToJs replayed |}

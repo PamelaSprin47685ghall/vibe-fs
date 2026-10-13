@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -7,12 +6,8 @@ import { acceptAuthorityRoot, injectAcceptedAssessment, openIncumbency, withExec
 import { permissionOfToolName } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import { manager, plan } from '../../../dist/Foundation/RolesSurface.js'
-import { EventIdModule_create } from '../../../dist/Foundation/Identity.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
-import { EventEnvelope, EventEnvelopeModule_normalize, EventStreamIdModule_create } from '../../../dist/Persistence/EventStore/Model.js'
-import { empty as emptyMap } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
-import { empty as emptyList, ofArray, toArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 
 // WHAT[work-019]: 执行入口按 sequence 与当前事实收口。无任期时全部拒绝，
 // 评审未接纳时只读放行而派工拒绝，评审接纳后固定 DevOps 派工恢复，确认先于
@@ -26,28 +21,18 @@ const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, mes
 const storeOf = (directory) => workspaceEvents.acquire(realpathSync(join(directory, '.git')))
 
 // seedDeliver refuses to write ConfirmationCommitted without a review. The fold
-// accepts the event, so the illegal fact is appended to the same workspace store
-// the plugin reads. The opening batch has two heads, and the append must name both.
+// accepts the event, so the illegal fact is seeded directly into the same
+// workspace store the plugin reads.
 const seedConfirmationWithoutReview = async (directory, sessionID) => {
   const store = storeOf(directory)
-  const stream = `lifecycle/${sessionID}`
-  const streamId = EventStreamIdModule_create(stream)
-  const heads = toArray(store.TryHeads(streamId))
-  const incumbencyId = heads
-    .map((id) => store.TryEvent(id)?.Payload?.incumbencyId)
-    .find(Boolean)
-  const envelope = EventEnvelopeModule_normalize(new EventEnvelope(
-    EventIdModule_create(randomUUID().replaceAll('-', '')),
-    streamId,
-    'ConfirmationCommitted',
-    ofArray(heads),
-    { incumbencyId, providerRunId: 'run-seeded-confirmation', toolCallId: 'call-seeded-confirmation' },
-    emptyList(),
-    emptyMap(),
-  ))
-  const appended = await store.Append(ofArray([envelope]))
+  const appended = await lifecycle.seedConfirmation(
+    store,
+    sessionID,
+    'run-seeded-confirmation',
+    'call-seeded-confirmation',
+  )
   const view = lifecycle.workView(store, sessionID)
-  return { ...view, error: appended.tag === 0 ? '' : JSON.stringify(appended.fields?.[0] ?? appended) }
+  return { ...view, error: appended.ok ? '' : appended.error }
 }
 
 // 执行入口门禁：tool.execute.before 只对评审专用工具（js-manager）与跨角色
