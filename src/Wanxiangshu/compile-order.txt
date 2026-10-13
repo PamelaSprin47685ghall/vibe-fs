@@ -454,8 +454,8 @@ Mission/Lifecycle/Kernel.fsi
 Mission/Lifecycle/Kernel.fs
 Mission/Lifecycle/Surface.fsi
 Mission/Lifecycle/Surface.fs
-Mission/Planning/IntegrationRules.fsi
-Mission/Planning/IntegrationRules.fs
+Mission/Lifecycle/Integration.fsi
+Mission/Lifecycle/Integration.fs
 Mission/Planning/PlanPath.fsi
 Mission/Planning/PlanPath.fs
 Mission/Planning/PlanWorkOpen.fsi

@@ -1,6 +1,5 @@
-namespace Wanxiangshu.Mission.Planning
+namespace Wanxiangshu.Mission.Lifecycle
 
-open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.EventStore
 
 [<RequireQualifiedAccess>]
@@ -11,13 +10,14 @@ module LifecycleIntegrationRules =
         { Name = "Lifecycle"
           Initial = box Map.empty<string, LifecycleWork>
           FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
-          Accepts = fun envelope -> Wanxiangshu.Mission.Lifecycle.LifecycleEventTypes.isLifecycleEvent envelope.EventType
+          Accepts = fun envelope -> LifecycleEventTypes.isLifecycleEvent envelope.EventType
           Integrate =
             fun current envelope ->
                 match LifecycleCodec.decodePayload envelope.EventType envelope.Payload with
                 | Error error -> Error error
                 | Ok event ->
                     let works = unbox<Map<string, LifecycleWork>> current
+
                     match event with
                     | LifecycleEvent.WorkOpened(workId, root, sequence, authority) ->
                         if Map.containsKey workId works then
@@ -27,7 +27,10 @@ module LifecycleIntegrationRules =
                         else
                             Ok(box (Map.add workId (LifecycleFold.fresh workId root sequence authority) works))
                     | _ ->
-                        let workId = EventStreamId.value envelope.StreamId |> fun stream -> stream.Replace("lifecycle/", "")
+                        let workId =
+                            EventStreamId.value envelope.StreamId
+                            |> fun stream -> stream.Replace("lifecycle/", "")
+
                         match Map.tryFind workId works with
                         | None -> Error "lifecycle event before WorkOpened"
                         | Some work ->

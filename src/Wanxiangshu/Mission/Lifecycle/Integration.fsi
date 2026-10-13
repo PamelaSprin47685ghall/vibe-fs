@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Planning
+namespace Wanxiangshu.Mission.Lifecycle
 
 open Wanxiangshu.Persistence.EventStore
 
