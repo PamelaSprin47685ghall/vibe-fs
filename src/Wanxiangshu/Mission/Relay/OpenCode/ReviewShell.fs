@@ -87,14 +87,19 @@ module ReviewShell =
         | Error _ -> Error ReviewBackendManager.Path.InvalidFindings
         | Ok findings -> Ok findings
 
-    let private resolveActiveIncumbency (store: IEventStore) (workId: string) : Result<ActivePlanIncumbency, string> =
-        let activeOpt =
-            PlanEventStore.activeWorkState store (PlanWorkId.create workId)
-            |> Option.bind (fun state -> state.Active)
-
-        match activeOpt with
+    let private resolveActiveIncumbency (store: IEventStore) (workId: string) : Result<string, string> =
+        match store.TryCurrent "Lifecycle" with
         | None -> Error ReviewBackendManager.Path.BindingUnavailable
-        | Some active -> Ok active
+        | Some current ->
+            let works =
+                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+            match Map.tryFind workId works with
+            | Some work ->
+                match work.Active with
+                | Some active -> Ok active.Id
+                | None -> Error ReviewBackendManager.Path.BindingUnavailable
+            | None -> Error ReviewBackendManager.Path.BindingUnavailable
 
     let private gapsOf (findings: AssessmentFindings) : (string * string) list =
         AssessmentFindings.values findings
@@ -112,7 +117,7 @@ module ReviewShell =
         |> Result.bind (fun store -> parseFindings args |> Result.map (fun findings -> (store, findings)))
         |> Result.bind (fun (store, findings) ->
             resolveActiveIncumbency store context.SessionId
-            |> Result.map (fun active -> (store, active.Id, gapsOf findings)))
+            |> Result.map (fun incumbencyId -> (store, incumbencyId, gapsOf findings)))
 
     let private executePlan
         (planStore: IEventStore option)

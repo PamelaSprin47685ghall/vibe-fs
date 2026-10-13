@@ -447,20 +447,19 @@ module ToolRegistry =
             return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
         }
 
-    let private resolveActiveTenure store sessionId =
-        let pid = PlanWorkId.create sessionId
-
-        let state =
-            PlanEventStore.workState store pid
-            |> Option.defaultValue PlanFold.initialWorkState
-
-        match state.Active with
+    let private resolveActiveTenure (store: IEventStore) (sessionId: string) =
+        match store.TryCurrent "Lifecycle" with
         | None -> Error "No active incumbency found for this work"
-        | Some active ->
-            let hasReviewed =
-                state.Reviewed |> Option.exists (fun (reviewedId, _) -> reviewedId = active.Id)
+        | Some current ->
+            let works =
+                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
 
-            Ok hasReviewed
+            match Map.tryFind sessionId works with
+            | Some work ->
+                match work.Active with
+                | None -> Error "No active incumbency found for this work"
+                | Some active -> Ok active.Review.IsSome
+            | None -> Error "No active incumbency found for this work"
 
     let private executeTenureSandbox prose root store sessionId programSource =
         match resolveActiveTenure store sessionId with

@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as registry from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+
+// The sandbox resolves the active tenure from the unified lifecycle work, so the
+// store is a real workspace store with one opened plan work.
+const openPlanStore = async (root, workId) => {
+  execFileSync('git', ['init', '--quiet', root])
+  const store = workspaceEvents.acquire(fs.realpathSync(path.join(root, '.git')))
+  const opened = await lifecycle.seedOpen(store, 'plan', workId, root, 1n)
+  assert.equal(opened.ok, true, opened.error)
+  return store
+}
 
 test('WHAT[work-029] Plan path derivation resolves deterministically and rejects path traversal', () => {
   const root = '/workspace/test-repo/.git/wanxiangshu'
@@ -89,16 +102,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
   try {
     const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
     surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
-
-    let state = surface.PlanFold.initialWorkState
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.workOpened(workId, tmpRoot), state).state
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-1', surface.PlanStage.S1, 0n), state).state
-
-    const mockStore = {
-      TryCurrent: (key) => (key === 'Plan' ? state : null),
-      TryHead: () => null,
-      Append: async () => ({ tag: 0 }),
-    }
+    const store = await openPlanStore(tmpRoot, workId)
 
     // 1. Passing a path to this.file('plan.md') MUST fail with PATH_DENIED
     const fileWithPath = `class Js extends JsProgram {
@@ -107,7 +111,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { text: f.text() };
       }
     }`
-    const resFileWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, fileWithPath)
+    const resFileWithPath = await registry.runJsPlan(store, tmpRoot, workId, fileWithPath)
     assert.match(resFileWithPath, /# failed/)
     assert.match(resFileWithPath, /code = "PATH_DENIED"/)
 
@@ -118,7 +122,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { ok: true };
       }
     }`
-    const resEditWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, editWithPath)
+    const resEditWithPath = await registry.runJsPlan(store, tmpRoot, workId, editWithPath)
     assert.match(resEditWithPath, /# failed/)
     assert.match(resEditWithPath, /code = "PATH_DENIED"/)
 
@@ -129,7 +133,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { ok: true };
       }
     }`
-    const resRewriteWithPath = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteWithPath)
+    const resRewriteWithPath = await registry.runJsPlan(store, tmpRoot, workId, rewriteWithPath)
     assert.match(resRewriteWithPath, /# failed/)
     assert.match(resRewriteWithPath, /code = "PATH_DENIED"/)
   } finally {
@@ -144,16 +148,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
   try {
     const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
     surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
-
-    let state = surface.PlanFold.initialWorkState
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.workOpened(workId, tmpRoot), state).state
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-1', surface.PlanStage.S1, 0n), state).state
-
-    const mockStore = {
-      TryCurrent: (key) => (key === 'Plan' ? state : null),
-      TryHead: () => null,
-      Append: async () => ({ tag: 0 }),
-    }
+    const store = await openPlanStore(tmpRoot, workId)
 
     // 1. In unreviewed tenure: read without path succeeds
     const readProgram = `class Js extends JsProgram {
@@ -162,7 +157,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { slice: f.text('step1', '$') };
       }
     }`
-    const readRes = await registry.runJsPlan(mockStore, tmpRoot, workId, readProgram)
+    const readRes = await registry.runJsPlan(store, tmpRoot, workId, readProgram)
     assert.match(readRes, /# ok/)
     assert.match(readRes, /Step 1: Draft/)
 
@@ -173,7 +168,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { edited: true };
       }
     }`
-    const editRes = await registry.runJsPlan(mockStore, tmpRoot, workId, editProgram)
+    const editRes = await registry.runJsPlan(store, tmpRoot, workId, editProgram)
     assert.match(editRes, /# failed/)
     assert.match(editRes, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(editRes, /Review is required before modifying the plan artifact/)
@@ -188,17 +183,19 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { done: true };
       }
     }`
-    const rewriteRes = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteProgram)
+    const rewriteRes = await registry.runJsPlan(store, tmpRoot, workId, rewriteProgram)
     assert.match(rewriteRes, /# failed/)
     assert.match(rewriteRes, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(rewriteRes, /Review is required before modifying the plan artifact/)
     assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, initialContent)
 
-    // 4. Submit review for current tenure inc-1
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.reviewed('inc-1', surface.PlanStage.S1, surface.PlanReviewedOutcome.Stayed), state).state
+    // 4. Submit review for current tenure: the accepted review is a unified
+    //    lifecycle Reviewed event (Stayed).
+    const reviewed = await lifecycle.seedReview(store, workId, 'Stayed')
+    assert.equal(reviewed.ok, true)
 
     // 5. Now tenure inc-1 has been reviewed -> rewrite succeeds!
-    const rewriteAfterReviewRes = await registry.runJsPlan(mockStore, tmpRoot, workId, rewriteProgram)
+    const rewriteAfterReviewRes = await registry.runJsPlan(store, tmpRoot, workId, rewriteProgram)
     assert.match(rewriteAfterReviewRes, /# ok/)
     assert.match(rewriteAfterReviewRes, /plan\.md/)
     assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Completely New Plan')
@@ -210,13 +207,14 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { edited: true };
       }
     }`
-    const editAfterReviewRes = await registry.runJsPlan(mockStore, tmpRoot, workId, editAfterReviewProgram)
+    const editAfterReviewRes = await registry.runJsPlan(store, tmpRoot, workId, editAfterReviewProgram)
     assert.match(editAfterReviewRes, /# ok/)
     assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
 
-    // 7. Relay to next tenure: inc-1 retires Relayed, inc-2 opens at S1
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyRetired('inc-1', surface.PlanRetirementOutcome.Relayed, 10n), state).state
-    state = surface.PlanFold.applyWorkEventJs(surface.PlanEvents.incumbencyOpened(workId, 'inc-2', surface.PlanStage.S1, 11n), state).state
+    // 7. Relay to next tenure: the reviewed (Stayed) tenure relays — one append
+    //    retires inc-1 Relayed and opens the successor inc-2 at S1.
+    const relayed = await lifecycle.seedDeliver(store, workId, 'run-029-relay', 'call-029-relay', 11n)
+    assert.equal(relayed.ok, true, relayed.error)
 
     // 8. Next tenure inc-2 has NOT yet submitted review -> mutation MUST be blocked again!
     const writeInInc2 = `class Js extends JsProgram {
@@ -225,7 +223,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { done: true };
       }
     }`
-    const resWriteInInc2 = await registry.runJsPlan(mockStore, tmpRoot, workId, writeInInc2)
+    const resWriteInInc2 = await registry.runJsPlan(store, tmpRoot, workId, writeInInc2)
     assert.match(resWriteInInc2, /# failed/)
     assert.match(resWriteInInc2, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(resWriteInInc2, /Review is required before modifying the plan artifact/)
@@ -239,7 +237,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { text: f.text('^', '$') };
       }
     }`
-    const readInInc2Res = await registry.runJsPlan(mockStore, tmpRoot, workId, readInInc2Program)
+    const readInInc2Res = await registry.runJsPlan(store, tmpRoot, workId, readInInc2Program)
     assert.match(readInInc2Res, /# ok/)
     assert.match(readInInc2Res, /# Reviewed Plan/)
   } finally {

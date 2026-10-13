@@ -74,47 +74,47 @@ module PluginRecoveryWiring =
         with _ ->
             None
 
-    let private emitRecoveryEffect (effect: PlanRecoveryEffect) : unit =
-        match effect with
-        | PlanRecoveryEffect.DeliveredIdempotent(workId, path) ->
-            Diagnostic.emit "plan-work-delivered-idempotent" [ "work_id", workId; "path", path ]
-        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, authorized, true) ->
-            Diagnostic.emit
-                "plan-work-active-rebound"
-                [ "work_id", workId
-                  "incumbency_id", incumbencyId
-                  "stage", stage
-                  "authorized", (if authorized then "true" else "false")
-                  "plan_exists", "true" ]
-        | PlanRecoveryEffect.ActiveRebound(workId, incumbencyId, stage, authorized, false) ->
-            Diagnostic.emit
-                "plan-work-active-file-missing"
-                [ "work_id", workId
-                  "incumbency_id", incumbencyId
-                  "stage", stage
-                  "authorized", (if authorized then "true" else "false")
-                  "plan_exists", "false" ]
-        | PlanRecoveryEffect.Conflict(workId, reason) ->
-            Diagnostic.emit "plan-recovery-conflict" [ "work_id", workId; "reason", reason ]
+    /// Algorithm F: recovery reads the unified fold, not the retired Plan events.
+    let private emitUnifiedRecoveryEffect (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork) : unit =
+        match Wanxiangshu.Mission.Lifecycle.LifecycleFold.recover work with
+        | Error reason ->
+            Diagnostic.emit "plan-recovery-conflict" [ "work_id", work.WorkId; "reason", reason ]
+        | Ok(position, _) ->
+            match position with
+            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.DeliveredIdempotent ->
+                Diagnostic.emit "plan-work-delivered-idempotent" [ "work_id", work.WorkId ]
+            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.ActiveRebound ->
+                Diagnostic.emit "plan-work-active-rebound" [ "work_id", work.WorkId ]
+            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.Conflict ->
+                Diagnostic.emit "plan-recovery-conflict" [ "work_id", work.WorkId ]
+            | _ -> ()
 
-    let private evaluatePlanRecovery (viewsOpt: PlanWorkView list option) (workspaceDirOpt: string option) : unit =
-        match viewsOpt, workspaceDirOpt with
-        | Some views, Some root ->
-            let readPlan = tryReadPlanFile root
-            let effects = PlanRecovery.evaluateRecoveryEffects views readPlan
-            effects |> List.iter emitRecoveryEffect
+    let private evaluatePlanRecovery
+        (worksOpt: Wanxiangshu.Mission.Lifecycle.LifecycleWork list option)
+        (workspaceDirOpt: string option)
+        : unit =
+        match worksOpt, workspaceDirOpt with
+        | Some works, Some _ -> works |> List.iter emitUnifiedRecoveryEffect
         | _ -> ()
 
-    let private tryResolveViews (workspace: string) : PlanWorkView list option =
+    let private tryResolveViews
+        (workspace: string)
+        : Wanxiangshu.Mission.Lifecycle.LifecycleWork list option =
         try
             let commonDir = RuntimePath.gitCommonDir workspace
 
             WorkspaceEventStore.tryCurrent commonDir
-            |> Option.map PlanEventStore.allWorkViews
+            |> Option.bind (fun store -> store.TryCurrent "Lifecycle")
+            |> Option.map (fun current ->
+                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                |> Map.toList
+                |> List.map snd)
         with _ ->
             None
 
-    let private tryResolveWorkspaceViews (workspaceDirOpt: string option) : PlanWorkView list option =
+    let private tryResolveWorkspaceViews
+        (workspaceDirOpt: string option)
+        : Wanxiangshu.Mission.Lifecycle.LifecycleWork list option =
         match workspaceDirOpt with
         | Some workspace when not (String.IsNullOrWhiteSpace workspace) -> tryResolveViews workspace
         | _ -> None

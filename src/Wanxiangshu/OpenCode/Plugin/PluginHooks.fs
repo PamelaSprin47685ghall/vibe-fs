@@ -123,11 +123,12 @@ module PluginHooks =
             // session's active plan incumbency. Non-plan sessions, missing
             // stores and delivered works resolve None and append nothing, so
             // the non-plan system prompt path stays byte-identical.
-            let stagePathOf (stage: Wanxiangshu.Mission.Planning.PlanStage) =
+            let stagePathOf (stage: Wanxiangshu.Mission.Lifecycle.StageElement) : string option =
                 match stage with
-                | Wanxiangshu.Mission.Planning.PlanStage.S1 -> "planning/s1"
-                | Wanxiangshu.Mission.Planning.PlanStage.S2 -> "planning/s2"
-                | Wanxiangshu.Mission.Planning.PlanStage.S3 -> "planning/s3"
+                | Wanxiangshu.Mission.Lifecycle.StageElement.S1 -> Some "planning/s1"
+                | Wanxiangshu.Mission.Lifecycle.StageElement.S2 -> Some "planning/s2"
+                | Wanxiangshu.Mission.Lifecycle.StageElement.S3 -> Some "planning/s3"
+                | Wanxiangshu.Mission.Lifecycle.StageElement.S4 -> None
 
             let planStageFor (sessionId: SessionId) : string option =
                 match roleFor sessionId with
@@ -136,10 +137,19 @@ module PluginHooks =
                     |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
                     |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
                     |> Option.bind (fun store ->
-                        Wanxiangshu.Mission.Planning.PlanEventStore.activeWorkState
-                            store
-                            (Wanxiangshu.Mission.Planning.PlanWorkId.create (SessionId.value sessionId)))
-                    |> Option.bind (fun state -> state.Active |> Option.map (fun active -> stagePathOf active.Stage))
+                        store.TryCurrent "Lifecycle"
+                        |> Option.bind (fun current ->
+                            let works =
+                                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+                            Map.tryFind (SessionId.value sessionId) works))
+                    |> Option.bind (fun work ->
+                        match work.Sequence, work.Active with
+                        | Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan, Some _ ->
+                            match Wanxiangshu.Mission.Lifecycle.LifecycleFold.projection work with
+                            | Ok(stage, _) -> stagePathOf stage
+                            | Error _ -> None
+                        | _ -> None)
                 | _ -> None
 
             let systemTransform =
