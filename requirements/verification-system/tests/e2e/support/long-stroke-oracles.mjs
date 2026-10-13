@@ -237,11 +237,11 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   );
 }
 
-/** §21: non-10 assessment assigns work (AssessmentCommitted). */
+/** §21: non-10 assessment assigns work (Reviewed). */
 export function assertAssessmentAssignsWork(workDir, label = 'long-stroke') {
   assert.ok(
-    countFactCase(workDir, 'AssessmentCommitted') >= 1,
-    `${label}: AssessmentCommitted required (non-10 assessment assigns work)`,
+    countFactCase(workDir, 'Reviewed') >= 1,
+    `${label}: Reviewed required (non-10 assessment assigns work)`,
   );
 }
 
@@ -338,11 +338,11 @@ export async function holdChildC1UntilLabor(scenario) {
 /**
  * Script the owner-driven Manager incarnations without inventing a Reviewer identity.
  * The initial authority prompt and later manager-assess resource keep separate
- * declarations; the reopened owner resource serves review or suicide closes
+ * declarations; the reopened owner resource serves review or deliver closes
  * by delivery: initial-low→work, candidate-perfect→finish, conflict-low→repair,
  * repaired-perfect→finish, rebased-perfect→finish. HumanRoot:
  * low→Continue, perfect→Accepted.
- * Every logical step still crosses the real review/suicide/resume tools and durable
+ * Every logical step still crosses the real review/deliver/resume tools and durable
  * IncumbencyOpened/RetirementCommitted facts. Iterations are never distinguished
  * by prompt text.
  */
@@ -395,7 +395,7 @@ export async function bindManagerLoopSequence(scenario) {
     prefixText: 'HumanRoot loop next iteration independently audits the current snapshot as complete.',
     args: scores('PERFECT'),
   });
-  const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
+  const retire = () => ({ type: 'tool-call', tool: 'deliver', args: {} });
   const joinOwnedWork = () => ({ type: 'tool-call', tool: 'join', args: {} });
  // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
  // Later responses are selected by the new incarnation's audit delivery count.
@@ -776,7 +776,7 @@ export async function oracleLongStroke(scenario, ctx) {
 export const PLANNED_WAIT_FACTS = Object.freeze({
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
   providerFailure: waitFactShape('FailureRecorded', { eq: 2 }),
-  assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
+  assessmentCommitted: waitFactShape('Reviewed', { gte: 1 }),
   retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
   incumbencyOpened: waitFactShape('IncumbencyOpened', { gte: 1 }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
@@ -817,10 +817,8 @@ export const HUMANROOT_CANARY_DELTAS = Object.freeze({
 const isContinueOutcome = (summary) => summary?.Outcome === 'Continue';
 
 const isAcceptedOutcome = (summary) =>
-  Array.isArray(summary?.Outcome)
-  && summary.Outcome[0] === 'Accepted'
-  && Array.isArray(summary.Outcome[1])
-  && summary.Outcome[1][0] === 'QualityCertificateId';
+  summary?.Outcome === 'Accepted'
+  || (Array.isArray(summary?.Outcome) && summary.Outcome[0] === 'Accepted');
 
 const incumbencyIdsIn = (payloads) => {
   const ids = new Set();
@@ -962,13 +960,13 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   assert.ok(typeof sessionId === 'string' && sessionId.length > 0, `${label}: canary session id required`);
   const workDir = scenario.host.workDir;
 
-  await awaitNamedFact(workDir, waitFactShape('AssessmentCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('Reviewed', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
   await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
   await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
 
  // The authority-turn family answers the initial iteration only: once the successor
  // carries the owner-controlled assess resource as its last user message, the
- // assess-resource family (same review + suicide shape, perfect audit) answers it.
+ // assess-resource family (same review + deliver shape, perfect audit) answers it.
  // An IncumbencyOpened fact alone is an event-only fake; physically observed
  // deliveries under the same LogicalRun prove the loop.
   assert.equal(
@@ -1012,7 +1010,7 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
  // Pure-loop authority: the next iteration carries the same system/provider
  // plan and the same typed authority user sequence as the initial iteration.
  // The next iteration now retains the full predecessor physical history —
- // the first-iteration review call/result and the suicide call stay in the
+ // the first-iteration review call/result and the deliver call stay in the
  // provider context, with the owner-controlled assessment resource appended.
  // ONE reusable humanroot-loop family covers both iterations, so iterations
  // are never distinguished by prompt text; the assertions below are on
@@ -1060,12 +1058,12 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   assert.equal(
     canaryRetirements.filter(isAcceptedOutcome).length,
     1,
-    `${label}: next retirement must be Outcome Accepted with a certificate`,
+    `${label}: next retirement must be Outcome Accepted`,
   );
   assert.equal(
-    countFactCase(workDir, 'AssessmentCommitted'),
+    countFactCase(workDir, 'Reviewed'),
     HUMANROOT_CANARY_DELTAS.assessments,
-    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.assessments} AssessmentCommitted before the main spine`,
+    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.assessments} Reviewed before the main spine`,
   );
   assert.equal(
     countFactCase(workDir, 'RetirementCommitted'),

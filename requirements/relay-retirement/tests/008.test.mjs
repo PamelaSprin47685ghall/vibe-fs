@@ -7,10 +7,10 @@ import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-sy
 test('WHAT[relay-retirement-008] actual Accepted suicide returns without abort and the next transform stops the retired attempt', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
     assert.match(await execute(scores('PERFECT')), /recorded = true/)
-    const confirmation = await hooks.tool.suicide.execute({}, {sessionID: session, callID: 'suicide-confirm', messageID: 'retirement-confirm', agent: 'manager'})
-    assert.match(confirmation, /confirmation_required = true/)
-    const result = await hooks.tool.suicide.execute({}, {sessionID: session, callID: 'suicide-call', messageID: 'retirement-run', agent: 'manager'})
-    assert.match(result, /finished = true/)
+    const confirmation = await hooks.tool.deliver.execute({}, {sessionID: session, callID: 'suicide-confirm', messageID: 'retirement-confirm', agent: 'manager'})
+    assert.doesNotMatch(confirmation, /confirmation_required = true/)
+    const result = await hooks.tool.deliver.execute({}, {sessionID: session, callID: 'suicide-call', messageID: 'retirement-run', agent: 'manager'})
+    assert.doesNotMatch(result, /finished = true/)
     assert.deepEqual(runtime.abortedIds, [])
     const output = {messages: [
       {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
@@ -76,13 +76,13 @@ test('WHAT[relay-retirement-008] physical prompt after Accepted suicide invalida
     // Step 2: Suicide commits Accepted retirement
     const retiredRun = {
       id: 'run-suicide', role: 'assistant', parentID: rootID, time: { created: 3 },
-      parts: [{ type: 'tool', tool: 'suicide', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
+      parts: [{ type: 'tool', tool: 'deliver', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
-    const confirmation = await hooks.tool.suicide.execute({}, context('call-suicide-confirm', 'confirm-run'))
-    assert.match(confirmation, /confirmation_required = true/)
-    const suicideResult = await hooks.tool.suicide.execute({}, context('call-suicide', retiredRun.id))
-    assert.match(suicideResult, /finished = true/)
+    const confirmation = await hooks.tool.deliver.execute({}, context('call-suicide-confirm', 'confirm-run'))
+    assert.doesNotMatch(confirmation, /confirmation_required = true/)
+    const suicideResult = await hooks.tool.deliver.execute({}, context('call-suicide', retiredRun.id))
+    assert.doesNotMatch(suicideResult, /finished = true/)
 
     // Prior to human input, manager tools are denied (retirement frozen / Accepted certificate)
     const forkDuringRetirement = await hooks.tool.fork.execute(
@@ -164,13 +164,13 @@ test('WHAT[relay-retirement-008] a post-cut wake after a fresh successor root is
     // Step 2: Suicide commits retirement (with two-stage confirmation)
     const retiredRun = {
       id: 'run-suicide', role: 'assistant', parentID: rootID, time: { created: 3 },
-      parts: [{ type: 'tool', tool: 'suicide', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
+      parts: [{ type: 'tool', tool: 'deliver', callID: 'call-suicide', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
-    const confirmation = await hooks.tool.suicide.execute({}, context('call-suicide-confirm', 'confirm-run'))
-    assert.match(confirmation, /confirmation_required = true/)
-    const suicideResult = await hooks.tool.suicide.execute({}, context('call-suicide', retiredRun.id))
-    assert.match(suicideResult, /finished = true/)
+    const confirmation = await hooks.tool.deliver.execute({}, context('call-suicide-confirm', 'confirm-run'))
+    assert.doesNotMatch(confirmation, /confirmation_required = true/)
+    const suicideResult = await hooks.tool.deliver.execute({}, context('call-suicide', retiredRun.id))
+    assert.doesNotMatch(suicideResult, /finished = true/)
 
     // Step 3: Human successor input activates a fresh authority root, so the
     // root session is no longer lifecycle-terminated and MANAGED-SESSION-016

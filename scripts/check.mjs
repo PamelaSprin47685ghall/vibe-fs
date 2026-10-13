@@ -4,6 +4,7 @@
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createCheckContext } from './lib/check-context.mjs'
+import { registrationGap } from './checks/clean-break-symbols.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)))
 
@@ -27,10 +28,15 @@ export const checks = [
   join(root, 'checks/js-boundary-gate.mjs'),
   join(root, 'checks/shard-edge-audit.mjs'),
   join(root, 'checks/ablation-manifest.mjs'),
+  join(root, 'checks/clean-break-symbols.mjs'),
 ]
 
 export async function runChecks(options = {}) {
   const checkList = options.checks ?? checks
+  if (options.checks == null) {
+    const gap = registrationGap(checkList)
+    if (gap) throw new Error(gap.message)
+  }
   const ctx = options.context ?? createCheckContext({ root: options.root })
   const allIssues = []
 
@@ -41,7 +47,14 @@ export async function runChecks(options = {}) {
       throw new Error(`Gate does not export check(context): ${script}`)
     }
     const result = await mod.check(ctx)
-    const issues = result?.issues ?? []
+    const issues = [...(result?.issues ?? [])]
+    if (script.replace(/\\/g, '/').endsWith('checks/clean-break-symbols.mjs') && result?.ran !== true) {
+      issues.push({
+        code: 'scan-not-run',
+        path: script,
+        message: 'clean-break symbol scan did not run',
+      })
+    }
     if (issues.length > 0) {
       allIssues.push({ script, issues })
     }

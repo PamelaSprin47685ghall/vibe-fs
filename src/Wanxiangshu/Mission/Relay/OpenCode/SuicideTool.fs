@@ -19,42 +19,34 @@ module SuicideTool =
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
-        let Description = "tool/suicide/description"
+        let Description = "tool/deliver/description"
 
         [<Literal>]
-        let Blocked = "tool/suicide/blocked"
+        let Blocked = "tool/deliver/blocked"
 
         [<Literal>]
-        let AssessmentRequired = "tool/suicide/assessment-required"
+        let AssessmentRequired = "tool/deliver/assessment-required"
 
         [<Literal>]
-        let Retired = "tool/suicide/finished"
+        let Retired = "tool/deliver/finished"
 
         [<Literal>]
-        let Confirmation = "tool/suicide/confirmation"
+        let Confirmation = "tool/deliver/confirmation"
 
         [<Literal>]
-        let NonManagerRole = "tool/suicide/non-manager-role"
+        let NonManagerRole = "tool/deliver/non-manager-role"
 
         [<Literal>]
-        let NoAuthority = "tool/suicide/no-authority"
+        let NoAuthority = "tool/deliver/no-authority"
 
         [<Literal>]
-        let NoRetirementProjection = "tool/suicide/finish-not-recorded"
+        let NoRetirementProjection = "tool/deliver/finish-not-recorded"
 
         [<Literal>]
-        let BindingUnavailable = "tool/suicide/binding-unavailable"
+        let BindingUnavailable = "tool/deliver/binding-unavailable"
 
         [<Literal>]
-        let FinishFailed = "tool/suicide/finish-failed"
-
-    let private gitCapability: WorkspaceSnapshotGitCapability =
-        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
-          DiffHeadBinary = GitSubject.diffHeadBinary
-          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
-          HashObjectNoFilters = GitSubject.hashObjectNoFilters
-          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
-          LsFilesStageZ = GitSubject.lsFilesStageZ }
+        let FinishFailed = "tool/deliver/finish-failed"
 
     let private text (path: string) =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
@@ -72,71 +64,6 @@ module SuicideTool =
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
         |> fun digest -> create (prefix + ":" + digest)
-
-    let private qualityCandidate (view: RoadView) incumbent =
-        view.Certificate
-        |> Option.filter (fun certificate -> certificate.Valid && certificate.IncumbencyId = incumbent)
-
-    let private retirementTransaction roadId incumbent providerRun toolCallId snapshot authority (view: RoadView) =
-        let candidate = qualityCandidate view incumbent
-
-        let outcome =
-            match candidate with
-            | Some certificate -> RetirementOutcome.Accepted certificate.Id
-            | None -> RetirementOutcome.Continue
-
-        let outcomeTag, certificatePart =
-            match outcome with
-            | RetirementOutcome.Continue -> "continue", ""
-            | RetirementOutcome.Accepted certificateId -> "accepted", QualityCertificateId.value certificateId
-
-        let payload =
-            String.concat
-                "\n"
-                [ RoadId.value roadId
-                  IncumbencyId.value incumbent
-                  WorkspaceSnapshotId.value snapshot
-                  AuthorityRevision.value authority
-                  ProviderRunIdentity.value providerRun
-                  ToolCallId.value toolCallId
-                  outcomeTag
-                  certificatePart ]
-
-        let retirementId = deterministicId "retirement-v1" payload RetirementId.create
-
-        let cut =
-            { ProviderRunId = ProviderRunIdentity.value providerRun
-              ToolCallId = ToolCallId.value toolCallId }
-
-        let summary: RetirementSummary =
-            { Id = retirementId
-              IncumbencyId = incumbent
-              SnapshotId = snapshot
-              AuthorityRevision = authority
-              ProjectionCut = cut
-              Outcome = outcome }
-
-        let invalidation =
-            view.Certificate
-            |> Option.filter (fun certificate -> certificate.Valid && candidate.IsNone)
-            |> Option.map (fun certificate ->
-                RelayEvent.QualityCertificateInvalidated(certificate.Id, "RetirementBindingChanged"))
-            |> Option.toList
-
-        RelayTransaction.create (invalidation @ [ RelayEvent.RetirementCommitted summary ])
-
-    let private blockedTransaction incumbent blockerDigest =
-        RelayTransaction.create [ RelayEvent.RetirementCleanupBlocked(incumbent, blockerDigest) ]
-
-    let private append journal sessionId providerRun roadId transaction =
-        let fact =
-            AgentFact.Relay(
-                RelayFactCases.TransactionCommitted
-                    {| RoadId = roadId
-                       Transaction = transaction |}
-            )
-
-        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
 
     let private blockedResult blockers =
         ToolHostCodec.tomlObjectWithInstructions
@@ -173,7 +100,6 @@ module SuicideTool =
         { Bound: BoundRetirement
           SessionId: SessionId
           RoadId: RoadId
-          Snapshot: WorkspaceSnapshotId
           View: RoadView
           Authority: AuthorityRevision
           Incumbent: IncumbencyId }
@@ -232,14 +158,6 @@ module SuicideTool =
                   Incumbent = incumbent }
         }
 
-    let private appendPrepared (prepared: PreparedRetirement) transaction =
-        task {
-            let! outcome =
-                append prepared.Bound.Journal prepared.SessionId prepared.Bound.ProviderRun prepared.RoadId transaction
-
-            return outcome |> Result.mapError (fun _ -> text Path.FinishFailed)
-        }
-
     let private retirementFromProjection (prepared: PreparedRetirement) projection =
         AgentProjection.tryFind prepared.SessionId projection.AgentProjections
         |> Option.bind (fun session -> session.Relay)
@@ -273,16 +191,9 @@ module SuicideTool =
              @ optionalFields)
 
     let private runBlocked (prepared: PreparedRetirement) blockers =
-        let blockerDigest = HostDigest.sha256Hex (String.concat "\n" blockers)
-
-        taskResult {
-            let! transaction =
-                blockedTransaction prepared.Incumbent blockerDigest
-                |> Result.mapError (fun _ -> text Path.FinishFailed)
-
-            let! _ = appendPrepared prepared transaction
-            return blockedResult blockers
-        }
+        ignore prepared
+        ignore blockers
+        Task.FromResult(Error "blocked retirement is written only by the lifecycle append")
 
     /// ATTENTION-005: a completed retirement consumes this life's remaining
     /// deferred work and leaves a durable consumption receipt, so a replayed
@@ -305,23 +216,7 @@ module SuicideTool =
         }
 
     let private runRetirement (prepared: PreparedRetirement) =
-        taskResult {
-            let! transaction =
-                retirementTransaction
-                    prepared.RoadId
-                    prepared.Incumbent
-                    prepared.Bound.ProviderRun
-                    prepared.Bound.ToolCallId
-                    prepared.Snapshot
-                    prepared.Authority
-                    prepared.View
-                |> Result.mapError (fun _ -> text Path.FinishFailed)
-
-            let! projection = appendPrepared prepared transaction
-            let! _ = retirementFromProjection prepared projection
-
-            return retiredResult ()
-        }
+        Task.FromResult(Error "retirement is written only by the lifecycle append")
 
     // ATTENTION-005: the completed retirement consumes this life's
     // remaining deferred work. An append failure leaves the outcome
@@ -358,14 +253,82 @@ module SuicideTool =
         providerRunId
         confirmFirst
         =
-        match prepared.View.RetirementConfirmation with
+        let confirmed =
+            scope.WorkspaceDirectory
+            |> Option.map RuntimePath.gitCommonDir
+            |> Option.bind (fun dir ->
+                if String.IsNullOrWhiteSpace dir then
+                    None
+                else
+                    WorkspaceEventStore.tryCurrent dir)
+            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+            |> Option.bind (fun current ->
+                let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                Map.tryFind context.SessionId works)
+            |> Option.bind (fun work -> work.Active)
+            |> Option.bind (fun active -> active.Confirmed)
+
+        match confirmed with
         | None -> confirmFirst ()
         | Some(confirmedRun, confirmedCall) when confirmedCall = toolCallId && confirmedRun = providerRunId ->
             scope.UnfreezeRetirement context.SessionId
             Task.FromResult(Ok(confirmationResult prepared pending))
         | Some(_, confirmedCall) when confirmedCall = toolCallId ->
             Task.FromResult(Error "RetirementConfirmationReplayConflict")
-        | Some _ -> runRetirementOrBlocked scope context prepared
+        | Some _ ->
+            task {
+                let directory = scope.WorkspaceDirectory
+                let commonDir = directory |> Option.map RuntimePath.gitCommonDir
+                let store =
+                    match commonDir with
+                    | None -> None
+                    | Some dir when String.IsNullOrWhiteSpace dir -> None
+                    | Some dir ->
+                        match WorkspaceEventStore.tryCurrent dir with
+                        | Some held -> Some held
+                        | None -> Some(WorkspaceEventStore.acquire dir)
+
+                match store with
+                | None -> return Error "lifecycle store is unavailable"
+                | Some held ->
+                    match held.TryCurrent "Lifecycle" with
+                    | None -> return Error "lifecycle work is missing"
+                    | Some current ->
+                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                        match Map.tryFind context.SessionId works with
+                        | None -> return Error "lifecycle work is missing"
+                        | Some work ->
+                            let fence =
+                                { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                                  Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+
+                            let blockerDigest =
+                                let blockers = scope.RetirementBlockersFor context.SessionId
+                                if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
+
+                            match
+                                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
+                                    HostDigest.sha256Hex
+                                    work
+                                    fence
+                                    None
+                                    blockerDigest
+                            with
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                                scope.UnfreezeRetirement context.SessionId
+                                return Ok(confirmationResult prepared pending)
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
+                                    scope.UnfreezeRetirement context.SessionId
+                                    return Ok(text Path.Retired)
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
+                                    return Error "retirement was not committed"
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
+                                    return Error "retirement commit is unknown"
+                                | Error reason -> return Error reason
+            }
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
         let hasAssessment = prepared.View.AcceptedAssessmentTransport |> Option.isSome
@@ -375,15 +338,61 @@ module SuicideTool =
         let pending = pendingDeferred prepared.Bound.Journal prepared.SessionId
 
         let confirmFirst () =
-            taskResult {
-                let! transaction =
-                    RelayTransaction.create
-                        [ RelayEvent.RetirementConfirmationCommitted(prepared.Incumbent, providerRunId, toolCallId) ]
-                    |> Result.mapError (fun _ -> text Path.FinishFailed)
+            task {
+                let directory = scope.WorkspaceDirectory
+                let commonDir = directory |> Option.map RuntimePath.gitCommonDir
+                let store =
+                    match commonDir with
+                    | None -> None
+                    | Some dir when String.IsNullOrWhiteSpace dir -> None
+                    | Some dir ->
+                        match WorkspaceEventStore.tryCurrent dir with
+                        | Some held -> Some held
+                        | None -> Some(WorkspaceEventStore.acquire dir)
 
-                let! _ = appendPrepared prepared transaction
-                scope.UnfreezeRetirement context.SessionId
-                return confirmationResult prepared pending
+                match store with
+                | None -> return Error "lifecycle store is unavailable"
+                | Some held ->
+                    match held.TryCurrent "Lifecycle" with
+                    | None -> return Error "lifecycle work is missing"
+                    | Some current ->
+                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                        match Map.tryFind context.SessionId works with
+                        | None -> return Error "lifecycle work is missing"
+                        | Some work ->
+                            let fence =
+                                { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                                  Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+
+                            let blockerDigest =
+                                let blockers = scope.RetirementBlockersFor context.SessionId
+                                if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
+
+                            match
+                                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
+                                    HostDigest.sha256Hex
+                                    work
+                                    fence
+                                    None
+                                    blockerDigest
+                            with
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                                scope.UnfreezeRetirement context.SessionId
+                                return Ok(confirmationResult prepared pending)
+                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
+                                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
+                                    scope.UnfreezeRetirement context.SessionId
+                                    if label = "confirmed" then
+                                        return Ok(confirmationResult prepared pending)
+                                    else
+                                        return Ok(text Path.Retired)
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
+                                    return Error "retirement was not committed"
+                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
+                                    return Error "retirement commit is unknown"
+                                | Error reason -> return Error reason
             }
 
         if not hasAssessment then
@@ -414,7 +423,6 @@ module SuicideTool =
     let private refreshAfterFreeze (context: HostToolContext) (target: FreezeTarget) =
         try
             result {
-                let snapshot = WorkspaceSnapshot.capture gitCapability target.Bound.Directory
                 let state = currentState target.Bound.Journal target.SessionId
                 let! road = requireView target.RoadId state
                 let! incumbent = requireSameIncumbency target road
@@ -423,7 +431,6 @@ module SuicideTool =
                     { Bound = target.Bound
                       SessionId = target.SessionId
                       RoadId = target.RoadId
-                      Snapshot = snapshot
                       View = road
                       Authority = road.AuthorityRevision
                       Incumbent = incumbent }
@@ -455,11 +462,13 @@ module SuicideTool =
         | Ok target -> executePrepared scope context target
         | Error error -> task { return raise (InvalidOperationException error) }
 
+    let description () = text Path.Description
+
     let admission =
         ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Finality)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
-        { Name = "suicide"
+        { Name = "deliver"
           Description = text Path.Description
           Arguments = []
           Admission = admission

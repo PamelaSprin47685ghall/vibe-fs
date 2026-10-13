@@ -29,13 +29,12 @@ module StaticTools =
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
-        | ToolPermission.Finality -> [ "suicide" ]
+        | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "js-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
         | ToolPermission.Deliver -> [ "deliver" ]
-        // planning-002: Plan's review permission shares the `review` verb with
-        // Manager's ReviewAssessment. Listed after it so the reverse lookup
-        // keeps resolving `review` to the Manager-owned contract.
+        // planning-002: Plan's review shares the `review` verb with Manager's
+        // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
 
     /// Primary name for permissions with a single verb (tests / simple maps).
@@ -75,15 +74,27 @@ module StaticTools =
     /// capability-enforcement-012: the sole reverse lookup for tool name →
     /// permission. The schema projection, the dispatch tool map and the
     /// execute gate all read this, so no consumer keeps a second
-    /// name→permission table.
-    let permissionOfToolName (name: string) : ToolPermission option =
-        allPermissions
-        |> List.tryFind (fun permission -> toolNames permission |> List.contains name)
+    /// name→permission table. A verb shared by two permissions resolves to the
+    /// one this role owns. Catalog order is not an override. A verb owned by
+    /// exactly one permission keeps that mapping for every role.
+    let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
+        let named =
+            allPermissions
+            |> List.filter (fun permission -> toolNames permission |> List.contains name)
+
+        let ownedByRole =
+            named
+            |> List.filter (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
+
+        match ownedByRole, named with
+        | [ permission ], _ -> Some permission
+        | _, [ permission ] -> Some permission
+        | _ -> None
 
     /// The office projection of one name: true only when the role's permission
     /// set owns the permission this exact name maps to.
     let admitsToolForRole (role: Role) (name: string) : bool =
-        permissionOfToolName name
+        permissionOfToolName role name
         |> Option.exists (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
 
 
@@ -146,7 +157,7 @@ module StaticTools =
           "review"
           "chronicle"
           "fetch"
-          "suicide"
+          "deliver"
           "js-engineer"
           "js-manager"
           "js-orchestrator"
@@ -160,7 +171,7 @@ module StaticTools =
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools keep
     /// their own predicates.
-    let requestToolMap (allowed: Set<ToolPermission>) : Map<string, bool> =
+    let requestToolMap (role: Role) (allowed: Set<ToolPermission>) : Map<string, bool> =
         let registry = AblationGate.registry ()
 
         knownToolNames
@@ -171,14 +182,14 @@ module StaticTools =
              || name = "assume"
              || name = "defer"
              || name = "publish"
-             || (permissionOfToolName name
+             || (permissionOfToolName role name
                  |> Option.exists (fun permission -> Set.contains permission allowed))))
         |> Map.ofList
         |> AblationGate.filterToolPermissionMap registry
 
-    let private defaultPermission (allowed: Set<ToolPermission>) name =
+    let private defaultPermission (allowed: Set<ToolPermission>) (role: Role) name =
         let admitted =
-            permissionOfToolName name
+            permissionOfToolName role name
             |> Option.exists (fun permission -> Set.contains permission allowed)
 
         if admitted then "allow" else "deny"
@@ -216,7 +227,7 @@ module StaticTools =
         | true, ("defer" | "publish"), _ -> "allow"
         | true, "js-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "js-" -> jsPermission role name
-        | true, _, _ -> defaultPermission allowed name
+        | true, _, _ -> defaultPermission allowed role name
 
     let permissionObj (role: Role) : obj =
         let registry = AblationGate.registry ()

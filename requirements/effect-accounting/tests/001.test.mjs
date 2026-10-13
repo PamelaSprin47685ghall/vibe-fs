@@ -88,8 +88,6 @@ integrationTest('WHAT[effect-accounting-001] real negative compilation rejects c
     '               TargetRef = TargetRef.create "refs/heads/main"',
     '               RebasedCommit = CommitHash.create "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
     '               ExpectedHead = CommitHash.create "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
-    '               WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot"',
-    '               QualityCertificateId = QualityCertificateId.create "certificate"',
     '               AuthorityRevision = AuthorityRevision.create "revision" |}',
     '',
     '    let published =',
@@ -104,15 +102,13 @@ integrationTest('WHAT[effect-accounting-001] real negative compilation rejects c
     '            {| TargetRef = TargetRef.create "refs/heads/main"',
     '               RebasedCommit = CommitHash.create "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
     '               ExpectedHead = CommitHash.create "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
-    '               WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot"',
-    '               QualityCertificateId = QualityCertificateId.create "certificate"',
     '               AuthorityRevision = AuthorityRevision.create "revision" |}',
     '            OrchestratorProjection.empty',
     '',
   ].join('\n')
 
   // Negative probe A: the physical confirmation payload (three outcome fields)
-  // is offered where the claim admission requires the six-field request
+  // is offered where the claim admission requires the request
   // witness record.
   const CONFIRMATION_AS_CLAIM_PROBE = [
     'namespace Wanxiangshu.Probe',
@@ -149,8 +145,6 @@ integrationTest('WHAT[effect-accounting-001] real negative compilation rejects c
     '           TargetRef = TargetRef.create "refs/heads/main"',
     '           RebasedCommit = CommitHash.create "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
     '           ExpectedHead = CommitHash.create "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
-    '           WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot"',
-    '           QualityCertificateId = QualityCertificateId.create "certificate"',
     '           AuthorityRevision = AuthorityRevision.create "revision" |}',
     '',
     '    let confusedConfirmation = OrchestratorFact.Published intentPayload',

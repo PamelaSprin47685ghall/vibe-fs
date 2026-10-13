@@ -4,7 +4,7 @@
 
 ## [001] 不存在 session 级持久认知画板
 
-生产代码不得维护、恢复或投影 session 级 JSON 认知画板；Life、重启、suicide、退休等生命周期都不再携带此类状态。
+生产代码不得维护、恢复或投影 session 级 JSON 认知画板；Life、重启、deliver、退休等生命周期都不再携带此类状态。
 
 ## [002] assume 只有 assumption
 

@@ -281,7 +281,6 @@ module JournalSurface =
                    authorityMessageIdCount = List.length road.AuthorityMessageIds
                    activeIncumbencyPresent = road.ActiveIncumbency |> Option.isSome
                    retiredIncumbencyCount = List.length road.RetiredIncumbencies
-                   certificatePresent = road.Certificate |> Option.isSome
                    latestRetirementPresent = road.LatestRetirement |> Option.isSome
                    boundDevOps = road.BoundDevOps |> Option.toObj |}
 

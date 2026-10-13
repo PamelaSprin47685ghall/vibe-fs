@@ -62,7 +62,7 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；suicide 在任期 committed 退休后，可凭退休事实终止该 run 的残余尝试。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；deliver 在任期退休事实落地后，可凭退休事实终止该 run 的残余尝试。
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
 

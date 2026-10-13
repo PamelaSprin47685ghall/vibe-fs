@@ -147,43 +147,31 @@ const payload = (overrides = {}) => ({
   worktreePath: '/tmp/wt1',
   targetRef: 'refs/heads/main',
   targetBranchFrozen: 'refs/heads/main',
-  ...overrides,
-})
+  ...overrides})
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
 const fact = {
-  candidateReady: (candidateCommit = 'c1', workspaceSnapshotId = 'snapshot-1', qualityCertificateId = 'certificate-1') =>
-    change.fact('CandidateReady', { candidateCommit, workspaceSnapshotId, qualityCertificateId }),
+  candidateReady: (candidateCommit = 'c1') =>
+    change.fact('CandidateReady', { candidateCommit }),
   conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
     change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
-      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles,
-      diagnosticsDigest: 'digest',
-    }),
-  rebased: (targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased') =>
+      diagnosticsDigest: 'digest'}),
+  rebased: (targetHeadSnapshot = 'h1') =>
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
-      targetHeadSnapshot,
-      workspaceSnapshotId,
-    }),
+      targetHeadSnapshot}),
   publishClaimed: (
-    workspaceSnapshotId = 'snapshot-rebased',
-    qualityCertificateId = 'certificate-1',
-    authorityRevision = 'authority-1',
-  ) =>
+    authorityRevision = 'authority-1') =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
       expectedHead: 'h1',
-      workspaceSnapshotId,
-      qualityCertificateId,
-      authorityRevision,
-    }),
+      authorityRevision}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
-  abandoned: () => change.fact('JobAbandoned', null),
-}
+  abandoned: () => change.fact('JobAbandoned', null)}
 const jobAt = (value, projection = created()) => {
   const next = change.recordFact(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
@@ -194,21 +182,15 @@ const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 const createdEvent = {
   kind: 'ManagerJobCreated',
-  payload: payload(),
-}
+  payload: payload()}
 const candidateEvent = {
   kind: 'CandidateReady',
   payload: {
     jobId: JOB,
-    candidateCommit: 'c1',
-    workspaceSnapshotId: 'snapshot-1',
-    qualityCertificateId: 'certificate-1',
-  },
-}
+    candidateCommit: 'c1'}}
 const publishedEvent = {
   kind: 'Published',
-  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' },
-}
+  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' }}
 const foldProjection = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -252,36 +234,25 @@ const createEvent = (jobId, managerSessionId, worktreeIdentity = `wt_${jobId.sli
     worktreeIdentity,
     worktreePath: `/tmp/${worktreeIdentity}`,
     targetRef: 'refs/heads/main',
-    targetBranchFrozen: 'refs/heads/main',
-  },
-})
+    targetBranchFrozen: 'refs/heads/main'}})
 const candidateEvent = (
   jobId,
-  candidateCommit = 'c1',
-  workspaceSnapshotId = 'snapshot-1',
-  qualityCertificateId = 'certificate-1',
-) => ({
+  candidateCommit = 'c1') => ({
   kind: 'CandidateReady',
-  payload: { jobId, candidateCommit, workspaceSnapshotId, qualityCertificateId },
-})
+  payload: { jobId, candidateCommit }})
 const conflictEvent = (jobId, { candidateCommit = 'c1', targetHeadSnapshot = 'h1', conflictFiles = ['publish_proof.txt'] } = {}) => ({
   kind: 'ConflictDetected',
   payload: {
     jobId,
     candidateCommit,
     targetHeadSnapshot,
-    workspaceSnapshotId: 'snapshot-conflict',
     conflictFiles,
-    diagnosticsDigest: 'conflict-digest',
-  },
-})
+    diagnosticsDigest: 'conflict-digest'}})
 const rebasedEvent = (
   jobId,
-  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased' } = {},
-) => ({
+  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1' } = {}) => ({
   kind: 'RebasedCandidateReady',
-  payload: { jobId, rebasedCommit, targetHeadSnapshot, workspaceSnapshotId },
-})
+  payload: { jobId, rebasedCommit, targetHeadSnapshot }})
 const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
   kind: 'PublishClaimed',
   payload: {
@@ -289,15 +260,10 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
     expectedHead,
-    workspaceSnapshotId: 'snapshot-rebased',
-    qualityCertificateId: 'certificate-1',
-    authorityRevision: 'authority-1',
-  },
-})
+    authorityRevision: 'authority-1'}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
-  payload: { jobId, candidateCommit, resultingTargetHead },
-})
+  payload: { jobId, candidateCommit, resultingTargetHead }})
 const foldEvents = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -317,8 +283,7 @@ test('WHAT[change-integration-003] THEOREM_publish_claimed_without_rebased_candi
 test('WHAT[change-integration-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected', () => {
   const incomplete = {
     kind: 'PublishClaimed',
-    payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1', expectedHead: 'h1' },
-  }
+    payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1', expectedHead: 'h1' }}
   const result = change.fold([
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -391,22 +356,16 @@ test('WHAT[change-integration-003] old incomplete claim decode fails closed in f
         worktreeIdentity: 'wt_1',
         worktreePath: '/tmp/wt1',
         targetRef: 'refs/heads/main',
-        targetBranchFrozen: 'refs/heads/main',
-      },
-    },
+        targetBranchFrozen: 'refs/heads/main'}},
     {
       kind: 'RebasedCandidateReady',
       payload: {
         jobId: 'job_1',
         rebasedCommit: 'r1',
-        targetHeadSnapshot: 'h1',
-        workspaceSnapshotId: 'snapshot-rebased-1',
-      },
-    },
+        targetHeadSnapshot: 'h1'}},
     {
       kind: 'PublishClaimed',
-      payload: { jobId: 'job_1', rebasedCommit: 'r1', expectedHead: 'h1' },
-    },
+      payload: { jobId: 'job_1', rebasedCommit: 'r1', expectedHead: 'h1' }},
   ])
   assert.equal(foldResult.ok, false)
   assert.match(foldResult.error, /Incomplete PublishClaimed payload/)
@@ -478,18 +437,13 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
   let projection = change.createJob(change.empty(), {
     jobId: 'binding-probe', managerSessionId: 'manager-probe', managerAgent: 'manager', byname: 'Road',
     worktreeIdentity: 'worktree-probe', worktreePath: '/tmp/worktree-probe',
-    targetRef: 'refs/heads/main', targetBranchFrozen: 'refs/heads/main',
-  })
+    targetRef: 'refs/heads/main', targetBranchFrozen: 'refs/heads/main'})
   projection = change.recordFact(projection, 'binding-probe', change.fact('CandidateReady', {
-    candidateCommit: 'rebased', workspaceSnapshotId: 'snapshot', qualityCertificateId: 'certificate',
-  }))
+    candidateCommit: 'rebased'}))
   projection = change.recordFact(projection, 'binding-probe', change.fact('RebasedCandidateReady', {
-    rebasedCommit: 'rebased', targetHeadSnapshot: 'target', workspaceSnapshotId: 'snapshot',
-  }))
+    rebasedCommit: 'rebased', targetHeadSnapshot: 'target'}))
   const claim = {
-    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target',
-    workspaceSnapshotId: 'snapshot', qualityCertificateId: 'certificate', authorityRevision: 'authority',
-  }
+    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target'}
   assert.ok(change.find(change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', claim)), 'binding-probe').facts.includes('PublishClaimed'))
   for (const field of Object.keys(claim)) {
     const incomplete = { ...claim }

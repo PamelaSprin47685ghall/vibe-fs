@@ -16,28 +16,22 @@ type OrchestratorFactCases =
            TargetBranchFrozen: string |}
     | CandidateReady of
         {| ManagerJobId: ManagerJobId
-           CandidateCommit: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
-           QualityCertificateId: QualityCertificateId |}
+           CandidateCommit: CommitHash |}
     | ConflictDetected of
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash
            TargetHeadSnapshot: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
            ConflictFiles: string list
            DiagnosticsDigest: string |}
     | RebasedCandidateReady of
         {| ManagerJobId: ManagerJobId
            RebasedCommit: CommitHash
-           TargetHeadSnapshot: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId |}
+           TargetHeadSnapshot: CommitHash |}
     | PublishClaimed of
         {| ManagerJobId: ManagerJobId
            TargetRef: TargetRef
            RebasedCommit: CommitHash
            ExpectedHead: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
-           QualityCertificateId: QualityCertificateId
            AuthorityRevision: AuthorityRevision |}
     | Published of
         {| ManagerJobId: ManagerJobId

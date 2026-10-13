@@ -23,25 +23,18 @@ module OrchestratorProgram =
           TargetRef: TargetRef
           ExpectedHead: CommitHash
           CandidateCommit: CommitHash
-          QualityCertificateId: QualityCertificateId
-          AuthorityRevision: AuthorityRevision
-          WorkspaceSnapshotId: WorkspaceSnapshotId }
+          AuthorityRevision: AuthorityRevision }
+
+    let private failed (job: ManagerJob) details =
+        OrchestratorVerdict.IntegrationFailed(job.JobId, details)
 
     let private buildPublicationEvidence
         (job: ManagerJob)
-        (rebasedReady:
+        (_rebasedReady:
             {| RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |})
-        (certificate: QualityCertificate)
-        : PublicationEvidence =
-        { ManagerJobId = job.JobId
-          TargetRef = job.TargetRef
-          ExpectedHead = rebasedReady.TargetHeadSnapshot
-          CandidateCommit = rebasedReady.RebasedCommit
-          QualityCertificateId = certificate.Id
-          AuthorityRevision = certificate.AuthorityRevision
-          WorkspaceSnapshotId = rebasedReady.WorkspaceSnapshotId }
+               TargetHeadSnapshot: CommitHash |})
+        : Result<PublicationEvidence, OrchestratorVerdict> =
+        Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
 
     let private buildClaimPublicationEvidence
         (job: ManagerJob)
@@ -49,20 +42,13 @@ module OrchestratorProgram =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         : PublicationEvidence =
         { ManagerJobId = job.JobId
           TargetRef = claim.TargetRef
           ExpectedHead = claim.ExpectedHead
           CandidateCommit = claim.RebasedCommit
-          QualityCertificateId = claim.QualityCertificateId
-          AuthorityRevision = claim.AuthorityRevision
-          WorkspaceSnapshotId = claim.WorkspaceSnapshotId }
-
-    let private failed (job: ManagerJob) details =
-        OrchestratorVerdict.IntegrationFailed(job.JobId, details)
+          AuthorityRevision = claim.AuthorityRevision }
 
     let private mapTask (mapper: 'a -> 'b) (operation: Task<'a>) : Task<'b> =
         task {
@@ -96,17 +82,9 @@ module OrchestratorProgram =
         deps.Git.GetTargetHead job.TargetRef
         |> mapTaskError (fun error -> failed job (sprintf "Git target head lookup failed: %s" error))
 
-    let private invalidate (deps: OrchestratorProgramDeps) (job: ManagerJob) reason =
-        deps.Relay.InvalidateCertificate job.JobId reason
-        |> mapTaskError (fun error -> failed job (sprintf "Certificate invalidation failed: %s" error))
-
     let private continueLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         deps.Relay.ContinueLoop job.JobId
         |> mapTaskError (fun error -> failed job (sprintf "Manager loop continuation failed: %s" error))
-
-    let private captureSnapshotResult (deps: OrchestratorProgramDeps) (job: ManagerJob) details =
-        deps.Relay.CaptureSnapshot job.JobId
-        |> mapTaskError (fun error -> failed job (sprintf "%s: %s" details error))
 
     let private conflictedFilesResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         deps.Git.ConflictedFiles job.Worktree.Path
@@ -120,22 +98,18 @@ module OrchestratorProgram =
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (candidate: CommitHash)
-        (certificate: QualityCertificate)
         =
         append
             deps
             job
             (OrchestratorFact.CandidateReady
                 {| ManagerJobId = job.JobId
-                   CandidateCommit = candidate
-                   WorkspaceSnapshotId = certificate.SnapshotId
-                   QualityCertificateId = certificate.Id |})
+                   CandidateCommit = candidate |})
 
     let private recordRebased
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (target: CommitHash)
-        (snapshot: WorkspaceSnapshotId)
         =
         taskResult {
             let! rebased = readHead deps job
@@ -147,8 +121,7 @@ module OrchestratorProgram =
                     (OrchestratorFact.RebasedCandidateReady
                         {| ManagerJobId = job.JobId
                            RebasedCommit = rebased
-                           TargetHeadSnapshot = target
-                           WorkspaceSnapshotId = snapshot |})
+                           TargetHeadSnapshot = target |})
 
             return rebased
         }
@@ -158,7 +131,6 @@ module OrchestratorProgram =
         (job: ManagerJob)
         (candidate: CommitHash)
         (target: CommitHash)
-        (snapshot: WorkspaceSnapshotId)
         (files: string list)
         =
         append
@@ -168,7 +140,6 @@ module OrchestratorProgram =
                 {| ManagerJobId = job.JobId
                    CandidateCommit = candidate
                    TargetHeadSnapshot = target
-                   WorkspaceSnapshotId = snapshot
                    ConflictFiles = files
                    DiagnosticsDigest = HostDigest.sha256Hex (String.Join("\n", files)) |})
 
@@ -183,16 +154,6 @@ module OrchestratorProgram =
             Error(failed job "Publication evidence target mismatch; refusing publish")
         elif current <> evidence.ExpectedHead then
             Error(failed job "Publish CAS head does not match publication evidence; refusing publish")
-        else
-            Ok()
-
-    let private gateSnapshotVerdict
-        (job: ManagerJob)
-        (evidence: PublicationEvidence)
-        (snapshot: WorkspaceSnapshotId)
-        : Result<unit, OrchestratorVerdict> =
-        if snapshot <> evidence.WorkspaceSnapshotId then
-            Error(failed job "Workspace snapshot changed inside publish gate; refusing publish")
         else
             Ok()
 
@@ -250,8 +211,6 @@ module OrchestratorProgram =
                    TargetRef = evidence.TargetRef
                    RebasedCommit = evidence.CandidateCommit
                    ExpectedHead = evidence.ExpectedHead
-                   WorkspaceSnapshotId = evidence.WorkspaceSnapshotId
-                   QualityCertificateId = evidence.QualityCertificateId
                    AuthorityRevision = evidence.AuthorityRevision |})
 
     let private appendPublishedEvidence
@@ -366,31 +325,6 @@ module OrchestratorProgram =
             | Ok worktreeHead -> return! continuePublishAfterWorktreeHead deps job evidence current worktreeHead
         }
 
-    let private continuePublishAfterGateSnapshot
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (evidence: PublicationEvidence)
-        (current: CommitHash)
-        (snapshot: WorkspaceSnapshotId)
-        =
-        task {
-            match gateSnapshotVerdict job evidence snapshot with
-            | Error verdict -> return Error verdict
-            | Ok() -> return! verifyPublishWorktreePin deps job evidence current
-        }
-
-    let private capturePublishGateSnapshot
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (evidence: PublicationEvidence)
-        (current: CommitHash)
-        =
-        task {
-            match! deps.Relay.CaptureSnapshot job.JobId with
-            | Error error -> return Error(failed job (sprintf "Publish gate snapshot failed: %s" error))
-            | Ok snapshot -> return! continuePublishAfterGateSnapshot deps job evidence current snapshot
-        }
-
     let private completeClaimAndFf
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
@@ -400,7 +334,7 @@ module OrchestratorProgram =
         task {
             match publicationIdentityVerdict job evidence current with
             | Error verdict -> return Error verdict
-            | Ok() -> return! capturePublishGateSnapshot deps job evidence current
+            | Ok() -> return! verifyPublishWorktreePin deps job evidence current
         }
 
     let private claimExpectationVerdict
@@ -509,22 +443,10 @@ module OrchestratorProgram =
     let private currentRecord (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         OrchestratorProjection.tryFind job.JobId (deps.Snapshot()).AgentProjections.Orchestrator
 
-    let private artifactSnapshotMatches
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (certificate: QualityCertificate)
-        =
-        taskResult {
-            let! snapshot =
-                deps.Relay.CaptureSnapshot job.JobId
-                |> mapTaskError (fun error -> failed job (sprintf "Workspace snapshot failed: %s" error))
-
-            return snapshot = certificate.SnapshotId, snapshot
-        }
-
     let private requestAfterBindingChange (deps: OrchestratorProgramDeps) (job: ManagerJob) reason =
+        ignore reason
+
         taskResult {
-            do! invalidate deps job reason
             let! _ = continueLoop deps job
             return ()
         }
@@ -534,7 +456,7 @@ module OrchestratorProgram =
             match! deps.Relay.AwaitLoopSignal job.JobId with
             | Error error -> return failed job (sprintf "Manager loop signal failed: %s" error)
             | Ok ManagerLoopSignal.Continue -> return! continueManagerLoop deps job
-            | Ok(ManagerLoopSignal.Candidate certificate) -> return! handleQualityCandidate deps job certificate
+            | Ok ManagerLoopSignal.Candidate -> return! handleQualityCandidate deps job
             | Ok(ManagerLoopSignal.ExceptionalTerminal reason) -> return failed job reason
         }
 
@@ -548,32 +470,23 @@ module OrchestratorProgram =
     and private handleRebase
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (certificate: QualityCertificate)
         (candidate: CommitHash)
         (target: CommitHash)
         reason
         : Task<OrchestratorVerdict> =
         let afterRebasedRecord _ = continueManagerLoop deps job
 
-        let afterRebaseSnapshot snapshot =
-            recordRebased deps job target snapshot |> continueResult afterRebasedRecord
-
         let onRebaseSuccess () =
-            captureSnapshotResult deps job "Post-rebase snapshot failed"
-            |> continueResult afterRebaseSnapshot
+            recordRebased deps job target |> continueResult afterRebasedRecord
 
         let afterConflictRecord _ = continueManagerLoop deps job
-
-        let afterConflictSnapshot files snapshot =
-            recordConflict deps job candidate target snapshot files
-            |> continueResult afterConflictRecord
 
         let handleConflictFiles rebaseError files =
             if List.isEmpty files then
                 Task.FromResult(failed job (sprintf "Rebase failed without conflicts: %s" rebaseError))
             else
-                captureSnapshotResult deps job "Conflict snapshot failed"
-                |> continueResult (afterConflictSnapshot files)
+                recordConflict deps job candidate target files
+                |> continueResult afterConflictRecord
 
         let onRebaseFailure rebaseError =
             conflictedFilesResult deps job
@@ -588,17 +501,16 @@ module OrchestratorProgram =
                 | Error rebaseError -> return! onRebaseFailure rebaseError
             }
 
-        invalidate deps job reason |> continueUnit afterInvalidation
+        afterInvalidation ()
 
     and private publishCertified
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (certificate: QualityCertificate)
         (candidate: CommitHash)
         (expectedHead: CommitHash)
         : Task<OrchestratorVerdict> =
         let afterTargetRefresh refreshed =
-            handleRebase deps job certificate candidate refreshed "PublishCasMissed"
+            handleRebase deps job candidate refreshed "PublishCasMissed"
 
         let handlePublishAttempt =
             function
@@ -619,25 +531,13 @@ module OrchestratorProgram =
                 | Ok() -> return! runManagerLoop deps job
             }
 
-        let continueValidatedWithSnapshot (evidence: PublicationEvidence) (snapshot: WorkspaceSnapshotId) =
-            if snapshot <> evidence.WorkspaceSnapshotId then
-                handleStaleSnapshotBeforePublish ()
-            else
-                continueValidatedPublish evidence
-
         let publishValidated (evidence: PublicationEvidence) =
-            task {
-                match! deps.Relay.CaptureSnapshot job.JobId with
-                | Error error ->
-                    return failed job (sprintf "Workspace snapshot capture failed before publish: %s" error)
-                | Ok snapshot -> return! continueValidatedWithSnapshot evidence snapshot
-            }
+            continueValidatedPublish evidence
 
         let certifiedEvidence
             (rebasedReady:
                 {| RebasedCommit: CommitHash
-                   TargetHeadSnapshot: CommitHash
-                   WorkspaceSnapshotId: WorkspaceSnapshotId |})
+                   TargetHeadSnapshot: CommitHash |})
             : Result<PublicationEvidence, OrchestratorVerdict> =
             if candidate <> rebasedReady.RebasedCommit then
                 Error(
@@ -657,16 +557,13 @@ module OrchestratorProgram =
                             (CommitHash.value expectedHead)
                             (CommitHash.value rebasedReady.TargetHeadSnapshot))
                 )
-            elif certificate.SnapshotId <> rebasedReady.WorkspaceSnapshotId then
-                Error(failed job "Live certificate snapshot does not match rebased evidence snapshot")
             else
-                Ok(buildPublicationEvidence job rebasedReady certificate)
+                buildPublicationEvidence job rebasedReady
 
         let continueCertifiedWithRebased
             (rebasedReady:
                 {| RebasedCommit: CommitHash
-                   TargetHeadSnapshot: CommitHash
-                   WorkspaceSnapshotId: WorkspaceSnapshotId |})
+                   TargetHeadSnapshot: CommitHash |})
             =
             task {
                 match certifiedEvidence rebasedReady with
@@ -690,7 +587,6 @@ module OrchestratorProgram =
     and private handleQualityCandidate
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (certificate: QualityCertificate)
         : Task<OrchestratorVerdict> =
         let resumeLoop () = runManagerLoop deps job
 
@@ -704,16 +600,16 @@ module OrchestratorProgram =
             requestAfterBindingChange deps job "ArtifactAdmissionUnmerged"
             |> continueUnit afterConflictBindingChange
 
-        let recordObservedConflict currentSnapshot files candidate target =
-            recordConflict deps job candidate target currentSnapshot files
+        let recordObservedConflict files candidate target =
+            recordConflict deps job candidate target files
             |> continueUnit afterConflictRecord
 
-        let afterConflictHead currentSnapshot files candidate =
+        let afterConflictHead files candidate =
             targetHead deps job
-            |> continueResult (recordObservedConflict currentSnapshot files candidate)
+            |> continueResult (recordObservedConflict files candidate)
 
-        let handleObservedConflict currentSnapshot files =
-            readHead deps job |> continueResult (afterConflictHead currentSnapshot files)
+        let handleObservedConflict files =
+            readHead deps job |> continueResult (afterConflictHead files)
 
         let rebaseReason =
             function
@@ -722,9 +618,9 @@ module OrchestratorProgram =
 
         let recordInitialCandidate candidate target rebased =
             let afterCandidateRecord () =
-                handleRebase deps job certificate candidate target (rebaseReason rebased)
+                handleRebase deps job candidate target (rebaseReason rebased)
 
-            recordCandidate deps job candidate certificate
+            recordCandidate deps job candidate
             |> continueUnit afterCandidateRecord
 
         let admitPreparedCandidate candidate target =
@@ -734,38 +630,28 @@ module OrchestratorProgram =
 
             match rebased with
             | Some admitted when admitted.RebasedCommit = candidate && admitted.TargetHeadSnapshot = target ->
-                publishCertified deps job certificate candidate target
+                publishCertified deps job candidate target
             | _ -> recordInitialCandidate candidate target rebased
 
         let onPreparedCandidate candidate =
             targetHead deps job |> continueResult (admitPreparedCandidate candidate)
 
-        let handleConflictFiles currentSnapshot files =
+        let handleConflictFiles files =
             match files with
             | [] -> prepareCandidateResult deps job |> continueResult onPreparedCandidate
-            | _ -> handleObservedConflict currentSnapshot files
+            | _ -> handleObservedConflict files
 
-        let onPrepareFailure currentSnapshot _ =
+        let onPrepareFailure _ =
             conflictedFilesResult deps job
-            |> continueResult (handleConflictFiles currentSnapshot)
+            |> continueResult handleConflictFiles
 
-        let inspectCurrentArtifact currentSnapshot =
-            task {
-                let! outcome = prepareCandidateResult deps job
+        task {
+            let! outcome = prepareCandidateResult deps job
 
-                match outcome with
-                | Ok candidate -> return! onPreparedCandidate candidate
-                | Error error -> return! onPrepareFailure currentSnapshot error
-            }
-
-        let handleSnapshotAdmission (matches, currentSnapshot) =
-            if matches then
-                inspectCurrentArtifact currentSnapshot
-            else
-                bindingChanged ()
-
-        artifactSnapshotMatches deps job certificate
-        |> continueResult handleSnapshotAdmission
+            match outcome with
+            | Ok candidate -> return! onPreparedCandidate candidate
+            | Error error -> return! onPrepareFailure error
+        }
 
     let private resumePublishReady
         (deps: OrchestratorProgramDeps)
@@ -803,15 +689,12 @@ module OrchestratorProgram =
     let private reentryRebasedMatches
         (rebasedCommit: CommitHash)
         (expectedHead: CommitHash)
-        (workspaceSnapshotId: WorkspaceSnapshotId)
         (rebasedReady:
             {| RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+               TargetHeadSnapshot: CommitHash |})
         =
         rebasedCommit = rebasedReady.RebasedCommit
         && expectedHead = rebasedReady.TargetHeadSnapshot
-        && workspaceSnapshotId = rebasedReady.WorkspaceSnapshotId
 
     let private continueReentryWithTarget
         (deps: OrchestratorProgramDeps)
@@ -858,41 +741,12 @@ module OrchestratorProgram =
             | Ok worktreeHead -> return! continueReentryAfterHead deps job evidence worktreeHead
         }
 
-    let private handleStaleReentrySnapshot (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        task {
-            match! requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment" with
-            | Error verdict -> return verdict
-            | Ok() -> return! runManagerLoop deps job
-        }
-
-    let private continueReentryAfterSnapshot
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (evidence: PublicationEvidence)
-        (currentSnapshot: WorkspaceSnapshotId)
-        =
-        if currentSnapshot <> evidence.WorkspaceSnapshotId then
-            handleStaleReentrySnapshot deps job
-        else
-            verifyReentryHead deps job evidence
-
-    let private verifyReentrySnapshot
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (evidence: PublicationEvidence)
-        =
-        task {
-            match! deps.Relay.CaptureSnapshot job.JobId with
-            | Error err -> return failed job (sprintf "Workspace snapshot capture failed during reentry: %s" err)
-            | Ok currentSnapshot -> return! continueReentryAfterSnapshot deps job evidence currentSnapshot
-        }
-
     let private continueReentryWithEvidence
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (evidence: PublicationEvidence)
         =
-        verifyReentrySnapshot deps job evidence
+        verifyReentryHead deps job evidence
 
     let private continueReentryWithRebased
         (deps: OrchestratorProgramDeps)
@@ -901,15 +755,12 @@ module OrchestratorProgram =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         (rebasedReady:
             {| RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+               TargetHeadSnapshot: CommitHash |})
         =
-        if reentryRebasedMatches claim.RebasedCommit claim.ExpectedHead claim.WorkspaceSnapshotId rebasedReady then
+        if reentryRebasedMatches claim.RebasedCommit claim.ExpectedHead rebasedReady then
             continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
         else
             runManagerLoop deps job
@@ -921,8 +772,6 @@ module OrchestratorProgram =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         (record: ManagerJobProjection)
         =
@@ -939,8 +788,6 @@ module OrchestratorProgram =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         =
         task {
@@ -956,8 +803,6 @@ module OrchestratorProgram =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         =
         task {

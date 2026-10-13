@@ -330,7 +330,7 @@ module ToolRegistry =
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
-          "suicide", SuicideTool.admission
+          "deliver", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
           "rm", FileMutationTools.rmAdmission
@@ -511,7 +511,6 @@ module ToolRegistry =
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
-        (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
         (childWorkRecordForRun:
             (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
         (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
@@ -555,7 +554,6 @@ module ToolRegistry =
                 ?childWorkRecordForRun = childWorkRecordForRun,
                 ?workRecordCapability = workRecordCapability,
                 continueManagerLoop = continueManagerLoop,
-                captureWorktreeSnapshot = captureWorktreeSnapshot,
                 ?eventPort = eventPort
             )
 
@@ -929,7 +927,7 @@ module ToolRegistry =
             let managerPermission =
                 match ManagerReviewTools.requiredPermissions spec.Name with
                 | Some perms -> perms |> Seq.tryHead
-                | None -> StaticTools.permissionOfToolName spec.Name
+                | None -> StaticTools.permissionOfToolName Role.Manager spec.Name
 
             fun args (ctx: HostToolContext) -> executeGate gateFacts spec managerPermission args ctx
 

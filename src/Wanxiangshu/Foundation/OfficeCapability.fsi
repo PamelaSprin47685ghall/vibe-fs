@@ -33,6 +33,7 @@ type ManagerCapabilityFacts =
     {
         HasActiveIncumbency: bool
         HasAssessment: bool
+        HasConfirmation: bool
         /// True when the active incumbency's accepted assessment has empty
         /// findings: the final incumbent who settles and retires with no successor.
         IsFinalIncumbent: bool

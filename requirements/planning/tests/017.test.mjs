@@ -181,7 +181,7 @@ test('WHAT[planning-017] the first part immediately after the opening cursor sur
   assert.deepEqual(assembledIds, ['u1', 'lwr-prev-inc-2', 'a-first', 'u2'])
 })
 
-test('WHAT[planning-017] a current assistant row with no canonical cursor and semantic parts rejects assembly (fail-closed)', () => {
+test('WHAT[planning-017] a current assistant row with a Host id but no first-observation entry stays', () => {
   const rawMessages = [
     userText('u1', 'go'),
     assistantText('a-no-cursor', 'current work', 'u1'),
@@ -194,12 +194,37 @@ test('WHAT[planning-017] a current assistant row with no canonical cursor and se
     previousRange: [0n, 19n],
     isFreshHandover: false,
   }
-  // No cursor entry for a-no-cursor: an assistant/tool row carrying semantic
-  // parts must never be silently dropped for lack of evidence.
+  // info.id is present. The empty cursor map means this physical message has
+  // not been captured yet. That is not a missing identity, so assembly keeps
+  // the row and does not fail the exchange.
+  const result = assemble(rawMessages, tenure, () => '# prev', {})
+  assert.ok(ids(result.messages).includes('a-no-cursor'))
+  assert.equal(result.messages.filter((m) => msgId(m).startsWith('lwr-prev-')).length, 1)
+})
+
+test('WHAT[planning-017] a semantic assistant row with no Host info.id rejects assembly', () => {
+  const rawMessages = [
+    userText('u1', 'go'),
+    {
+      info: { role: 'assistant' },
+      parts: [{ type: 'text', text: 'current work without a stable identity' }],
+    },
+  ]
+  const identified = assistantText('a-uncaptured', 'captured later', 'u1')
+  const tenure = {
+    workId: 'work-1',
+    incumbencyId: 'inc-2',
+    stage: 'S2',
+    openingCursor: 20n,
+    previousRange: [0n, 19n],
+    isFreshHandover: false,
+  }
   assert.throws(
     () => assemble(rawMessages, tenure, () => '# prev', {}),
     /no stable XTrace message identity/i,
   )
+  const stayed = assemble([userText('u1', 'go'), identified], tenure, () => '# prev', {})
+  assert.ok(ids(stayed.messages).includes('a-uncaptured'))
 })
 
 test('WHAT[planning-017] synthetic previous LWR rows are stripped and exactly one current record is injected', () => {
@@ -374,4 +399,36 @@ test('WHAT[planning-017] reanchorRequested is true on fresh handover and dedupli
     {},
   )
   assert.equal(continuing.reanchorRequested, false)
+
+test('WHAT[planning-017] successor projection strips earlier assistant and tool messages and inserts LWR_prev once', () => {
+  const rawMessages = [
+    userText('u-history', 'Original user request'),
+    assistantText('a-old', 'previous tenure answer'),
+    toolResult('t-old', 'js-plan', 'old draft'),
+    assistantText('a-current', 'this tenure answer'),
+    assistantText('a-uncaptured', 'this request, not captured yet'),
+  ]
+  const tenure = {
+    workId: 'work-1',
+    incumbencyId: 'inc-2',
+    stage: 'S2',
+    openingCursor: 20n,
+    previousRange: [1n, 19n],
+    isFreshHandover: false,
+  }
+  const result = assemble(
+    rawMessages,
+    tenure,
+    () => '# Previous record',
+    cursors({ 'a-old': 4n, 't-old': 5n, 'a-current': 25n }),
+  )
+  const lwrRows = result.messages.filter((m) => msgId(m).startsWith('lwr-prev-'))
+  assert.equal(lwrRows.length, 1, 'LWR_prev is inserted once')
+  assert.ok(ids(result.messages).includes('u-history'))
+  assert.ok(ids(result.messages).includes('a-current'), 'current-tenure message stays')
+  assert.ok(ids(result.messages).includes('a-uncaptured'), 'uncaptured physical message stays')
+  assert.ok(!ids(result.messages).includes('a-old'), 'earlier assistant message is stripped')
+  assert.ok(!ids(result.messages).includes('t-old'), 'earlier tool message is stripped')
+  const currentIndex = ids(result.messages).indexOf('a-current')
+  assert.equal(ids(result.messages)[currentIndex - 1], 'lwr-prev-inc-2')
 })

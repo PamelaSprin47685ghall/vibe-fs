@@ -2,25 +2,14 @@ namespace Wanxiangshu.Mission.Relay
 
 [<RequireQualifiedAccess>]
 type RelayEvent =
-    | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
     | RoadDevOpsBound of RoadId * devopsId: string * modelTarget: string option
-    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId
-    | AssessmentCommitted of
-        AssessmentId *
-        IncumbencyId *
-        AssessmentBinding *
-        WorkspaceSnapshotId *
-        AuthorityRevision *
-        AssessmentFindings
+    | IncumbencyOpened of IncumbencyId
     | AuthorityRevisionAdvanced of
         IncumbencyId *
         expected: AuthorityRevision *
         next: AuthorityRevision *
-        PhysicalUserMessageId *
-        WorkspaceSnapshotId
-    | QualityCertificateInvalidated of QualityCertificateId * reason: string
+        PhysicalUserMessageId
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
-    | RetirementConfirmationCommitted of IncumbencyId * providerRunId: string * toolCallId: string
     | RetirementCommitted of RetirementSummary
 
 type RelayTransaction = private RelayTransaction of RelayEvent list
@@ -45,47 +34,21 @@ module IncumbencyOpening =
         | Ok transaction -> transaction
         | Error error -> failwith error
 
-    let initial
-        (sha256: string -> string)
-        (roadId: RoadId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (snapshotId: WorkspaceSnapshotId)
-        =
-        let authorityRevision =
-            AuthorityRevision.create (PhysicalUserMessageId.value physicalUserMessageId)
-
-        let incumbencyId =
-            sha256 (
-                "incumbency-v1\n"
-                + RoadId.value roadId
-                + "\n"
-                + PhysicalUserMessageId.value physicalUserMessageId
-            )
-            |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
-
-        let transaction =
-            buildTransaction
-                [ RelayEvent.RoadOpened(roadId, authorityRevision, physicalUserMessageId)
-                  RelayEvent.IncumbencyOpened(incumbencyId, snapshotId) ]
-
-        { RoadId = roadId
-          IncumbencyId = incumbencyId
-          AuthorityRevision = authorityRevision
-          Transaction = transaction }
+    let initial () : Result<unit, string> =
+        Error "Refused"
 
     let next
         (sha256: string -> string)
         (roadId: RoadId)
         (retirementId: RetirementId)
         (authorityRevision: AuthorityRevision)
-        (snapshotId: WorkspaceSnapshotId)
         =
         let incumbencyId =
             sha256 ("manager-loop-v1\n" + RetirementId.value retirementId)
             |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
 
         let transaction =
-            buildTransaction [ RelayEvent.IncumbencyOpened(incumbencyId, snapshotId) ]
+            buildTransaction [ RelayEvent.IncumbencyOpened incumbencyId ]
 
         { RoadId = roadId
           IncumbencyId = incumbencyId

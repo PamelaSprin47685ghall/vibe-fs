@@ -263,19 +263,6 @@ module PluginHooks =
                                     with ex ->
                                         return Error ex.Message
                                 })
-                            (fun (worktreePath: WorktreePath) ->
-                                try
-                                    let git: WorkspaceSnapshotGitCapability =
-                                        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
-                                          DiffHeadBinary = GitSubject.diffHeadBinary
-                                          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
-                                          HashObjectNoFilters = GitSubject.hashObjectNoFilters
-                                          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
-                                          LsFilesStageZ = GitSubject.lsFilesStageZ }
-
-                                    Ok(WorkspaceSnapshot.capture git (WorktreePath.value worktreePath))
-                                with error ->
-                                    Error error.Message)
                             userNotify
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
@@ -341,7 +328,10 @@ module PluginHooks =
                 if readonlyDelegationPredictorConfigured () then
                     ReadonlyDelegationContract.decorateDefinition toolInput toolOutput
 
-            let isReviewPermitted toolName facts =
+            let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
+                if toolName = "js-manager" && facts.HasActiveIncumbency then
+                    OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
+                else
                 match ManagerReviewTools.requiredPermissions toolName with
                 | Some required ->
                     let allowed = OfficeCapability.permissionsForManagerFacts facts
@@ -493,8 +483,13 @@ module PluginHooks =
                 |> Option.defaultValue (Task.FromResult(()))
 
             let checkManagerReviewPermissions toolName toolInput =
-                if ManagerReviewTools.isReviewTool toolName then
-                    assertReviewPermitted toolName (toolField toolInput "sessionID")
+                let sessionId = toolField toolInput "sessionID"
+                let blockedNative = toolName = "js-engineer" || toolName = "js-devops"
+
+                if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
+                    invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
+                elif ManagerReviewTools.isReviewTool toolName then
+                    assertReviewPermitted toolName sessionId
 
             // host-boundary-032: snapshot the protocol
             // fields the model actually produced, before either contract family

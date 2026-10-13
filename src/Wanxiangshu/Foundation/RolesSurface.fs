@@ -1,9 +1,12 @@
 namespace Wanxiangshu.Foundation
 
-/// JS-native semantic surface for participant identity. Role
-/// crosses the boundary as canonical wire labels; JS callers never touch
-/// Fable representation (js-semantic-surface-003/005).
+/// JS-native semantic surface for participant identity. Labels stay
+/// canonical wire strings. `manager` and `plan` are the existing Role
+/// values, so a caller can pass them without inventing a label.
 module RolesSurface =
+
+    let manager: Role = Role.Manager
+    let plan: Role = Role.Plan
 
     let private labelsOf (predicate: Role -> bool) : string array =
         Roles.all

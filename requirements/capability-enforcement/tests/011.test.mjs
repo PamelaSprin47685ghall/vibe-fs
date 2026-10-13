@@ -94,7 +94,7 @@ const allowList = (config, name) => {
     'review',
     'chronicle',
     'fetch',
-    'suicide',
+    'deliver',
     'skill',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
@@ -104,7 +104,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [
@@ -276,7 +276,7 @@ const TOOL_NAMES = [
   'bash-honeypot', 'assume', 'todowrite',
   'defer',  'publish',
   'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-  'review', 'chronicle', 'fetch', 'suicide',
+  'review', 'chronicle', 'fetch', 'deliver',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
@@ -285,7 +285,7 @@ const COGNITIVE_TOOLS = ['defer',  'publish']
 
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'suicide', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   devops: [
     'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',

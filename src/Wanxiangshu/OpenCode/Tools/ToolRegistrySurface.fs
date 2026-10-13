@@ -20,6 +20,9 @@ module ToolRegistrySurface =
     /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
     /// internal leaf admitted by owner-held evidence and never holds an office.
+    let deliverDescription () : string =
+        Wanxiangshu.Mission.Relay.OpenCode.SuicideTool.description ()
+
     let admissionAuthority (toolName: string) : string =
         match ToolRegistry.tryAdmission toolName None with
         | Some(ToolAdmission.OfficeRole _) -> "office"
@@ -73,3 +76,6 @@ module ToolRegistrySurface =
         Wanxiangshu.Repository.Programming.Js.JsCanonicalDescription.renderPlan
             prose
             (ProviderProse.render parsed "tool/js-plan" Map.empty)
+
+    let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
+        StaticTools.permissionOfToolName role name

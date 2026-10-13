@@ -127,7 +127,8 @@ module PluginTransforms =
 
     type TraceTransformCapture =
         { RawMessages: obj list
-          Current: XTraceProjectionState option }
+          Current: XTraceProjectionState option
+          Receipt: XTraceCaptureReceipt option }
 
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
@@ -622,7 +623,8 @@ module PluginTransforms =
                 | None ->
                     return
                         { RawMessages = rawMessages
-                          Current = None }
+                          Current = None
+                          Receipt = None }
                 | Some sessionId ->
                     let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
 
@@ -647,7 +649,8 @@ module PluginTransforms =
                     | Ok captured ->
                         return
                             { RawMessages = rawMessages
-                              Current = captured.Current }
+                              Current = captured.Current
+                              Receipt = Some captured.Receipt }
                     | Error(XTraceCaptureError.Refused reason) -> return raiseFailClosed strengthFailFuse reason
                     | Error(XTraceCaptureError.StorageAppendFailed failure) ->
                         return raiseFailClosed strengthFailFuse (JournalAppendFailure.describe failure)
@@ -668,6 +671,18 @@ module PluginTransforms =
             match sidOpt with
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
+
+        let tryReadLifecycleWork (sid: string) =
+            workspaceDirectory
+            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
+            |> Option.bind (fun store -> store.TryCurrent "Lifecycle")
+            |> Option.bind (fun current ->
+                if isNull current then
+                    None
+                else
+                    unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                    |> Map.tryFind sid)
 
         let tryReadActivePlanState (sidOpt: string option) : Wanxiangshu.Mission.Planning.PlanWorkState option =
             // Resolve the plan work by the session id (workId = sessionId) so
@@ -730,18 +745,26 @@ module PluginTransforms =
             (sessionId: SessionId)
             (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
             =
-            match tenure.PreviousRange with
-            | Some(startCursor, endCursor) when endCursor > startCursor ->
-                let range =
-                    XTraceRange.create
-                        (XTraceCursor.create startCursor |> XTraceCursor.nextCursor)
-                        (XTraceCursor.create endCursor |> XTraceCursor.nextCursor)
+            match tryReadLifecycleWork (SessionId.value sessionId) with
+            | Some work when work.Active.IsSome && work.Retirements.IsEmpty |> not ->
+                let previous = List.last work.Retirements
+                let ending =
+                    previous.RetirementCursor
+                    |> Option.defaultValue work.Active.Value.OpeningCursor
 
-                Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
-                    durable
-                    (AgentJournal.snapshot durable)
-                    sessionId
-                    range
+                if ending > previous.OpeningCursor then
+                    let range =
+                        XTraceRange.create
+                            (XTraceCursor.create previous.OpeningCursor |> XTraceCursor.nextCursor)
+                            (XTraceCursor.create ending |> XTraceCursor.nextCursor)
+
+                    Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                        durable
+                        (AgentJournal.snapshot durable)
+                        sessionId
+                        range
+                else
+                    Task.FromResult None
             | _ -> Task.FromResult None
 
         // COMPANION-003: the Plan session is a top-level main session; nothing
@@ -880,8 +903,6 @@ module PluginTransforms =
           ApplyRelayProjection =
             fun sidOpt outObj ->
                 task {
-                    do! ManagerWorkflow.ensureManagerRoadOpened journal workspaceDirectory sidOpt None
-
                     let physicalUserMessageId =
                         outObj
                         |> ProviderWireDecode.messagesFromTransformOutput
@@ -906,6 +927,9 @@ module PluginTransforms =
                             ()
                         else
                             invalidOp ("MANAGER-LOOP-004: retired attempt interrupt failed: " + error)
+
+                    let lifecycle =
+                        sidOpt |> Option.bind tryReadLifecycleWork
 
                     return!
                         RelayNarrativeTransform.apply
@@ -936,13 +960,44 @@ module PluginTransforms =
                                         })
                                     sid)
                             sidOpt
+                            lifecycle
                             outObj
                 }
           ApplyTenureIsolation = applyTenureIsolation
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
-                ProviderWireDecode.messagesFromTransformOutput outObj
-                |> captureXTraceMessages projectionSessionIdOpt
+                task {
+                    let! captured =
+                        ProviderWireDecode.messagesFromTransformOutput outObj
+                        |> captureXTraceMessages projectionSessionIdOpt
+
+                    match captured.Receipt with
+                    | None -> return captured
+                    | Some receipt ->
+                        let observedHead = XTraceCursor.sequence receipt.CurrentHead
+
+                        let borrowedStore =
+                            workspaceDirectory
+                            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                            |> Option.bind (fun dir ->
+                                if System.String.IsNullOrWhiteSpace dir then
+                                    None
+                                else
+                                    match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
+                                    | Some held -> Some held
+                                    | None -> Some(Wanxiangshu.OpenCode.WorkspaceEventStore.acquire dir))
+
+                        do!
+                            ManagerWorkflow.ensureManagerRoadOpened
+                                journal
+                                workspaceDirectory
+                                borrowedStore
+                                (Some observedHead)
+                                projectionSessionIdOpt
+                                None
+
+                        return captured
+                }
           CommitStrengthTrace =
             fun projectionSessionIdOpt traceState strengthReplayPlans ->
                 match projectionSessionIdOpt with

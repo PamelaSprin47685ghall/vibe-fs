@@ -10,7 +10,7 @@ test('WHAT[attention-regulation-005] manager retirement consumes the pending lis
   const fixture = recordingPort()
   await tools.execute(fixture.tools, 'defer', { new_work: 'first' }, context('session-manager', 'call-m1'))
   await tools.execute(fixture.tools, 'defer', { new_work: 'second' }, context('session-manager', 'call-m2'))
-  // The first suicide returns the still-unconsumed list for review.
+  // The first deliver returns the still-unconsumed list for review.
   assert.deepEqual(pendingOf(fixture, 'session-manager'), [
     { occurrence: 'call-m1', text: 'first' },
     { occurrence: 'call-m2', text: 'second' },

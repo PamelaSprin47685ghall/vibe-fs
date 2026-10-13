@@ -103,7 +103,7 @@ const allowList = (config, name) => {
     'review',
     'chronicle',
     'fetch',
-    'suicide',
+    'deliver',
     'skill',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
@@ -118,7 +118,7 @@ const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_AL
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [

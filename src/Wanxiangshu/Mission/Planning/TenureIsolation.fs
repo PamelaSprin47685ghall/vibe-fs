@@ -23,6 +23,37 @@ type TenureAssemblyResult =
 
 module TenureIsolation =
 
+    /// A message already observed strictly before this opening is the
+    /// previous tenure. A message with no first-observation cursor has not
+    /// been captured yet; that absence is not a cursor on the Host message.
+    let isCurrentTenurePhysical (openingCursor: int64) (cursor: int64 option) =
+        match cursor with
+        | None -> true
+        | Some sequence -> sequence >= openingCursor
+
+    let insertBeforeCurrentTenure
+        (openingCursor: int64)
+        (messageCursors: Map<string, int64>)
+        (record: obj)
+        (messages: obj list)
+        (messageId: obj -> string option)
+        : obj list =
+        let rec place reversed pending rest =
+            match pending, rest with
+            | None, _ -> List.rev reversed @ rest
+            | Some pendingRecord, [] -> List.rev (pendingRecord :: reversed)
+            | Some pendingRecord, message :: tail ->
+                let cursor =
+                    messageId message
+                    |> Option.bind (fun id -> Map.tryFind id messageCursors)
+
+                if isCurrentTenurePhysical openingCursor cursor then
+                    List.rev reversed @ (pendingRecord :: message :: tail)
+                else
+                    place (message :: reversed) pending tail
+
+        place [] (Some record) messages
+
     let private recordMessage (tenure: ActiveTenureInfo) (text: string) : obj =
         box
             {| info =
@@ -37,22 +68,29 @@ module TenureIsolation =
         message.Id
         |> Option.bind (fun messageId -> Map.tryFind messageId messageCursors)
 
-    /// Ownership of one assistant/tool exchange: its first canonical
-    /// observation must sit strictly after the tenure opening. A semantic
-    /// exchange without canonical identity is a contract violation, never a
-    /// silent drop or a silent keep.
-    let private keepsInteraction (tenure: ActiveTenureInfo) cursor (hasSemanticParts: bool) =
-        match cursor with
-        | Some sequence -> sequence > tenure.OpeningCursor
-        | None when not hasSemanticParts -> false
-        | None -> invalidOp "Plan interaction has no stable XTrace message identity"
+    /// Strip a captured assistant/tool exchange only when its first
+    /// observation is strictly earlier than this opening. A Host id that is
+    /// not in the first-observation map has not been captured yet, so the
+    /// message stays. A semantic exchange with no Host id is still a contract
+    /// violation: do not invent a cursor, and do not keep or drop the whole set.
+    let private keepsInteraction
+        (tenure: ActiveTenureInfo)
+        (identity: string option)
+        (cursor: int64 option)
+        (hasSemanticParts: bool)
+        =
+        match identity, cursor, hasSemanticParts with
+        | _, Some sequence, _ -> sequence >= tenure.OpeningCursor
+        | Some _, None, _ -> true
+        | None, None, false -> false
+        | None, None, true -> invalidOp "Plan interaction has no stable XTrace message identity"
 
     let private keepMessage (tenure: ActiveTenureInfo) cursor (message: TenureMessage) =
         match message.IsSynthetic, message.Role with
         | true, _ -> false
         | false, "user" -> true
         | false, "assistant"
-        | false, "tool" -> keepsInteraction tenure cursor message.HasSemanticParts
+        | false, "tool" -> keepsInteraction tenure message.Id cursor message.HasSemanticParts
         | false, _ -> false
 
     let private validateTenure (tenure: ActiveTenureInfo) =
@@ -83,7 +121,7 @@ module TenureIsolation =
         (raw: obj)
         : obj list * obj option =
         match pendingRecord, cursor with
-        | Some record, Some sequence when sequence > tenure.OpeningCursor -> raw :: record :: reversed, None
+        | Some record, Some sequence when isCurrentTenurePhysical tenure.OpeningCursor (Some sequence) -> raw :: record :: reversed, None
         | _ -> raw :: reversed, pendingRecord
 
     let private step

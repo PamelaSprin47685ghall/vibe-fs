@@ -330,7 +330,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
 
   // Non-participating tools get zero increment
   const nonParticipating = [
-    'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'suicide',
+    'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
     'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
     'skill', 'assume', 'defer', 
     'publish', 'chronicle', 'js-bookkeeper',

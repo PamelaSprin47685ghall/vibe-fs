@@ -44,16 +44,14 @@ type ManagerStart =
 [<RequireQualifiedAccess>]
 type ManagerLoopSignal =
     | Continue
-    | Candidate of QualityCertificate
+    | Candidate
     | ExceptionalTerminal of string
 
 type RelayPort =
     { CreateManagerSession: ManagerStart -> Task<Result<SessionId, string>>
       ActivateManager: ManagerJobId -> Task<Result<unit, string>>
       AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
-      InvalidateCertificate: ManagerJobId -> string -> Task<Result<unit, string>>
       ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
-      CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
       TerminateRoadResources: ManagerJobId -> Task<unit> }
 

@@ -11,6 +11,10 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Mission.Lifecycle
+open Wanxiangshu.Mission.Planning
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
@@ -57,7 +61,7 @@ module RelayNarrativeTransform =
                 gateKind
                 terminalRun)
 
-    let private cutToolIndex (cut: ProjectionCut) messages =
+    let private cutToolIndex (cut: Wanxiangshu.Mission.Relay.ProjectionCut) messages =
         messages
         |> List.tryFindIndex (fun message ->
             ProviderWireDecode.rawPartsOf message
@@ -132,17 +136,93 @@ module RelayNarrativeTransform =
         |> Option.filter (fun retirement ->
             not (isSuccessorRequest journal sessionId road retirement acceptedRequest messages))
 
-    // The provider view keeps the full physical history after a retirement:
-    // the next iteration sees every prior message, the retirement tool call
-    // and its own fresh-head prompt. The cut now only decides request
-    // identity for stale attempts; it never filters the provider message set.
-    let private projectActive (road: RoadView) outObj =
-        let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+    let private firstCursors (journal: AgentJournal) (sessionId: SessionId) =
+        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+        |> Option.bind (fun session -> session.XTrace)
+        |> Option.map XTraceProjection.hostMessageFirstCursors
+        |> Option.defaultValue Map.empty
 
-        HostMessageProjection.replaceMessagesInPlace outObj messages
-        dispositionAfterProjection road
+    let private earlierAssistantOrTool openingCursor cursors message =
+        match messageRole message, messageId message |> Option.bind (fun id -> Map.tryFind id cursors) with
+        | Some role, Some sequence when
+            (role.ToLowerInvariant() = "assistant" || role.ToLowerInvariant() = "tool")
+            && sequence < openingCursor ->
+            true
+        | _ -> false
 
-    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road acceptedRequest outObj =
+    let private previousRange (work: LifecycleWork) =
+        match work.Active, List.tryLast work.Retirements with
+        | Some active, Some previous ->
+            let ending = previous.RetirementCursor |> Option.defaultValue active.OpeningCursor
+            if ending > previous.OpeningCursor then Some(previous.OpeningCursor, ending) else None
+        | _ -> None
+
+    let private handoverRecord (work: LifecycleWork) (text: string) : obj =
+        box
+            {| info =
+                {| id = "lwr-prev-" + work.Active.Value.Id
+                   sessionID = work.WorkId
+                   role = "user"
+                   synthetic = true
+                   source = "plan-tenure-record" |}
+               parts = [| box {| ``type`` = "text"; text = text |} |] |}
+
+    /// Successor visibility. Opening sequence comes from the active lifecycle
+    /// tenure. The other side is the first observation of a captured Host
+    /// message id. A message absent from that map has not been captured yet,
+    /// so it stays. The retirement cut is not a strip condition.
+    let private projectActive
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (road: RoadView)
+        (work: LifecycleWork option)
+        outObj
+        =
+        task {
+            let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+            match work |> Option.bind (fun lifecycle -> lifecycle.Active |> Option.map (fun active -> lifecycle, active)) with
+            | None ->
+                HostMessageProjection.replaceMessagesInPlace outObj messages
+                return dispositionAfterProjection road
+            | Some(lifecycle, active) ->
+                let cursors = firstCursors journal sessionId
+
+                let kept =
+                    messages
+                    |> List.filter (earlierAssistantOrTool active.OpeningCursor cursors >> not)
+
+                let! record =
+                    match previousRange lifecycle with
+                    | None -> Task.FromResult None
+                    | Some(startCursor, endCursor) ->
+                        let range =
+                            XTraceRange.create
+                                (XTraceCursor.create startCursor |> XTraceCursor.nextCursor)
+                                (XTraceCursor.create endCursor |> XTraceCursor.nextCursor)
+
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                            journal
+                            (AgentJournal.snapshot journal)
+                            sessionId
+                            range
+
+                let visible =
+                    match record with
+                    | Some text when not (String.IsNullOrWhiteSpace text) ->
+                        TenureIsolation.insertBeforeCurrentTenure
+                            active.OpeningCursor
+                            cursors
+                            (handoverRecord lifecycle text)
+                            kept
+                            messageId
+                    | _ -> kept
+
+                HostMessageProjection.replaceMessagesInPlace outObj visible
+                return dispositionAfterProjection road
+        }
+
+    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road acceptedRequest lifecycle outObj =
         task {
             let messages = ProviderWireDecode.messagesFromTransformOutput outObj
 
@@ -153,7 +233,7 @@ module RelayNarrativeTransform =
                 do! interruptAttempt sessionId
                 HostMessageProjection.replaceMessagesInPlace outObj []
                 return RelayProjectionDisposition.RetiredAttemptStopped
-            | None -> return projectActive road outObj
+            | None -> return! projectActive journal sessionId road lifecycle outObj
         }
 
     let apply
@@ -161,6 +241,7 @@ module RelayNarrativeTransform =
         (acceptedRequest: bool)
         (interruptAttempt: SessionId -> Task<unit>)
         (sessionId: string option)
+        (lifecycle: LifecycleWork option)
         (outObj: obj)
         : Task<RelayProjectionDisposition> =
         task {
@@ -175,6 +256,6 @@ module RelayNarrativeTransform =
 
             match resolved with
             | Some(durable, currentSessionId, road) ->
-                return! project durable interruptAttempt currentSessionId road acceptedRequest outObj
+                return! project durable interruptAttempt currentSessionId road acceptedRequest lifecycle outObj
             | None -> return RelayProjectionDisposition.Unchanged
         }

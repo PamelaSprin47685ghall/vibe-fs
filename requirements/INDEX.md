@@ -88,12 +88,12 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
-| `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
-| `relay-assessment` | 每任至多一次三问评审，findings 为 (验收标准, 工作计划) pairs；Manager 可亲自只读取证或委派只读 Engineer，非空 findings 原位接责，工作区变更使旧快照证书失效。 |
-| `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
-| `relay-context-projection` | 物理历史、durable audit 与下一迭代 provider 投影保留同一份完整历史；ProjectionCut 只做请求身份判定与 stale 拦截，继任者据此看见并评审前任的工作。 |
+| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。 |
+| `relay-incumbency` | 目录仍在。现行窄条款只留唯一活跃 tenure 与 DevOps 绑定。主合同在 work。 |
+| `relay-assessment` | 目录仍在。现行窄条款只留 findings pairs 与每任一次 review。主合同在 work。 |
+| `relay-retirement` | 目录仍在。现行窄条款只留资源阻塞与 S4 两段 deliver。主合同在 work。 |
+| `relay-context-projection` | 目录仍在。现行窄条款只留 cut 判定请求身份。主合同在 work。 |
 
-评审归 `relay-assessment`，终结归 `relay-retirement`，上下文历史与退休请求边界归 `relay-context-projection`。
 
 ## 10. Feedback
 
@@ -179,10 +179,11 @@
 | 39 | `crash-reconciliation` | 21 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重）、crash-reconciliation-021（进程本地表是缓存，durable 投影是存在性真源） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
-| 42 | `relay-incumbency` | 12 | relay-incumbency-001 ~ 006、008 ~ 013 |
-| 43 | `relay-assessment` | 11 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证）、relay-assessment-011（review 共享壳与 Manager/Plan 角色后端） |
-| 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界） |
-| 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（前任工作与交互对继任可见，固定 DevOps 执行事实如实呈现） |
+| 42 | `work` | 10 | work-001 ~ 010 |
+| 43 | `relay-incumbency` | 8 | relay-incumbency-001、005、006、008 ~ 012 |
+| 44 | `relay-assessment` | 3 | relay-assessment-001、006、007 |
+| 45 | `relay-retirement` | 4 | relay-retirement-003、005、007、009 |
+| 46 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 009 |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
@@ -242,10 +243,7 @@ host-provider-failure-ownership → execution-failure-policy, provider-attempt-r
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
 obligation-ledger        → host-boundary, context-compression
-relay-incumbency         → obligation-ledger, participant-identity, durable-events, interaction-authority
-relay-assessment         → relay-incumbency, obligation-ledger, participant-identity
-relay-retirement         → relay-incumbency, relay-assessment, relay-context-projection, delegation, managed-chat-execution, provider-attempt-recovery
-relay-context-projection → relay-incumbency, participant-identity, provider-projection, host-boundary
+work                     → participant-identity, semantic-trace, office-capability, durable-events, prefix-stability
 behavior-diagnosis       → semantic-trace, durable-events, prefix-stability, managed-session-lifecycle
 guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events, concern-routing
 institutional-learning   → 已退役，不再定义当前依赖

@@ -36,7 +36,7 @@ Blogger、Bookkeeper、Predictor 等内部辅助角色不进入模型可见的 e
 
 ## [008] 隐藏 review 编排不进 Manager horizon
 
-Manager 的 system prompt、continuation、Schema、错误、工具描述及结果不得暴露第二评审身份、专用会话、确认屏障或双重检查。assessment 结论按 relay-assessment-004 原子物化为质量义务与工作权，不附带编排者身份。
+Manager 的 system prompt、continuation、Schema、错误、工具描述及结果不得暴露第二评审身份、专用会话、确认屏障或双重检查。review 的 Promoted 与 Stayed 按 work-003 记录，不附带编排者身份。
 
 ## [009] 隐藏 target 只返回 generic unavailable
 

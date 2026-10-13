@@ -10,8 +10,7 @@ module OrchestratorFactFold =
         (payload:
             {| ManagerJobId: ManagerJobId
                RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+               TargetHeadSnapshot: CommitHash |})
         (projection: OrchestratorProjection)
         : Result<OrchestratorProjection, OrchestratorFoldRejection> =
         // Journal is append-only: the projection keeps the latest appended
@@ -22,8 +21,7 @@ module OrchestratorFactFold =
             OrchestratorProjection.recordRebasedCandidateReady
                 payload.ManagerJobId
                 {| RebasedCommit = payload.RebasedCommit
-                   TargetHeadSnapshot = payload.TargetHeadSnapshot
-                   WorkspaceSnapshotId = payload.WorkspaceSnapshotId |}
+                   TargetHeadSnapshot = payload.TargetHeadSnapshot |}
                 projection
         )
 
@@ -33,8 +31,6 @@ module OrchestratorFactFold =
                TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         (projection: OrchestratorProjection)
         : Result<OrchestratorProjection, OrchestratorFoldRejection> =
@@ -56,8 +52,6 @@ module OrchestratorFactFold =
                         {| TargetRef = payload.TargetRef
                            RebasedCommit = payload.RebasedCommit
                            ExpectedHead = payload.ExpectedHead
-                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
-                           QualityCertificateId = payload.QualityCertificateId
                            AuthorityRevision = payload.AuthorityRevision |}
                         projection
                 )
@@ -72,9 +66,7 @@ module OrchestratorFactFold =
             Ok(
                 OrchestratorProjection.recordCandidateReady
                     payload.ManagerJobId
-                    {| CandidateCommit = payload.CandidateCommit
-                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId
-                       QualityCertificateId = payload.QualityCertificateId |}
+                    {| CandidateCommit = payload.CandidateCommit |}
                     orchestrator
             )
         | OrchestratorFactCases.ConflictDetected payload ->
@@ -83,7 +75,6 @@ module OrchestratorFactFold =
                     payload.ManagerJobId
                     {| CandidateCommit = payload.CandidateCommit
                        TargetHeadSnapshot = payload.TargetHeadSnapshot
-                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId
                        ConflictFiles = payload.ConflictFiles
                        DiagnosticsDigest = payload.DiagnosticsDigest |}
                     orchestrator

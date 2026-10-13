@@ -58,43 +58,31 @@ const payload = (overrides = {}) => ({
   worktreePath: '/tmp/wt1',
   targetRef: 'refs/heads/main',
   targetBranchFrozen: 'refs/heads/main',
-  ...overrides,
-})
+  ...overrides})
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
 const fact = {
-  candidateReady: (candidateCommit = 'c1', workspaceSnapshotId = 'snapshot-1', qualityCertificateId = 'certificate-1') =>
-    change.fact('CandidateReady', { candidateCommit, workspaceSnapshotId, qualityCertificateId }),
+  candidateReady: (candidateCommit = 'c1') =>
+    change.fact('CandidateReady', { candidateCommit }),
   conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
     change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
-      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles,
-      diagnosticsDigest: 'digest',
-    }),
-  rebased: (targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased') =>
+      diagnosticsDigest: 'digest'}),
+  rebased: (targetHeadSnapshot = 'h1') =>
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
-      targetHeadSnapshot,
-      workspaceSnapshotId,
-    }),
+      targetHeadSnapshot}),
   publishClaimed: (
-    workspaceSnapshotId = 'snapshot-rebased',
-    qualityCertificateId = 'certificate-1',
-    authorityRevision = 'authority-1',
-  ) =>
+    authorityRevision = 'authority-1') =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
       expectedHead: 'h1',
-      workspaceSnapshotId,
-      qualityCertificateId,
-      authorityRevision,
-    }),
+      authorityRevision}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
-  abandoned: () => change.fact('JobAbandoned', null),
-}
+  abandoned: () => change.fact('JobAbandoned', null)}
 const jobAt = (value, projection = created()) => {
   const next = change.recordFact(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
@@ -105,21 +93,15 @@ const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 const createdEvent = {
   kind: 'ManagerJobCreated',
-  payload: payload(),
-}
+  payload: payload()}
 const candidateEvent = {
   kind: 'CandidateReady',
   payload: {
     jobId: JOB,
-    candidateCommit: 'c1',
-    workspaceSnapshotId: 'snapshot-1',
-    qualityCertificateId: 'certificate-1',
-  },
-}
+    candidateCommit: 'c1'}}
 const publishedEvent = {
   kind: 'Published',
-  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' },
-}
+  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' }}
 const foldProjection = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -139,8 +121,7 @@ test('WHAT[change-integration-001] ORCH_003_a_created_job_persists_the_manager_a
     worktreePath: '/tmp/wt1',
     targetRef: 'refs/heads/main',
     targetBranchFrozen: 'refs/heads/main',
-    facts: [],
-  })
+    facts: []})
 })
 }
 

@@ -33,6 +33,8 @@ module ManagerWorkflow =
     val ensureManagerRoadOpened:
         journal: AgentJournal option ->
         workspaceDirectory: string option ->
+        store: Wanxiangshu.Persistence.EventStore.IEventStore option ->
+        observedHead: int64 option ->
         sessionIdTextOpt: string option ->
         providerRunIdOpt: ProviderRunIdentity option ->
             Task<unit>

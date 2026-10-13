@@ -205,7 +205,7 @@ module PluginSessionWiring =
                             // epistemic-reasoning-032: delegated Engineers have
                             // the same WorkMain capabilities as other Engineers.
                             PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
-                            |> StaticTools.requestToolMap),
+                            |> StaticTools.requestToolMap role),
                     ?workspaceDirectory = workspaceDirectory,
                     ?onDelegatePrompt = Some CasebookLifecycle.notePrompt,
                     ?onDelegateAnswer = Some CasebookLifecycle.noteAnswer,

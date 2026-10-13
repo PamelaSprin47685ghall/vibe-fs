@@ -161,8 +161,8 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   assert.deepEqual(result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
     .map((fault) => fault.entryId), ['manager-loop.2', 'continue.0'])
 
-  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide']
-  const managerTools = ['fork', 'resume', 'join', 'horizon', 'assume', 'suicide']
+  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'deliver']
+  const managerTools = ['fork', 'resume', 'join', 'horizon', 'assume', 'deliver']
   const request = (turn, step, tools) => ({
     messages: [{ role: 'user', content: turn },
       ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` }))],
@@ -179,7 +179,7 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
     "# During assessment, you may directly use the review-only read tool js-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work"
-  for (const [step, tool] of [[0, 'review'], [1, 'suicide']]) {
+  for (const [step, tool] of [[0, 'review'], [1, 'deliver']]) {
     const id = `manager-reopened-loop.${step}`
     const entry = byId.get(id)
     assert.deepEqual({ step: entry?.step, optional: entry?.optional, internal: entry?.internal, tool: entry?.respond?.tool },

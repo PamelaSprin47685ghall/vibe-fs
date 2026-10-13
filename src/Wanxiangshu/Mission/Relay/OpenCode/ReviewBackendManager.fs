@@ -64,14 +64,6 @@ module ReviewBackendManager =
         | ReplayConflict -> Path.ReplayConflict
         | AlreadySubmitted -> Path.AlreadySubmitted
 
-    let private gitCapability: WorkspaceSnapshotGitCapability =
-        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
-          DiffHeadBinary = GitSubject.diffHeadBinary
-          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
-          HashObjectNoFilters = GitSubject.hashObjectNoFilters
-          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
-          LsFilesStageZ = GitSubject.lsFilesStageZ }
-
     let private providerText (path: string) substitutions =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
 
@@ -212,20 +204,16 @@ module ReviewBackendManager =
         (incumbencyId: IncumbencyId)
         (assessmentId: AssessmentId)
         (binding: AssessmentBinding)
-        (snapshotId: WorkspaceSnapshotId)
         (authorityRevision: AuthorityRevision)
         (findings: AssessmentFindings)
         =
-        let assessment =
-            RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, findings)
-
-        match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision with
-        | None, _, _ -> Error BindingUnavailable
-        | Some active, _, _ when active <> incumbencyId -> Error BindingUnavailable
-        | _, _, Some expected when expected <> authorityRevision -> Error RecordFailed
-        | _ ->
-            RelayTransaction.create [ assessment ]
-            |> Result.mapError (fun _ -> RecordFailed)
+        ignore view
+        ignore incumbencyId
+        ignore assessmentId
+        ignore binding
+        ignore authorityRevision
+        ignore findings
+        Error RecordFailed
 
     type private BoundReviewInvocation =
         { Findings: AssessmentFindings
@@ -239,7 +227,6 @@ module ReviewBackendManager =
         { Bound: BoundReviewInvocation
           SessionId: SessionId
           RoadId: RoadId
-          SnapshotId: WorkspaceSnapshotId
           View: RoadView
           RootAuthorityUserMessageId: string
           AuthorityRevision: AuthorityRevision
@@ -274,7 +261,6 @@ module ReviewBackendManager =
     type private ReplayCandidate =
         { IncumbencyId: IncumbencyId
           AuthorityRevision: AuthorityRevision
-          SnapshotId: WorkspaceSnapshotId
           RootAuthorityUserMessageId: string }
 
     type private PreparedReview =
@@ -286,7 +272,6 @@ module ReviewBackendManager =
         (bound: BoundReviewInvocation)
         sessionId
         roadId
-        snapshotId
         (road: RoadView)
         rootAuthorityUserMessageId
         =
@@ -297,7 +282,6 @@ module ReviewBackendManager =
                 ReplayCandidate
                     { IncumbencyId = incumbencyId
                       AuthorityRevision = road.AuthorityRevision
-                      SnapshotId = snapshotId
                       RootAuthorityUserMessageId = rootAuthorityUserMessageId })
             |> requireSome BindingUnavailable
         | Some _ -> Error AlreadySubmitted
@@ -313,7 +297,6 @@ module ReviewBackendManager =
                             [ "assessment-v2"
                               context.SessionId
                               IncumbencyId.value incumbencyId
-                              WorkspaceSnapshotId.value snapshotId
                               AuthorityRevision.value road.AuthorityRevision
                               ToolCallId.value bound.ToolCallId ]
                     )
@@ -323,7 +306,6 @@ module ReviewBackendManager =
                     { Bound = bound
                       SessionId = sessionId
                       RoadId = roadId
-                      SnapshotId = snapshotId
                       View = road
                       RootAuthorityUserMessageId = rootAuthorityUserMessageId
                       AuthorityRevision = road.AuthorityRevision
@@ -335,7 +317,6 @@ module ReviewBackendManager =
         let roadId = RoadId.create context.SessionId
 
         try
-            let snapshotId = WorkspaceSnapshot.capture gitCapability bound.Directory
             let state = currentRelayState bound.Journal sessionId
 
             let activeRoad =
@@ -348,7 +329,7 @@ module ReviewBackendManager =
                 scope.ActiveProfileFor sessionId
                 |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
                 |> requireSome BindingUnavailable
-                |> Result.bind (planForRoad context bound sessionId roadId snapshotId road))
+                |> Result.bind (planForRoad context bound sessionId roadId road))
         with _ ->
             Error BindingUnavailable
 
@@ -364,23 +345,9 @@ module ReviewBackendManager =
             [ "recorded", ToolHostCodec.TBool true ]
 
     let private appendAssessment (prepared: PreparedAssessment) transaction =
-        let fact =
-            AgentFact.Relay(
-                RelayFactCases.TransactionCommitted
-                    {| RoadId = prepared.RoadId
-                       Transaction = transaction |}
-            )
-
-        task {
-            let! outcome =
-                AgentJournal.appendAgent
-                    (StreamId.Session prepared.SessionId)
-                    (Some prepared.Bound.ProviderRun)
-                    fact
-                    prepared.Bound.Journal
-
-            return outcome |> Result.mapError (fun _ -> RecordFailed)
-        }
+        ignore prepared
+        ignore transaction
+        Task.FromResult(Error RecordFailed)
 
     let private runPrepared
         (scope: ToolRuntimeScope)
@@ -410,7 +377,6 @@ module ReviewBackendManager =
                         roadId
                         replay.IncumbencyId
                         binding
-                        replay.SnapshotId
                         replay.AuthorityRevision
                         bound.Findings
                     |> Result.mapError (fun _ -> ReplayConflict)
@@ -434,7 +400,6 @@ module ReviewBackendManager =
                         prepared.IncumbencyId
                         prepared.AssessmentId
                         binding
-                        prepared.SnapshotId
                         prepared.AuthorityRevision
                         prepared.Bound.Findings
 

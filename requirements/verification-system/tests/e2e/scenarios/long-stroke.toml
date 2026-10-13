@@ -12,7 +12,7 @@
 #
 #   Birth (Orchestrator)
 #     ↓
-#   commission / ManagerJobCreated (AgentOwnerRoot; first suicide migrates Life)
+#   commission / ManagerJobCreated (AgentOwnerRoot; first deliver migrates Life)
 #     ↓
 #   Manager forks engineer; join blocked; child held incomplete
 #     ↓
@@ -37,7 +37,7 @@
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
 #   [x] provider failure continuation       — manager.1→continue.0 + assertProviderFailureContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
-#   [x] non-10 assessment assigns work      — AssessmentCommitted + assertAssessmentAssignsWork
+#   [x] non-10 assessment assigns work      — Reviewed + assertAssessmentAssignsWork
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
 #   [x] retirement needs next iteration     — non-10 blocks publication + Continue → fresh IncumbencyOpened + assertRetirementNeedsIteration
 #   [x] durable recovery/continuation       — same PID FailureRecorded + assertDurableRecovery
@@ -215,8 +215,8 @@ flow = [
   # authority-first manager-loop entry; the binder varies review results by durable attempt.
   { wait = "manager-loop.0" },
   # Manager loop first main assessment (session = "child"): precisely 1 for this road/branch,
-  # decoupled from preflow/world AssessmentCommitted total.
-  { waitFact = { name = "AssessmentCommitted", eq = 1, session = "child" }, timeoutMs = 60000 },
+  # decoupled from preflow/world Reviewed total.
+  { waitFact = { name = "Reviewed", eq = 1, session = "child" }, timeoutMs = 60000 },
   { wait = "manager-loop.1" },
   # The held child request proves the forked run is active before the idle join
   # attempt. Without this causal barrier, join may correctly report NothingToJoin
@@ -251,7 +251,7 @@ flow = [
   # deliberately conflicting target edit yields the machine ConflictDetected fact.
   # The Manager owner opens iteration #2 through the same manager-assess resource.
   # Durable facts order every later incarnation; prompt text never encodes an index.
-  { waitFact = { name = "AssessmentCommitted", gte = 4 }, timeoutMs = 60000 },
+  { waitFact = { name = "Reviewed", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "RetirementCommitted", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
@@ -262,7 +262,7 @@ flow = [
   # never resumes; each iteration-first carries only the current iteration, with
   # the exact owner-controlled assessment resource after the authority prefix.
   { waitFact = { name = "IncumbencyOpened", gte = 5 }, timeoutMs = 60000 },
-  { waitFact = { name = "AssessmentCommitted", gte = 5 }, timeoutMs = 60000 },
+  { waitFact = { name = "Reviewed", gte = 5 }, timeoutMs = 60000 },
   { wait = "engineer-resolve.0", timeoutMs = 60000 },
   { wait = "engineer-resolve.1", timeoutMs = 60000 },
   { awaitIdle = { after = "engineer-resolve.1" }, timeoutMs = 60000 },
@@ -274,7 +274,7 @@ flow = [
   # same authority. A fresh certificate (Outcome Accepted) is required before
   # rebase completion/publish can proceed; Accepted exits with no further iteration.
   { waitFact = { name = "IncumbencyOpened", gte = 6 }, timeoutMs = 60000 },
-  { waitFact = { name = "AssessmentCommitted", gte = 6 }, timeoutMs = 60000 },
+  { waitFact = { name = "Reviewed", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "RetirementCommitted", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
   { waitFact = { name = "Published", eq = 1 }, timeoutMs = 90000 },
@@ -386,13 +386,13 @@ user = "HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager ass
 
 # ONE reusable HumanRoot loop family: same lane/authority/steps reused for both
 # iterations. The binder returns low review on first delivery (Continue) and
-# perfect on second (Accepted); step-1 suicide is identical. Provider-visible
+# perfect on second (Accepted); step-1 deliver is identical. Provider-visible
 # user stays the original authority because the wake is stripped.
 [[turn]]
 id = "humanroot-loop"
 lane = "humanroot-manager"
 user = "HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check."
-tools = ["review", "suicide"]
+tools = ["review", "deliver"]
 
   [[turn.step]]
   runtimeStep = 0
@@ -400,7 +400,7 @@ tools = ["review", "suicide"]
 
   [[turn.step]]
   runtimeStep = 1
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
 [[turn]]
 id = "title"
@@ -463,7 +463,7 @@ user = "# The account is not yet ready to entrust."
 id = "manager-loop"
 lane = "manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
-tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
+tools = ["fork", "resume", "join", "horizon", "review", "deliver"]
 
   [[turn.step]]
   runtimeStep = 0
@@ -488,7 +488,7 @@ internal = true
 # The ordinal sentence is the leader; the declared fragment stays the stable
 # tail so the successor number never has to be re-pinned per iteration.
 user = ["# You are the ", "entrust read-only work to Engineer to establish facts about the predecessor's work"]
-tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
+tools = ["fork", "resume", "join", "horizon", "review", "deliver"]
 
   [[turn.step]]
   runtimeStep = 0
@@ -498,7 +498,7 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
   [[turn.step]]
   runtimeStep = 1
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 2
@@ -511,12 +511,12 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
   [[turn.step]]
   runtimeStep = 3
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 4
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
 # A fresh Manager terminal can race with the externally injected interruption
 # while its child is still outstanding. INTERACTION-AUTHORITY-014 then requires
@@ -527,12 +527,12 @@ id = "manager-join-guard"
 internal = true
 optional = true
 user = "# Delegated work you sent out has not come back yet. Continue the work."
-tools = ["fork", "resume", "join", "horizon", "assume", "suicide"]
+tools = ["fork", "resume", "join", "horizon", "assume", "deliver"]
 forbiddenTools = ["commission"]
 
   [[turn.step]]
   runtimeStep = 1
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "materialize the Manager life" } }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 2
@@ -540,7 +540,7 @@ forbiddenTools = ["commission"]
 
   [[turn.step]]
   runtimeStep = 3
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 4
@@ -560,11 +560,11 @@ forbiddenTools = ["commission"]
 
   [[turn.step]]
   runtimeStep = 8
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 9
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 10
@@ -593,11 +593,11 @@ user = "Interrupt the active join."
 id = "manager-current-action"
 internal = true
 user = "# The reviewed defects are now entrusted to you."
-tools = ["join", "assume", "suicide"]
+tools = ["join", "assume", "deliver"]
 
   # Host tips and owner nudges can place this exact resource at any bounded runtime
   # cursor. The binder maps the first observed cursor to the assumption, one cursor
-  # per work episode to join, and every later cursor to suicide.
+  # per work episode to join, and every later cursor to deliver.
   [[turn.step]]
   runtimeStep = 0
   optional = true
@@ -606,52 +606,52 @@ tools = ["join", "assume", "suicide"]
   [[turn.step]]
   runtimeStep = 1
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 2
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 3
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 4
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 5
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 6
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 7
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 8
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 9
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
   [[turn.step]]
   runtimeStep = 10
   optional = true
-  respond = { type = "tool-call", tool = "suicide", args = {} }
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
 [[turn]]
 id = "engineer"

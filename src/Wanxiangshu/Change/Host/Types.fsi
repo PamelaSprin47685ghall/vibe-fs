@@ -30,7 +30,6 @@ type OrchestratorHostDeps =
               -> ProviderRunIdentity
               -> Task<Result<Wanxiangshu.Foundation.Identity.PhysicalUserMessageId, string>>
       ContinueManagerLoop: SessionId -> string -> Task<Result<unit, string>>
-      CaptureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>
       RepoPath: string
       TargetBranch: string
       ParentWorkRecordFor: SessionId -> Task<string option>

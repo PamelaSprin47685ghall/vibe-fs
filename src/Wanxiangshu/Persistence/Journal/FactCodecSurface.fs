@@ -238,23 +238,6 @@ module FactCodecSurface =
                             CommitHash.create (propertyText payload [ "RebasedCommit"; "rebasedCommit" ] "rebased-1")
                            ExpectedHead =
                             CommitHash.create (propertyText payload [ "ExpectedHead"; "expectedHead" ] "target-1")
-                           WorkspaceSnapshotId =
-                            WorkspaceSnapshotId.create (
-                                propertyText
-                                    payload
-                                    [ "WorkspaceSnapshotId"; "workspaceSnapshotId"; "SnapshotId"; "snapshotId" ]
-                                    "snapshot-rebased-1"
-                            )
-                           QualityCertificateId =
-                            QualityCertificateId.create (
-                                propertyText
-                                    payload
-                                    [ "QualityCertificateId"
-                                      "qualityCertificateId"
-                                      "CertificateId"
-                                      "certificateId" ]
-                                    "certificate-1"
-                            )
                            AuthorityRevision =
                             AuthorityRevision.create (
                                 propertyText payload [ "AuthorityRevision"; "authorityRevision" ] "authority-1"
@@ -281,8 +264,7 @@ module FactCodecSurface =
                     OrchestratorFactCases.RebasedCandidateReady
                         {| ManagerJobId = ManagerJobId.create (text (payload?ManagerJobId))
                            RebasedCommit = CommitHash.create (text (payload?RebasedCommit))
-                           TargetHeadSnapshot = CommitHash.create (text (payload?TargetHeadSnapshot))
-                           WorkspaceSnapshotId = WorkspaceSnapshotId.create (text (payload?WorkspaceSnapshotId)) |}
+                           TargetHeadSnapshot = CommitHash.create (text (payload?TargetHeadSnapshot)) |}
                 )
             )
         | "Orchestrator", "Published" ->

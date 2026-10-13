@@ -24,6 +24,7 @@ module AuthoritativeEventTypes =
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
               yield! PlanEventTypes.all
+              yield! LifecycleEventTypes.all
               // Version 1 remains readable for the domain's explicit semantic cut.
               // New transitions use the strict canonical version 2 payload.
               yield! SphinxV2EventTypes.all ]

@@ -23,7 +23,7 @@ type ToolPermission =
     | Chronicle
     /// CASE-009: conditional Casebook read surface for Engineer.
     | Fetch
-    /// GLORY-036: the Manager's own end-of-life tool (`suicide`).
+    /// GLORY-036: the Manager's own end-of-life tool (`deliver`).
     | Finality
     /// Engineer honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
@@ -39,6 +39,7 @@ type ManagerCapabilityFacts =
     {
         HasActiveIncumbency: bool
         HasAssessment: bool
+        HasConfirmation: bool
         /// True when the active incumbency's accepted assessment has empty
         /// findings: the final incumbent who settles and retires with no successor.
         IsFinalIncumbent: bool
@@ -53,7 +54,7 @@ module OfficeCapability =
 
     /// capability-enforcement-025 / relay-assessment-005: the final incumbent's
     /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
-    /// suicide finality, and drops every new-work capability (fork, resume,
+    /// deliver finality, and drops every new-work capability (fork, resume,
     /// review).
     let managerFinishPermissions: ToolPermission Set =
         set
@@ -133,14 +134,47 @@ module OfficeCapability =
     let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
         if not facts.HasActiveIncumbency then
             Set.empty
+        elif facts.HasConfirmation && not facts.HasAssessment then
+            set
+                [ ToolPermission.ReviewAssessment
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon ]
         elif facts.CleanupBlockerDigest.IsSome then
             set [ ToolPermission.Join; ToolPermission.Finality ]
         elif facts.IsFinalIncumbent then
-            managerFinishPermissions
-        elif facts.HasAssessment then
-            Set.difference (permissions Role.Manager) managerReviewReadOnlyPermissions
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.Finality ]
+        elif facts.HasAssessment && not facts.HasConfirmation then
+            set
+                [ ToolPermission.ReviewAssessment
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Fork
+                  ToolPermission.Resume
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.Finality ]
+        elif not facts.HasAssessment then
+            set
+                [ ToolPermission.ReviewAssessment
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon ]
         else
-            permissions Role.Manager
+            Set.empty
 
     let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
         permissionsForManagerFacts facts |> Set.contains permission

@@ -2,10 +2,8 @@ namespace Wanxiangshu.Mission.Relay
 
 type RoadId
 type IncumbencyId
-type WorkspaceSnapshotId
 type AuthorityRevision
 type AssessmentId
-type QualityCertificateId
 type RetirementId
 type PhysicalUserMessageId
 
@@ -21,10 +19,6 @@ module IncumbencyId =
     val create: string -> IncumbencyId
     val value: IncumbencyId -> string
 
-module WorkspaceSnapshotId =
-    val create: string -> WorkspaceSnapshotId
-    val value: WorkspaceSnapshotId -> string
-
 module AuthorityRevision =
     val create: string -> AuthorityRevision
     val value: AuthorityRevision -> string
@@ -32,10 +26,6 @@ module AuthorityRevision =
 module AssessmentId =
     val create: string -> AssessmentId
     val value: AssessmentId -> string
-
-module QualityCertificateId =
-    val create: string -> QualityCertificateId
-    val value: QualityCertificateId -> string
 
 module RetirementId =
     val create: string -> RetirementId
@@ -74,20 +64,10 @@ type IncumbencyPhase =
     | PerfectAwaitingRetirement
     | RetirementCleanupBlocked
 
-type QualityCertificate =
-    { Id: QualityCertificateId
-      AssessmentId: AssessmentId
-      IncumbencyId: IncumbencyId
-      SnapshotId: WorkspaceSnapshotId
-      AuthorityRevision: AuthorityRevision
-      Binding: AssessmentBinding
-      Valid: bool
-      InvalidationReason: string option }
-
 [<RequireQualifiedAccess>]
 type RetirementOutcome =
-    | Continue
-    | Accepted of QualityCertificateId
+    | Relayed
+    | Delivered
 
 type ProjectionCut =
     { ProviderRunId: string
@@ -96,7 +76,6 @@ type ProjectionCut =
 type RetirementSummary =
     { Id: RetirementId
       IncumbencyId: IncumbencyId
-      SnapshotId: WorkspaceSnapshotId
       AuthorityRevision: AuthorityRevision
       ProjectionCut: ProjectionCut
       Outcome: RetirementOutcome }

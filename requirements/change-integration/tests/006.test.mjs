@@ -13,29 +13,21 @@ test('WHAT[change-integration-006] projecting candidate and conflict facts prese
     worktreeIdentity: 'manager/job-1',
     worktreePath: '/tmp/wt-job-1',
     targetRef: 'refs/heads/main',
-    targetBranchFrozen: 'refs/heads/main',
-  })
+    targetBranchFrozen: 'refs/heads/main'})
 
   projection = change.recordFact(
     projection,
     'job-1',
     change.fact('CandidateReady', {
-      candidateCommit: 'candidate-head',
-      workspaceSnapshotId: 'snapshot-1',
-      qualityCertificateId: 'certificate-1',
-    }),
-  )
+      candidateCommit: 'candidate-head'}))
   projection = change.recordFact(
     projection,
     'job-1',
     change.fact('ConflictDetected', {
       candidateCommit: 'candidate-head',
       targetHeadSnapshot: 'target-head-1',
-      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles: ['src/conflict.fs'],
-      diagnosticsDigest: 'conflict-digest',
-    }),
-  )
+      diagnosticsDigest: 'conflict-digest'}))
 
   const job = change.find(projection, 'job-1')
   assert.equal(job.worktreePath, '/tmp/wt-job-1')
@@ -58,8 +50,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   worktreeIdentity: `manager/${id}`,
   worktreePath: path,
   targetRef: 'refs/heads/main',
-  targetBranchFrozen: 'refs/heads/main',
-})
+  targetBranchFrozen: 'refs/heads/main'})
 
 test('WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
@@ -86,43 +77,31 @@ const payload = (overrides = {}) => ({
   worktreePath: '/tmp/wt1',
   targetRef: 'refs/heads/main',
   targetBranchFrozen: 'refs/heads/main',
-  ...overrides,
-})
+  ...overrides})
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
 const fact = {
-  candidateReady: (candidateCommit = 'c1', workspaceSnapshotId = 'snapshot-1', qualityCertificateId = 'certificate-1') =>
-    change.fact('CandidateReady', { candidateCommit, workspaceSnapshotId, qualityCertificateId }),
+  candidateReady: (candidateCommit = 'c1') =>
+    change.fact('CandidateReady', { candidateCommit }),
   conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
     change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
-      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles,
-      diagnosticsDigest: 'digest',
-    }),
-  rebased: (targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased') =>
+      diagnosticsDigest: 'digest'}),
+  rebased: (targetHeadSnapshot = 'h1') =>
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
-      targetHeadSnapshot,
-      workspaceSnapshotId,
-    }),
+      targetHeadSnapshot}),
   publishClaimed: (
-    workspaceSnapshotId = 'snapshot-rebased',
-    qualityCertificateId = 'certificate-1',
-    authorityRevision = 'authority-1',
-  ) =>
+    authorityRevision = 'authority-1') =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
       expectedHead: 'h1',
-      workspaceSnapshotId,
-      qualityCertificateId,
-      authorityRevision,
-    }),
+      authorityRevision}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
-  abandoned: () => change.fact('JobAbandoned', null),
-}
+  abandoned: () => change.fact('JobAbandoned', null)}
 const jobAt = (value, projection = created()) => {
   const next = change.recordFact(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
@@ -133,21 +112,15 @@ const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 const createdEvent = {
   kind: 'ManagerJobCreated',
-  payload: payload(),
-}
+  payload: payload()}
 const candidateEvent = {
   kind: 'CandidateReady',
   payload: {
     jobId: JOB,
-    candidateCommit: 'c1',
-    workspaceSnapshotId: 'snapshot-1',
-    qualityCertificateId: 'certificate-1',
-  },
-}
+    candidateCommit: 'c1'}}
 const publishedEvent = {
   kind: 'Published',
-  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' },
-}
+  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' }}
 const foldProjection = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -242,15 +215,13 @@ test('WHAT[change-integration-006] EXEC_016_active_manager_jobs_are_outstanding_
     worktreeIdentity: 'manager/job_1',
     worktreePath: '/tmp/wt',
     targetRef: 'refs/heads/main',
-    targetBranchFrozen: 'main',
-  })
+    targetBranchFrozen: 'main'})
   assert.equal(change.activeJobs(jobs).length, 1)
 
   jobs = change.recordFact(
     jobs,
     'job_1',
-    change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
-  )
+    change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }))
   assert.equal(change.activeJobs(jobs).length, 0)
 })
 }
@@ -272,36 +243,25 @@ const createEvent = (jobId, managerSessionId, worktreeIdentity = `wt_${jobId.sli
     worktreeIdentity,
     worktreePath: `/tmp/${worktreeIdentity}`,
     targetRef: 'refs/heads/main',
-    targetBranchFrozen: 'refs/heads/main',
-  },
-})
+    targetBranchFrozen: 'refs/heads/main'}})
 const candidateEvent = (
   jobId,
-  candidateCommit = 'c1',
-  workspaceSnapshotId = 'snapshot-1',
-  qualityCertificateId = 'certificate-1',
-) => ({
+  candidateCommit = 'c1') => ({
   kind: 'CandidateReady',
-  payload: { jobId, candidateCommit, workspaceSnapshotId, qualityCertificateId },
-})
+  payload: { jobId, candidateCommit }})
 const conflictEvent = (jobId, { candidateCommit = 'c1', targetHeadSnapshot = 'h1', conflictFiles = ['publish_proof.txt'] } = {}) => ({
   kind: 'ConflictDetected',
   payload: {
     jobId,
     candidateCommit,
     targetHeadSnapshot,
-    workspaceSnapshotId: 'snapshot-conflict',
     conflictFiles,
-    diagnosticsDigest: 'conflict-digest',
-  },
-})
+    diagnosticsDigest: 'conflict-digest'}})
 const rebasedEvent = (
   jobId,
-  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased' } = {},
-) => ({
+  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1' } = {}) => ({
   kind: 'RebasedCandidateReady',
-  payload: { jobId, rebasedCommit, targetHeadSnapshot, workspaceSnapshotId },
-})
+  payload: { jobId, rebasedCommit, targetHeadSnapshot }})
 const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
   kind: 'PublishClaimed',
   payload: {
@@ -309,15 +269,10 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
     expectedHead,
-    workspaceSnapshotId: 'snapshot-rebased',
-    qualityCertificateId: 'certificate-1',
-    authorityRevision: 'authority-1',
-  },
-})
+    authorityRevision: 'authority-1'}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
-  payload: { jobId, candidateCommit, resultingTargetHead },
-})
+  payload: { jobId, candidateCommit, resultingTargetHead }})
 const foldEvents = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -393,8 +348,7 @@ test('WHAT[change-integration-006] WORKTREE_adopt_never_releases_on_dispose', as
   assert.deepEqual(
     calls.filter(({ args }) => args[1] === 'remove' || args[0] === 'branch'),
     [],
-    'an adopted resource must not clean up on dispose (recovery owns it)',
-  )
+    'an adopted resource must not clean up on dispose (recovery owns it)')
 })
 test('WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_release', async () => {
   const { git, calls } = fakeGit()
@@ -404,8 +358,7 @@ test('WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_releas
   assert.deepEqual(
     calls.filter(({ args }) => args[1] === 'remove' || args[0] === 'branch'),
     [],
-    'a durable worktree (published) must survive dispose',
-  )
+    'a durable worktree (published) must survive dispose')
 })
 test('WHAT[change-integration-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
   const porcelain = [
@@ -467,8 +420,7 @@ const requested = (entries) => ({
   kind: 'RequestedEntries',
   jobId: job,
   path,
-  entries,
-})
+  entries})
 
 test('WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed', () => {
   // Fresh entry records intent before the ordinary fork CE creates anything.
@@ -482,41 +434,34 @@ test('WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentr
   // adopted and the missing receipt is recorded, never recreated.
   assert.deepEqual(
     decide(requested([{ path, identity }])),
-    { kind: 'AdoptThenRecordCreated' },
-  )
+    { kind: 'AdoptThenRecordCreated' })
 
   // Either half of the physical identity/path key conflicting fails closed.
   assert.deepEqual(
     decide(requested([{ path: '/repo/.worktrees/elsewhere', identity }])),
-    { kind: 'Reject', reason: 'PhysicalIdentityPathConflict' },
-  )
+    { kind: 'Reject', reason: 'PhysicalIdentityPathConflict' })
   assert.deepEqual(
     decide(requested([{ path, identity: 'manager/another-job' }])),
-    { kind: 'Reject', reason: 'PhysicalIdentityPathConflict' },
-  )
+    { kind: 'Reject', reason: 'PhysicalIdentityPathConflict' })
 
   // No guessed success or unsafe retry is available when the physical query fails.
   assert.deepEqual(
     decide({ kind: 'RequestedQueryFailure', jobId: job, path, error: 'git unavailable' }),
-    { kind: 'Reject', reason: 'WorktreeQueryFailed' },
-  )
+    { kind: 'Reject', reason: 'WorktreeQueryFailed' })
 
   // Created is already the durable receipt: reentry adopts without another query.
   assert.deepEqual(
     decide({ kind: 'CreatedReceipt', jobId: job, path }),
-    { kind: 'AdoptCreated' },
-  )
+    { kind: 'AdoptCreated' })
 
   // Durable intent cannot be stolen by another job or redirected to another path;
   // this state is rejected before any physical query is admitted.
   assert.deepEqual(
     decide({ kind: 'RequestedConflict', jobId: 'job-other', path }),
-    { kind: 'Reject', reason: 'DurableOwnershipConflict' },
-  )
+    { kind: 'Reject', reason: 'DurableOwnershipConflict' })
   assert.deepEqual(
     decide({ kind: 'CreatedReceipt', jobId: 'job-other', path }),
-    { kind: 'Reject', reason: 'DurableOwnershipConflict' },
-  )
+    { kind: 'Reject', reason: 'DurableOwnershipConflict' })
 })
 }
 

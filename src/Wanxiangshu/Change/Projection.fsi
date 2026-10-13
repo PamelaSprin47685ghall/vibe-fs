@@ -22,24 +22,19 @@ type ManagerJobProjection =
       TargetBranchFrozen: string
       CandidateReady:
           {| CandidateCommit: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
-             QualityCertificateId: QualityCertificateId |} option
+             |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
              ConflictFiles: string list
              DiagnosticsDigest: string |} option
       RebasedCandidateReady:
           {| RebasedCommit: CommitHash
-             TargetHeadSnapshot: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId |} option
+             TargetHeadSnapshot: CommitHash |} option
       PublishClaimed:
           {| TargetRef: TargetRef
              RebasedCommit: CommitHash
              ExpectedHead: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
-             QualityCertificateId: QualityCertificateId
              AuthorityRevision: AuthorityRevision |} option
       Terminal: TerminalOutcome option }
 
@@ -129,9 +124,7 @@ module OrchestratorProjection =
 
     val recordCandidateReady:
         ManagerJobId ->
-        {| CandidateCommit: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
-           QualityCertificateId: QualityCertificateId |} ->
+        {| CandidateCommit: CommitHash |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 
@@ -139,7 +132,6 @@ module OrchestratorProjection =
         ManagerJobId ->
         {| CandidateCommit: CommitHash
            TargetHeadSnapshot: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
            ConflictFiles: string list
            DiagnosticsDigest: string |} ->
         OrchestratorProjection ->
@@ -148,8 +140,7 @@ module OrchestratorProjection =
     val recordRebasedCandidateReady:
         ManagerJobId ->
         {| RebasedCommit: CommitHash
-           TargetHeadSnapshot: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId |} ->
+           TargetHeadSnapshot: CommitHash |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 
@@ -158,8 +149,6 @@ module OrchestratorProjection =
         {| TargetRef: TargetRef
            RebasedCommit: CommitHash
            ExpectedHead: CommitHash
-           WorkspaceSnapshotId: WorkspaceSnapshotId
-           QualityCertificateId: QualityCertificateId
            AuthorityRevision: AuthorityRevision |} ->
         OrchestratorProjection ->
             OrchestratorProjection

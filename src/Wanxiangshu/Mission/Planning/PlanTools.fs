@@ -165,29 +165,16 @@ module PlanTools =
         (execSessionId: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            let retCurSeq = retirementCursor
-
-            let retEvent =
-                PlanEvents.incumbencyRetired incumbencyId PlanRetirementOutcome.Delivered retCurSeq
-
-            let delEvent =
-                PlanEvents.delivered incumbencyId workId digest planPath execSessionId
-
-            match! appendRetireAndDeliver store pid retEvent delEvent with
-            | Error err -> return Error err
-            | Ok() ->
-                return
-                    Ok
-                        { Ok = true
-                          Relayed = false
-                          Delivered = true
-                          RetiredIncumbencyId = incumbencyId
-                          RetirementOutcome = PlanRetirementOutcome.render PlanRetirementOutcome.Delivered
-                          Digest = digest
-                          Path = planPath
-                          ExecSessionId = execSessionId
-                          NextIncumbencyId = ""
-                          Message = "Plan delivered successfully" }
+            ignore retirementCursor
+            ignore digest
+            ignore planPath
+            ignore execSessionId
+            ignore incumbencyId
+            ignore active
+            ignore pid
+            ignore store
+            ignore workId
+            return Error "deliver fence was not observed from the host context"
         }
 
     // The execution session must start before any durable fact is written: a
@@ -282,23 +269,13 @@ module PlanTools =
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
-            let relay = buildRelayTransition workId incumbencyId active retirementCursor
-
-            match! appendRetireAndOpen store pid relay.Retire relay.Open with
-            | Error err -> return Error err
-            | Ok() ->
-                return
-                    Ok
-                        { Ok = true
-                          Relayed = true
-                          Delivered = false
-                          RetiredIncumbencyId = incumbencyId
-                          RetirementOutcome = PlanRetirementOutcome.render PlanRetirementOutcome.Relayed
-                          Digest = ""
-                          Path = ""
-                          ExecSessionId = ""
-                          NextIncumbencyId = relay.NextIncumbencyId
-                          Message = sprintf "Relayed to the next incumbency at stage %s" (PlanStage.render relay.Stage) }
+            match store.TryCurrent "Lifecycle" with
+            | None -> return Error "lifecycle work is missing"
+            | Some current ->
+                let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                match Map.tryFind workId works with
+                | None -> return Error "lifecycle work is missing"
+                | Some _ -> return Error "deliver fence was not observed from the host context"
         }
 
     let private runDeliverDecision

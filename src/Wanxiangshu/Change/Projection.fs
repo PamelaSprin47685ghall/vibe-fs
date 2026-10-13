@@ -22,25 +22,19 @@ type ManagerJobProjection =
       TargetRef: TargetRef
       TargetBranchFrozen: string
       CandidateReady:
-          {| CandidateCommit: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
-             QualityCertificateId: QualityCertificateId |} option
+          {| CandidateCommit: CommitHash |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
              ConflictFiles: string list
              DiagnosticsDigest: string |} option
       RebasedCandidateReady:
           {| RebasedCommit: CommitHash
-             TargetHeadSnapshot: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId |} option
+             TargetHeadSnapshot: CommitHash |} option
       PublishClaimed:
           {| TargetRef: TargetRef
              RebasedCommit: CommitHash
              ExpectedHead: CommitHash
-             WorkspaceSnapshotId: WorkspaceSnapshotId
-             QualityCertificateId: QualityCertificateId
              AuthorityRevision: AuthorityRevision |} option
       Terminal: TerminalOutcome option }
 
@@ -269,9 +263,7 @@ module OrchestratorProjection =
     let recordCandidateReady
         (jobId: ManagerJobId)
         (payload:
-            {| CandidateCommit: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId |})
+            {| CandidateCommit: CommitHash |})
         (projection: OrchestratorProjection)
         =
         updateActiveJob
@@ -286,7 +278,6 @@ module OrchestratorProjection =
         (payload:
             {| CandidateCommit: CommitHash
                TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
                ConflictFiles: string list
                DiagnosticsDigest: string |})
         (projection: OrchestratorProjection)
@@ -302,8 +293,7 @@ module OrchestratorProjection =
         (jobId: ManagerJobId)
         (payload:
             {| RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+               TargetHeadSnapshot: CommitHash |})
         (projection: OrchestratorProjection)
         =
         // Latest-event view mirroring Fold: exact replay is idempotent and a
@@ -322,8 +312,6 @@ module OrchestratorProjection =
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
         (projection: OrchestratorProjection)
         =

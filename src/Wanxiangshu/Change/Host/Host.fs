@@ -143,23 +143,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let roadIdOf (record: ManagerJobProjection) =
         RoadId.create (SessionId.value record.ManagerSessionId)
 
-    let loopSignalOfRetirement (road: RoadView) (retirement: RetirementSummary) =
-        match retirement.Outcome, road.Certificate with
-        | RetirementOutcome.Continue, _ -> ManagerLoopSignal.Continue
-        | RetirementOutcome.Accepted certificateId, Some certificate when
-            certificate.Id = certificateId && certificate.Valid
-            ->
-            ManagerLoopSignal.Candidate certificate
-        | RetirementOutcome.Accepted certificateId, Some certificate when
-            certificate.Id = certificateId && not certificate.Valid
-            ->
-            ManagerLoopSignal.Continue
-        | RetirementOutcome.Accepted certificateId, _ ->
+    let loopSignalOfRetirement (_road: RoadView) (retirement: RetirementSummary) =
+        match retirement.Outcome with
+        | RetirementOutcome.Relayed -> ManagerLoopSignal.Continue
+        | RetirementOutcome.Delivered ->
             ManagerLoopSignal.ExceptionalTerminal(
                 sprintf
-                    "Accepted retirement %s without matching valid certificate %s"
+                    "Retirement %s has no durable Relayed or Delivered confirmation"
                     (RetirementId.value retirement.Id)
-                    (QualityCertificateId.value certificateId)
             )
 
     let loopSignalOfRoad (road: RoadView) =
@@ -204,47 +195,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Error error -> Task.FromResult(Error error)
         | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
 
-    let certificateToInvalidate (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
-        let roadOpt, _ = relay.RoadSnapshot record
-
-        roadOpt
-        |> Option.bind (fun road -> road.Certificate)
-        |> Option.map (fun cert -> cert.Id)
-
-    let buildInvalidationTransaction reason certificateIdOpt =
-        match certificateIdOpt with
-        | None -> Ok None
-        | Some certificateId ->
-            RelayTransaction.create [ RelayEvent.QualityCertificateInvalidated(certificateId, reason) ]
-            |> Result.map Some
-
-    let appendInvalidation
-        (relay: OrchestratorRelayPort)
-        (record: ManagerJobProjection)
-        (transactionOpt: RelayTransaction option)
-        : Task<Result<unit, string>> =
-        match transactionOpt with
-        | None -> Task.FromResult(Ok())
-        | Some transaction -> relay.AppendRelay record transaction
-
-    let invalidateCertificate (jobId: ManagerJobId) reason : Task<Result<unit, string>> =
-        taskResult {
-            let! relay, record =
-                requireRelayAndJob relayPortOpt jobId "Certificate invalidation requires a durable journal"
-
-            let certIdOpt = certificateToInvalidate relay record
-            let! transactionOpt = buildInvalidationTransaction reason certIdOpt
-            return! appendInvalidation relay record transactionOpt
-        }
-
-    let tryCaptureSnapshot (worktreePath: WorktreePath) : Result<WorkspaceSnapshotId, string> =
-        deps.CaptureWorktreeSnapshot worktreePath
-
-    let captureSnapshot (jobId: ManagerJobId) : Task<Result<WorkspaceSnapshotId, string>> =
-        requireJobRecord jobId
-        |> Result.bind (fun record -> tryCaptureSnapshot record.WorktreePath)
-        |> Task.FromResult
-
     let requireOpenRoad (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
         let roadOpt, _ = relay.RoadSnapshot record
 
@@ -263,20 +213,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         match road.ActiveIncumbency with
         | Some active -> Task.FromResult(Ok active)
         | None ->
-            taskResult {
-                let! snapshot = tryCaptureSnapshot record.WorktreePath |> Task.FromResult
-
-                let opening =
-                    IncumbencyOpening.next
-                        HostDigest.sha256Hex
-                        (roadIdOf record)
-                        retirement.Id
-                        road.AuthorityRevision
-                        snapshot
-
-                let! _ = relay.AppendRelay record opening.Transaction
-                return opening.IncumbencyId
-            }
+            Task.FromResult(Error "no legal incumbency opening")
 
     let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
@@ -287,14 +224,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! retirement = requireCommittedRetirement road
 
             let! incumbent =
-                match retirement.Outcome, road.Certificate with
-                | RetirementOutcome.Continue, _ -> activateNextIfAbsent relay record road retirement
-                | RetirementOutcome.Accepted certificateId, Some certificate when
-                    certificate.Id = certificateId && not certificate.Valid
-                    ->
-                    activateNextIfAbsent relay record road retirement
-                | RetirementOutcome.Accepted _, _ ->
-                    Task.FromResult(Error "Manager loop continuation requires an invalidated Accepted certificate")
+                match retirement.Outcome with
+                | RetirementOutcome.Relayed
+                | RetirementOutcome.Delivered -> activateNextIfAbsent relay record road retirement
 
             return incumbent
         }
@@ -332,9 +264,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         { CreateManagerSession = createManagerSession
           ActivateManager = activateManager
           AwaitLoopSignal = awaitLoopSignal
-          InvalidateCertificate = invalidateCertificate
           ContinueLoop = continueLoop
-          CaptureSnapshot = captureSnapshot
           PrepareCandidate = prepareCandidate
           TerminateRoadResources = terminateRoadResources }
 
@@ -500,8 +430,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             Error(sprintf "Relay incumbency %s is already retired" (IncumbencyId.value active))
         | Some _ when road.AcceptedAssessmentTransport.IsNone ->
             Error "Relay incumbency cannot take new charge before assessment is recorded"
-        | Some _ when road.Certificate |> Option.exists (fun cert -> cert.Valid) ->
-            Error "Relay incumbency cannot take new charge after perfect assessment yields valid certificate"
         | Some active -> Ok active
 
     let advanceAuthorityRevision
@@ -515,7 +443,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         : Task<Result<string, string>> =
         taskResult {
             let expectedRevision = road.AuthorityRevision
-            let! snapshot = captureSnapshot record.ManagerJobId
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
             let! physicalAuthorityMessage =
@@ -528,20 +455,49 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     gateKind
                     callerProviderRun
 
-            let! transaction =
-                RelayTransaction.create
-                    [ RelayEvent.AuthorityRevisionAdvanced(
-                          incumbent,
-                          expectedRevision,
-                          nextRevision,
-                          Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (
-                              Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value physicalAuthorityMessage
-                          ),
-                          snapshot
-                      ) ]
+            let directory = WorktreePath.value record.WorktreePath
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+            if String.IsNullOrWhiteSpace commonDir then
+                return! Error "lifecycle store is unavailable"
+            else
+                let store =
+                    match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir with
+                    | Some held -> held
+                    | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
 
-            let! _ = relay.AppendRelay record transaction
-            return WorktreePath.value record.WorktreePath
+                let workOpt =
+                    store.TryCurrent "Lifecycle"
+                    |> Option.bind (fun current ->
+                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                        Map.tryFind (SessionId.value record.ManagerSessionId) works)
+
+                match workOpt with
+                | None -> return! Error "lifecycle work is missing"
+                | Some work when String.IsNullOrEmpty work.Authority ->
+                    return! Error "expected advance is missing"
+                | Some work ->
+                    match
+                        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.advance
+                            work
+                            (AuthorityRevision.value expectedRevision)
+                            (AuthorityRevision.value nextRevision)
+                    with
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return! Error reason
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                        return WorktreePath.value record.WorktreePath
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                        match!
+                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit
+                                store
+                                (SessionId.value record.ManagerSessionId)
+                                events
+                        with
+                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable ->
+                            return WorktreePath.value record.WorktreePath
+                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted ->
+                            return! Error "advance was not committed"
+                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown ->
+                            return! Error "advance commit is unknown"
         }
 
     let continueManagerJobCore

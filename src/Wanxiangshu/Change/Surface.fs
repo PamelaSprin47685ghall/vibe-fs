@@ -89,12 +89,6 @@ module ChangeSurface =
     let private sessionId value = SessionId.create (stringOf value)
     let private commit value = CommitHash.create (stringOf value)
 
-    let private snapshotId value =
-        WorkspaceSnapshotId.create (stringOf value)
-
-    let private certificateId value =
-        QualityCertificateId.create (stringOf value)
-
     let private authorityRevision value =
         AuthorityRevision.create (stringOf value)
 
@@ -123,33 +117,21 @@ module ChangeSurface =
         let expectedHeadStr =
             tryField payload [ "expectedHead"; "ExpectedHead" ] |> Option.map stringOf
 
-        let snapshotStr =
-            tryField payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
-            |> Option.map stringOf
-
-        let certStr =
-            tryField payload [ "qualityCertificateId"; "QualityCertificateId" ]
-            |> Option.map stringOf
-
         let authorityStr =
             tryField payload [ "authorityRevision"; "AuthorityRevision" ]
             |> Option.map stringOf
 
-        match targetRefStr, rebasedCommitStr, expectedHeadStr, snapshotStr, certStr, authorityStr with
-        | Some tr, Some rc, Some eh, Some ws, Some qc, Some ar when
+        match targetRefStr, rebasedCommitStr, expectedHeadStr, authorityStr with
+        | Some tr, Some rc, Some eh, Some ar when
             not (String.IsNullOrWhiteSpace tr)
             && not (String.IsNullOrWhiteSpace rc)
             && not (String.IsNullOrWhiteSpace eh)
-            && not (String.IsNullOrWhiteSpace ws)
-            && not (String.IsNullOrWhiteSpace qc)
             && not (String.IsNullOrWhiteSpace ar)
             ->
             Ok
                 {| TargetRef = target tr
                    RebasedCommit = commit rc
                    ExpectedHead = commit eh
-                   WorkspaceSnapshotId = snapshotId ws
-                   QualityCertificateId = certificateId qc
                    AuthorityRevision = authorityRevision ar |}
         | _ -> Error "Incomplete PublishClaimed payload: missing required publication evidence"
 
@@ -170,17 +152,13 @@ module ChangeSurface =
         | "CandidateReady" ->
             OrchestratorProjection.recordCandidateReady
                 managerJobId
-                {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
-                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
-                   QualityCertificateId =
-                    certificateId (field payload [ "qualityCertificateId"; "QualityCertificateId" ]) |}
+                {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ]) |}
                 projection
         | "ConflictDetected" ->
             OrchestratorProjection.recordConflictDetected
                 managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
                    ConflictFiles = stringArray (field payload [ "conflictFiles"; "ConflictFiles" ]) |> Array.toList
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
                 projection
@@ -188,8 +166,7 @@ module ChangeSurface =
             OrchestratorProjection.recordRebasedCandidateReady
                 managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
-                   TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
+                   TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ]) |}
                 projection
         | "PublishClaimed" ->
             match decodePublishClaimed payload with
@@ -490,15 +467,10 @@ module ChangeSurface =
                 else
                     t
 
-            let ws =
-                let w = field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
-                if isNullish w then box "snap-synthetic" else w
-
             let normalizedPayload =
                 box
                     {| rebasedCommit = field payload [ "rebasedCommit"; "RebasedCommit" ]
-                       targetHeadSnapshot = targetHead
-                       workspaceSnapshotId = ws |}
+                       targetHeadSnapshot = targetHead |}
 
             Ok(
                 recordFactValue
@@ -1066,20 +1038,11 @@ module ChangeSurface =
           RequirementSetDigest = "requirements-" + tag
           EvidenceFrontierDigest = "evidence-" + tag }
 
-    let private scenarioCertificate tag snapshot =
-        { Id = QualityCertificateId.create ("certificate-" + tag)
-          AssessmentId = AssessmentId.create ("assessment-" + tag)
-          IncumbencyId = IncumbencyId.create ("incumbency-" + tag)
-          SnapshotId = WorkspaceSnapshotId.create snapshot
-          AuthorityRevision = AuthorityRevision.create ("authority-" + tag)
-          Binding = scenarioBinding tag
-          Valid = true
-          InvalidationReason = None }
-
     let private scenarioSignal index signal =
+        ignore index
+
         match signal with
-        | ProgramScenarioSignal.QualityCandidate snapshot ->
-            ManagerLoopSignal.Candidate(scenarioCertificate (string index) snapshot)
+        | ProgramScenarioSignal.QualityCandidate _ -> ManagerLoopSignal.Candidate
         | ProgramScenarioSignal.Retired -> ManagerLoopSignal.Continue
         | ProgramScenarioSignal.Exceptional reason -> ManagerLoopSignal.ExceptionalTerminal reason
 
@@ -1196,7 +1159,7 @@ module ChangeSurface =
 
                         let label =
                             match value with
-                            | ManagerLoopSignal.Candidate _ -> "Candidate"
+                            | ManagerLoopSignal.Candidate -> "Candidate"
                             | ManagerLoopSignal.Continue -> "Continue"
                             | ManagerLoopSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
 
@@ -1310,43 +1273,37 @@ module ChangeSurface =
                         OrchestratorProjection.recordRebasedCandidateReady
                             jobId
                             {| RebasedCommit = CommitHash.create scenario.InitialHead
-                               TargetHeadSnapshot = CommitHash.create targetSnapshot
-                               WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot-rebased-1" |}
+                               TargetHeadSnapshot = CommitHash.create targetSnapshot |}
                             current
 
                 let withCandidate current =
                     match scenario.SeededCandidateReady with
                     | None -> current
-                    | Some(candidate, snapshot, cert) ->
+                    | Some(candidate, _snapshot, _cert) ->
                         OrchestratorProjection.recordCandidateReady
                             jobId
-                            {| CandidateCommit = CommitHash.create candidate
-                               WorkspaceSnapshotId = WorkspaceSnapshotId.create snapshot
-                               QualityCertificateId = QualityCertificateId.create cert |}
+                            {| CandidateCommit = CommitHash.create candidate |}
                             current
 
                 let withRebased current =
                     match scenario.SeededRebasedReady with
                     | None -> current
-                    | Some(rebased, targetSnap, workspaceSnap) ->
+                    | Some(rebased, targetSnap, _workspaceSnap) ->
                         OrchestratorProjection.recordRebasedCandidateReady
                             jobId
                             {| RebasedCommit = CommitHash.create rebased
-                               TargetHeadSnapshot = CommitHash.create targetSnap
-                               WorkspaceSnapshotId = WorkspaceSnapshotId.create workspaceSnap |}
+                               TargetHeadSnapshot = CommitHash.create targetSnap |}
                             current
 
                 let withClaim current =
                     match scenario.SeededPublishClaimed with
                     | None -> current
-                    | Some(targetRef, rebased, expected, workspaceSnap, cert, authority) ->
+                    | Some(targetRef, rebased, expected, _workspaceSnap, _cert, authority) ->
                         OrchestratorProjection.recordPublishClaimed
                             jobId
                             {| TargetRef = TargetRef.create targetRef
                                RebasedCommit = CommitHash.create rebased
                                ExpectedHead = CommitHash.create expected
-                               WorkspaceSnapshotId = WorkspaceSnapshotId.create workspaceSnap
-                               QualityCertificateId = QualityCertificateId.create cert
                                AuthorityRevision = AuthorityRevision.create authority |}
                             current
 
@@ -1413,11 +1370,6 @@ module ChangeSurface =
                             throwProductionCancellation operationCanceledCtor "manager task cancelled"
 
                         Task.FromResult(nextSignal ())
-                  InvalidateCertificate =
-                    fun _ reason ->
-                        invalidations.Add reason
-                        timeline.Add("invalidate:" + reason)
-                        Task.FromResult(Ok())
                   ContinueLoop =
                     fun _ ->
                         continuationCount.Value <- continuationCount.Value + 1
@@ -1431,12 +1383,6 @@ module ChangeSurface =
                             Task.FromResult(Ok nextId)
                         else
                             Task.FromResult(Ok burstIncumbency)
-                  CaptureSnapshot =
-                    fun _ ->
-                        if snapshots.Count = 0 then
-                            Task.FromResult(Error "scenario snapshot queue exhausted")
-                        else
-                            Task.FromResult(Ok(WorkspaceSnapshotId.create (snapshots.Dequeue())))
                   PrepareCandidate =
                     fun _ ->
                         if conflictReads.Count > 0 then

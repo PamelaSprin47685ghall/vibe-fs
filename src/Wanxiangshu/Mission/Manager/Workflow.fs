@@ -28,14 +28,6 @@ module ManagerWorkflow =
     [<Literal>]
     let private finishPath = "runtime/manager-finish"
 
-    let private gitCapability: WorkspaceSnapshotGitCapability =
-        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
-          DiffHeadBinary = GitSubject.diffHeadBinary
-          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
-          HashObjectNoFilters = GitSubject.hashObjectNoFilters
-          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
-          LsFilesStageZ = GitSubject.lsFilesStageZ }
-
     let private roadId (sessionId: SessionId) =
         RoadId.create (SessionId.value sessionId)
 
@@ -73,25 +65,51 @@ module ManagerWorkflow =
         |> Option.bind (fun durable -> currentView durable sessionId)
         |> Option.exists (fun road -> Set.contains (ProviderRunIdentity.value providerRun) road.RetiredProviderRunIds)
 
-    let private resourceForCurrentAction (road: RoadView) =
-        // Structured-workflow: auto assess/work/finish sequence is derived purely
-        // from concrete immutable facts (active incumbency, assessment receipt, exact certificate binding),
-        // never from an execution-position program counter or ActivePhase enum.
-        let isBoundCertificate (active: IncumbencyId) (cert: QualityCertificate) =
-            // The final incumbent's valid certificate selects the finish surface.
-            // Snapshot and authority revision are no longer part of this decision:
-            // the certificate is historical evidence, not a runtime binding.
-            cert.Valid && cert.IncumbencyId = active
+    let private lifecycleWork (directory: string option) (sessionId: string) =
+        match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
+        | None -> None
+        | Some dir when System.String.IsNullOrWhiteSpace dir -> None
+        | Some dir ->
+            match WorkspaceEventStore.tryCurrent dir with
+            | None -> None
+            | Some held ->
+                match held.TryCurrent "Lifecycle" with
+                | None -> None
+                | Some current ->
+                    let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                    Map.tryFind sessionId works
 
-        match road.ActiveIncumbency, road.AcceptedAssessmentTransport, road.Certificate with
-        | Some _, None, _ -> Some assessPath
-        | Some active, Some _, Some cert when isBoundCertificate active cert -> Some finishPath
-        | Some _, Some _, _ -> Some workPath
-        | None, _, _ -> None
+    // Algorithm H reads the opening sequence plus tenure, review outcome, and confirmation.
+    // S1–S3 do not enter the S4 resource match. Certificates are not an input.
+    let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) (road: RoadView) =
+        match lifecycleWork directory (SessionId.value sessionId) with
+        | None -> None
+        | Some work when work.Sequence <> Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution -> None
+        | Some work ->
+            match road.ActiveIncumbency, work.Active with
+            | None, _
+            | Some _, None -> None
+            | Some _, Some active when work.CurrentRelayed && active.Review.IsNone -> None
+            | Some _, Some active when active.Review.IsNone && active.Confirmed.IsSome -> None
+            | Some _, Some active when active.Review.IsNone -> Some assessPath
+            | Some _, Some active when active.Confirmed.IsNone ->
+                match active.Review with
+                | Some review when review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed ->
+                    Some workPath
+                | Some review when review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted ->
+                    Some finishPath
+                | _ -> None
+            | Some _, Some active ->
+                match active.Review with
+                | Some review when
+                    review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
+                    || review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed ->
+                    Some finishPath
+                | _ -> None
 
 
-    let private activeResourcePath (view: RoadView option) =
-        view |> Option.bind resourceForCurrentAction
+    let private activeResourcePath (directory: string option) (sessionId: SessionId) (view: RoadView option) =
+        view |> Option.bind (resourceForCurrentAction directory sessionId)
 
     let private sendNudge
         (quiescence: ISessionQuiescenceGate)
@@ -105,6 +123,32 @@ module ManagerWorkflow =
         let substitutions =
             if resourcePath = assessPath then
                 Map [ "ordinal", iterationOrdinalText (Some journal) turn.SessionId ]
+            elif resourcePath = finishPath then
+                let confirmed =
+                    match lifecycleWork turn.Directory (SessionId.value turn.SessionId) with
+                    | Some work ->
+                        match work.Active with
+                        | Some active -> active.Confirmed.IsSome
+                        | None -> false
+                    | None -> false
+
+                let preferEnglish =
+                    match ProviderLanguageBinding.readGlobalPreference () with
+                    | ProviderLanguage.English -> true
+                    | _ -> false
+
+                let closeout =
+                    if preferEnglish then
+                        if confirmed then
+                            "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
+                        else
+                            "This call only records confirmation. It does not end."
+                    elif confirmed then
+                        "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
+                    else
+                        "这一次调用只落下确认，不结束。"
+
+                Map [ "closeout", closeout ]
             else
                 Map.empty
 
@@ -133,7 +177,7 @@ module ManagerWorkflow =
         task {
             let view = currentView journal turn.SessionId
 
-            match activeResourcePath view with
+            match activeResourcePath turn.Directory turn.SessionId view with
             | Some resourcePath ->
                 // Durable PromptAuthority gate is the sole dedupe/source of truth:
                 // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
@@ -142,35 +186,6 @@ module ManagerWorkflow =
             | None -> return ()
         }
         :> Task
-
-    let private captureSnapshot (dirOpt: string option) =
-        match dirOpt |> Option.filter (System.String.IsNullOrWhiteSpace >> not) with
-        | Some dir -> WorkspaceSnapshot.capture gitCapability dir
-        | None -> invalidOp "MANAGER-LOOP-001: workspace directory unavailable for snapshot capture"
-
-    let private commitOpeningTransaction
-        (durable: AgentJournal)
-        sessionId
-        providerRunIdOpt
-        roadId
-        (transaction: RelayTransaction)
-        =
-        task {
-            let fact =
-                AgentFact.Relay(
-                    RelayFactCases.TransactionCommitted
-                        {| RoadId = roadId
-                           Transaction = transaction |}
-                )
-
-            match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable with
-            | Ok _ -> return ()
-            | Error failure ->
-                return
-                    invalidOp (
-                        sprintf "MANAGER-LOOP-002: opening commit failed: %s" (JournalAppendFailure.describe failure)
-                    )
-        }
 
     let private mergeWithInvalidation (opening: IncumbencyOpening) invalidationEvents =
         if List.isEmpty invalidationEvents then
@@ -181,13 +196,13 @@ module ManagerWorkflow =
 
     let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
         match retirement.Outcome with
-        | RetirementOutcome.Continue -> true
-        | RetirementOutcome.Accepted _ -> false
+        | RetirementOutcome.Relayed -> true
+        | RetirementOutcome.Delivered -> false
 
-    let private isAcceptedWithValidCertificate (road: RoadView) (retirement: RetirementSummary) =
-        match retirement.Outcome, road.Certificate with
-        | RetirementOutcome.Accepted certId, Some cert -> cert.Id = certId && cert.Valid
-        | _ -> false
+    let private isDeliveredRetirement (retirement: RetirementSummary) =
+        match retirement.Outcome with
+        | RetirementOutcome.Delivered -> true
+        | RetirementOutcome.Relayed -> false
 
     let private tryAcceptedRoadContext (durable: AgentJournal) sidText =
         let sessionId = SessionId.create sidText
@@ -202,7 +217,7 @@ module ManagerWorkflow =
         match roadOpt with
         | Some road ->
             road.LatestRetirement
-            |> Option.filter (isAcceptedWithValidCertificate road)
+            |> Option.filter isDeliveredRetirement
             |> Option.map (fun retirement ->
                 durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
         | _ -> None
@@ -239,29 +254,13 @@ module ManagerWorkflow =
         authorityRevision
         (retirement: RetirementSummary)
         =
-        match retirement.Outcome with
-        | RetirementOutcome.Accepted _ ->
-            let snapshot = captureSnapshot workspaceDirectory
-
-            let roadOpt =
-                AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
-                |> Option.bind (fun s -> s.Relay)
-                |> Option.bind (fun r -> Fold.view r roadId)
-
-            let invalidationEvents =
-                roadOpt
-                |> Option.bind (fun r -> r.Certificate)
-                |> Option.filter (fun c -> c.Valid)
-                |> Option.map (fun c ->
-                    [ RelayEvent.QualityCertificateInvalidated(c.Id, "ContinuousSessionAdvancesRoad") ])
-                |> Option.defaultValue []
-
-            let opening =
-                IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
-
-            let fullTransaction = mergeWithInvalidation opening invalidationEvents
-            Some(durable, sessionId, opening.RoadId, fullTransaction)
-        | RetirementOutcome.Continue -> None
+        ignore durable
+        ignore workspaceDirectory
+        ignore sessionId
+        ignore roadId
+        ignore authorityRevision
+        ignore retirement
+        None
 
     let private decideLoopOpening journal (workspaceDirectory: string option) sessionIdTextOpt =
         sessionIdTextOpt
@@ -286,20 +285,13 @@ module ManagerWorkflow =
         let profileOpt =
             PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
 
-        match roadView, profileOpt with
-        | None, Some profile when profile.CanonicalRole = Role.Manager ->
-            let rootUserMsg =
-                AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
-
-            let opening =
-                IncumbencyOpening.initial
-                    HostDigest.sha256Hex
-                    (RoadId.create (SessionId.value sessionId))
-                    (PhysicalUserMessageId.create rootUserMsg)
-                    (captureSnapshot workspaceDirectory)
-
-            Some(durable, sessionId, opening.RoadId, opening.Transaction)
-        | _ -> None
+        ignore durable
+        ignore workspaceDirectory
+        ignore sessionId
+        ignore sessionIdText
+        ignore roadView
+        ignore profileOpt
+        None
 
     let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
         match decideLoopOpening journal workspaceDirectory sessionIdTextOpt with
@@ -316,14 +308,35 @@ module ManagerWorkflow =
     let ensureManagerRoadOpened
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
+        (store: Wanxiangshu.Persistence.EventStore.IEventStore option)
+        (observedHead: int64 option)
         (sessionIdTextOpt: string option)
         (providerRunIdOpt: ProviderRunIdentity option)
         : Task<unit> =
         task {
-            match decideOpeningAction journal workspaceDirectory sessionIdTextOpt with
-            | None -> return ()
-            | Some(durable, sessionId, roadId, transaction) ->
-                do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId transaction
+            ignore journal
+            ignore providerRunIdOpt
+            match store, sessionIdTextOpt, workspaceDirectory with
+            | None, _, _
+            | _, None, _
+            | _, _, None -> return ()
+            | Some held, Some sessionId, Some root ->
+                let firstLine = None
+                match
+                    Wanxiangshu.Mission.Lifecycle.LifecycleKernel.openWork
+                        HostDigest.sha256Hex
+                        Wanxiangshu.Mission.Lifecycle.OpeningKind.ManagerDirect
+                        firstLine
+                        sessionId
+                        root
+                        false
+                        observedHead
+                with
+                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                    let! _ = Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held sessionId events
+                    return ()
+                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse _
+                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ -> return ()
         }
 
     let private deliverLoopPrompt
@@ -335,6 +348,10 @@ module ManagerWorkflow =
         (retirement: RetirementSummary)
         =
         task {
+            match lifecycleWork workspaceDirectory (SessionId.value sessionId) with
+            | Some work when work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution -> ()
+            | _ -> return ()
+
             let loopPromptText =
                 ProviderProse.documentFor
                     sessionId
@@ -378,30 +395,9 @@ module ManagerWorkflow =
             let durable, sessionId, roadId, authorityRevision, retirement, needsOpening =
                 context
 
-            match needsOpening with
-            | true ->
-                let snapshot = captureSnapshot workspaceDirectory
-
-                let roadOpt =
-                    AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
-                    |> Option.bind (fun s -> s.Relay)
-                    |> Option.bind (fun r -> Fold.view r roadId)
-
-                let invalidationEvents =
-                    roadOpt
-                    |> Option.bind (fun r -> r.Certificate)
-                    |> Option.filter (fun c -> c.Valid)
-                    |> Option.map (fun c ->
-                        [ RelayEvent.QualityCertificateInvalidated(c.Id, "ContinuousSessionAdvancesRoad") ])
-                    |> Option.defaultValue []
-
-                let opening =
-                    IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
-
-                let fullTransaction = mergeWithInvalidation opening invalidationEvents
-
-                do! commitOpeningTransaction durable sessionId None opening.RoadId fullTransaction
-            | false -> ()
+            ignore needsOpening
+            ignore roadId
+            ignore authorityRevision
 
             do! deliverLoopPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId retirement
         }

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Relay.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
@@ -16,5 +17,6 @@ module RelayNarrativeTransform =
         acceptedRequest: bool ->
         interruptAttempt: (SessionId -> Task<unit>) ->
         sessionId: string option ->
+        lifecycle: LifecycleWork option ->
         outObj: obj ->
             Task<RelayProjectionDisposition>

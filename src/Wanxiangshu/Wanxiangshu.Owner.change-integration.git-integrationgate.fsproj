@@ -59,6 +59,7 @@
     <Compile Include="Change/Host/SessionDirectories.fs"/>
     <Compile Include="Change/Recovery.fsi"/>
     <Compile Include="Change/Recovery.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <Compile Include="Change/Host/Host.fsi"/>
     <Compile Include="Change/Host/Host.fs"/>
     <Compile Include="Change/Host/Surface.fsi"/>

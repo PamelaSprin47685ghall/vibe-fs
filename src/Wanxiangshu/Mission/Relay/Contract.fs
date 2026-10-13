@@ -4,10 +4,8 @@ open FsToolkit.ErrorHandling
 
 type RoadId = private RoadId of string
 type IncumbencyId = private IncumbencyId of string
-type WorkspaceSnapshotId = private WorkspaceSnapshotId of string
 type AuthorityRevision = private AuthorityRevision of string
 type AssessmentId = private AssessmentId of string
-type QualityCertificateId = private QualityCertificateId of string
 type RetirementId = private RetirementId of string
 type PhysicalUserMessageId = private PhysicalUserMessageId of string
 
@@ -23,10 +21,6 @@ module IncumbencyId =
     let create value = IncumbencyId value
     let value (IncumbencyId value) = value
 
-module WorkspaceSnapshotId =
-    let create value = WorkspaceSnapshotId value
-    let value (WorkspaceSnapshotId value) = value
-
 module AuthorityRevision =
     let create value = AuthorityRevision value
     let value (AuthorityRevision value) = value
@@ -34,10 +28,6 @@ module AuthorityRevision =
 module AssessmentId =
     let create value = AssessmentId value
     let value (AssessmentId value) = value
-
-module QualityCertificateId =
-    let create value = QualityCertificateId value
-    let value (QualityCertificateId value) = value
 
 module RetirementId =
     let create value = RetirementId value
@@ -88,20 +78,10 @@ type IncumbencyPhase =
     | PerfectAwaitingRetirement
     | RetirementCleanupBlocked
 
-type QualityCertificate =
-    { Id: QualityCertificateId
-      AssessmentId: AssessmentId
-      IncumbencyId: IncumbencyId
-      SnapshotId: WorkspaceSnapshotId
-      AuthorityRevision: AuthorityRevision
-      Binding: AssessmentBinding
-      Valid: bool
-      InvalidationReason: string option }
-
 [<RequireQualifiedAccess>]
 type RetirementOutcome =
-    | Continue
-    | Accepted of QualityCertificateId
+    | Relayed
+    | Delivered
 
 type ProjectionCut =
     { ProviderRunId: string
@@ -110,7 +90,6 @@ type ProjectionCut =
 type RetirementSummary =
     { Id: RetirementId
       IncumbencyId: IncumbencyId
-      SnapshotId: WorkspaceSnapshotId
       AuthorityRevision: AuthorityRevision
       ProjectionCut: ProjectionCut
       Outcome: RetirementOutcome }

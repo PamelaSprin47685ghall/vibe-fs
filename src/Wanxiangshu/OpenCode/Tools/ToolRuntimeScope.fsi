@@ -43,7 +43,6 @@ type ToolRuntimeScope =
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         ?workRecordCapability: DelegationWorkRecordCapability *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
 

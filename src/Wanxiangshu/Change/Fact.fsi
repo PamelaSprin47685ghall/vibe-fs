@@ -20,9 +20,7 @@ module OrchestratorFact =
     val inline CandidateReady:
         payload:
             {| ManagerJobId: ManagerJobId
-               CandidateCommit: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId |} ->
+               CandidateCommit: CommitHash |} ->
             AgentFact
 
     val inline ConflictDetected:
@@ -30,7 +28,6 @@ module OrchestratorFact =
             {| ManagerJobId: ManagerJobId
                CandidateCommit: CommitHash
                TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
                ConflictFiles: string list
                DiagnosticsDigest: string |} ->
             AgentFact
@@ -39,8 +36,7 @@ module OrchestratorFact =
         payload:
             {| ManagerJobId: ManagerJobId
                RebasedCommit: CommitHash
-               TargetHeadSnapshot: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId |} ->
+               TargetHeadSnapshot: CommitHash |} ->
             AgentFact
 
     val inline PublishClaimed:
@@ -49,8 +45,6 @@ module OrchestratorFact =
                TargetRef: TargetRef
                RebasedCommit: CommitHash
                ExpectedHead: CommitHash
-               WorkspaceSnapshotId: WorkspaceSnapshotId
-               QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |} ->
             AgentFact
 

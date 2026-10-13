@@ -2,25 +2,14 @@ namespace Wanxiangshu.Mission.Relay
 
 [<RequireQualifiedAccess>]
 type RelayEvent =
-    | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
     | RoadDevOpsBound of RoadId * devopsId: string * modelTarget: string option
-    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId
-    | AssessmentCommitted of
-        AssessmentId *
-        IncumbencyId *
-        AssessmentBinding *
-        WorkspaceSnapshotId *
-        AuthorityRevision *
-        AssessmentFindings
+    | IncumbencyOpened of IncumbencyId
     | AuthorityRevisionAdvanced of
         IncumbencyId *
         expected: AuthorityRevision *
         next: AuthorityRevision *
-        PhysicalUserMessageId *
-        WorkspaceSnapshotId
-    | QualityCertificateInvalidated of QualityCertificateId * reason: string
+        PhysicalUserMessageId
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
-    | RetirementConfirmationCommitted of IncumbencyId * providerRunId: string * toolCallId: string
     | RetirementCommitted of RetirementSummary
 
 type RelayTransaction
@@ -36,19 +25,13 @@ type IncumbencyOpening =
       Transaction: RelayTransaction }
 
 module IncumbencyOpening =
-    val initial:
-        sha256: (string -> string) ->
-        roadId: RoadId ->
-        physicalUserMessageId: PhysicalUserMessageId ->
-        snapshotId: WorkspaceSnapshotId ->
-            IncumbencyOpening
+    val initial: unit -> Result<unit, string>
 
     val next:
         sha256: (string -> string) ->
         roadId: RoadId ->
         retirementId: RetirementId ->
         authorityRevision: AuthorityRevision ->
-        snapshotId: WorkspaceSnapshotId ->
             IncumbencyOpening
 
 [<RequireQualifiedAccess>]

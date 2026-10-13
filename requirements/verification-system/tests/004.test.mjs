@@ -259,4 +259,55 @@ test('WHAT[verification-system-004] boundary guard distinguishes environment key
     rmSync(fixture, { recursive: true, force: true })
   }
 })
+
+test('WHAT[verification-system-004] clean-break symbol gate fails on the known-bad fixture and accepts a legal structure', async () => {
+  const { check: scanCleanBreak } = await import('../../../scripts/checks/clean-break-symbols.mjs')
+  const { checks } = await import('../../../scripts/check.mjs')
+  const bad = scanCleanBreak({ root: join(import.meta.dirname, 'fixtures/clean-break-symbols/bad') })
+  assert.equal(bad.ok, false)
+  for (const code of [
+    'QualityCertificate',
+    'WorkspaceSnapshot',
+    'WorkspaceSnapshotId',
+    'suicide',
+    'RoadOpened',
+    'AssessmentCommitted',
+    'RetirementConfirmationCommitted',
+  ]) {
+    assert.ok(bad.issues.some((issue) => issue.code === code), code)
+  }
+  const legal = scanCleanBreak({ root: join(import.meta.dirname, 'fixtures/clean-break-symbols/legal') })
+  assert.equal(legal.ok, true, JSON.stringify(legal.issues))
+  assert.deepEqual(legal.issues, [])
+  assert.ok(checks.some((script) => script.replace(/\\/g, '/').endsWith('checks/clean-break-symbols.mjs')))
+})
+
+test('WHAT[verification-system-009] clean-break symbol gate is red on an empty directory, a read failure, and a scan that did not run', async () => {
+  const { assess, check: scanCleanBreak, registrationGap } = await import('../../../scripts/checks/clean-break-symbols.mjs')
+  const { checks } = await import('../../../scripts/check.mjs')
+  const empty = mkdtempSync(join(tmpdir(), 'clean-break-empty-'))
+  try {
+    mkdirSync(join(empty, 'src'))
+    const emptyResult = scanCleanBreak({ root: empty })
+    assert.equal(emptyResult.ok, false)
+    assert.ok(emptyResult.issues.some((issue) => issue.code === 'scan-empty'))
+  } finally {
+    rmSync(empty, { recursive: true, force: true })
+  }
+
+  const unreadable = scanCleanBreak({
+    root: join(import.meta.dirname, 'fixtures/clean-break-symbols/legal'),
+    readText() {
+      throw new Error('clean-break fixture read denied')
+    },
+  })
+  assert.equal(unreadable.ok, false)
+  assert.ok(unreadable.issues.some((issue) => issue.code === 'read-failed'))
+
+  const notRun = assess({ ran: false })
+  assert.equal(notRun.ok, false)
+  assert.equal(notRun.issues[0].code, 'scan-not-run')
+  assert.equal(registrationGap([]).code, 'scan-not-run')
+  assert.equal(registrationGap(checks), null)
+})
 }

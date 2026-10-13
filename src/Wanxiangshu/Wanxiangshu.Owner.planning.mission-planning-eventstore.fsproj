@@ -17,6 +17,16 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj"/>
+    <Compile Include="Mission/Lifecycle/Facts.fsi"/>
+    <Compile Include="Mission/Lifecycle/Facts.fs"/>
+    <Compile Include="Mission/Lifecycle/Fold.fsi"/>
+    <Compile Include="Mission/Lifecycle/Fold.fs"/>
+    <Compile Include="Mission/Lifecycle/Codec.fsi"/>
+    <Compile Include="Mission/Lifecycle/Codec.fs"/>
+    <Compile Include="Mission/Lifecycle/Kernel.fsi"/>
+    <Compile Include="Mission/Lifecycle/Kernel.fs"/>
+    <Compile Include="Mission/Lifecycle/Surface.fsi"/>
+    <Compile Include="Mission/Lifecycle/Surface.fs"/>
     <Compile Include="Mission/Planning/EventCodec.fsi"/>
     <Compile Include="Mission/Planning/EventCodec.fs"/>
     <Compile Include="Mission/Planning/IntegrationRules.fsi"/>

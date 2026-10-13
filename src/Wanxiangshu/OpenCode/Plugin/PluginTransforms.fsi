@@ -12,7 +12,8 @@ module PluginTransforms =
 
     type TraceTransformCapture =
         { RawMessages: obj list
-          Current: XTraceProjectionState option }
+          Current: XTraceProjectionState option
+          Receipt: XTraceCaptureReceipt option }
 
     type NormalTransformCapabilities =
         {

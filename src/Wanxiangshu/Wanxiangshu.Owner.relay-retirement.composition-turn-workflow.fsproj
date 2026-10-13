@@ -27,7 +27,8 @@
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-<Compile Include="Mission/Manager/Workflow.fsi"/>
+    <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
+    <Compile Include="Mission/Manager/Workflow.fsi"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Composition/Turn/Workflow.fsi"/>
     <Compile Include="Composition/Turn/Workflow.fs"/>

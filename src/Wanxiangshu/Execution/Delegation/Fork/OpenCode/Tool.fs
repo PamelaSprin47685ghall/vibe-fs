@@ -674,10 +674,9 @@ module ForkTool =
 
             executeManagerExistingPerson scope runtime context request language handles existingByname
 
-    let private resumeDevOpsAssessmentPending (scope: ToolRuntimeScope) parentSessionId isDevOps =
+    let private boundDevOpsDispatchClosed (scope: ToolRuntimeScope) parentSessionId isDevOps =
         if isDevOps then
-            let roadSessionId = SessionId.value parentSessionId
-            let facts = scope.ManagerCapabilityFactsFor roadSessionId
+            let facts = scope.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
             not facts.HasAssessment
         else
             false
@@ -704,7 +703,7 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if resumeDevOpsAssessmentPending scope parentSessionId isDevOps then
+            if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
                 return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
             else
                 do! bindRoadDevOpsIfNeeded scope parentSessionId isDevOps
@@ -738,7 +737,19 @@ module ForkTool =
             elif isSelfAttachment request then
                 return consequence (prose language Path.Fork.AttachSelf)
             else
-                return! executeManagerAfterGuards scope request context language
+                let parentSessionId =
+                    if String.IsNullOrWhiteSpace context.SessionId then
+                        SessionId.create ""
+                    else
+                        scope.LogicalOwnerFor(SessionId.create context.SessionId)
+
+                let isDevOps =
+                    String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
+                if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
+                    return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
+                else
+                    return! executeManagerAfterGuards scope request context language
         }
 
     let private orchestratorExistingByname (scope: ToolRuntimeScope) (request: Request) =

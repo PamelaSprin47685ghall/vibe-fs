@@ -635,8 +635,8 @@ const createRawManagerTools = () => [
     },
   },
   {
-    name: 'suicide',
-    description: 'Retire current manager run cleanly once obligations are fulfilled.',
+    name: 'deliver',
+    description: 'Deliver the current manager run once obligations are fulfilled.',
     parameters: {
       type: 'object',
       properties: {},

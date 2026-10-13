@@ -10,6 +10,8 @@ module ToolRegistrySurface =
     /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
     /// internal leaf admitted by owner-held evidence and never holds an office.
+    val deliverDescription: unit -> string
+
     val admissionAuthority: toolName: string -> string
 
     /// capability-enforcement-006: the internal-leaf decision for a session holding no public
@@ -27,3 +29,6 @@ module ToolRegistrySurface =
             System.Threading.Tasks.Task<string>
 
     val jsPlanDescription: language: string -> string
+
+    /// The existing tool-name lookup. Role decides a shared verb; catalog order does not.
+    val permissionOfToolName: role: Wanxiangshu.Foundation.Role -> name: string -> Wanxiangshu.Foundation.ToolPermission option

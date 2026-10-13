@@ -107,9 +107,9 @@ test('WHAT[capability-enforcement-009] TOOLSPEC_review_and_finality_tools_have_o
   assert.equal(rolePredicate('review', 'manager'), true)
   assert.equal(rolePredicate('review', 'engineer'), false)
 
-  // suicide: Manager only
-  assert.equal(rolePredicate('suicide', 'manager'), true)
-  assert.equal(rolePredicate('suicide', 'engineer'), false)
+  // deliver: Manager only
+  assert.equal(rolePredicate('deliver', 'manager'), true)
+  assert.equal(rolePredicate('deliver', 'engineer'), false)
 })
 test('WHAT[capability-enforcement-009] TOOLSPEC_unknown_tools_and_host_natives_fail_closed', () => {
   assert.equal(rolePredicate('nonexistent-tool', 'engineer'), false)

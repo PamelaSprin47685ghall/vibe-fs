@@ -20,6 +20,16 @@ type TenureAssemblyResult =
       ReanchorRequested: bool }
 
 module TenureIsolation =
+    val isCurrentTenurePhysical: openingCursor: int64 -> cursor: int64 option -> bool
+
+    val insertBeforeCurrentTenure:
+        openingCursor: int64 ->
+        messageCursors: Map<string, int64> ->
+        record: obj ->
+        messages: obj list ->
+        messageId: (obj -> string option) ->
+            obj list
+
     val assemble:
         messages: TenureMessage list ->
         tenure: ActiveTenureInfo ->

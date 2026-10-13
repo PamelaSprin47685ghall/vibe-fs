@@ -5,4 +5,4 @@
 /src/Wanxiangshu/Mission/Relay/Fold.*
 /src/Wanxiangshu/Mission/Manager/Workflow.*
 /src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.*
-/resources/provider/tool/suicide/**
+/resources/provider/tool/deliver/**

@@ -106,18 +106,33 @@ module PlanWorkOpen =
     // The three opening events in order; the first failure stops the entry.
     // Identical replays are fold-idempotent, so a retry after a partial
     // failure appends the remaining events safely (planning-020).
-    let private appendOpeningSequence
+    let private commitOpening
         (store: IEventStore)
-        (pid: PlanWorkId)
         (sessionId: string)
         (root: string)
-        (incumbencyId: string)
-        (devopsId: string)
+        (observedHead: int64 option)
         : Task<Result<unit, string>> =
         task {
-            match! appendWorkOpened store pid sessionId root with
-            | Error err -> return Error err
-            | Ok _ -> return! appendBindingAndFirstTenure store pid sessionId devopsId incumbencyId
+            match
+                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.openWork
+                    HostDigest.sha256Hex
+                    Wanxiangshu.Mission.Lifecycle.OpeningKind.UserPlan
+                    None
+                    sessionId
+                    root
+                    false
+                    observedHead
+            with
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ -> return Ok()
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store sessionId events with
+                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) -> return Ok()
+                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
+                    return Error "plan work was not opened"
+                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
+                    return Error "plan work commit is unknown"
+                | Error reason -> return Error reason
         }
 
     // planning-020 entry body: an already-opened work appends nothing; a
@@ -129,10 +144,7 @@ module PlanWorkOpen =
             match workAlreadyOpened store pid with
             | Error readError -> return Error readError
             | Ok true -> return Ok()
-            | Ok false ->
-                let incumbencyId = deriveIncumbencyId sessionId
-                let devopsId = deriveDevOpsId sessionId
-                return! appendOpeningSequence store pid sessionId root incumbencyId devopsId
+            | Ok false -> return! commitOpening store sessionId root None
         }
 
     let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) : Task<Result<unit, string>> =

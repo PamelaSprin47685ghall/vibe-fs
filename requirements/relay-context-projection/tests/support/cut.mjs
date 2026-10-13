@@ -3,9 +3,9 @@ import * as projection from '../../../../dist/Mission/Relay/ProjectionSurface.js
 import {withReview, scores} from '../../../relay-assessment/tests/support/plugin.mjs'
 
 export const textMessage = (id, role, text) => ({info: {id, role}, parts: [{type: 'text', text}]})
-export const toolMessage = (id = 'retirement-run', call = 'suicide-call') => ({
+export const toolMessage = (id = 'retirement-run', call = 'deliver-call') => ({
   info: {id, role: 'assistant'},
-  parts: [{type: 'tool', tool: 'suicide', callID: call, state: {status: 'completed', input: {}, output: 'finished = true'}}],
+  parts: [{type: 'tool', tool: 'deliver', callID: call, state: {status: 'completed', input: {}, output: 'finished = true'}}],
 })
 export const messageId = message => message.id ?? message.info?.id
 
@@ -17,11 +17,11 @@ export const withSuccessor = async body => withReview(async context => {
   retirement.info.parentID = 'user-root'
   retirement.info.time = {created: 3}
   runtime.pushHostMessage(session, retirement)
-  assert.match(await hooks.tool.suicide.execute({}, {
-    sessionID: session, callID: 'suicide-confirm', messageID: 'retirement-confirm', agent: 'manager',
+  assert.match(await hooks.tool.deliver.execute({}, {
+    sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', agent: 'manager',
   }), /confirmation_required = true/)
-  assert.match(await hooks.tool.suicide.execute({}, {
-    sessionID: session, callID: 'suicide-call', messageID: 'retirement-run', agent: 'manager',
+  assert.match(await hooks.tool.deliver.execute({}, {
+    sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', agent: 'manager',
   }), /finished = true/)
   assert.deepEqual(runtime.abortedIds, [])
   const history = structuredClone(runtime.messages)

@@ -157,36 +157,25 @@ const createEvent = (jobId, managerSessionId, worktreeIdentity = `wt_${jobId.sli
     worktreeIdentity,
     worktreePath: `/tmp/${worktreeIdentity}`,
     targetRef: 'refs/heads/main',
-    targetBranchFrozen: 'refs/heads/main',
-  },
-})
+    targetBranchFrozen: 'refs/heads/main'}})
 const candidateEvent = (
   jobId,
-  candidateCommit = 'c1',
-  workspaceSnapshotId = 'snapshot-1',
-  qualityCertificateId = 'certificate-1',
-) => ({
+  candidateCommit = 'c1') => ({
   kind: 'CandidateReady',
-  payload: { jobId, candidateCommit, workspaceSnapshotId, qualityCertificateId },
-})
+  payload: { jobId, candidateCommit }})
 const conflictEvent = (jobId, { candidateCommit = 'c1', targetHeadSnapshot = 'h1', conflictFiles = ['publish_proof.txt'] } = {}) => ({
   kind: 'ConflictDetected',
   payload: {
     jobId,
     candidateCommit,
     targetHeadSnapshot,
-    workspaceSnapshotId: 'snapshot-conflict',
     conflictFiles,
-    diagnosticsDigest: 'conflict-digest',
-  },
-})
+    diagnosticsDigest: 'conflict-digest'}})
 const rebasedEvent = (
   jobId,
-  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased' } = {},
-) => ({
+  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1' } = {}) => ({
   kind: 'RebasedCandidateReady',
-  payload: { jobId, rebasedCommit, targetHeadSnapshot, workspaceSnapshotId },
-})
+  payload: { jobId, rebasedCommit, targetHeadSnapshot }})
 const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
   kind: 'PublishClaimed',
   payload: {
@@ -194,15 +183,10 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
     expectedHead,
-    workspaceSnapshotId: 'snapshot-rebased',
-    qualityCertificateId: 'certificate-1',
-    authorityRevision: 'authority-1',
-  },
-})
+    authorityRevision: 'authority-1'}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
-  payload: { jobId, candidateCommit, resultingTargetHead },
-})
+  payload: { jobId, candidateCommit, resultingTargetHead }})
 const foldEvents = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -262,8 +246,7 @@ const commit = (repo, file, contents, message) => {
 const realRunner = (command) => {
   const result = spawnSync(command.fileName, command.args, {
     cwd: command.workingDirectory,
-    encoding: 'utf8',
-  })
+    encoding: 'utf8'})
   return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
 }
 
@@ -286,8 +269,7 @@ const fixture = () => {
     expectedHead,
     gitAdapter: change.createGit(repo, realRunner),
     repo,
-    remove: () => rmSync(root, { recursive: true, force: true }),
-  }
+    remove: () => rmSync(root, { recursive: true, force: true })}
 }
 
 integrationTest('WHAT[change-integration-008] Adapter_ffMerge_clean_fast_forward_returns_exact_candidate_receipt', async () => {

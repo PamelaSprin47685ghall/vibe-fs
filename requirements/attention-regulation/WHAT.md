@@ -20,7 +20,7 @@ DeferredWork 有稳定 occurrence 标识，归属特定 participant life；重�
 
 DeferredWork 只在下列真实终点被消费；消费即消灭，不激活义务，participant 可选择处理、再次 defer、正式立项或忽略：
 
-1. Manager：第一次 `suicide` 返回本任尚未消费的 DeferredWork 待办，供调用方核对；随后完成的正常退休确认使这些条目消灭。该载体依赖 relay-retirement 的两次 suicide 合同。
+1. Manager：sequence 为 S4 时，第一次 `deliver` 返回本任尚未消费的 DeferredWork 待办，供调用方核对；另一个调用完成退休后这些条目消灭。该载体依赖 work 的两段 deliver。sequence 为 S1、S2、S3 时不套这两段。
 2. Engineer 与 DevOps：participant 自然终止且仍有未消费条目时，系统以一次 user prompt 回合呈现这些条目，呈现后消灭。
 3. Orchestrator：按上述精神，在其交接或收尾时呈现并消灭。当前落点为其 run 自然终止（收尾），与 Engineer、DevOps 共用同一呈现入口；三者的呈现都恰好一次，由消费凭据保证。
 

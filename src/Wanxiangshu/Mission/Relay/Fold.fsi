@@ -12,7 +12,6 @@ type RoadView =
         IterationOrdinal: int
         ActiveIncumbency: IncumbencyId option
         ActivePhase: IncumbencyPhase option
-        ActiveSnapshotId: WorkspaceSnapshotId option
         ActiveAuthorityRevision: AuthorityRevision option
         ActiveCleanupBlockerDigest: string option
         AcceptedAssessmentTransport: (string * string) option
@@ -20,7 +19,6 @@ type RoadView =
         AcceptedAssessmentFindings: AssessmentFindings option
         RetiredIncumbencies: IncumbencyId list
         RetiredProviderRunIds: Set<string>
-        Certificate: QualityCertificate option
         LatestRetirement: RetirementSummary option
         BoundDevOps: string option
         BoundDevOpsModelTarget: string option
@@ -36,7 +34,6 @@ module Fold =
         roadId: RoadId ->
         incumbencyId: IncumbencyId ->
         binding: AssessmentBinding ->
-        snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
         findings: AssessmentFindings ->
             Result<AssessmentFindings, string>
@@ -46,13 +43,7 @@ module Fold =
     val roads: state: RelayState -> RoadId list
 
 module Decision =
-    val openIncumbency:
-        state: RelayState ->
-        roadId: RoadId ->
-        incumbentId: IncumbencyId ->
-        snapshotId: WorkspaceSnapshotId ->
-        authorityRevision: AuthorityRevision ->
-            Result<RelayState, string>
+    val openIncumbency: unit -> Result<unit, string>
 
     val bindRoadDevOps:
         state: RelayState ->
@@ -61,16 +52,7 @@ module Decision =
         modelTarget: string option ->
             Result<RelayState, string>
 
-    val assess:
-        state: RelayState ->
-        roadId: RoadId ->
-        incumbentId: IncumbencyId ->
-        assessmentId: AssessmentId ->
-        binding: AssessmentBinding ->
-        snapshotId: WorkspaceSnapshotId ->
-        authorityRevision: AuthorityRevision ->
-        findings: AssessmentFindings ->
-            Result<RelayState, string>
+    val assess: unit -> Result<unit, string>
 
     val advanceAuthority:
         state: RelayState ->
@@ -79,10 +61,7 @@ module Decision =
         expected: AuthorityRevision ->
         next: AuthorityRevision ->
         authorityMessageId: PhysicalUserMessageId ->
-        snapshotId: WorkspaceSnapshotId ->
             Result<RelayState, string>
-
-    val invalidateCertificate: state: RelayState -> roadId: RoadId -> reason: string -> Result<RelayState, string>
 
     val blockCleanup:
         state: RelayState ->
@@ -91,13 +70,7 @@ module Decision =
         blockerDigest: string ->
             Result<RelayState, string>
 
-    val confirmRetirement:
-        state: RelayState ->
-        roadId: RoadId ->
-        incumbentId: IncumbencyId ->
-        providerRunId: string ->
-        toolCallId: string ->
-            Result<RelayState, string>
+    val confirmRetirement: unit -> Result<unit, string>
 
     val retire:
         state: RelayState ->

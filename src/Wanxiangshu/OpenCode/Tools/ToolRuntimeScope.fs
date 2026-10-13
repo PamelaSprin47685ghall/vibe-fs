@@ -51,7 +51,6 @@ type ToolRuntimeScope
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
         ?workRecordCapability: DelegationWorkRecordCapability,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -82,8 +81,6 @@ type ToolRuntimeScope
 
     // Workspace-snapshot capture is an injected capability: Relay certificate
     // binding owns the capture vocabulary, the composition root supplies it.
-    let captureWorktreeSnapshot =
-        defaultArg captureWorktreeSnapshot (fun _ -> Error "workspace snapshot capture unavailable")
 
     let childRecordForRun =
         defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
@@ -450,6 +447,7 @@ type ToolRuntimeScope
     let defaultEmptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false
+          HasConfirmation = false
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
@@ -463,21 +461,50 @@ type ToolRuntimeScope
     let activeIncumbencyOfSession (sessionId: string) : IncumbencyId option =
         roadViewOfSession sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
 
-    let managerFactsOfSession (sessionId: string) : ManagerCapabilityFacts =
-        roadViewOfSession sessionId
-        |> Option.bind (fun road ->
-            match road.ActiveIncumbency with
+    let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
+        let lifecycle =
+            match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
             | None -> None
-            | Some _ ->
+            | Some dir when System.String.IsNullOrWhiteSpace dir -> None
+            | Some dir ->
+                match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
+                | None -> None
+                | Some held ->
+                    match held.TryCurrent "Lifecycle" with
+                    | None -> None
+                    | Some current ->
+                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                        Map.tryFind sessionId works
 
-                let facts: ManagerCapabilityFacts =
-                    { HasActiveIncumbency = true
-                      HasAssessment = road.AcceptedAssessmentTransport.IsSome
-                      IsFinalIncumbent = road.AcceptedAssessmentFindings |> Option.exists AssessmentFindings.isEmpty
-                      CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
+        let cleanup =
+            roadViewOfSession sessionId |> Option.bind (fun road -> road.ActiveCleanupBlockerDigest)
 
-                Some facts)
-        |> Option.defaultValue defaultEmptyManagerFacts
+        match lifecycle with
+        | Some work when work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution ->
+            match work.Active with
+            | None -> defaultEmptyManagerFacts
+            | Some active ->
+                let promoted =
+                    match active.Review with
+                    | Some review -> review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
+                    | None -> false
+
+                { HasActiveIncumbency = true
+                  HasAssessment = active.Review.IsSome
+                  HasConfirmation = active.Confirmed.IsSome
+                  IsFinalIncumbent = promoted
+                  CleanupBlockerDigest = cleanup }
+        | _ ->
+            match roadViewOfSession sessionId with
+            | Some road when road.ActiveIncumbency.IsSome ->
+                { HasActiveIncumbency = true
+                  HasAssessment = road.AcceptedAssessmentTransport.IsSome
+                  HasConfirmation = road.RetirementConfirmation.IsSome
+                  IsFinalIncumbent =
+                    road.AcceptedAssessmentFindings
+                    |> Option.exists AssessmentFindings.isEmpty
+                  CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
+            | _ -> defaultEmptyManagerFacts
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
@@ -792,10 +819,12 @@ type ToolRuntimeScope
     static member emptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false
+          HasConfirmation = false
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
-    member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts = managerFactsOfSession sessionId
+    member self.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
+        managerFactsOfSession self.WorkspaceDirectory sessionId
 
     member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
         lock gate (fun () ->
@@ -1002,7 +1031,7 @@ type ToolRuntimeScope
                         // EXEC-014: host executor leaves are Host-owned and
                         // parent-invisible. A DurableParentHandle would leak every
                         // worker into the caller's list/join/guard (EXEC-016) and
-                        // block suicide with "join before end" long after `run`
+                        // block deliver with "join before end" long after `run`
                         // returned its bounded result.
                         ownership = HandleOwnership.HostOwnedHidden
                     )
@@ -1026,7 +1055,6 @@ type ToolRuntimeScope
                       OnRunStarted = onStarted
                       SendGateContinuation = HostSessionNudge.trySendGateContinuationPhysical sessions rootWorkspace
                       ContinueManagerLoop = continueManagerLoop
-                      CaptureWorktreeSnapshot = captureWorktreeSnapshot
                       RepoPath = defaultArg workspaceDirectory "."
                       TargetBranch = ""
                       ParentWorkRecordFor = fun sid -> parentRecord (SessionId.value sid)

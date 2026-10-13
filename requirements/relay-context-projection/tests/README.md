@@ -2,7 +2,7 @@
 
 新上游保留完整物理历史，退休 cut 只判定请求身份。旧“删除前任消息”的合同和反例不再适用；没有把旧过滤实现迁回。
 
-`support/cut.mjs` 通过真实插件和journal执行 REVISE→suicide→退休请求transform，取得真正owner派发的后继prompt。随后 `ProjectionSurface.apply` 只转换输入、观察interrupt回调，并调用生产 `RelayNarrativeTransform.apply`，没有复制投影算法。
+`support/cut.mjs` 通过真实插件和journal执行 REVISE→deliver→退休请求transform，取得真正owner派发的后继prompt。随后 `ProjectionSurface.apply` 只转换输入、观察interrupt回调，并调用生产 `RelayNarrativeTransform.apply`，没有复制投影算法。
 
 - `001/005/006`：在这条真实前序上检查历史保留、同物理session和确定性，完整比较可见消息及输入不变。
 - `002/008`：同一durable退休事实下，旧请求、伪装成user的未准入wake会被拦截，实际后继gate可通过；wake作为历史仍保留。文本包含工具名不能取得权威。

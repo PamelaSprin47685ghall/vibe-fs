@@ -106,7 +106,7 @@ test('WHAT[intra-participant-parallelism-013] real root chat message carries a r
           sessionID,
           agent: 'manager',
           model: { providerID: 'host', modelID: 'placeholder' },
-          tools: { fork: true, join: true, horizon: true, suicide: true },
+          tools: { fork: true, join: true, horizon: true, deliver: true },
         },
         parts: [{ type: 'text', text: 'root work' }],
       }
@@ -117,7 +117,7 @@ test('WHAT[intra-participant-parallelism-013] real root chat message carries a r
       assert.equal(output.message.tools?.fork, true)
       assert.equal(output.message.tools?.join, true)
       assert.equal(output.message.tools?.horizon, true)
-      assert.equal(output.message.tools?.suicide, true)
+      assert.equal(output.message.tools?.deliver, true)
     })
   })
 })

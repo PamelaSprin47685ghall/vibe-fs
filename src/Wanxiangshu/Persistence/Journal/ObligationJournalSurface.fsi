@@ -2,12 +2,11 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System.Threading.Tasks
 
-/// Journal operations for the relay lifecycle, plus the retired obligation-ledger
-/// read boundary.
+/// Retired obligation-ledger read boundary, plus relay-shaped entry points that
+/// no longer append lifecycle facts.
 ///
-/// obligation-ledger-007: the append is gone, so the only honest answer refuses and
-/// names the retirement. The relay lifecycle functions stay because real callers use
-/// them; they are relay code that historically sat beside the old ledger route.
+/// obligation-ledger-007: the magic-todo append is gone. This surface refuses
+/// lifecycle appends and writes nothing.
 [<RequireQualifiedAccess>]
 module ObligationJournalSurface =
     /// Retired. A refusal, so a migrated caller learns why instead of inferring it.

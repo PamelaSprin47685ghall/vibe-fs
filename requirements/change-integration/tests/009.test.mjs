@@ -13,16 +13,12 @@ const job = (id, path = `/tmp/${id}`) => ({
   worktreeIdentity: `manager/${id}`,
   worktreePath: path,
   targetRef: 'refs/heads/main',
-  targetBranchFrozen: 'refs/heads/main',
-})
+  targetBranchFrozen: 'refs/heads/main'})
 
 test('WHAT[change-integration-009] manager loop keeps the durable job worktree', () => {
   let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
   projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {
-    candidateCommit: 'c1',
-    workspaceSnapshotId: 'snapshot-1',
-    qualityCertificateId: 'certificate-1',
-  }))
+    candidateCommit: 'c1'}))
   const continued = change.find(projection, 'hostfw8')
   assert.equal(continued.worktreePath, '/tmp/wt-hostfw8')
   assert.deepEqual(continued.facts, ['CandidateReady'])
@@ -45,43 +41,31 @@ const payload = (overrides = {}) => ({
   worktreePath: '/tmp/wt1',
   targetRef: 'refs/heads/main',
   targetBranchFrozen: 'refs/heads/main',
-  ...overrides,
-})
+  ...overrides})
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
 const fact = {
-  candidateReady: (candidateCommit = 'c1', workspaceSnapshotId = 'snapshot-1', qualityCertificateId = 'certificate-1') =>
-    change.fact('CandidateReady', { candidateCommit, workspaceSnapshotId, qualityCertificateId }),
+  candidateReady: (candidateCommit = 'c1') =>
+    change.fact('CandidateReady', { candidateCommit }),
   conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
     change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
-      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles,
-      diagnosticsDigest: 'digest',
-    }),
-  rebased: (targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased') =>
+      diagnosticsDigest: 'digest'}),
+  rebased: (targetHeadSnapshot = 'h1') =>
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
-      targetHeadSnapshot,
-      workspaceSnapshotId,
-    }),
+      targetHeadSnapshot}),
   publishClaimed: (
-    workspaceSnapshotId = 'snapshot-rebased',
-    qualityCertificateId = 'certificate-1',
-    authorityRevision = 'authority-1',
-  ) =>
+    authorityRevision = 'authority-1') =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
       expectedHead: 'h1',
-      workspaceSnapshotId,
-      qualityCertificateId,
-      authorityRevision,
-    }),
+      authorityRevision}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
-  abandoned: () => change.fact('JobAbandoned', null),
-}
+  abandoned: () => change.fact('JobAbandoned', null)}
 const jobAt = (value, projection = created()) => {
   const next = change.recordFact(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
@@ -92,21 +76,15 @@ const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 const createdEvent = {
   kind: 'ManagerJobCreated',
-  payload: payload(),
-}
+  payload: payload()}
 const candidateEvent = {
   kind: 'CandidateReady',
   payload: {
     jobId: JOB,
-    candidateCommit: 'c1',
-    workspaceSnapshotId: 'snapshot-1',
-    qualityCertificateId: 'certificate-1',
-  },
-}
+    candidateCommit: 'c1'}}
 const publishedEvent = {
   kind: 'Published',
-  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' },
-}
+  payload: { jobId: JOB, candidateCommit: 'c1', resultingTargetHead: 'r1' }}
 const foldProjection = (events) => {
   const result = change.fold(events)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -130,8 +108,7 @@ test('WHAT[change-integration-009] ORCH_003_durable_facts_do_not_change_job_iden
     worktreeIdentity: job.worktreeIdentity,
     worktreePath: job.worktreePath,
     targetRef: job.targetRef,
-    targetBranchFrozen: job.targetBranchFrozen,
-  })
+    targetBranchFrozen: job.targetBranchFrozen})
   assert.deepEqual(identity(after.job), identity(before))
   assert.deepEqual(after.job.facts, ['CandidateReady'])
 })
@@ -145,8 +122,7 @@ test('WHAT[change-integration-009] ORCH_003_a_second_create_for_one_job_id_canno
   const again = change.createJob(created(), payload({ managerAgent: 'coder', worktreeIdentity: 'wt_other', worktreePath: '/tmp/wt_other' }))
   assert.deepEqual(
     { agent: change.find(again, JOB).managerAgent, worktree: change.find(again, JOB).worktreeIdentity },
-    { agent: 'manager', worktree: 'wt_1' },
-  )
+    { agent: 'manager', worktree: 'wt_1' })
 })
 }
 

@@ -460,7 +460,6 @@ module PluginHostInterop =
         (eventPort: IEventObservationPort option)
         (casebookToolSpecs: ToolSpec list)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
-        (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
         (userNotify: (string -> string -> unit) option)
         : ToolRegistration =
         let jsTransactionPersistence =
@@ -496,7 +495,6 @@ module PluginHostInterop =
                 casebookToolSpecs
                 jsTransactionPersistence
                 continueManagerLoop
-                captureWorktreeSnapshot
                 (Some childWorkRecordForRun)
                 (Some workRecordCapability)
                 userNotify

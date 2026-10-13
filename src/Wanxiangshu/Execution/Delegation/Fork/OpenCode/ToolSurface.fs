@@ -1427,163 +1427,18 @@ module ForkToolSurface =
         }
 
     let injectAcceptedAssessment (value: obj) (owner: string) : Task =
+        ignore value
+        ignore owner
         task {
-            let harness = unbox<ForkHarness> value
-            let sessionId = harness.OwnerSession owner
-            let sessionStr = SessionId.value sessionId
-
-            let existingRoad =
-                AgentProjection.tryFind sessionId (AgentJournal.snapshot harness.Journal).AgentProjections
-                |> Option.bind (fun session -> session.Relay)
-                |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay (RoadId.create sessionStr))
-
-            let hasAssessment =
-                existingRoad
-                |> Option.bind (fun road -> road.AcceptedAssessmentTransport)
-                |> Option.isSome
-
-            if not hasAssessment then
-                let roadId = RoadId.create sessionStr
-                let incId = IncumbencyId.create (sprintf "incumbency:%s" sessionStr)
-                let snapId = WorkspaceSnapshotId.create (sprintf "snapshot:%s" sessionStr)
-                let authRev = AuthorityRevision.create (sprintf "rev:%s" sessionStr)
-
-                let physUser =
-                    Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
-
-                let assessId = AssessmentId.create (sprintf "assess:%s" sessionStr)
-
-                let binding: AssessmentBinding =
-                    { PhysicalUserMessageId = sprintf "phys:%s" sessionStr
-                      ProviderRunId = sprintf "run:%s" sessionStr
-                      ToolCallId = sprintf "tool:%s" sessionStr
-                      NarrativeDigest = sprintf "narrative:%s" sessionStr
-                      PayloadDigest = sprintf "payload:%s" sessionStr
-                      RootRequestDigest = sprintf "root:%s" sessionStr
-                      RequirementSetDigest = sprintf "req:%s" sessionStr
-                      EvidenceFrontierDigest = sprintf "evidence:%s" sessionStr }
-
-                let findings =
-                    AssessmentFindings.tryCreate
-                        [ { AcceptanceCriteria = "the delivery reaches the requested target state"
-                            WorkPlan = "close the remaining gap before the next review" } ]
-                    |> Result.defaultWith (fun _ ->
-                        failwith "injectAcceptedAssessment: failed to construct assessment findings")
-
-                let events =
-                    match existingRoad with
-                    | None ->
-                        [ RelayEvent.RoadOpened(roadId, authRev, physUser)
-                          RelayEvent.IncumbencyOpened(incId, snapId)
-                          RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, authRev, findings) ]
-                    | Some road ->
-                        match road.ActiveIncumbency, road.ActiveSnapshotId, road.ActiveAuthorityRevision with
-                        | Some activeInc, Some activeSnap, Some activeRev ->
-                            [ RelayEvent.AssessmentCommitted(
-                                  assessId,
-                                  activeInc,
-                                  binding,
-                                  activeSnap,
-                                  activeRev,
-                                  findings
-                              ) ]
-                        | _ ->
-                            let currentRev =
-                                if road.AuthorityRevisions.IsEmpty then
-                                    authRev
-                                else
-                                    road.AuthorityRevision
-
-                            let roadOpened =
-                                if road.AuthorityRevisions.IsEmpty then
-                                    [ RelayEvent.RoadOpened(roadId, currentRev, physUser) ]
-                                else
-                                    []
-
-                            roadOpened
-                            @ [ RelayEvent.IncumbencyOpened(incId, snapId)
-                                RelayEvent.AssessmentCommitted(assessId, incId, binding, snapId, currentRev, findings) ]
-
-                match RelayTransaction.create events with
-                | Error error ->
-                    return raise (InvalidOperationException(sprintf "Failed to create relay transaction: %s" error))
-                | Ok tx ->
-                    let fact =
-                        Fact.AgentFact.Relay(
-                            RelayFactCases.TransactionCommitted {| RoadId = roadId; Transaction = tx |}
-                        )
-
-                    match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact harness.Journal with
-                    | Ok _ -> ()
-                    | Error error ->
-                        return
-                            raise (
-                                InvalidOperationException(sprintf "Failed to append accepted assessment fact: %A" error)
-                            )
+            return raise (InvalidOperationException("injectAcceptedAssessment refused: no event store, observed head, or workId; zero writes"))
         }
         :> Task
 
     let injectAuditPendingIncumbency (value: obj) (owner: string) : Task =
+        ignore value
+        ignore owner
         task {
-            let harness = unbox<ForkHarness> value
-            let sessionId = harness.OwnerSession owner
-            let sessionStr = SessionId.value sessionId
-
-            let existingRoad =
-                AgentProjection.tryFind sessionId (AgentJournal.snapshot harness.Journal).AgentProjections
-                |> Option.bind (fun session -> session.Relay)
-                |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay (RoadId.create sessionStr))
-
-            let hasActiveIncumbency =
-                existingRoad |> Option.bind (fun road -> road.ActiveIncumbency) |> Option.isSome
-
-            if not hasActiveIncumbency then
-                let roadId = RoadId.create sessionStr
-                let incId = IncumbencyId.create (sprintf "incumbency:%s" sessionStr)
-                let snapId = WorkspaceSnapshotId.create (sprintf "snapshot:%s" sessionStr)
-                let authRev = AuthorityRevision.create (sprintf "rev:%s" sessionStr)
-
-                let physUser =
-                    Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
-
-                let events =
-                    match existingRoad with
-                    | None ->
-                        [ RelayEvent.RoadOpened(roadId, authRev, physUser)
-                          RelayEvent.IncumbencyOpened(incId, snapId) ]
-                    | Some road ->
-                        let currentRev =
-                            if road.AuthorityRevisions.IsEmpty then
-                                authRev
-                            else
-                                road.AuthorityRevision
-
-                        let roadOpened =
-                            if road.AuthorityRevisions.IsEmpty then
-                                [ RelayEvent.RoadOpened(roadId, currentRev, physUser) ]
-                            else
-                                []
-
-                        roadOpened @ [ RelayEvent.IncumbencyOpened(incId, snapId) ]
-
-                match RelayTransaction.create events with
-                | Error error ->
-                    return raise (InvalidOperationException(sprintf "Failed to create relay transaction: %s" error))
-                | Ok tx ->
-                    let fact =
-                        Fact.AgentFact.Relay(
-                            RelayFactCases.TransactionCommitted {| RoadId = roadId; Transaction = tx |}
-                        )
-
-                    match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact harness.Journal with
-                    | Ok _ -> ()
-                    | Error error ->
-                        return
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "Failed to append audit pending incumbency fact: %A" error
-                                )
-                            )
+            return raise (InvalidOperationException("injectAuditPendingIncumbency refused: no event store, observed head, or workId; zero writes"))
         }
         :> Task
 

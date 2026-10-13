@@ -27,7 +27,7 @@ module Fold =
     let private completesRoad events =
         events
         |> List.exists (function
-            | RelayEvent.RetirementCommitted { Outcome = RetirementOutcome.Accepted _ } -> true
+            | RelayEvent.RetirementCommitted { Outcome = RetirementOutcome.Delivered } -> true
             | _ -> false)
 
     let private settlePromptAuthority events authorityOpt =

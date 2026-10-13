@@ -100,7 +100,7 @@ const allowList = (config, name) => {
     'review',
     'chronicle',
     'fetch',
-    'suicide',
+    'deliver',
     'skill',
   ]
   const candidateTools = [...new Set([...staticTools, ...permissionToolKeys])]
@@ -122,7 +122,7 @@ const ROLE_ALLOW = {
     'resume',
     'join',
     'horizon',
-    'suicide',
+    'deliver',
     'review',
     'js-manager',
   ],
@@ -188,7 +188,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       review: 'ReviewAssessment',
       chronicle: 'Chronicle',
       fetch: 'Fetch',
-      suicide: 'Finality',
+      deliver: 'Finality',
     })[toolName]
 
   const permissionsForTool = (toolName) => {

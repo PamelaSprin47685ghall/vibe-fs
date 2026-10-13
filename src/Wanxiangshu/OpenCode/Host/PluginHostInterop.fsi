@@ -92,6 +92,5 @@ module PluginHostInterop =
         eventPort: IEventObservationPort option ->
         casebookToolSpecs: ToolSpec list ->
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
-        captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) ->
         userNotify: (string -> string -> unit) option ->
             ToolRegistration

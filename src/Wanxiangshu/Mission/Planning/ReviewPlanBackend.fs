@@ -97,11 +97,32 @@ module ReviewPlanBackend =
             | Error error -> return Error error
             | Ok active ->
                 let outcome = reviewOutcome gaps
-                let reviewEvent = PlanEvents.reviewed incumbencyId active.Stage outcome
+                let reviewOutcomeValue =
+                    match outcome with
+                    | PlanReviewedOutcome.Promoted -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
+                    | PlanReviewedOutcome.Stayed -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed
 
-                let! appended = PlanEventStore.append store pid reviewEvent
+                let! appended =
+                    task {
+                        match store.TryCurrent "Lifecycle" with
+                        | None -> return Error "lifecycle work is missing"
+                        | Some current ->
+                            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+                            match Map.tryFind workId works with
+                            | None -> return Error "lifecycle work is missing"
+                            | Some work ->
+                                match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.review work incumbencyId reviewOutcomeValue with
+                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ -> return Ok()
+                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                                    match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
+                                    | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) -> return Ok()
+                                    | Ok _ -> return Error "review commit is not durable"
+                                    | Error reason -> return Error reason
+                    }
 
-                // The stage advance itself is the fold's decision
-                // (planning-004); this backend only records the fact.
-                return recordOutcome outcome gaps appended
+                return
+                    match appended with
+                    | Error reason -> Error(PlanReviewError.RecordFailed reason)
+                    | Ok() -> Ok { Outcome = outcome; Gaps = gaps }
         }

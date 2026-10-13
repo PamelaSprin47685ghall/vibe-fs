@@ -46,7 +46,6 @@ module InvestigationEstimateContract =
         | "join"
         | "horizon"
         | "review"
-        | "suicide"
         | "fission"
         | "js-plan"
         | "ask"

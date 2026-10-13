@@ -9,7 +9,5 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fsi"/>
-    <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fs"/>
   </ItemGroup>
 </Project>
