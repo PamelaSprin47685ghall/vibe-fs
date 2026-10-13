@@ -684,34 +684,29 @@ module PluginTransforms =
                     unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
                     |> Map.tryFind sid)
 
-        let tryReadActivePlanState (sidOpt: string option) : Wanxiangshu.Mission.Planning.PlanWorkState option =
-            // Resolve the plan work by the session id (workId = sessionId) so
-            // multiple plan sessions never read each other's state.
-            sidOpt
-            |> Option.bind (fun sid ->
-                workspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
-                |> Option.bind (fun store ->
-                    Wanxiangshu.Mission.Planning.PlanEventStore.activeWorkState
-                        store
-                        (Wanxiangshu.Mission.Planning.PlanWorkId.create sid)))
 
         let buildTenureOf
-            (state: Wanxiangshu.Mission.Planning.PlanWorkState)
+            (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
             (fresh: bool)
             : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
-            let active = state.Active.Value
+            let active = work.Active.Value
 
             let previousRange =
-                state.PredecessorRange
-                |> Option.map (fun (startCursor, endCursor) ->
-                    XTraceCursor.sequence startCursor, XTraceCursor.sequence endCursor)
+                match List.tryLast work.Retirements with
+                | Some previous ->
+                    let ending = previous.RetirementCursor |> Option.defaultValue active.OpeningCursor
+                    if ending > previous.OpeningCursor then Some(previous.OpeningCursor, ending) else None
+                | None -> None
 
-            { WorkId = state.WorkId.Value
+            let stage =
+                match Wanxiangshu.Mission.Lifecycle.LifecycleFold.projection work with
+                | Ok(projected, _) -> Wanxiangshu.Mission.Lifecycle.StageElement.render projected
+                | Error _ -> Wanxiangshu.Mission.Lifecycle.StageElement.render active.OpeningStage
+
+            { WorkId = work.WorkId
               IncumbencyId = active.Id
-              Stage = Wanxiangshu.Mission.Planning.PlanStage.render active.Stage
-              OpeningCursor = XTraceCursor.sequence active.OpeningCursor
+              Stage = stage
+              OpeningCursor = active.OpeningCursor
               PreviousRange = previousRange
               IsFreshHandover = fresh }
 
@@ -815,7 +810,7 @@ module PluginTransforms =
                       HasSemanticParts = not (List.isEmpty message.Parts)
                       Raw = raw }))
 
-        let isolatePlanTenure (state: Wanxiangshu.Mission.Planning.PlanWorkState) (sid: string) (outObj: obj) =
+        let isolatePlanTenure (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork) (sid: string) (outObj: obj) =
             task {
                 let durable =
                     journal
@@ -839,7 +834,9 @@ module PluginTransforms =
                 let epoch = tenureReanchorEpoch durable sessionId
 
                 let tenure =
-                    buildTenureOf state (not (PrefixEpochProjection.isTenureReanchored state.Active.Value.Id epoch))
+                    buildTenureOf
+                        work
+                        (not (PrefixEpochProjection.isTenureReanchored work.Active.Value.Id epoch))
 
                 if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
                     invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
@@ -861,9 +858,12 @@ module PluginTransforms =
 
         let applyResolvedTenure (sid: string) (outObj: obj) =
             task {
-                match tryReadActivePlanState (Some sid) with
-                | Some state when state.Active.IsSome -> return! isolatePlanTenure state sid outObj
-                | _ -> ()
+                match tryReadLifecycleWork sid with
+                | Some work when
+                    work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan && work.Active.IsSome
+                    ->
+                    return! isolatePlanTenure work sid outObj
+                | _ -> return ()
             }
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =

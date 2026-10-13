@@ -9,7 +9,8 @@
 - Change 发布门改读统一事实：`RelayPort` 增 `LifecycleReviewed`，`buildPublicationEvidence` 由该事实（`Promoted`/`Stayed` + 工作权威计数）构造，无持久评审即零写拒绝；证书与工作区快照不再是输入。
 - `OfficeCapability.permissionsForManagerFacts` 恢复 `capability-enforcement-025` 的语义：无活跃任期空集，有确认无评审空集，清理阻塞收窄到 Join+Finality，末任保留读/清理/收口，已评（有 findings）移除评审专用只读权限。
 - 测试资产：新增 `Mission/Lifecycle/Surface.js` 的存储播种面（`seedOpen`/`seedReview`/`seedDeliver`/`workView`），`plugin-fixture.mjs` 的 `openIncumbency`/`injectAcceptedAssessment`/`completeManagerLife`/`activateLife` 改为向插件的工作区 EventStore 播种真实统一事件；统一契约测试迁到 `requirements/work/tests/011…019`，锚点 `WHAT[work-NNN]`；`planning` 的 007/008/020/022/023 与 `capability-enforcement` 024–028 按统一契约重写。
-- 证据：`node scripts/build.mjs` 绿（generation 12）；`requirements/verification-system/tests/run.mjs` 4997 passed / 18 failed（本轮起点为 179 failed）。仍红：`work-011`/`work-019` 的两段式确认与执行门断言（在修），以及 `managed-session-lifecycle-020`、`participant-identity-009`、`interaction-authority-005/017/022`、`dispatch-protocol-002` 所需的「Delivered 退休驱动 PromptAuthority 收束」与 `Workflow` 后继开任两处生产缺口。
+- 后继派发与旧尝试停止改由统一事实决定：`NarrativeTransform` 的陈旧尝试判定读 `LifecycleWork`（S4、当前任期已 Relayed、后继尚未 review），不再读 Relay fold；没有统一 work 的会话完全不动消息集，首任不剥除。统一 S4 `Delivered` 退休在 Journal 投影里收束 human-root authority 与 attention life（`Fold.settleCompletedLife`，由 Journal 集成规则接受 `IncumbencyRetired` 驱动）。`DeliverTool` 从本次调用的 owning exchange 观察退休游标，两段式的第二次调用才能退休。`JournalHandle` 暴露其 writer 持有的 store，journal 启动集成器注册生命周期规则，测试因此能经 handle 播种统一事实。
+- 证据：`node scripts/build.mjs` 绿；`requirements/verification-system/tests/run.mjs` 5013 passed / 0 failed（827 文件）。唯一非通过容器是 `/tmp/failed-test-file-*` 下两个刻意的坏夹具（断言坏夹具必须失败）；runner 退出码 1 来自其 pending-todo 策略。
 
 ## Unreleased — js-plan 复用共享锚点教程
 
