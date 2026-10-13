@@ -1,140 +1,126 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as planning from '../../../dist/Mission/Planning/Surface.js'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 
-test('WHAT[work-024] action gate permits the four tools uniformly across stages; stage is not an action gate', () => {
-  assert.ok(typeof planning.isActionAllowed === 'function', 'gate.isActionAllowed must be an exported function')
+const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-  // The new toolset is { js-plan, ask, review, deliver }; every stage treats them alike.
-  for (const stage of ['S1', 'S2', 'S3']) {
-    assert.equal(
-      planning.isActionAllowed({ stage, action: 'js-plan', hasDelivered: false, hasBlocker: false }),
-      true,
-      `${stage}: js-plan must be allowed on an active tenure`,
-    )
-    assert.equal(
-      planning.isActionAllowed({ stage, action: 'ask', hasDelivered: false, hasBlocker: false }),
-      true,
-      `${stage}: ask must be allowed on an active tenure`,
-    )
-    assert.equal(
-      planning.isActionAllowed({ stage, action: 'review', hasDelivered: false, hasBlocker: false }),
-      true,
-      `${stage}: review must be allowed on an active tenure`,
-    )
-    assert.equal(
-      planning.isActionAllowed({ stage, action: 'deliver', hasDelivered: false, hasBlocker: false }),
-      true,
-      `${stage}: deliver must be allowed on an active tenure (relay when unauthorized)`,
-    )
-    // Retired tools must be denied on every stage
-    for (const action of ['handoff', 'resume']) {
-      assert.equal(
-        planning.isActionAllowed({ stage, action, hasDelivered: false, hasBlocker: false }),
-        false,
-        `${stage}: retired tool ${action} must be denied`,
-      )
-    }
+const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const incumbencyIdOf = (text) =>
+  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+
+const withStore = async (body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-'))
+  execFileSync('git', ['init', '--quiet', root])
+  try {
+    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
+}
 
-  // Blocker presence rejects deliver
+test('WHAT[work-024] Plan admits the four tools on every stage; handoff and resume stay denied', () => {
+  const rules = rolePermissionRules('plan')
+  for (const tool of ['js-plan', 'ask', 'review', 'deliver']) {
+    assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
+    assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
+  }
+  for (const tool of ['handoff', 'resume', 'read', 'edit', 'write']) {
+    assert.notEqual(rules[tool], 'allow', `plan must deny ${tool}`)
+  }
+  // Stage is not an action gate: S1, S2 and S3 share the same admission.
   for (const stage of ['S1', 'S2', 'S3']) {
-    assert.equal(
-      planning.isActionAllowed({ stage, action: 'deliver', hasDelivered: false, hasBlocker: true }),
-      false,
-      `${stage}: deliver must be denied when a blocker exists`,
-    )
+    assert.equal(rules.deliver, 'allow', stage)
+    assert.notEqual(rules.handoff, 'allow', stage)
   }
 })
 
-test('WHAT[work-024] delivered state permits only js-plan read and rejects ask, review, deliver until reopened', () => {
-  // After Delivered: only js-plan.read is permitted; mutation tools are rejected
-  for (const action of ['deliver', 'ask', 'review', 'js-plan.edit', 'js-plan.rewrite']) {
-    assert.equal(
-      planning.isActionAllowed({ stage: 'S3', action, hasDelivered: true, hasBlocker: false }),
-      false,
-      `delivered work must reject action ${action} until reopened`,
-    )
-  }
-  assert.equal(
-    planning.isActionAllowed({ stage: 'S3', action: 'js-plan.read', hasDelivered: true, hasBlocker: false }),
-    true,
-    'delivered work must still permit js-plan.read',
-  )
-  assert.equal(
-    planning.isActionAllowed({ stage: 'S3', action: 'read', hasDelivered: true, hasBlocker: false }),
-    true,
-    'delivered work must still permit read',
-  )
+test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a write', async () => {
+  await withStore(async (store, root) => {
+    const opened = await surface.seedOpen(store, 'plan', 'work-24', root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    const before = surface.workView(store, 'work-24')
+    assert.equal(before.reviewed, '')
+
+    const read = await runJsPlan(store, root, 'work-24', `class Js extends JsProgram {
+      async run() {
+        const file = await this.file([]);
+        return { text: file.text() };
+      }
+    }`)
+    assert.match(read, /# ok/)
+
+    const write = await runJsPlan(store, root, 'work-24', `class Js extends JsProgram {
+      async run() {
+        this.rewrite('# mutated before review');
+        return { written: true };
+      }
+    }`)
+    assert.match(write, /# failed/)
+    assert.match(write, /PLAN_REVIEW_REQUIRED/)
+    assert.equal(surface.workView(store, 'work-24').reviewed, '', 'a refused write leaves the tenure unreviewed')
+  })
 })
 
-test('WHAT[work-024] decideAction provides typed rejections for disallowed actions', () => {
-  // Retired tool -> typed rejection
-  const handoff = planning.decideAction('S1', 'handoff', false, false)
-  assert.equal(handoff.ok, false)
-  assert.equal(handoff.rejection, 'HandoffRetired')
+test('WHAT[work-024] a reviewed tenure may write; a second review and a delivered tenure stay refused', async () => {
+  await withStore(async (store, root) => {
+    const seeded = await surface.seedOpen(store, 'plan', 'work-24b', root, 0n)
+    assert.equal(seeded.ok, true, seeded.error)
+    const reviewed = await surface.seedReview(store, 'work-24b', 'Stayed')
+    assert.equal(reviewed.ok, true, reviewed.error)
 
-  const resume = planning.decideAction('S2', 'resume', false, false)
-  assert.equal(resume.ok, false)
-  assert.equal(resume.rejection, 'ResumeRetired')
+    const write = await runJsPlan(store, root, 'work-24b', `class Js extends JsProgram {
+      async run() {
+        this.rewrite('# written after review');
+        return { written: true };
+      }
+    }`)
+    assert.match(write, /# ok/)
 
-  // Blocker -> BlockedByLiveResources
-  const blockedDeliver = planning.decideAction('S1', 'deliver', false, true)
-  assert.equal(blockedDeliver.ok, false)
-  assert.equal(blockedDeliver.rejection, 'BlockedByLiveResources')
+    const again = await surface.seedReview(store, 'work-24b', 'Promoted')
+    assert.equal(again.ok, false, 'a tenure carries one review')
+    assert.match(again.error, /already reviewed/i)
+    assert.equal(surface.workView(store, 'work-24b').reviewed, 'Stayed')
+  })
 
-  // Delivered mutation -> AlreadyDelivered
-  const postDeliveredAsk = planning.decideAction('S3', 'ask', true, false)
-  assert.equal(postDeliveredAsk.ok, false)
-  assert.equal(postDeliveredAsk.rejection, 'AlreadyDelivered')
-
-  // Unreviewed tenure mutation -> ReviewRequired
-  for (const action of ['edit', 'rewrite', 'js-plan.edit', 'js-plan.rewrite']) {
-    const unreviewedMutation = planning.decideAction('S1', action, false, false, false)
-    assert.equal(unreviewedMutation.ok, false, `unreviewed tenure must reject mutation ${action}`)
-    assert.equal(unreviewedMutation.rejection, 'ReviewRequired')
-
-    assert.equal(
-      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: false }),
-      false,
-      `isActionAllowed must reject mutation ${action} when hasReviewed is false`,
-    )
+  const opened = surface.encodeOpening('plan', 'work-24c', '/root', 0n)
+  let text = opened
+  for (let step = 0; step < 2; step += 1) {
+    const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+    const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt((step + 1) * 10))
+    text = `${text}${reviewed.bytes}${relayed.bytes}`
   }
-
-  // Unreviewed tenure read -> Allowed
-  for (const action of ['read', 'js-plan.read', 'js-plan']) {
-    const unreviewedRead = planning.decideAction('S1', action, false, false, false)
-    assert.equal(unreviewedRead.ok, true, `unreviewed tenure must permit read ${action}`)
-
-    assert.equal(
-      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: false }),
-      true,
-      `isActionAllowed must permit read ${action} when hasReviewed is false`,
-    )
-  }
-
-  // Reviewed tenure mutation -> Allowed
-  for (const action of ['edit', 'rewrite', 'js-plan.edit', 'js-plan.rewrite']) {
-    const reviewedMutation = planning.decideAction('S1', action, false, false, true)
-    assert.equal(reviewedMutation.ok, true, `reviewed tenure must permit mutation ${action}`)
-
-    assert.equal(
-      planning.isActionAllowed({ stage: 'S1', action, hasDelivered: false, hasBlocker: false, hasReviewed: true }),
-      true,
-      `isActionAllowed must permit mutation ${action} when hasReviewed is true`,
-    )
-  }
+  const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+  text = `${text}${reviewed.bytes}`
+  const delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n)
+  text = `${text}${delivered.bytes}`
+  const view = surface.documentView(text)
+  assert.equal(view.delivered, true)
+  assert.equal(view.active, false, 'a delivered work has no active tenure to admit a tool against')
+  const lateReview = surface.reviewProbe(text, view.activeId || 'missing', 'Promoted')
+  assert.equal(lateReview.decision, 'Refuse')
+  const lateAsk = surface.reopenProbe(text, 'not-the-delivered-incumbency')
+  assert.equal(lateAsk.decision, 'Refuse', 'a delivered work does not admit a new action until Reopened')
+  assert.deepEqual(surface.documentView(text), view)
 })
 
-test('WHAT[work-024] allowedPermissions maps to the new ToolPermission set uniformly per stage', () => {
-  // Every stage carries the same permission set: Ask, Deliver, JsPlan, Review
-  const expected = ['Ask', 'Deliver', 'JsPlan', 'Review']
-  for (const stage of ['S1', 'S2', 'S3']) {
-    const perms = planning.allowedPermissions(stage, false, false)
-    assert.deepEqual(perms, expected, `${stage} permissions must be the new four-tool set`)
-  }
+test('WHAT[work-024] deliver refuses a blocker and an unauthorized tenure relays rather than delivers', () => {
+  const opened = surface.encodeOpening('plan', 'work-24d', '/root', 0n)
+  const blocked = surface.deliverProbe(opened, 'run-blocked', 'call-blocked', 9n)
+  assert.equal(blocked.decision, 'Write', blocked.detail)
+  assert.equal(blocked.detail, 'relayed', 'an unauthorized tenure relays; stage does not change that')
+  assert.equal(blocked.names, 'IncumbencyRetired,IncumbencyOpened')
+  assert.equal(eventsOf(blocked.bytes)[0].payload.outcome, 'Relayed')
 
-  // Delivered: only JsPlan
-  const deliveredPerms = planning.allowedPermissions('S3', true, false)
-  assert.deepEqual(deliveredPerms, ['JsPlan'])
+  const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
+  const stayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-stay', 'call-stay', 11n)
+  assert.equal(stayed.decision, 'Write', stayed.detail)
+  assert.equal(stayed.detail, 'relayed', 'Stayed keeps the unauthorized relay path on every stage')
+  assert.equal(surface.documentView(`${opened}${reviewed.bytes}${stayed.bytes}`).projection, 'S1')
 })

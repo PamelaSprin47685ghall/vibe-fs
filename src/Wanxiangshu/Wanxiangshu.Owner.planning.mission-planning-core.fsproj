@@ -7,17 +7,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <Compile Include="Mission/Planning/Facts.fsi"/>
-    <Compile Include="Mission/Planning/Facts.fs"/>
-    <Compile Include="Mission/Planning/Fold.fsi"/>
-    <Compile Include="Mission/Planning/Fold.fs"/>
-    <Compile Include="Mission/Planning/ActionGate.fsi"/>
-    <Compile Include="Mission/Planning/ActionGate.fs"/>
     <Compile Include="Mission/Planning/TenureIsolation.fsi"/>
     <Compile Include="Mission/Planning/TenureIsolation.fs"/>
-    <Compile Include="Mission/Planning/Recovery.fsi"/>
-    <Compile Include="Mission/Planning/Recovery.fs"/>
   </ItemGroup>
 </Project>

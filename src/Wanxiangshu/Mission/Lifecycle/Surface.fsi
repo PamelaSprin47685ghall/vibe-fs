@@ -10,6 +10,10 @@ module LifecycleSurface =
     val finalPromotionProbe: text: string -> obj
     val deliverProbe: text: string -> providerRunId: string -> toolCallId: string -> head: int64 -> obj
     val replayProbe: text: string -> providerRunId: string -> toolCallId: string -> obj
+    /// Apply the kernel's deliver decision a second time. Exact facts return the original state.
+    val deliverStateProbe: text: string -> providerRunId: string -> toolCallId: string -> head: int64 -> obj
+    val replayStateProbe: text: string -> providerRunId: string -> toolCallId: string -> head: int64 -> obj
+    val reopenProbe: text: string -> incumbencyId: string -> obj
     val detachedOpeningProbe: text: string -> obj
     val commitProbe: name: string -> string
     val decodeDocument: text: string -> obj
@@ -24,6 +28,8 @@ module LifecycleSurface =
     val seedConfirmation: store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> Task<obj>
     /// Read-only folded view of one seeded work.
     val workView: store: obj -> workId: string -> obj
+    /// Folded view of one lifecycle document, including durable receipt fields.
+    val documentView: text: string -> obj
     /// First DevOps binding wins. A conflicting rebind writes nothing and keeps the stored target.
     val bindDevOps: store: obj -> workId: string -> devopsId: string -> target: obj -> Task<obj>
     val roadDevOps: store: obj -> workId: string -> obj

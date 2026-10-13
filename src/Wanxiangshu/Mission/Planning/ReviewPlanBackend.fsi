@@ -1,11 +1,12 @@
 namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.EventStore
 
 /// planning-022: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
-    { Outcome: PlanReviewedOutcome
+    { Outcome: ReviewOutcome
       Gaps: (string * string) list }
 
 /// planning-022: typed rejections for the plan review gate. The hard

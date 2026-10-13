@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import {
   assistantText,
@@ -16,6 +17,11 @@ import {
 
 const assemble = (rawMessages, tenure, materializePrev, messageCursors) =>
   surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, materializePrev, messageCursors)
+
+const life = lifecycle.LifecycleSurface ?? lifecycle
+const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const incumbencyIdOf = (text) =>
+  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
 
 test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no LWR_prev and requests reanchor on first turn', () => {
   const rawMessages = [
@@ -276,8 +282,10 @@ test('WHAT[work-034] durable Plan active state assembles U + current interaction
   assert.equal(result.reanchorRequested, false, 'a continuing durable tenure must not re-request reanchor')
 })
 
-test('WHAT[work-034] the Plan store read path is reachable as a pure function', () => {
-  assert.equal(typeof surface.PlanningSurface.getPlanWorkStateFromIntegrator, 'function')
+test('WHAT[work-034] the lifecycle document view is reachable as a pure function', () => {
+  assert.equal(typeof life.documentView, 'function')
+  const opened = life.encodeOpening('plan', 'w-25a', '/tmp/plan-test', 0n)
+  assert.equal(life.documentView(opened).found, true)
 })
 
 test('WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover', () => {
@@ -298,22 +306,6 @@ test('WHAT[work-034] reanchorRequested is returned by assemble and is true only 
   assert.equal(continuing.reanchorRequested, false, 'a continuing tenure must not re-request reanchor on an empty stop')
 })
 
-const openWork = (workId) => surface.PlanningSurface.workOpened(workId, '/tmp/plan-test')
-const openInc = (workId, incId, stage, cursor) =>
-  surface.PlanningSurface.incumbencyOpened(workId, incId, stage, cursor)
-const retireInc = (incId, outcome, cursor) =>
-  surface.PlanningSurface.incumbencyRetired(incId, outcome, cursor)
-
-const firstStateOf = (events) => {
-  let st = surface.PlanningSurface.empty()
-  for (const ev of events) {
-    const res = surface.PlanningSurface.applyWorkEvent(ev, st)
-    assert.equal(res.ok, true, JSON.stringify(res))
-    st = res.state
-  }
-  return st
-}
-
 const tenureFor = (overrides) => ({
   workId: 'w1',
   incumbencyId: 'inc-2',
@@ -325,17 +317,29 @@ const tenureFor = (overrides) => ({
 })
 
 test('WHAT[work-034] S1 with no retirement carries no previous range', () => {
-  const st = firstStateOf([openWork('w1'), openInc('w1', 'inc-1', 'S1', 0n)])
-  assert.equal(surface.PlanningSurface.latestRetirementRange(st), undefined)
+  const opened = life.encodeOpening('plan', 'w1', '/tmp/plan-test', 0n)
+  const view = life.documentView(opened)
+  assert.equal(view.openingStage, 'S1')
+  assert.equal(view.latestRetirement, '')
+  assert.equal(view.predecessor, '')
+  assert.equal(view.openingCursor, 0n)
 })
 
 test('WHAT[work-034] S1 retirement preserves its opening range for the next tenure', () => {
-  const st = firstStateOf([
-    openWork('w1'),
-    openInc('w1', 'inc-1', 'S1', 7n),
-    retireInc('inc-1', 'Continue', 25n),
-  ])
-  assert.deepEqual(surface.PlanningSurface.latestRetirementRange(st), [7n, 25n])
+  const opened = life.encodeOpening('plan', 'w1', '/tmp/plan-test', 7n)
+  const reviewed = life.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
+  assert.equal(reviewed.decision, 'Write', reviewed.detail)
+  const relayed = life.deliverProbe(`${opened}${reviewed.bytes}`, 'run-034', 'call-034', 25n)
+  assert.equal(relayed.decision, 'Write', relayed.detail)
+  const retired = eventsOf(relayed.bytes)[0]
+  const successor = eventsOf(relayed.bytes)[1]
+  assert.equal(retired.payload.retirementCursor, '25')
+  assert.equal(successor.payload.openingCursor, '25')
+  assert.equal(successor.payload.stage, 'S1', 'Stayed keeps the opening stage for the successor')
+  const view = life.documentView(`${opened}${reviewed.bytes}${relayed.bytes}`)
+  assert.equal(view.latestRetirement, '7,25')
+  assert.equal(view.predecessor, '7,25')
+  assert.equal(view.openingCursor, 25n)
 })
 
 test('WHAT[work-034] tenure assembly consumes PreviousRange into LWR_prev', () => {

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>planning</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>lifecycle-event-vocabulary-contract</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>planning</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-lifecycle-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Mission/Lifecycle/LifecycleEventTypes.fsi"/>
+    <Compile Include="Mission/Lifecycle/LifecycleEventTypes.fs"/>
+  </ItemGroup>
+</Project>

@@ -3,11 +3,12 @@ namespace Wanxiangshu.Mission.Planning
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.EventStore
 
 /// planning-022: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
-    { Outcome: PlanReviewedOutcome
+    { Outcome: ReviewOutcome
       Gaps: (string * string) list }
 
 [<RequireQualifiedAccess>]
@@ -32,17 +33,17 @@ module PlanReviewError =
 module ReviewPlanBackend =
 
     let reviewTargetFor (stage: string) : string =
-        match PlanStage.ofString stage with
-        | Some PlanStage.S1 -> "S2"
-        | Some PlanStage.S2 -> "S3"
-        | Some PlanStage.S3 -> "authorized"
-        | None -> raise (ArgumentException(sprintf "Unknown plan stage: %s" stage))
+        match stage with
+        | "S1" -> "S2"
+        | "S2" -> "S3"
+        | "S3" -> "authorized"
+        | _ -> raise (ArgumentException(sprintf "Unknown plan stage: %s" stage))
 
-    let private reviewOutcome (gaps: (string * string) list) : PlanReviewedOutcome =
+    let private reviewOutcome (gaps: (string * string) list) : ReviewOutcome =
         if List.isEmpty gaps then
-            PlanReviewedOutcome.Promoted
+            ReviewOutcome.Promoted
         else
-            PlanReviewedOutcome.Stayed
+            ReviewOutcome.Stayed
 
     let private lifecycleWorkOf
         (store: IEventStore)
@@ -77,24 +78,19 @@ module ReviewPlanBackend =
                 | Some _ ->
                     let outcome = reviewOutcome gaps
 
-                    let reviewOutcomeValue =
-                        match outcome with
-                        | PlanReviewedOutcome.Promoted -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
-                        | PlanReviewedOutcome.Stayed -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed
-
                     match
-                        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.review work incumbencyId reviewOutcomeValue
+                        LifecycleKernel.review work incumbencyId outcome
                     with
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason ->
+                    | KernelDecision.Refuse reason ->
                         if reason = "incumbency already reviewed" then
                             return Error(PlanReviewError.AlreadyReviewed incumbencyId)
                         else
                             return Error(PlanReviewError.RecordFailed reason)
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                    | KernelDecision.Done _ ->
                         return Error(PlanReviewError.RecordFailed "review was not written")
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                        match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
-                        | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
+                    | KernelDecision.Write(events, _) ->
+                        match! LifecycleKernel.commit store workId events with
+                        | Ok(CommitOutcome.AppendDurable) ->
                             return Ok { Outcome = outcome; Gaps = gaps }
                         | Ok _ -> return Error(PlanReviewError.RecordFailed "review commit is not durable")
                         | Error reason -> return Error(PlanReviewError.RecordFailed reason)

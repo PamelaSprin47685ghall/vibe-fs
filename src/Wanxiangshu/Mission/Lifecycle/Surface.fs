@@ -203,6 +203,126 @@ module LifecycleSurface =
     let replayProbe (text: string) (providerRunId: string) (toolCallId: string) =
         deliverProbe text providerRunId toolCallId 1L
 
+    let private refusal (reason: string) =
+        box {| decision = "Refuse"; detail = reason; names = ""; bytes = "" |}
+
+    let private written (events: LifecycleEvent list) (label: string) =
+        box
+            {| decision = "Write"
+               detail = label
+               names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
+               bytes = document events |}
+
+    let private oneshotDecision (work: LifecycleWork) (providerRunId: string) (toolCallId: string) (head: int64) =
+        let deliveredLookup =
+            SessionLookup.One
+                { ExecSessionId = "exec-session-1"
+                  WorkId = Some work.WorkId }
+
+        if work.Sequence = WorkSequence.Execution then
+            KernelDecision.Refuse "oneshot deliver requires S1 S2 S3"
+        elif
+            work.Retirements
+            |> List.exists (fun record ->
+                record.Outcome = RetirementOutcome.Delivered
+                && record.ProviderRunId = Some providerRunId
+                && record.ToolCallId = Some toolCallId)
+        then
+            LifecycleKernel.deliverOneshot
+                sha256
+                work
+                (fence providerRunId toolCallId)
+                (Some head)
+                None
+                deliveredLookup
+                None
+                None
+        else
+            match LifecycleFold.projection work with
+            | Error error -> KernelDecision.Refuse error
+            | Ok(_, true) ->
+                LifecycleKernel.deliverOneshot
+                    sha256
+                    work
+                    (fence providerRunId toolCallId)
+                    (Some head)
+                    None
+                    deliveredLookup
+                    (Some
+                        { Missing = false
+                          Empty = false
+                          Digest = "sha256-receipt"
+                          Path = "plan.md" })
+                    (Some "exec-session-1")
+            | Ok(_, false) ->
+                LifecycleKernel.deliverOneshot
+                    sha256
+                    work
+                    (fence providerRunId toolCallId)
+                    (Some head)
+                    None
+                    SessionLookup.None
+                    None
+                    None
+
+    let deliverStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
+        match workOf text with
+        | Error error -> refusal error
+        | Ok work ->
+            match oneshotDecision work providerRunId toolCallId head with
+            | KernelDecision.Refuse reason -> refusal reason
+            | KernelDecision.Done label ->
+                box
+                    {| decision = "Done"
+                       detail = label
+                       names = ""
+                       bytes = ""
+                       original = label |}
+            | KernelDecision.Write(events, label) ->
+                written events label
+
+    let replayStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
+        match workOf text with
+        | Error error -> refusal error
+        | Ok work ->
+            match oneshotDecision work providerRunId toolCallId head with
+            | KernelDecision.Refuse reason -> refusal reason
+            | KernelDecision.Done label ->
+                box
+                    {| decision = "Done"
+                       detail = label
+                       names = ""
+                       bytes = ""
+                       original = label |}
+            | KernelDecision.Write(events, label) ->
+                let writtenText = text + document events
+                match workOf writtenText with
+                | Error error -> refusal error
+                | Ok next ->
+                    match oneshotDecision next providerRunId toolCallId head with
+                    | KernelDecision.Refuse reason -> refusal reason
+                    | KernelDecision.Write(_, _) -> refusal "exact replay wrote a second event"
+                    | KernelDecision.Done replayLabel ->
+                        match workOf writtenText with
+                        | Error error -> refusal error
+                        | Ok replayed when replayed = next ->
+                            box
+                                {| decision = "Done"
+                                   detail = replayLabel
+                                   names = ""
+                                   bytes = ""
+                                   original = label |}
+                        | Ok _ -> refusal "exact replay changed the folded work"
+
+    let reopenProbe (text: string) (incumbencyId: string) =
+        match workOf text with
+        | Error error -> refusal error
+        | Ok work ->
+            match LifecycleKernel.reopen work incumbencyId with
+            | KernelDecision.Refuse reason -> refusal reason
+            | KernelDecision.Done label -> box {| decision = "Done"; detail = label; names = ""; bytes = "" |}
+            | KernelDecision.Write(events, label) -> written events label
+
     let detachedOpeningProbe (text: string) =
         match workOf text with
         | Error error -> box {| decision = "Refuse"; detail = error; names = "" |}
@@ -467,6 +587,81 @@ module LifecycleSurface =
                     |> Option.bind (fun active -> active.Confirmed)
                     |> Option.isSome
                    delivered = work.CurrentDelivered |}
+
+    let documentView (text: string) =
+        match workOf text with
+        | Error error -> box {| found = false; detail = error |}
+        | Ok work ->
+            let folded = LifecycleFold.folded work
+
+            let projection, authorized =
+                match folded with
+                | Ok view ->
+                    let stage =
+                        match work.Active, work.DeliveredRecord with
+                        | None, Some record -> record.Stage |> Option.map StageElement.render
+                        | _ -> None
+                    Option.defaultValue (StageElement.render view.Projection) stage, view.DeliveryAuthorized
+                | Error _ -> "", false
+
+            let activeStage =
+                work.Active
+                |> Option.map (fun active -> StageElement.render active.OpeningStage)
+                |> Option.defaultValue ""
+
+            let activeId = work.Active |> Option.map (fun active -> active.Id) |> Option.defaultValue ""
+
+            let openingCursor =
+                work.Active |> Option.map (fun active -> active.OpeningCursor) |> Option.defaultValue 0L
+
+            let predecessor =
+                let prior =
+                    work.Retirements
+                    |> List.filter (fun record -> record.Outcome = RetirementOutcome.Relayed)
+                    |> List.tryLast
+
+                match work.Active, prior with
+                | Some active, Some record when record.RetirementCursor = Some active.OpeningCursor -> Some record
+                | Some active, Some record when
+                    active.OpeningCursor = 0L
+                    && record.IncumbencyId <> active.Id
+                    && (work.DeliveredRecord |> Option.exists (fun delivered -> delivered.IncumbencyId = active.Id))
+                    ->
+                    Some record
+                | _ -> None
+                |> Option.map (fun record -> string record.OpeningCursor + "," + (record.RetirementCursor |> Option.map string |> Option.defaultValue ""))
+                |> Option.defaultValue ""
+
+            let latest =
+                work.Retirements
+                |> List.tryLast
+                |> Option.map (fun record ->
+                    string record.OpeningCursor
+                    + ","
+                    + (record.RetirementCursor |> Option.map string |> Option.defaultValue ""))
+                |> Option.defaultValue ""
+
+            let receipt = work.DeliveredRecord
+
+            box
+                {| found = true
+                   detail = ""
+                   workId = work.WorkId
+                   root = work.Root
+                   projection = projection
+                   authorized = authorized
+                   active = work.Active.IsSome
+                   activeId = activeId
+                   openingStage = activeStage
+                   openingCursor = openingCursor
+                   retiredCount = work.Retirements.Length
+                   delivered = work.CurrentDelivered
+                   digest = receipt |> Option.bind (fun record -> record.Digest) |> Option.defaultValue ""
+                   path = receipt |> Option.bind (fun record -> record.Path) |> Option.defaultValue ""
+                   execSessionId = receipt |> Option.bind (fun record -> record.ExecSessionId) |> Option.defaultValue ""
+                   devopsId = work.DevOps |> Option.map fst |> Option.defaultValue ""
+                   predecessor = predecessor
+                   latestRetirement = latest |}
 
     let bindDevOps (store: obj) (workId: string) (devopsId: string) (target: obj) : Task<obj> =
         task {

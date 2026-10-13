@@ -1,129 +1,163 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
-import * as surface from '../../../dist/Mission/Planning/Surface.js'
 
-test('WHAT[work-033] plan events canonical JSON encoding strictly orders keys by Unicode code point', () => {
-  // 1. WorkOpened payload keys: ["root", "workId"]
-  const ev1 = surface.workOpened('work-1', '/repo/root')
-  const json1 = surface.encodeEventJson(ev1)
-  const parsed1 = JSON.parse(json1)
-  assert.deepEqual(Object.keys(parsed1), ['root', 'workId'])
+const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-  // 2. DevOpsBound payload keys: ["devopsId", "target", "workId"]
-  const ev2 = surface.devOpsBound('work-1', 'devops-1', ['gpt-4o'])
-  const json2 = surface.encodeEventJson(ev2)
-  const parsed2 = JSON.parse(json2)
-  assert.deepEqual(Object.keys(parsed2), ['devopsId', 'target', 'workId'])
+const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const incumbencyIdOf = (text) =>
+  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const sorted = (keys) => [...keys].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
 
-  // 3. IncumbencyOpened payload keys: ["incumbencyId", "openingCursor", "stage", "workId"]
-  const ev3 = surface.incumbencyOpened('work-1', 'inc-1', 'S1', 42n)
-  const json3 = surface.encodeEventJson(ev3)
-  const parsed3 = JSON.parse(json3)
-  assert.deepEqual(Object.keys(parsed3), ['incumbencyId', 'openingCursor', 'stage', 'workId'])
-
-  // 4. IncumbencyRetired payload keys: ["incumbencyId", "outcome", "retirementCursor"]
-  const ev4 = surface.incumbencyRetired('inc-1', 'Relayed', 100n)
-  const json4 = surface.encodeEventJson(ev4)
-  const parsed4 = JSON.parse(json4)
-  assert.deepEqual(Object.keys(parsed4), ['incumbencyId', 'outcome', 'retirementCursor'])
-
-  // 5. Reviewed payload keys: ["incumbencyId", "outcome", "stage"]
-  const ev5 = surface.reviewed('inc-1', 'S1', 'Promoted')
-  const json5 = surface.encodeEventJson(ev5)
-  const parsed5 = JSON.parse(json5)
-  assert.deepEqual(Object.keys(parsed5), ['incumbencyId', 'outcome', 'stage'])
-
-  // 6. Delivered payload keys: ["digest", "execSessionId", "incumbencyId", "path", "workId"]
-  const ev6 = surface.delivered('inc-2', 'work-1', 'sha256-abc', 'plan.md', 'exec-session-9')
-  const json6 = surface.encodeEventJson(ev6)
-  const parsed6 = JSON.parse(json6)
-  assert.deepEqual(Object.keys(parsed6), ['digest', 'execSessionId', 'incumbencyId', 'path', 'workId'])
-
-  // 7. Reopened payload keys: ["incumbencyId"]
-  const ev7 = surface.reopened('inc-2')
-  const json7 = surface.encodeEventJson(ev7)
-  const parsed7 = JSON.parse(json7)
-  assert.deepEqual(Object.keys(parsed7), ['incumbencyId'])
-})
-
-test('WHAT[work-033] canonical envelope round-trip preserves event semantics and int64 cursor precision', () => {
-  const largeCursor = 9007199254740995n // Greater than Number.MAX_SAFE_INTEGER
-
-  const evOpened = surface.incumbencyOpened('work-1', 'inc-1', 'S1', largeCursor)
-  const envelopeJson = surface.toCanonicalEnvelopeJson('work-1', evOpened, ['parent-1'])
-  assert.ok(envelopeJson.endsWith('\n'), 'canonical JSON line must end with LF')
-
-  const decoded = surface.tryDecodeEnvelopeJson(envelopeJson)
-  assert.equal(decoded.ok, true)
-  assert.equal(decoded.workId, 'work-1')
-  assert.equal(decoded.incumbencyId, 'inc-1')
-  assert.equal(decoded.stage, 'S1')
-  assert.equal(decoded.cursor, largeCursor)
-})
-
-test('WHAT[work-033] Plan integration rule integrates envelopes and exports PlanWorkView', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'wxs-planning-016-'))
-  const commonDir = join(root, '.git')
-  mkdirSync(commonDir, { recursive: true })
-
+const withStore = async (body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-033-'))
+  execFileSync('git', ['init', '--quiet', root])
   try {
-    const store = workspace.acquire(commonDir)
-
-    // Construct a sequence for a full planning cycle under the new contract:
-    // review promotes in place, relay swaps the tenure at the same stage.
-    const ev1 = surface.workOpened('work-demo', '/workspace')
-    const ev2 = surface.devOpsBound('work-demo', 'devops-fixed', null)
-    const ev3 = surface.incumbencyOpened('work-demo', 'inc-1', 'S1', 0n)
-    const ev4 = surface.reviewed('inc-1', 'S1', 'Promoted')
-    const ev5 = surface.incumbencyRetired('inc-1', 'Relayed', 10n)
-    const ev6 = surface.incumbencyOpened('work-demo', 'inc-2', 'S2', 11n)
-    const ev7 = surface.reviewed('inc-2', 'S2', 'Promoted')
-    const ev8 = surface.incumbencyRetired('inc-2', 'Relayed', 20n)
-    const ev9 = surface.incumbencyOpened('work-demo', 'inc-3', 'S3', 21n)
-    const ev10 = surface.reviewed('inc-3', 'S3', 'Promoted')
-    const ev11 = surface.incumbencyRetired('inc-3', 'Delivered', 30n)
-    const ev12 = surface.delivered('inc-3', 'work-demo', 'sha256-receipt', '/workspace/plan/work-demo/plan.md', 'exec-demo-1')
-
-    const allEvents = [ev1, ev2, ev3, ev4, ev5, ev6, ev7, ev8, ev9, ev10, ev11, ev12]
-    for (const ev of allEvents) {
-      const res = await surface.append(store, 'work-demo', ev)
-      assert.equal(res.ok, true, `append failed: ${res.error}`)
-    }
-
-    // Inspect projection view through PlanningSurface
-    const viewObj = surface.getPlanWorkView(store, 'work-demo')
-    assert.equal(viewObj.found, true)
-    assert.equal(viewObj.view.WorkId, 'work-demo')
-    assert.equal(viewObj.view.RetiredCount, 3)
-    assert.equal(viewObj.view.Delivered, true)
-    assert.equal(viewObj.view.DeliveryDigest, 'sha256-receipt')
-    assert.equal(viewObj.view.BoundDevOpsId, 'devops-fixed')
+    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+}
+
+test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', () => {
+  const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', 42n)
+  const [workOpened, incumbencyOpened] = eventsOf(opened)
+  assert.deepEqual(Object.keys(workOpened.payload), sorted(Object.keys(workOpened.payload)))
+  assert.deepEqual(Object.keys(workOpened.payload), ['authorityInitial', 'root', 'sequence', 'workId'])
+  assert.deepEqual(Object.keys(incumbencyOpened.payload), ['incumbencyId', 'openingCursor', 'stage', 'workId'])
+  assert.equal(incumbencyOpened.payload.openingCursor, '42')
+
+  const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
+  const review = JSON.parse(reviewed.bytes)
+  assert.deepEqual(Object.keys(review.payload), ['incumbencyId', 'outcome', 'stage'])
+
+  const relayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-1', 'call-1', 100n)
+  const [retired, successor] = eventsOf(relayed.bytes)
+  assert.deepEqual(Object.keys(retired.payload), sorted(Object.keys(retired.payload)))
+  assert.equal(retired.payload.outcome, 'Relayed')
+  assert.equal(retired.payload.retirementCursor, '100')
+  assert.ok(Object.keys(retired.payload).includes('incumbencyId'))
+  assert.ok(Object.keys(retired.payload).includes('retirementId'))
+  assert.deepEqual(Object.keys(successor.payload), ['incumbencyId', 'openingCursor', 'stage', 'workId'])
+
+  const authorized = surface.finalPromotionProbe(opened)
+  assert.equal(authorized.authorized, true)
+
+  const full = (() => {
+    let text = opened
+    for (let step = 0; step < 2; step += 1) {
+      const reviewStep = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+      const relayStep = surface.deliverProbe(`${text}${reviewStep.bytes}`, `run-${step}`, `call-${step}`, BigInt(step + 1))
+      text = `${text}${reviewStep.bytes}${relayStep.bytes}`
+    }
+    const last = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+    const receipt = surface.deliverStateProbe(`${text}${last.bytes}`, 'run-final', 'call-final', 30n)
+    const reopened = surface.reopenProbe(`${text}${last.bytes}${receipt.bytes}`, incumbencyIdOf(text))
+    return { receipt, reopened }
+  })()
+  const receipt = JSON.parse(full.receipt.bytes)
+  for (const key of ['digest', 'execSessionId', 'incumbencyId', 'outcome', 'path', 'retirementCursor']) {
+    assert.equal(Object.keys(receipt.payload).includes(key), true, key)
+  }
+  const reopened = JSON.parse(full.reopened.bytes)
+  assert.deepEqual(Object.keys(reopened.payload), ['incumbencyId'])
+  assert.equal(reopened.event_type, 'Reopened')
 })
 
-test('WHAT[work-033] append pre-validation enforces fold laws and rejects rule violations before hitting store', async () => {
-  // Mock store implementing IEventStore
-  let appendCalled = false
-  const mockStore = {
-    TryCurrent: () => null,
-    TryHead: () => null,
-    Append: async () => {
-      appendCalled = true
-      return { tag: 0 }
-    },
+test('WHAT[work-033] canonical lines round-trip and keep int64 cursor precision', () => {
+  const large = 9007199254740995n
+  const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', large)
+  assert.equal(opened.endsWith('\n'), true, 'a canonical lifecycle line ends with LF')
+  const decoded = surface.decodeDocument(opened)
+  assert.equal(decoded.ok, true, decoded.fault)
+  assert.equal(decoded.names, 'WorkOpened,IncumbencyOpened')
+  const openedEvent = eventsOf(opened)[1]
+  assert.equal(openedEvent.payload.openingCursor, '9007199254740995')
+  assert.equal(BigInt(openedEvent.payload.openingCursor), large)
+  assert.equal(surface.documentView(opened).openingCursor, large)
+
+  const truncated = opened.replace(/\n$/, '')
+  const invalid = surface.decodeDocument(truncated)
+  assert.equal(invalid.ok, false)
+  assert.equal(surface.readProbe(truncated).position, 'StorageInvalid')
+})
+
+test('WHAT[work-033] real bytes fold through the codec and the live store', async () => {
+  const opened = surface.encodeOpening('plan', 'work-demo', '/workspace', 0n)
+  let text = opened
+  for (let step = 0; step < 2; step += 1) {
+    const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+    const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt((step + 1) * 10))
+    text = `${text}${reviewed.bytes}${relayed.bytes}`
   }
+  const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+  text = `${text}${reviewed.bytes}`
+  const delivered = surface.deliverStateProbe(text, 'run-demo', 'call-demo', 30n)
+  assert.equal(delivered.decision, 'Write', delivered.detail)
+  text = `${text}${delivered.bytes}`
 
-  // Attempt to open the initial incumbency directly at S2 (violating the S1 start)
-  const invalidEvent = surface.incumbencyOpened('work-mock', 'inc-1', 'S2', 0n)
-  const res = await surface.append(mockStore, 'work-mock', invalidEvent)
+  const folded = surface.readProbe(text)
+  assert.equal(folded.position, 'DeliveredIdempotent')
+  const view = surface.documentView(text)
+  assert.equal(view.found, true)
+  assert.equal(view.workId, 'work-demo')
+  assert.equal(view.retiredCount, 3)
+  assert.equal(view.delivered, true)
+  assert.equal(view.digest, 'sha256-receipt')
+  assert.equal(view.projection, 'S3')
 
-  assert.equal(res.ok, false)
-  assert.match(res.error, /Fold validation failed before append/)
-  assert.equal(appendCalled, false, 'Store.Append must never be called when fold validation fails')
+  await withStore(async (store) => {
+    const seeded = await surface.seedOpen(store, 'plan', 'work-demo', '/workspace', 0n)
+    assert.equal(seeded.ok, true, seeded.error)
+    const bound = await surface.bindDevOps(store, 'work-demo', 'devops-fixed', null)
+    assert.equal(bound.ok, true, bound.error)
+    for (let step = 0; step < 2; step += 1) {
+      const review = await surface.seedReview(store, 'work-demo', 'Promoted')
+      assert.equal(review.ok, true, review.error)
+      const relay = await surface.seedDeliver(store, 'work-demo', `run-${step}`, `call-${step}`, BigInt((step + 1) * 10))
+      assert.equal(relay.ok, true, relay.error)
+      assert.equal(relay.decision, 'relayed')
+    }
+    const last = await surface.seedReview(store, 'work-demo', 'Promoted')
+    assert.equal(last.ok, true, last.error)
+    const blocked = await surface.seedDeliver(store, 'work-demo', 'run-demo', 'call-demo', 30n)
+    assert.equal(blocked.ok, false, 'an authorized tenure does not deliver without a draft and a session')
+    assert.match(blocked.error, /draft|session/i)
+    const stored = surface.workView(store, 'work-demo')
+    assert.equal(stored.found, true)
+    assert.equal(stored.sequence, 'S1,S2,S3')
+    assert.equal(stored.active, true)
+    assert.equal(stored.reviewed, 'Promoted')
+    assert.equal(stored.delivered, false, 'the refused deliver writes no retirement')
+    assert.equal(surface.roadDevOps(store, 'work-demo').devopsId, 'devops-fixed')
+  })
+})
+
+test('WHAT[work-033] an illegal first stage is rejected by the fold before any live append', async () => {
+  const opened = surface.encodeOpening('plan', 'work-mock', '/repo', 0n)
+  const illegal = opened.replace('"stage":"S1"', '"stage":"S2"')
+  const read = surface.readProbe(illegal)
+  assert.equal(read.position, 'Rejected', 'the first incumbency must open at S1')
+  const decoded = surface.decodeDocument(illegal)
+  assert.equal(decoded.ok, true, 'the bytes are legal; the fold is what rejects them')
+
+  await withStore(async (store) => {
+    const batches = []
+    const append = store.Append.bind(store)
+    store.Append = async (envelopes) => {
+      const batch = []
+      for (const envelope of envelopes) batch.push(envelope)
+      batches.push(batch)
+      return append(envelopes)
+    }
+    const seeded = await surface.seedOpen(store, 'plan', 'work-mock', '/repo', 0n)
+    assert.equal(seeded.ok, true, seeded.error)
+    assert.equal(batches.length, 1)
+    assert.equal(batches[0][1].Payload.stage, 'S1', 'the kernel does not append an S2 opening')
+  })
 })

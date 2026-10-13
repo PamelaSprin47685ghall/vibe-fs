@@ -3,8 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open Wanxiangshu.Persistence.EventStore
 
 [<RequireQualifiedAccess>]
-module PlanIntegrationRules =
-    val planRule: IntegrationRule
+module LifecycleIntegrationRules =
     /// The one lifecycle vocabulary's integration rule.
-    val lifecycleRule: IntegrationRule
+    val rule: IntegrationRule
     val rules: IntegrationRule list

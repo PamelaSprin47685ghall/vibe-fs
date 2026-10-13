@@ -133,22 +133,6 @@ type LifecycleEvent =
     | AdvanceCommitted of incumbencyId: string * expected: string * next: string
     | RetirementBlocked of incumbencyId: string * blockerDigest: string
 
-[<RequireQualifiedAccess>]
-module LifecycleEventTypes =
-    let WorkOpened = Wanxiangshu.Mission.Planning.LifecycleEventTypes.WorkOpened
-    let DevOpsBound = Wanxiangshu.Mission.Planning.LifecycleEventTypes.DevOpsBound
-    let IncumbencyOpened = Wanxiangshu.Mission.Planning.LifecycleEventTypes.IncumbencyOpened
-    let ConfirmationCommitted = Wanxiangshu.Mission.Planning.LifecycleEventTypes.ConfirmationCommitted
-    let IncumbencyRetired = Wanxiangshu.Mission.Planning.LifecycleEventTypes.IncumbencyRetired
-    let Reviewed = Wanxiangshu.Mission.Planning.LifecycleEventTypes.Reviewed
-    let Reopened = Wanxiangshu.Mission.Planning.LifecycleEventTypes.Reopened
-    let AdvanceCommitted = Wanxiangshu.Mission.Planning.LifecycleEventTypes.AdvanceCommitted
-    let RetirementBlocked = Wanxiangshu.Mission.Planning.LifecycleEventTypes.RetirementBlocked
-
-    let all = Wanxiangshu.Mission.Planning.LifecycleEventTypes.all
-    let isLifecycleEvent eventType =
-        Wanxiangshu.Mission.Planning.LifecycleEventTypes.isLifecycleEvent eventType
-
 module LifecycleIdentity =
     let spawnMark = "spawn-from-authorized-delivery-v1"
 

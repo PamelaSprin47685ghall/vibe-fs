@@ -1,16 +1,6 @@
-namespace Wanxiangshu.Mission.Planning
+namespace Wanxiangshu.Mission.Lifecycle
 
-module PlanEventTypes =
-    val WorkOpened: string
-    val DevOpsBound: string
-    val IncumbencyOpened: string
-    val IncumbencyRetired: string
-    val Delivered: string
-    val Reviewed: string
-    val Reopened: string
-    val all: string list
-    val isPlanEvent: string -> bool
-
+[<RequireQualifiedAccess>]
 module LifecycleEventTypes =
     val WorkOpened: string
     val DevOpsBound: string

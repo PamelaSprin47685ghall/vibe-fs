@@ -60,7 +60,7 @@ module ReviewShell =
         // planning-022: the gaps return to the model as repair obligations,
         // echoed verbatim below the outcome instruction.
         let instructionPath =
-            if review.Outcome = PlanReviewedOutcome.Promoted then
+            if review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted then
                 Path.PlanPromoted
             else
                 Path.PlanStayed
