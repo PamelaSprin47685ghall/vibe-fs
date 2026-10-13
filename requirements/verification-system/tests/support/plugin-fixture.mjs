@@ -6,7 +6,7 @@
 // `scripts/architecture-gate.mjs` scans `['.mjs']`, so this file is still gated.
 
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -25,7 +25,8 @@ const journalSurface = await import('../../../../dist/Persistence/Journal/Surfac
 const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceSharedJournal.js')
 const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface.js')
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
-const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
+const workspaceEventStoreSurface = await import('../../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
+const lifecycleSurface = await import('../../../../dist/Mission/Lifecycle/Surface.js')
 const bloggerRuntimeSurface = await import('../../../../dist/Context/Companion/RuntimeSurface.js')
 const bloggerOwnership = await import('./blogger-ownership.mjs')
 
@@ -44,6 +45,7 @@ const withJournalRuntime = async (directory, action) => {
       journal: journalResult.journal,
       runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
       terminalPort,
+      directory,
     })
   } finally {
     try {
@@ -267,6 +269,7 @@ export const withExecutablePlugin = async (body, options = {}, createHooks = ini
         journal: journalResult.journal,
         runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
         terminalPort,
+        directory,
         client,
         prompts,
         messages,
@@ -521,25 +524,40 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
   }
 }
 
-const resolveJournalHandle = (runtime) => runtime?.journal ?? runtime
+/**
+ * The workspace EventStore the running plugin already reads. Lifecycle facts are
+ * one vocabulary in one store; a test seeds real unified events there instead of
+ * inventing a relay-shaped private surface.
+ */
+const lifecycleStore = (runtime) => {
+  const directory = runtime?.directory
+  if (!directory) throw new Error('lifecycle seeding needs an executable plugin runtime (runtime.directory)')
+  return workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
+}
 
-export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
-  const handle = resolveJournalHandle(runtime)
-  const result = await obligationJournalSurface.openIncumbency(handle, sessionId, incumbencyId)
+export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`, kind = 'S4') => {
+  const store = lifecycleStore(runtime)
+  const result = await lifecycleSurface.seedOpen(store, kind, sessionId, runtime.directory, 1n)
   if (!result?.ok) throw new Error(`openIncumbency(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
   return result
 }
 
 export const injectAuditPendingIncumbency = openIncumbency
 
-// The accepted assessment is a relay durable fact; it is committed through the
-// registered journal surface, so no relay/durable representation crosses here.
-export const injectAcceptedAssessment = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
-  const result = await obligationJournalSurface.grantWorkOwned(
-    resolveJournalHandle(runtime),
-    sessionId,
-    incumbencyId,
-  )
+// The accepted review is a unified lifecycle fact (Reviewed). It is committed to
+// the workspace store the plugin reads, so no second representation crosses here.
+export const injectAcceptedAssessment = async (
+  runtime,
+  sessionId,
+  incumbencyId = `inc-${sessionId}`,
+  outcome = 'Stayed',
+) => {
+  const store = lifecycleStore(runtime)
+  const opened = await lifecycleSurface.workView(store, sessionId)
+  if (!opened?.found) {
+    await openIncumbency(runtime, sessionId, incumbencyId)
+  }
+  const result = await lifecycleSurface.seedReview(store, sessionId, outcome)
   if (!result?.ok) {
     throw new Error(`injectAcceptedAssessment(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
   }
@@ -548,54 +566,23 @@ export const injectAcceptedAssessment = async (runtime, sessionId, incumbencyId 
 
 export const grantWorkOwned = injectAcceptedAssessment
 
-export const activateLife = async (runtime, sessionId, openingUserMessageId = `root-${sessionId}`) => {
-  const lifeId = `life-${sessionId}`
-  const opened = await obligationJournalSurface.appendManagerLifecycle(
-    runtime.journal,
-    sessionId,
-    'LifeOpened',
-    {
-      sessionId,
-      lifeId,
-      openingCursorSequence: 0,
-      openingTextDigest: 'digest-opening',
-      openingTextRef: 'blob-ref',
-      openingUserMessageId,
-    },
-  )
-  if (!opened?.ok) throw new Error(`LifeOpened(${sessionId}) rejected: ${opened?.error ?? 'unknown error'}`)
-  const activated = await obligationJournalSurface.appendManagerLifecycle(
-    runtime.journal,
-    sessionId,
-    'WorkActivated',
-    {
-      sessionId,
-      lifeId,
-      activationPromptKey: '',
-      protectedPrefixEndSequence: 1,
-    },
-  )
-  if (!activated?.ok) {
-    throw new Error(`WorkActivated(${sessionId}) rejected: ${activated?.error ?? 'unknown error'}`)
-  }
+export const activateLife = async (runtime, sessionId) => {
+  await openIncumbency(runtime, sessionId)
 }
 
 export const completeManagerLife = async (runtime, sessionId) => {
-  const completed = await obligationJournalSurface.appendManagerLifecycle(
-    runtime.journal,
-    sessionId,
-    'LifeCompleted',
-    {
-      sessionId,
-      lifeId: `life-${sessionId}`,
-      requestId: `finality-${sessionId}`,
-      terminalRef: `terminal-${sessionId}`,
-      terminalDigest: `digest-terminal-${sessionId}`,
-    },
-  )
-  if (!completed?.ok) {
-    throw new Error(`LifeCompleted(${sessionId}) rejected: ${completed?.error ?? 'unknown error'}`)
+  const store = lifecycleStore(runtime)
+  const view = await lifecycleSurface.workView(store, sessionId)
+  if (!view?.found) await openIncumbency(runtime, sessionId)
+  const reviewed = await lifecycleSurface.workView(store, sessionId)
+  if (!reviewed?.reviewed) {
+    const seeded = await lifecycleSurface.seedReview(store, sessionId, 'Promoted')
+    if (!seeded?.ok) throw new Error(`LifeCompleted(${sessionId}) review rejected: ${seeded?.error ?? 'unknown error'}`)
   }
+  const confirm = await lifecycleSurface.seedDeliver(store, sessionId, `run-${sessionId}`, 'call-first', 2n)
+  if (!confirm?.ok) throw new Error(`LifeCompleted(${sessionId}) confirmation rejected: ${confirm?.error ?? 'unknown error'}`)
+  const retired = await lifecycleSurface.seedDeliver(store, sessionId, `run-${sessionId}`, 'call-second', 3n)
+  if (!retired?.ok) throw new Error(`LifeCompleted(${sessionId}) retirement rejected: ${retired?.error ?? 'unknown error'}`)
 }
 
 /**

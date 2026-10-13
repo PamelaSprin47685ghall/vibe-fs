@@ -61,7 +61,7 @@ type ToolRuntimeScope
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
-    let retirementFrozen = Dictionary<string, IncumbencyId>()
+    let retirementFrozen = Dictionary<string, string>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -458,8 +458,25 @@ type ToolRuntimeScope
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay -> Fold.view relay (RoadId.create sessionId))
 
-    let activeIncumbencyOfSession (sessionId: string) : IncumbencyId option =
-        roadViewOfSession sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
+    /// The active unified incumbency id for this session, read from the same
+    /// workspace EventStore the lifecycle kernel writes.
+    let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
+        match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
+        | None -> None
+        | Some dir when System.String.IsNullOrWhiteSpace dir -> None
+        | Some dir ->
+            match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
+            | None -> None
+            | Some held ->
+                match held.TryCurrent "Lifecycle" with
+                | None -> None
+                | Some current ->
+                    let works =
+                        unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+                    Map.tryFind sessionId works
+                    |> Option.bind (fun work -> work.Active)
+                    |> Option.map (fun active -> active.Id)
 
     let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
         let lifecycle =
@@ -826,7 +843,7 @@ type ToolRuntimeScope
     member self.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
         managerFactsOfSession self.WorkspaceDirectory sessionId
 
-    member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
+    member _.TryFreezeRetirement(sessionId: string, incumbentId: string) =
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId with
             | true, current when current = incumbentId -> false
@@ -838,7 +855,7 @@ type ToolRuntimeScope
         lock gate (fun () -> retirementFrozen.Remove sessionId |> ignore)
 
     member _.IsRetirementFrozen(sessionId: string) =
-        let activeIncumbency = activeIncumbencyOfSession sessionId
+        let activeIncumbency = activeIncumbencyOfSession workspaceDirectory sessionId
 
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId, activeIncumbency with

@@ -39,7 +39,7 @@ module PlanningSurface =
     val getPlanWorkView: store: IEventStore -> workId: string -> obj
     val getPlanWorkStateFromIntegrator: integrator: ICanonicalIntegrator -> workId: string -> obj
     val getPlanWorkViewFromIntegrator: integrator: ICanonicalIntegrator -> workId: string -> obj
-    val ensurePlanWorkOpened: store: IEventStore -> root: string -> sessionId: string -> Task<obj>
+    val ensurePlanWorkOpened: store: IEventStore -> root: string -> sessionId: string -> observedHead: obj -> Task<obj>
 
     val assembleTenureMessages:
         messages: obj -> tenureObj: obj -> materializePrev: (obj -> string) -> messageCursors: obj -> obj
@@ -56,6 +56,8 @@ module PlanningSurface =
         root: string ->
         workId: string ->
         incumbencyId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
         hasBlocker: bool ->
         spawn: obj ->
         retirementCursor: obj ->

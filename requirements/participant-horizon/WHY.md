@@ -10,7 +10,7 @@
 
 ## 边界与关系
 
-provider-projection 负责已准入信息的编码，本包负责准入和必要后果。office-capability 与 delegation 决定可见动作背后的真实职责，relay-assessment 定义质量结论；本包不通过呈现创造权限或改写结论。
+provider-projection 负责已准入信息的编码，本包负责准入和必要后果。office-capability 与 delegation 决定可见动作背后的真实职责，work 定义质量结论；本包不通过呈现创造权限或改写结论。
 
 ## DEPENDS ON
 

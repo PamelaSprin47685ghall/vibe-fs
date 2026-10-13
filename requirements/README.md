@@ -26,7 +26,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 56 包索引
+## 50 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -88,7 +88,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 | [semantic-trace](semantic-trace/WHAT.md) | participant life 的原始 semantic history append-only、可定位。 |
-| [work-record](work-record/WHAT.md) | bounded work 跨 participant/review/finality 传递有 canonical statement。 |
+| [work-record](work-record/WHAT.md) | bounded work 跨 participant、review 与 deliver 传递有 canonical statement。 |
 | [context-compression](context-compression/WHAT.md) | 历史过长时只在证据边界用 semantic memory 替换可压缩区。 |
 | [prefix-stability](prefix-stability/WHAT.md) | 同一 semantic epoch 已呈现前缀 byte-stable；冷边界由事实驱动。 |
 
@@ -105,12 +105,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 | [obligation-ledger](obligation-ledger/WHAT.md) | mission 持续维护「仍欠世界什么」，不用 phase/status 伪装进度。 |
-| [relay-incumbency](relay-incumbency/WHAT.md) | 每一任从只读 audit 开始；低分即接责，退休永不恢复，单 active 任期。 |
-| [relay-assessment](relay-assessment/WHAT.md) | 每任期至多一次三问评审，返回 (验收标准, 工作计划) pairs；非空 findings 原子生成修复义务，空集生成证书。 |
-| [relay-retirement](relay-retirement/WHAT.md) | deliver 是唯一正常出口；只有递归 live 资源阻塞退休。 |
-| [relay-context-projection](relay-context-projection/WHAT.md) | 审计与 provider 投影保留同一份完整历史；ProjectionCut 只做请求身份判定与 stale 拦截，继任者评审前任的工作。 |
-
-旧 `review-judgement` / `review-assurance` / `finality` 已 clean break 到上述 relay 包。
+| [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
 
 ### 10. Feedback
 | Package | 一句话 WHY |

@@ -81,25 +81,24 @@ module ManagerWorkflow =
 
     // Algorithm H reads the opening sequence plus tenure, review outcome, and confirmation.
     // S1–S3 do not enter the S4 resource match. Certificates are not an input.
-    let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) (road: RoadView) =
+    let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) =
         match lifecycleWork directory (SessionId.value sessionId) with
         | None -> None
         | Some work when work.Sequence <> Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution -> None
         | Some work ->
-            match road.ActiveIncumbency, work.Active with
-            | None, _
-            | Some _, None -> None
-            | Some _, Some active when work.CurrentRelayed && active.Review.IsNone -> None
-            | Some _, Some active when active.Review.IsNone && active.Confirmed.IsSome -> None
-            | Some _, Some active when active.Review.IsNone -> Some assessPath
-            | Some _, Some active when active.Confirmed.IsNone ->
+            match work.Active with
+            | None -> None
+            | Some active when work.CurrentRelayed && active.Review.IsNone -> None
+            | Some active when active.Review.IsNone && active.Confirmed.IsSome -> None
+            | Some active when active.Review.IsNone -> Some assessPath
+            | Some active when active.Confirmed.IsNone ->
                 match active.Review with
                 | Some review when review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed ->
                     Some workPath
                 | Some review when review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted ->
                     Some finishPath
                 | _ -> None
-            | Some _, Some active ->
+            | Some active ->
                 match active.Review with
                 | Some review when
                     review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
@@ -108,8 +107,24 @@ module ManagerWorkflow =
                 | _ -> None
 
 
-    let private activeResourcePath (directory: string option) (sessionId: SessionId) (view: RoadView option) =
-        view |> Option.bind (resourceForCurrentAction directory sessionId)
+    let private activeResourcePath (directory: string option) (sessionId: SessionId) =
+        resourceForCurrentAction directory sessionId
+
+    /// The closeout instruction substituted into `runtime/manager-finish`. The
+    /// two-stage deliver is the point: the first call only records confirmation,
+    /// a later call with a different tool call is what closes out.
+    let finishCloseoutText (confirmed: bool) : string =
+        match ProviderLanguageBinding.readGlobalPreference () with
+        | ProviderLanguage.English ->
+            if confirmed then
+                "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
+            else
+                "This call only records confirmation. It does not end."
+        | _ ->
+            if confirmed then
+                "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
+            else
+                "这一次调用只落下确认，不结束。"
 
     let private sendNudge
         (quiescence: ISessionQuiescenceGate)
@@ -132,23 +147,7 @@ module ManagerWorkflow =
                         | None -> false
                     | None -> false
 
-                let preferEnglish =
-                    match ProviderLanguageBinding.readGlobalPreference () with
-                    | ProviderLanguage.English -> true
-                    | _ -> false
-
-                let closeout =
-                    if preferEnglish then
-                        if confirmed then
-                            "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
-                        else
-                            "This call only records confirmation. It does not end."
-                    elif confirmed then
-                        "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
-                    else
-                        "这一次调用只落下确认，不结束。"
-
-                Map [ "closeout", closeout ]
+                Map [ "closeout", finishCloseoutText confirmed ]
             else
                 Map.empty
 
@@ -175,9 +174,7 @@ module ManagerWorkflow =
         (turn: ReconciledTurn)
         =
         task {
-            let view = currentView journal turn.SessionId
-
-            match activeResourcePath turn.Directory turn.SessionId view with
+            match activeResourcePath turn.Directory turn.SessionId with
             | Some resourcePath ->
                 // Durable PromptAuthority gate is the sole dedupe/source of truth:
                 // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
@@ -187,123 +184,27 @@ module ManagerWorkflow =
         }
         :> Task
 
-    let private mergeWithInvalidation (opening: IncumbencyOpening) invalidationEvents =
-        if List.isEmpty invalidationEvents then
-            opening.Transaction
-        else
-            RelayTransaction.create (invalidationEvents @ RelayTransaction.events opening.Transaction)
-            |> Result.defaultValue opening.Transaction
-
-    let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
-        match retirement.Outcome with
-        | RetirementOutcome.Relayed -> true
-        | RetirementOutcome.Delivered -> false
-
-    let private isDeliveredRetirement (retirement: RetirementSummary) =
-        match retirement.Outcome with
-        | RetirementOutcome.Delivered -> true
-        | RetirementOutcome.Relayed -> false
-
-    let private tryAcceptedRoadContext (durable: AgentJournal) sidText =
-        let sessionId = SessionId.create sidText
-        let roadId = RoadId.create sidText
-        let snapshot = AgentJournal.snapshot durable
-
-        let roadOpt =
-            AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-        match roadOpt with
-        | Some road ->
-            road.LatestRetirement
-            |> Option.filter isDeliveredRetirement
-            |> Option.map (fun retirement ->
-                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+    /// Algorithm H8 entry two: after a Relayed retirement on an S4 work whose
+    /// successor has not been reviewed yet, the successor prompt is the first
+    /// visible instruction. The retired record's cut names the provider run.
+    let private successorPromptContext
+        (workspaceDirectory: string option)
+        (sessionIdText: string)
+        : (string * string) option =
+        match lifecycleWork workspaceDirectory sessionIdText with
+        | Some work when
+            work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution && work.CurrentRelayed
+            ->
+            match work.Active with
+            | Some active when active.Review.IsNone ->
+                work.Retirements
+                |> List.tryFindBack (fun record ->
+                    record.Outcome = Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed)
+                |> Option.bind (fun record ->
+                    record.ProjectionCut
+                    |> Option.map (fun cut -> record.RetirementId, cut.ProviderRunId))
+            | _ -> None
         | _ -> None
-
-    let private loopContextFor (durable: AgentJournal) sidText =
-        let sessionId = SessionId.create sidText
-        let roadId = RoadId.create sidText
-        let snapshot = AgentJournal.snapshot durable
-
-        let roadOpt =
-            AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-        match roadOpt with
-        | Some road ->
-            road.LatestRetirement
-            |> Option.filter (requiresContinuation road)
-            |> Option.map (fun retirement ->
-                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
-        | _ -> None
-
-    let private decideLoopContext journal sessionIdTextOpt =
-        match sessionIdTextOpt, journal with
-        | Some sidText, Some durable when not (System.String.IsNullOrWhiteSpace sidText) ->
-            loopContextFor durable sidText
-        | _ -> None
-
-    let private tryBuildAcceptedOpening
-        durable
-        workspaceDirectory
-        sessionId
-        roadId
-        authorityRevision
-        (retirement: RetirementSummary)
-        =
-        ignore durable
-        ignore workspaceDirectory
-        ignore sessionId
-        ignore roadId
-        ignore authorityRevision
-        ignore retirement
-        None
-
-    let private decideLoopOpening journal (workspaceDirectory: string option) sessionIdTextOpt =
-        sessionIdTextOpt
-        |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-        |> Option.bind (fun sessionIdText ->
-            journal
-            |> Option.bind (fun durable ->
-                match tryAcceptedRoadContext durable sessionIdText with
-                | Some(_, sessionId, roadId, authorityRevision, retirement, true) ->
-                    tryBuildAcceptedOpening durable workspaceDirectory sessionId roadId authorityRevision retirement
-                | _ -> None))
-
-    let private decideInitialOpening durable workspaceDirectory sessionId sessionIdText =
-        let snapshot = AgentJournal.snapshot durable
-        let roadId = RoadId.create sessionIdText
-
-        let roadView =
-            AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-        let profileOpt =
-            PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
-
-        ignore durable
-        ignore workspaceDirectory
-        ignore sessionId
-        ignore sessionIdText
-        ignore roadView
-        ignore profileOpt
-        None
-
-    let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
-        match decideLoopOpening journal workspaceDirectory sessionIdTextOpt with
-        | Some action -> Some action
-        | None ->
-            sessionIdTextOpt
-            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-            |> Option.bind (fun sessionIdText ->
-                journal
-                |> Option.bind (fun durable ->
-                    let sessionId = SessionId.create sessionIdText
-                    decideInitialOpening durable workspaceDirectory sessionId sessionIdText))
 
     let ensureManagerRoadOpened
         (journal: AgentJournal option)
@@ -345,20 +246,17 @@ module ManagerWorkflow =
         workspaceDirectory
         (durable: AgentJournal)
         sessionId
-        (retirement: RetirementSummary)
+        (retirementId: string)
+        (terminalProviderRunId: string)
         =
         task {
-            match lifecycleWork workspaceDirectory (SessionId.value sessionId) with
-            | Some work when work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution -> ()
-            | _ -> return ()
-
             let loopPromptText =
                 ProviderProse.documentFor
                     sessionId
                     "runtime/manager-assess"
                     (Map [ "ordinal", iterationOrdinalText (Some durable) sessionId ])
 
-            let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
+            let terminalRun = ProviderRunIdentity.create terminalProviderRunId
 
             match!
                 HostSessionNudge.trySendGateContinuation
@@ -369,7 +267,7 @@ module ManagerWorkflow =
                     PromptAuthority.ContinuationKind.ManagerGuard
                     workspaceDirectory
                     (Some durable)
-                    (ManagerLoopGate.gateKind retirement.Id)
+                    (ManagerLoopGate.gateKind (RetirementId.create retirementId))
                     terminalRun
             with
             | HostSessionNudge.GateContinuationOutcome.Sent _
@@ -379,27 +277,32 @@ module ManagerWorkflow =
                     invalidOp (
                         sprintf
                             "MANAGER-LOOP-003: loop gate retired for retirement %s"
-                            (RetirementId.value retirement.Id)
+                            retirementId
                     )
             | HostSessionNudge.GateContinuationOutcome.Failed error ->
                 return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
         }
 
-    let private deliverLoopContext
+    let private deliverSuccessorPrompt
         sessionPort
         rootWorkspace
         workspaceDirectory
-        (context: AgentJournal * SessionId * RoadId * AuthorityRevision * RetirementSummary * bool)
+        (durable: AgentJournal)
+        (sessionId: SessionId)
         =
         task {
-            let durable, sessionId, roadId, authorityRevision, retirement, needsOpening =
-                context
-
-            ignore needsOpening
-            ignore roadId
-            ignore authorityRevision
-
-            do! deliverLoopPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId retirement
+            match successorPromptContext workspaceDirectory (SessionId.value sessionId) with
+            | Some(retirementId, providerRunId) ->
+                do!
+                    deliverLoopPrompt
+                        sessionPort
+                        rootWorkspace
+                        workspaceDirectory
+                        durable
+                        sessionId
+                        retirementId
+                        providerRunId
+            | None -> return ()
         }
 
     let maybeDeliverLoop
@@ -410,9 +313,10 @@ module ManagerWorkflow =
         (sessionIdTextOpt: string option)
         : Task<unit> =
         task {
-            match decideLoopContext journal sessionIdTextOpt with
-            | Some context -> do! deliverLoopContext sessionPort rootWorkspace workspaceDirectory context
-            | None -> return ()
+            match journal, sessionIdTextOpt with
+            | Some durable, Some sidText when not (System.String.IsNullOrWhiteSpace sidText) ->
+                do! deliverSuccessorPrompt sessionPort rootWorkspace workspaceDirectory durable (SessionId.create sidText)
+            | _ -> return ()
         }
 
     let continueAfterRetiredAttempt
@@ -424,15 +328,15 @@ module ManagerWorkflow =
         (sessionId: SessionId)
         : Task<unit> =
         task {
-            let loopContext = decideLoopContext journal (Some(SessionId.value sessionId))
+            let sendPrompt =
+                journal
+                |> Option.map (fun durable ->
+                    fun () -> deliverSuccessorPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId)
 
             do! stopRetiredAttempt sessionId
 
-            match
-                loopContext
-                |> Option.orElseWith (fun () -> decideLoopContext journal (Some(SessionId.value sessionId)))
-            with
-            | Some context -> do! deliverLoopContext sessionPort rootWorkspace workspaceDirectory context
+            match sendPrompt with
+            | Some send -> do! send ()
             | None -> return ()
         }
 

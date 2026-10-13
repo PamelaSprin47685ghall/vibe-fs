@@ -6,7 +6,14 @@ open Wanxiangshu.Persistence.EventStore
 module PlanWorkOpen =
     /// root is the plan root directory (<git-common-dir>/wanxiangshu in
     /// production); sessionId is the plan session id, which becomes the workId.
-    val ensurePlanWorkOpened: store: IEventStore -> root: string -> sessionId: string -> Task<Result<unit, string>>
+    /// observedHead is the XTrace head observed at opening; without it the
+    /// entry refuses with zero writes.
+    val ensurePlanWorkOpened:
+        store: IEventStore ->
+        root: string ->
+        sessionId: string ->
+        observedHead: int64 option ->
+            Task<Result<unit, string>>
 
     /// planning-020 / planning-010: the single runtime derivation of the
     /// fixed DevOps identity for a plan work. The entry binding and the

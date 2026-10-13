@@ -1368,8 +1368,8 @@ Mission/Relay/OpenCode/ReviewShell.fsi
 Mission/Relay/OpenCode/ReviewShell.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi
 Execution/Delegation/Fork/OpenCode/Tool.fs
-Mission/Relay/OpenCode/SuicideTool.fsi
-Mission/Relay/OpenCode/SuicideTool.fs
+Mission/Relay/OpenCode/DeliverTool.fsi
+Mission/Relay/OpenCode/DeliverTool.fs
 Persistence/EventStore/Surface.fsi
 Persistence/EventStore/Surface.fs
 Persistence/EventStore/StrengthSurface.fsi

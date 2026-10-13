@@ -79,7 +79,7 @@ test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only
   const eventsDir = path.join(dir, 'wanxiangshu', 'events')
   mkdirSync(eventsDir, { recursive: true })
 
-  const incumbencyOpened = ({ session, inc, seq, id }) =>
+  const handleLinked = ({ session, child, seq, id }) =>
     canonicalEventLine({
       event_id: id,
       event_type: 'JournalEnvelope',
@@ -89,17 +89,17 @@ test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only
         Fact: [
           'Agent',
           [
-            'Relay',
+            'Execution',
             [
-              'TransactionCommitted',
+              'HandleLinked',
               {
-                RoadId: ['RoadId', session],
-                Transaction: [
-                  'RelayTransaction',
-                  [
-                    ['IncumbencyOpened', ['IncumbencyId', inc]],
-                  ],
-                ],
+                Byname: 'Ada',
+                CanonicalRole: 'Engineer',
+                ChildSessionId: ['SessionId', child],
+                Handle: ['Agent', ['AgentHandleId', 'h-scope']],
+                Ownership: 'DurableParentHandle',
+                ParentSessionId: ['SessionId', session],
+                TargetAgent: 'engineer',
               },
             ],
           ],
@@ -117,10 +117,10 @@ test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only
     })
 
   const historical = [
-    incumbencyOpened({ session: 'ses_fault_a', inc: 'inc_a1', seq: 1, id: '1'.repeat(40) }),
-    // A second open on the same road while active is deliberately invalid.
-    incumbencyOpened({ session: 'ses_fault_a', inc: 'inc_a2', seq: 2, id: '2'.repeat(40) }),
-    incumbencyOpened({ session: 'ses_healthy_b', inc: 'inc_b1', seq: 3, id: '3'.repeat(40) }),
+    handleLinked({ session: 'ses_fault_a', child: 'ses_child_a1', seq: 1, id: '1'.repeat(40) }),
+    // The same handle cannot change its durable child. That conflict is the fault.
+    handleLinked({ session: 'ses_fault_a', child: 'ses_child_a2', seq: 2, id: '2'.repeat(40) }),
+    handleLinked({ session: 'ses_healthy_b', child: 'ses_child_b1', seq: 3, id: '3'.repeat(40) }),
   ]
 
   writeFileSync(path.join(eventsDir, 'historical.ndjson'), historical.join(''))

@@ -873,9 +873,22 @@ module PluginTransforms =
                 | Some sid ->
                     // planning-020: the entry hook runs before resolveTenure so
                     // the first tenure exists when the isolation is assembled.
-                    // The EventStore write lives in PlanWorkOpenWiring; this
-                    // module writes its facts through AgentJournal only.
-                    do! PlanWorkOpenWiring.ensurePlanWorkOpenedForSession workspaceDirectory sid
+                    // The opening cursor is the XTrace head observed in this
+                    // transform. The EventStore write lives in
+                    // PlanWorkOpenWiring; this module writes its facts through
+                    // AgentJournal only.
+                    let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+                    let! captured =
+                        rawMessages
+                        |> List.filter (ProviderWireCapture.isSyntheticMessage >> not)
+                        |> captureXTraceMessages (Some sid)
+
+                    let observedHead =
+                        captured.Current
+                        |> Option.map (fun trace -> XTraceCursor.sequence (XTraceProjection.headCursor trace))
+
+                    do! PlanWorkOpenWiring.ensurePlanWorkOpenedForSession workspaceDirectory sid observedHead
                     do! applyResolvedTenure sid outObj
             }
 

@@ -153,7 +153,7 @@ Blogger、Bookkeeper、Predictor 等内部角色由编排路径调用，不作�
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
 | Orchestrator | `commission`, `join`, `horizon` | 顶层战役战略统筹与独立道路委任 |
-| Manager | `fork`, `resume`, `join`, `horizon`, `review`, `suicide` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
+| Manager | `fork`, `resume`, `join`, `horizon`, `review`, `deliver` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
 | Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `js-engineer`, `bash-honeypot`, `fission` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
 | DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `js-devops`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `join`, `horizon` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
 | Blogger | `chronicle` | Companion 叶子，记录工作历史与认知上下文 |

@@ -9,10 +9,12 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Host
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.Assessment
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 /// relay-assessment-011: the Manager backend of the shared `review` shell.
@@ -195,25 +197,22 @@ module ReviewBackendManager =
                     )
             }
 
-    let private currentRelayState (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.Relay)
+    /// The one lifecycle work this session owns, read from the same workspace
+    /// EventStore the plugin writes. No relay fact, no certificate.
+    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * LifecycleWork) option =
+        let commonDir = RuntimePath.gitCommonDir directory
 
-    let private assessmentTransaction
-        (view: RoadView)
-        (incumbencyId: IncumbencyId)
-        (assessmentId: AssessmentId)
-        (binding: AssessmentBinding)
-        (authorityRevision: AuthorityRevision)
-        (findings: AssessmentFindings)
-        =
-        ignore view
-        ignore incumbencyId
-        ignore assessmentId
-        ignore binding
-        ignore authorityRevision
-        ignore findings
-        Error RecordFailed
+        if String.IsNullOrWhiteSpace commonDir then
+            None
+        else
+            match WorkspaceEventStore.tryCurrent commonDir with
+            | None -> None
+            | Some held ->
+                match held.TryCurrent "Lifecycle" with
+                | None -> None
+                | Some current ->
+                    let works = unbox<Map<string, LifecycleWork>> current
+                    Map.tryFind sessionId works |> Option.map (fun work -> held, work)
 
     type private BoundReviewInvocation =
         { Findings: AssessmentFindings
@@ -226,12 +225,8 @@ module ReviewBackendManager =
     type private PreparedAssessment =
         { Bound: BoundReviewInvocation
           SessionId: SessionId
-          RoadId: RoadId
-          View: RoadView
           RootAuthorityUserMessageId: string
-          AuthorityRevision: AuthorityRevision
-          IncumbencyId: IncumbencyId
-          AssessmentId: AssessmentId }
+          IncumbencyId: string }
 
     let private boundInvocation (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         Model.tryParse args.Raw
@@ -258,78 +253,26 @@ module ReviewBackendManager =
                       Directory = directory
                       Journal = journal })
 
-    type private ReplayCandidate =
-        { IncumbencyId: IncumbencyId
-          AuthorityRevision: AuthorityRevision
-          RootAuthorityUserMessageId: string }
-
-    type private PreparedReview =
-        | ReplayCandidate of ReplayCandidate
-        | FreshAssessment of PreparedAssessment
-
-    let private planForRoad
-        (context: HostToolContext)
-        (bound: BoundReviewInvocation)
-        sessionId
-        roadId
-        (road: RoadView)
-        rootAuthorityUserMessageId
-        =
-        match road.AcceptedAssessmentTransport with
-        | Some(acceptedCall, _) when acceptedCall = ToolCallId.value bound.ToolCallId ->
-            road.ActiveIncumbency
-            |> Option.map (fun incumbencyId ->
-                ReplayCandidate
-                    { IncumbencyId = incumbencyId
-                      AuthorityRevision = road.AuthorityRevision
-                      RootAuthorityUserMessageId = rootAuthorityUserMessageId })
-            |> requireSome BindingUnavailable
-        | Some _ -> Error AlreadySubmitted
-        | None ->
-            road.ActiveIncumbency
-            |> Option.filter (fun _ -> road.ActivePhase = Some IncumbencyPhase.AuditPending)
-            |> requireSome BindingUnavailable
-            |> Result.map (fun incumbencyId ->
-                let assessmentId =
-                    HostDigest.sha256Hex (
-                        String.concat
-                            "\n"
-                            [ "assessment-v2"
-                              context.SessionId
-                              IncumbencyId.value incumbencyId
-                              AuthorityRevision.value road.AuthorityRevision
-                              ToolCallId.value bound.ToolCallId ]
-                    )
-                    |> fun digest -> AssessmentId.create ("assessment:" + digest)
-
-                FreshAssessment
-                    { Bound = bound
-                      SessionId = sessionId
-                      RoadId = roadId
-                      View = road
-                      RootAuthorityUserMessageId = rootAuthorityUserMessageId
-                      AuthorityRevision = road.AuthorityRevision
-                      IncumbencyId = incumbencyId
-                      AssessmentId = assessmentId })
-
     let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) =
         let sessionId = SessionId.create context.SessionId
-        let roadId = RoadId.create context.SessionId
 
         try
-            let state = currentRelayState bound.Journal sessionId
-
-            let activeRoad =
-                state
-                |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
-                |> requireSome BindingUnavailable
-
-            activeRoad
-            |> Result.bind (fun road ->
-                scope.ActiveProfileFor sessionId
-                |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-                |> requireSome BindingUnavailable
-                |> Result.bind (planForRoad context bound sessionId roadId road))
+            match lifecycleWorkOf bound.Directory context.SessionId with
+            | None -> Error BindingUnavailable
+            | Some(_, work) ->
+                match work.Active with
+                | None -> Error BindingUnavailable
+                | Some active when active.Review.IsSome -> Error AlreadySubmitted
+                | Some active ->
+                    scope.ActiveProfileFor sessionId
+                    |> Option.map (fun profile ->
+                        AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+                    |> requireSome BindingUnavailable
+                    |> Result.map (fun rootAuthorityUserMessageId ->
+                        { Bound = bound
+                          SessionId = sessionId
+                          RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                          IncumbencyId = active.Id })
         with _ ->
             Error BindingUnavailable
 
@@ -340,72 +283,58 @@ module ReviewBackendManager =
             else
                 Path.Work
 
+        let substitutions =
+            if instructionPath = Path.Finish then
+                // The review just recorded, so no confirmation is durable yet.
+                Map [ "closeout", Wanxiangshu.Mission.Manager.ManagerWorkflow.finishCloseoutText false ]
+            else
+                Map.empty
+
         ToolHostCodec.tomlObjectWithInstructions
-            [ providerText instructionPath Map.empty ]
+            [ providerText instructionPath substitutions ]
             [ "recorded", ToolHostCodec.TBool true ]
 
-    let private appendAssessment (prepared: PreparedAssessment) transaction =
-        ignore prepared
-        ignore transaction
-        Task.FromResult(Error RecordFailed)
-
+    /// The one review write: append `Reviewed` through the unified kernel. The
+    /// binding is still validated first (relay-assessment-007: a rejected
+    /// invocation writes nothing and consumes no slot), but its eight fields do
+    /// not enter the event.
     let private runPrepared
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
-        (bound: BoundReviewInvocation)
-        (plan: PreparedReview)
+        (prepared: PreparedAssessment)
         =
-        match plan with
-        | ReplayCandidate replay ->
-            taskResult {
-                let! binding =
-                    captureBinding
-                        scope
-                        context
-                        bound.PhysicalUserMessageId
-                        replay.RootAuthorityUserMessageId
-                        bound.ToolCallId
-                        bound.ProviderRun
+        task {
+            let! binding =
+                captureBinding
+                    scope
+                    context
+                    prepared.Bound.PhysicalUserMessageId
+                    prepared.RootAuthorityUserMessageId
+                    prepared.Bound.ToolCallId
+                    prepared.Bound.ProviderRun
 
-                let sessionId = SessionId.create context.SessionId
-                let roadId = RoadId.create context.SessionId
-                let! state = currentRelayState bound.Journal sessionId |> requireSome ReplayConflict
+            match binding with
+            | Error failure -> return Error failure
+            | Ok _ ->
+                let outcome =
+                    if AssessmentFindings.isEmpty prepared.Bound.Findings then
+                        ReviewOutcome.Promoted
+                    else
+                        ReviewOutcome.Stayed
 
-                let! acceptedFindings =
-                    Fold.tryReplayAssessment
-                        state
-                        roadId
-                        replay.IncumbencyId
-                        binding
-                        replay.AuthorityRevision
-                        bound.Findings
-                    |> Result.mapError (fun _ -> ReplayConflict)
-
-                return acceptedResult acceptedFindings
-            }
-        | FreshAssessment prepared ->
-            taskResult {
-                let! binding =
-                    captureBinding
-                        scope
-                        context
-                        prepared.Bound.PhysicalUserMessageId
-                        prepared.RootAuthorityUserMessageId
-                        prepared.Bound.ToolCallId
-                        prepared.Bound.ProviderRun
-
-                let! transaction =
-                    assessmentTransaction
-                        prepared.View
-                        prepared.IncumbencyId
-                        prepared.AssessmentId
-                        binding
-                        prepared.AuthorityRevision
-                        prepared.Bound.Findings
-
-                let! _ = appendAssessment prepared transaction
-                return acceptedResult prepared.Bound.Findings
-            }
+                match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
+                | None -> return Error RecordFailed
+                | Some(held, work) ->
+                    match LifecycleKernel.review work prepared.IncumbencyId outcome with
+                    | KernelDecision.Refuse _ -> return Error RecordFailed
+                    | KernelDecision.Done _ -> return Ok(acceptedResult prepared.Bound.Findings)
+                    | KernelDecision.Write(events, _) ->
+                        match! LifecycleKernel.commit held context.SessionId events with
+                        | Ok CommitOutcome.AppendDurable -> return Ok(acceptedResult prepared.Bound.Findings)
+                        | Ok CommitOutcome.AppendNotAttempted
+                        | Ok CommitOutcome.CommitUnknown -> return Error RecordFailed
+                        | Error _ -> return Error RecordFailed
+        }
 
     let private renderExecution =
         function
@@ -418,7 +347,7 @@ module ReviewBackendManager =
                 taskResult {
                     let! bound = boundInvocation scope args context
                     let! plan = prepareAssessment scope context bound
-                    return! runPrepared scope context bound plan
+                    return! runPrepared scope context plan
                 }
 
             return renderExecution outcome

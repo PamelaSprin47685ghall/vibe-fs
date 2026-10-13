@@ -13,19 +13,19 @@
 
 | 条款 | 当前有效观察 | 尚不能据此宣称 |
 | --- | --- | --- |
-| [001] | 真实 Program 从候选到发布的调用顺序、失效与继续循环 | Relay 的 durable invalidation 已落盘、真实模型独立 assessment 的全链闭合 |
+| [001] | 真实 Program 从候选到发布的调用顺序与继续循环；候选与已承认变基 pin 不符时 fold 拒绝 | 真实模型独立 review 的全链闭合 |
 | [002] | dirty/clean/error 分别返回；实际 Host 在 cleanliness 错误后拒绝新 Job，保持其持久请求、worktree、Manager 和目标 HEAD 不变；ff 发布遇到 dirty 或 status 失败时拒绝 | 用户请求入口的所有 Clean Gate 条件均已接入；Host 初始化中既有义务的恢复、清理过程也没有副作用 |
 | [003] | 各事实独立投影；完整 claim 的恢复裁决；缺失字段拒绝；Published 追加失败不会伪装成功 | 任意真实崩溃点都有足够持久材料可恢复 |
 | [004] | rebase/冲突处置不持锁；ff 受锁保护；发布完成后释放门禁再清理一次；实际锁与循环 | 门内只存在 ref 重读和 CAS；durable claim/Published 写入等仍在门内，见 GAP-215 |
-| [005] | 冲突事实及 snapshot 留存、门外继续循环、worktree 清理错误传播 | 完整 Relay 失效与下一真实 incumbency 的端到端因果链；重复 fold 不是重启 |
+| [005] | 冲突事实留存、门外继续循环、worktree 清理错误传播 | 下一真实 incumbency 的端到端因果链；重复 fold 不是重启 |
 | [006] | 事实投影保留 Road、终态和 worktree 身份；受控资源创建/采用/清理 | fresh process 从真实中断产物恢复且沿用原 worktree，见 GAP-212 |
 | [007] | claim 三分支优先级及受控已发布重入不再 ff | 在真实进程故障后自动完成这些分支 |
 | [008] | 冻结符号引用、head 读取拒绝、错误分支与 expected head、严格快进判定 | 所有并发进程共享同一入口的完整发布原子性 |
 | [009] | Job/worktree 身份在事实投影中稳定 | 追加 charge、retirement、AuthorityRevision 与真实物理 session 的完整接线 |
 | [011] | 明确 TODO | 真实 fork/resume/join 发给 provider 的内容遵守 horizon，见 GAP-212 |
-| [013] | target 前移或 CAS miss 时真实 Program 释放门禁、失效、rebase 并继续；新事实替代旧绑定 | 仅凭失效端口被调用就断言其持久化成功 |
-| [014] | 真实 Program 拒绝 stale certificate、unmerged files 和错误恢复 snapshot | 满分评估的全部生产路径均已贯穿到同一检查 |
-| [015] | 真实 Program 对观察到的 snapshot/certificate 不一致请求新 assessment，含 fresh 正向控制 | 真实 Engineer/DevOps 修改后，旧测试证据失效并新跑验证，见 GAP-212 |
+| [013] | target 前移或 CAS miss 时真实 Program 释放门禁、rebase 并继续；新事实替代旧绑定 | 这些裁决已在真实进程崩溃后重放 |
+| [014] | 真实 Program 在 target 与已承认变基证据不符时拒绝发布、拒绝 unmerged files | 满分评估的全部生产路径均已贯穿到同一检查 |
+| [015] | 真实 Program 在观察到的 target 与已承认证据不符时 rebase 并继续到下一 tenure，含 fresh 正向控制 | 真实 Engineer/DevOps 修改后，旧测试证据失效并新跑验证，见 GAP-212 |
 | [017] | 明确 TODO | 两条真实 Road 合流后对最终工作树完成独立验证，见 GAP-212 |
 
 `PublishClaimed` 的 Surface 只接受明确给出的完整绑定材料，不再从 Job 或候选记录猜字段；这项测试证明接缝没有补造事实，不能替代生产事件解码兼容测试。已删除的 `applyFact`、`createJobResult`、`jobView`、`dropEphemeral` 曾在接缝中自建失效与跨 Road 规则，其结果不能证明生产实现。

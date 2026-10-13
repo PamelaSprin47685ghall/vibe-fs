@@ -1396,7 +1396,10 @@ module ChangeSurface =
                   TerminateRoadResources =
                     fun _ ->
                         timeline.Add "relay:terminate"
-                        Task.FromResult() }
+                        Task.FromResult()
+                  LifecycleReviewed =
+                    fun _ _ ->
+                        Some(Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted, "authority-1") }
 
             let acquireGate () =
                 if scenario.GateCancelled then

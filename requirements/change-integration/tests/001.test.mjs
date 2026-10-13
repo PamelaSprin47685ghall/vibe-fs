@@ -10,13 +10,13 @@ test('WHAT[change-integration-001] fresh quality candidate runs the full publish
   const observation = await change.observeRelayProgram('fresh')
 
   assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
-  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
 
+  // No invalidation stream remains. The surviving order is the rebase record,
+  // the next tenure's review signal, then the claim and the gated ff.
   assert.deepEqual(observation.timeline, [
     'await:Candidate',
     'fact:CandidateReady',
-    'invalidate:InitialRebaseRequired',
     'git:rebase',
     'git:read-head:rebased-1',
     'fact:RebasedCandidateReady',
@@ -31,14 +31,15 @@ test('WHAT[change-integration-001] fresh quality candidate runs the full publish
     'relay:terminate',
   ])
 })
-test('WHAT[change-integration-001] retirement without a valid certificate continues the loop', async () => {
+test('WHAT[change-integration-001] retirement continues the loop without publishing', async () => {
   const observation = await change.observeRelayProgram('retired')
 
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
-  assert.deepEqual(observation.invalidations, [])
   assert.equal(observation.timeline[0], 'await:Continue')
   assert.equal(observation.timeline[1], 'continue:surface-loop-1')
   assert.equal(observation.timeline[2], 'await:ExceptionalTerminal')
+  assert.equal(observation.ffCalls, 0)
+  assert.equal(observation.facts.includes('Published'), false)
 })
 }
 
@@ -135,7 +136,6 @@ test('WHAT[change-integration-001] fresh quality candidate runs to Published wit
   const observation = await change.observeRelayProgram('fresh')
 
   assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
-  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.equal(observation.ffGateHeld.length, 1)
   assert.equal(observation.ffGateHeld[0], true)
@@ -143,16 +143,40 @@ test('WHAT[change-integration-001] fresh quality candidate runs to Published wit
   assert.equal(observation.gateAcquireCount, 1)
   assert.equal(observation.gateReleaseCount, 1)
 })
-test('WHAT[change-integration-001] pre-rebase C1/S1 certificate cannot authorize rebased S2 candidate and fails closed', async () => {
-  const observation = await change.observeRelayProgram('rebase-reuse-old-cert')
+test('WHAT[change-integration-001] a candidate whose commit no longer matches the rebased evidence pin fails closed', async () => {
+  // Publication evidence is the durable Reviewed plus the work's authority
+  // count. The surviving fail-closed check is the pin: a live candidate that
+  // no longer equals the admitted rebased commit is refused with zero writes.
+  const created = {
+    kind: 'ManagerJobCreated',
+    payload: {
+      jobId: 'job_1',
+      managerSessionId: 'ses_1',
+      managerAgent: 'manager',
+      byname: 'Road',
+      worktreeIdentity: 'wt_1',
+      worktreePath: '/tmp/wt1',
+      targetRef: 'refs/heads/main',
+      targetBranchFrozen: 'refs/heads/main'}}
+  const events = (claimCommit) => [
+    created,
+    { kind: 'RebasedCandidateReady', payload: { jobId: 'job_1', rebasedCommit: 'rebased-2', targetHeadSnapshot: 'target-1' } },
+    {
+      kind: 'PublishClaimed',
+      payload: {
+        jobId: 'job_1',
+        targetRef: 'refs/heads/main',
+        rebasedCommit: claimCommit,
+        expectedHead: 'target-1',
+        authorityRevision: 'authority-1'}},
+  ]
 
-  assert.equal(observation.verdict.kind, 'IntegrationFailed')
-  assert.match(observation.verdict.detail, /Live certificate snapshot does not match rebased evidence snapshot/)
-  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
-  assert.deepEqual(observation.continuations, ['surface-loop-1'])
-  assert.equal(observation.ffCalls, 0)
-  assert.equal(observation.gateAcquireCount, 0)
-  assert.equal(observation.facts.includes('Published'), false)
+  const mismatched = change.fold(events('rebased-1'))
+  assert.equal(mismatched.ok, false)
+  assert.match(mismatched.error, /does not match admitted rebased commit/)
+
+  const matching = change.fold(events('rebased-2'))
+  assert.equal(matching.ok, true, matching.ok ? '' : matching.error)
 })
 test('WHAT[change-integration-001] cancellation during manager loop returns Cancelled verdict and does not burn retry budget', async () => {
   const observation = await change.observeRelayProgram('cancelled-program')
@@ -165,7 +189,6 @@ test('WHAT[change-integration-001] cancellation during manager loop returns Canc
   assert.equal(observation.ffCalls, 0)
   assert.deepEqual(observation.ffPinnedCandidates, [])
   assert.deepEqual(observation.ffExpectedHeads, [])
-  assert.deepEqual(observation.invalidations, [])
   assert.deepEqual(observation.continuations, [])
 })
 test('WHAT[change-integration-001] reentry gate cancellation returns Cancelled with zero FF', async () => {
@@ -178,13 +201,16 @@ test('WHAT[change-integration-001] reentry gate cancellation returns Cancelled w
   assert.equal(observation.gateReleaseCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
 })
-test('WHAT[change-integration-001] old certificate still fails closed after the rebased record supersedes it', async () => {
-  const observation = await change.observeRelayProgram('rebase-reuse-old-cert')
+test('WHAT[change-integration-001] superseded rebased evidence still fails closed when a later claim cites the old pin', async () => {
+  const observation = await change.observeRelayProgram('reentry-stale-claim-superseded')
 
-  assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])
-  assert.equal(observation.verdict.kind, 'IntegrationFailed')
-  assert.match(observation.verdict.detail, /Live certificate snapshot does not match rebased evidence snapshot/)
+  // The later rebased record supersedes the claimed pin. Reentry treats the
+  // old claim as expired evidence and continues the loop instead of
+  // fast-forwarding it.
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.equal(observation.ffCalls, 0)
+  assert.deepEqual(observation.ffPinnedCandidates, [])
   assert.equal(observation.facts.includes('Published'), false)
+  assert.equal(observation.gateAcquireCount, 0)
 })
 }

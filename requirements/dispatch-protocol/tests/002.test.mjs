@@ -1,7 +1,6 @@
 import test from 'node:test'
 import * as managerWorkflow from '../../../dist/Mission/Manager/WorkflowSurface.js'
 import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
-import * as relayJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -417,11 +416,14 @@ test('WHAT[dispatch-protocol-002] the exact claim is already durable while the t
 
 {
 const { default: assert } = await import('node:assert/strict')
-const { existsSync, mkdtempSync, readFileSync, rmSync } = await import('node:fs')
+const { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } = await import('node:fs')
 const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
+const { execFileSync } = await import('node:child_process')
 const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+const lifecycle = await import('../../../dist/Mission/Lifecycle/Surface.js')
+const workspaceEvents = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
 
 for (const newPhysicalInput of [false, true]) {
   test(`WHAT[dispatch-protocol-002] production Manager idle dispatch (crash-reconciliation-006 compatibility) ${newPhysicalInput ? 'abandons a captured permit revoked by Human physical ingress before SDK send' : 'sends with the same road and fresh captured permit'}`, async () => {
@@ -435,7 +437,8 @@ for (const newPhysicalInput of [false, true]) {
       const rootPhysical = 'msg-manager-root'
       const root = await dispatch.acceptHumanRoot(opened.journal, session, rootPhysical, 'manager')
       assert.equal(root.ok, true, root.error)
-      const opening = await relayJournal.openIncumbency(opened.journal, session, 'inc-manager-idle-send')
+      const store = workspaceEvents.acquire(base)
+      const opening = await lifecycle.seedOpen(store, 'S4', session, base, 1n)
       assert.equal(opening.ok, true, JSON.stringify(opening.error))
 
       const gate = quiescence.create()

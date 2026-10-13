@@ -545,8 +545,7 @@ const canonicalJson = await import("../../../dist/OpenCode/Codec/CanonicalJsonSu
 const language = await import("../../../dist/Participant/Provider/LanguageSurface.js");
 const providerProjection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
 const strength = await import("../../../dist/Strength/Surface.js");
-const relay = await import("../../../dist/Mission/Relay/Surface.js");
-const assessment = await import("../../../dist/Mission/Relay/Assessment/Surface.js");
+const lifecycle = await import("../../../dist/Mission/Lifecycle/Surface.js");
 const tools = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
 const pluginHooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
 const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
@@ -609,7 +608,23 @@ const createRawManagerTools = () => [
   {
     name: 'review',
     description: 'Submit an independent 8-dimension review of workspace and artifacts.',
-    parameters: JSON.parse(assessment.schemaJson),
+    parameters: {
+      type: 'object',
+      properties: {
+        findings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              acceptance_criteria: { type: 'string' },
+              work_plan: { type: 'string' },
+            },
+            required: ['acceptance_criteria', 'work_plan'],
+          },
+        },
+      },
+      required: ['findings'],
+    },
   },
   {
     name: 'js-manager',
@@ -676,15 +691,14 @@ const wire = (
 
 test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is_append_only_prefix_and_tools_identical', () => {
   const roadId = 'road-life-001'
-  const incId = 'inc-life-001'
-  const snapshotId = 'snap-life-001'
-  const authorityRev = 'auth-life-001'
+  const root = 'workspace-life-001'
 
-  // 1. Initial State: Manager Life begins in AuditPending phase
-  const opened = relay.openIncumbency(relay.empty(), roadId, incId, snapshotId, authorityRev)
-  assert.equal(opened.ok, true)
-  const initialView = relay.view(opened.state, roadId)
-  assert.equal(initialView.phase, 'AuditPending', 'initial Manager phase must be AuditPending')
+  // 1. Initial state: an S4 Manager life opens unreviewed. Delivery stays closed until review.
+  const opening = lifecycle.encodeOpening('S4', roadId, root, 1n)
+  assert.equal(opening.startsWith('REFUSE'), false, opening)
+  const initialProbe = lifecycle.readProbe(opening)
+  assert.equal(initialProbe.sequence, 'S4', 'Manager life opens on the execution sequence')
+  assert.equal(initialProbe.authorized, false, 'an unreviewed Manager life must not authorize delivery')
 
   // 资源文档经 provider-language owner 面读取
   const assessPromptDoc = language.readText('zh-CN', 'runtime/manager-assess')
@@ -739,19 +753,13 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
     system: [managerSystemPrompt],
   })
 
-  // 3. State Transition: Manager completes independent assessment and submits Review
-  const assessed = relay.assess(
-    opened.state,
-    roadId,
-    incId,
-    'assess-life-001',
-    snapshotId,
-    authorityRev,
-    [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }],
-  )
-  assert.equal(assessed.ok, true)
-  const assessedView = relay.view(assessed.state, roadId)
-  assert.equal(assessedView.phase, 'WorkOwned', 'assessed phase with REVISE must transition to WorkOwned')
+  // 3. State transition: the accepted review is a unified Reviewed fact. Stayed keeps delivery closed.
+  const incId = JSON.parse(opening.trim().split('\n')[1]).payload.incumbencyId
+  const reviewed = lifecycle.reviewProbe(opening, incId, 'Stayed')
+  assert.equal(reviewed.decision, 'Write', reviewed.detail)
+  const afterReview = lifecycle.readProbe(opening + reviewed.bytes)
+  assert.equal(afterReview.sequence, 'S4', 'review does not change the opened sequence')
+  assert.equal(afterReview.authorized, false, 'a Stayed review must not authorize delivery')
 
   const reviewAssistantMessage = {
     id: 'msg-02',

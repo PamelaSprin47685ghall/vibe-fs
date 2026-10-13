@@ -86,7 +86,7 @@ test('WHAT[feature-ablation-002] ABL_002_borrowed_surface_enforcement', () => {
     assert.equal(Ablation.allowsFact('AgentFact.Execution'), true, 'fact in borrowed_surface must be allowed')
     // fork 属于 delegation.async-fork，不在 delegation 借用面中，必须被拒绝
     assert.equal(Ablation.allowsTool('fork'), false, 'tool outside borrowed_surface must be denied')
-    // AgentFact.Relay 属于 relay-incumbency（在 station-15 为 ablated 且无借用），必须被拒绝
+    // AgentFact.Relay 由 Ablation 节点 relay-incumbency 承载（在 station-15 为 ablated 且无借用），必须被拒绝
     assert.equal(Ablation.allowsFact('AgentFact.Relay'), false, 'unborrowed fact must be denied')
   })
 })
@@ -117,7 +117,7 @@ test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_engineer_surface_and_a
 })
 
 test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_legacy_inquiry_agent_are_gated_together', () => {
-  // 1. station-05 下 relay-incumbency 与 change-integration 为 ablated:
+  // 1. station-05 下 Ablation 节点 relay-incumbency 与 change-integration 为 ablated:
   // manager 与 orchestrator 必须被拒绝 (allowsPrimaryAgent === false)
   // browser 恒 false (fail-closed)
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
@@ -125,7 +125,7 @@ test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_legacy_inquiry_agent
     assert.equal(
       Ablation.allowsPrimaryAgent('manager'),
       false,
-      'station-05 must reject manager when relay-incumbency is ablated',
+      'station-05 must reject manager when the relay-incumbency Ablation node is ablated',
     )
     assert.equal(
       Ablation.allowsPrimaryAgent('orchestrator'),
@@ -192,7 +192,7 @@ test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ab
 test('WHAT[feature-ablation-002] ABL_002_primary_agent_admission_follows_the_selected_profile', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     Ablation.load()
-    assert.equal(Ablation.allowsPrimaryAgent('manager'), false, 'station-05 must reject manager when relay-incumbency is ablated')
+    assert.equal(Ablation.allowsPrimaryAgent('manager'), false, 'station-05 must reject manager when the relay-incumbency Ablation node is ablated')
     assert.equal(Ablation.allowsPrimaryAgent('orchestrator'), false, 'station-05 must reject orchestrator when change-integration is ablated')
     assert.equal(Ablation.allowsPrimaryAgent('browser'), false, 'browser must be fail-closed false')
     assert.equal(Ablation.allowsPrimaryAgent('inquiry'), false, 'inquiry must be false when epistemic-reasoning is ablated')

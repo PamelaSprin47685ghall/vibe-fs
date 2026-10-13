@@ -134,47 +134,18 @@ module OfficeCapability =
     let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
         if not facts.HasActiveIncumbency then
             Set.empty
+        // A confirmation without a review is an illegal fact: the two-stage
+        // deliver only confirms after the review is durable. Fail closed.
         elif facts.HasConfirmation && not facts.HasAssessment then
-            set
-                [ ToolPermission.ReviewAssessment
-                  ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon ]
+            Set.empty
         elif facts.CleanupBlockerDigest.IsSome then
             set [ ToolPermission.Join; ToolPermission.Finality ]
         elif facts.IsFinalIncumbent then
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Finality ]
-        elif facts.HasAssessment && not facts.HasConfirmation then
-            set
-                [ ToolPermission.ReviewAssessment
-                  ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Fork
-                  ToolPermission.Resume
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Finality ]
-        elif not facts.HasAssessment then
-            set
-                [ ToolPermission.ReviewAssessment
-                  ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon ]
+            managerFinishPermissions
+        elif facts.HasAssessment then
+            Set.difference (permissions Role.Manager) managerReviewReadOnlyPermissions
         else
-            Set.empty
+            permissions Role.Manager
 
     let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
         permissionsForManagerFacts facts |> Set.contains permission

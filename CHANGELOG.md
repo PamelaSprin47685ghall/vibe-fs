@@ -1,5 +1,16 @@
 # Changelog — 版本历史
 
+## Unreleased — 生命周期统一：Plan 与 Manager 收成一条内核
+
+- `Mission/Lifecycle/`（Facts/Fold/Codec/Kernel/Surface）成为唯一生命周期内核：开立、绑定、评审、一段式与两段式 deliver、恢复位置、重开、权威推进都走这一套事件（`WorkOpened`/`DevOpsBound`/`IncumbencyOpened`/`ConfirmationCommitted`/`IncumbencyRetired`/`Reviewed`/`Reopened`/`AdvanceCommitted`/`RetirementBlocked`），结果名只有 `Relayed` 与 `Delivered`，评审结果只有 `Promoted` 与 `Stayed`。序列写在 `WorkOpened`：S1–S3 为 Plan，S4 为 Manager；确认次数由序列导出。
+- `deliver` 只有一个注册名与一份资源。准入同时接受 Manager（Finality）与 Plan（Deliver），路径按工作序列分派：S4 走两段式，S1–S3 走一段式。删掉了 `planningSpecs()` 里重名的 `deliver` 规格——JS 对象字面量后写覆盖先写，Manager 的 deliver 曾因此被 Plan 规格遮蔽并答角色拒绝。
+- Manager 侧改读统一事实：`DeliverTool` 的绑定、评审位、冻结刷新都读 `Lifecycle` 当前折叠，不再读 Relay fold；`ReviewBackendManager` 的评审写入改为 `LifecycleKernel.review` 提交 `Reviewed`（binding 仍先校验，八个字段不进事件）；`Workflow` 的 S4 资源选择不再要求 Relay `RoadView`，`runtime/manager-finish` 的 `{{closeout}}` 由 `ManagerWorkflow.finishCloseoutText` 统一填充。两段式收口模块与分片改名为 `DeliverTool` / `mission-deliver-tool`。
+- Plan 侧改读统一事实：`PlanWorkOpen` 开立改读 `Lifecycle` 当前折叠、并按开立时观察到的 XTrace 头写 `openingCursor`（缺头序号零写拒绝）；`ReviewPlanBackend` 的活跃任期门改读 `Lifecycle`；`PlanTools.executeDeliver` 改为 `LifecycleKernel.deliverOneshot`，退休游标由 deliver 自身的 XTrace 前沿提供。
+- Change 发布门改读统一事实：`RelayPort` 增 `LifecycleReviewed`，`buildPublicationEvidence` 由该事实（`Promoted`/`Stayed` + 工作权威计数）构造，无持久评审即零写拒绝；证书与工作区快照不再是输入。
+- `OfficeCapability.permissionsForManagerFacts` 恢复 `capability-enforcement-025` 的语义：无活跃任期空集，有确认无评审空集，清理阻塞收窄到 Join+Finality，末任保留读/清理/收口，已评（有 findings）移除评审专用只读权限。
+- 测试资产：新增 `Mission/Lifecycle/Surface.js` 的存储播种面（`seedOpen`/`seedReview`/`seedDeliver`/`workView`），`plugin-fixture.mjs` 的 `openIncumbency`/`injectAcceptedAssessment`/`completeManagerLife`/`activateLife` 改为向插件的工作区 EventStore 播种真实统一事件；统一契约测试迁到 `requirements/work/tests/011…019`，锚点 `WHAT[work-NNN]`；`planning` 的 007/008/020/022/023 与 `capability-enforcement` 024–028 按统一契约重写。
+- 证据：`node scripts/build.mjs` 绿（generation 12）；`requirements/verification-system/tests/run.mjs` 4997 passed / 18 failed（本轮起点为 179 failed）。仍红：`work-011`/`work-019` 的两段式确认与执行门断言（在修），以及 `managed-session-lifecycle-020`、`participant-identity-009`、`interaction-authority-005/017/022`、`dispatch-protocol-002` 所需的「Delivered 退休驱动 PromptAuthority 收束」与 `Workflow` 后继开任两处生产缺口。
+
 ## Unreleased — js-plan 复用共享锚点教程
 
 - `js-plan` 的模型可见描述不再使用独立短教程。它复用其它 `js-*` 的同一套教程：有序锚点、`text(from, to)`、精确 edit、结构重组和失败记忆。教程签名槽按工具填写，Plan 面为 `file(matches = [])`、`edit(changes)`、`rewrite(newText)`；仓库面仍为带路径签名。

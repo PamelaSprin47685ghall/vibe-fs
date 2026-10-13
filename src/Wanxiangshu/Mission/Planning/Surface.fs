@@ -528,9 +528,16 @@ module PlanningSurface =
             // so currying never gets in the way.
             unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
 
-    let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) : Task<obj> =
+    let ensurePlanWorkOpened
+        (store: IEventStore)
+        (root: string)
+        (sessionId: string)
+        (observedHead: obj)
+        : Task<obj> =
         task {
-            match! PlanWorkOpen.ensurePlanWorkOpened store root sessionId with
+            let head = extractInt64Opt observedHead
+
+            match! PlanWorkOpen.ensurePlanWorkOpened store root sessionId head with
             | Ok() -> return box {| ok = true; error = null |}
             | Error err -> return box {| ok = false; error = err |}
         }
@@ -540,6 +547,8 @@ module PlanningSurface =
         (root: string)
         (workId: string)
         (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
         (hasBlocker: bool)
         (spawn: obj)
         (retirementCursor: obj)
@@ -550,7 +559,17 @@ module PlanningSurface =
             let! outcome =
                 match extractInt64Opt retirementCursor with
                 | None -> Task.FromResult(Error "Plan retirement cursor evidence is required")
-                | Some cursor -> PlanTools.executeDeliver store root workId incumbencyId hasBlocker spawnFn cursor
+                | Some cursor ->
+                    PlanTools.executeDeliver
+                        store
+                        root
+                        workId
+                        incumbencyId
+                        providerRunId
+                        toolCallId
+                        hasBlocker
+                        spawnFn
+                        cursor
 
             match outcome with
             | Ok res ->

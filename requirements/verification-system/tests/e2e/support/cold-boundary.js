@@ -131,7 +131,7 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 // Every manager iteration keeps the same workspace, tools and authority plan: a
 // Continue retirement is followed by another ordinary iteration, and the successor
 // keeps the predecessor's provider history instead of restarting from a trimmed
-// transcript (relay-context-projection-001: raw messages, tool calls, results, nudge,
+// transcript (work-008: raw messages, tool calls, results, nudge,
 // late parts and the internal loop wake are all retained). A preceding provider
 // fallback may change only OpenCode's exact model banner. This layer checks structure
 // only — the normalized system is equal, the previous message list is an ordered

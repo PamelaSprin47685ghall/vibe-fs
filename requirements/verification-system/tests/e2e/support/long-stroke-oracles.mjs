@@ -711,7 +711,7 @@ export async function oracleLongStroke(scenario, ctx) {
   );
  // The four successor iterations (candidate, repair, repaired, rebased) carry the
  // owner-controlled assess resource as their fresh head, so their audits land on the
- // assess-resource family (relay-context-projection-001: the successor keeps the
+ // assess-resource family (work-008: the successor keeps the
  // predecessor history and appends its own head instead of restarting from the
  // trimmed authority turn).
   assert.equal(

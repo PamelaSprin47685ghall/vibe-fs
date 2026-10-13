@@ -93,7 +93,14 @@ type RelayPort =
       AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
       ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
-      TerminateRoadResources: ManagerJobId -> Task<unit> }
+      TerminateRoadResources: ManagerJobId -> Task<unit>
+      /// The durable unified review fact for a manager session, with the work's
+      /// authority count. `None` when no review is durable yet: the publish gate
+      /// then refuses with zero writes.
+      LifecycleReviewed:
+        SessionId ->
+        Wanxiangshu.Foundation.Identity.WorktreePath ->
+            (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option }
 
 type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>

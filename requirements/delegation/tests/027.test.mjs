@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import { injectAcceptedAssessment } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 for (const kind of ['Failed', 'Aborted']) {
@@ -86,7 +87,9 @@ for (const replacement of ['active', 'finished', 'successor']) {
       assert.equal(await forkTool.settle(runtime, owner, 'SOURCE-DONE', 'source-provider'), true)
       forkTool.acceptNextPrompt(runtime)
       if (byname === 'devops') {
-        await forkTool.injectAcceptedAssessment(runtime, owner)
+        execFileSync('git', ['init', '--quiet', directory])
+        runtime.directory = directory
+        await injectAcceptedAssessment(runtime, owner)
         assert.match(await forkTool.executeManagerResume(runtime, toolModule, owner, '', byname, 'ORIGINAL-WORK'), /carries this charge now/)
       } else {
         assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', byname, 'ORIGINAL-WORK'), /carries this charge now/)

@@ -330,7 +330,10 @@ module ToolRegistry =
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
-          "deliver", SuicideTool.admission
+          "deliver",
+          ToolAdmission.OfficeRole(fun _ role ->
+              OfficeCapability.isAllowed role ToolPermission.Finality
+              || OfficeCapability.isAllowed role ToolPermission.Deliver)
           "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
           "rm", FileMutationTools.rmAdmission
@@ -649,9 +652,19 @@ module ToolRegistry =
                     return renderAskOutcome outcome
             }
 
-        let activeIncumbencyOf store (sessionId: string) : ActivePlanIncumbency option =
-            PlanEventStore.activeWorkState store (PlanWorkId.create sessionId)
-            |> Option.bind (fun state -> state.Active)
+        let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
+            runtime.WorkspaceDirectory
+            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
+            |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
+            |> Option.bind (fun held ->
+                held.TryCurrent "Lifecycle"
+                |> Option.bind (fun current ->
+                    let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+                    Map.tryFind sessionId works
+                    |> Option.bind (fun work -> work.Active)
+                    |> Option.map (fun active -> active.Id)))
 
         // planning-008: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of
@@ -787,37 +800,35 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
-        let deliverActiveIncumbency
-            store
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (active: ActivePlanIncumbency)
-            : Task<string> =
-            task {
-                let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
-
-                match! resolveDeliverRetirementCursor runtime ctx with
-                | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
-                    let! outcome =
-                        PlanTools.executeDeliver
-                            store
-                            root
-                            ctx.SessionId
-                            active.Id
-                            hasBlocker
-                            (deliverSpawn runtime)
-                            retirementCursor
-
-                    return renderDeliverOutcome outcome
-            }
-
         let runDeliver store (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
-                match activeIncumbencyOf store ctx.SessionId with
+                match lifecycleActiveIncumbencyOf runtime ctx.SessionId with
                 | None -> return "deliver failed: no active incumbency found for this work"
-                | Some active -> return! deliverActiveIncumbency store root runtime ctx active
+                | Some incumbencyId ->
+                    let providerRunId =
+                        ctx.ProviderRunId |> Option.map ProviderRunIdentity.value |> Option.defaultValue ""
+
+                    let toolCallId =
+                        ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                    let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
+
+                    match! resolveDeliverRetirementCursor runtime ctx with
+                    | Error err -> return sprintf "deliver failed: %s" err
+                    | Ok retirementCursor ->
+                        let! outcome =
+                            PlanTools.executeDeliver
+                                store
+                                root
+                                ctx.SessionId
+                                incumbencyId
+                                providerRunId
+                                toolCallId
+                                hasBlocker
+                                (deliverSpawn runtime)
+                                retirementCursor
+
+                        return renderDeliverOutcome outcome
             }
 
         let executeDeliverTool
@@ -851,12 +862,44 @@ module ToolRegistry =
                   [ "intent",
                     ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
                 Admission = planningAdmission
-                Execute = fun args ctx -> executeAskTool planStore syncDelegateRuntime args ctx }
-              { Name = "deliver"
-                Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
-                Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
-                Admission = planningAdmission
-                Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx } ]
+                Execute = fun args ctx -> executeAskTool planStore syncDelegateRuntime args ctx } ]
+
+        /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
+        /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
+        /// deliver. The name, the registration and the resource are single.
+        let deliverSpec () =
+            let managerSpec = DeliverTool.spec factory runtime
+
+            let planSpec =
+                { Name = "deliver"
+                  Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
+                  Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
+                  Admission = planningAdmission
+                  Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx }
+
+            let sequenceOf (ctx: HostToolContext) =
+                runtime.WorkspaceDirectory
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
+                |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
+                |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+                |> Option.bind (fun current ->
+                    let works =
+                        unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+                    Map.tryFind ctx.SessionId works
+                    |> Option.map (fun work -> work.Sequence))
+
+            { managerSpec with
+                Admission =
+                    ToolAdmission.OfficeRole(fun _ role ->
+                        OfficeCapability.isAllowed role ToolPermission.Finality
+                        || OfficeCapability.isAllowed role ToolPermission.Deliver)
+                Execute =
+                    fun args ctx ->
+                        match sequenceOf ctx with
+                        | Some Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan -> planSpec.Execute args ctx
+                        | _ -> managerSpec.Execute args ctx }
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
@@ -884,7 +927,7 @@ module ToolRegistry =
               // The plan store only activates the Plan backend; every other
               // admitted caller keeps the Manager backend's byte behavior.
               yield ReviewShell.spec factory runtime planStore
-              yield SuicideTool.spec factory runtime
+              yield deliverSpec ()
               yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory

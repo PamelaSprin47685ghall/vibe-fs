@@ -260,13 +260,40 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock runtime.Gate (fun () -> runtime.Children.Remove managerId |> ignore)
         }
 
+    /// The durable unified review fact for a manager session, read from the
+    /// workspace EventStore the lifecycle kernel writes.
+    let lifecycleReviewed
+        (managerSessionId: SessionId)
+        (worktreePath: Wanxiangshu.Foundation.Identity.WorktreePath)
+        : (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option =
+        let commonDir =
+            Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir (
+                Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath
+            )
+
+        if System.String.IsNullOrWhiteSpace commonDir then
+            None
+        else
+            Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir
+            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+            |> Option.bind (fun current ->
+                let works =
+                    unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+
+                Map.tryFind (SessionId.value managerSessionId) works)
+            |> Option.bind (fun work ->
+                work.Active
+                |> Option.bind (fun active -> active.Review)
+                |> Option.map (fun stamp -> stamp.Outcome, work.Authority))
+
     let relayPort: RelayPort =
         { CreateManagerSession = createManagerSession
           ActivateManager = activateManager
           AwaitLoopSignal = awaitLoopSignal
           ContinueLoop = continueLoop
           PrepareCandidate = prepareCandidate
-          TerminateRoadResources = terminateRoadResources }
+          TerminateRoadResources = terminateRoadResources
+          LifecycleReviewed = lifecycleReviewed }
 
     // ── engine ──────────────────────────────────────────────────────────────
 

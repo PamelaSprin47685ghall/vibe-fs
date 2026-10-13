@@ -52,7 +52,7 @@ const REQUEST_KIND_SWITCHED = body(
 // authority turn carries the guidance occurrence the Host had appended, and (in the
 // nudge variant) a non-authority nudge the projection had injected. The next iteration
 // keeps every one of those messages, in order, and appends its own fresh-head prompt
-// (relay-context-projection-001 retains raw messages, tool calls, results, nudge, late
+// (work-008 retains raw messages, tool calls, results, nudge, late
 // parts and the internal loop wake); only the retired guidance occurrence and the
 // companion frame may disappear (context-compression-019 / GAP-022). Structural only:
 // typed authority-revision retention is proved by the unit projection tests and the
@@ -333,7 +333,7 @@ export const coldBoundaryCases = [
       assertEq(
         decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
-        'a retained nudge may not be dropped: relay-context-projection-001 keeps it',
+        'a retained nudge may not be dropped: work-008 keeps it',
       );
 
       const beforeFallback = body('test-model', [hostSystem('test-model'), ...MANAGER_TRAFFIC]);

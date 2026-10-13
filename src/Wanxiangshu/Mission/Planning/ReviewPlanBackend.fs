@@ -44,41 +44,22 @@ module ReviewPlanBackend =
         else
             PlanReviewedOutcome.Stayed
 
-    let private resolveActiveWorkState (store: IEventStore) (pid: PlanWorkId) : Result<PlanWorkState, PlanReviewError> =
-        match PlanEventStore.activeWorkState store pid with
+    let private lifecycleWorkOf
+        (store: IEventStore)
+        (workId: string)
+        : Result<Wanxiangshu.Mission.Lifecycle.LifecycleWork, PlanReviewError> =
+        match store.TryCurrent "Lifecycle" with
         | None -> Error PlanReviewError.NoActiveIncumbency
-        | Some state -> Ok state
+        | Some current ->
+            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
 
-    // planning-022: each incumbency reviews exactly once; the fold keeps the
-    // second-different-payload conflict as its own StorageInvalid guard.
-    let private requireUnreviewed
-        (incumbencyId: string)
-        (state: PlanWorkState)
-        : Result<PlanWorkState, PlanReviewError> =
-        match state.Reviewed with
-        | Some(reviewedIncumbency, _) when reviewedIncumbency = incumbencyId ->
-            Error(PlanReviewError.AlreadyReviewed incumbencyId)
-        | _ -> Ok state
+            match Map.tryFind workId works with
+            | None -> Error PlanReviewError.NoActiveIncumbency
+            | Some work -> Ok work
 
-    let private requireActiveMatch
-        (incumbencyId: string)
-        (state: PlanWorkState)
-        : Result<ActivePlanIncumbency, PlanReviewError> =
-        match state.Active with
-        | None -> Error PlanReviewError.NoActiveIncumbency
-        | Some active when active.Id <> incumbencyId ->
-            Error(PlanReviewError.IncumbencyMismatch(active.Id, incumbencyId))
-        | Some active -> Ok active
-
-    let private recordOutcome
-        (outcome: PlanReviewedOutcome)
-        (gaps: (string * string) list)
-        (appended: Result<EventId, string>)
-        : Result<PlanReviewResult, PlanReviewError> =
-        match appended with
-        | Error reason -> Error(PlanReviewError.RecordFailed reason)
-        | Ok _ -> Ok { Outcome = outcome; Gaps = gaps }
-
+    // planning-022: each incumbency reviews exactly once. The kernel refuses a
+    // second review for the same tenure; that refusal is the already-reviewed
+    // error, not a record failure.
     let executeReview
         (store: IEventStore)
         (workId: string)
@@ -86,43 +67,35 @@ module ReviewPlanBackend =
         (gaps: (string * string) list)
         : Task<Result<PlanReviewResult, PlanReviewError>> =
         task {
-            let pid = PlanWorkId.create workId
-
-            let decision =
-                resolveActiveWorkState store pid
-                |> Result.bind (requireUnreviewed incumbencyId)
-                |> Result.bind (requireActiveMatch incumbencyId)
-
-            match decision with
+            match lifecycleWorkOf store workId with
             | Error error -> return Error error
-            | Ok active ->
-                let outcome = reviewOutcome gaps
-                let reviewOutcomeValue =
-                    match outcome with
-                    | PlanReviewedOutcome.Promoted -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
-                    | PlanReviewedOutcome.Stayed -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed
+            | Ok work ->
+                match work.Active with
+                | None -> return Error PlanReviewError.NoActiveIncumbency
+                | Some active when active.Id <> incumbencyId ->
+                    return Error(PlanReviewError.IncumbencyMismatch(active.Id, incumbencyId))
+                | Some _ ->
+                    let outcome = reviewOutcome gaps
 
-                let! appended =
-                    task {
-                        match store.TryCurrent "Lifecycle" with
-                        | None -> return Error "lifecycle work is missing"
-                        | Some current ->
-                            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                            match Map.tryFind workId works with
-                            | None -> return Error "lifecycle work is missing"
-                            | Some work ->
-                                match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.review work incumbencyId reviewOutcomeValue with
-                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ -> return Ok()
-                                | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                                    match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
-                                    | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) -> return Ok()
-                                    | Ok _ -> return Error "review commit is not durable"
-                                    | Error reason -> return Error reason
-                    }
+                    let reviewOutcomeValue =
+                        match outcome with
+                        | PlanReviewedOutcome.Promoted -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
+                        | PlanReviewedOutcome.Stayed -> Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Stayed
 
-                return
-                    match appended with
-                    | Error reason -> Error(PlanReviewError.RecordFailed reason)
-                    | Ok() -> Ok { Outcome = outcome; Gaps = gaps }
+                    match
+                        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.review work incumbencyId reviewOutcomeValue
+                    with
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason ->
+                        if reason = "incumbency already reviewed" then
+                            return Error(PlanReviewError.AlreadyReviewed incumbencyId)
+                        else
+                            return Error(PlanReviewError.RecordFailed reason)
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                        return Error(PlanReviewError.RecordFailed "review was not written")
+                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                        match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
+                        | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
+                            return Ok { Outcome = outcome; Gaps = gaps }
+                        | Ok _ -> return Error(PlanReviewError.RecordFailed "review commit is not durable")
+                        | Error reason -> return Error(PlanReviewError.RecordFailed reason)
         }

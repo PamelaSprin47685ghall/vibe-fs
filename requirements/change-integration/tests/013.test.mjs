@@ -18,39 +18,38 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[change-integration-013] target movement before publish invalidates the certificate and continues the loop without entering the gate', async () => {
+test('WHAT[change-integration-013] target movement before publish rebases and continues the loop without entering the gate', async () => {
   const observation = await change.observeRelayProgram('target-moved')
 
-  assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.deepEqual(observation.rebaseGateHeld, [false])
   assert.deepEqual(observation.ffGateHeld, [])
   assert.equal(observation.gateAcquireCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
+  const rebase = observation.timeline.indexOf('git:rebase')
+  const continuation = observation.timeline.indexOf('continue:surface-loop-1')
+  assert.ok(rebase >= 0 && continuation > rebase)
 })
-test('WHAT[change-integration-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate', async () => {
+test('WHAT[change-integration-013] CAS miss rebases and continues the loop after releasing the gate', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.ffGateHeld, [true])
   assert.deepEqual(observation.ffExpectedHeads, ['target-1'])
   assert.equal(observation.gateAcquireCount, 1)
   assert.equal(observation.gateReleaseCount, 1)
-  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.deepEqual(observation.rebaseGateHeld, [false])
   assert.equal(observation.facts.includes('Published'), false)
 
   const release = observation.timeline.indexOf('gate:release')
-  const invalidate = observation.timeline.indexOf('invalidate:PublishCasMissed')
   const rebase = observation.timeline.indexOf('git:rebase')
   const continuation = observation.timeline.indexOf('continue:surface-loop-1')
-  assert.ok(release < invalidate && invalidate < rebase && rebase < continuation)
+  assert.ok(release >= 0 && release < rebase && rebase < continuation)
 })
 test('WHAT[change-integration-013] CAS miss appends the complete claim then a superseding rebased record, continues once, publishes at most once', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.facts, ['PublishClaimed', 'RebasedCandidateReady'])
-  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.ok(observation.ffCalls <= 1)
   assert.equal(observation.facts.includes('Published'), false)
@@ -61,7 +60,6 @@ test('WHAT[change-integration-013] target movement appends a superseding rebased
   const observation = await change.observeRelayProgram('target-moved')
 
   assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])
-  assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.equal(observation.facts.includes('Published'), false)
   assert.equal(observation.gateAcquireCount, 0)
@@ -213,14 +211,16 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[change-integration-013] CAS miss releases gate and invalidates certificate without publishing', async () => {
+test('WHAT[change-integration-013] CAS miss releases gate without publishing', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.ffGateHeld, [true])
   assert.equal(observation.facts.includes('Published'), false)
-  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.equal(observation.gateHeldAfterRun, false)
+  const release = observation.timeline.indexOf('gate:release')
+  const continuation = observation.timeline.indexOf('continue:surface-loop-1')
+  assert.ok(release >= 0 && continuation > release)
 })
 test('WHAT[change-integration-013] superseding rebased evidence appends while the old claim cannot reenter after supersession', () => {
   const created = {

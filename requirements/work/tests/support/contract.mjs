@@ -61,7 +61,8 @@ export function review(view, outcome) {
 }
 
 export function admitAction(view, action) {
-  if (!view.active || view.reviewed) return { admitted: true }
+  if (!view.active) return { admitted: false }
+  if (view.reviewed) return { admitted: true }
   if (action === 'read' || action === 'observe' || action === 'review') return { admitted: true }
   if (action === 'write-source' || action === 'dispatch-devops') return { admitted: false }
   if (action === 'deliver' && confirmationCount(view.sequence) === 1 && !view.deliveryAuthorized) return { admitted: true }
@@ -135,4 +136,22 @@ export function projectSuccessor(messages, openingCursor, first) {
 
 export function admitOldBytes(bytes) {
   return { admitted: false, reason: 'old-bytes-are-not-input', bytes }
+}
+
+export function bindDevOps(input) {
+  if (input.bound) return { ok: true, written: [] }
+  return { ok: true, written: [{ type: 'DevOpsBound', workId: input.workId, devopsId: input.devopsId }] }
+}
+
+export function reviewFromFindings(findings) {
+  if (!Array.isArray(findings)) return { ok: false, written: [] }
+  if (findings.some((pair) => !Array.isArray(pair) || pair.length !== 2 || pair.some((item) => typeof item !== 'string' || item.length === 0))) {
+    return { ok: false, written: [] }
+  }
+  return { ok: true, outcome: findings.length === 0 ? 'Promoted' : 'Stayed' }
+}
+
+export function relayHandover(relayed, owned) {
+  if (relayed.outcome !== 'Relayed') return { ok: false, orphaned: false, kept: [], written: [] }
+  return { ok: true, orphaned: false, kept: owned.received, written: relayed.written }
 }

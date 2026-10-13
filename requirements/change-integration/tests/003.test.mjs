@@ -322,14 +322,17 @@ test('WHAT[change-integration-003] reentry missing RebasedCandidateReady evidenc
   assert.equal(observation.verdict.kind, 'IntegrationFailed')
 })
 test('WHAT[change-integration-003] reentry with conflicting claim snapshot sends zero FF', async () => {
-  const observation = await change.observeRelayProgram('reentry-claim-snapshot-mismatch')
+  const observation = await change.observeRelayProgram('reentry-stale-claim-superseded')
 
   assert.equal(observation.ffCalls, 0)
   assert.deepEqual(observation.ffPinnedCandidates, [])
   assert.equal(observation.facts.includes('Published'), false)
-  // Expired claim re-enters the manager loop and consumes the terminal signal.
+  // A claim whose pin no longer matches the admitted rebased record is expired
+  // evidence. Reentry continues the loop and consumes the terminal signal
+  // instead of fast-forwarding the old pin.
   assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'scenario-complete' })
-  assert.equal(observation.signalCount, 1)
+  assert.equal(observation.signalCount, 2)
+  assert.equal(observation.gateAcquireCount, 0)
 })
 test('WHAT[change-integration-003] reentry with conflicting claim target sends zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-claim-target-mismatch')
@@ -443,7 +446,7 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
   projection = change.recordFact(projection, 'binding-probe', change.fact('RebasedCandidateReady', {
     rebasedCommit: 'rebased', targetHeadSnapshot: 'target'}))
   const claim = {
-    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target'}
+    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target', authorityRevision: 'authority-1'}
   assert.ok(change.find(change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', claim)), 'binding-probe').facts.includes('PublishClaimed'))
   for (const field of Object.keys(claim)) {
     const incomplete = { ...claim }

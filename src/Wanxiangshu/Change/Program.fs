@@ -29,12 +29,21 @@ module OrchestratorProgram =
         OrchestratorVerdict.IntegrationFailed(job.JobId, details)
 
     let private buildPublicationEvidence
+        (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (_rebasedReady:
+        (rebasedReady:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash |})
         : Result<PublicationEvidence, OrchestratorVerdict> =
-        Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
+        match deps.Relay.LifecycleReviewed job.ManagerSessionId job.Worktree.Path with
+        | None -> Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
+        | Some(_, authority) ->
+            Ok
+                { ManagerJobId = job.JobId
+                  TargetRef = job.TargetRef
+                  ExpectedHead = rebasedReady.TargetHeadSnapshot
+                  CandidateCommit = rebasedReady.RebasedCommit
+                  AuthorityRevision = AuthorityRevision.create authority }
 
     let private buildClaimPublicationEvidence
         (job: ManagerJob)
@@ -558,7 +567,7 @@ module OrchestratorProgram =
                             (CommitHash.value rebasedReady.TargetHeadSnapshot))
                 )
             else
-                buildPublicationEvidence job rebasedReady
+                buildPublicationEvidence deps job rebasedReady
 
         let continueCertifiedWithRebased
             (rebasedReady:

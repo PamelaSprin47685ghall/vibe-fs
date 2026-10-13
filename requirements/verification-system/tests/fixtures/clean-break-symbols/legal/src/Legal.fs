@@ -4,7 +4,7 @@ module Legal
 type AgentJournal =
     static member appendAgent () = ()
 
-module SuicideTool = begin end
+module DeliverTool = begin end
 type Workspace = class end
 type Snapshot = class end
 type Assessment = class end

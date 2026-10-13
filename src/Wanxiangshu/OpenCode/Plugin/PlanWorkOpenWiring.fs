@@ -14,14 +14,23 @@ module PlanWorkOpenWiring =
     // incumbency; it is idempotent for an existing work and fails with zero
     // writes when the store cannot serve it. A failure is diagnosed, never
     // raised: the caller continues without a forged tenure.
-    let private runPlanWorkOpen (store: IEventStore) (root: string) (sid: string) : Task<unit> =
+    let private runPlanWorkOpen
+        (store: IEventStore)
+        (root: string)
+        (sid: string)
+        (observedHead: int64 option)
+        : Task<unit> =
         task {
-            match! Wanxiangshu.Mission.Planning.PlanWorkOpen.ensurePlanWorkOpened store root sid with
+            match! Wanxiangshu.Mission.Planning.PlanWorkOpen.ensurePlanWorkOpened store root sid observedHead with
             | Ok() -> ()
             | Error err -> Diagnostic.emit "plan-work-open-failed" [ "work_id", sid; "error", err ]
         }
 
-    let ensurePlanWorkOpenedForSession (workspaceDirectory: string option) (sid: string) : Task<unit> =
+    let ensurePlanWorkOpenedForSession
+        (workspaceDirectory: string option)
+        (sid: string)
+        (observedHead: int64 option)
+        : Task<unit> =
         task {
             let commonDirOpt =
                 workspaceDirectory
@@ -30,6 +39,7 @@ module PlanWorkOpenWiring =
             let storeOpt = commonDirOpt |> Option.bind WorkspaceEventStore.tryCurrent
 
             match commonDirOpt, storeOpt with
-            | Some commonDir, Some store -> do! runPlanWorkOpen store (commonDir + "/wanxiangshu") sid
+            | Some commonDir, Some store ->
+                do! runPlanWorkOpen store (commonDir + "/wanxiangshu") sid observedHead
             | _ -> Diagnostic.emit "plan-work-open-store-unavailable" [ "work_id", sid ]
         }

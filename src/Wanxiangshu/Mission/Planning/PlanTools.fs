@@ -313,25 +313,144 @@ module PlanTools =
         else
             runDeliverDecision store pid root workId decision spawn retirementCursor
 
+    /// The one lifecycle work this session owns, read from the same workspace
+    /// EventStore the plan entry writes.
+    let private lifecycleWorkOf
+        (store: IEventStore)
+        (workId: string)
+        : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
+        match store.TryCurrent "Lifecycle" with
+        | None -> None
+        | Some current ->
+            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
+            Map.tryFind workId works
+
+    let private commitLifecycleDeliver
+        (store: IEventStore)
+        (workId: string)
+        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (fence: Wanxiangshu.Mission.Lifecycle.HostFence)
+        (retirementCursor: int64)
+        (blockerDigest: string option)
+        (draft: Wanxiangshu.Mission.Lifecycle.DeliverDraft option)
+        (startedSessionId: string option)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match
+                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverOneshot
+                    HostDigest.sha256Hex
+                    work
+                    fence
+                    (Some retirementCursor)
+                    blockerDigest
+                    Wanxiangshu.Mission.Lifecycle.SessionLookup.None
+                    draft
+                    startedSessionId
+            with
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done label -> return Error label
+            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
+                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
+                | Ok Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable ->
+                    let nextIncumbencyId =
+                        events
+                        |> List.tryPick (function
+                            | Wanxiangshu.Mission.Lifecycle.LifecycleEvent.IncumbencyOpened(_, id, _, _) -> Some id
+                            | _ -> None)
+                        |> Option.defaultValue ""
+
+                    let digest = draft |> Option.map (fun value -> value.Digest) |> Option.defaultValue ""
+                    let path = draft |> Option.map (fun value -> value.Path) |> Option.defaultValue ""
+                    let execSessionId = startedSessionId |> Option.defaultValue ""
+
+                    let message =
+                        match label with
+                        | "relayed" -> "Relayed to the next incumbency"
+                        | "delivered" -> "Plan delivered"
+                        | "blocked" -> "Retirement is blocked by live resources; nothing was retired"
+                        | other -> other
+
+                    return
+                        Ok
+                            { Ok = true
+                              Relayed = label = "relayed"
+                              Delivered = label = "delivered"
+                              RetiredIncumbencyId = ""
+                              RetirementOutcome =
+                                if label = "relayed" then "Relayed"
+                                elif label = "delivered" then "Delivered"
+                                else ""
+                              Digest = digest
+                              Path = path
+                              ExecSessionId = execSessionId
+                              NextIncumbencyId = nextIncumbencyId
+                              Message = message }
+                | Ok _ -> return Error "deliver was not committed"
+                | Error reason -> return Error reason
+        }
+
     let executeDeliver
         (store: IEventStore)
         (root: string)
         (workId: string)
         (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
         (hasBlocker: bool)
         (spawn: string -> string -> Task<string>)
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
-            let pid = PlanWorkId.create workId
+            match lifecycleWorkOf store workId with
+            | None -> return Error "lifecycle work is missing"
+            | Some work ->
+                match work.Active with
+                | None -> return Error "No active incumbency found for this work"
+                | Some active when active.Id <> incumbencyId ->
+                    return
+                        Error(
+                            sprintf
+                                "Active incumbency ID '%s' does not match invocation target '%s'"
+                                active.Id
+                                incumbencyId
+                        )
+                | Some _ ->
+                    let fence =
+                        { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                          Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
 
-            let state =
-                PlanEventStore.workState store pid
-                |> Option.defaultValue PlanFold.initialWorkState
+                    let blockerDigest = if hasBlocker then Some "retirement-blocked" else None
 
-            match resolveDeliverDecision state incumbencyId hasBlocker with
-            | Error err -> return Error err
-            | Ok decision -> return! runCheckedDeliver store pid root workId decision spawn retirementCursor
+                    let authorized =
+                        match Wanxiangshu.Mission.Lifecycle.LifecycleFold.folded work with
+                        | Ok folded -> folded.DeliveryAuthorized
+                        | Error _ -> false
+
+                    if not authorized || hasBlocker then
+                        return! commitLifecycleDeliver store workId work fence retirementCursor blockerDigest None None
+                    else
+                        match readAndValidatePlan root workId with
+                        | Error err -> return Error err
+                        | Ok(content, digest, planPath) ->
+                            match! spawnExecutionSessionFor spawn content with
+                            | Error err -> return Error err
+                            | Ok execSessionId ->
+                                let draft: Wanxiangshu.Mission.Lifecycle.DeliverDraft =
+                                    { Missing = false
+                                      Empty = false
+                                      Digest = digest
+                                      Path = planPath }
+
+                                return!
+                                    commitLifecycleDeliver
+                                        store
+                                        workId
+                                        work
+                                        fence
+                                        retirementCursor
+                                        blockerDigest
+                                        (Some draft)
+                                        (Some execSessionId)
         }
 
     // planning-010: at most one pending ask delegation per work. The tracker

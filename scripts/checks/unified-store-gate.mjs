@@ -199,11 +199,12 @@ const GIT_BYPASS_MULTILINE_RES = [
 /** Owner-only remote-tracking store tip: refs/wanxiang/remotes/<remote>/store (§14). */
 const REMOTE_TRACKING_STORE_REF_RE = /^refs\/wanxiang\/remotes\/[^/]+\/store$/
 
-/** Same-module EventStore write + Journal NDJSON write (dual-write bridge). */
+// A type annotation or a Current read is not a write. The fixture's
+// store.Append plus journal.AppendAgent is the shape this gate rejects.
 const EVENT_STORE_WRITE_RE =
-  /\b(?:IEventStore|AppendCandidate)\b|\bEventStore\.(?:append|create|createWithConverge|createWithRetries|commit)\b/
+  /\b(?:store|eventStore|held)\s*\.\s*Append\b|\bAppendCandidate\b|\bEventStore\s*\.\s*(?:append|create|createWithConverge|createWithRetries|commit)\b/
 const JOURNAL_NDJSON_WRITE_RE =
-  /\b(?:JournalWriter|AgentJournal|SharedAgentJournal)\b|\.ndjson\b|wanxiangshu\/runtimes/
+  /\b(?:JournalWriter|journal)\s*\.\s*Append|\b(?:AgentJournal|SharedAgentJournal)\s*\.\s*Append\b|\.\s*AppendAgent\b|\.ndjson\b|wanxiangshu\/runtimes/
 
 /** History access/order is owner-sensitive; feature history APIs are always forbidden. */
 const HISTORY_OBSERVER_RES = [

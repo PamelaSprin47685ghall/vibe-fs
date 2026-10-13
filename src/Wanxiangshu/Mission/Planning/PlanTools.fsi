@@ -33,6 +33,8 @@ module PlanTools =
         root: string ->
         workId: string ->
         incumbencyId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
         hasBlocker: bool ->
         spawn: (string -> string -> Task<string>) ->
         retirementCursor: int64 ->

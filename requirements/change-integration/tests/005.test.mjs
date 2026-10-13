@@ -11,15 +11,23 @@ test('WHAT[change-integration-005] rebase conflict records machine fact and cont
   const observation = await change.observeRelayProgram('rebase-conflict')
 
   assert.deepEqual(observation.facts, ['CandidateReady', 'ConflictDetected'])
-  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.ffCalls, 0)
+  const conflict = observation.timeline.indexOf('fact:ConflictDetected')
+  const continuation = observation.timeline.indexOf('continue:surface-loop-1')
+  assert.ok(conflict >= 0 && continuation > conflict)
 })
 test('WHAT[change-integration-005] artifact conflict continues the loop outside the gate', async () => {
   const observation = await change.observeRelayProgram('artifact-conflict')
 
   assert.deepEqual(observation.facts, ['ConflictDetected'])
-  assert.deepEqual(observation.invalidations, ['ArtifactAdmissionUnmerged'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.ffCalls, 0)
+  const conflict = observation.timeline.indexOf('fact:ConflictDetected')
+  const continuation = observation.timeline.indexOf('continue:surface-loop-1')
+  assert.ok(conflict >= 0 && continuation > conflict)
 })
 }
 

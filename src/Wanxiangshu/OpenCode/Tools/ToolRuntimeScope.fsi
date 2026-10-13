@@ -88,7 +88,7 @@ type ToolRuntimeScope =
 
     static member emptyManagerFacts: ManagerCapabilityFacts
     member ManagerCapabilityFactsFor: sessionId: string -> ManagerCapabilityFacts
-    member TryFreezeRetirement: sessionId: string * incumbentId: IncumbencyId -> bool
+    member TryFreezeRetirement: sessionId: string * incumbentId: string -> bool
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> bool
     member RetirementBlockersFor: sessionId: string -> string list

@@ -1,6 +1,6 @@
 # Package index
 
-当前索引包含 **55 个活跃规范包**与 **2 个历史包**（epistemic-reasoning、institutional-learning）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
+当前索引包含 **50 个活跃规范包**与 **2 个历史包**（epistemic-reasoning、institutional-learning）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
 
 ## 1. Requirement system
 
@@ -69,7 +69,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `semantic-trace` | participant life 中不可丢失的原始语义历史必须有 append-only、可定位的事实表示；Fission 多 present 确定性 keyed 汇聚，独立 invocation 范围与 resume 边界隔离。 |
-| `work-record` | 跨 participant/relay-assessment/relay-retirement 传递的一段 work 必须有 bounded canonical statement（LWR）；Fission 汇聚生成单次 Invocation 唯一 Canonical Record。 |
+| `work-record` | 跨 participant/review/deliver 传递的一段 work 必须有 bounded canonical statement（LWR）；Fission 汇聚生成单次 Invocation 唯一 Canonical Record。 |
 | `context-compression` | 当历史过长时，只能以受控、证据边界明确的 semantic memory 替代可压缩部分。 |
 | `prefix-stability` | 同一 semantic epoch 内已呈现给 provider 的前缀必须保持稳定；冷边界只能由事实驱动。 |
 
@@ -88,11 +88,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
-| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。 |
-| `relay-incumbency` | 目录仍在。现行窄条款只留唯一活跃 tenure 与 DevOps 绑定。主合同在 work。 |
-| `relay-assessment` | 目录仍在。现行窄条款只留 findings pairs 与每任一次 review。主合同在 work。 |
-| `relay-retirement` | 目录仍在。现行窄条款只留资源阻塞与 S4 两段 deliver。主合同在 work。 |
-| `relay-context-projection` | 目录仍在。现行窄条款只留 cut 判定请求身份。主合同在 work。 |
+| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。Plan 的编程面、ask、自然停止、任期隔离、阶段资源、入口、review 门与持权交付同属本包。 |
 
 
 ## 10. Feedback
@@ -124,12 +120,6 @@
 | Package | 一句话 WHY |
 |---|---|
 | `distribution` | 可安装 artifact 必须携带运行所需代码与 semantic resources，同时排除不属于交付面的源码/开发资产；打包资源与活动注册严格同步。 |
-
-## 14. Planning
-
-| Package | 一句话 WHY |
-|---|---|
-| `planning` | SWELoop 自评死锁改成 review 硬门：每任评离下一里程碑的 gap，空集晋级、非空留任；接力只换人不换阶段，持权交付把底稿交给真实 Manager 执行会话，Plan 是唯一允许空停等用户 prompt 的 role。 |
 
 # 规范条款索引
 
@@ -179,11 +169,7 @@
 | 39 | `crash-reconciliation` | 21 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重）、crash-reconciliation-021（进程本地表是缓存，durable 投影是存在性真源） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
-| 42 | `work` | 10 | work-001 ~ 010 |
-| 43 | `relay-incumbency` | 8 | relay-incumbency-001、005、006、008 ~ 012 |
-| 44 | `relay-assessment` | 3 | relay-assessment-001、006、007 |
-| 45 | `relay-retirement` | 4 | relay-retirement-003、005、007、009 |
-| 46 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 009 |
+| 42 | `work` | 45 | work-001 ~ 045（011 起是内核证明；020 起是 Plan 编程面、ask、自然停止、任期隔离、阶段资源、入口、review 门与持权交付；040 起是唯一活跃任期、DevOps 绑定、findings pairs、资源交接与投影不转述工作区） |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
@@ -195,7 +181,6 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
-| 58 | `planning` | 20 | planning-001 ~ 005、007 ~ 011、013 ~ 018、020 ~ 023（七条轮换事实含 Reviewed/Reopened、review 驱动的阶段推进与授权、四工具动作许可矩阵、deliver 接力与持权交付、自然停止、ask 同步委派 DevOps、入口与 reprompt 状态机、review 晋级门、deliver 起执行会话；006 并入 017、012 并入 018，019 已删除，编号均不复用） |
 
 # 依赖骨架
 
@@ -255,7 +240,6 @@ speculative-investigation→ repository-investigation, participant-identity, exe
 epistemic-reasoning      → 历史包，不再定义当前依赖
 sphinx-v2                → 取代关系及当前合同见本包，完整依赖待审
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
-planning                 → participant-identity, semantic-trace, office-capability
 ```
 
 Phase E 审计结论：3 条 coupling edge 已删（见 `AUDIT.md` Phase E）：

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Mission.Lifecycle
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
@@ -316,3 +317,125 @@ module LifecycleSurface =
                 {| ok = true
                    names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
                    fault = "" |}
+
+    // Test-facing seeding: commit real unified lifecycle events into the
+    // workspace store the plugin already reads. No relay facts, no certificate,
+    // no second vocabulary. These helpers exist so executable tests can stand up
+    // an incumbency, a review, or a retirement without inventing a private store.
+    let private heldStore (store: obj) : IEventStore = unbox store
+
+    let private workOfStore (held: IEventStore) (workId: string) : LifecycleWork option =
+        match held.TryCurrent "Lifecycle" with
+        | None -> None
+        | Some current ->
+            let works = unbox<Map<string, LifecycleWork>> current
+            Map.tryFind workId works
+
+    let private commitEvents (held: IEventStore) (workId: string) (events: LifecycleEvent list) : Task<Result<unit, string>> =
+        task {
+            match! LifecycleKernel.commit held workId events with
+            | Ok CommitOutcome.AppendDurable -> return Ok()
+            | Ok CommitOutcome.AppendNotAttempted -> return Error "append was not attempted"
+            | Ok CommitOutcome.CommitUnknown -> return Error "commit outcome is unknown"
+            | Error reason -> return Error reason
+        }
+
+    let private openingKindOf (kind: string) =
+        match kind with
+        | "S4" -> OpeningKind.ManagerDirect
+        | "spawn" -> OpeningKind.SpawnedExecution
+        | _ -> OpeningKind.UserPlan
+
+    let seedOpen (store: obj) (kind: string) (workId: string) (root: string) (head: int64) : Task<obj> =
+        task {
+            let held = heldStore store
+
+            match workOfStore held workId with
+            | Some _ -> return box {| ok = true; opened = false; error = "" |}
+            | None ->
+                let firstLine =
+                    if kind = "spawn" then Some LifecycleIdentity.spawnMark else None
+
+                match LifecycleKernel.openWork sha256 (openingKindOf kind) firstLine workId root false (Some head) with
+                | KernelDecision.Write(events, _) ->
+                    match! commitEvents held workId events with
+                    | Ok() -> return box {| ok = true; opened = true; error = "" |}
+                    | Error reason -> return box {| ok = false; opened = false; error = reason |}
+                | KernelDecision.Refuse reason -> return box {| ok = false; opened = false; error = reason |}
+                | KernelDecision.Done label -> return box {| ok = false; opened = false; error = label |}
+        }
+
+    let seedReview (store: obj) (workId: string) (outcome: string) : Task<obj> =
+        task {
+            let held = heldStore store
+
+            match workOfStore held workId, ReviewOutcome.parse outcome with
+            | None, _ -> return box {| ok = false; reviewed = false; error = "lifecycle work is missing" |}
+            | _, None -> return box {| ok = false; reviewed = false; error = "review outcome rejected" |}
+            | Some work, Some reviewOutcome ->
+                match work.Active with
+                | None -> return box {| ok = false; reviewed = false; error = "no active incumbency" |}
+                | Some active ->
+                    match LifecycleKernel.review work active.Id reviewOutcome with
+                    | KernelDecision.Done label -> return box {| ok = true; reviewed = false; error = label |}
+                    | KernelDecision.Refuse reason -> return box {| ok = false; reviewed = false; error = reason |}
+                    | KernelDecision.Write(events, _) ->
+                        match! commitEvents held workId events with
+                        | Ok() -> return box {| ok = true; reviewed = true; error = "" |}
+                        | Error reason -> return box {| ok = false; reviewed = false; error = reason |}
+        }
+
+    let seedDeliver
+        (store: obj)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (head: int64)
+        : Task<obj> =
+        task {
+            let held = heldStore store
+
+            match workOfStore held workId with
+            | None -> return box {| ok = false; decision = "missing"; error = "lifecycle work is missing" |}
+            | Some work ->
+                let fence =
+                    { HostFence.ProviderRunId = Some providerRunId
+                      HostFence.ToolCallId = Some toolCallId }
+
+                let decision =
+                    if work.Sequence = WorkSequence.Execution then
+                        LifecycleKernel.deliverExecution sha256 work fence (Some head) None
+                    else
+                        LifecycleKernel.deliverOneshot sha256 work fence (Some head) None SessionLookup.None None None
+
+                match decision with
+                | KernelDecision.Refuse reason -> return box {| ok = false; decision = "Refuse"; error = reason |}
+                | KernelDecision.Done label -> return box {| ok = true; decision = "Done"; error = label |}
+                | KernelDecision.Write(events, label) ->
+                    match! commitEvents held workId events with
+                    | Ok() -> return box {| ok = true; decision = label; error = "" |}
+                    | Error reason -> return box {| ok = false; decision = label; error = reason |}
+        }
+
+    let workView (store: obj) (workId: string) =
+        let held = heldStore store
+
+        match workOfStore held workId with
+        | None -> box {| found = false; sequence = ""; active = false; reviewed = ""; confirmed = false; delivered = false |}
+        | Some work ->
+            let reviewed =
+                work.Active
+                |> Option.bind (fun active -> active.Review)
+                |> Option.map (fun stamp -> ReviewOutcome.render stamp.Outcome)
+                |> Option.defaultValue ""
+
+            box
+                {| found = true
+                   sequence = WorkSequence.render work.Sequence |> String.concat ","
+                   active = work.Active.IsSome
+                   reviewed = reviewed
+                   confirmed =
+                    work.Active
+                    |> Option.bind (fun active -> active.Confirmed)
+                    |> Option.isSome
+                   delivered = work.CurrentDelivered |}

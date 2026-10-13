@@ -276,9 +276,9 @@ const providerStartFacts = (directory) => {
   return readdirSync(events)
     .filter(name => name.endsWith('.ndjson'))
     .flatMap(name => readFileSync(join(events, name), 'utf8').trim().split('\n'))
-    .map(line => JSON.parse(line).payload.Fact)
-    .filter(fact => fact[0] === 'Agent' && fact[1][0] === 'ChatExecution' && fact[1][1][0] === 'ProviderStarted')
-    .map(fact => fact[1][1][1])
+    .map(line => JSON.parse(line).payload)
+    .filter(payload => payload?.Fact?.[0] === 'Agent' && payload.Fact[1]?.[0] === 'ChatExecution' && payload.Fact[1][1]?.[0] === 'ProviderStarted')
+    .map(payload => payload.Fact[1][1][1])
 }
 const assertNoReplacementPrompt = (runtime, created, sessionID) => {
   assert.equal(runtime.prompts.filter(prompt => prompt.path?.id === sessionID).length, 0,

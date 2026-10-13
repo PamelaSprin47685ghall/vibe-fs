@@ -405,6 +405,13 @@
       "borrowed_surface": []
     },
     {
+      "id": "work",
+      "package": "work",
+      "station": 58,
+      "kind": "package",
+      "borrowed_surface": []
+    },
+    {
       "id": "delegation.sync-delegate",
       "package": "delegation",
       "station": 42,

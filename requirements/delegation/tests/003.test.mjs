@@ -168,7 +168,7 @@ const assertAcceptedRefused = async (runtime, owner, directory) => {
 }
 
 const refused = (title, body) => {
-  test(title, async () => {
+  test(`WHAT[delegation-003] ${title}`, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-refused-'))
     const owner = 'manager-devops-refused'
     const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -181,12 +181,12 @@ const refused = (title, body) => {
   })
 }
 
-refused('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_directly', assertAcceptedRefused)
-refused('WHAT[delegation-003] explicit runtime reopen preserves the companion DevOps route for a new charge', assertAcceptedRefused)
-refused('WHAT[delegation-003] companion devops is preserved and not abandoned when parent session cancels child work', assertAcceptedRefused)
-refused('WHAT[delegation-003] parent cancel preserves the busy fixed DevOps work until its real terminal', assertAcceptedRefused)
-refused('WHAT[delegation-003] the original fixed DevOps terminal callback survives parent cancel without another tool lookup', assertAcceptedRefused)
-refused('WHAT[delegation-003] scope detach after parent cancel releases the preserved fixed DevOps callback', assertAcceptedRefused)
+refused('FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_directly', assertAcceptedRefused)
+refused('explicit runtime reopen preserves the companion DevOps route for a new charge', assertAcceptedRefused)
+refused('companion devops is preserved and not abandoned when parent session cancels child work', assertAcceptedRefused)
+refused('parent cancel preserves the busy fixed DevOps work until its real terminal', assertAcceptedRefused)
+refused('the original fixed DevOps terminal callback survives parent cancel without another tool lookup', assertAcceptedRefused)
+refused('scope detach after parent cancel releases the preserved fixed DevOps callback', assertAcceptedRefused)
 test('WHAT[delegation-003] each new ordinary work is cancelled after the fixed road owner survives an earlier cancel', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-repeat-cancel-'))
   const owner = 'manager-devops-repeat-cancel'
