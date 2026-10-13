@@ -1,10 +1,10 @@
-namespace Wanxiangshu.Mission.Relay.OpenCode
+namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.Assessment
+open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
@@ -82,7 +82,7 @@ module ReviewShell =
 
     // Same findings schema and three-question semantics as the Manager
     // backend (relay-assessment-011 shared shell).
-    let private parseFindings (args: HostToolArguments) : Result<AssessmentFindings, string> =
+    let private parseFindings (args: HostToolArguments) : Result<ReviewFindings, string> =
         match Model.tryParse args.Raw with
         | Error _ -> Error ReviewBackendManager.Path.InvalidFindings
         | Ok findings -> Ok findings
@@ -101,8 +101,8 @@ module ReviewShell =
                 | None -> Error ReviewBackendManager.Path.BindingUnavailable
             | None -> Error ReviewBackendManager.Path.BindingUnavailable
 
-    let private gapsOf (findings: AssessmentFindings) : (string * string) list =
-        AssessmentFindings.values findings
+    let private gapsOf (findings: ReviewFindings) : (string * string) list =
+        ReviewFindings.values findings
         |> List.map (fun finding -> (finding.AcceptanceCriteria, finding.WorkPlan))
 
     // One preparation chain: store wiring, findings parsing and the active

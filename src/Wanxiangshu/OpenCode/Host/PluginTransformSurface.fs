@@ -2,7 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Work.OpenCode
 
 module PluginTransformSurface =
     let ordinaryEffects tentative : Task<string array> =

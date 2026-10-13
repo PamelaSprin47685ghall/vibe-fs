@@ -1,4 +1,4 @@
-module Wanxiangshu.Mission.Relay.Retirement.Surface
+module Wanxiangshu.Mission.Work.Retirement.Surface
 
 type AdmissionFence
 type NudgeState

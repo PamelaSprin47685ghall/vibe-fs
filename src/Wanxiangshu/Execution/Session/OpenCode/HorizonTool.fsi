@@ -54,7 +54,7 @@ module HorizonTool =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
           Journal: AgentJournal option
-          EnsureRoadDevOpsBound: SessionId -> Task<unit> }
+          EnsureWorkDevOpsBound: SessionId -> Task<unit> }
 
     val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec

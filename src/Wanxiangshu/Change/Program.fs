@@ -7,7 +7,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 
 /// One manager session owns one stable worktree. Human quality decisions come only from
@@ -418,7 +418,7 @@ module OrchestratorProgram =
 
     let private releaseTerminalWorktree (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {
-            do! deps.Relay.TerminateRoadResources job.JobId
+            do! deps.Relay.TerminateWorkResources job.JobId
             return! job.Worktree.Release()
         }
 

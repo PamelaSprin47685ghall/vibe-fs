@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Relay.OpenCode
+namespace Wanxiangshu.Mission.Work.OpenCode
 
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore

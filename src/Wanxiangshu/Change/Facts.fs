@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Foundation
 
 /// Durable orchestration facts owned by the Change/orchestrator boundary.

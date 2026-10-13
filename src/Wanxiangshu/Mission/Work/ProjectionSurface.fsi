@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Relay
+namespace Wanxiangshu.Mission.Work
 
 open System.Threading.Tasks
 open Wanxiangshu.Persistence.Journal

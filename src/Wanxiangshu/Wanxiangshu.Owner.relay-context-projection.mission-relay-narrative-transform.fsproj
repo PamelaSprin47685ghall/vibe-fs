@@ -21,7 +21,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
-<Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fsi"/>
-    <Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fs"/>
+<Compile Include="Mission/Work/OpenCode/NarrativeTransform.fsi"/>
+    <Compile Include="Mission/Work/OpenCode/NarrativeTransform.fs"/>
   </ItemGroup>
 </Project>

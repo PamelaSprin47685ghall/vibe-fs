@@ -12,7 +12,7 @@ open Wanxiangshu.Git
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 
 /// JS-native boundary for change integration. Job projections and git/worktree
 /// resources stay behind opaque handles; answers and failures are plain objects.
@@ -1393,7 +1393,7 @@ module ChangeSurface =
                                 Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
                         else
                             Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
-                  TerminateRoadResources =
+                  TerminateWorkResources =
                     fun _ ->
                         timeline.Add "relay:terminate"
                         Task.FromResult()

@@ -23,9 +23,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
-    <Compile Include="Mission/Relay/OpenCode/ReviewBackendManager.fsi"/>
-    <Compile Include="Mission/Relay/OpenCode/ReviewBackendManager.fs"/>
-    <Compile Include="Mission/Relay/OpenCode/ReviewShell.fsi"/>
-    <Compile Include="Mission/Relay/OpenCode/ReviewShell.fs"/>
+    <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fsi"/>
+    <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fs"/>
+    <Compile Include="Mission/Work/OpenCode/ReviewShell.fsi"/>
+    <Compile Include="Mission/Work/OpenCode/ReviewShell.fs"/>
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
@@ -93,7 +93,7 @@ type RelayPort =
       AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
       ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
-      TerminateRoadResources: ManagerJobId -> Task<unit>
+      TerminateWorkResources: ManagerJobId -> Task<unit>
       /// The durable unified review fact for a manager session, with the work's
       /// authority count. `None` when no review is durable yet: the publish gate
       /// then refuses with zero writes.

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Change
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 
 module OrchestratorFact =
     val inline ManagerJobCreated:

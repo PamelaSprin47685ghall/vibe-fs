@@ -18,7 +18,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Lifecycle
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
@@ -223,9 +223,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Error error -> Task.FromResult(Error error)
         | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
 
-    let requireOpenRoad (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
-        requireOpenWork record
-
     let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
             let! relay, record =
@@ -254,7 +251,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             return! gitPort.ReadHead record.WorktreePath
         }
 
-    let terminateRoadResources (jobId: ManagerJobId) : Task<unit> =
+    let terminateWorkResources (jobId: ManagerJobId) : Task<unit> =
         task {
             let managerId = managerAgentId jobId
 
@@ -303,7 +300,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
           AwaitLoopSignal = awaitLoopSignal
           ContinueLoop = continueLoop
           PrepareCandidate = prepareCandidate
-          TerminateRoadResources = terminateRoadResources
+          TerminateWorkResources = terminateWorkResources
           LifecycleReviewed = lifecycleReviewed }
 
     // ── engine ──────────────────────────────────────────────────────────────
@@ -553,7 +550,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 relayPortOpt
                 |> Result.requireSome "Relay authority update requires a durable journal"
 
-            let! work = requireOpenRoad relay record
+            let! work = requireOpenWork record
 
             let nextRevision =
                 authorityRevisionFor record callerProviderRun callerToolCallId prompt

@@ -8,7 +8,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js

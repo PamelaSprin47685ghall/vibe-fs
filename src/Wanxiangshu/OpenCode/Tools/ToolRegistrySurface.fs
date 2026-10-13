@@ -21,7 +21,7 @@ module ToolRegistrySurface =
     /// needs the session's established public Role; `private-attachment` is an
     /// internal leaf admitted by owner-held evidence and never holds an office.
     let deliverDescription () : string =
-        Wanxiangshu.Mission.Relay.OpenCode.DeliverTool.description ()
+        Wanxiangshu.Mission.Work.OpenCode.DeliverTool.description ()
 
     let admissionAuthority (toolName: string) : string =
         match ToolRegistry.tryAdmission toolName None with

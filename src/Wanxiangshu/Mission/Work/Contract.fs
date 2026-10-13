@@ -1,21 +1,8 @@
-namespace Wanxiangshu.Mission.Relay
+namespace Wanxiangshu.Mission.Work
 
-open FsToolkit.ErrorHandling
-
-type RoadId = private RoadId of string
 type IncumbencyId = private IncumbencyId of string
 type AuthorityRevision = private AuthorityRevision of string
-type AssessmentId = private AssessmentId of string
 type RetirementId = private RetirementId of string
-type PhysicalUserMessageId = private PhysicalUserMessageId of string
-
-module PhysicalUserMessageId =
-    let create value = PhysicalUserMessageId value
-    let value (PhysicalUserMessageId value) = value
-
-module RoadId =
-    let create value = RoadId value
-    let value (RoadId value) = value
 
 module IncumbencyId =
     let create value = IncumbencyId value
@@ -24,10 +11,6 @@ module IncumbencyId =
 module AuthorityRevision =
     let create value = AuthorityRevision value
     let value (AuthorityRevision value) = value
-
-module AssessmentId =
-    let create value = AssessmentId value
-    let value (AssessmentId value) = value
 
 module RetirementId =
     let create value = RetirementId value
@@ -39,29 +22,29 @@ module ManagerLoopGate =
     let gateKind (retirementId: RetirementId) =
         "manager-loop:" + RetirementId.value retirementId
 
-type AssessmentFinding =
+type ReviewFinding =
     { AcceptanceCriteria: string
       WorkPlan: string }
 
-type AssessmentFindings = private AssessmentFindings of AssessmentFinding list
+type ReviewFindings = private ReviewFindings of ReviewFinding list
 
-module AssessmentFindings =
-    let tryCreate (findings: AssessmentFinding list) =
+module ReviewFindings =
+    let tryCreate (findings: ReviewFinding list) =
         if
             findings
             |> List.forall (fun finding ->
                 not (System.String.IsNullOrWhiteSpace finding.AcceptanceCriteria)
                 && not (System.String.IsNullOrWhiteSpace finding.WorkPlan))
         then
-            Ok(AssessmentFindings findings)
+            Ok(ReviewFindings findings)
         else
             Error "AssessmentFinding requires non-empty acceptance criteria and work plan"
 
-    let values (AssessmentFindings findings) = findings
+    let values (ReviewFindings findings) = findings
 
-    let isEmpty (AssessmentFindings findings) = List.isEmpty findings
+    let isEmpty (ReviewFindings findings) = List.isEmpty findings
 
-type AssessmentBinding =
+type ReviewBinding =
     { PhysicalUserMessageId: string
       ProviderRunId: string
       ToolCallId: string
@@ -70,26 +53,3 @@ type AssessmentBinding =
       RootRequestDigest: string
       RequirementSetDigest: string
       EvidenceFrontierDigest: string }
-
-[<RequireQualifiedAccess>]
-type IncumbencyPhase =
-    | AuditPending
-    | WorkOwned
-    | PerfectAwaitingRetirement
-    | RetirementCleanupBlocked
-
-[<RequireQualifiedAccess>]
-type RetirementOutcome =
-    | Relayed
-    | Delivered
-
-type ProjectionCut =
-    { ProviderRunId: string
-      ToolCallId: string }
-
-type RetirementSummary =
-    { Id: RetirementId
-      IncumbencyId: IncumbencyId
-      AuthorityRevision: AuthorityRevision
-      ProjectionCut: ProjectionCut
-      Outcome: RetirementOutcome }

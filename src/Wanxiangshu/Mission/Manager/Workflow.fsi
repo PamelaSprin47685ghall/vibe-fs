@@ -30,7 +30,7 @@ module ManagerWorkflow =
         context: ReconciledTurnContext ->
             Task
 
-    val ensureManagerRoadOpened:
+    val ensureManagerWorkOpened:
         journal: AgentJournal option ->
         workspaceDirectory: string option ->
         store: Wanxiangshu.Persistence.EventStore.IEventStore option ->

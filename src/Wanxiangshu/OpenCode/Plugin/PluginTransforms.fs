@@ -28,8 +28,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
@@ -1001,7 +1001,7 @@ module PluginTransforms =
                                     | None -> Some(Wanxiangshu.OpenCode.WorkspaceEventStore.acquire dir))
 
                         do!
-                            ManagerWorkflow.ensureManagerRoadOpened
+                            ManagerWorkflow.ensureManagerWorkOpened
                                 journal
                                 workspaceDirectory
                                 borrowedStore

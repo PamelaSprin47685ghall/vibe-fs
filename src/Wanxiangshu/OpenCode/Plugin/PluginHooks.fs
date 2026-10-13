@@ -26,8 +26,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

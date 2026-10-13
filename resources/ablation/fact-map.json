@@ -2,7 +2,6 @@
   "facts": {
     "AgentFact.Prompt": "interaction-authority",
     "AgentFact.ProviderFailure": "provider-attempt-recovery",
-    "AgentFact.Relay": "work",
     "AgentFact.Execution": "delegation",
     "AgentFact.Orchestrator": "change-integration",
     "AgentFact.Companion": "context-compression",

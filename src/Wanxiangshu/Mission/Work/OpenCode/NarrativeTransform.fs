@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Relay.OpenCode
+namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
@@ -8,7 +8,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Context.Trace

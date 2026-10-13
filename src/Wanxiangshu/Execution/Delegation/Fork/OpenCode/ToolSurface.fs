@@ -25,7 +25,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Foundation.Identity
 
 /// Opaque JS-native harness for the real Manager fork tool path.
@@ -1010,7 +1010,7 @@ module ForkToolSurface =
             { RuntimeFor = harness.Scope.RuntimeFor
               LogicalOwnerFor = harness.Scope.LogicalOwnerFor
               Journal = harness.Scope.Journal
-              EnsureRoadDevOpsBound = harness.Scope.EnsureRoadDevOpsBound }
+              EnsureWorkDevOpsBound = harness.Scope.EnsureWorkDevOpsBound }
 
         let spec = HorizonTool.spec horizonContext
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)

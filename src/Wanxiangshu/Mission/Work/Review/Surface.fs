@@ -1,12 +1,12 @@
-namespace Wanxiangshu.Mission.Relay.Assessment
+namespace Wanxiangshu.Mission.Work.Review
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 
 module Surface =
     let schemaJson = Model.schemaJson
 
-    let private findingObject (finding: AssessmentFinding) =
+    let private findingObject (finding: ReviewFinding) =
         box
             {| acceptance_criteria = finding.AcceptanceCriteria
                work_plan = finding.WorkPlan |}
@@ -15,9 +15,9 @@ module Surface =
         match Model.tryParse value with
         | Error error -> box {| ok = false; error = error |}
         | Ok findings ->
-            let values = AssessmentFindings.values findings
+            let values = ReviewFindings.values findings
 
             box
                 {| ok = true
                    findings = values |> List.map findingObject |> List.toArray
-                   passed = AssessmentFindings.isEmpty findings |}
+                   passed = ReviewFindings.isEmpty findings |}

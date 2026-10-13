@@ -8,9 +8,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <Compile Include="Mission/Relay/Assessment/Model.fsi"/>
-    <Compile Include="Mission/Relay/Assessment/Model.fs"/>
-    <Compile Include="Mission/Relay/Assessment/Surface.fsi"/>
-    <Compile Include="Mission/Relay/Assessment/Surface.fs"/>
+    <Compile Include="Mission/Work/Review/Model.fsi"/>
+    <Compile Include="Mission/Work/Review/Model.fs"/>
+    <Compile Include="Mission/Work/Review/Surface.fsi"/>
+    <Compile Include="Mission/Work/Review/Surface.fs"/>
   </ItemGroup>
 </Project>

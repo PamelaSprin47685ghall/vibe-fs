@@ -62,7 +62,7 @@ module HorizonTool =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
           Journal: AgentJournal option
-          EnsureRoadDevOpsBound: SessionId -> Task<unit> }
+          EnsureWorkDevOpsBound: SessionId -> Task<unit> }
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -165,7 +165,7 @@ module HorizonTool =
             let parentSessionId =
                 SessionId.create context.SessionId |> runtimeCtx.LogicalOwnerFor
 
-            do! runtimeCtx.EnsureRoadDevOpsBound parentSessionId
+            do! runtimeCtx.EnsureWorkDevOpsBound parentSessionId
 
             match runtimeCtx.RuntimeFor context with
             | Error _ -> return unavailable language Path.CannotBeSeen

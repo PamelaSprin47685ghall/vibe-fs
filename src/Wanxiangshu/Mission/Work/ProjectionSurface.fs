@@ -1,9 +1,9 @@
-namespace Wanxiangshu.Mission.Relay
+namespace Wanxiangshu.Mission.Work
 
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 module ProjectionSurface =

@@ -12,8 +12,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -195,7 +195,7 @@ module ManagerWorkflow =
             | _ -> None
         | _ -> None
 
-    let ensureManagerRoadOpened
+    let ensureManagerWorkOpened
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
         (store: Wanxiangshu.Persistence.EventStore.IEventStore option)

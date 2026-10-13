@@ -2,7 +2,7 @@ namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 
 [<RequireQualifiedAccess>]
 type TerminalOutcome =

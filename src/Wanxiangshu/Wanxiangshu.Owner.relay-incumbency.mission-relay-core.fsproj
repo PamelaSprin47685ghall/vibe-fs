@@ -7,7 +7,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Mission/Relay/Contract.fsi"/>
-    <Compile Include="Mission/Relay/Contract.fs"/>
+    <Compile Include="Mission/Work/Contract.fsi"/>
+    <Compile Include="Mission/Work/Contract.fs"/>
   </ItemGroup>
 </Project>

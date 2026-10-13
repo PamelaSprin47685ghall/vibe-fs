@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Relay.OpenCode
+namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
@@ -10,8 +10,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Lifecycle
-open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.Assessment
+open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
@@ -182,7 +182,7 @@ module ReviewBackendManager =
         (rootAuthorityUserMessageId: string)
         (toolCallId: ToolCallId)
         (providerRun: ProviderRunIdentity)
-        : Task<Result<AssessmentBinding, ReviewFailure>> =
+        : Task<Result<ReviewBinding, ReviewFailure>> =
         match scope.Snapshot with
         | None -> Task.FromResult(Error BindingUnavailable)
         | Some snapshot ->
@@ -215,7 +215,7 @@ module ReviewBackendManager =
                     Map.tryFind sessionId works |> Option.map (fun work -> held, work)
 
     type private BoundReviewInvocation =
-        { Findings: AssessmentFindings
+        { Findings: ReviewFindings
           ToolCallId: ToolCallId
           ProviderRun: ProviderRunIdentity
           PhysicalUserMessageId: string
@@ -276,9 +276,9 @@ module ReviewBackendManager =
         with _ ->
             Error BindingUnavailable
 
-    let private acceptedResult (findings: AssessmentFindings) =
+    let private acceptedResult (findings: ReviewFindings) =
         let instructionPath =
-            if AssessmentFindings.isEmpty findings then
+            if ReviewFindings.isEmpty findings then
                 Path.Finish
             else
                 Path.Work
@@ -317,7 +317,7 @@ module ReviewBackendManager =
             | Error failure -> return Error failure
             | Ok _ ->
                 let outcome =
-                    if AssessmentFindings.isEmpty prepared.Bound.Findings then
+                    if ReviewFindings.isEmpty prepared.Bound.Findings then
                         ReviewOutcome.Promoted
                     else
                         ReviewOutcome.Stayed

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Mission.Relay.Assessment
+namespace Wanxiangshu.Mission.Work.Review
 
 module Surface =
     val schemaJson: string

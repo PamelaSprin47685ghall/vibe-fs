@@ -10,7 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-context-projection.mission-relay-narrative-transform.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
-    <Compile Include="Mission/Relay/ProjectionSurface.fsi"/>
-    <Compile Include="Mission/Relay/ProjectionSurface.fs"/>
+    <Compile Include="Mission/Work/ProjectionSurface.fsi"/>
+    <Compile Include="Mission/Work/ProjectionSurface.fs"/>
   </ItemGroup>
 </Project>

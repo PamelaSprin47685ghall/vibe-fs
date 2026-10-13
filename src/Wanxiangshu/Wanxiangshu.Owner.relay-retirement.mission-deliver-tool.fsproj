@@ -26,7 +26,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-snapshot-contract.fsproj"/>
-    <Compile Include="Mission/Relay/OpenCode/DeliverTool.fsi"/>
-    <Compile Include="Mission/Relay/OpenCode/DeliverTool.fs"/>
+    <Compile Include="Mission/Work/OpenCode/DeliverTool.fsi"/>
+    <Compile Include="Mission/Work/OpenCode/DeliverTool.fs"/>
   </ItemGroup>
 </Project>

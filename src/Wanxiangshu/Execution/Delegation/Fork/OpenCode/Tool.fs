@@ -681,10 +681,10 @@ module ForkTool =
         else
             false
 
-    let private bindRoadDevOpsIfNeeded (scope: ToolRuntimeScope) parentSessionId isDevOps =
+    let private bindWorkDevOpsIfNeeded (scope: ToolRuntimeScope) parentSessionId isDevOps =
         task {
             if isDevOps then
-                do! scope.EnsureRoadDevOpsBound parentSessionId
+                do! scope.EnsureWorkDevOpsBound parentSessionId
         }
 
     let private executeManagerResumeAfterGuards
@@ -706,7 +706,7 @@ module ForkTool =
             if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
                 return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
             else
-                do! bindRoadDevOpsIfNeeded scope parentSessionId isDevOps
+                do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
                 return! resumeOnRuntime scope request context language
         }
 

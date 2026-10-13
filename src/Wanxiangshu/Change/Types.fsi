@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 
 type OrchestratorVerdict =
@@ -53,7 +53,7 @@ type RelayPort =
       AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
       ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
-      TerminateRoadResources: ManagerJobId -> Task<unit>
+      TerminateWorkResources: ManagerJobId -> Task<unit>
       LifecycleReviewed:
         SessionId ->
         Wanxiangshu.Foundation.Identity.WorktreePath ->

@@ -9,7 +9,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Participant.Persona
 
 /// JS-native owner surface for decode-only journal fact compatibility.

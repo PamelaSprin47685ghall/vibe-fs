@@ -15,7 +15,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 
 /// Owns every per-session tool runtime.
@@ -115,7 +115,7 @@ type ToolRuntimeScope =
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
     member PtyCapabilityFor: ctx: HostToolContext -> Result<DelegationPtyCapability, string>
 
-    member EnsureRoadDevOpsBound: parentSessionId: SessionId -> Task<unit>
+    member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
     /// planning-023: spawn a parentless execution session (agent, no parentID)
     /// and deliver the init prompt. Returns the spawned session id, or a typed

@@ -5,7 +5,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal

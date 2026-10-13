@@ -14,8 +14,8 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Planning
-open Wanxiangshu.Mission.Relay.OpenCode
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work.OpenCode
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
@@ -918,7 +918,7 @@ module ToolRegistry =
                   { RuntimeFor = runtime.RuntimeFor
                     LogicalOwnerFor = runtime.LogicalOwnerFor
                     Journal = runtime.Journal
-                    EnsureRoadDevOpsBound = runtime.EnsureRoadDevOpsBound }
+                    EnsureWorkDevOpsBound = runtime.EnsureWorkDevOpsBound }
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime

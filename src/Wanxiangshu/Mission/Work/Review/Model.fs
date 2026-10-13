@@ -1,8 +1,8 @@
-namespace Wanxiangshu.Mission.Relay.Assessment
+namespace Wanxiangshu.Mission.Work.Review
 
 open FsToolkit.ErrorHandling
 open Fable.Core.JsInterop
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 
 module Model =
     let schemaJson =
@@ -24,7 +24,7 @@ module Model =
         else
             Error("review finding field must be a string: " + name)
 
-    let private readFinding (value: obj) : Result<AssessmentFinding, string> =
+    let private readFinding (value: obj) : Result<ReviewFinding, string> =
         result {
             let! acceptanceCriteria = readString value "acceptance_criteria"
             let! workPlan = readString value "work_plan"
@@ -34,7 +34,7 @@ module Model =
                   WorkPlan = workPlan }
         }
 
-    let private readFindings (value: obj) : Result<AssessmentFinding list, string> =
+    let private readFindings (value: obj) : Result<ReviewFinding list, string> =
         if not (emitJsExpr value "Array.isArray($0)") then
             Error "review findings must be an array"
         else
@@ -72,5 +72,5 @@ module Model =
                 do! validateKeys value
                 do! validateNote value
                 let! findings = property value "findings" |> readFindings
-                return! AssessmentFindings.tryCreate findings
+                return! ReviewFindings.tryCreate findings
             }

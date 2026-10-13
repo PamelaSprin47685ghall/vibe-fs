@@ -19,7 +19,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -522,7 +522,7 @@ type ToolRuntimeScope
         | Some profile -> profile.CanonicalRole = Role.Manager
         | None -> isManagerInJournal journal sessionId
 
-    let isManagerRoadSession (sessionId: SessionId) =
+    let isManagerWorkSession (sessionId: SessionId) =
         let sidStr = SessionId.value sessionId
 
         match String.IsNullOrWhiteSpace sidStr with
@@ -706,7 +706,7 @@ type ToolRuntimeScope
                 devopsBindingTasks.[key] <- t
                 t)
 
-    let obtainRoadDevOpsTask (parentSessionId: SessionId) (key: string) =
+    let obtainWorkDevOpsTask (parentSessionId: SessionId) (key: string) =
         lock gate (fun () ->
             match getOrCreateRuntime key with
             | Ok runtime when not (runtime.OwnsAgent "devops") ->
@@ -714,12 +714,12 @@ type ToolRuntimeScope
                 getOrCreateDevOpsTask parentSessionId key
             | _ -> getOrCreateDevOpsTask parentSessionId key)
 
-    let ensureRoadDevOpsBound (parentSessionId: SessionId) : Task<unit> =
-        match isManagerRoadSession parentSessionId with
+    let ensureWorkDevOpsBound (parentSessionId: SessionId) : Task<unit> =
+        match isManagerWorkSession parentSessionId with
         | false -> Task.FromResult()
         | true ->
             let key = SessionId.value parentSessionId
-            obtainRoadDevOpsTask parentSessionId key
+            obtainWorkDevOpsTask parentSessionId key
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -766,7 +766,7 @@ type ToolRuntimeScope
     member _.EnsureCommandRoleFor(sessionId: SessionId, resolveAgent: SessionId -> Task<string option>) =
         ensureCommandRoleFor sessionId resolveAgent
 
-    member _.EnsureRoadDevOpsBound(parentSessionId: SessionId) = ensureRoadDevOpsBound parentSessionId
+    member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
     /// planning-023: spawn a parentless execution session for a delivered plan.
     /// The session is created with the requested agent and no parentID — equal
