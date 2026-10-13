@@ -17,7 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>
+
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-retirement.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>

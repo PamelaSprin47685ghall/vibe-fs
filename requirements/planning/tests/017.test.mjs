@@ -399,6 +399,7 @@ test('WHAT[planning-017] reanchorRequested is true on fresh handover and dedupli
     {},
   )
   assert.equal(continuing.reanchorRequested, false)
+})
 
 test('WHAT[planning-017] successor projection strips earlier assistant and tool messages and inserts LWR_prev once', () => {
   const rawMessages = [
