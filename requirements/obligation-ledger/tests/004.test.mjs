@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const foldSurface = await import("../../../dist/Context/Companion/FoldSurface.js");
 const obligation = await import("../../../dist/Persistence/Journal/ObligationJournalSurface.js");
 const journalSurface = await import("../../../dist/Persistence/Journal/Surface.js");
-const { acceptAuthorityRoot, bindManagedChild, openIncumbency, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+const { acceptAuthorityRoot, bindManagedChild, lifecycleWorkView, openIncumbency, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
 
 // All envelopes cross the registered FoldSurface. The checkpoint fact carries
@@ -279,9 +279,9 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     assert.ok(beforeSlices.promptAuthority?.activeLogicalRun, 'the pre-state carries an active logical run')
     assert.equal(beforeSlices.handles?.handleCount, 1, 'the pre-state carries one linked handle')
     assert.equal(beforeSlices.handles?.handles[0]?.childSessionId, childID, 'the handle is the linked child session')
-    assert.equal(beforeSlices.relay?.roadCount, 1, 'the pre-state carries one relay road')
-    assert.equal(beforeSlices.relay?.roads[0]?.iterationOrdinal, 1, 'the relay road has opened once')
-    assert.ok(beforeSlices.relay?.roads[0]?.activeIncumbencyPresent, 'the relay road carries an active incumbency')
+    const lifecycle = await lifecycleWorkView(runtime, sessionID)
+    assert.equal(lifecycle.found, true, 'the pre-state carries one lifecycle work')
+    assert.equal(lifecycle.active, true, 'the lifecycle work carries an active incumbency')
     assert.equal(beforeSlices.companion?.bloggerSessionId, bloggerSession, 'the pre-state carries a linked companion')
     assert.ok(beforeSlices.xTrace?.latestTerminalPresent, 'the pre-state carries a captured terminal')
 

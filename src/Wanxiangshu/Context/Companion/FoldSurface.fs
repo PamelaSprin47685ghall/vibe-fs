@@ -11,7 +11,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -313,8 +312,8 @@ module ContextFoldSurface =
     // ── obligation-ledger-004: read-only forwarders for the slices this
     // fold oracle previously hard-coded as null. Same rule as the journal
     // snapshot forwarders: public fields and owner accessors only
-    // (Relay.Fold.view/roads, SessionStartedAtProjection.startedAt); no
-    // private representation is destructured outside its owner domain.
+    // (SessionStartedAtProjection.startedAt); no private representation is
+    // destructured outside its owner domain.
 
     let private handleIdText (handleId: HandleId) =
         match handleId with
@@ -403,30 +402,6 @@ module ContextFoldSurface =
                openByBloggerCount = Map.count state.OpenByBlogger
                providerRunByRequestIdCount = Map.count state.ProviderRunByRequestId |}
 
-    let private relayToJs (state: RelayState) : obj =
-        let roadViewToJs roadId (road: RoadView) =
-            box
-                {| roadId = RoadId.value roadId
-                   iterationOrdinal = road.IterationOrdinal
-                   authorityRevisionCount = List.length road.AuthorityRevisions
-                   authorityMessageIdCount = List.length road.AuthorityMessageIds
-                   activeIncumbencyPresent = road.ActiveIncumbency |> Option.isSome
-                   retiredIncumbencyCount = List.length road.RetiredIncumbencies
-                   latestRetirementPresent = road.LatestRetirement |> Option.isSome
-                   boundDevOps = road.BoundDevOps |> Option.toObj |}
-
-        let roadIds = Wanxiangshu.Mission.Relay.Fold.roads state
-
-        box
-            {| roadCount = List.length roadIds
-               roads =
-                roadIds
-                |> List.map (fun roadId ->
-                    Wanxiangshu.Mission.Relay.Fold.view state roadId
-                    |> Option.map (roadViewToJs roadId)
-                    |> Option.toObj)
-                |> List.toArray |}
-
     let private guidelinesToJs (state: GuidelineProjectionState) : obj =
         box
             {| pairCount = List.length state.Pairs
@@ -491,7 +466,6 @@ module ContextFoldSurface =
                PromptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj
                Enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
                BloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
-               Relay = session.Relay |> Option.map relayToJs |> Option.toObj
                Guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
                RequirementGrounding =
                 session.RequirementGrounding

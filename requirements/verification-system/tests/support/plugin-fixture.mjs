@@ -544,6 +544,9 @@ export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${s
 
 export const injectAuditPendingIncumbency = openIncumbency
 
+export const lifecycleWorkView = (runtime, sessionId) =>
+  lifecycleSurface.workView(lifecycleStore(runtime), sessionId)
+
 // The accepted review is a unified lifecycle fact (Reviewed). It is committed to
 // the workspace store the plugin reads, so no second representation crosses here.
 export const injectAcceptedAssessment = async (

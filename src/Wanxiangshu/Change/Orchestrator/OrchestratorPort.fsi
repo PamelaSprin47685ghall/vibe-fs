@@ -3,8 +3,6 @@ namespace Wanxiangshu.Change
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Relay
-
 type OrchestratorRecoveryView =
     { ActiveJobs: ManagerJobProjection list
       Handles: AgentLinkageProjection option }
@@ -19,11 +17,5 @@ type OrchestratorSweepPort =
       TryJob: ManagerJobId -> ManagerJobProjection option
       RecoveryView: SessionId -> OrchestratorRecoveryView }
 
-/// Domain-owned Relay reads, appends, and revision wait for one ManagerJob.
-///
-/// RoadSnapshot performs exactly one snapshot-with-revision read per call, so
-/// the returned road view and revision always belong to the same revision.
 type OrchestratorRelayPort =
-    { RoadSnapshot: ManagerJobProjection -> RoadView option * JournalRevision
-      AwaitChangeFrom: JournalRevision -> Task<unit>
-      AppendRelay: ManagerJobProjection -> RelayTransaction -> Task<Result<unit, string>> }
+    { AwaitChangeFrom: JournalRevision -> Task<unit> }

@@ -16,7 +16,6 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Context.Companion.Blogger
@@ -276,30 +275,6 @@ module JournalSurface =
                openByBloggerCount = Map.count state.OpenByBlogger
                providerRunByRequestIdCount = Map.count state.ProviderRunByRequestId |}
 
-    let private relayToJs (state: RelayState) : obj =
-        let roadViewToJs roadId (road: RoadView) =
-            box
-                {| roadId = RoadId.value roadId
-                   iterationOrdinal = road.IterationOrdinal
-                   authorityRevisionCount = List.length road.AuthorityRevisions
-                   authorityMessageIdCount = List.length road.AuthorityMessageIds
-                   activeIncumbencyPresent = road.ActiveIncumbency |> Option.isSome
-                   retiredIncumbencyCount = List.length road.RetiredIncumbencies
-                   latestRetirementPresent = road.LatestRetirement |> Option.isSome
-                   boundDevOps = road.BoundDevOps |> Option.toObj |}
-
-        let roadIds = Wanxiangshu.Mission.Relay.Fold.roads state
-
-        box
-            {| roadCount = List.length roadIds
-               roads =
-                roadIds
-                |> List.map (fun roadId ->
-                    Wanxiangshu.Mission.Relay.Fold.view state roadId
-                    |> Option.map (roadViewToJs roadId)
-                    |> Option.toObj)
-                |> List.toArray |}
-
     let private guidelinesToJs (state: GuidelineProjectionState) : obj =
         box
             {| pairCount = List.length state.Pairs
@@ -358,7 +333,6 @@ module JournalSurface =
                promptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj
                enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
                bloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
-               relay = session.Relay |> Option.map relayToJs |> Option.toObj
                guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
                requirementGrounding =
                 session.RequirementGrounding

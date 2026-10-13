@@ -26,12 +26,6 @@ Foundation/GlobMatch.fsi
 Foundation/GlobMatch.fs
 Mission/Relay/Contract.fsi
 Mission/Relay/Contract.fs
-Mission/Relay/Facts.fsi
-Mission/Relay/Facts.fs
-Mission/Relay/Fold.fsi
-Mission/Relay/Fold.fs
-Mission/Relay/Surface.fsi
-Mission/Relay/Surface.fs
 Mission/Relay/Assessment/Model.fsi
 Mission/Relay/Assessment/Model.fs
 Mission/Relay/Assessment/Surface.fsi

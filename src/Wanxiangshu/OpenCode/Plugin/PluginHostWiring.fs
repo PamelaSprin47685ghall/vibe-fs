@@ -11,7 +11,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Strength.Persistence
@@ -240,16 +240,22 @@ module PluginHostWiring =
                     |> Option.bind (fun pa -> pa.ActiveLogicalRun)
                     |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
-                sessionOpt
-                |> Option.bind (fun s -> s.Relay)
-                |> Option.bind (fun r -> Fold.view r (RoadId.create (SessionId.value sessionId)))
-                |> Option.exists (fun road ->
-                    road.LatestRetirement.IsSome
-                    && (match activeRoot with
-                        | None -> true
-                        | Some root ->
-                            road.AuthorityMessageIds
-                            |> List.exists (fun oldRoot -> PhysicalUserMessageId.value oldRoot = root)))
+                let workOpt =
+                    match workspaceDirectory with
+                    | None -> None
+                    | Some workspace ->
+                        Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent (
+                            Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                        )
+                        |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+                        |> Option.bind (fun current ->
+                            let works = unbox<Map<string, LifecycleWork>> current
+                            Map.tryFind (SessionId.value sessionId) works)
+
+                workOpt
+                |> Option.exists (fun work ->
+                    not (List.isEmpty work.Retirements)
+                    && activeRoot.IsNone)
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)

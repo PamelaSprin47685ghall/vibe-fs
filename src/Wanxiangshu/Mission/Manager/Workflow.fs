@@ -28,43 +28,6 @@ module ManagerWorkflow =
     [<Literal>]
     let private finishPath = "runtime/manager-finish"
 
-    let private roadId (sessionId: SessionId) =
-        RoadId.create (SessionId.value sessionId)
-
-    let private relayState (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.bind (fun session -> session.Relay)
-
-    let private currentView (journal: AgentJournal) (sessionId: SessionId) =
-        relayState journal sessionId
-        |> Option.bind (fun state -> Fold.view state (roadId sessionId))
-
-    let private currentViewOf (journal: AgentJournal option) (sessionId: SessionId) =
-        journal
-        |> Option.bind (fun durable ->
-            relayState durable sessionId
-            |> Option.bind (fun state -> Fold.view state (roadId sessionId)))
-
-    /// The iteration ordinal as the provider reads it: "1" for the first
-    /// Manager on this road, then one more per durable opening. A road with no
-    /// view yet (first opening not yet committed) is still the first.
-    let private iterationOrdinalText (journal: AgentJournal option) (sessionId: SessionId) =
-        let ordinal =
-            currentViewOf journal sessionId
-            |> Option.map (fun road -> max 1 road.IterationOrdinal)
-            |> Option.defaultValue 1
-
-        string ordinal
-
-    let private isRetiredObservation
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        =
-        journal
-        |> Option.bind (fun durable -> currentView durable sessionId)
-        |> Option.exists (fun road -> Set.contains (ProviderRunIdentity.value providerRun) road.RetiredProviderRunIds)
-
     let private lifecycleWork (directory: string option) (sessionId: string) =
         match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
         | None -> None
@@ -78,6 +41,32 @@ module ManagerWorkflow =
                 | Some current ->
                     let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
                     Map.tryFind sessionId works
+
+    /// The iteration ordinal as the provider reads it: "1" for the first
+    /// Manager on this road, then one more per durable opening. A road with no
+    /// view yet (first opening not yet committed) is still the first.
+    let private iterationOrdinalText (directory: string option) (sessionId: SessionId) =
+        let ordinal =
+            lifecycleWork directory (SessionId.value sessionId)
+            |> Option.map (fun work ->
+                let retired = List.length work.Retirements
+                max 1 (retired + if work.Active.IsSome then 1 else 0))
+            |> Option.defaultValue 1
+
+        string ordinal
+
+    let private isRetiredObservation
+        (directory: string option)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        =
+        lifecycleWork directory (SessionId.value sessionId)
+        |> Option.exists (fun work ->
+            work.Retirements
+            |> List.exists (fun record ->
+                record.ProviderRunId = Some(ProviderRunIdentity.value providerRun)
+                || record.ProjectionCut
+                   |> Option.exists (fun cut -> cut.ProviderRunId = ProviderRunIdentity.value providerRun)))
 
     // Algorithm H reads the opening sequence plus tenure, review outcome, and confirmation.
     // S1–S3 do not enter the S4 resource match. Certificates are not an input.
@@ -137,7 +126,7 @@ module ManagerWorkflow =
         =
         let substitutions =
             if resourcePath = assessPath then
-                Map [ "ordinal", iterationOrdinalText (Some journal) turn.SessionId ]
+                Map [ "ordinal", iterationOrdinalText turn.Directory turn.SessionId ]
             elif resourcePath = finishPath then
                 let confirmed =
                     match lifecycleWork turn.Directory (SessionId.value turn.SessionId) with
@@ -254,7 +243,7 @@ module ManagerWorkflow =
                 ProviderProse.documentFor
                     sessionId
                     "runtime/manager-assess"
-                    (Map [ "ordinal", iterationOrdinalText (Some durable) sessionId ])
+                    (Map [ "ordinal", iterationOrdinalText workspaceDirectory sessionId ])
 
             let terminalRun = ProviderRunIdentity.create terminalProviderRunId
 
@@ -361,7 +350,7 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         match
-            isRetiredObservation journal context.Turn.SessionId context.Turn.ProviderRun,
+            isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun,
             context.Failure,
             context.Turn.Outcome
         with

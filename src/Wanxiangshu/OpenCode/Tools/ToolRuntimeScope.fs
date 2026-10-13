@@ -451,13 +451,6 @@ type ToolRuntimeScope
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
-    let roadViewOfSession (sessionId: string) : RoadView option =
-        journal
-        |> Option.bind (fun durable ->
-            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
-        |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay -> Fold.view relay (RoadId.create sessionId))
-
     /// The active unified incumbency id for this session, read from the same
     /// workspace EventStore the lifecycle kernel writes.
     let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
@@ -493,11 +486,8 @@ type ToolRuntimeScope
                         let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
                         Map.tryFind sessionId works
 
-        let cleanup =
-            roadViewOfSession sessionId |> Option.bind (fun road -> road.ActiveCleanupBlockerDigest)
-
         match lifecycle with
-        | Some work when work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution ->
+        | Some work ->
             match work.Active with
             | None -> defaultEmptyManagerFacts
             | Some active ->
@@ -510,18 +500,8 @@ type ToolRuntimeScope
                   HasAssessment = active.Review.IsSome
                   HasConfirmation = active.Confirmed.IsSome
                   IsFinalIncumbent = promoted
-                  CleanupBlockerDigest = cleanup }
-        | _ ->
-            match roadViewOfSession sessionId with
-            | Some road when road.ActiveIncumbency.IsSome ->
-                { HasActiveIncumbency = true
-                  HasAssessment = road.AcceptedAssessmentTransport.IsSome
-                  HasConfirmation = road.RetirementConfirmation.IsSome
-                  IsFinalIncumbent =
-                    road.AcceptedAssessmentFindings
-                    |> Option.exists AssessmentFindings.isEmpty
-                  CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
-            | _ -> defaultEmptyManagerFacts
+                  CleanupBlockerDigest = active.CleanupBlockerDigest }
+        | _ -> defaultEmptyManagerFacts
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
@@ -547,7 +527,7 @@ type ToolRuntimeScope
 
         match String.IsNullOrWhiteSpace sidStr with
         | true -> false
-        | false -> Option.isSome (roadViewOfSession sidStr) || isManagerProfile sessionId
+        | false -> isManagerProfile sessionId
 
     let adoptIfNotOwned (runtime: HostForkRuntime) (childSessionId: SessionId) (handleId: AgentHandleId) =
         let agentId = AgentHandleId.value handleId
@@ -829,10 +809,10 @@ type ToolRuntimeScope
         }
 
     /// Manager authorization facts for the capability gate, derived purely
-    /// from the objective RoadView. The final incumbent is the one whose
-    /// accepted assessment has empty findings: it keeps the read/cleanup/
-    /// close-out surface and loses every new-work capability. The cleanup
-    /// blocker digest is the stored objective evidence, passed through verbatim.
+    /// from the lifecycle work. The final incumbent is the one whose review
+    /// is Promoted: it keeps the read/cleanup/close-out surface and loses
+    /// every new-work capability. The cleanup blocker digest is the stored
+    /// objective evidence, passed through verbatim.
     static member emptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false

@@ -1,111 +1,118 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 
-const facts = {
-  PlanEvents: surface.PlanEvents,
-  PlanStage: surface.PlanStage,
-  PlanRetirementOutcome: surface.PlanRetirementOutcome,
+const life = lifecycle.LifecycleSurface ?? lifecycle
+
+const withStore = async (body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-planning-028-'))
+  const commonDir = join(root, '.git')
+  mkdirSync(commonDir, { recursive: true })
+  try {
+    await body(workspace.acquire(commonDir), root)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
-const fold = { PlanFold: surface.PlanFold }
+
+const workOf = (store, workId) => store.TryCurrent('Lifecycle').get(workId)
 
 test('WHAT[work-028] ask delegates the intent to the bound DevOps and returns its work record', async () => {
-  let state = fold.PlanFold.initialWorkState
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-ask-1', '/root'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyOpened('work-ask-1', 'inc-1', facts.PlanStage.S1, 0n),
-    state,
-  ).state
+  await withStore(async (store) => {
+    const opened = await life.seedOpen(store, 'plan', 'work-ask-1', '/root', 0n)
+    assert.equal(opened.ok, true, opened.error)
 
-  const appended = []
-  const mockStore = {
-    TryCurrent: () => state,
-    TryHead: () => null,
-    Append: async (envs) => {
-      appended.push(...envs)
-      for (const env of envs) {
-        const decoded = surface.PlanningSurface.tryDecodeEnvelopeJson(JSON.stringify(env))
-        if (decoded.ok) {
-          state = fold.PlanFold.applyWorkEventJs(decoded.event, state).state
-        }
-      }
-      return { tag: 0 }
-    },
-  }
+    const batches = []
+    const append = store.Append.bind(store)
+    store.Append = async (envelopes) => {
+      const batch = []
+      for (const envelope of envelopes) batch.push(envelope.EventType)
+      batches.push(batch)
+      return append(envelopes)
+    }
 
-  let delegatedIntent = null
-  const delegate = async (intent) => {
-    delegatedIntent = intent
-    return '# DevOps work record\nInvestigated build artifact paths; they match expectations.'
-  }
+    let delegatedIntent = null
+    const delegate = async (intent) => {
+      delegatedIntent = intent
+      return '# DevOps work record\nInvestigated build artifact paths; they match expectations.'
+    }
 
-  const res = await surface.PlanningSurface.executeAsk(mockStore, 'work-ask-1', 'Check whether build artifact paths match expectation', delegate)
+    const res = await surface.PlanningSurface.executeAsk(store, 'work-ask-1', 'Check whether build artifact paths match expectation', delegate)
 
-  assert.equal(res.ok, true, `ask failed: ${res.error}`)
-  assert.notEqual(res.kind, 'waiting_for_user', 'ask must not return a waiting-for-user suspension')
-  assert.equal(delegatedIntent, 'Check whether build artifact paths match expectation')
-  assert.equal(
-    typeof res.workRecord === 'string' && res.workRecord.includes('DevOps work record'),
-    true,
-    'ask must return the DevOps work record verbatim (no model summarization)',
-  )
+    assert.equal(res.ok, true, `ask failed: ${res.error}`)
+    assert.notEqual(res.kind, 'waiting_for_user', 'ask must not return a waiting-for-user suspension')
+    assert.equal(delegatedIntent, 'Check whether build artifact paths match expectation')
+    assert.equal(
+      typeof res.workRecord === 'string' && res.workRecord.includes('DevOps work record'),
+      true,
+      'ask must return the DevOps work record verbatim (no model summarization)',
+    )
 
-  // An unbound work gets its DevOps binding persisted on first ask
-  assert.ok(state.BoundDevOps != null, 'ask must bind the fixed DevOps when the work is unbound')
+    // An unbound work gets its DevOps binding persisted on first ask.
+    assert.deepEqual(batches, [['DevOpsBound']])
+    const bound = workOf(store, 'work-ask-1').DevOps
+    assert.equal(bound?.[0]?.startsWith('devops-'), true, 'ask must bind the fixed DevOps when the work is unbound')
 
-  // Empty intent is rejected
-  const resEmpty = await surface.PlanningSurface.executeAsk(mockStore, 'work-ask-1', '   ', delegate)
-  assert.equal(resEmpty.ok, false)
-  assert.match(resEmpty.error, /cannot be empty/i)
+    // Empty intent is rejected
+    const resEmpty = await surface.PlanningSurface.executeAsk(store, 'work-ask-1', '   ', delegate)
+    assert.equal(resEmpty.ok, false)
+    assert.match(resEmpty.error, /cannot be empty/i)
+  })
 })
 
 test('WHAT[work-028] a second ask is rejected while one delegation is pending', async () => {
-  let state = fold.PlanFold.initialWorkState
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-ask-2', '/root'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyOpened('work-ask-2', 'inc-1', facts.PlanStage.S1, 0n),
-    state,
-  ).state
+  await withStore(async (store) => {
+    const opened = await life.seedOpen(store, 'plan', 'work-ask-2', '/root', 0n)
+    assert.equal(opened.ok, true, opened.error)
 
-  const mockStore = { TryCurrent: () => state }
+    // The first delegation never resolves; it stays pending.
+    const pendingDelegate = () => new Promise(() => {})
 
-  // The first delegation never resolves; it stays pending.
-  const pendingDelegate = () => new Promise(() => {})
+    surface.PlanningSurface.executeAsk(store, 'work-ask-2', 'First investigation', pendingDelegate)
+    const second = await surface.PlanningSurface.executeAsk(store, 'work-ask-2', 'Second investigation', pendingDelegate)
 
-  surface.PlanningSurface.executeAsk(mockStore, 'work-ask-2', 'First investigation', pendingDelegate)
-  const second = await surface.PlanningSurface.executeAsk(mockStore, 'work-ask-2', 'Second investigation', pendingDelegate)
-
-  assert.equal(second.ok, false, 'a second ask must be rejected while a delegation is pending')
-  assert.match(second.error, /pending|already/i)
+    assert.equal(second.ok, false, 'a second ask must be rejected while a delegation is pending')
+    assert.match(second.error, /pending|already/i)
+  })
 })
 
 test('WHAT[work-028] ask is rejected after delivery until the work is reopened', async () => {
-  let state = fold.PlanFold.initialWorkState
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.workOpened('work-ask-3', '/root'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyOpened('work-ask-3', 'inc-1', facts.PlanStage.S1, 0n),
-    state,
-  ).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-1', 'S1', 'Promoted'), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-1', 'Relayed', 10n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened('work-ask-3', 'inc-2', facts.PlanStage.S2, 11n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-2', 'S2', 'Promoted'), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyRetired('inc-2', 'Relayed', 20n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.incumbencyOpened('work-ask-3', 'inc-3', facts.PlanStage.S3, 21n), state).state
-  state = fold.PlanFold.applyWorkEventJs(facts.PlanEvents.reviewed('inc-3', 'S3', 'Promoted'), state).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.incumbencyRetired('inc-3', facts.PlanRetirementOutcome.Delivered, 30n),
-    state,
-  ).state
-  state = fold.PlanFold.applyWorkEventJs(
-    facts.PlanEvents.delivered('inc-3', 'work-ask-3', 'sha256-hash', 'plan.md', 'exec-1'),
-    state,
-  ).state
+  await withStore(async (store, root) => {
+    const opened = await life.seedOpen(store, 'plan', 'work-ask-3', root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    for (let step = 0; step < 2; step += 1) {
+      const before = workOf(store, 'work-ask-3')
+      const reviewed = await life.seedReview(store, 'work-ask-3', 'Promoted')
+      assert.equal(reviewed.ok, true, reviewed.error)
+      const relayed = await surface.PlanningSurface.executeDeliver(
+        store, root, 'work-ask-3', before.Active.Id, `run-${step}`, `call-${step}`, false,
+        async () => { throw new Error('spawn must not run while climbing an unauthorised tenure') },
+        BigInt((step + 1) * 10),
+      )
+      assert.equal(relayed.ok, true, relayed.error)
+    }
+    const active = workOf(store, 'work-ask-3')
+    const promoted = await life.seedReview(store, 'work-ask-3', 'Promoted')
+    assert.equal(promoted.ok, true, promoted.error)
+    const planPath = surface.PlanningSurface.resolvePlanPath(root, 'work-ask-3')
+    assert.equal(planPath.ok, true, planPath.error)
+    const written = surface.PlanningSurface.rewritePlanAtomic(root, 'work-ask-3', '# delivered plan\n')
+    assert.equal(written.ok, true, written.error)
+    const delivered = await surface.PlanningSurface.executeDeliver(
+      store, root, 'work-ask-3', active.Active.Id, 'run-d', 'call-d', false,
+      async () => 'exec-1',
+      30n,
+    )
+    assert.equal(delivered.ok, true, delivered.error)
+    assert.equal(delivered.delivered, true)
 
-  const mockStore = { TryCurrent: () => state }
-  const delegate = async () => 'unused'
-
-  const res = await surface.PlanningSurface.executeAsk(mockStore, 'work-ask-3', 'Any investigation?', delegate)
-  assert.equal(res.ok, false)
-  assert.match(res.error, /already been delivered/i)
+    const res = await surface.PlanningSurface.executeAsk(store, 'work-ask-3', 'Any investigation?', async () => 'unused')
+    assert.equal(res.ok, false)
+    assert.match(res.error, /already been delivered/i)
+  })
 })

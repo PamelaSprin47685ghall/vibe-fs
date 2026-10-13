@@ -1762,15 +1762,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Mission/Relay/Surface.js',
-    owner: 'work',
-    laws: ['WORK-001', 'WORK-005', 'WORK-006', 'WORK-007', 'WORK-009', 'WORK-011', 'WORK-017'],
-    source: 'src/Wanxiangshu/Mission/Relay/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-
-  {
     module: 'Mission/Planning/Surface.js',
     owner: 'work',
     laws: [

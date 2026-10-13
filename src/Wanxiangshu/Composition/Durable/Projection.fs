@@ -16,7 +16,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -55,8 +54,6 @@ type SessionAgentProjection =
         Enforcement: EnforcementProjectionState option
         /// C5: open materializations + unified Entry|Squash receipts.
         BloggerCycles: BloggerCycleProjectionState option
-        /// Relay Road/Incumbency projection for the single current Manager protocol.
-        Relay: RelayState option
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
         RequirementGrounding: RequirementGroundingProjectionState option
@@ -120,7 +117,6 @@ module AgentProjection =
           PromptAuthority = None
           Enforcement = None
           BloggerCycles = None
-          Relay = None
           Guidelines = None
           RequirementGrounding = None
           TipDelivery = None

@@ -114,9 +114,10 @@ module LifecycleCodec =
             match List.tryFind (fun (key, _) -> key = name) pairs with
             | None -> Decode.succeed None
             | Some(_, value) ->
-                match Decode.fromValue ("$." + name) Decode.string value with
-                | Ok text -> Decode.succeed (Some text)
-                | Error _ -> Decode.fail (name + " is present but not a string"))
+                match Decode.fromValue ("$." + name) (Decode.option Decode.string) value with
+                | Ok text -> Decode.succeed text
+                | Error _ -> Decode.fail (name + " is present but not a string")
+            )
 
     let private forbid (names: string list) : Decoder<unit> =
         Decode.object (fun get ->

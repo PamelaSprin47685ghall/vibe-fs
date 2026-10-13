@@ -8,7 +8,6 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.EventStore
@@ -46,14 +45,25 @@ module PluginRecoveryWiring =
     /// child session, and ModelRouting owns the binding. A road without a bound
     /// target is skipped; a malformed one is refused by the parser rather than
     /// replaced by the current scheduler preference.
-    let private seedBoundDevOpsModelTargets (journal: AgentJournal) =
+    let private seedBoundDevOpsModelTargets (journal: AgentJournal) (workspace: string option) =
         let snapshot = AgentJournal.snapshot journal
+
+        let works =
+            workspace
+            |> Option.bind (fun directory ->
+                Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent (
+                    Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+                ))
+            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+            |> Option.map (fun current ->
+                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current)
+            |> Option.defaultValue Map.empty
 
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
             let target =
-                projection.Relay
-                |> Option.bind (fun state -> Fold.view state (RoadId.create (SessionId.value sessionId)))
-                |> Option.bind (fun view -> view.BoundDevOpsModelTarget)
+                Map.tryFind (SessionId.value sessionId) works
+                |> Option.bind (fun work -> work.DevOps)
+                |> Option.bind snd
 
             let child =
                 projection.Handles
@@ -188,7 +198,7 @@ module PluginRecoveryWiring =
                     // admission would take the target from the current scheduler
                     // preference and silently overwrite the road's fixed one.
                     match boot.Journal with
-                    | Some journal -> seedBoundDevOpsModelTargets journal
+                    | Some journal -> seedBoundDevOpsModelTargets journal boot.WorkspaceDirectory
                     | None -> ()
 
                     // planning-018 / Algorithm J: Plan crash recovery idempotent evaluation

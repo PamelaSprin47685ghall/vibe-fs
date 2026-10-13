@@ -9,7 +9,6 @@ open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
@@ -23,25 +22,6 @@ module Fold =
           RuntimeId = None }
 
     let private reject = FoldRejection.reject
-
-    let private completesRoad events =
-        events
-        |> List.exists (function
-            | RelayEvent.RetirementCommitted { Outcome = RetirementOutcome.Delivered } -> true
-            | _ -> false)
-
-    let private settlePromptAuthority events authorityOpt =
-        if completesRoad events then
-            authorityOpt
-            |> Option.map Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager
-        else
-            authorityOpt
-
-    let private settleAttentionLife events sessionId attention =
-        if completesRoad events then
-            Wanxiangshu.Interaction.Attention.AttentionProjection.closeLife sessionId attention
-        else
-            attention
 
     /// A unified S4 `Delivered` retirement completes the manager life: the human
     /// root authority closes and the life's deferred work closes with it. This is
@@ -72,43 +52,12 @@ module Fold =
         { projection with
             AgentProjections = { updatedAgents with Attention = attentionAfterClosure } }
 
-    let private foldRelay (projection: AgentProjectionSet) (fact: RelayFactCases) =
-        match fact with
-        | RelayFactCases.TransactionCommitted payload ->
-            let sessionId = SessionId.create (RoadId.value payload.RoadId)
-            let events = RelayTransaction.events payload.Transaction
-
-            // ATTENTION-004: a completed life takes its un-consumed deferred
-            // work with it, so a reused SessionId cannot inherit it.
-            let attentionAfterClosure =
-                settleAttentionLife events sessionId projection.Attention
-
-            AgentProjection.tryUpdate
-                sessionId
-                (fun session ->
-                    let current =
-                        session.Relay |> Option.defaultValue Wanxiangshu.Mission.Relay.Fold.empty
-
-                    let updatedPromptAuthority = session.PromptAuthority |> settlePromptAuthority events
-
-                    Wanxiangshu.Mission.Relay.Fold.apply current payload.RoadId payload.Transaction
-                    |> Result.map (fun updated ->
-                        { session with
-                            Relay = Some updated
-                            PromptAuthority = updatedPromptAuthority }))
-                projection
-            |> Result.map (fun updated ->
-                { updated with
-                    Attention = attentionAfterClosure })
-            |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
-
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
         match fact with
         | AgentFact.Prompt prompt -> PromptAuthorityProjectionBridge.fold projection prompt
         | AgentFact.ProviderFailure failure -> ProviderFailureProjectionBridge.fold projection failure
-        | AgentFact.Relay relay -> foldRelay projection relay
         | AgentFact.Execution execution -> DelegationProjectionBridge.foldExecution projection execution
         | AgentFact.ChatExecution chatExecution ->
             ChatExecutionFactFold.fold projection.ChatExecutions chatExecution

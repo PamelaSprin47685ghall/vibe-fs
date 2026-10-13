@@ -24,3 +24,6 @@ module LifecycleSurface =
     val seedConfirmation: store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> Task<obj>
     /// Read-only folded view of one seeded work.
     val workView: store: obj -> workId: string -> obj
+    /// First DevOps binding wins. A conflicting rebind writes nothing and keeps the stored target.
+    val bindDevOps: store: obj -> workId: string -> devopsId: string -> target: obj -> Task<obj>
+    val roadDevOps: store: obj -> workId: string -> obj

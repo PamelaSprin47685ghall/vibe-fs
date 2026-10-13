@@ -78,7 +78,6 @@ module private AgentJournalInternals =
         match fact with
         | AgentFact.Prompt _ -> "AgentFact.Prompt"
         | AgentFact.ProviderFailure _ -> "AgentFact.ProviderFailure"
-        | AgentFact.Relay _ -> "AgentFact.Relay"
         | AgentFact.Execution _ -> "AgentFact.Execution"
         | AgentFact.Orchestrator _ -> "AgentFact.Orchestrator"
         | AgentFact.Companion _ -> "AgentFact.Companion"

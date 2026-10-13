@@ -9,7 +9,8 @@ type ActiveIncumbency =
       OpeningStage: StageElement
       OpeningCursor: int64
       Review: ReviewStamp option
-      Confirmed: (string * string) option }
+      Confirmed: (string * string) option
+      CleanupBlockerDigest: string option }
 
 type RetirementRecord =
     { RetirementId: string

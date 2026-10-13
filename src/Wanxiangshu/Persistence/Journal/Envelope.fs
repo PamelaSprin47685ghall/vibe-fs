@@ -18,7 +18,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -233,9 +232,6 @@ module Envelope =
                        AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
                        ProviderRun = payload.ProviderRun |})
 
-    let private relayFactDecoder =
-        Decode.Auto.generateDecoderCached<RelayFactCases> (extra = extra)
-
     let private executionFactDecoder =
         Decode.Auto.generateDecoderCached<ExecutionFactCases> (extra = extra)
 
@@ -306,7 +302,6 @@ module Envelope =
             | "Prompt" -> familyCase promptFactDecoder AgentFact.Prompt
             | "ProviderFailure" -> familyCase providerFailureFactDecoder AgentFact.ProviderFailure
             | "Fallback" -> familyCase legacyFallbackDecoder AgentFact.ProviderFailure
-            | "Relay" -> familyCase relayFactDecoder AgentFact.Relay
             | "Execution" -> familyCase executionFactDecoder AgentFact.Execution
             | "Orchestrator" -> familyCase orchestratorFactDecoder AgentFact.Orchestrator
             | "Companion" -> familyCase companionFactDecoder AgentFact.Companion

@@ -53,9 +53,6 @@ module RelayNarrativeTransform =
                 | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = cutToolCallId
                 | _ -> false))
 
-    let private activeRetirement (road: RoadView) =
-        road.LatestRetirement |> Option.filter (fun _ -> road.ActiveIncumbency.IsSome)
-
     let private dispositionAfterProjection (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork option) =
         match work with
         | Some lifecycle when lifecycle.Active.IsSome && not (List.isEmpty lifecycle.Retirements) ->

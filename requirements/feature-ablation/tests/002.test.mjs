@@ -86,8 +86,8 @@ test('WHAT[feature-ablation-002] ABL_002_borrowed_surface_enforcement', () => {
     assert.equal(Ablation.allowsFact('AgentFact.Execution'), true, 'fact in borrowed_surface must be allowed')
     // fork 属于 delegation.async-fork，不在 delegation 借用面中，必须被拒绝
     assert.equal(Ablation.allowsTool('fork'), false, 'tool outside borrowed_surface must be denied')
-    // AgentFact.Relay 由 Ablation 节点 relay-incumbency 承载（在 station-15 为 ablated 且无借用），必须被拒绝
-    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false, 'unborrowed fact must be denied')
+    // AgentFact.Orchestrator is owned by change-integration, which station-15 has not reached.
+    assert.equal(Ablation.allowsFact('AgentFact.Orchestrator'), false, 'unborrowed fact must be denied')
   })
 })
 
@@ -164,7 +164,7 @@ test('WHAT[feature-ablation-002] ABL_002_station_05_denies_ablated_durable_fact_
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsFact('AgentFact.Delegation'), false)
-    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.Orchestrator'), false)
     assert.equal(Ablation.allowsFact('AgentFact.Cognition'), false)
     // The retired ledger family is not mapped at all, so it is neither granted nor
     // denied by a node: an unmapped tag stays allowed as the unowned default.
@@ -178,7 +178,7 @@ test('WHAT[feature-ablation-002] ABL_002_station_15_borrows_delegation_facts', (
     Ablation.load()
     assert.equal(Ablation.allowsFact('AgentFact.Delegation'), true)
     assert.equal(Ablation.allowsFact('AgentFact.Execution'), true)
-    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.Orchestrator'), false)
   })
 })
 

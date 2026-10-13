@@ -11,7 +11,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 module Fact =
@@ -40,7 +39,6 @@ module Fact =
     type AgentFact =
         | Prompt of PromptFactCases
         | ProviderFailure of ProviderFailureFactCases
-        | Relay of RelayFactCases
         | Execution of ExecutionFactCases
         | Orchestrator of OrchestratorFactCases
         | Companion of CompanionFactCases

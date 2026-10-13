@@ -17,7 +17,9 @@ open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
 /// Host wiring for one Change manager session. One physical Manager session can host many
@@ -140,24 +142,45 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Some record -> Ok record
         | None -> Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
 
-    let roadIdOf (record: ManagerJobProjection) =
-        RoadId.create (SessionId.value record.ManagerSessionId)
+    let lifecycleWorkOf (record: ManagerJobProjection) =
+        let directory = WorktreePath.value record.WorktreePath
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
 
-    let loopSignalOfRetirement (_road: RoadView) (retirement: RetirementSummary) =
-        match retirement.Outcome with
-        | RetirementOutcome.Relayed -> ManagerLoopSignal.Continue
-        | RetirementOutcome.Delivered ->
-            ManagerLoopSignal.ExceptionalTerminal(
-                sprintf
-                    "Retirement %s has no durable Relayed or Delivered confirmation"
-                    (RetirementId.value retirement.Id)
-            )
-
-    let loopSignalOfRoad (road: RoadView) =
-        if road.ActiveIncumbency.IsSome then
+        if System.String.IsNullOrWhiteSpace commonDir then
             None
         else
-            road.LatestRetirement |> Option.map (loopSignalOfRetirement road)
+            Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir
+            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
+            |> Option.bind (fun current ->
+                let works = unbox<Map<string, LifecycleWork>> current
+                Map.tryFind (SessionId.value record.ManagerSessionId) works)
+
+    let loopSignalOfWork (work: LifecycleWork) =
+        match work.Active, List.tryLast work.Retirements with
+        | Some _, _ -> None
+        | None, Some retirement when retirement.Outcome = Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed ->
+            Some ManagerLoopSignal.Continue
+        | None, Some retirement ->
+            Some(
+                ManagerLoopSignal.ExceptionalTerminal(
+                    sprintf
+                        "Retirement %s has no durable Relayed or Delivered confirmation"
+                        retirement.RetirementId
+                )
+            )
+        | None, None -> None
+
+    let requireOpenWork (record: ManagerJobProjection) =
+        lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
+
+    let requireCommittedRetirement (work: LifecycleWork) =
+        List.tryLast work.Retirements
+        |> Result.requireSome "Manager loop continuation requires a committed retirement"
+
+    let activateNextIfAbsent (work: LifecycleWork) : Task<Result<string, string>> =
+        match work.Active with
+        | Some active -> Task.FromResult(Ok active.Id)
+        | None -> Task.FromResult(Error "no legal incumbency opening")
 
     let requireRelayAndJob (relay: OrchestratorRelayPort option) (jobId: ManagerJobId) (relayError: string) =
         match relay, requireJobRecord jobId with
@@ -171,9 +194,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (record: ManagerJobProjection)
         : Task<Result<ManagerLoopSignal, string>> =
         task {
-            let roadOpt, revision = relay.RoadSnapshot record
+            let revision =
+                deps.Journal
+                |> Option.map (fun durable -> (AgentJournal.snapshotWithRevision durable) |> snd)
+                |> Option.defaultWith (fun () -> JournalRevision.create 0L)
 
-            match roadOpt |> Option.bind loopSignalOfRoad with
+            let workOpt = lifecycleWorkOf record
+
+            match workOpt |> Option.bind loopSignalOfWork with
             | Some signal -> return Ok signal
             | None -> return! awaitDispatchedWait jobId relay record revision
         }
@@ -196,39 +224,22 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
 
     let requireOpenRoad (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
-        let roadOpt, _ = relay.RoadSnapshot record
-
-        roadOpt |> Result.requireSome "Manager session is not open"
-
-    let requireCommittedRetirement (road: RoadView) =
-        road.LatestRetirement
-        |> Result.requireSome "Manager loop continuation requires a committed retirement"
-
-    let activateNextIfAbsent
-        (relay: OrchestratorRelayPort)
-        (record: ManagerJobProjection)
-        (road: RoadView)
-        (retirement: RetirementSummary)
-        : Task<Result<IncumbencyId, string>> =
-        match road.ActiveIncumbency with
-        | Some active -> Task.FromResult(Ok active)
-        | None ->
-            Task.FromResult(Error "no legal incumbency opening")
+        requireOpenWork record
 
     let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
             let! relay, record =
                 requireRelayAndJob relayPortOpt jobId "Manager loop continuation requires a durable journal"
 
-            let! road = requireOpenRoad relay record
-            let! retirement = requireCommittedRetirement road
+            let! work = requireOpenWork record
+            let! retirement = requireCommittedRetirement work
 
             let! incumbent =
                 match retirement.Outcome with
-                | RetirementOutcome.Relayed
-                | RetirementOutcome.Delivered -> activateNextIfAbsent relay record road retirement
+                | Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed
+                | Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Delivered -> activateNextIfAbsent work
 
-            return incumbent
+            return IncumbencyId.create incumbent
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -424,7 +435,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         String.concat
             "\n"
             [ "relay-authority-revision-v1"
-              RoadId.value (roadIdOf record)
+              SessionId.value record.ManagerSessionId
               ProviderRunIdentity.value callerProviderRun
               ToolCallId.value callerToolCallId
               HostDigest.sha256Hex prompt ]
@@ -450,26 +461,26 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock joinGate (fun () -> joinInFlight <- false)
         }
 
-    let requireActiveWorkOwnedIncumbent (road: RoadView) : Result<IncumbencyId, string> =
-        match road.ActiveIncumbency with
+    let requireActiveWorkOwnedIncumbent (work: LifecycleWork) : Result<string, string> =
+        match work.Active with
         | None -> Error "Manager session has no active incumbent"
-        | Some active when List.contains active road.RetiredIncumbencies ->
-            Error(sprintf "Relay incumbency %s is already retired" (IncumbencyId.value active))
-        | Some _ when road.AcceptedAssessmentTransport.IsNone ->
+        | Some active when work.Retirements |> List.exists (fun record -> record.IncumbencyId = active.Id) ->
+            Error(sprintf "Relay incumbency %s is already retired" active.Id)
+        | Some active when active.Review.IsNone ->
             Error "Relay incumbency cannot take new charge before assessment is recorded"
-        | Some active -> Ok active
+        | Some active -> Ok active.Id
 
     let advanceAuthorityRevision
         (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
-        (road: RoadView)
-        (incumbent: IncumbencyId)
+        (work: LifecycleWork)
+        (incumbent: string)
         (nextRevision: AuthorityRevision)
         (prompt: string)
         (callerProviderRun: ProviderRunIdentity)
         : Task<Result<string, string>> =
         taskResult {
-            let expectedRevision = road.AuthorityRevision
+            let expectedRevision = AuthorityRevision.create work.Authority
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
             let! physicalAuthorityMessage =
@@ -542,16 +553,16 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 relayPortOpt
                 |> Result.requireSome "Relay authority update requires a durable journal"
 
-            let! road = requireOpenRoad relay record
+            let! work = requireOpenRoad relay record
 
             let nextRevision =
                 authorityRevisionFor record callerProviderRun callerToolCallId prompt
 
-            if List.contains nextRevision road.AuthorityRevisions then
+            if work.AdvanceHistory |> List.exists (fun revision -> AuthorityRevision.create revision = nextRevision) then
                 return WorktreePath.value record.WorktreePath
             else
-                let! incumbent = requireActiveWorkOwnedIncumbent road
-                return! advanceAuthorityRevision relay record road incumbent nextRevision prompt callerProviderRun
+                let! incumbent = requireActiveWorkOwnedIncumbent work
+                return! advanceAuthorityRevision relay record work incumbent nextRevision prompt callerProviderRun
         }
 
     let runAuthorityUpdate (jobId: ManagerJobId) (action: unit -> Task<Result<string, string>>) =

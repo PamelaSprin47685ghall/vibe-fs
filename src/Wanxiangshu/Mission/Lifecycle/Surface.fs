@@ -467,3 +467,28 @@ module LifecycleSurface =
                     |> Option.bind (fun active -> active.Confirmed)
                     |> Option.isSome
                    delivered = work.CurrentDelivered |}
+
+    let bindDevOps (store: obj) (workId: string) (devopsId: string) (target: obj) : Task<obj> =
+        task {
+            let held = heldStore store
+            let targetText = if isNull target then None else Some(string target)
+
+            match workOfStore held workId with
+            | None -> return box {| ok = false; error = "lifecycle work is missing" |}
+            | Some work ->
+                match LifecycleKernel.bindDevOps work BindTrigger.Ask devopsId targetText with
+                | KernelDecision.Refuse reason -> return box {| ok = false; error = reason |}
+                | KernelDecision.Done _ -> return box {| ok = true; error = "" |}
+                | KernelDecision.Write(events, _) ->
+                    match! commitEvents held workId events with
+                    | Ok() -> return box {| ok = true; error = "" |}
+                    | Error reason -> return box {| ok = false; error = reason |}
+        }
+
+    let roadDevOps (store: obj) (workId: string) =
+        match workOfStore (heldStore store) workId |> Option.bind (fun work -> work.DevOps) with
+        | None -> null
+        | Some(devopsId, target) ->
+            box
+                {| devopsId = devopsId
+                   modelTarget = target |> Option.toObj |}

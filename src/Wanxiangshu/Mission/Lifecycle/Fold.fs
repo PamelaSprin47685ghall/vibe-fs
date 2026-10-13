@@ -9,7 +9,8 @@ type ActiveIncumbency =
       OpeningStage: StageElement
       OpeningCursor: int64
       Review: ReviewStamp option
-      Confirmed: (string * string) option }
+      Confirmed: (string * string) option
+      CleanupBlockerDigest: string option }
 
 type RetirementRecord =
     { RetirementId: string
@@ -179,7 +180,8 @@ module LifecycleFold =
                                       OpeningStage = stage
                                       OpeningCursor = openingCursor
                                       Review = None
-                                      Confirmed = None } }
+                                      Confirmed = None
+                                      CleanupBlockerDigest = None } }
                 | None when work.Retirements.IsEmpty && not work.CurrentDelivered ->
                     match elements work with
                     | head :: _ when head = stage ->
@@ -191,7 +193,8 @@ module LifecycleFold =
                                           OpeningStage = stage
                                           OpeningCursor = openingCursor
                                           Review = None
-                                          Confirmed = None } }
+                                          Confirmed = None
+                                          CleanupBlockerDigest = None } }
                     | _ -> Error "first incumbency stage is not the first sequence element"
                 | None -> Error "incumbency opening is not a first tenure or a relay successor"
         | LifecycleEvent.ConfirmationCommitted(incumbencyId, providerRunId, toolCallId) ->
@@ -267,7 +270,8 @@ module LifecycleFold =
                                       OpeningStage = stage
                                       OpeningCursor = 0L
                                       Review = review
-                                      Confirmed = None } }
+                                      Confirmed = None
+                                      CleanupBlockerDigest = None } }
                 | None, _ -> Error "reopen authorization cannot be read"
             | _ -> Error "reopen without a matching delivered retirement and no active tenure"
         | LifecycleEvent.AdvanceCommitted(incumbencyId, expected, next) ->
@@ -284,9 +288,10 @@ module LifecycleFold =
                     { work with
                         Authority = next
                         AdvanceHistory = work.AdvanceHistory @ [ next ] }
-        | LifecycleEvent.RetirementBlocked(incumbencyId, _) ->
+        | LifecycleEvent.RetirementBlocked(incumbencyId, blockerDigest) ->
             match work.Active with
-            | Some active when active.Id = incumbencyId -> Ok work
+            | Some active when active.Id = incumbencyId ->
+                Ok { work with Active = Some { active with CleanupBlockerDigest = Some blockerDigest } }
             | _ -> Error "blocked retirement without this active incumbency"
 
     let applyAll (events: LifecycleEvent list) : Result<LifecycleWork, string> =

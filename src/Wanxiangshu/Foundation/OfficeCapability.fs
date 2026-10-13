@@ -126,7 +126,7 @@ module OfficeCapability =
         else
             false
 
-    /// Manager gate over exact RoadView facts. No phase enum crosses this
+    /// Manager gate over exact lifecycle facts. No phase enum crosses this
     /// boundary: retired/no-active grants nothing, a cleanup blocker confines
     /// to the Join+Finality finish window, the final incumbent keeps the
     /// read/cleanup/close-out surface but loses every new-work capability, and
