@@ -40,6 +40,12 @@ type DeliverDraft =
 module LifecycleKernel =
     val classifyCommit: Result<unit, AppendError> -> Result<CommitOutcome, string>
     val commit: IEventStore -> string -> LifecycleEvent list -> Task<Result<CommitOutcome, string>>
+    /// The unified lifecycle work already folded into a held store. A missing
+    /// current or a missing work is None; the caller keeps the store for commit.
+    val tryWorkOfStore: store: IEventStore -> workId: string -> LifecycleWork option
+    /// Every unified lifecycle work folded into a held store. A missing current
+    /// yields None; an empty fold yields Some empty.
+    val tryWorksOfStore: store: IEventStore -> Map<string, LifecycleWork> option
     val openWork: (string -> string) -> OpeningKind -> firstPromptLine: string option -> workId: string -> root: string -> alreadyOpened: bool -> observedHead: int64 option -> KernelDecision
     val bindDevOps: LifecycleWork -> BindTrigger -> devopsId: string -> target: string option -> KernelDecision
     val review: LifecycleWork -> incumbencyId: string -> ReviewOutcome -> KernelDecision

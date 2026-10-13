@@ -49,14 +49,9 @@ module ReviewPlanBackend =
         (store: IEventStore)
         (workId: string)
         : Result<Wanxiangshu.Mission.Lifecycle.LifecycleWork, PlanReviewError> =
-        match store.TryCurrent "Lifecycle" with
+        match LifecycleKernel.tryWorkOfStore store workId with
         | None -> Error PlanReviewError.NoActiveIncumbency
-        | Some current ->
-            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-            match Map.tryFind workId works with
-            | None -> Error PlanReviewError.NoActiveIncumbency
-            | Some work -> Ok work
+        | Some work -> Ok work
 
     // planning-022: each incumbency reviews exactly once. The kernel refuses a
     // second review for the same tenure; that refusal is the already-reviewed

@@ -241,16 +241,9 @@ module PluginHostWiring =
                     |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
                 let workOpt =
-                    match workspaceDirectory with
-                    | None -> None
-                    | Some workspace ->
-                        Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent (
-                            Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
-                        )
-                        |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-                        |> Option.bind (fun current ->
-                            let works = unbox<Map<string, LifecycleWork>> current
-                            Map.tryFind (SessionId.value sessionId) works)
+                    Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
+                        workspaceDirectory
+                        (SessionId.value sessionId)
 
                 workOpt
                 |> Option.exists (fun work ->

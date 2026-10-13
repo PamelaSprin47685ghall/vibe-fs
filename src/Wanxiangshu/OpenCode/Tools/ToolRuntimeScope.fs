@@ -454,37 +454,13 @@ type ToolRuntimeScope
     /// The active unified incumbency id for this session, read from the same
     /// workspace EventStore the lifecycle kernel writes.
     let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
-        match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
-        | None -> None
-        | Some dir when System.String.IsNullOrWhiteSpace dir -> None
-        | Some dir ->
-            match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
-            | None -> None
-            | Some held ->
-                match held.TryCurrent "Lifecycle" with
-                | None -> None
-                | Some current ->
-                    let works =
-                        unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-                    Map.tryFind sessionId works
-                    |> Option.bind (fun work -> work.Active)
-                    |> Option.map (fun active -> active.Id)
+        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
+        |> Option.bind (fun work -> work.Active)
+        |> Option.map (fun active -> active.Id)
 
     let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
         let lifecycle =
-            match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
-            | None -> None
-            | Some dir when System.String.IsNullOrWhiteSpace dir -> None
-            | Some dir ->
-                match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
-                | None -> None
-                | Some held ->
-                    match held.TryCurrent "Lifecycle" with
-                    | None -> None
-                    | Some current ->
-                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                        Map.tryFind sessionId works
+            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
 
         match lifecycle with
         | Some work ->

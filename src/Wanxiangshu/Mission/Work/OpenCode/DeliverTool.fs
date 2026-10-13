@@ -67,12 +67,7 @@ module DeliverTool =
         else
             match WorkspaceEventStore.tryCurrent commonDir with
             | None -> None
-            | Some held ->
-                match held.TryCurrent "Lifecycle" with
-                | None -> None
-                | Some current ->
-                    let works = unbox<Map<string, LifecycleWork>> current
-                    Map.tryFind sessionId works |> Option.map (fun work -> held, work)
+            | Some held -> LifecycleKernel.tryWorkOfStore held sessionId |> Option.map (fun work -> held, work)
 
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
@@ -285,17 +280,7 @@ module DeliverTool =
         confirmFirst
         =
         let confirmed =
-            scope.WorkspaceDirectory
-            |> Option.map RuntimePath.gitCommonDir
-            |> Option.bind (fun dir ->
-                if String.IsNullOrWhiteSpace dir then
-                    None
-                else
-                    WorkspaceEventStore.tryCurrent dir)
-            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-            |> Option.bind (fun current ->
-                let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                Map.tryFind context.SessionId works)
+            WorkspaceEventStore.tryLifecycleWorkOfDirectory scope.WorkspaceDirectory context.SessionId
             |> Option.bind (fun work -> work.Active)
             |> Option.bind (fun active -> active.Confirmed)
 
@@ -322,46 +307,42 @@ module DeliverTool =
                 match store with
                 | None -> return Error "lifecycle store is unavailable"
                 | Some held ->
-                    match held.TryCurrent "Lifecycle" with
+                    match LifecycleKernel.tryWorkOfStore held context.SessionId with
                     | None -> return Error "lifecycle work is missing"
-                    | Some current ->
-                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                        match Map.tryFind context.SessionId works with
-                        | None -> return Error "lifecycle work is missing"
-                        | Some work ->
-                            let fence =
-                                { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                                  Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+                    | Some work ->
+                        let fence =
+                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
 
-                            let blockerDigest =
-                                let blockers = scope.RetirementBlockersFor context.SessionId
-                                if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
+                        let blockerDigest =
+                            let blockers = scope.RetirementBlockersFor context.SessionId
+                            if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
 
-                            let! observedHead =
-                                observedRetirementCursor scope context prepared.Bound.Journal
+                        let! observedHead =
+                            observedRetirementCursor scope context prepared.Bound.Journal
 
-                            match
-                                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
-                                    HostDigest.sha256Hex
-                                    work
-                                    fence
-                                    observedHead
-                                    blockerDigest
-                            with
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                        match
+                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
+                                HostDigest.sha256Hex
+                                work
+                                fence
+                                observedHead
+                                blockerDigest
+                        with
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                            scope.UnfreezeRetirement context.SessionId
+                            return Ok(confirmationResult prepared pending)
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
+                            match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
                                 scope.UnfreezeRetirement context.SessionId
-                                return Ok(confirmationResult prepared pending)
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
-                                    scope.UnfreezeRetirement context.SessionId
-                                    return Ok(text Path.Retired)
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
-                                    return Error "retirement was not committed"
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
-                                    return Error "retirement commit is unknown"
-                                | Error reason -> return Error reason
+                                return Ok(text Path.Retired)
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
+                                return Error "retirement was not committed"
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
+                                return Error "retirement commit is unknown"
+                            | Error reason -> return Error reason
             }
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
@@ -387,49 +368,45 @@ module DeliverTool =
                 match store with
                 | None -> return Error "lifecycle store is unavailable"
                 | Some held ->
-                    match held.TryCurrent "Lifecycle" with
+                    match LifecycleKernel.tryWorkOfStore held context.SessionId with
                     | None -> return Error "lifecycle work is missing"
-                    | Some current ->
-                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                        match Map.tryFind context.SessionId works with
-                        | None -> return Error "lifecycle work is missing"
-                        | Some work ->
-                            let fence =
-                                { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                                  Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+                    | Some work ->
+                        let fence =
+                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
 
-                            let blockerDigest =
-                                let blockers = scope.RetirementBlockersFor context.SessionId
-                                if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
+                        let blockerDigest =
+                            let blockers = scope.RetirementBlockersFor context.SessionId
+                            if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
 
-                            let! observedHead =
-                                observedRetirementCursor scope context prepared.Bound.Journal
+                        let! observedHead =
+                            observedRetirementCursor scope context prepared.Bound.Journal
 
-                            match
-                                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
-                                    HostDigest.sha256Hex
-                                    work
-                                    fence
-                                    observedHead
-                                    blockerDigest
-                            with
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                        match
+                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
+                                HostDigest.sha256Hex
+                                work
+                                fence
+                                observedHead
+                                blockerDigest
+                        with
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                            scope.UnfreezeRetirement context.SessionId
+                            return Ok(confirmationResult prepared pending)
+                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
+                            match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
                                 scope.UnfreezeRetirement context.SessionId
-                                return Ok(confirmationResult prepared pending)
-                            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
-                                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
-                                    scope.UnfreezeRetirement context.SessionId
-                                    if label = "confirmed" then
-                                        return Ok(confirmationResult prepared pending)
-                                    else
-                                        return Ok(text Path.Retired)
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
-                                    return Error "retirement was not committed"
-                                | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
-                                    return Error "retirement commit is unknown"
-                                | Error reason -> return Error reason
+                                if label = "confirmed" then
+                                    return Ok(confirmationResult prepared pending)
+                                else
+                                    return Ok(text Path.Retired)
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
+                                return Error "retirement was not committed"
+                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
+                                return Error "retirement commit is unknown"
+                            | Error reason -> return Error reason
             }
 
         if not hasAssessment then

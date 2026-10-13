@@ -70,6 +70,19 @@ module LifecycleKernel =
                 return classifyCommit (appended |> Result.map ignore)
             }
 
+    /// The unified lifecycle work already folded into a held store. A missing
+    /// current or a missing work is None; the caller keeps the store for commit.
+    let tryWorkOfStore (store: IEventStore) (workId: string) : LifecycleWork option =
+        store.TryCurrent "Lifecycle"
+        |> Option.bind (fun current ->
+            let works = unbox<Map<string, LifecycleWork>> current
+            Map.tryFind workId works)
+
+    /// Every unified lifecycle work already folded into a held store.
+    let tryWorksOfStore (store: IEventStore) : Map<string, LifecycleWork> option =
+        store.TryCurrent "Lifecycle"
+        |> Option.map (fun current -> unbox<Map<string, LifecycleWork>> current)
+
     let private opened (workId: string) (root: string) (sequence: WorkSequence) (sha256: string -> string) (head: int64) =
         let authority = LifecycleIdentity.authorityInitial sha256 workId
         let incumbencyId = LifecycleIdentity.firstIncumbencyId sha256 workId

@@ -88,18 +88,12 @@ module ReviewShell =
         | Ok findings -> Ok findings
 
     let private resolveActiveIncumbency (store: IEventStore) (workId: string) : Result<string, string> =
-        match store.TryCurrent "Lifecycle" with
-        | None -> Error ReviewBackendManager.Path.BindingUnavailable
-        | Some current ->
-            let works =
-                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-            match Map.tryFind workId works with
-            | Some work ->
-                match work.Active with
-                | Some active -> Ok active.Id
-                | None -> Error ReviewBackendManager.Path.BindingUnavailable
+        match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId with
+        | Some work ->
+            match work.Active with
+            | Some active -> Ok active.Id
             | None -> Error ReviewBackendManager.Path.BindingUnavailable
+        | None -> Error ReviewBackendManager.Path.BindingUnavailable
 
     let private gapsOf (findings: ReviewFindings) : (string * string) list =
         ReviewFindings.values findings

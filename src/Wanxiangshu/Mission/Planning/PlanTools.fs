@@ -68,11 +68,7 @@ module PlanTools =
         (store: IEventStore)
         (workId: string)
         : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
-        match store.TryCurrent "Lifecycle" with
-        | None -> None
-        | Some current ->
-            let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-            Map.tryFind workId works
+        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId
 
     let private commitLifecycleDeliver
         (store: IEventStore)

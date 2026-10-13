@@ -445,11 +445,7 @@ module LifecycleSurface =
     let private heldStore (store: obj) : IEventStore = unbox store
 
     let private workOfStore (held: IEventStore) (workId: string) : LifecycleWork option =
-        match held.TryCurrent "Lifecycle" with
-        | None -> None
-        | Some current ->
-            let works = unbox<Map<string, LifecycleWork>> current
-            Map.tryFind workId works
+        LifecycleKernel.tryWorkOfStore held workId
 
     let private commitEvents (held: IEventStore) (workId: string) (events: LifecycleEvent list) : Task<Result<unit, string>> =
         task {

@@ -448,18 +448,12 @@ module ToolRegistry =
         }
 
     let private resolveActiveTenure (store: IEventStore) (sessionId: string) =
-        match store.TryCurrent "Lifecycle" with
-        | None -> Error "No active incumbency found for this work"
-        | Some current ->
-            let works =
-                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-            match Map.tryFind sessionId works with
-            | Some work ->
-                match work.Active with
-                | None -> Error "No active incumbency found for this work"
-                | Some active -> Ok active.Review.IsSome
+        match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store sessionId with
+        | Some work ->
+            match work.Active with
             | None -> Error "No active incumbency found for this work"
+            | Some active -> Ok active.Review.IsSome
+        | None -> Error "No active incumbency found for this work"
 
     let private executeTenureSandbox prose root store sessionId programSource =
         match resolveActiveTenure store sessionId with
@@ -652,18 +646,9 @@ module ToolRegistry =
             }
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
-            runtime.WorkspaceDirectory
-            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-            |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
-            |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
-            |> Option.bind (fun held ->
-                held.TryCurrent "Lifecycle"
-                |> Option.bind (fun current ->
-                    let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-                    Map.tryFind sessionId works
-                    |> Option.bind (fun work -> work.Active)
-                    |> Option.map (fun active -> active.Id)))
+            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory runtime.WorkspaceDirectory sessionId
+            |> Option.bind (fun work -> work.Active)
+            |> Option.map (fun active -> active.Id)
 
         // planning-008: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of
@@ -877,17 +862,10 @@ module ToolRegistry =
                   Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx }
 
             let sequenceOf (ctx: HostToolContext) =
-                runtime.WorkspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
-                |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
-                |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-                |> Option.bind (fun current ->
-                    let works =
-                        unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-                    Map.tryFind ctx.SessionId works
-                    |> Option.map (fun work -> work.Sequence))
+                Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
+                    runtime.WorkspaceDirectory
+                    ctx.SessionId
+                |> Option.map (fun work -> work.Sequence)
 
             { managerSpec with
                 Admission =

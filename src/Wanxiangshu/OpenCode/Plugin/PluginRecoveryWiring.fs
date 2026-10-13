@@ -54,9 +54,7 @@ module PluginRecoveryWiring =
                 Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent (
                     Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
                 ))
-            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-            |> Option.map (fun current ->
-                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current)
+            |> Option.bind Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorksOfStore
             |> Option.defaultValue Map.empty
 
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
@@ -114,11 +112,8 @@ module PluginRecoveryWiring =
             let commonDir = RuntimePath.gitCommonDir workspace
 
             WorkspaceEventStore.tryCurrent commonDir
-            |> Option.bind (fun store -> store.TryCurrent "Lifecycle")
-            |> Option.map (fun current ->
-                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                |> Map.toList
-                |> List.map snd)
+            |> Option.bind Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorksOfStore
+            |> Option.map (fun works -> works |> Map.toList |> List.map snd)
         with _ ->
             None
 

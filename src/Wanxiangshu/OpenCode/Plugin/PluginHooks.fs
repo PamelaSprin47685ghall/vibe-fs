@@ -133,16 +133,9 @@ module PluginHooks =
             let planStageFor (sessionId: SessionId) : string option =
                 match roleFor sessionId with
                 | Some Role.Plan ->
-                    workspaceDirectory
-                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                    |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
-                    |> Option.bind (fun store ->
-                        store.TryCurrent "Lifecycle"
-                        |> Option.bind (fun current ->
-                            let works =
-                                unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-                            Map.tryFind (SessionId.value sessionId) works))
+                    Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
+                        workspaceDirectory
+                        (SessionId.value sessionId)
                     |> Option.bind (fun work ->
                         match work.Sequence, work.Active with
                         | Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan, Some _ ->

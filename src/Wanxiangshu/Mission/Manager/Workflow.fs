@@ -29,18 +29,7 @@ module ManagerWorkflow =
     let private finishPath = "runtime/manager-finish"
 
     let private lifecycleWork (directory: string option) (sessionId: string) =
-        match directory |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir with
-        | None -> None
-        | Some dir when System.String.IsNullOrWhiteSpace dir -> None
-        | Some dir ->
-            match WorkspaceEventStore.tryCurrent dir with
-            | None -> None
-            | Some held ->
-                match held.TryCurrent "Lifecycle" with
-                | None -> None
-                | Some current ->
-                    let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                    Map.tryFind sessionId works
+        WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
 
     /// The iteration ordinal as the provider reads it: "1" for the first
     /// Manager on this road, then one more per durable opening. A road with no

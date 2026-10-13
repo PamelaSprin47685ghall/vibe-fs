@@ -144,16 +144,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let lifecycleWorkOf (record: ManagerJobProjection) =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
-
-        if System.String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir
-            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-            |> Option.bind (fun current ->
-                let works = unbox<Map<string, LifecycleWork>> current
-                Map.tryFind (SessionId.value record.ManagerSessionId) works)
+        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
+            directory
+            (SessionId.value record.ManagerSessionId)
 
     let loopSignalOfWork (work: LifecycleWork) =
         match work.Active, List.tryLast work.Retirements with
@@ -274,21 +267,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (managerSessionId: SessionId)
         (worktreePath: Wanxiangshu.Foundation.Identity.WorktreePath)
         : (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option =
-        let commonDir =
-            Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir (
-                Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath
-            )
-
-        if System.String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir
-            |> Option.bind (fun held -> held.TryCurrent "Lifecycle")
-            |> Option.bind (fun current ->
-                let works =
-                    unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-
-                Map.tryFind (SessionId.value managerSessionId) works)
+        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
+            (Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath)
+            (SessionId.value managerSessionId)
             |> Option.bind (fun work ->
                 work.Active
                 |> Option.bind (fun active -> active.Review)
@@ -501,10 +482,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
 
                 let workOpt =
-                    store.TryCurrent "Lifecycle"
-                    |> Option.bind (fun current ->
-                        let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                        Map.tryFind (SessionId.value record.ManagerSessionId) works)
+                    Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore
+                        store
+                        (SessionId.value record.ManagerSessionId)
 
                 match workOpt with
                 | None -> return! Error "lifecycle work is missing"

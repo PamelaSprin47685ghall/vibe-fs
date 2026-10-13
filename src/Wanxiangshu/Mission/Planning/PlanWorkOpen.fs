@@ -27,11 +27,7 @@ module PlanWorkOpen =
             Error "Plan store projection cannot be read"
         else
             try
-                match store.TryCurrent "Lifecycle" with
-                | None -> Ok false
-                | Some current ->
-                    let works = unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                    Ok(Map.containsKey workId works)
+                Ok(Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId |> Option.isSome)
             with ex ->
                 Error(sprintf "Plan store projection read failed: %s" ex.Message)
 

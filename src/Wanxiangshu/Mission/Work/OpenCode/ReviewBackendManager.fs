@@ -207,12 +207,7 @@ module ReviewBackendManager =
         else
             match WorkspaceEventStore.tryCurrent commonDir with
             | None -> None
-            | Some held ->
-                match held.TryCurrent "Lifecycle" with
-                | None -> None
-                | Some current ->
-                    let works = unbox<Map<string, LifecycleWork>> current
-                    Map.tryFind sessionId works |> Option.map (fun work -> held, work)
+            | Some held -> LifecycleKernel.tryWorkOfStore held sessionId |> Option.map (fun work -> held, work)
 
     type private BoundReviewInvocation =
         { Findings: ReviewFindings

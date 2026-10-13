@@ -673,16 +673,7 @@ module PluginTransforms =
             | _ -> None
 
         let tryReadLifecycleWork (sid: string) =
-            workspaceDirectory
-            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-            |> Option.bind Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent
-            |> Option.bind (fun store -> store.TryCurrent "Lifecycle")
-            |> Option.bind (fun current ->
-                if isNull current then
-                    None
-                else
-                    unbox<Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork>> current
-                    |> Map.tryFind sid)
+            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory workspaceDirectory sid
 
 
         let buildTenureOf
