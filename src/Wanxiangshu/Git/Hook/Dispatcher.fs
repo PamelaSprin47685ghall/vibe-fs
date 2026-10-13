@@ -18,6 +18,9 @@ module HookDispatcher =
     let SyncActiveEnv = "WANXIANG_GIT_SYNC_ACTIVE"
 
     [<Literal>]
+    let DisableHooksEnv = "WANXIANGSHU_DISABLE_GIT_HOOKS"
+
+    [<Literal>]
     let OwnershipMarker = "wanxiang-hook-dispatcher"
 
     [<Literal>]
@@ -45,6 +48,9 @@ module HookDispatcher =
     [<Import("chmodSync", "node:fs")>]
     let private chmodSync (path: string) (mode: int) : unit = jsNative
 
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) (options: obj) : unit = jsNative
 
@@ -62,6 +68,9 @@ module HookDispatcher =
 
     [<Emit("import.meta.url")>]
     let private importMetaUrl: string = jsNative
+
+    [<Emit("process.env.WANXIANGSHU_DISABLE_GIT_HOOKS || ''")>]
+    let private disableHooksEnv () : string = jsNative
 
     [<Emit("process.platform")>]
     let private platform: string = jsNative
@@ -375,9 +384,21 @@ module HookDispatcher =
         else
             ensureUnixSshMultiplex workspace
 
-    let private ensureWorkspace workspace : Result<unit, string> =
-        let hooksDir = hooksDirectory workspace
+    let private hooksDisabled () =
+        disableHooksEnv () = "1"
 
+    /// Remove hooks this product installed, leaving any foreign hook untouched.
+    let private uninstallOwnedHook hooksDir kind =
+        let path = joinPath hooksDir (hookFileName kind)
+
+        match tryReadHook path with
+        | Some body when containsOwnershipMarker body -> unlinkSync path
+        | _ -> ()
+
+    let private uninstallOwnedHooks hooksDir =
+        List.iter (uninstallOwnedHook hooksDir) [ HookKind.ReferenceTransaction; HookKind.PrePush ]
+
+    let private ensureWorkspaceInstalled hooksDir workspace : Result<unit, string> =
         let verdicts =
             [ HookKind.ReferenceTransaction; HookKind.PrePush ]
             |> List.map (fun kind -> kind, installOrDiagnose hooksDir kind (shimBody kind))
@@ -396,6 +417,15 @@ module HookDispatcher =
             ensureRemoteRefs workspace
             ensureSshMultiplex workspace
             Ok()
+
+    let private ensureWorkspace workspace : Result<unit, string> =
+        let hooksDir = hooksDirectory workspace
+
+        if hooksDisabled () then
+            uninstallOwnedHooks hooksDir
+            Ok()
+        else
+            ensureWorkspaceInstalled hooksDir workspace
 
     /// Startup-only ensure. There is intentionally no fetch/pull/push here.
     /// Both installed hooks later launch the same standalone FULL converge path.

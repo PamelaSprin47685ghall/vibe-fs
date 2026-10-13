@@ -88,6 +88,7 @@ npm install wanxiangshu --registry <your-private-registry>
 | `WANXIANGSHU_DIAG=1` | 让内部诊断记录经 stderr 可见；只观测，不改变任何决策 |
 | `WANXIANGSHU_ABLATION_PROFILE` | feature-ablation 拓扑 profile 选择（配 `resources/ablation/`） |
 | `WANXIANGSHU_ABLATION_<node>` | feature-ablation 单节点三态覆盖（`ablated` / `borrowed` / `active`）；仍过 DAG 校验 |
+| `WANXIANGSHU_DISABLE_GIT_HOOKS=1` | 关闭 git-hook 安装与同步；启动时移除已安装的自有 hook，保留外部 hook |
 | `SPHINX_COMMON_DIR` | Sphinx MCP 独立进程的 durable workspace；缺失即启动失败 |
 | `SPHINX_START_CONFIG` | Sphinx MCP start 配置 JSON；缺失时只允许读取类工具（start 返回 `CONFIG_REQUIRED`） |
 

@@ -14,6 +14,10 @@
 - 旧轨删除（PLAN.md `Algorithm N`）：第二套词表两族都已删除——`RelayEvent`/`RelayTransaction`/`RelayFactCases`/`IncumbencyOpening`、relay 折叠与其 JS 面、`AgentFact.Relay`、`foldRelay`、`AppendRelay`、`Relay` 投影槽、`Envelope` 编解码条目，以及 `PlanEvent`/`PlanWorkState`/`PlanFold`/`PlanStage`/`PlanEventStore`/`PlanEventCodec`/`PlanEventTypes`/`PlanRecovery`/`PlanActionGate` 与 `Mission/Planning/Surface` 的事件面。仍然读它们的地方改读统一折叠（manager loop 信号、continuation、权威推进、能力事实、序号、退任检查、首次 DevOps 绑定与冲突重绑拒绝、Plan 阶段资源、崩溃恢复）。`PlanTools` 的旧 deliver 决策链删除，ask 经内核绑定 DevOps。`LifecycleCodec.absentOrString` 修正：present JSON null 视为 absent（此前未绑定 target 的 `DevOpsBound` 追加成功却被折叠丢弃）。
 - 命名收口（PLAN.md `Algorithm L1`）：`Mission/Relay/` 迁到 `Mission/Work/`，命名空间 `Wanxiangshu.Mission.Work`。删掉零引用的 `RoadId`、`AssessmentId`、`IncumbencyPhase`、`RetirementSummary`、relay 本地 `PhysicalUserMessageId` 与重复的 `RetirementOutcome`。`AssessmentFinding`/`AssessmentFindings`/`AssessmentBinding` 改为 `ReviewFinding`/`ReviewFindings`/`ReviewBinding`。`EnsureRoadDevOpsBound`、`ensureManagerRoadOpened`、`TerminateRoadResources` 改为 Work 名。`ManagerLoopGate.gateKind` 仍发出 `manager-loop:`。`scripts/check.mjs` 另有一处本工作之前就存在的红：`fsharp-control-pyramid-baseline.json` 为空表。
 
+## Unreleased — git-hook 关闭开关
+
+- `src/Wanxiangshu/Git/Hook/Dispatcher.fs`：新增 `WANXIANGSHU_DISABLE_GIT_HOOKS=1` 操作员开关。置位后 `HookDispatcher.ensure` 不再安装 `reference-transaction` / `pre-push`，并在启动时移除已安装的自有 hook（外部 hook 保留）；同步与 SSH multiplex 一并跳过。未置位时行为不变（默认开启，符合 durable-convergence-008）。
+
 ## Unreleased — js-plan 复用共享锚点教程
 
 - `js-plan` 的模型可见描述不再使用独立短教程。它复用其它 `js-*` 的同一套教程：有序锚点、`text(from, to)`、精确 edit、结构重组和失败记忆。教程签名槽按工具填写，Plan 面为 `file(matches = [])`、`edit(changes)`、`rewrite(newText)`；仓库面仍为带路径签名。

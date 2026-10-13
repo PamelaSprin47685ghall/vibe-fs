@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -87,6 +87,43 @@ test('WHAT[durable-convergence-008] ensure repairs a store-only remote without r
 
 test.todo('WHAT[durable-convergence-008] real plugin load leaves Git configuration unchanged and first durability activation installs hooks without starting synchronization (GAP-151)')
 test.todo('WHAT[durable-convergence-008] controlled CAS competition and replacement crash cuts preserve all facts while clean no-op leaves unseen remote progress untouched (GAP-151)')
+
+test('WHAT[durable-convergence-008] WANXIANGSHU_DISABLE_GIT_HOOKS=1 skips install and removes only owned hooks, preserving foreign ones', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-disable-'))
+  try {
+    git(repo, 'init', '--quiet')
+    const prePush = join(repo, '.git', 'hooks', 'pre-push')
+    const refTxn = join(repo, '.git', 'hooks', 'reference-transaction')
+
+    // Default: installs both owned hooks.
+    assert.equal(hook.ensure(repo), true)
+    assert.ok(readFileSync(prePush, 'utf8').includes('wanxiang-hook-dispatcher'))
+    assert.ok(readFileSync(refTxn, 'utf8').includes('wanxiang-hook-dispatcher'))
+
+    // Replace pre-push with a foreign hook, then disable: owned hook removed,
+    // foreign preserved, no reinstall.
+    writeFileSync(prePush, '#!/bin/sh\necho foreign\n')
+    process.env.WANXIANGSHU_DISABLE_GIT_HOOKS = '1'
+    assert.equal(hook.ensure(repo), true)
+    assert.ok(!existsSync(refTxn), 'owned reference-transaction removed')
+    assert.equal(readFileSync(prePush, 'utf8'), '#!/bin/sh\necho foreign\n', 'foreign pre-push preserved')
+    assert.equal(hook.ensure(repo), true, 'disabled ensure stays idempotent')
+    assert.equal(readFileSync(prePush, 'utf8'), '#!/bin/sh\necho foreign\n', 'foreign still preserved on repeat')
+
+    // Re-enable with a foreign hook present: fails safe, does not overwrite.
+    delete process.env.WANXIANGSHU_DISABLE_GIT_HOOKS
+    assert.equal(hook.ensure(repo), false, 'foreign hook blocks re-enable')
+    assert.equal(readFileSync(prePush, 'utf8'), '#!/bin/sh\necho foreign\n', 'foreign preserved on re-enable')
+
+    // Remove foreign and re-enable: reinstalls.
+    rmSync(prePush)
+    assert.equal(hook.ensure(repo), true)
+    assert.ok(readFileSync(prePush, 'utf8').includes('wanxiang-hook-dispatcher'), 'reinstalled after unset')
+  } finally {
+    delete process.env.WANXIANGSHU_DISABLE_GIT_HOOKS
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
 
 // ── WP-024: the store lock covers local bytes only; network stays outside ──
 
