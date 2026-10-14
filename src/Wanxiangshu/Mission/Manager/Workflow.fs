@@ -54,6 +54,18 @@ module ManagerWorkflow =
         lifecycleWork directory (SessionId.value sessionId)
         |> Option.exists (fun work -> List.contains (ProviderRunIdentity.value providerRun) work.RetiredRuns)
 
+    /// An unreviewed S4 tenure whose confirmation already landed cannot
+    /// happen through the library's own gate; treat it as no action.
+    let private unreviewedResource (confirmed: bool) =
+        if confirmed then None else Some assessPath
+
+    /// The resource for a reviewed, unconfirmed S4 tenure, by review outcome.
+    let private reviewedResource (outcome: string option) =
+        match outcome with
+        | Some "Stayed" -> Some workPath
+        | Some "Promoted" -> Some finishPath
+        | _ -> None
+
     // Algorithm H reads the opening sequence plus tenure, review outcome, and confirmation.
     // S1–S3 do not enter the S4 resource match. Certificates are not an input.
     let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) =
@@ -61,18 +73,9 @@ module ManagerWorkflow =
         | None -> None
         | Some work when work.Sequence <> [ "S4" ] -> None
         | Some work when work.ActiveId.IsNone -> None
-        | Some work when work.Reviewed |> not ->
-            // An unreviewed S4 tenure whose confirmation already landed cannot
-            // happen through the library's own gate; treat it as no action.
-            if work.Confirmed then None else Some assessPath
-        | Some work ->
-            if not work.Confirmed then
-                match work.ReviewOutcome with
-                | Some "Stayed" -> Some workPath
-                | Some "Promoted" -> Some finishPath
-                | _ -> None
-            else
-                Some finishPath
+        | Some work when work.Reviewed |> not -> unreviewedResource work.Confirmed
+        | Some work when not work.Confirmed -> reviewedResource work.ReviewOutcome
+        | Some _ -> Some finishPath
 
 
     let private activeResourcePath (directory: string option) (sessionId: SessionId) =
@@ -83,16 +86,20 @@ module ManagerWorkflow =
     /// a later call with a different tool call is what closes out.
     let finishCloseoutText (confirmed: bool) : string =
         match ProviderLanguageBinding.readGlobalPreference () with
-        | ProviderLanguage.English ->
-            if confirmed then
-                "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
-            else
-                "This call only records confirmation. It does not end."
-        | _ ->
-            if confirmed then
-                "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
-            else
-                "这一次调用只落下确认，不结束。"
+        | ProviderLanguage.English when confirmed ->
+            "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
+        | ProviderLanguage.English -> "This call only records confirmation. It does not end."
+        | _ when confirmed -> "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
+        | _ -> "这一次调用只落下确认，不结束。"
+
+    /// The closeout substitution reads the confirmation bit from the work the
+    /// closeout targets. A missing work is still unconfirmed.
+    let private closeoutSubstitutions (turn: ReconciledTurn) =
+        let confirmed =
+            lifecycleWork turn.Directory (SessionId.value turn.SessionId)
+            |> Option.exists (fun work -> work.Confirmed)
+
+        Map [ "closeout", finishCloseoutText confirmed ]
 
     let private sendNudge
         (quiescence: ISessionQuiescenceGate)
@@ -107,12 +114,7 @@ module ManagerWorkflow =
             if resourcePath = assessPath then
                 Map [ "ordinal", iterationOrdinalText turn.Directory turn.SessionId ]
             elif resourcePath = finishPath then
-                let confirmed =
-                    match lifecycleWork turn.Directory (SessionId.value turn.SessionId) with
-                    | Some work -> work.Confirmed
-                    | None -> false
-
-                Map [ "closeout", finishCloseoutText confirmed ]
+                closeoutSubstitutions turn
             else
                 Map.empty
 
@@ -151,15 +153,45 @@ module ManagerWorkflow =
 
     /// Algorithm H8 entry two: after a Relayed retirement on an S4 work whose
     /// successor has not been reviewed yet, the successor prompt is the first
-    /// visible instruction.
-    // Stopped. Nothing names the provider run that produced a relayed
-    // retirement, so no successor prompt can be tied to the cut. The library
-    // deliberately keeps the run identity out of the retirement record.
+    /// visible instruction. The retirement id names the cut and the committed
+    /// retirement fence carries the provider run that made it; no run identity
+    /// is invented.
     let private successorPromptContext
-        (_workspaceDirectory: string option)
-        (_sessionIdText: string)
+        (workspaceDirectory: string option)
+        (sessionIdText: string)
         : (string * string) option =
-        None
+        lifecycleWork workspaceDirectory sessionIdText
+        |> Option.bind (fun work ->
+            match work.Sequence, List.tryLast work.Retirements with
+            | [ "S4" ], Some retirement when retirement.Outcome = "Relayed" && not work.Reviewed ->
+                Some(retirement.RetirementId, retirement.Fence.ProviderRunId)
+            | _ -> None)
+
+    /// One durable opening at an observed head, idempotent for a work that is
+    /// already open: an opened work returns without a command, so a drifted
+    /// head cannot mint a second request identity against it.
+    let private openManagerWorkAtHead (sessionId: string) (root: string) (head: int64) : unit =
+        let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
+
+        let opened =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+            |> Option.isSome
+
+        if not opened then
+            let requestId = sessionId + ":open:" + string head
+
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Open"
+                    [ "root", box root
+                      "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ()
+                      "ownerId", box sessionId
+                      "openingCursor", box (float head) ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
+
+            ignore receipt
 
     let ensureManagerWorkOpened
         (journal: AgentJournal option)
@@ -172,27 +204,14 @@ module ManagerWorkflow =
         task {
             ignore journal
             ignore providerRunIdOpt
+
             match store, sessionIdTextOpt, workspaceDirectory with
             | None, _, _
             | _, None, _
             | _, _, None -> return ()
             | Some _held, Some sessionId, Some root ->
-                match observedHead with
-                | None -> return ()
-                | Some head ->
-                    let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
-                    let requestId = sessionId + ":open:" + string head
-                    let command =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                            "Open"
-                            [ "root", box root
-                              "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ()
-                              "ownerId", box sessionId
-                              "openingCursor", box (float head) ]
-                    let receipt =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
-                    ignore receipt
-                    return ()
+                observedHead |> Option.iter (openManagerWorkAtHead sessionId root)
+                return ()
         }
 
     let private deliverLoopPrompt
@@ -228,12 +247,7 @@ module ManagerWorkflow =
             | HostSessionNudge.GateContinuationOutcome.Sent _
             | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return ()
             | HostSessionNudge.GateContinuationOutcome.Retired ->
-                return
-                    invalidOp (
-                        sprintf
-                            "MANAGER-LOOP-003: loop gate retired for retirement %s"
-                            retirementId
-                    )
+                return invalidOp (sprintf "MANAGER-LOOP-003: loop gate retired for retirement %s" retirementId)
             | HostSessionNudge.GateContinuationOutcome.Failed error ->
                 return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
         }
@@ -270,7 +284,13 @@ module ManagerWorkflow =
         task {
             match journal, sessionIdTextOpt with
             | Some durable, Some sidText when not (System.String.IsNullOrWhiteSpace sidText) ->
-                do! deliverSuccessorPrompt sessionPort rootWorkspace workspaceDirectory durable (SessionId.create sidText)
+                do!
+                    deliverSuccessorPrompt
+                        sessionPort
+                        rootWorkspace
+                        workspaceDirectory
+                        durable
+                        (SessionId.create sidText)
             | _ -> return ()
         }
 
