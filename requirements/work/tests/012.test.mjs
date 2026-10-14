@@ -19,12 +19,16 @@ test('WHAT[work-012] 同一 workId 的第二笔 WorkOpened 不得被折叠成已
   assert.equal(opened.names.includes('WorkOpened'), true)
   assert.equal(opened.names.includes('IncumbencyOpened'), true)
 
-  const second = first + first
-  const again = surface.readProbe(second)
+  // A second opening of the same work under a different request id is a new
+  // opening, not a replay: the fold must refuse it.
+  const secondFrame = JSON.parse(first)
+  secondFrame.requestId = 'open:work-1:second'
+  const second = `${canonical(secondFrame)}\n`
+  const again = surface.readProbe(`${first}${second}`)
   assert.equal(again.ok, false)
   assert.equal(again.opened, false)
   assert.equal(again.names, '')
-  assert.equal(again.reason.includes('Replayed'), true)
+  assert.equal(again.reason, 'Work is already open or identity differs')
 })
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`

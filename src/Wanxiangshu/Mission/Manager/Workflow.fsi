@@ -31,7 +31,6 @@ module ManagerWorkflow =
             Task
 
     val ensureManagerWorkOpened:
-        journal: AgentJournal option ->
         workspaceDirectory: string option ->
         store: Wanxiangshu.Persistence.EventStore.IEventStore option ->
         observedHead: int64 option ->

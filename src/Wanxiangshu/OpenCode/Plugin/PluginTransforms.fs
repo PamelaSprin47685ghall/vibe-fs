@@ -895,7 +895,6 @@ module PluginTransforms =
 
                         do!
                             ManagerWorkflow.ensureManagerWorkOpened
-                                journal
                                 workspaceDirectory
                                 borrowedStore
                                 (Some observedHead)

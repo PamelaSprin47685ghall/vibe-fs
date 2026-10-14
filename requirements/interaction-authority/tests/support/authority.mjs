@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,6 +34,28 @@ export const withJournal = async (label, action) => {
   const open = async () => {
     incarnation += 1
     const result = await journal.JournalSurface_bootWithWriterId(directory, `writer-${label}-${incarnation}`, `runtime-${label}-${incarnation}`, 4242, '2026-09-26T00:00:00Z')
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    handle = result.journal
+    return handle
+  }
+  const reopen = async () => {
+    journal.JournalSurface_dispose(handle)
+    handle = null
+    return open()
+  }
+  try { return await action(await open(), reopen, directory) }
+  finally {
+    if (handle) journal.JournalSurface_dispose(handle)
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+export const withSharedJournal = async (label, action) => {
+  const directory = mkdtempSync(join(tmpdir(), `wxs-authority-shared-${label}-`))
+  execFileSync('git', ['init', '--quiet', directory])
+  let handle
+  const open = async () => {
+    const result = await journal.JournalSurface_acquireSharedForWorkspace(directory, process.pid, '2026-10-14T00:00:00Z')
     assert.equal(result.ok, true, JSON.stringify(result.error))
     handle = result.journal
     return handle

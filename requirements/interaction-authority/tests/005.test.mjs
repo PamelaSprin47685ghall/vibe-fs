@@ -10,6 +10,7 @@ const authority = await import("../../../dist/Interaction/Authority/RuntimeSurfa
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 const lifecycle = await import("../../../dist/Mission/Lifecycle/Surface.js");
+const { withSharedJournal } = await import("./support/authority.mjs");
 
 const participantIdentity = {
   participant: 'manager',
@@ -154,7 +155,7 @@ test('WHAT[interaction-authority-005] stale owner witness is rejected before Hos
   })
 })
 test('WHAT[interaction-authority-005] owner superseded after claim rejects physical acceptance without child authority', async () => {
-  await withJournal('owner-race', async (handle, directory) => {
+  await withSharedJournal('owner-race', async (handle, _reopen, directory) => {
     const owner = await acceptOwner(handle, 'ses-race-owner')
     const seed = inheritedSeed(owner)
     let providerSends = 0

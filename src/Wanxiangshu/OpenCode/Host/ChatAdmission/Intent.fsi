@@ -29,7 +29,7 @@ module ChatAdmissionIntent =
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
         | UnmanagedMessage
-        | AlreadyAcceptedHostMessage of PromptAuthority.ContinuationKind
+        | AlreadyAcceptedHostMessage of PromptAuthority.PromptOrigin
 
     [<RequireQualifiedAccess>]
     type Rejection =

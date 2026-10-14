@@ -263,9 +263,10 @@ module ReviewBackendManager =
         (sessionId: SessionId)
         (directorySessionId: string)
         (bound: BoundReviewInvocation)
-        : Result<PreparedAssessment, string> =
+        : Result<PreparedAssessment, ReviewFailure> =
         lifecycleWorkOf bound.Directory directorySessionId
-        |> Option.bind (fun (_, work) ->
+        |> requireSome BindingUnavailable
+        |> Result.bind (fun (_, work) ->
             match work.ActiveId, work.Reviewed with
             | None, _ -> Error BindingUnavailable
             | Some _, true -> Error AlreadySubmitted
@@ -305,11 +306,65 @@ module ReviewBackendManager =
             [ providerText instructionPath substitutions ]
             [ "recorded", ToolHostCodec.TBool true ]
 
+    /// The write receipt decides the result. A duplicate review is a structured
+    /// failure; a committed or replayed write is accepted.
+    let private reviewOutcome
+        (findings: ReviewFindings)
+        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        : Result<string, ReviewFailure> =
+        if receipt.Reason = "Incumbency already reviewed" then
+            Error RecordFailed
+        elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
+            Ok(acceptedResult findings)
+        else
+            Error RecordFailed
+
+    let private runRecorded
+        (context: HostToolContext)
+        (prepared: PreparedAssessment)
+        : Task<Result<string, ReviewFailure>> =
+        task {
+            match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
+            | None -> return Error RecordFailed
+            | Some _ ->
+                let gitCommonDir =
+                    Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
+
+                let requestId = prepared.IncumbencyId + ":review"
+
+                let findings =
+                    prepared.Bound.Findings
+                    |> Wanxiangshu.Mission.Work.ReviewFindings.values
+                    |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
+                    |> List.toArray
+                    |> box
+
+                let command =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                        "Review"
+                        [ "incumbencyId", box prepared.IncumbencyId
+                          "reviewerId", box ReviewerId
+                          "findings", findings ]
+
+                let receipt =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                        gitCommonDir
+                        context.SessionId
+                        requestId
+                        command
+
+                return reviewOutcome prepared.Bound.Findings receipt
+        }
+
     /// The one review write: append `Reviewed` through the unified kernel. The
     /// binding is still validated first (relay-assessment-007: a rejected
     /// invocation writes nothing and consumes no slot), but its eight fields do
     /// not enter the event.
-    let private runPrepared (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedAssessment) =
+    let private runPrepared
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedAssessment)
+        : Task<Result<string, ReviewFailure>> =
         task {
             let! binding =
                 captureBinding
@@ -322,44 +377,7 @@ module ReviewBackendManager =
 
             match binding with
             | Error failure -> return Error failure
-            | Ok _ -> ()
-
-            match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
-            | None -> return Error RecordFailed
-            | Some _ -> ()
-
-            let gitCommonDir =
-                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
-
-            let requestId = prepared.IncumbencyId + ":review"
-
-            let findings =
-                prepared.Bound.Findings
-                |> Wanxiangshu.Mission.Work.ReviewFindings.values
-                |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
-                |> List.toArray
-                |> box
-
-            let command =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                    "Review"
-                    [ "incumbencyId", box prepared.IncumbencyId
-                      "reviewerId", box ReviewerId
-                      "findings", findings ]
-
-            let receipt =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
-                    gitCommonDir
-                    context.SessionId
-                    requestId
-                    command
-
-            if receipt.Reason = "Incumbency already reviewed" then
-                return Error RecordFailed
-            elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                return Ok(acceptedResult prepared.Bound.Findings)
-            else
-                return Error RecordFailed
+            | Ok _ -> return! runRecorded context prepared
         }
 
     let private renderExecution =

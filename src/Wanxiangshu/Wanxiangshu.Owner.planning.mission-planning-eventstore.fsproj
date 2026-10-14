@@ -7,21 +7,12 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.planning.mission-lifecycle-event-vocabulary-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
-    <Compile Include="Mission/Lifecycle/Facts.fsi"/>
-    <Compile Include="Mission/Lifecycle/Facts.fs"/>
-    <Compile Include="Mission/Lifecycle/Fold.fsi"/>
-    <Compile Include="Mission/Lifecycle/Fold.fs"/>
-    <Compile Include="Mission/Lifecycle/Codec.fsi"/>
-    <Compile Include="Mission/Lifecycle/Codec.fs"/>
-    <Compile Include="Mission/Lifecycle/Kernel.fsi"/>
-    <Compile Include="Mission/Lifecycle/Kernel.fs"/>
     <Compile Include="Mission/Lifecycle/DurableWorkHost.fsi"/>
     <Compile Include="Mission/Lifecycle/DurableWorkHost.fs"/>
     <Compile Include="Mission/Lifecycle/Surface.fsi"/>

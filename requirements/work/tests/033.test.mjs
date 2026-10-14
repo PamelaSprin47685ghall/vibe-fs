@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -22,6 +22,9 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-033-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
+    // The journal directory is fixed next to the events dir; tests that open
+    // the database directly create it here rather than relying on the host.
+    mkdirSync(join(root, '.git', 'wanxiangshu'), { recursive: true })
     await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
   } finally {
     rmSync(root, { recursive: true, force: true })

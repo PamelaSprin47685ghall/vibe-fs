@@ -426,6 +426,10 @@ module JournalSurface =
                     let store =
                         EventStore.createLocal commonDirectory (Guid.NewGuid().ToString("N")) integrator
 
+                    // The lifecycle seed path reads its durable common dir from this
+                    // store field; a bare store silently falls back to the in-memory
+                    // seed path and never appends closure facts.
+                    emitJsStatement (box store, commonDirectory) "$0.gitCommonDir = $1"
                     createdStore <- Some store
 
                     let! result =
@@ -532,6 +536,9 @@ module JournalSurface =
                 CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
 
             let store = EventStore.createLocal (str commonDir) (str writerId) integrator
+            // Same binding as acquireSharedForWorkspace: lifecycle seeds locate
+            // durable work through this store field.
+            emitJsStatement (box store, str commonDir) "$0.gitCommonDir = $1"
 
             let! result =
                 EventStoreJournalWriter.resumeOrCreate (

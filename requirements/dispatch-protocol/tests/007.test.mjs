@@ -210,10 +210,10 @@ test('WHAT[dispatch-protocol-007] the runtime exact-run close preserves unknown 
     assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, state), 2)
     assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, state), 2)
 
-    // The durable closure writer is AuthorityLogicalRunClosed (GAP-123); this
-    // pure runtime close is exact-run. Manager-only filtering belongs to the
-    // writer side (activeHumanRootManager + appendManagerAuthorityClosure) and
-    // is not expressible through this pure boundary.
+    // The durable closure writer is AuthorityLogicalRunClosed through the
+    // JournalSurface.appendAuthorityLogicalRunClosed narrow end (GAP-123);
+    // this pure runtime close is exact-run. Manager-only filtering belongs to
+    // that writer and is not expressible through this pure boundary.
     const closed = authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, state)
     assertObserved.equal(closed.ok, true, closed.ok ? '' : closed.error)
     const value = closed.value

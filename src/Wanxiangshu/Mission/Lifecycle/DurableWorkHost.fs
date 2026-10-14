@@ -328,7 +328,7 @@ module DurableWorkHost =
             |> Array.map hostAdvanceOf
             |> Array.toList }
 
-    let inspected (gitCommonDir: string) (workId: string) : InspectedWork option =
+    let private inspectedJournal (gitCommonDir: string) (workId: string) : InspectedWork option =
         // One open, one close for the snapshot and the history it needs.
         useWork gitCommonDir workId (fun work ->
             let snapshot: obj = work?inspect ()
@@ -337,6 +337,13 @@ module DurableWorkHost =
                 Some(projectedWork snapshot work)
             else
                 None)
+
+    let inspected (gitCommonDir: string) (workId: string) : InspectedWork option =
+        // An empty id names no work; it never reaches the journal as a query.
+        if String.IsNullOrEmpty workId then
+            None
+        else
+            inspectedJournal gitCommonDir workId
 
     let recover (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?recover ())

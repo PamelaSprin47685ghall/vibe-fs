@@ -937,46 +937,60 @@ module LifecycleSurface =
                                    decision = "missing"
                                    error = "lifecycle work is missing" |}
                     | Some work ->
-                        let incumbencyId = work.ActiveId |> Option.defaultValue ""
-
-                        let receipt =
-                            DurableWorkHost.execute
-                                dir
-                                workId
-                                ("deliver:" + providerRunId + ":" + toolCallId)
-                                (deliverCommand incumbencyId providerRunId toolCallId cursor None)
-
-                        let kind =
-                            if receipt.Kind.Length = 0 then
-                                receipt.Status
-                            else
-                                receipt.Kind
-
-                        if
-                            receipt.Status = "Committed"
-                            || receipt.Status = "Replayed"
-                            || receipt.Status = "Observed"
-                        then
-                            match completedManagerDelivery dir workId with
-                            | Some retirementId ->
-                                do! JournalSurface.appendAuthorityLogicalRunClosed dir workId retirementId
-                            | None -> ()
+                        match completedManagerDelivery dir workId with
+                        | Some retirementId ->
+                            // WHAT-018: the durable source terminal already exists, so a
+                            // retry may only repeat the idempotent closure append; the
+                            // delivery command would carry a different payload for the
+                            // same request id once the tenure is retired.
+                            do! JournalSurface.appendAuthorityLogicalRunClosed dir workId retirementId
 
                             return
                                 box
                                     {| ok = true
-                                       decision = normalizedDecision kind
+                                       decision = "delivered"
                                        error = "" |}
-                        else
-                            return
-                                box
-                                    {| ok = false
-                                       decision = "Refuse"
-                                       error =
-                                        if receipt.Reason = "" then
-                                            receipt.Status
-                                        else
-                                            receipt.Reason |}
+                        | None ->
+                            let incumbencyId = work.ActiveId |> Option.defaultValue ""
+
+                            let receipt =
+                                DurableWorkHost.execute
+                                    dir
+                                    workId
+                                    ("deliver:" + providerRunId + ":" + toolCallId)
+                                    (deliverCommand incumbencyId providerRunId toolCallId cursor None)
+
+                            let kind =
+                                if receipt.Kind.Length = 0 then
+                                    receipt.Status
+                                else
+                                    receipt.Kind
+
+                            if
+                                receipt.Status = "Committed"
+                                || receipt.Status = "Replayed"
+                                || receipt.Status = "Observed"
+                            then
+                                match completedManagerDelivery dir workId with
+                                | Some retirementId ->
+                                    do! JournalSurface.appendAuthorityLogicalRunClosed dir workId retirementId
+                                | None -> ()
+
+                                return
+                                    box
+                                        {| ok = true
+                                           decision = normalizedDecision kind
+                                           error = "" |}
+                            else
+                                return
+                                    box
+                                        {| ok = false
+                                           decision = "Refuse"
+                                           error =
+                                            if receipt.Reason = "" then
+                                                receipt.Status
+                                            else
+                                                receipt.Reason |}
                 with error ->
                     return
                         box

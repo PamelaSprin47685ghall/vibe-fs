@@ -22,6 +22,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-eventstorewriter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-prompt-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <Compile Include="Persistence/Journal/Surface.fsi"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
   </ItemGroup>

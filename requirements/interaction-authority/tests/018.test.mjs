@@ -228,7 +228,10 @@ test('WHAT[interaction-authority-018] a refused closure append keeps the active 
     assert.equal(after.activeLogicalRun.logicalRun, original.logicalRun)
     assert.equal(after.activeLogicalRun.authorityRoot, original.authorityRoot)
     assert.equal(after.activeLogicalRun.authorityKind, 'HumanRoot')
-    assert.equal(after.lastAuthorityProfile, null, 'no closure success may be recorded')
+    // Registering the root installs it as LastAuthorityProfile; a refused
+    // closure must leave that archived profile exactly as accepted.
+    assert.equal(after.lastAuthorityProfile.logicalRun, original.logicalRun, 'no closure success may be recorded')
+    assert.equal(after.lastAuthorityProfile.authorityRoot, original.authorityRoot)
 
     const fresh = await dispatch.acceptHumanRootSelection(handle, session, 'fresh-' + session, durableRootSelection('manager'))
     assert.equal(fresh.ok, false, 'a fresh identity must be refused while the prior run is not closed')
