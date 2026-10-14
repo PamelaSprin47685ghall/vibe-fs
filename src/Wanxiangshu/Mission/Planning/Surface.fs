@@ -209,9 +209,7 @@ module PlanningSurface =
             task {
                 try
                     let! raw =
-                        unbox<Task<obj>> (
-                            emitJsExpr (execution, execSessionId, agent, prompt) "$0.prompt($1, $2, $3)"
-                        )
+                        unbox<Task<obj>> (emitJsExpr (execution, execSessionId, agent, prompt) "$0.prompt($1, $2, $3)")
 
                     let kind = if isNull raw then "" else string raw?kind
 
@@ -228,22 +226,14 @@ module PlanningSurface =
         fun (execSessionId: string) ->
             task {
                 try
-                    do!
-                        unbox<Task<unit>> (
-                            emitJsExpr (execution, execSessionId) "$0.discard($1)"
-                        )
+                    do! unbox<Task<unit>> (emitJsExpr (execution, execSessionId) "$0.discard($1)")
 
                     return Ok()
                 with ex ->
                     return Error ex.Message
             }
 
-    let ensurePlanWorkOpened
-        (gitCommonDir: string)
-        (root: string)
-        (sessionId: string)
-        (observedHead: obj)
-        : Task<obj> =
+    let ensurePlanWorkOpened (gitCommonDir: string) (root: string) (sessionId: string) (observedHead: obj) : Task<obj> =
         task {
             let head = extractInt64Opt observedHead
 
@@ -252,6 +242,17 @@ module PlanningSurface =
             | Error err -> return box {| ok = false; error = err |}
         }
 
+    let private retirementBlockersOfJs (observation: obj) () =
+        let value = emitJsExpr observation "typeof $0 === 'function' ? $0() : $0"
+
+        if not (emitJsExpr value "typeof $0 === 'boolean'") then
+            invalidOp "Expected a boolean retirement resource observation"
+
+        if unbox<bool> value then
+            [| "retirement-blocked" |]
+        else
+            [||]
+
     let executeDeliver
         (gitCommonDir: string)
         (root: string)
@@ -259,7 +260,7 @@ module PlanningSurface =
         (incumbencyId: string)
         (providerRunId: string)
         (toolCallId: string)
-        (hasBlocker: bool)
+        (hasBlocker: obj)
         (execution: obj)
         (retirementCursor: obj)
         : Task<obj> =
@@ -282,7 +283,7 @@ module PlanningSurface =
                             incumbencyId
                             providerRunId
                             toolCallId
-                            (fun () -> if hasBlocker then [| "retirement-blocked" |] else [||])
+                            (retirementBlockersOfJs hasBlocker)
                             createSession
                             promptSession
                             discardSession
@@ -318,6 +319,19 @@ module PlanningSurface =
                            message = null
                            error = err |}
         }
+
+    let reconcileBoundExecution gitCommonDir workId execSessionId observedPrompt blockers : obj =
+        match PlanTools.reconcileBoundExecution gitCommonDir workId execSessionId observedPrompt blockers with
+        | Ok result ->
+            box
+                {| ok = true
+                   delivered = result.Delivered
+                   error = null |}
+        | Error reason ->
+            box
+                {| ok = false
+                   delivered = false
+                   error = reason |}
 
     // The delegate argument arrives as a plain JavaScript function
     // (intent) => Promise<workRecord>; call it through JS interop so currying
@@ -489,6 +503,7 @@ module PlanningSurface =
                editPlanAtomic = editPlanAtomic
                ensurePlanWorkOpened = ensurePlanWorkOpened
                executeDeliver = executeDeliver
+               reconcileBoundExecution = reconcileBoundExecution
                executeAsk = executeAsk
                executeJsPlan = executeJsPlan
                executeReview = executeReview

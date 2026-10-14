@@ -361,6 +361,57 @@ test('WHAT[verification-system-021] a clean child exit without authoritative sum
   assert.doesNotMatch(messages.join('\n'), /\b0 passed, 0 failed\b/)
 })
 
+test('WHAT[verification-system-021] nested supervision preserves child output without corrupting the outer test protocol', async () => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'nested-supervisor-output-')))
+  try {
+    const inner = join(directory, 'inner.mjs')
+    const outer = join(directory, 'outer.fixture.mjs')
+    const supervisorUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    writeFileSync(inner, `import { Serializer } from 'node:v8'
+process.stdout.write('NESTED_STDOUT\\n')
+process.stderr.write('NESTED_STDERR\\n')
+const serializer = new Serializer()
+serializer.writeHeader()
+const text = Buffer.from('跨块原文🧭')
+process.stdout.write(text.subarray(0, 1))
+setImmediate(() => {
+  process.stdout.write(text.subarray(1))
+  process.stdout.write(Buffer.concat([serializer.releaseBuffer(), Buffer.from([0, 0, 0, 1, 0])]))
+})
+`)
+    writeFileSync(outer, `import assert from 'node:assert/strict'
+import test from 'node:test'
+import { superviseNodeTest } from ${JSON.stringify(supervisorUrl)}
+test('nested output stays observable', async () => {
+  const env = { ...process.env }
+  delete env.NODE_TEST_CONTEXT
+  await assert.rejects(superviseNodeTest({
+    files: [${JSON.stringify(fixture)}], inner: ${JSON.stringify(inner)},
+    env, label: 'nested-output', silenceMs: 10000, throwOnFailure: true,
+  }), /supervised suite failed/)
+})
+`)
+    const child = spawn(process.execPath, ['--test', outer], {
+      stdio: ['ignore', 'pipe', 'pipe'], env: childEnv,
+    })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', data => { stdout += data })
+    child.stderr.on('data', data => { stderr += data })
+    const code = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', resolveExit)
+    })
+    assert.equal(code, 0, stdout + stderr)
+    assert.match(stdout + stderr, /NESTED_STDOUT/)
+    assert.match(stdout + stderr, /NESTED_STDERR/)
+    assert.match(stdout + stderr, /跨块原文🧭/)
+    assert.doesNotMatch(stdout + stderr, /Unable to deserialize cloned data/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[verification-system-021] a tier exclusion identifies the missing execution tier', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tier-report-'))
   try {

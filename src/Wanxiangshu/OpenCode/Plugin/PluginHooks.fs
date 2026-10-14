@@ -137,9 +137,7 @@ module PluginHooks =
                     |> Option.bind (fun workspace ->
                         let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
 
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
-                            commonDir
-                            (SessionId.value sessionId))
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
                     |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
                 | _ -> None
 

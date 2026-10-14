@@ -60,11 +60,7 @@ module PlanTools =
             Result<DeliverResult, string>
 
     val bindObservedExecutionSession:
-        gitCommonDir: string ->
-        workId: string ->
-        operationId: string ->
-        execSessionId: string ->
-            Result<unit, string>
+        gitCommonDir: string -> workId: string -> operationId: string -> execSessionId: string -> Result<unit, string>
 
     /// planning-010: delegate the intent synchronously to the bound fixed
     /// DevOps and return its complete work record verbatim. `delegateTo`

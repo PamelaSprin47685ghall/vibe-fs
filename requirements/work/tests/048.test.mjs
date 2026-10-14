@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
 import { SqliteJournal } from 'wanxiangli/eventstore'
-import { createDiscovery } from '../../../dist/OpenCode/Host/SessionSnapshotPort.js'
+import { observeDeliveryDiscovery } from '../../../dist/OpenCode/Host/SessionsSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import { acceptAuthorityRoot, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
@@ -134,15 +134,69 @@ test('WHAT[work-048] corrupt work cannot prevent an independent bound delivery f
   })
 })
 
+test('WHAT[work-048] a work damaged during Host observation cannot abort another work recovery', async () => {
+  await withRestartablePlugin(async (start, directory, control) => {
+    const first = await start()
+    const { commonDir } = await seedPendingDelivery(control, directory, 'a-late-damage', 'exec-late-damage', '# first\n')
+    await seedPendingDelivery(control, directory, 'z-independent', 'exec-independent', '# second\n')
+    control.pushHostMessage('exec-late-damage', userMessage('exec-late-damage', '# first\n'))
+    control.pushHostMessage('exec-independent', userMessage('exec-independent', '# second\n'))
+    await control.stop(first)
+
+    const messages = control.client.session.messages
+    let damaged = false
+    control.client.session.messages = async request => {
+      if (request.path.id === 'exec-late-damage' && !damaged) {
+        const journal = new SqliteJournal(new DatabaseSync(life.journalPath(commonDir)))
+        try {
+          const records = journal.read('a-late-damage')
+          assert.equal(journal.append('a-late-damage', records.length, 'damaged', '{"invalid":true}').status, 'Committed')
+          damaged = true
+        } finally {
+          journal.close()
+        }
+      }
+      return messages(request)
+    }
+
+    const second = await start()
+    await activateDurability(second, 'late-damage')
+    await waitFor(() => life.inspected(commonDir, 'z-independent')?.Delivered === true)
+    assert.equal(damaged, true, 'the corruption must occur after the initial work inspection')
+    assert.throws(() => life.inspected(commonDir, 'a-late-damage'), /field|history|record/i)
+    assert.equal(control.prompts.length, 0)
+    await control.stop(second)
+  })
+})
+
 test('WHAT[work-048] malformed discovery rows cannot disappear to turn an ambiguous result into a unique session', async () => {
   const title = 'wanxiangshu-delivery:operation'
-  const discovery = createDiscovery({ client: { session: { list: async () => ({ data: [
+  const result = await observeDeliveryDiscovery({ client: { session: { list: async () => ({ data: [
     { id: 'real-session', title, agent: 'manager' },
     { title, agent: 'manager' },
-  ] }) } } })
-  const result = await discovery.FindRootSessionsByTitle(title)
-  assert.equal(result.tag, 1, 'an exact candidate without identity must refuse discovery, not be silently dropped')
+  ] }) } } }, title)
+  assert.equal(result.ok, false, 'an exact candidate without identity must refuse discovery, not be silently dropped')
 })
+
+for (const [label, response] of [
+  ['missing list', {}],
+  ['SDK error', { error: { message: 'unavailable' } }],
+  ['missing identity', { data: [{ title: 'wanxiangshu-delivery:operation', agent: 'manager' }] }],
+  ['wrong agent', { data: [{ id: 'session', title: 'wanxiangshu-delivery:operation', agent: 'coder' }] }],
+  ['full page before exact filtering', { data: [
+    { id: 'exact', title: 'wanxiangshu-delivery:operation', agent: 'manager' },
+    { id: 'near', title: 'wanxiangshu-delivery:operation-extra', agent: 'manager' },
+  ] }],
+]) {
+  test(`WHAT[work-048] discovery refuses ${label} instead of claiming a unique execution`, async () => {
+    const result = await observeDeliveryDiscovery({ client: { session: { list: async request => {
+      assert.equal(request.query.limit, 2)
+      assert.equal(request.query.roots, true)
+      return response
+    } } } }, 'wanxiangshu-delivery:operation')
+    assert.equal(result.ok, false)
+  })
+}
 
 test('WHAT[work-048] restart settles a bound delivery from the exact persisted Host prompt without another external effect', async () => {
   await withRestartablePlugin(async (start, directory, control) => {

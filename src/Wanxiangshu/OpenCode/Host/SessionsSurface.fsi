@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 
 module SessionsSurface =
+    val observeDeliveryDiscovery: input: obj -> title: string -> Task<obj>
     val familyRoot: parents: obj -> session: string -> string
     val physicalParents: parents: obj -> children: obj -> string array
     val flattenedChildAdapterProbe: unit -> Task<obj>

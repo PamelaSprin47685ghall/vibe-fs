@@ -12,6 +12,7 @@ module PlanningSurface =
     val readPlan: root: string -> workId: string -> obj
     val rewritePlanAtomic: root: string -> workId: string -> content: string -> obj
     val editPlanAtomic: root: string -> workId: string -> patches: obj -> obj
+
     val ensurePlanWorkOpened:
         gitCommonDir: string -> root: string -> sessionId: string -> observedHead: obj -> Task<obj>
 
@@ -22,10 +23,18 @@ module PlanningSurface =
         incumbencyId: string ->
         providerRunId: string ->
         toolCallId: string ->
-        hasBlocker: bool ->
+        hasBlocker: obj ->
         execution: obj ->
         retirementCursor: obj ->
             Task<obj>
+
+    val reconcileBoundExecution:
+        gitCommonDir: string ->
+        workId: string ->
+        execSessionId: string ->
+        observedPrompt: string ->
+        blockers: string array ->
+            obj
 
     /// planning-010: `delegateTo` is a plain JavaScript function
     /// `(intent) => Promise<string>` returning the DevOps work record.

@@ -31,10 +31,7 @@ module ManagerWorkflow =
             Task
 
     val ensureManagerWorkOpened:
-        workspaceDirectory: string option ->
-        observedHead: int64 option ->
-        sessionIdTextOpt: string option ->
-            Task<unit>
+        workspaceDirectory: string option -> observedHead: int64 option -> sessionIdTextOpt: string option -> Task<unit>
 
     val maybeDeliverLoop:
         sessionPort: ISessionHostPort ->

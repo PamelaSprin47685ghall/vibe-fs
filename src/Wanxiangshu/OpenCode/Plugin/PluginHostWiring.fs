@@ -245,9 +245,7 @@ module PluginHostWiring =
                     |> Option.bind (fun workspace ->
                         let commonDir = RuntimePath.gitCommonDir workspace
 
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
-                            commonDir
-                            (SessionId.value sessionId))
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
 
                 // Delivered closes the work: the final retirement left no
                 // active tenure to continue. A missing list is not an empty

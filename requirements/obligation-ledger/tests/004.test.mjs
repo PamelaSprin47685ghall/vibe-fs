@@ -301,10 +301,16 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     // no pre-state keep their empty shape too.
     const afterSlices = after.sessionProjections[sessionID]
     const sliceNames = Object.keys(beforeSlices)
-    assert.ok(sliceNames.length >= 15, 'the observation port forwards every session slice')
+    assert.deepEqual(sliceNames.sort(), [
+      'blog', 'bloggerCycles', 'companion', 'delegatedToolEstimate', 'enforcement',
+      'guidelines', 'handles', 'prefixEpoch', 'promptAuthority', 'providerFailures',
+      'requirementGrounding', 'sessionStartedAt', 'tipDelivery', 'xTrace',
+    ], 'the observation port forwards all remaining Journal slices, without a duplicate lifecycle projection')
+    assert.deepEqual(Object.keys(afterSlices).sort(), sliceNames)
     for (const slice of sliceNames) {
       assert.deepEqual(afterSlices[slice], beforeSlices[slice], `slice ${slice} survives the checkpoint untouched`)
     }
+    assert.deepEqual(await lifecycleWorkView(runtime, sessionID), lifecycle, 'the independent lifecycle work also stays unchanged')
 
     // Other sessions' projections are untouched as well.
     for (const [sessionId, slices] of Object.entries(before.sessionProjections)) {

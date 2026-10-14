@@ -366,10 +366,17 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
   try {
     child = spawn(process.execPath, [inner, ...homeArguments, ...files], {
-      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       detached: true,
       env,
     })
+    // Decode diagnostic output as UTF-8 and forward through this process.
+    // Inherited descriptors or raw binary chunks can corrupt an outer
+    // node:test result stream. Only IPC carries authoritative verdicts.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.pipe(process.stdout, { end: false })
+    child.stderr.pipe(process.stderr, { end: false })
   } catch (error) {
     watchdog.stop()
     throw error

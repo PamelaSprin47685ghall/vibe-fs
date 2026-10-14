@@ -73,8 +73,7 @@ module private ExecutionSpawn =
             match! sessions.CreateSiblingSession(SessionId.create operationId, None, options) with
             // Session creation itself is a Host effect. A generic transport
             // error does not prove that the Host failed before creating it.
-            | Error error ->
-                return Error(sprintf "Execution session creation outcome is unknown: %s" error)
+            | Error error -> return Error(sprintf "Execution session creation outcome is unknown: %s" error)
             | Ok sessionId -> return Ok sessionId
         }
 
@@ -805,9 +804,7 @@ type ToolRuntimeScope
     /// planning-023: create the parentless execution container. The returned
     /// SessionId is not permission to send its prompt: PlanTools first commits
     /// DeliverySessionBound for the operation.
-    member _.CreateExecutionSession
-        (operationId: string, agent: string)
-        : Task<Result<string, string>> =
+    member _.CreateExecutionSession(operationId: string, agent: string) : Task<Result<string, string>> =
         task {
             try
                 let! created = ExecutionSpawn.create sessions operationId agent

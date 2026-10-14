@@ -298,6 +298,8 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
 
 work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规范 record，SqliteJournal 负责原子字节提交，DurableWork 负责两者的提交协作。旧 EventStore/CanonicalIntegrator 不再投影 work lifecycle。
 
+一次宿主投影中的当前任期、轮次、退休历史和推进记录必须来自同一次 records 读取；其他连接在读取之后提交的事实只能出现在下一次投影。固定 DevOps 的身份与模型目标分别投影为 DevOpsId 和 DevOpsTarget，恢复路由只能读取后者，不能把身份字符串作为模型目标。
+
 - 允许后果：每次状态变化先在 Work 候选上完整验证，随后把一条规范 JSON record 作为 UTF-8 BLOB 原子写入 `<git-common-dir>/wanxiangshu/work.sqlite` 的 workId stream；同流 revision 连续，requestId 绑定同一 record。JSON 对象键按 Unicode 码点稳定排序，opening/retirement cursor 必须是 JS safe integer。读取时由同一组 records 重建 Work 并校验规范编码、摘要与全部领域跃迁。
 - 禁止后果：规则校验失败不得进入 SQLite append。严禁让旧 EventStore envelope、CanonicalIntegrator 投影或进程内缓存成为第二份 lifecycle 权威；严禁自动修复、跳过损坏 record 或把 Conflict/Unknown 当成功。
 - 失败后果：非法命令在 append 前拒绝且零写；revision/request 冲突显式返回 Conflict；已知未写返回 NotWritten；COMMIT 结果不明返回 Unknown 并要求重开后核对。读到损坏历史时整份拒绝。
@@ -393,6 +395,8 @@ provider 上下文由剥除后留下的本任消息、用户原文与显式资�
 
 work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<git-common-dir>/wanxiangshu/work.sqlite`，不在事件流目录内。
 
+Manager 开立的 root 取 Git 证明的当前工作树根目录，不取插件进入时的任意子目录。同一工作树的多个入口必须指向同一 root；不同 linked worktree 即使共用 git-common-dir，也不能因此冒充同一工作根。无法确认工作树根时拒绝开立，不以路径猜测替代。
+
 ## [047] lifecycle SQLite 宿主边界
 
 Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择：Node 使用 `node:sqlite` 的 `DatabaseSync`，Bun 使用 `bun:sqlite` 的 `Database`。运行时选择只有一处；Surface 的内存 probe 与 durable 工作路径必须复用同一选择，不得各自静态导入某一运行时专属 SQLite 模块。Node 与 Bun 都必须能够真实加载 Lifecycle 产物、完成持久开立、关闭连接并重开读取同一工作；模块装载不得因另一个运行时不存在的内建模块而失败。
@@ -404,3 +408,9 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 - 允许后果：若进程在 prompt 接受后、`ResolveDelivery(Accepted)` 提交前崩溃，重启从 pending work 读出精确 `operationId + execSessionId + digest + path`，只查询这个已绑定 session。若 Host 中首条真实 user prompt 的字节摘要等于预留 digest，重启以同一个 `operationId + ":accepted"` 请求结算 Accepted；不创建第二个 session，不重发 prompt。若崩溃发生在 CreateSession 已成功但创建回执丢失、因而还没有 DeliverySessionBound，恢复只可用稳定 title `wanxiangshu-delivery:<operationId>` 查询 root sessions；恰好一个精确 title 命中时才补 SessionCreated 绑定，再按同一 prompt 证据结算。
 - 禁止后果：不得仅凭 session 存在、模糊 title、时间、异常文本或“未查到消息”推断 Accepted/NotStarted。title 查询为零或多于一个精确 root 命中时保持 unbound pending。锁定的 OpenCode 1.18.29 即使接受 caller-supplied messageID，重复 prompt 仍可能生成新的 part，因此 recovery 不得把 messageID 当完整幂等发送许可。已绑定 session 读不到首 user prompt、摘要不符或 snapshot 查询失败时保持 pending。
 - 失败后果：SessionCreated 未持久确认前不得发送 prompt；确切 prompt 拒绝时先销毁该空 session，销毁成功后才可写 NotStarted。session 清理、绑定提交或 Accepted 结算结果未知时都保持 fail-closed，不开启新的 delivery operation。
+
+正常交付在异步 prompt 返回后重新查询资源 owner；恢复也必须查询同一个 owner，不得以空数组冒充已经排空。仍有 blocker 时保留 pending，不提交固定的 Accepted 请求，以免以后真实排空时因同 requestId 的不同载荷产生冲突。资源 owner 尚未安装时不能当成没有资源。
+
+发现查询显式请求最多两条候选；返回满页时不能声称结果唯一，即使本地过滤后只剩一条。精确候选必须有有效 session identity 并明确属于 Manager；SDK 错误、非列表响应、缺身份和错误 agent 都是拒绝，不得静默丢行后推断唯一性。
+
+恢复以单个 work 为失败边界。初次读历史或等待 Host 之后再读历史发生错误时，诊断必须指明 workId，保留坏记录和未结算义务，继续恢复其他独立 work。不得把损坏记录解释为“没有工作”，也不得通过跳过记录修复该 work；正常业务读取仍拒绝这份历史。

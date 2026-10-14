@@ -111,11 +111,7 @@ module ReviewShell =
                 resolveActiveIncumbency gitCommonDir context.SessionId
                 |> Result.map (fun incumbencyId -> (incumbencyId, gapsOf findings)))
 
-    let private executePlan
-        (gitCommonDir: string)
-        (args: HostToolArguments)
-        (context: HostToolContext)
-        : Task<string> =
+    let private executePlan (gitCommonDir: string) (args: HostToolArguments) (context: HostToolContext) : Task<string> =
         task {
             // planning-022 binding: workId is the caller's session.
             match preparePlanReview gitCommonDir args context with

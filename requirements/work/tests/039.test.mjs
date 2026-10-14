@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
-import { DeliverySpawnOutcome, PlanTools_executeDeliver, PlanTools_reconcileBoundExecution } from '../../../dist/Mission/Planning/PlanTools.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 
 const surface = planning.PlanningSurface ?? planning
@@ -73,30 +72,32 @@ test('WHAT[work-039] resources appearing during prompt admission block retiremen
     let busy = false
     let queries = 0
     let prompts = 0
-    const blockers = () => { queries += 1; return busy ? ['owned-live-process'] : [] }
-    const result = await PlanTools_executeDeliver(
-      commonDir, root, workId, active, 'resource-run', 'resource-call', blockers,
-      async () => ({ tag: 0, fields: ['exec-resource'] }),
-      async sessionId => {
-        prompts += 1
-        busy = true
-        return new DeliverySpawnOutcome(0, [sessionId])
+    const hasBlocker = () => { queries += 1; return busy }
+    const result = await surface.executeDeliver(
+      commonDir, root, workId, active, 'resource-run', 'resource-call', hasBlocker,
+      {
+        create: async () => 'exec-resource',
+        prompt: async () => {
+          prompts += 1
+          busy = true
+          return { kind: 'Started' }
+        },
+        discard: async () => assert.fail('an accepted execution must not be discarded'),
       },
-      async () => assert.fail('an accepted execution must not be discarded'),
       40n,
     )
-    assert.equal(result.tag, 1)
-    assert.match(result.fields[0], /live resources/)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /live resources/)
     assert.ok(queries >= 2, 'retirement must recheck resources after the asynchronous prompt')
     assert.equal(host.inspected(commonDir, workId).PendingDelivery, true)
     const before = host.inspect(commonDir, workId).revision
-    const blocked = PlanTools_reconcileBoundExecution(commonDir, workId, 'exec-resource', content, blockers())
-    assert.equal(blocked.tag, 1)
+    const blocked = surface.reconcileBoundExecution(commonDir, workId, 'exec-resource', content, ['owned-live-process'])
+    assert.equal(blocked.ok, false)
     assert.equal(host.inspect(commonDir, workId).revision, before)
     busy = false
-    const settled = PlanTools_reconcileBoundExecution(commonDir, workId, 'exec-resource', content, blockers())
-    assert.equal(settled.tag, 0)
-    assert.equal(settled.fields[0].Delivered, true)
+    const settled = surface.reconcileBoundExecution(commonDir, workId, 'exec-resource', content, [])
+    assert.equal(settled.ok, true)
+    assert.equal(settled.delivered, true)
     assert.equal(host.inspected(commonDir, workId).Delivered, true)
     assert.equal(prompts, 1)
   })

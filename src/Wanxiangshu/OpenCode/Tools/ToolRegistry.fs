@@ -587,8 +587,7 @@ module ToolRegistry =
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.
-        let planGitCommonDir =
-            workspaceDirectory |> Option.map RuntimePath.gitCommonDir
+        let planGitCommonDir = workspaceDirectory |> Option.map RuntimePath.gitCommonDir
 
         let planRoot =
             workspaceDirectory
@@ -669,8 +668,7 @@ module ToolRegistry =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
-            lifecycleWorkOf runtime sessionId
-            |> Option.bind (fun work -> work.ActiveId)
+            lifecycleWorkOf runtime sessionId |> Option.bind (fun work -> work.ActiveId)
 
         // planning-008: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of

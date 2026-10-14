@@ -13,7 +13,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Work
-open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -173,7 +172,16 @@ module ManagerWorkflow =
     /// One durable opening at an observed head. DurableWorkHost owns race
     /// reconciliation: a conflicting or unknown append is accepted only when
     /// a reread proves the same Manager work now exists.
-    let private openManagerWorkAtHead (sessionId: string) (root: string) (head: int64) : unit =
+    let private openManagerWorkAtHead (sessionId: string) (directory: string) (head: int64) : unit =
+        // A plugin may enter from a subdirectory. The work belongs to the
+        // actual worktree root, not that entry directory or the common Git dir.
+        let root =
+            Wanxiangshu.Git.GitSubject.execIn directory [| "rev-parse"; "--show-toplevel" |]
+            |> fun path -> path.TrimEnd('\r', '\n')
+
+        if System.String.IsNullOrWhiteSpace root then
+            invalidOp "Manager lifecycle opening failed: Git did not identify a worktree root"
+
         let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
 
         match
@@ -198,8 +206,7 @@ module ManagerWorkflow =
             match sessionIdTextOpt, workspaceDirectory with
             | None, _
             | _, None -> return ()
-            | Some sessionId, Some root ->
-                observedHead |> Option.iter (openManagerWorkAtHead sessionId root)
+            | Some sessionId, Some root -> observedHead |> Option.iter (openManagerWorkAtHead sessionId root)
         }
 
     let private deliverLoopPrompt

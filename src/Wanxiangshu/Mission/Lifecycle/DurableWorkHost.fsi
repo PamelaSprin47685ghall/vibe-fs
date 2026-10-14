@@ -59,6 +59,7 @@ module DurableWorkHost =
           RoundCount: int
           RetiredRuns: string list
           DevOpsId: string option
+          DevOpsTarget: string option
           Authority: string
           Confirmed: bool
           BlockerDigest: string option

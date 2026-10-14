@@ -373,17 +373,41 @@ module SessionSnapshotPort =
                 }
 
     let private sessionIdOfRow (row: obj) : SessionId option =
-        if isNull row || isNull row?id then
-            None
-        else
-            let value = unbox<string> row?id
-            if String.IsNullOrWhiteSpace value then None else Some(SessionId.create value)
+        let value = if isNull row then null else row?id
+        readString value |> Option.map SessionId.create
 
     let private exactRootTitle (title: string) (row: obj) =
         not (isNull row)
         && isNull row?parentID
         && not (isNull row?title)
         && unbox<string> row?title = title
+
+    let private discoveredSessions (title: string) (response: obj) =
+        let rows =
+            if not (isNull response) && not (isNull response?error) then
+                invalidOp "Session discovery returned an error response"
+            elif isJsArray response then
+                unbox<obj array> response
+            elif not (isNull response) && isJsArray response?data then
+                unbox<obj array> response?data
+            else
+                invalidOp "Session discovery did not return a session list"
+
+        // Request two matches. A full page cannot prove there is only one
+        // candidate, even when local filtering would leave one usable row.
+        if rows.Length >= 2 then
+            invalidOp "Session discovery is ambiguous or its result page is full"
+
+        rows
+        |> Array.filter (exactRootTitle title)
+        |> Array.map (fun row ->
+            if readString row?agent <> Some "manager" then
+                invalidOp "Delivery session does not identify the Manager agent"
+
+            match sessionIdOfRow row with
+            | Some session -> session
+            | None -> invalidOp "Delivery session has no valid identity")
+        |> Array.toList
 
     type SdkDiscoveryPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
@@ -400,23 +424,17 @@ module SessionSnapshotPort =
                         do! Result.requireFalse "session.list unavailable on SDK client" (isNull listFn)
 
                         let queryFields =
-                            [ "roots", box true; "search", box title ]
+                            [ "roots", box true; "search", box title; "limit", box 2 ]
                             @ (workspaceDirectory
                                |> Option.map (fun dir -> [ "directory", box dir ])
                                |> Option.defaultValue [])
 
                         let payload =
-                            createObj
-                                [ "query", box (createObj queryFields)
-                                  "headers", box (headersObj ()) ]
+                            createObj [ "query", box (createObj queryFields); "headers", box (headersObj ()) ]
 
                         let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
 
-                        return
-                            unwrapPayload response
-                            |> Array.filter (exactRootTitle title)
-                            |> Array.choose sessionIdOfRow
-                            |> Array.toList
+                        return discoveredSessions title response
                     with ex ->
                         return! Error ex.Message
                 }
@@ -465,23 +483,15 @@ module SessionSnapshotPort =
             member _.FindRootSessionsByTitle(title) =
                 taskResult {
                     try
-                        let url = sprintf "%s/session?roots=true&search=%s" cleanBase (encodeURIComponent title)
+                        let url =
+                            sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
+
                         let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
                         let status = unbox<int> response?status
                         do! Result.requireTrue (sprintf "HTTP %d" status) (status >= 200 && status < 300)
                         let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
 
-                        let rows =
-                            if String.IsNullOrWhiteSpace body then
-                                [||]
-                            else
-                                unwrapPayload (JS.JSON.parse body)
-
-                        return
-                            rows
-                            |> Array.filter (exactRootTitle title)
-                            |> Array.choose sessionIdOfRow
-                            |> Array.toList
+                        return discoveredSessions title (JS.JSON.parse body)
                     with ex ->
                         return! Error ex.Message
                 }

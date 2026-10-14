@@ -98,12 +98,7 @@ module PlanTools =
             |> Result.map (fun (_, digest, planPath) -> [ "draft", box {| digest = digest; path = planPath |} ])
             |> Result.defaultValue []
 
-    let private durableObservation
-        (gitCommonDir: string)
-        (workId: string)
-        (requestId: string)
-        (command: obj)
-        =
+    let private durableObservation (gitCommonDir: string) (workId: string) (requestId: string) (command: obj) =
         let first =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
 
@@ -174,8 +169,28 @@ module PlanTools =
             Error(
                 sprintf
                     "execution session binding was not durably confirmed: %s"
-                    (if receipt.Reason = "" then receipt.Status else receipt.Reason)
+                    (if receipt.Reason = "" then
+                         receipt.Status
+                     else
+                         receipt.Reason)
             )
+
+    let private rereadExecutionBinding gitCommonDir workId operationId execSessionId original =
+        let read () =
+            match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
+            | Some work when
+                work.PendingOperationId = Some operationId
+                && work.PendingExecSessionId = Some execSessionId
+                ->
+                Ok()
+            | Some work when work.PendingExecSessionId.IsSome ->
+                Error "a different execution session is already bound to this delivery"
+            | _ -> Error original
+
+        try
+            read ()
+        with _ ->
+            Error original
 
     let bindObservedExecutionSession
         (gitCommonDir: string)
@@ -185,18 +200,7 @@ module PlanTools =
         : Result<unit, string> =
         match bindExecutionSession gitCommonDir workId operationId execSessionId with
         | Ok() -> Ok()
-        | Error original ->
-            try
-                match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
-                | Some work when
-                    work.PendingOperationId = Some operationId
-                    && work.PendingExecSessionId = Some execSessionId
-                    -> Ok()
-                | Some work when work.PendingExecSessionId.IsSome ->
-                    Error "a different execution session is already bound to this delivery"
-                | _ -> Error original
-            with _ ->
-                Error original
+        | Error original -> rereadExecutionBinding gitCommonDir workId operationId execSessionId original
 
     let private receiptRefusal (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
         if receipt.Reason = "" then
@@ -254,6 +258,10 @@ module PlanTools =
 
             settledDelivery resolved digest path execSessionId
 
+    let private rejectedDelivery gitCommonDir workId operationId reason : Result<DeliverResult, string> =
+        refuseDelivery gitCommonDir workId operationId reason
+        |> Result.bind (fun () -> Error reason)
+
     let private discardBeforeReject
         (discardSession: string -> Task<Result<unit, string>>)
         (gitCommonDir: string)
@@ -267,14 +275,9 @@ module PlanTools =
             | Error cleanup ->
                 return
                     Error(
-                        sprintf
-                            "Execution prompt was refused, but its empty session could not be discarded: %s"
-                            cleanup
+                        sprintf "Execution prompt was refused, but its empty session could not be discarded: %s" cleanup
                     )
-            | Ok() ->
-                match refuseDelivery gitCommonDir workId operationId reason with
-                | Ok() -> return Error reason
-                | Error settlement -> return Error settlement
+            | Ok() -> return rejectedDelivery gitCommonDir workId operationId reason
         }
 
     let private promptBoundDelivery
@@ -292,16 +295,8 @@ module PlanTools =
         task {
             match! promptSession execSessionId "manager" content with
             | NotStarted err ->
-                return!
-                    discardBeforeReject
-                        discardSession
-                        gitCommonDir
-                        workId
-                        operationId
-                        execSessionId
-                        err
-            | Unknown err ->
-                return Error(sprintf "Execution session prompt outcome is unknown: %s" err)
+                return! discardBeforeReject discardSession gitCommonDir workId operationId execSessionId err
+            | Unknown err -> return Error(sprintf "Execution session prompt outcome is unknown: %s" err)
             | Started observedSession when observedSession <> execSessionId ->
                 return Error "Execution prompt returned a different session identity"
             | Started _ ->
@@ -329,28 +324,29 @@ module PlanTools =
         (content: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            match! createSession operationId "manager" with
+            let! created = createSession operationId "manager"
+
+            let bound =
+                created
+                |> Result.bind (fun sessionId ->
+                    bindObservedExecutionSession gitCommonDir workId operationId sessionId
+                    |> Result.map (fun () -> sessionId))
+
+            match bound with
             | Error reason -> return Error reason
             | Ok execSessionId ->
-                match bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
-                | Ok() ->
-                    return!
-                        promptBoundDelivery
-                            gitCommonDir
-                            workId
-                            operationId
-                            execSessionId
-                            digest
-                            path
-                            retirementBlockers
-                            promptSession
-                            discardSession
-                            content
-                | Error binding ->
-                    // The binding append can be acceptance-unknown. Do not
-                    // destroy a session that may already be durably named.
-                    // Recovery finds it by the operation title and reconciles.
-                    return Error binding
+                return!
+                    promptBoundDelivery
+                        gitCommonDir
+                        workId
+                        operationId
+                        execSessionId
+                        digest
+                        path
+                        retirementBlockers
+                        promptSession
+                        discardSession
+                        content
         }
 
     let private resolveDeliveryRequest
@@ -367,10 +363,7 @@ module PlanTools =
         : Task<Result<DeliverResult, string>> =
         task {
             match readAndValidatePlan root workId with
-            | Error err ->
-                match refuseDelivery gitCommonDir workId operationId err with
-                | Ok() -> return Error err
-                | Error settlement -> return Error settlement
+            | Error err -> return rejectedDelivery gitCommonDir workId operationId err
             | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
                 return!
                     createBindAndPrompt
@@ -386,9 +379,8 @@ module PlanTools =
                         content
             | Ok _ ->
                 let error = "Cannot deliver: plan artifact changed after delivery reservation"
-                match refuseDelivery gitCommonDir workId operationId error with
-                | Ok() -> return Error error
-                | Error settlement -> return Error settlement
+
+                return rejectedDelivery gitCommonDir workId operationId error
         }
 
     let private interpretDeliverReceipt
@@ -424,6 +416,7 @@ module PlanTools =
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
 
                 let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
+
                 return!
                     resolveDeliveryRequest
                         gitCommonDir
@@ -448,7 +441,8 @@ module PlanTools =
                             sprintf "Execution delivery remains pending; observe operation %s" operationId
                     )
             elif receipt.Kind = "ExecutionRejected" then
-                let reason = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "reason"
+                let reason =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "reason"
 
                 return
                     Error(
@@ -457,7 +451,11 @@ module PlanTools =
                         else
                             reason
                     )
-            elif receipt.Kind = "Relayed" || receipt.Kind = "Blocked" || receipt.Kind = "Delivered" then
+            elif
+                receipt.Kind = "Relayed"
+                || receipt.Kind = "Blocked"
+                || receipt.Kind = "Delivered"
+            then
                 return
                     Ok
                         { Ok = true
@@ -494,7 +492,9 @@ module PlanTools =
                 let authorized = work.DeliveryAuthorized
                 let requestId = providerRunId + ":" + toolCallId
                 let blockers = retirementBlockers ()
-                let draftFields = draftFieldsFor root workId (not (Array.isEmpty blockers)) authorized
+
+                let draftFields =
+                    draftFieldsFor root workId (not (Array.isEmpty blockers)) authorized
 
                 let command =
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
@@ -521,6 +521,16 @@ module PlanTools =
                         receipt
         }
 
+    let private pendingExecutionEvidence
+        (execSessionId: string)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        =
+        match work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath with
+        | Some operationId, Some boundSession, Some digest, Some path when boundSession = execSessionId ->
+            Ok(operationId, digest, path)
+        | Some _, None, _, _ -> Error "delivery session is not durably bound"
+        | _ -> Error "pending delivery evidence is incomplete"
+
     /// Crash reconciliation for a session that was durably bound before the
     /// process died. The Host supplies the exact observed first user prompt;
     /// this function verifies both session identity and plan bytes before
@@ -532,26 +542,18 @@ module PlanTools =
         (observedPrompt: string)
         (blockers: string array)
         : Result<DeliverResult, string> =
-        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
-        | None -> Error "lifecycle work is missing"
-        | Some work when not work.PendingDelivery -> Error "delivery operation is not pending"
-        | Some work ->
-            match
-                work.PendingOperationId,
-                work.PendingExecSessionId,
-                work.PendingDigest,
-                work.PendingPath
-            with
-            | Some operationId, Some boundSession, Some digest, Some path when boundSession = execSessionId ->
-                let observedDigest = HostDigest.sha256Hex observedPrompt
+        let evidence =
+            match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
+            | None -> Error "lifecycle work is missing"
+            | Some work when not work.PendingDelivery -> Error "delivery operation is not pending"
+            | Some work -> pendingExecutionEvidence execSessionId work
 
-                if observedDigest <> digest then
-                    Error "observed execution prompt does not match the reserved plan digest"
-                else
-                    settleAcceptedDelivery gitCommonDir workId operationId execSessionId digest path blockers
-            | Some _, Some _, _, _ -> Error "pending delivery evidence is incomplete"
-            | Some _, None, _, _ -> Error "delivery session is not durably bound"
-            | _ -> Error "pending delivery evidence is incomplete"
+        evidence
+        |> Result.bind (fun (operationId, digest, path) ->
+            if HostDigest.sha256Hex observedPrompt <> digest then
+                Error "observed execution prompt does not match the reserved plan digest"
+            else
+                settleAcceptedDelivery gitCommonDir workId operationId execSessionId digest path blockers)
 
     // planning-010: at most one pending ask delegation per work. The tracker
     // is process-local memory — crash recovery has no hanging ask state

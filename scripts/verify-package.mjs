@@ -489,6 +489,15 @@ export async function runExternalConsumer({
   // npm ci as well. Copy only the exact tracked artifact, never the sibling
   // source repository.
   const rootPackage = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package.json'), 'utf8'))
+  const rootLock = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package-lock.json'), 'utf8'))
+  const lifecycleVersion = rootLock.packages?.['node_modules/wanxiangli']?.version
+  if (typeof lifecycleVersion !== 'string' || lifecycleVersion.length === 0) {
+    throw createVerificationError(
+      'consumer-lifecycle-version-missing',
+      'package-lock.json',
+      'The external consumer requires an exact locked wanxiangli version',
+    )
+  }
   for (const specifier of Object.values(rootPackage.dependencies ?? {})) {
     if (typeof specifier !== 'string' || !specifier.startsWith('file:')) continue
     const relative = specifier.slice('file:'.length)
@@ -609,7 +618,7 @@ export async function runExternalConsumer({
     assert.ok(fs.existsSync(zhLaw), 'resources/provider/world/common-law/zh-CN.md missing in consumed package');
     assert.ok(fs.existsSync(roleEn), 'resources/provider/role/manager/en.md missing in consumed package');
     assert.ok(fs.existsSync(lifecycleDependency), 'bundled wanxiangli dependency missing in consumed package');
-    assert.equal(JSON.parse(fs.readFileSync(lifecycleDependency, 'utf8')).version, '0.5.1');
+    assert.equal(JSON.parse(fs.readFileSync(lifecycleDependency, 'utf8')).version, ${JSON.stringify(lifecycleVersion)});
 
     assert.ok(fs.readFileSync(enLaw, 'utf8').trim().length > 0, 'en common law is empty');
     assert.ok(fs.readFileSync(zhLaw, 'utf8').trim().length > 0, 'zh common law is empty');

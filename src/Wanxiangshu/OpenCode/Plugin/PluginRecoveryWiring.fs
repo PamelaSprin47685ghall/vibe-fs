@@ -15,6 +15,13 @@ open Wanxiangshu.Persistence.Journal
 
 module PluginRecoveryWiring =
 
+    let private inspectRecoveryWork gitCommonDir workId =
+        try
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+        with error ->
+            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", error.Message ]
+            None
+
     let private isFlightActive
         (bloggerHost: IBloggerRuntimeHost)
         (bloggerSessionId: SessionId)
@@ -56,12 +63,9 @@ module PluginRecoveryWiring =
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
             let workId = SessionId.value sessionId
 
-            let _recovery =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.recover gitCommonDir workId
-
             let target =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
-                |> Option.bind (fun work -> work.DevOpsId)
+                inspectRecoveryWork gitCommonDir workId
+                |> Option.bind (fun work -> work.DevOpsTarget)
                 |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
 
             let child =
@@ -74,8 +78,7 @@ module PluginRecoveryWiring =
     let private firstUserPrompt (messages: SessionMessage list) : string option =
         messages
         |> List.tryFind (fun message -> message.Role = "user")
-        |> Option.map (fun message ->
-            Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.partsText message.Parts)
+        |> Option.map (fun message -> Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.partsText message.Parts)
         |> Option.filter (fun text -> not (String.IsNullOrEmpty text))
 
     let private observeBoundDelivery
@@ -86,40 +89,64 @@ module PluginRecoveryWiring =
         (retirementBlockers: string -> string array)
         : Task =
         task {
-            match! snapshots.GetMessages(SessionId.create execSessionId) with
-            | Ok messages ->
-                match firstUserPrompt messages with
-                | None ->
-                    Diagnostic.emit
-                        "plan-delivery-recovery-pending"
-                        [ "work_id", workId
-                          "exec_session_id", execSessionId
-                          "reason", "bound session has no observed user prompt" ]
-                | Some prompt ->
-                    match
-                        Wanxiangshu.Mission.Planning.PlanTools.reconcileBoundExecution
-                            gitCommonDir
-                            workId
-                            execSessionId
-                            prompt
-                            (retirementBlockers workId)
-                    with
-                    | Ok _ ->
-                        Diagnostic.emit
-                            "plan-delivery-recovery-settled"
-                            [ "work_id", workId; "exec_session_id", execSessionId ]
-                    | Error reason ->
-                        Diagnostic.emit
-                            "plan-delivery-recovery-refused"
-                            [ "work_id", workId
-                              "exec_session_id", execSessionId
-                              "reason", reason ]
+            let! observed = snapshots.GetMessages(SessionId.create execSessionId)
+
+            let settled =
+                observed
+                |> Result.mapError (fun reason -> "observation-failed", reason)
+                |> Result.bind (fun messages ->
+                    firstUserPrompt messages
+                    |> Option.map Ok
+                    |> Option.defaultValue (Error("pending", "bound session has no observed user prompt")))
+                |> Result.bind (fun prompt ->
+                    Wanxiangshu.Mission.Planning.PlanTools.reconcileBoundExecution
+                        gitCommonDir
+                        workId
+                        execSessionId
+                        prompt
+                        (retirementBlockers workId)
+                    |> Result.mapError (fun reason -> "refused", reason))
+
+            match settled with
+            | Ok _ ->
+                Diagnostic.emit "plan-delivery-recovery-settled" [ "work_id", workId; "exec_session_id", execSessionId ]
+            | Error(kind, reason) ->
+                Diagnostic.emit
+                    ("plan-delivery-recovery-" + kind)
+                    [ "work_id", workId; "exec_session_id", execSessionId; "reason", reason ]
+        }
+
+    let private observeAvailableDelivery gitCommonDir workId execSessionId snapshots retirementBlockers : Task =
+        match snapshots with
+        | Some snapshot -> observeBoundDelivery gitCommonDir workId execSessionId snapshot retirementBlockers
+        | None ->
+            Diagnostic.emit "plan-delivery-recovery-no-snapshot" [ "work_id", workId; "exec_session_id", execSessionId ]
+            Task.FromResult(()) :> Task
+
+    let private bindDiscoveredDelivery
+        gitCommonDir
+        workId
+        operationId
+        execSessionId
+        snapshots
+        retirementBlockers
+        : Task =
+        task {
+            match
+                Wanxiangshu.Mission.Planning.PlanTools.bindObservedExecutionSession
+                    gitCommonDir
+                    workId
+                    operationId
+                    execSessionId
+            with
             | Error reason ->
                 Diagnostic.emit
-                    "plan-delivery-recovery-observation-failed"
+                    "plan-delivery-recovery-bind-refused"
                     [ "work_id", workId
+                      "operation_id", operationId
                       "exec_session_id", execSessionId
                       "reason", reason ]
+            | Ok() -> do! observeAvailableDelivery gitCommonDir workId execSessionId snapshots retirementBlockers
         }
 
     let private discoverUnboundDelivery
@@ -146,35 +173,49 @@ module PluginRecoveryWiring =
                       "reason", "no exact Host session is currently observable" ]
             | Ok [ sessionId ] ->
                 let execSessionId = SessionId.value sessionId
-
-                match
-                    Wanxiangshu.Mission.Planning.PlanTools.bindObservedExecutionSession
-                        gitCommonDir
-                        workId
-                        operationId
-                        execSessionId
-                with
-                | Error reason ->
-                    Diagnostic.emit
-                        "plan-delivery-recovery-bind-refused"
-                        [ "work_id", workId
-                          "operation_id", operationId
-                          "exec_session_id", execSessionId
-                          "reason", reason ]
-                | Ok() ->
-                    match snapshots with
-                    | Some snapshot ->
-                        do! observeBoundDelivery gitCommonDir workId execSessionId snapshot retirementBlockers
-                    | None ->
-                        Diagnostic.emit
-                            "plan-delivery-recovery-no-snapshot"
-                            [ "work_id", workId; "exec_session_id", execSessionId ]
+                do! bindDiscoveredDelivery gitCommonDir workId operationId execSessionId snapshots retirementBlockers
             | Ok sessions ->
                 Diagnostic.emit
                     "plan-delivery-recovery-ambiguous"
                     [ "work_id", workId
                       "operation_id", operationId
                       "matches", string sessions.Length ]
+        }
+
+    let private reconcilePendingWork
+        gitCommonDir
+        workId
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        snapshotPort
+        discoveryPort
+        retirementBlockers
+        : Task =
+        task {
+            match work.PendingExecSessionId, work.PendingOperationId, discoveryPort with
+            | Some execSessionId, _, _ ->
+                do! observeAvailableDelivery gitCommonDir workId execSessionId snapshotPort retirementBlockers
+            | None, Some operationId, Some discovery ->
+                do! discoverUnboundDelivery gitCommonDir workId operationId snapshotPort discovery retirementBlockers
+            | None, Some operationId, None ->
+                Diagnostic.emit "plan-delivery-recovery-no-discovery" [ "work_id", workId; "operation_id", operationId ]
+            | None, None, _ ->
+                Diagnostic.emit
+                    "plan-delivery-recovery-unbound"
+                    [ "work_id", workId; "reason", "pending delivery has no operation identity" ]
+        }
+
+    let private reconcileDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers : Task =
+        match inspectRecoveryWork gitCommonDir workId with
+        | Some work when work.PendingDelivery ->
+            reconcilePendingWork gitCommonDir workId work snapshotPort discoveryPort retirementBlockers
+        | _ -> Task.FromResult(()) :> Task
+
+    let private recoverDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers : Task =
+        task {
+            try
+                do! reconcileDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers
+            with error ->
+                Diagnostic.emit "plan-delivery-recovery-failed" [ "work_id", workId; "reason", error.Message ]
         }
 
     /// A delivery session is bound durably before its first prompt is sent.
@@ -195,47 +236,17 @@ module PluginRecoveryWiring =
                 |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
                 |> Option.defaultValue ""
 
-            if String.IsNullOrWhiteSpace gitCommonDir then
-                ()
-            else
-                let sessions =
+            let sessions =
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    [||]
+                else
                     (AgentJournal.snapshot journal).AgentProjections.Sessions
                     |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
                     |> Seq.distinct
                     |> Seq.toArray
 
-                for workId in sessions do
-                    match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
-                    | Some work when work.PendingDelivery ->
-                        match work.PendingExecSessionId, snapshotPort with
-                        | Some execSessionId, Some snapshots ->
-                            do! observeBoundDelivery gitCommonDir workId execSessionId snapshots retirementBlockers
-                        | None, _ ->
-                            match work.PendingOperationId, discoveryPort with
-                            | Some operationId, Some discovery ->
-                                do!
-                                    discoverUnboundDelivery
-                                        gitCommonDir
-                                        workId
-                                        operationId
-                                        snapshotPort
-                                        discovery
-                                        retirementBlockers
-                            | Some operationId, None ->
-                                Diagnostic.emit
-                                    "plan-delivery-recovery-no-discovery"
-                                    [ "work_id", workId; "operation_id", operationId ]
-                            | None, _ ->
-                                Diagnostic.emit
-                                    "plan-delivery-recovery-unbound"
-                                    [ "work_id", workId
-                                      "reason", "pending delivery has no operation identity" ]
-                        | Some execSessionId, None ->
-                            Diagnostic.emit
-                                "plan-delivery-recovery-no-snapshot"
-                                [ "work_id", workId
-                                  "exec_session_id", execSessionId ]
-                    | _ -> ()
+            for workId in sessions do
+                do! recoverDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers
         }
 
     let private readExistingFile (fullPath: string) : string option =
@@ -254,7 +265,9 @@ module PluginRecoveryWiring =
         let scope = boot.Scope
         let snapshotPort = SessionSnapshotPort.create boot.Input
         let discoveryPort = SessionSnapshotPort.createDiscovery boot.Input
-        let retirementBlockers sessionId = scope.RetirementBlockersFor sessionId |> List.toArray
+
+        let retirementBlockers sessionId =
+            scope.RetirementBlockersFor sessionId |> List.toArray
 
         // Restart dropped the process-local execution bindings; the durable
         // handle records are the evidence for which parented children a road
@@ -310,6 +323,7 @@ module PluginRecoveryWiring =
                     | Some journal ->
                         do! ChildWorkRecovery.settleOrphanedChildRuns journal
                         do! settleAbandonedStaleBloggerSessions journal
+
                         do!
                             reconcilePendingDeliveries
                                 journal

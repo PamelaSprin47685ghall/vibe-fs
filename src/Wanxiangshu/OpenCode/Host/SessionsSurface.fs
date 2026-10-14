@@ -15,6 +15,28 @@ open Wanxiangshu.Participant.Provider
 /// return JSON observations and keep transport capabilities private.
 module SessionsSurface =
 
+    let private discoveryView (result: Result<SessionId list, string>) : obj =
+        match result with
+        | Ok sessions ->
+            box
+                {| ok = true
+                   sessions = sessions |> List.map SessionId.value |> List.toArray
+                   error = null |}
+        | Error reason ->
+            box
+                {| ok = false
+                   sessions = ([||]: string array)
+                   error = reason |}
+
+    let observeDeliveryDiscovery (input: obj) (title: string) : Task<obj> =
+        match SessionSnapshotPort.createDiscovery input with
+        | None -> Task.FromResult(discoveryView (Error "Session discovery is unavailable"))
+        | Some discovery ->
+            task {
+                let! result = discovery.FindRootSessionsByTitle title
+                return discoveryView result
+            }
+
     let private text (value: obj) =
         if isNull value then "" else string value
 

@@ -27,6 +27,9 @@ module DurableWorkHost =
     [<Import("DurableWork", "wanxiangli/durable-work")>]
     let private DurableWork: obj = jsNative
 
+    [<Import("Work", "wanxiangli/work")>]
+    let private Work: obj = jsNative
+
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) (options: obj) : unit = jsNative
 
@@ -224,6 +227,7 @@ module DurableWorkHost =
           RoundCount: int
           RetiredRuns: string list
           DevOpsId: string option
+          DevOpsTarget: string option
           Authority: string
           Confirmed: bool
           BlockerDigest: string option
@@ -376,6 +380,10 @@ module DurableWorkHost =
           RoundCount = rounds.Length
           RetiredRuns = retirements |> Array.choose retiredRunOf |> Array.toList
           DevOpsId = optionalText (textOf snapshot?devopsId)
+          DevOpsTarget =
+            eventsOfType "DevOpsBound" history
+            |> Array.tryLast
+            |> Option.bind (fun event -> optionalText (textOf event?target))
           Authority = textOf snapshot?authority
           Confirmed = confirmedOf active
           BlockerDigest = blockerDigestOf activeId history
@@ -389,8 +397,10 @@ module DurableWorkHost =
             |> Array.toList }
 
     let private inspectedJournal (gitCommonDir: string) (workId: string) : InspectedWork option =
-        // One open, one close for the snapshot and the history it needs.
-        useWork gitCommonDir workId (fun work ->
+        // Read once. Snapshot and history must describe the same revision.
+        useWork gitCommonDir workId (fun durable ->
+            let records: string array = durable?records ()
+            let work: obj = createNew Work (workId, records)
             let snapshot: obj = work?inspect ()
 
             if unbox<bool> snapshot?opened then
@@ -406,16 +416,15 @@ module DurableWorkHost =
             inspectedJournal gitCommonDir workId
 
     let private openingFailure (receipt: HostReceipt) =
-        if receipt.Reason = "" then receipt.Status else receipt.Reason
+        if receipt.Reason = "" then
+            receipt.Status
+        else
+            receipt.Reason
 
     let private expectedSequence (value: obj) =
         asArray value |> Array.toList |> List.map text
 
-    let private matchingOpening
-        (root: string)
-        (sequence: obj)
-        (work: InspectedWork)
-        : Result<InspectedWork, string> =
+    let private matchingOpening (root: string) (sequence: obj) (work: InspectedWork) : Result<InspectedWork, string> =
         let expected = expectedSequence sequence
 
         if work.Sequence <> expected then
@@ -440,9 +449,7 @@ module DurableWorkHost =
         let readExisting () =
             inspected gitCommonDir workId |> Option.map (matchingOpening root sequence)
 
-        match readExisting () with
-        | Some result -> result
-        | None ->
+        let openMissing () =
             let issued =
                 command
                     "Open"
@@ -457,11 +464,12 @@ module DurableWorkHost =
             | "Committed"
             | "Replayed"
             | "Conflict"
-            | "Unknown" ->
-                match readExisting () with
-                | Some result -> result
-                | None -> Error(openingFailure receipt)
+            | "Unknown" -> readExisting () |> Option.defaultValue (Error(openingFailure receipt))
             | _ -> Error(openingFailure receipt)
+
+        match readExisting () with
+        | Some result -> result
+        | None -> openMissing ()
 
     let recover (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?recover ())

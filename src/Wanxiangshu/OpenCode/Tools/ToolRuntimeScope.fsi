@@ -119,8 +119,7 @@ type ToolRuntimeScope =
 
     /// planning-023: create a parentless execution container. The caller must
     /// durably bind the returned SessionId before sending its first prompt.
-    member CreateExecutionSession:
-        operationId: string * agent: string -> Task<Result<string, string>>
+    member CreateExecutionSession: operationId: string * agent: string -> Task<Result<string, string>>
 
     member PromptExecutionSession:
         execSessionId: string * agent: string * prompt: string ->

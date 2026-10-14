@@ -457,11 +457,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             Error(sprintf "active incumbency %s does not own the current authority" id)
         | Some id, true, _ -> Ok id
 
-    let acquireLifecycleStore (commonDir: string) =
-        match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir with
-        | Some held -> held
-        | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
-
     let advanceReceiptOutcome
         (directory: string)
         (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
@@ -485,8 +480,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (expected: string)
         (next: string)
         : Result<string, string> =
-        acquireLifecycleStore commonDir |> ignore
-
         match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir workId with
         | None -> Error "lifecycle work is missing"
         | Some seen when String.IsNullOrEmpty seen.Authority -> Error "expected advance is missing"

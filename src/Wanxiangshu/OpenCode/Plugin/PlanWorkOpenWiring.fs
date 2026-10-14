@@ -15,11 +15,7 @@ module PlanWorkOpenWiring =
         : Task<unit> =
         task {
             match!
-                Wanxiangshu.Mission.Planning.PlanWorkOpen.ensurePlanWorkOpened
-                    gitCommonDir
-                    root
-                    sid
-                    observedHead
+                Wanxiangshu.Mission.Planning.PlanWorkOpen.ensurePlanWorkOpened gitCommonDir root sid observedHead
             with
             | Ok() -> ()
             | Error err ->
