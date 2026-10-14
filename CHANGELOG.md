@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — Fission lane 执行接纳修复（现场停摆根因）
+
+- 现场症状：`fission` 开出七条 lane 后立刻全部停住，Manager 的 `join` 永久挂起。日志每条 lane 都是 `HOST-BOUNDARY-008: provider attempt plan freeze failed (accepted-execution-missing)`。
+- 根因：`PromptDispatcher.AcceptManagedChatIntent` 用 authority profile 的 `SessionId` 而不是本次 intent key 的 session 去写 `ChatExecution.Accepted`。对普通 child 两者相同所以一直没暴露；对 Fission lane，profile 是 logical owner 的，于是 accepted execution 记在 owner 名下，而 lane 自己的 transform 按 `(laneSessionId, physical)` 查表必然落空。
+- 修复：`PromptAuthority.withSessionId` 把已接受证据重新绑定到本次 intent 的 session。`Dispatcher.AcceptManagedChatIntent` 的 `accept` 现在接收 intent key 的 session；`AgentJournalPortAdapter.forWire` 把 `activeProfile` 投给当前 session。`SyncDelegateRuntime.issueCurrentOwnerIdentitySeed` 由自带的重复实现改为复用 `PromptAuthorityProjectionQueries.issueCurrentOwnerIdentitySeed`，lane 因此也能为 fork 子会话签发继承身份。
+- 回归：新增 `requirements/intra-participant-parallelism/tests/003.test.mjs` 的真实注册插件用例——真 `fork` 建立 Engineer，再 `fission` 两条 lane，逐条断言 `ChatExecution` 处于该 lane 自己的 `accepted ∧ providerStarted` 且 transform 不再以 `AcceptedExecutionMissing` 拒绝。修复前该用例红，修复后绿；证据已存档。
+- 证据：`node scripts/build.mjs` 绿（generation 240）；intra-participant-parallelism + interaction-authority + managed-chat-execution + managed-session-lifecycle + provider-attempt-recovery 共 536 项 0 failed；work 套件 127 项 0 failed（`WANXIANGSHU_PROVIDER_LANGUAGE=en`）。
+
 ## Unreleased — 生命周期统一：Plan 与 Manager 收成一条内核
 
 - `Mission/Lifecycle/`（Facts/Fold/Codec/Kernel/Surface）成为唯一生命周期内核：开立、绑定、评审、一段式与两段式 deliver、恢复位置、重开、权威推进都走这一套事件（`WorkOpened`/`DevOpsBound`/`IncumbencyOpened`/`ConfirmationCommitted`/`IncumbencyRetired`/`Reviewed`/`Reopened`/`AdvanceCommitted`/`RetirementBlocked`），结果名只有 `Relayed` 与 `Delivered`，评审结果只有 `Promoted` 与 `Stayed`。序列写在 `WorkOpened`：S1–S3 为 Plan，S4 为 Manager；确认次数由序列导出。

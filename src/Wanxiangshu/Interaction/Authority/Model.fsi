@@ -34,6 +34,8 @@ module PromptAuthority =
         member PersonaCatalogVersion: int
         member PersonaOrigin: PersonaOrigin
 
+    val withSessionId: sessionId: SessionId -> profile: AuthorityExecutionProfile -> AuthorityExecutionProfile
+
     val identitySeedParticipantIdentity: (IdentitySeed -> ParticipantIdentityEvidence)
     val identitySeedOwner: (IdentitySeed -> (SessionId * LogicalRunId * AuthorityRootUserMessageId) option)
 

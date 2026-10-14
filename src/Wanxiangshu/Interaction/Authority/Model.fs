@@ -57,6 +57,10 @@ module PromptAuthority =
 
         member this.PersonaOrigin = ParticipantIdentity.origin this.ParticipantIdentity
 
+    let withSessionId (sessionId: SessionId) (profile: AuthorityExecutionProfile) : AuthorityExecutionProfile =
+        { profile with
+            StoredSessionId = sessionId }
+
     let identitySeedParticipantIdentity = PromptIdentitySeed.participantIdentity
 
     let identitySeedOwner = PromptIdentitySeed.owner

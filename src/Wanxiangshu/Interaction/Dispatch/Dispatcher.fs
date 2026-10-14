@@ -405,9 +405,12 @@ module PromptDispatcher =
         member this.AcceptManagedChatIntent
             (intent: ChatAdmissionIntent.Decision)
             : Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>> =
-            let accept profile physicalMessageId origin =
+            let accept sessionId profile physicalMessageId origin =
                 let evidence =
-                    ManagedChatAcceptance.evidenceFromIntent profile physicalMessageId origin
+                    ManagedChatAcceptance.evidenceFromIntent
+                        (PromptAuthority.withSessionId sessionId profile)
+                        physicalMessageId
+                        origin
 
                 ManagedChatAcceptance.acceptWith
                     (journal.ChatAcceptancePersistence())
@@ -434,10 +437,10 @@ module PromptDispatcher =
             | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptExternalManagedRoot evidence
-                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
+                    return! accept evidence.Key.SessionId profile evidence.Key.PhysicalUserMessageId evidence.Origin
                 }
             | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
+                accept evidence.Key.SessionId evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
             | ChatAdmissionIntent.Decision.AcceptedInputIntent evidence -> acceptEstablishedInput evidence
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
@@ -447,7 +450,9 @@ module PromptDispatcher =
                         this.RequireActiveProfile evidence.Key.SessionId profile
                         |> Result.mapError ManagedChatAcceptanceError.IntentRejected
 
-                    let! witness = accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
+                    let! witness =
+                        accept evidence.Key.SessionId profile evidence.Key.PhysicalUserMessageId evidence.Origin
+
                     PromptPhysicalAcceptance.accepted evidence.PromptKey evidence.Key.PhysicalUserMessageId
                     return witness
                 }

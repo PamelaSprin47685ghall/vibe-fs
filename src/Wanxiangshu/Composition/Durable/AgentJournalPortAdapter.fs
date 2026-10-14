@@ -151,6 +151,7 @@ module AgentJournalPortAdapter =
 
                 let activeProf =
                     PromptAuthorityProjectionQueries.activeProfile sessionId projections
+                    |> Option.map (PromptAuthority.withSessionId sessionId)
 
                 let failState = sessionProj |> Option.bind (fun session -> session.ProviderFailures)
 
