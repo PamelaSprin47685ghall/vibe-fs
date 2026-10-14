@@ -124,8 +124,7 @@ module DeliverTool =
             match messagesResult with
             | Error _ -> return None
             | Ok messages ->
-                let! captured =
-                    XTraceCapture.captureSessionMessagesWithReceipt (Some journal) sessionId messages
+                let! captured = XTraceCapture.captureSessionMessagesWithReceipt (Some journal) sessionId messages
 
                 return
                     captured
@@ -144,8 +143,7 @@ module DeliverTool =
         match current, scope.Snapshot with
         | Some cursor, _ -> Task.FromResult(Some cursor)
         | None, None -> Task.FromResult None
-        | None, Some snapshotPort ->
-            captureObservedCursor journal (SessionId.create context.SessionId) snapshotPort
+        | None, Some snapshotPort -> captureObservedCursor journal (SessionId.create context.SessionId) snapshotPort
 
     type private BoundRetirement =
         { ToolCallId: ToolCallId

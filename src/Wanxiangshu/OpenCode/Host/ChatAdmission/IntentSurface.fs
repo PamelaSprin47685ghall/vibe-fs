@@ -146,7 +146,8 @@ module ChatAdmissionIntentSurface =
             requiredString "landing.physicalUserMessageId" value?physicalUserMessageId
             |> PhysicalUserMessageId.create
 
-        let promptKey = requiredString "landing.promptKey" value?promptKey |> PromptKey.create
+        let promptKey =
+            requiredString "landing.promptKey" value?promptKey |> PromptKey.create
 
         let participant =
             optionalString value?participant

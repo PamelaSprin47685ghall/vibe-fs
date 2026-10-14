@@ -124,10 +124,7 @@ module PromptFactFold =
             active.LogicalRunId = payload.LogicalRunId
             && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
             ->
-            PromptAuthorityRun.closeAuthority
-                payload.LogicalRunId
-                payload.AuthorityRootUserMessageId
-                currentAuthority
+            PromptAuthorityRun.closeAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId currentAuthority
             |> Result.map (fun closed ->
                 [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ])
             |> Result.mapError PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
@@ -197,5 +194,4 @@ module PromptFactFold =
 
         // ── closure ─────────────────────────────────────────────────────────
 
-        | PromptFactCases.AuthorityLogicalRunClosed payload ->
-            foldAuthorityLogicalRunClosed authorityOf payload
+        | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed authorityOf payload

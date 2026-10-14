@@ -220,8 +220,7 @@ module ChatAdmissionIntent =
         // has no continuation mapping and no pending claim left, so without
         // this evidence the replay would be refused as unclaimed.
         match accepted, landed, pending, isHostInternal message with
-        | Some continuation, _, _, _ ->
-            KnownEvidence.Accepted(PromptAuthority.PromptOrigin.Continuation continuation)
+        | Some continuation, _, _, _ -> KnownEvidence.Accepted(PromptAuthority.PromptOrigin.Continuation continuation)
         | None, Some landing, _, _ -> KnownEvidence.Accepted landing.Origin
         | None, None, Some claim, _ -> KnownEvidence.Pending claim
         | None, None, None, true -> KnownEvidence.HostInternal

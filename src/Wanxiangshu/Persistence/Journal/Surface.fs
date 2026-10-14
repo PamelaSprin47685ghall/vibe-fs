@@ -462,11 +462,7 @@ module JournalSurface =
     /// owner. A missing shared entry refuses instead of creating a second
     /// writer; an already-closed projection is a no-op, so repeated transforms
     /// stay idempotent.
-    let appendAuthorityLogicalRunClosed
-        (commonDir: string)
-        (sessionId: string)
-        (retirementId: string)
-        : Task<unit> =
+    let appendAuthorityLogicalRunClosed (commonDir: string) (sessionId: string) (retirementId: string) : Task<unit> =
         task {
             let session = SessionId.create sessionId
 
@@ -487,8 +483,7 @@ module JournalSurface =
                     refuseMissingEntry
 
             match acquired with
-            | Error error ->
-                return failwith ("authority closure refused: " + error.Fact + ": " + error.Reason)
+            | Error error -> return failwith ("authority closure refused: " + error.Fact + ": " + error.Reason)
             | Ok journal ->
                 // The acquire above takes one share of the ref-counted shared entry; the
                 // finally below returns it. After the last holder releases, a later closure
