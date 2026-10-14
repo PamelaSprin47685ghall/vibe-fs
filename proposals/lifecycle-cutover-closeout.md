@@ -46,7 +46,9 @@ Manager 的 opening root 来自 Git 确认的实际工作树根，不来自插�
 
 一次完整复跑出现 `Unable to deserialize cloned data`，四个用例未完成。没有把该轮计为完整通过。
 
-新增真实嵌套 node:test 反例，让子进程输出类似 V8 协议头的二进制字节，稳定复现同一错误。监督器原来继承 stdout/stderr，允许子输出直接进入外层测试协议流。现在以管道接收，经增量 UTF-8 解码后由父进程转发；IPC 仍是唯一权威结果通道。
+新增真实嵌套 node:test 反例，让子进程输出类似 V8 协议头的二进制字节，稳定复现同一错误。监督器原来继承 stdout/stderr，允许子输出直接进入外层测试协议流。管道与增量 UTF-8 解码解决了原始协议头字节，但提交后的复跑仍发现一次外层结果流损坏：5035 项通过、1 个失败容器，该轮不计完整通过。
+
+进一步收紧边界：在 node:test worker 内，子进程诊断全部转发到 stderr，stdout 留给原生结果协议；普通 CLI 不改变两个输出通道。反例另检查纯文本诊断也不能直接写入外层 stdout，先观察到失败，再修复。IPC 仍是唯一权威结果通道。
 
 反例由红转绿；合法跨块中文和 emoji 保留。非法 UTF-8 可显示替换字符，诊断文本不冒充二进制存档。`verification-system-021` 全部 19 项通过，最终全量复跑无失败容器。没有改变 verdict、TODO、skip、取消或文件收尾的判定规则。
 
@@ -62,13 +64,13 @@ Manager 的 opening root 来自 Git 确认的实际工作树根，不来自插�
 | 最终候选完整 integration suites | 767 通过、0 失败，44/44 文件完成；21 skip、14 TODO，仍拒绝完整接受 |
 | integration 的 package 子组 | 3 通过、0 失败，1 既有 TODO，仍拒绝完整接受 |
 | integration 的 harness 子组 | 290 通过、0 失败 |
-| 最终候选实际 pack/extract/isolated consumer | 通过；generation 51，2069 个成员、12,980,151 解包字节 |
+| 最终候选实际 pack/extract/isolated consumer | 通过；2069 个成员、12,980,151 解包字节 |
 
 上表各项均已取得最终回执。verify 在 unit 的待证明门禁处停止，因此 integration 与 pack 另行完整执行，不能据此把整个 verify 标成通过。不同层的用例有重叠，不将这些数字加成一个覆盖率。
 
-实际产物为 `.fable-build/verify-logs/package/wanxiangshu-0.9.0.tgz`，SHA-256 为 `92e5a4159c4d43744ca03d5182e3d7863aa67c3baf84fd1824790c7b487f63b5`。收尾构建新鲜度检查通过，generation 51 的 1813 个源输入、891 个构建产物与工作区一致。
+实际产物为 `.fable-build/verify-logs/package/wanxiangshu-0.9.0.tgz`，SHA-256 为 `92e5a4159c4d43744ca03d5182e3d7863aa67c3baf84fd1824790c7b487f63b5`。收尾构建新鲜度检查覆盖 1813 个源输入、891 个构建产物。文档首次纳入 Git 时会进入仓库语料输入集合，必须重建并核对当前指纹，不能沿用新增跟踪文件之前的 manifest。
 
-固定验收日志：`.fable-build/verify-logs/2026-10-14T23-26-53-455Z/`。
+固定验收每次单独保存于 `.fable-build/verify-logs/` 的时间戳目录，完整终端回执见下列日志；监督器的通道隔离还通过实际 scoped runner 完成了 19 项验证。
 
 完整命令：
 
@@ -86,6 +88,7 @@ node scripts/verify-package.mjs
 /tmp/lifecycle-cutover-closeout-package-final.log
 /tmp/lifecycle-cutover-final-library.log
 /tmp/lifecycle-cutover-nested-output-regression.log
+/tmp/lifecycle-cutover-supervisor-channel-proof.log
 ```
 
 ## 合并边界

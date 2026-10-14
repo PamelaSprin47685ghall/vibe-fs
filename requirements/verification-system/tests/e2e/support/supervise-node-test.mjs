@@ -375,7 +375,9 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     // node:test result stream. Only IPC carries authoritative verdicts.
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    child.stdout.pipe(process.stdout, { end: false })
+    // In a test worker, stdout belongs to its native result protocol.
+    const diagnostics = process.env.NODE_TEST_CONTEXT ? process.stderr : process.stdout
+    child.stdout.pipe(diagnostics, { end: false })
     child.stderr.pipe(process.stderr, { end: false })
   } catch (error) {
     watchdog.stop()

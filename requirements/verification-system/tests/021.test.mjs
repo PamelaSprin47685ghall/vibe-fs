@@ -385,10 +385,21 @@ import { superviseNodeTest } from ${JSON.stringify(supervisorUrl)}
 test('nested output stays observable', async () => {
   const env = { ...process.env }
   delete env.NODE_TEST_CONTEXT
-  await assert.rejects(superviseNodeTest({
-    files: [${JSON.stringify(fixture)}], inner: ${JSON.stringify(inner)},
-    env, label: 'nested-output', silenceMs: 10000, throwOnFailure: true,
-  }), /supervised suite failed/)
+  const write = process.stdout.write
+  let rawDiagnostics = 0
+  process.stdout.write = function(chunk, ...args) {
+    if (typeof chunk === 'string' && chunk.includes('NESTED_STDOUT')) rawDiagnostics += 1
+    return write.call(this, chunk, ...args)
+  }
+  try {
+    await assert.rejects(superviseNodeTest({
+      files: [${JSON.stringify(fixture)}], inner: ${JSON.stringify(inner)},
+      env, label: 'nested-output', silenceMs: 10000, throwOnFailure: true,
+    }), /supervised suite failed/)
+  } finally {
+    process.stdout.write = write
+  }
+  assert.equal(rawDiagnostics, 0, 'nested diagnostics must not enter the outer result channel')
 })
 `)
     const child = spawn(process.execPath, ['--test', outer], {
