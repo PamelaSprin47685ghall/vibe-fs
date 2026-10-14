@@ -4,7 +4,7 @@
 
 ## [001] 词表
 
-生命周期事件只有这一套：WorkOpened、DevOpsBound、IncumbencyOpened、ConfirmationCommitted、IncumbencyRetired、Reviewed、Reopened、AdvanceCommitted、RetirementBlocked。TenureReanchored 仍属前缀 epoch，不是本词表的第二套生命周期事件。
+生命周期事实只有这一套：WorkOpened、DevOpsBound、IncumbencyOpened、ConfirmationCommitted、IncumbencyRetired、Reviewed、Reopened、AdvanceCommitted、RetirementBlocked、DeliveryRequested、DeliverySessionBound、DeliveryRejected。TenureReanchored 仍属前缀 epoch，不是本词表的第二套生命周期事实。
 
 - 允许后果：事件名不带 Plan 前缀，也不带 Road 前缀。结果名只在 Relayed 与 Delivered 中取值。评审结果只在 Promoted 与 Stayed 中取值。结束动作的注册名是 deliver。
 - 禁止后果：不得签发、携带、失效或重放 QualityCertificate。事件与退休结果不得含 snapshotId，不得使用 WorkspaceSnapshot 这个类型名。不得把 suicide 注册为结束工具，也不得把它留成仍可用的别名。不得把 Road、iteration、assessment、certificate 当作现行词。不得把 Continue 或 Accepted 留成结果名。不得把旧日志翻译进新事件；旧字节不是输入。
@@ -34,13 +34,13 @@ Reviewed 的载荷只含 incumbencyId、stage、outcome。outcome 只是 Promote
 - 禁止后果：不得把本条收成「没有评审就拒绝一切工具」。不得在尚未 review 时写源码，也不得向固定 DevOps 派工。sequence 为 S4 时，尚未 review 且尚无确认的 deliver 不得写入 ConfirmationCommitted，也不得退休；返回已完成未退休，assessment_required 为真，零写。
 - 失败后果：越界写入或派工被拒绝，原状态不变。
 
-## [005] 一段 deliver
+## [005] Plan deliver 无确认阶段
 
-sequence 为 S1、S2、S3 时，deliver 是一次调用结束。本算法不写 ConfirmationCommitted。
+sequence 为 S1、S2、S3 时，deliver 不使用 ConfirmationCommitted。无权路径在本次调用内接力退休；持权路径在本次调用内先持久预留外部执行，最终退休由该 operation 的外部观察结算，不要求模型再发第二次 deliver。
 
-- 允许后果：无权路径在无活跃 blocker 时，同一笔追加 IncumbencyRetired（Relayed）与下一任 IncumbencyOpened。下一任起始投影等于退休当时的折叠投影，不推进。openingCursor 等于这笔退休载荷里名为 retirementCursor 的字段，不加一，不加十。持权且交付授权已置真时，先启动执行会话；失败零写；成功后只写 IncumbencyRetired（Delivered），载荷还含 execSessionId、digest、path，并 spawn。一段式退休载荷保留 retirementId、incumbencyId、outcome、ProviderRunId、ToolCallId、名为 retirementCursor 的字段与期望推进值。
+- 允许后果：无权路径在无活跃 blocker 时，同一笔追加 IncumbencyRetired（Relayed）与下一任 IncumbencyOpened。下一任起始投影等于退休当时的折叠投影，不推进。openingCursor 等于这笔退休载荷里的 retirementCursor，不加一，不加十。持权且交付授权已置真时，先写 DeliveryRequested，保存 operationId、当前任期、围栏、retirementCursor、digest 与 path；只有该预留首次 durable Committed 后才允许外部启动。外部确切承接后以 ResolveDelivery(Accepted) 写 IncumbencyRetired（Delivered），其中保存 execSessionId、digest、path 与同一 retirementCursor。
 - 禁止后果：不得把一段写成两段。不得写 ConfirmationCommitted。S1 的 Promoted 之后，若交付授权仍为假，deliver 不得写成 Delivered。不得要求证书选出 Relayed 或 Delivered。
-- 失败后果：无活跃任期且重放未命中时拒绝，零写。活跃 blocker 非空时写 RetirementBlocked，不写 IncumbencyRetired。持权路径缺 execSessionId、digest 或 path 时拒绝。
+- 失败后果：无活跃任期且重放未命中时拒绝，零写。活跃 blocker 非空时写 RetirementBlocked，不写 IncumbencyRetired。持权路径在预留前缺 digest/path 时拒绝；预留后的启动结果未知时保留 pending，不写 Delivered，也不再次启动。
 
 ## [006] 两段 deliver
 
@@ -52,11 +52,11 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 ## [007] 身份与重放
 
-退休身份摘要的字段次序两种 sequence 相同：固定标记、workId、ProviderRunId、ToolCallId、outcome，外加入口读到的 work 计数。确认次数为 1 的标记是 oneshot-retirement-v1。确认次数为 2 的标记是 retirement-v1。两个标记不合并。
+退休身份摘要的输入两种 sequence 相同：固定标记、workId、ProviderRunId、ToolCallId、outcome、当前 durable authority。Plan 使用 oneshot-retirement-v1，S4 使用 retirement-v1，两个标记不合并。持权 Plan 的外部执行另有 operationId：delivery-operation-v1 + workId + incumbencyId + authority + 本次 requestId。
 
-- 允许后果：无活跃任期时，同一围栏重入命中已落盘退休，返回原状态。identity 里的 outcome 只是 Relayed 或 Delivered。
-- 禁止后果：不得把 retirementCursor、活跃任期标识、XTrace 头序号、snapshotId 或证书放进身份。不得用 Promoted 或 Stayed 重算身份。不得用另一个标记重算而得到同一 id。
-- 失败后果：算出的 id 与已写下的 id 不同时，返回 RetirementReplayConflict，零写。无活跃任期时返回 no active incumbency，是违约。
+- 允许后果：同一 ProviderRunId/toolCallId 围栏重入返回已经记录的结果；已完成 delivery operation 的精确 Accepted 回执重放也只返回原退休结果。identity 里的 outcome 只是 Relayed 或 Delivered。
+- 禁止后果：不得把 retirementCursor、XTrace 头序号、snapshotId 或证书放进退休 identity；不得用 Promoted/Stayed 重算 identity。operationId 不得用随机数或外部 session id 铸造。
+- 失败后果：同一 requestId 异载荷返回结构化 RequestIdConflict，零写；同一围栏带另一个 provider run、或 operation 回执与已记录执行实例冲突时拒绝，零写。
 
 ## [008] 后继投影
 
@@ -76,10 +76,10 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 ## [010] 旧账不是输入
 
-新 work 只写统一事件轨。不读取既有 AgentJournal，不读取既有 Relay 事件文件，不把旧字节翻译成新事件。
+新 work 只读写自己的 wanxiangli work journal。它不读取既有 AgentJournal、旧 EventStore lifecycle envelope 或 Relay 事件文件，也不把旧字节翻译成新事实。
 
-- 允许后果：新开立只追加本包词表里的事件。
-- 禁止后果：不得增加能把旧日志翻译进新事件的路径，也不得用测试把旧字节当成合法输入。
+- 允许后果：新开立只向 `<git-common-dir>/wanxiangshu/work.sqlite` 的对应 work stream 追加 wanxiangli 规范 record；旧持久层仍可承担其它子系统，但不是 work lifecycle 的读取来源。
+- 禁止后果：不得增加能把旧日志翻译进新事实的路径，不得让 CanonicalIntegrator/EventStore 投影与 wanxiangli 同时回答同一 work lifecycle 状态，也不得用测试把旧字节当成合法输入。
 - 失败后果：翻译层写入必须拒绝。
 
 ## [011] 两段 deliver 的后继派发
@@ -114,13 +114,13 @@ S4 两次调用之后，系统派发同一会话的后继。后继启动后，�
 - 禁止后果：落地前不得返回 confirmed。重放不得写 delivered 或 relayed。
 - 失败后果：无评审的第一次返回 Done，明细是 assessment required，不是 confirmed，零写。
 
-## [015] 内核持久化与恢复位置
+## [015] durable 提交与恢复位置
 
-AppendNotAttempted 与 CommitUnknown 不得被说成已落地。只见 Relayed 不见后任是 PairIncomplete，不是 Conflict。文件不以换行结尾必须 StorageInvalid。S4 的 Relayed 后继进入后任派发，S1、S2、S3 停在等待用户。
+持久提交结果只按 wanxiangli journal 的 Committed、Replayed、Conflict、NotWritten、Unknown 解释；Observed 是 Work 的无新事实观察，不是假 durable append。Relayed 与后任必须位于同一个规范 record，恢复不接受半对。
 
-- 允许后果：S4 的 Relayed 读回 ActiveRebound，下一步是 EnterSuccessorPrompt。S1、S2、S3 的 Relayed 读回 ActiveRebound，下一步是 WaitForUserPrompt。两个下一步不相同。成对的 Relayed 与后任读回不是 PairIncomplete，也不是 StorageInvalid。
-- 禁止后果：AppendNotAttempted 与 CommitUnknown 不得写成 AppendDurable。只见 Relayed 不见后任不得收成 Conflict、ActiveRebound、DeliveredIdempotent，也不得进入 EnterDispatch、EnterSuccessorPrompt 或 WaitForUserPrompt。不以换行结尾的文件不得裁残行后折成已开立。
-- 失败后果：只见 Relayed 不见后任的读回位置是 PairIncomplete，授权为假，事件名为空。不以换行结尾的文件整份 StorageInvalid，事件名与 sequence 为空。
+- 允许后果：Committed 才证明本次新 record 已落地；Replayed 证明同 requestId 的同一 record 已存在；NotWritten 证明本次没有提交；Unknown 保持未知并要求重开 journal/组合后核对。S4 的 Relayed 恢复到未评后任并由 Manager 工作流派发后继；S1、S2、S3 的 Relayed 恢复到新任 Review。
+- 禁止后果：不得继续把旧 AppendNotAttempted/CommitUnknown 名称当现行结果。不得把只有 IncumbencyRetired(Relayed) 的篡改 record 修补为合法后任，不得靠裁掉坏字节、补换行或猜身份恢复。完整 record 本身不依赖 NDJSON 结尾换行。
+- 失败后果：规范 JSON、字段、摘要、事件对或状态跃迁任一损坏时整条 work 历史拒绝；保留原始存储证据，不跳过坏 record。
 
 ## [016] 旧名字不是新事件
 
@@ -172,7 +172,7 @@ AppendNotAttempted 与 CommitUnknown 不得被说成已落地。只见 Relayed �
 
 ## [022] 轮换事实与持久化重放
 
-Plan 的轮换生命周期由不可变 Durable 事件驱动并投影状态。结束工具名是 deliver。
+Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。结束工具名是 deliver。
 
 - 允许后果：投影只通过以下事件更新：
   1. `WorkOpened(workId, root)`：标记规划任务开启与根路径绑定。
@@ -181,6 +181,12 @@ Plan 的轮换生命周期由不可变 Durable 事件驱动并投影状态。结
   4. `IncumbencyRetired(incumbencyId, outcome)`：标记任期退休，outcome 仅限 `Relayed` 或 `Delivered`。`Relayed` 表示接力退休（任期让位于下一任），`Delivered` 表示终态交付退休。
   5. `Reviewed(incumbencyId, stage, outcome)`：记录本任的 review 裁决，outcome 仅限 `Promoted`（晋级或授权）或 `Stayed`（留任原 stage）。
   6. `Reopened(retirementId)`：把已交付的工作回滚到 active 状态并开启一个新任期（见 [037]）。
+  7. `ConfirmationCommitted(incumbencyId, providerRunId, toolCallId)`：仅 S4 第一次 deliver 的确认。
+  8. `AdvanceCommitted(incumbencyId, expected, next)`：以精确 expected 推进 authority。
+  9. `RetirementBlocked(incumbencyId, blockerDigest)`：记录本次退休被真实资源阻塞。
+  10. `DeliveryRequested(operationId, incumbencyId, providerRunId, toolCallId, retirementCursor, digest, path)`：持权 Plan 在外部启动前的 durable 预留。
+  11. `DeliverySessionBound(operationId, execSessionId)`：真实执行 session 已创建且其身份已经 durable 绑定；不表示首 prompt 已被接受。
+  12. `DeliveryRejected(operationId, reason)`：只有已确定 NotStarted 时结算该预留，使后续显式新尝试成为可能。
   同一事件的重复重放必须保持幂等。
 - 禁止后果：同一 workId 同时至多一个活跃任期（`Active`）。已退休任期列表（`Retired`）只增不减。`Reviewed` 每任至多一条；已评任期不得再次评。`Reopened` 清除投影中的 `Delivered`，并以同一笔追加开启一个新任期：沿用原 stage，交付授权重置为假，新 incumbencyId 由固定标记 `reopened-incumbency-v1` 确定性派生、与旧任期不同；`Retired` 列表中的历史记录不删除。`Relayed` 退休的任期严禁复活；`Delivered` 退休的任期仅可经 `Reopened` 触发一次重开，旧任期永不复活。禁止在这些事实之外引入旁路状态机、内存标记或外部计数器。禁止 `AskPending` 与 `AskResolved`（该挂起协议已由 [027] 自然停止语义取代）。
 - 失败后果：遇到同一身份但载荷不同的冲突事件（含同一任期的第二条不同 `Reviewed`），或检测到不合法的状态跃迁（如重复激活、幽灵任期、无 `Delivered` 时的 `Reopened`、`Reopened` 的 retirementId 与退休记录不匹配），系统必须抛出 `StorageInvalid` 并关闭，严禁跳过或猜测。
@@ -288,13 +294,13 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
 - 禁止后果：非 Plan 角色严禁获取 Plan 专属工具。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话的消息集。Plan 的自然停止豁免严禁应用于其它 role（见 [027]）。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
-## [033] 事件持久化、Canonical 序列化与投影集成
+## [033] wanxiangli record、SQLite 持久化与投影
 
-本包的生命周期事实接入 EventStore 统一持久化存储与 CanonicalIntegrator 投影体系。
+work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规范 record，SqliteJournal 负责原子字节提交，DurableWork 负责两者的提交协作。旧 EventStore/CanonicalIntegrator 不再投影 work lifecycle。
 
-- 允许后果：本包事件按规范化 JSON 序列化并以自包含的 EventEnvelope 形式写入 `.git/wanxiangshu/events/<WriterId>.ndjson`。JSON 对象键必须按 Unicode 代码点严格升序排列，游标以 64 位整数无损保存。写入路径在提交到底层存储前必须先以 fold 校验当前工作状态的合法性。读取路径由 `ICanonicalIntegrator` 与 `IEventStore` 的统一 `Current` 导出工作视图，并按 `workId` 派生视图。
-- 禁止后果：严禁在状态机规则校验失败时向 EventStore 追加事件。严禁使用非规范化、键序混乱或篡改字段的 JSON 格式。严禁绕过 CanonicalIntegrator 私自全量扫描历史文件或在内存中维护第二份状态。
-- 失败后果：若追加前 fold 规则校验失败，返回带具体原因的强类型错误，底层存储零写入；遇到标识碰撞或损坏的事件信封，Integrator 必须 fail-closed 拒绝并进入安全关闭。
+- 允许后果：每次状态变化先在 Work 候选上完整验证，随后把一条规范 JSON record 作为 UTF-8 BLOB 原子写入 `<git-common-dir>/wanxiangshu/work.sqlite` 的 workId stream；同流 revision 连续，requestId 绑定同一 record。JSON 对象键按 Unicode 码点稳定排序，opening/retirement cursor 必须是 JS safe integer。读取时由同一组 records 重建 Work 并校验规范编码、摘要与全部领域跃迁。
+- 禁止后果：规则校验失败不得进入 SQLite append。严禁让旧 EventStore envelope、CanonicalIntegrator 投影或进程内缓存成为第二份 lifecycle 权威；严禁自动修复、跳过损坏 record 或把 Conflict/Unknown 当成功。
+- 失败后果：非法命令在 append 前拒绝且零写；revision/request 冲突显式返回 Conflict；已知未写返回 NotWritten；COMMIT 结果不明返回 Unknown 并要求重开后核对。读到损坏历史时整份拒绝。
 
 ## [034] 任期隔离与前缀重锚（openingCursor 形式）
 
@@ -311,7 +317,7 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
 
 ## [035] 崩溃恢复判定与位置重绑
 
-系统在进程重启或插件重新加载时执行崩溃恢复判定。恢复仅依据 CanonicalIntegrator 导出的持久化工作视图与确切的底稿文件存在性检查，绝对不按底稿正文猜测阶段，亦不凭同名 session 识别 DevOps。
+系统在进程重启或插件重新加载时执行崩溃恢复判定。恢复仅依据 wanxiangli work journal 重建的 durable 工作视图与确切的底稿文件存在性检查，绝对不按底稿正文猜测阶段，亦不凭同名 session 识别 DevOps。
 
 - 触发条件：进程启动激活持久化层后，对已存在的全部工作视图进行状态判定与恢复。
 - 允许后果：
@@ -320,6 +326,7 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
   3. 若工作视图处于 `Active(incumbencyId, stage)` 但底稿文件尚未创建，恢复位置仍为 `Active` 并标记底稿不存在，系统视为可继续推进（模型可从头编写底稿），绝对不得凭空假定已交付；
   4. 若工作视图既无活跃任期亦未交付，恢复位置为 `Nothing`，系统不执行猜测与推断。
   5. ask 为同步委派（[028]），不存在悬挂的 ask 状态，恢复判定无需处理 ask。
+  6. 若存在 pending DeliveryRequested，恢复义务是 `ObserveExecution`：只查询同一个 operation 的真实外部结果，严禁重新启动执行会话。只有 Accepted 或确定 NotStarted 才能把它收敛。
 - 禁止后果：严禁根据底稿文件内部的文本内容、标题或关键词推测任期阶段。严禁在恢复期间无故创建新任务、私自开启新任期、自动派发 DevOps 命令或自动执行 `Reopened`。严禁在恢复路径把 `Delivered` 工作重新激活为 `Active`（重开只由用户 reprompt 触发）。
 - 失败后果：若视图数据损坏或出现冲突（例如 Delivered 状态与 Active 任期同时并存），恢复函数必须 fail-closed 返回 `Conflict` 错误状态，保留原始证据，拒绝进入任何执行分支。
 
@@ -327,11 +334,10 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
 
 当用户在 Plan mode 会话中敲入首条 prompt 时，系统开启规划任务。
 
-- 允许后果：系统读取会话 sessionId，核验 owner role 为 `Plan`，以 single-flight 方式追加三条事件：
+- 允许后果：系统读取会话 sessionId，核验 owner role 为 `Plan`，以一条 durable record 原子追加两条事实：
   1. `WorkOpened(workId, root)`，其中 `workId = sessionId`，root 为 `<git-common-dir>/wanxiangshu`；
-  2. `DevOpsBound(workId, devopsId, target)`（devopsId 由运行时解析）；
-  3. `IncumbencyOpened(workId, incumbencyId, S1, openingCursor)`。openingCursor 取开立这一刻已观察到的 XTrace 头序号，不加一，不加十。缺这一序号则拒绝，不写空游标。
-  首任任期始于 `S1`。若该 work 已有活跃任期，入口幂等返回，不重复追加。入口挂点在消息 transform pipeline 的 Plan 分支（`resolveTenure` 之前）。
+  2. `IncumbencyOpened(workId, incumbencyId, S1, openingCursor)`。openingCursor 取开立这一刻已观察到的 XTrace 头序号，不加一，不加十。缺这一序号则拒绝，不写空游标。
+  首任任期始于 `S1`。DevOpsBound 不属于开立，首次 ask 成功收敛时再按 [028]/[042] 绑定。若该 work 已存在且 root/sequence 相同，入口重读 durable work 后幂等成功，不因后到调用观察到不同 head 再开一次；并发开立收到 Conflict 或 Unknown 时也必须先重读，只有持久事实能证明同一 work 已开立才算成功。入口挂点在消息 transform pipeline 的 Plan 分支（`resolveTenure` 之前）。
 - 禁止后果：非 Plan 会话严禁触发本入口。严禁凭同名物理会话或自然语言内容猜测已有 work。严禁在入口之外的位置追加首条 `WorkOpened` 或首个 `IncumbencyOpened`。
 - 失败后果：同一身份重放幂等；异载荷拒绝。若 store 不可得或写入失败，入口必须失败并保持零写入，严禁伪造 S1 兜底状态。
 
@@ -351,13 +357,13 @@ Plan 的阶段推进由 `review` 硬门承担。`review` 与 Manager 共用同�
 - 禁止后果：严禁第二评审、reverify 或自证（对齐 [003]）。严禁向评审者泄露晋级后的流程编排。严禁以数值评分或八维必填代替 findings pairs。严禁在无活跃任期或已 delivered（未重开）时调用 review。
 - 失败后果：同任第二条不同载荷的 `Reviewed` 必须拒绝（`StorageInvalid`）；工具门禁对已评任期的调用返回强类型拒绝错误，不消耗 provider 请求。
 
-## [039] deliver 起执行会话
+## [039] durable 预留后起执行会话
 
 持权交付（[026]）时，系统启动一个无 parent 的 Manager 执行会话来承接规划产物。
 
-- 允许后果：会话以 `agent = manager` 创建，不带 `parentID`（与用户手动新建 Manager 会话等效，role law 由其自身配置提供）。init prompt 为 `P` 的全文（逐字节，不做摘要或改写）。启动成功取得 `execSessionId` 并记入这笔记为 Delivered 的 `IncumbencyRetired`。该 Manager 会话即规划产物的执行者，其后续生命周期由既有 Manager 体系管理，与 Plan work 不再耦合。
-- 禁止后果：严禁以有 parent 的会话或其它角色承接交付。严禁对 `P` 做模型摘要后再投递。`execSessionId` 严禁进入 provider 可见面（工具参数、消息文本、schema）。启动失败时严禁追加记为 Delivered 的 `IncumbencyRetired`。
-- 失败后果：会话创建或 prompt 投递失败时，交付调用整体失败，任期保持活跃，等待模型重试或接力。
+- 允许后果：只有 `Committed + DeliveryRequested` 才调用执行 spawn 一次。会话以 `agent = manager` 创建，不带 `parentID`；init prompt 为预留 digest/path 对应的 `P` 全文，启动前再次核对字节不变。Host 只有在 session 创建且首 prompt 得到确切 admitted 结果后才返回 Started(execSessionId)；随后提交 ResolveDelivery(Accepted)，由同一 operation 写 Delivered retirement。该 Manager 会话后续生命周期由既有 Manager 体系管理，与 Plan work 不再耦合。
+- 禁止后果：Replayed/Observed/Unknown/NotWritten/Conflict 的 DeliveryRequested 一律不得再次 spawn。严禁以有 parent 的会话或其它角色承接交付，严禁摘要/改写 P。execSessionId 严禁进入 provider 可见面。创建或 prompt 接受结果未知时不得写 NotStarted，也不得以异常证明“没有启动”。
+- 失败后果：确切的创建前/提示准入拒绝写 DeliveryRejected(NotStarted)，任期保持活跃并允许新的显式 delivery 请求；无法证明是否承接时保留 pending DeliveryRequested，恢复与重放只观察原 operation，不自动重试。只有 Accepted 才写 Delivered。
 
 ## [040] 唯一活跃任期
 
@@ -390,3 +396,11 @@ work host 观察 durable 执行结果时原样保留调用方传入的 requestId
 ## [047] lifecycle SQLite 宿主边界
 
 Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择：Node 使用 `node:sqlite` 的 `DatabaseSync`，Bun 使用 `bun:sqlite` 的 `Database`。运行时选择只有一处；Surface 的内存 probe 与 durable 工作路径必须复用同一选择，不得各自静态导入某一运行时专属 SQLite 模块。Node 与 Bun 都必须能够真实加载 Lifecycle 产物、完成持久开立、关闭连接并重开读取同一工作；模块装载不得因另一个运行时不存在的内建模块而失败。
+
+## [048] 已绑定执行会话的崩溃恢复
+
+持权 Plan 的 `DeliveryRequested` 首次 Committed 后，宿主把外部效果拆成两步：先创建 parentless Manager session，取得真实 `execSessionId`；在发送首 prompt 之前，先提交 `ResolveDelivery(SessionCreated)`，由 wanxiangli 写入 `DeliverySessionBound(operationId, execSessionId)`。只有绑定持久确认后才允许向这个 session 发送 `P`。
+
+- 允许后果：若进程在 prompt 接受后、`ResolveDelivery(Accepted)` 提交前崩溃，重启从 pending work 读出精确 `operationId + execSessionId + digest + path`，只查询这个已绑定 session。若 Host 中首条真实 user prompt 的字节摘要等于预留 digest，重启以同一个 `operationId + ":accepted"` 请求结算 Accepted；不创建第二个 session，不重发 prompt。若崩溃发生在 CreateSession 已成功但创建回执丢失、因而还没有 DeliverySessionBound，恢复只可用稳定 title `wanxiangshu-delivery:<operationId>` 查询 root sessions；恰好一个精确 title 命中时才补 SessionCreated 绑定，再按同一 prompt 证据结算。
+- 禁止后果：不得仅凭 session 存在、模糊 title、时间、异常文本或“未查到消息”推断 Accepted/NotStarted。title 查询为零或多于一个精确 root 命中时保持 unbound pending。锁定的 OpenCode 1.18.29 即使接受 caller-supplied messageID，重复 prompt 仍可能生成新的 part，因此 recovery 不得把 messageID 当完整幂等发送许可。已绑定 session 读不到首 user prompt、摘要不符或 snapshot 查询失败时保持 pending。
+- 失败后果：SessionCreated 未持久确认前不得发送 prompt；确切 prompt 拒绝时先销毁该空 session，销毁成功后才可写 NotStarted。session 清理、绑定提交或 Accepted 结算结果未知时都保持 fail-closed，不开启新的 delivery operation。

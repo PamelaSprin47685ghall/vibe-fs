@@ -32,10 +32,8 @@ module ManagerWorkflow =
 
     val ensureManagerWorkOpened:
         workspaceDirectory: string option ->
-        store: Wanxiangshu.Persistence.EventStore.IEventStore option ->
         observedHead: int64 option ->
         sessionIdTextOpt: string option ->
-        providerRunIdOpt: ProviderRunIdentity option ->
             Task<unit>
 
     val maybeDeliverLoop:

@@ -64,7 +64,7 @@ test('WHAT[work-038] empty findings promote the tenure; non-empty findings keep 
   assert.match(secondProbe.detail, /already reviewed/i)
 
   await withStore(async (store, commonDir) => {
-    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, commonDir, 'work-22a', 0n)
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, 'work-22a', 0n)
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22a', commonDir, 0n))
     const finding = {
@@ -73,7 +73,7 @@ test('WHAT[work-038] empty findings promote the tenure; non-empty findings keep 
     }
     // The reviewer is a distinct bound identity, not the incumbency owner:
     // the same call succeeds and keeps the tenure with the gaps returned.
-    const stayed = await surface.PlanningSurface.executeReview(store, 'work-22a', activeId, [finding], null)
+    const stayed = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, [finding], null)
     assert.equal(stayed.ok, true, stayed.error)
     assert.equal(stayed.outcome, 'Stayed')
     assert.deepEqual(stayed.gaps, [finding])
@@ -101,10 +101,10 @@ test('WHAT[work-038] a fresh tenure with empty findings is promoted', async () =
   assert.equal(finalPromotion.detail, 'S3', 'only the S3 promotion authorises delivery')
 
   await withStore(async (store, commonDir) => {
-    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, commonDir, 'work-22b', 0n)
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, 'work-22b', 0n)
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22b', commonDir, 0n))
-    const promotedLive = await surface.PlanningSurface.executeReview(store, 'work-22b', activeId, [], null)
+    const promotedLive = await surface.PlanningSurface.executeReview(commonDir, 'work-22b', activeId, [], null)
     assert.equal(promotedLive.ok, true, promotedLive.error)
     assert.equal(promotedLive.outcome, 'Promoted')
     assert.deepEqual(promotedLive.gaps, [])

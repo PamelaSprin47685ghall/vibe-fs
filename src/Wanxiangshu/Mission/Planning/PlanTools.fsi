@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.EventStore
 
 type DeliverResult =
     { Ok: bool
@@ -32,23 +31,40 @@ module PlanTools =
     /// content, its digest, and the resolved path. Empty or missing is an error.
     val readAndValidatePlan: root: string -> workId: string -> Result<string * string * string, string>
 
-    /// planning-007 / planning-008: deliver splits on authorization — an
-    /// authorized tenure takes the terminal delivery path (spawn + retire +
-    /// PlanDelivered), an unauthorized one relays to the next incumbency.
-    /// `spawn` reports whether the parentless manager execution was admitted,
-    /// definitely not started, or remains acceptance-unknown (planning-023).
+    /// planning-007 / planning-008: an authorized delivery first creates a
+    /// parentless execution container, durably binds its SessionId to the
+    /// DeliveryRequested operation, then sends the first prompt. Prompt
+    /// acceptance settles Delivered; unknown acceptance remains pending.
     val executeDeliver:
         gitCommonDir: string ->
-        store: IEventStore ->
         root: string ->
         workId: string ->
         incumbencyId: string ->
         providerRunId: string ->
         toolCallId: string ->
-        hasBlocker: bool ->
-        spawn: (string -> string -> Task<DeliverySpawnOutcome>) ->
+        retirementBlockers: (unit -> string array) ->
+        createSession: (string -> string -> Task<Result<string, string>>) ->
+        promptSession: (string -> string -> string -> Task<DeliverySpawnOutcome>) ->
+        discardSession: (string -> Task<Result<unit, string>>) ->
         retirementCursor: int64 ->
             Task<Result<DeliverResult, string>>
+
+    /// Reconcile a bound execution after restart from an exact Host-observed
+    /// first user prompt. No external effect is issued by this function.
+    val reconcileBoundExecution:
+        gitCommonDir: string ->
+        workId: string ->
+        execSessionId: string ->
+        observedPrompt: string ->
+        blockers: string array ->
+            Result<DeliverResult, string>
+
+    val bindObservedExecutionSession:
+        gitCommonDir: string ->
+        workId: string ->
+        operationId: string ->
+        execSessionId: string ->
+            Result<unit, string>
 
     /// planning-010: delegate the intent synchronously to the bound fixed
     /// DevOps and return its complete work record verbatim. `delegateTo`
@@ -56,7 +72,6 @@ module PlanTools =
     /// at most one pending delegation per work, tracked in process memory.
     val executeAsk:
         gitCommonDir: string ->
-        store: IEventStore ->
         workId: string ->
         intent: string ->
         delegateTo: (string -> Task<string>) ->

@@ -56,7 +56,7 @@ import "wanxiangshu"
 
 `packageManager` = `npm@11.12.1`。安装依赖使用 `npm ci`（已提交 `package-lock.json`）。
 
-源码 checkout 所需的 `wanxiangli` 依赖固定为仓库内 `vendor/wanxiangli-0.5.1.tgz`；本地如另有 `wanxiangli/` 源码仓，只用于独立开发且被本仓忽略。构建、测试和发布不得读取该源码目录。
+源码 checkout 所需的 `wanxiangli` 依赖固定为仓库内 `vendor/wanxiangli-0.5.2.tgz`；本地如另有 `wanxiangli/` 源码仓，只用于独立开发且被本仓忽略。构建、测试和发布不得读取该源码目录。
 
 ### 获取与安装
 

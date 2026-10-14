@@ -49,7 +49,7 @@ test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a w
     const before = surface.workView(store, 'work-24')
     assert.equal(before.reviewed, '')
 
-    const read = await runJsPlan(store, root, 'work-24', `class Js extends JsProgram {
+    const read = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
       async run() {
         const file = await this.file([]);
         return { text: file.text() };
@@ -57,7 +57,7 @@ test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a w
     }`)
     assert.match(read, /# ok/)
 
-    const write = await runJsPlan(store, root, 'work-24', `class Js extends JsProgram {
+    const write = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
       async run() {
         this.rewrite('# mutated before review');
         return { written: true };
@@ -76,7 +76,7 @@ test('WHAT[work-024] a reviewed tenure may write; a second review and a delivere
     const reviewed = await surface.seedReview(store, 'work-24b', 'Stayed')
     assert.equal(reviewed.ok, true, reviewed.error)
 
-    const write = await runJsPlan(store, root, 'work-24b', `class Js extends JsProgram {
+    const write = await runJsPlan(store.gitCommonDir, root, 'work-24b', `class Js extends JsProgram {
       async run() {
         this.rewrite('# written after review');
         return { written: true };

@@ -18,3 +18,4 @@ module SessionSnapshotPort =
         interface ISessionSnapshotPort
 
     val create: input: obj -> ISessionSnapshotPort option
+    val createDiscovery: input: obj -> ISessionDiscoveryPort option

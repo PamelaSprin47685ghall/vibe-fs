@@ -117,11 +117,16 @@ type ToolRuntimeScope =
 
     member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
-    /// planning-023: spawn a parentless execution session (agent, no parentID)
-    /// and deliver the init prompt. Unknown acceptance stays unknown; it never
-    /// collapses to a retryable "not started" result.
-    member SpawnExecutionSession:
-        agent: string * prompt: string -> Task<Wanxiangshu.Mission.Planning.DeliverySpawnOutcome>
+    /// planning-023: create a parentless execution container. The caller must
+    /// durably bind the returned SessionId before sending its first prompt.
+    member CreateExecutionSession:
+        operationId: string * agent: string -> Task<Result<string, string>>
+
+    member PromptExecutionSession:
+        execSessionId: string * agent: string * prompt: string ->
+            Task<Wanxiangshu.Mission.Planning.DeliverySpawnOutcome>
+
+    member DiscardExecutionSession: execSessionId: string -> Task<Result<unit, string>>
 
     /// crash-reconciliation-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM

@@ -14,7 +14,6 @@ open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 /// relay-assessment-011: the Manager backend of the shared `review` shell.
@@ -203,21 +202,18 @@ module ReviewBackendManager =
                     )
             }
 
-    /// The one lifecycle work this session owns, read from the same workspace
-    /// EventStore the plugin writes. No relay fact, no certificate.
+    /// The one lifecycle work this session owns. It is independent of the
+    /// workspace EventStore; only the git common directory selects its journal.
     let private lifecycleWorkOf
         (directory: string)
         (sessionId: string)
-        : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
+        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         let commonDir = RuntimePath.gitCommonDir directory
 
         if String.IsNullOrWhiteSpace commonDir then
             None
         else
-            WorkspaceEventStore.tryCurrent commonDir
-            |> Option.bind (fun held ->
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
-                |> Option.map (fun seen -> held, seen))
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
 
     type private BoundReviewInvocation =
         { Findings: ReviewFindings
@@ -266,7 +262,7 @@ module ReviewBackendManager =
         : Result<PreparedAssessment, ReviewFailure> =
         lifecycleWorkOf bound.Directory directorySessionId
         |> requireSome BindingUnavailable
-        |> Result.bind (fun (_, work) ->
+        |> Result.bind (fun work ->
             match work.ActiveId, work.Reviewed with
             | None, _ -> Error BindingUnavailable
             | Some _, true -> Error AlreadySubmitted
@@ -356,7 +352,7 @@ module ReviewBackendManager =
                 return reviewOutcome prepared.Bound.Findings receipt
         }
 
-    /// The one review write: append `Reviewed` through the unified kernel. The
+    /// The one review write: send `Review` to the wanxiangli work owner. The
     /// binding is still validated first (relay-assessment-007: a rejected
     /// invocation writes nothing and consumes no slot), but its eight fields do
     /// not enter the event.

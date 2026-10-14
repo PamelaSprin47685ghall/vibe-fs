@@ -393,6 +393,13 @@ type PluginRuntimeScope(journal: AgentJournal option, isModelLeaseExternallyOwne
             | Some owner -> owner.HasLivePty sessionId
             | None -> false)
 
+    member _.RetirementBlockersFor(sessionId: string) : string list =
+        let owner = lock toolRuntimeGate (fun () -> toolRuntime)
+
+        match owner with
+        | Some active -> active.RetirementBlockersFor sessionId
+        | None -> invalidOp "Retirement resource owner is not attached"
+
     member _.CancelSessionChildren(sessionId: string) : Task =
         let owner = lock toolRuntimeGate (fun () -> toolRuntime)
 

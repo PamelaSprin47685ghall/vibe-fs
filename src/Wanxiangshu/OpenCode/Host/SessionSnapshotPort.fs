@@ -372,6 +372,55 @@ module SessionSnapshotPort =
                         return! Error ex.Message
                 }
 
+    let private sessionIdOfRow (row: obj) : SessionId option =
+        if isNull row || isNull row?id then
+            None
+        else
+            let value = unbox<string> row?id
+            if String.IsNullOrWhiteSpace value then None else Some(SessionId.create value)
+
+    let private exactRootTitle (title: string) (row: obj) =
+        not (isNull row)
+        && isNull row?parentID
+        && not (isNull row?title)
+        && unbox<string> row?title = title
+
+    type SdkDiscoveryPort(client: obj, workspaceDirectory: string option) =
+        let headersObj () =
+            match workspaceDirectory with
+            | Some dir -> createObj [ "x-opencode-directory", box (emitJsExpr dir "encodeURIComponent($0)") ]
+            | None -> createObj []
+
+        interface ISessionDiscoveryPort with
+            member _.FindRootSessionsByTitle(title) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+                        let listFn = sessObj?list
+                        do! Result.requireFalse "session.list unavailable on SDK client" (isNull listFn)
+
+                        let queryFields =
+                            [ "roots", box true; "search", box title ]
+                            @ (workspaceDirectory
+                               |> Option.map (fun dir -> [ "directory", box dir ])
+                               |> Option.defaultValue [])
+
+                        let payload =
+                            createObj
+                                [ "query", box (createObj queryFields)
+                                  "headers", box (headersObj ()) ]
+
+                        let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+
+                        return
+                            unwrapPayload response
+                            |> Array.filter (exactRootTitle title)
+                            |> Array.choose sessionIdOfRow
+                            |> Array.toList
+                    with ex ->
+                        return! Error ex.Message
+                }
+
     type HttpSnapshotPort(baseUrl: string) =
         let cleanBase =
             if baseUrl.EndsWith("/") then
@@ -399,6 +448,44 @@ module SessionSnapshotPort =
                         return! Error ex.Message
                 }
 
+    [<Emit("encodeURIComponent($0)")>]
+    let private encodeURIComponent (_value: string) : string = jsNative
+
+    type HttpDiscoveryPort(baseUrl: string) =
+        let cleanBase =
+            if baseUrl.EndsWith("/") then
+                baseUrl.Substring(0, baseUrl.Length - 1)
+            else
+                baseUrl
+
+        [<Emit("fetch($0, $1)")>]
+        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
+
+        interface ISessionDiscoveryPort with
+            member _.FindRootSessionsByTitle(title) =
+                taskResult {
+                    try
+                        let url = sprintf "%s/session?roots=true&search=%s" cleanBase (encodeURIComponent title)
+                        let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
+                        let status = unbox<int> response?status
+                        do! Result.requireTrue (sprintf "HTTP %d" status) (status >= 200 && status < 300)
+                        let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+
+                        let rows =
+                            if String.IsNullOrWhiteSpace body then
+                                [||]
+                            else
+                                unwrapPayload (JS.JSON.parse body)
+
+                        return
+                            rows
+                            |> Array.filter (exactRootTitle title)
+                            |> Array.choose sessionIdOfRow
+                            |> Array.toList
+                    with ex ->
+                        return! Error ex.Message
+                }
+
     let create (input: obj) : ISessionSnapshotPort option =
         let workDir = directoryOption input
 
@@ -412,5 +499,21 @@ module SessionSnapshotPort =
             Some(HttpSnapshotPort(unbox<string> input?baseUrl) :> ISessionSnapshotPort)
         elif not (isNull input?port) then
             Some(HttpSnapshotPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionSnapshotPort)
+        else
+            None
+
+    let createDiscovery (input: obj) : ISessionDiscoveryPort option =
+        let workDir = directoryOption input
+
+        if isNull input then
+            None
+        elif not (isNull input?client) && not (isNull input?client?session) then
+            Some(SdkDiscoveryPort(input?client, workDir) :> ISessionDiscoveryPort)
+        elif not (isNull input?serverUrl) then
+            Some(HttpDiscoveryPort(unbox<string> input?serverUrl) :> ISessionDiscoveryPort)
+        elif not (isNull input?baseUrl) then
+            Some(HttpDiscoveryPort(unbox<string> input?baseUrl) :> ISessionDiscoveryPort)
+        elif not (isNull input?port) then
+            Some(HttpDiscoveryPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionDiscoveryPort)
         else
             None

@@ -457,18 +457,7 @@ module ToolRegistry =
         | Some work -> activeReviewed work
         | None -> Error "No active incumbency found for this work"
 
-    let private executeTenureSandbox prose root store sessionId programSource =
-        let stamped =
-            emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
-
-        let stampedDir = if isNull stamped then "" else string stamped
-
-        let gitCommonDir =
-            if String.IsNullOrWhiteSpace stampedDir then
-                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
-            else
-                stampedDir
-
+    let private executeTenureSandbox prose root gitCommonDir sessionId programSource =
         match resolveActiveTenure gitCommonDir sessionId with
         | Error reason ->
             JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
@@ -477,7 +466,7 @@ module ToolRegistry =
 
     let private runPlanProgramCore
         (prose: JsCanonicalDescription.Prose)
-        storeOpt
+        gitCommonDirOpt
         (rootOpt: string option)
         (sessionId: string)
         (programSourceOpt: string option)
@@ -485,16 +474,16 @@ module ToolRegistry =
         if Option.isNone programSourceOpt then
             JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.InvalidProgram)
             |> Task.FromResult
-        elif Option.isNone rootOpt || Option.isNone storeOpt then
+        elif Option.isNone rootOpt || Option.isNone gitCommonDirOpt then
             JsToolsResult.render (
                 JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed "The plan workspace is unavailable")
             )
             |> Task.FromResult
         else
-            executeTenureSandbox prose rootOpt.Value storeOpt.Value sessionId programSourceOpt.Value
+            executeTenureSandbox prose rootOpt.Value gitCommonDirOpt.Value sessionId programSourceOpt.Value
 
-    let runPlanProgram prose (store: IEventStore) root sessionId program =
-        runPlanProgramCore prose (Some store) (Some root) sessionId (Some program)
+    let runPlanProgram prose gitCommonDir root sessionId program =
+        runPlanProgramCore prose (Some gitCommonDir) (Some root) sessionId (Some program)
 
     let create
         (toolModule: obj)
@@ -596,12 +585,10 @@ module ToolRegistry =
                 jsTransactionPersistence
                 (Some groundingObservation)
 
-        // planning-016: the plan store and plan root resolve from the
-        // workspace the same way the js-transaction persistence does; the
-        // plan store is shared by the planning tools and the review shell.
-        let planStore =
-            workspaceDirectory
-            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
+        // Lifecycle uses its own wanxiangli journal. The common directory is
+        // data passed to that owner, not a borrowed workspace EventStore.
+        let planGitCommonDir =
+            workspaceDirectory |> Option.map RuntimePath.gitCommonDir
 
         let planRoot =
             workspaceDirectory
@@ -611,7 +598,7 @@ module ToolRegistry =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
 
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
-            runPlanProgramCore jsProse planStore planRoot ctx.SessionId (args.OptionalText "program")
+            runPlanProgramCore jsProse planGitCommonDir planRoot ctx.SessionId (args.OptionalText "program")
 
         // planning-010: the real delegation capability — the SyncDelegate
         // runtime runs the bound fixed DevOps for this work synchronously and
@@ -640,17 +627,12 @@ module ToolRegistry =
             | Ok res -> res.WorkRecord
             | Error err -> sprintf "ask failed: %s" err
 
-        // The plan store flows through these helpers by inference only: an
-        // explicit IEventStore annotation would make this module carry both
-        // the EventStore and the Journal surface token (unified-store
-        // dual-write gate). The store itself is resolved once below.
         let askGitCommonDir (directory: string option) =
             match directory with
             | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
             | None -> ""
 
-        let askWithStore
-            store
+        let askWithLifecycle
             (syncRuntime: SyncDelegateRuntime option)
             (args: HostToolArguments)
             (ctx: HostToolContext)
@@ -666,7 +648,6 @@ module ToolRegistry =
                     let! outcome =
                         Wanxiangshu.Mission.Planning.PlanTools.executeAsk
                             gitCommonDir
-                            store
                             ctx.SessionId
                             (args.Text "intent")
                             delegateTo
@@ -675,19 +656,20 @@ module ToolRegistry =
             }
 
         let executeAskTool
-            storeOpt
             (syncRuntime: SyncDelegateRuntime option)
             (args: HostToolArguments)
             (ctx: HostToolContext)
             : Task<string> =
-            task {
-                match storeOpt with
-                | None -> return "ask failed: the plan workspace is unavailable"
-                | Some store -> return! askWithStore store syncRuntime args ctx
-            }
+            askWithLifecycle syncRuntime args ctx
+
+        let lifecycleWorkOf (runtime: ToolRuntimeScope) (sessionId: string) =
+            runtime.WorkspaceDirectory
+            |> Option.bind (fun workspace ->
+                let commonDir = RuntimePath.gitCommonDir workspace
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
-            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory runtime.WorkspaceDirectory sessionId
+            lifecycleWorkOf runtime sessionId
             |> Option.bind (fun work -> work.ActiveId)
 
         // planning-008: the receipt names the artifact path and the fact that
@@ -696,8 +678,10 @@ module ToolRegistry =
         let renderDeliverReceipt (res: DeliverResult) : string =
             if res.Relayed then
                 res.Message
-            else
+            elif res.Delivered then
                 sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
+            else
+                res.Message
 
         // planning-007/008: the retirement cursor is the exact consumed-through
         // XTrace frontier of the physical exchange that owns this deliver call.
@@ -806,10 +790,14 @@ module ToolRegistry =
                 | _, Error err -> return Error err
             }
 
-        // The execution session spawn capability handed to PlanTools: the
-        // provider-visible receipt never carries the spawned session id.
-        let deliverSpawn (runtime: ToolRuntimeScope) (agent: string) (prompt: string) =
-            runtime.SpawnExecutionSession(agent, prompt)
+        let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
+            runtime.CreateExecutionSession(operationId, agent)
+
+        let deliverPrompt (runtime: ToolRuntimeScope) (execSessionId: string) (agent: string) (prompt: string) =
+            runtime.PromptExecutionSession(execSessionId, agent, prompt)
+
+        let deliverDiscard (runtime: ToolRuntimeScope) (execSessionId: string) =
+            runtime.DiscardExecutionSession execSessionId
 
         let renderDeliverOutcome outcome =
             match outcome with
@@ -817,7 +805,6 @@ module ToolRegistry =
             | Error err -> sprintf "deliver failed: %s" err
 
         let deliverCursor
-            store
             (root: string)
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
@@ -833,7 +820,8 @@ module ToolRegistry =
                 let toolCallId =
                     ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
 
-                let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
 
                 match! resolveDeliverRetirementCursor runtime ctx with
                 | Error err -> return sprintf "deliver failed: %s" err
@@ -841,21 +829,21 @@ module ToolRegistry =
                     let! outcome =
                         PlanTools.executeDeliver
                             gitCommonDir
-                            store
                             root
                             ctx.SessionId
                             incumbencyId
                             providerRunId
                             toolCallId
-                            hasBlocker
-                            (deliverSpawn runtime)
+                            retirementBlockers
+                            (deliverCreate runtime)
+                            (deliverPrompt runtime)
+                            (deliverDiscard runtime)
                             retirementCursor
 
                     return renderDeliverOutcome outcome
             }
 
         let deliverForIncumbency
-            store
             (root: string)
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
@@ -870,26 +858,25 @@ module ToolRegistry =
                 if String.IsNullOrWhiteSpace gitCommonDir then
                     return "deliver failed: git common directory is missing"
                 else
-                    return! deliverCursor store root runtime ctx incumbencyId gitCommonDir
+                    return! deliverCursor root runtime ctx incumbencyId gitCommonDir
             }
 
-        let runDeliver store (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
+        let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
                 match lifecycleActiveIncumbencyOf runtime ctx.SessionId with
                 | None -> return "deliver failed: no active incumbency found for this work"
-                | Some incumbencyId -> return! deliverForIncumbency store root runtime ctx incumbencyId
+                | Some incumbencyId -> return! deliverForIncumbency root runtime ctx incumbencyId
             }
 
         let executeDeliverTool
-            storeOpt
             (rootOpt: string option)
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
             : Task<string> =
             task {
-                match storeOpt, rootOpt with
-                | Some store, Some root -> return! runDeliver store root runtime ctx
-                | _ -> return "deliver failed: the plan workspace is unavailable"
+                match rootOpt with
+                | Some root -> return! runDeliver root runtime ctx
+                | None -> return "deliver failed: the plan workspace is unavailable"
             }
 
         let planningSpecs () =
@@ -911,7 +898,7 @@ module ToolRegistry =
                   [ "intent",
                     ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
                 Admission = planningAdmission
-                Execute = fun args ctx -> executeAskTool planStore syncDelegateRuntime args ctx } ]
+                Execute = fun args ctx -> executeAskTool syncDelegateRuntime args ctx } ]
 
         /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
         /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
@@ -924,13 +911,10 @@ module ToolRegistry =
                   Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
                   Admission = planningAdmission
-                  Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx }
+                  Execute = fun _ ctx -> executeDeliverTool planRoot runtime ctx }
 
             let sequenceOf (ctx: HostToolContext) : string list option =
-                Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
-                    runtime.WorkspaceDirectory
-                    ctx.SessionId
-                |> Option.map (fun work -> work.Sequence)
+                lifecycleWorkOf runtime ctx.SessionId |> Option.map (fun work -> work.Sequence)
 
             { managerSpec with
                 Admission =
@@ -966,9 +950,8 @@ module ToolRegistry =
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
               // relay-assessment-011 / planning-022: the shared review shell.
-              // The plan store only activates the Plan backend; every other
-              // admitted caller keeps the Manager backend's byte behavior.
-              yield ReviewShell.spec factory runtime planStore
+              // Plan lifecycle reads its own durable owner directly.
+              yield ReviewShell.spec factory runtime
               yield deliverSpec ()
               yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory

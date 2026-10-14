@@ -99,29 +99,6 @@ module WorkspaceEventStore =
         else
             lookupCurrent commonDir
 
-    /// The unified lifecycle work for one session, read from the already-owned
-    /// workspace store. Missing workspace, missing store, missing current,
-    /// missing work, or a blank common dir all yield None.
-    let tryLifecycleWork
-        (workspace: string)
-        (workId: string)
-        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let commonDir = RuntimePath.gitCommonDir workspace
-
-        if String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir workId
-
-    /// Directory-option variant. A missing directory is the same None as a
-    /// blank common dir or an unowned store.
-    let tryLifecycleWorkOfDirectory
-        (workspaceDirectory: string option)
-        (workId: string)
-        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        workspaceDirectory
-        |> Option.bind (fun workspace -> tryLifecycleWork workspace workId)
-
     let private decrementEntry commonDir (entry: SharedEntry) =
         let remaining = entry.RefCount - 1
 

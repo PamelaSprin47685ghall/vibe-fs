@@ -12,18 +12,6 @@ module WorkspaceEventStore =
     val release: commonDir: string -> unit
     val bootPort: commonDir: string -> IJournalEventStoreBoot
 
-    /// The unified lifecycle work for one session, read from the already-owned
-    /// workspace store. Missing workspace, missing store, missing current,
-    /// missing work, or a blank common dir all yield None.
-    val tryLifecycleWork:
-        workspace: string -> workId: string -> Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option
-
-    /// Directory-option variant of tryLifecycleWork. None workspace yields None.
-    val tryLifecycleWorkOfDirectory:
-        workspaceDirectory: string option ->
-        workId: string ->
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option
-
     /// durable-events-019 registration-necessity seam: the production program
     /// with exactly one named registration removed, all others kept in order.
     val programWithoutRegistration: ruleName: string -> IntegrationRule list

@@ -29,7 +29,10 @@ module ManagerWorkflow =
     let private finishPath = "runtime/manager-finish"
 
     let private lifecycleWork (directory: string option) (sessionId: string) =
-        WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
+        directory
+        |> Option.bind (fun workspace ->
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
     /// The iteration ordinal as the provider reads it: "1" for the first
     /// Manager on this road, then one more per durable opening. A road with no
@@ -167,47 +170,35 @@ module ManagerWorkflow =
                 Some(retirement.RetirementId, retirement.Fence.ProviderRunId)
             | _ -> None)
 
-    /// One durable opening at an observed head, idempotent for a work that is
-    /// already open: an opened work returns without a command, so a drifted
-    /// head cannot mint a second request identity against it.
+    /// One durable opening at an observed head. DurableWorkHost owns race
+    /// reconciliation: a conflicting or unknown append is accepted only when
+    /// a reread proves the same Manager work now exists.
     let private openManagerWorkAtHead (sessionId: string) (root: string) (head: int64) : unit =
         let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
 
-        let opened =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
-            |> Option.isSome
-
-        if not opened then
-            let requestId = sessionId + ":open:" + string head
-
-            let command =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                    "Open"
-                    [ "root", box root
-                      "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ()
-                      "ownerId", box sessionId
-                      "openingCursor", box (float head) ]
-
-            let receipt =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
-
-            ignore receipt
+        match
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened
+                gitCommonDir
+                sessionId
+                (sessionId + ":open:" + string head)
+                root
+                (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ())
+                sessionId
+                (float head)
+        with
+        | Ok _ -> ()
+        | Error reason -> invalidOp ("Manager lifecycle opening failed: " + reason)
 
     let ensureManagerWorkOpened
         (workspaceDirectory: string option)
-        (store: Wanxiangshu.Persistence.EventStore.IEventStore option)
         (observedHead: int64 option)
         (sessionIdTextOpt: string option)
-        (providerRunIdOpt: ProviderRunIdentity option)
         : Task<unit> =
         task {
-            ignore providerRunIdOpt
-
-            match store, sessionIdTextOpt, workspaceDirectory with
-            | None, _, _
-            | _, None, _
-            | _, _, None -> return ()
-            | Some _held, Some sessionId, Some root ->
+            match sessionIdTextOpt, workspaceDirectory with
+            | None, _
+            | _, None -> return ()
+            | Some sessionId, Some root ->
                 observedHead |> Option.iter (openManagerWorkAtHead sessionId root)
         }
 

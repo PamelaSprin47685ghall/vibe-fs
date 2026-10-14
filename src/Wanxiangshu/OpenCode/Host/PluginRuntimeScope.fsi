@@ -150,6 +150,7 @@ type PluginRuntimeScope =
 
     /// EXEC-016: live PTY probe for DevOps join guard.
     member HasLivePty: sessionId: string -> bool
+    member RetirementBlockersFor: sessionId: string -> string list
 
     member CancelSessionChildren: sessionId: string -> Task
 

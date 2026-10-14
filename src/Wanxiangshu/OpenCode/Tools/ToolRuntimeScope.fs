@@ -45,7 +45,7 @@ module private ExecutionSpawn =
         | Outcome.SendOutcome.AcceptanceUnknown reason ->
             unknown "Execution session prompt acceptance is unknown" reason
 
-    let private prompt (sessions: ISessionHostPort) (agent: string) (text: string) (sessionId: SessionId) =
+    let prompt (sessions: ISessionHostPort) (sessionId: SessionId) (agent: string) (text: string) =
         task {
             use _listener = sessions.SubscribeTerminal(sessionId, (fun _ _ -> ()))
 
@@ -61,18 +61,21 @@ module private ExecutionSpawn =
             return ofSendOutcome sessionId outcome
         }
 
-    let start (sessions: ISessionHostPort) (agent: string) (text: string) : Task<Spawn> =
+    let create (sessions: ISessionHostPort) (operationId: string) (agent: string) : Task<Result<SessionId, string>> =
         task {
+            let title = sprintf "wanxiangshu-delivery:%s" operationId
+
             let options: OpenCodeChildOptions =
-                { Title = Some agent
+                { Title = Some title
                   Agent = Some agent
                   Directory = None }
 
-            match! sessions.CreateSiblingSession(SessionId.create agent, None, options) with
+            match! sessions.CreateSiblingSession(SessionId.create operationId, None, options) with
             // Session creation itself is a Host effect. A generic transport
             // error does not prove that the Host failed before creating it.
-            | Error error -> return unknown "Execution session creation outcome is unknown" error
-            | Ok sessionId -> return! prompt sessions agent text sessionId
+            | Error error ->
+                return Error(sprintf "Execution session creation outcome is unknown: %s" error)
+            | Ok sessionId -> return Ok sessionId
         }
 
 
@@ -501,10 +504,19 @@ type ToolRuntimeScope
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
-    /// The active unified incumbency id for this session, read from the same
-    /// workspace EventStore the lifecycle kernel writes.
+    let lifecycleWorkOfDirectory (directory: string option) (sessionId: string) =
+        directory
+        |> Option.bind (fun workspace ->
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+
+            if String.IsNullOrWhiteSpace commonDir then
+                None
+            else
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
+
+    /// The active unified incumbency id for this session.
     let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
-        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
+        lifecycleWorkOfDirectory directory sessionId
         |> Option.bind (fun work -> work.ActiveId)
 
     let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
@@ -513,7 +525,7 @@ type ToolRuntimeScope
         // nothing, a recorded cleanup blocker confines to the finish window, a
         // promoted final incumbent keeps the read/cleanup/close-out surface, and
         // every other active fact keeps the full Manager set.
-        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
+        lifecycleWorkOfDirectory directory sessionId
         |> Option.map (fun work ->
             match work.ActiveId, work.Reviewed with
             | None, _ -> defaultEmptyManagerFacts
@@ -790,22 +802,36 @@ type ToolRuntimeScope
 
     member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
-    /// planning-023: spawn a parentless execution session for a delivered plan.
-    /// The session is created with the requested agent and no parentID — equal
-    /// to a user-created session; its later lifecycle belongs to the ordinary
-    /// system for that agent and is no longer coupled to the plan work. A
-    /// no-op terminal listener satisfies the send-before-listen order check
-    /// (the reacting listener belongs to whoever awaits the agent, not to the
-    /// spawn). A missing Host transport fails closed.
-    member _.SpawnExecutionSession
-        (agent: string, prompt: string)
+    /// planning-023: create the parentless execution container. The returned
+    /// SessionId is not permission to send its prompt: PlanTools first commits
+    /// DeliverySessionBound for the operation.
+    member _.CreateExecutionSession
+        (operationId: string, agent: string)
+        : Task<Result<string, string>> =
+        task {
+            try
+                let! created = ExecutionSpawn.create sessions operationId agent
+                return created |> Result.map SessionId.value
+            with ex ->
+                return Error(sprintf "Execution session creation outcome is unknown: %s" ex.Message)
+        }
+
+    /// Send the first prompt only after the exact SessionId is durably bound.
+    /// AcceptanceUnknown remains pending; it is never converted to NotStarted.
+    member _.PromptExecutionSession
+        (execSessionId: string, agent: string, prompt: string)
         : Task<Wanxiangshu.Mission.Planning.DeliverySpawnOutcome> =
         task {
             try
-                return! ExecutionSpawn.start sessions agent prompt
+                return! ExecutionSpawn.prompt sessions (SessionId.create execSessionId) agent prompt
             with ex ->
-                return ExecutionSpawn.unknown "Execution session spawn outcome is unknown" ex.Message
+                return ExecutionSpawn.unknown "Execution session prompt outcome is unknown" ex.Message
         }
+
+    /// Cleanup for a container whose first prompt was definitely refused.
+    /// A failed cleanup prevents NotStarted settlement so no orphan is hidden.
+    member _.DiscardExecutionSession(execSessionId: string) : Task<Result<unit, string>> =
+        sessions.AbortSession(SessionId.create execSessionId)
 
     /// Manager authorization facts for the capability gate, derived purely
     /// from the lifecycle work. The final incumbent is the one whose review
@@ -1389,6 +1415,7 @@ type ToolRuntimeScope
         member this.DisposeExecutorRuntime sessionId = this.DisposeExecutorRuntime sessionId
         member this.DisposeAsync() = this.DisposeAsync()
         member this.HasLivePty sessionId = this.HasLivePty sessionId
+        member this.RetirementBlockersFor sessionId = this.RetirementBlockersFor sessionId
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

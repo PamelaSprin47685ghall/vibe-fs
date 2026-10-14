@@ -18,7 +18,7 @@ const withStore = async (body) => {
   const commonDir = join(root, '.git')
   mkdirSync(commonDir, { recursive: true })
   try {
-    await body(workspace.acquire(commonDir), root)
+    await body(workspace.acquire(commonDir), root, commonDir)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -41,7 +41,7 @@ test('WHAT[work-036] the first prompt of a plan session opens the work and start
   assert.equal(probed.next, 'Review')
   assert.equal(probed.sequence, 'S1,S2,S3')
 
-  await withStore(async (store, root) => {
+  await withStore(async (store, root, commonDir) => {
     const openingAppends = () => {
       const path = life.journalPath(store.gitCommonDir)
       if (!existsSync(path)) return []
@@ -54,12 +54,12 @@ test('WHAT[work-036] the first prompt of a plan session opens the work and start
       }
     }
 
-    const missing = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, undefined)
+    const missing = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, sessionId, undefined)
     assert.equal(missing.ok, false, 'opening without an observed cursor must refuse')
     assert.match(missing.error, /opening cursor was not observed/i)
     assert.equal(openingAppends().length, 0)
 
-    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, 7n)
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, sessionId, 7n)
     assert.equal(opened.ok, true, opened.error)
     const appended = openingAppends()
     assert.equal(appended.length, 1, 'the two opening events share one append')
@@ -83,27 +83,39 @@ test('WHAT[work-036] the first prompt of a plan session opens the work and start
       viewJournal.close()
     }
 
-    const again = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, 8n)
+    const again = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, sessionId, 8n)
     assert.equal(again.ok, true)
     assert.equal(openingAppends().length, 1, 'an already-open work must not append duplicate events')
+
+    const conflictingRoot = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, join(root, 'other'), sessionId, 9n)
+    assert.equal(conflictingRoot.ok, false, 'an existing work under the same id must not hide a root collision')
+    assert.match(conflictingRoot.error, /different root/i)
+    assert.equal(openingAppends().length, 1, 'a refused root collision must append nothing')
   })
 })
 
-test('WHAT[work-036] the entry never forges an S1 fallback when the store is unavailable', async () => {
-  let appendCalled = false
-  const brokenStore = {
-    TryCurrentThrows: true,
-    TryCurrent: () => null,
-    TryHead: () => null,
-    Append: async () => {
-      appendCalled = true
-      return { tag: 0 }
-    },
+test('WHAT[work-036] the entry needs only the lifecycle journal directory, not an acquired workspace EventStore', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-planning-no-event-store-'))
+  const commonDir = join(root, '.git')
+  mkdirSync(commonDir, { recursive: true })
+  try {
+    const legacyEvents = join(commonDir, 'wanxiangshu', 'events')
+    assert.equal(existsSync(legacyEvents), false, 'the legacy EventStore has not been activated')
+    const res = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, 'ses-plan-entry-2', 7n)
+    assert.equal(res.ok, true, res.error)
+    assert.equal(existsSync(legacyEvents), false, 'lifecycle opening must not create the legacy event stream')
+    assert.equal(existsSync(life.journalPath(commonDir)), true, 'the lifecycle journal is the only durable opening output')
+    assert.equal(life.workView({ gitCommonDir: commonDir }, 'ses-plan-entry-2').found, true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
-  const res = await surface.PlanningSurface.ensurePlanWorkOpened(brokenStore, '/workspace/repo', 'ses-plan-entry-2', 7n)
+})
+
+test('WHAT[work-036] the entry never forges an S1 fallback when the lifecycle directory is unavailable', async () => {
+  const missing = join(tmpdir(), 'wxs-planning-missing-dir', 'never-created')
+  const res = await surface.PlanningSurface.ensurePlanWorkOpened(missing, '/workspace/repo', 'ses-plan-entry-3', 7n)
   assert.equal(res.ok, false)
   assert.match(res.error, /cannot be read/i)
-  assert.equal(appendCalled, false)
 })
 
 test('WHAT[work-036] subsequent manager transform passes on an already-open work do not append duplicate WorkOpened or IncumbencyOpened events', async () => {
@@ -175,5 +187,34 @@ test('WHAT[work-036] subsequent manager transform passes on an already-open work
     runtime.pushHostMessage(managerSession, asst2)
     await hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user1, asst1] })
     assert.equal(openedCount(), 2, 'subsequent transform pass must not re-append WorkOpened / IncumbencyOpened')
+  })
+})
+
+test('WHAT[work-036] manager opening fails closed when the same session id already names a Plan work', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const managerSession = 'ses-manager-sequence-collision'
+    const commonDir = join(directory, '.git')
+    const store = workspace.acquire(commonDir)
+    const seeded = await life.seedOpen(store, 'plan', managerSession, directory, 1n)
+    assert.equal(seeded.ok, true, seeded.error)
+
+    await hooks['chat.message'](
+      { sessionID: managerSession, agent: 'manager' },
+      {
+        message: { id: 'msg-manager-collision', sessionID: managerSession, role: 'user', agent: 'manager' },
+        parts: [{ id: 'prt-manager-collision', type: 'text', text: 'continue as manager' }],
+      },
+    )
+    const user = {
+      info: { id: 'msg-manager-collision', sessionID: managerSession, role: 'user', agent: 'manager', time: { created: 1 } },
+      parts: [{ id: 'prt-manager-collision', type: 'text', text: 'continue as manager' }],
+    }
+    runtime.pushHostMessage(managerSession, user)
+
+    await assert.rejects(
+      hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user] }),
+      /Manager lifecycle opening failed: existing lifecycle work has a different sequence/,
+    )
+    assert.deepEqual(life.workView(store, managerSession).sequence, 'S1,S2,S3')
   })
 })

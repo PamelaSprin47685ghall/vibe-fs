@@ -241,9 +241,13 @@ module PluginHostWiring =
                     |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
                 let workOpt =
-                    Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
-                        workspaceDirectory
-                        (SessionId.value sessionId)
+                    workspaceDirectory
+                    |> Option.bind (fun workspace ->
+                        let commonDir = RuntimePath.gitCommonDir workspace
+
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
+                            commonDir
+                            (SessionId.value sessionId))
 
                 // Delivered closes the work: the final retirement left no
                 // active tenure to continue. A missing list is not an empty

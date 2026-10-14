@@ -111,7 +111,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { text: f.text() };
       }
     }`
-    const resFileWithPath = await registry.runJsPlan(store, tmpRoot, workId, fileWithPath)
+    const resFileWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, fileWithPath)
     assert.match(resFileWithPath, /# failed/)
     assert.match(resFileWithPath, /code = "PATH_DENIED"/)
 
@@ -122,7 +122,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { ok: true };
       }
     }`
-    const resEditWithPath = await registry.runJsPlan(store, tmpRoot, workId, editWithPath)
+    const resEditWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editWithPath)
     assert.match(resEditWithPath, /# failed/)
     assert.match(resEditWithPath, /code = "PATH_DENIED"/)
 
@@ -133,7 +133,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
         return { ok: true };
       }
     }`
-    const resRewriteWithPath = await registry.runJsPlan(store, tmpRoot, workId, rewriteWithPath)
+    const resRewriteWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteWithPath)
     assert.match(resRewriteWithPath, /# failed/)
     assert.match(resRewriteWithPath, /code = "PATH_DENIED"/)
   } finally {
@@ -157,7 +157,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { slice: f.text('step1', '$') };
       }
     }`
-    const readRes = await registry.runJsPlan(store, tmpRoot, workId, readProgram)
+    const readRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, readProgram)
     assert.match(readRes, /# ok/)
     assert.match(readRes, /Step 1: Draft/)
 
@@ -168,7 +168,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { edited: true };
       }
     }`
-    const editRes = await registry.runJsPlan(store, tmpRoot, workId, editProgram)
+    const editRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editProgram)
     assert.match(editRes, /# failed/)
     assert.match(editRes, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(editRes, /Review is required before modifying the plan artifact/)
@@ -183,7 +183,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { done: true };
       }
     }`
-    const rewriteRes = await registry.runJsPlan(store, tmpRoot, workId, rewriteProgram)
+    const rewriteRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteProgram)
     assert.match(rewriteRes, /# failed/)
     assert.match(rewriteRes, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(rewriteRes, /Review is required before modifying the plan artifact/)
@@ -195,7 +195,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
     assert.equal(reviewed.ok, true)
 
     // 5. Now tenure inc-1 has been reviewed -> rewrite succeeds!
-    const rewriteAfterReviewRes = await registry.runJsPlan(store, tmpRoot, workId, rewriteProgram)
+    const rewriteAfterReviewRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteProgram)
     assert.match(rewriteAfterReviewRes, /# ok/)
     assert.match(rewriteAfterReviewRes, /plan\.md/)
     assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Completely New Plan')
@@ -207,7 +207,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { edited: true };
       }
     }`
-    const editAfterReviewRes = await registry.runJsPlan(store, tmpRoot, workId, editAfterReviewProgram)
+    const editAfterReviewRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editAfterReviewProgram)
     assert.match(editAfterReviewRes, /# ok/)
     assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
 
@@ -223,7 +223,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { done: true };
       }
     }`
-    const resWriteInInc2 = await registry.runJsPlan(store, tmpRoot, workId, writeInInc2)
+    const resWriteInInc2 = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, writeInInc2)
     assert.match(resWriteInInc2, /# failed/)
     assert.match(resWriteInInc2, /code = "PLAN_REVIEW_REQUIRED"/)
     assert.match(resWriteInInc2, /Review is required before modifying the plan artifact/)
@@ -237,7 +237,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
         return { text: f.text('^', '$') };
       }
     }`
-    const readInInc2Res = await registry.runJsPlan(store, tmpRoot, workId, readInInc2Program)
+    const readInInc2Res = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, readInInc2Program)
     assert.match(readInInc2Res, /# ok/)
     assert.match(readInInc2Res, /# Reviewed Plan/)
   } finally {

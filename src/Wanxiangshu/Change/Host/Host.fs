@@ -144,7 +144,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let lifecycleWorkOf (record: ManagerJobProjection) =
         let directory = WorktreePath.value record.WorktreePath
-        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork directory (SessionId.value record.ManagerSessionId)
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
 
     /// The loop signal the last committed retirement holds for Change: a
     /// Delivered tenure has a candidate to publish, a Relayed tenure hands the
@@ -264,9 +265,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (managerSessionId: SessionId)
         (worktreePath: Wanxiangshu.Foundation.Identity.WorktreePath)
         : (string * string) option =
-        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
-            (Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath)
-            (SessionId.value managerSessionId)
+        let commonDir =
+            worktreePath
+            |> Wanxiangshu.Foundation.Identity.WorktreePath.value
+            |> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value managerSessionId)
         |> Option.bind (fun work ->
             match work.Reviewed, work.ReviewOutcome with
             | true, Some outcome -> Some(outcome, work.Authority)

@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.EventStore
 
 module PlanningSurface =
 
@@ -190,66 +189,103 @@ module PlanningSurface =
         else
             None
 
-    let private spawnOfJs (spawnVal: obj) : string -> string -> Task<DeliverySpawnOutcome> =
-        fun (agent: string) (prompt: string) ->
+    let private createExecutionOfJs (execution: obj) : string -> string -> Task<Result<string, string>> =
+        fun (operationId: string) (agent: string) ->
             task {
                 try
-                    // Test/interop surface: a resolved JS function is a proved
-                    // Started result. Rejection is conservatively Unknown.
-                    let! sessionId = unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
+                    let! sessionId =
+                        unbox<Task<string>> (emitJsExpr (execution, operationId, agent) "$0.create($1, $2)")
 
-                    return DeliverySpawnOutcome.Started sessionId
+                    if String.IsNullOrWhiteSpace sessionId then
+                        return Error "Execution session creation returned no session identity"
+                    else
+                        return Ok sessionId
+                with ex ->
+                    return Error(sprintf "Execution session creation outcome is unknown: %s" ex.Message)
+            }
+
+    let private promptExecutionOfJs (execution: obj) : string -> string -> string -> Task<DeliverySpawnOutcome> =
+        fun (execSessionId: string) (agent: string) (prompt: string) ->
+            task {
+                try
+                    let! raw =
+                        unbox<Task<obj>> (
+                            emitJsExpr (execution, execSessionId, agent, prompt) "$0.prompt($1, $2, $3)"
+                        )
+
+                    let kind = if isNull raw then "" else string raw?kind
+
+                    match kind with
+                    | "Started" -> return DeliverySpawnOutcome.Started execSessionId
+                    | "NotStarted" -> return DeliverySpawnOutcome.NotStarted(string raw?reason)
+                    | "Unknown" -> return DeliverySpawnOutcome.Unknown(string raw?reason)
+                    | _ -> return DeliverySpawnOutcome.Unknown "Execution prompt returned an unknown outcome"
                 with ex ->
                     return DeliverySpawnOutcome.Unknown ex.Message
             }
 
-    let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) (observedHead: obj) : Task<obj> =
+    let private discardExecutionOfJs (execution: obj) : string -> Task<Result<unit, string>> =
+        fun (execSessionId: string) ->
+            task {
+                try
+                    do!
+                        unbox<Task<unit>> (
+                            emitJsExpr (execution, execSessionId) "$0.discard($1)"
+                        )
+
+                    return Ok()
+                with ex ->
+                    return Error ex.Message
+            }
+
+    let ensurePlanWorkOpened
+        (gitCommonDir: string)
+        (root: string)
+        (sessionId: string)
+        (observedHead: obj)
+        : Task<obj> =
         task {
             let head = extractInt64Opt observedHead
 
-            match! PlanWorkOpen.ensurePlanWorkOpened store root sessionId head with
+            match! PlanWorkOpen.ensurePlanWorkOpened gitCommonDir root sessionId head with
             | Ok() -> return box {| ok = true; error = null |}
             | Error err -> return box {| ok = false; error = err |}
         }
 
-    let private acquiredCommonDir (store: IEventStore) : string option =
-        let text =
-            emitJsExpr (box store) "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
-            |> string
-
-        if String.IsNullOrWhiteSpace text then None else Some text
-
     let executeDeliver
-        (store: IEventStore)
+        (gitCommonDir: string)
         (root: string)
         (workId: string)
         (incumbencyId: string)
         (providerRunId: string)
         (toolCallId: string)
         (hasBlocker: bool)
-        (spawn: obj)
+        (execution: obj)
         (retirementCursor: obj)
         : Task<obj> =
-        let spawnFn = spawnOfJs spawn
+        let createSession = createExecutionOfJs execution
+        let promptSession = promptExecutionOfJs execution
+        let discardSession = discardExecutionOfJs execution
 
         task {
             let! outcome =
                 match extractInt64Opt retirementCursor with
                 | None -> Task.FromResult(Error "Plan retirement cursor evidence is required")
                 | Some cursor ->
-                    match acquiredCommonDir store with
-                    | None -> Task.FromResult(Error "git common directory is missing")
-                    | Some gitCommonDir ->
+                    if String.IsNullOrWhiteSpace gitCommonDir then
+                        Task.FromResult(Error "git common directory is missing")
+                    else
                         PlanTools.executeDeliver
                             gitCommonDir
-                            store
                             root
                             workId
                             incumbencyId
                             providerRunId
                             toolCallId
-                            hasBlocker
-                            spawnFn
+                            (fun () -> if hasBlocker then [| "retirement-blocked" |] else [||])
+                            createSession
+                            promptSession
+                            discardSession
                             cursor
 
             match outcome with
@@ -289,12 +325,11 @@ module PlanningSurface =
     let private delegateOfJs (delegateVal: obj) : string -> Task<string> =
         fun (intent: string) -> unbox<Task<string>> (emitJsExpr (delegateVal, intent) "$0($1)")
 
-    let executeAsk (store: IEventStore) (workId: string) (intent: string) (delegateTo: obj) : Task<obj> =
+    let executeAsk (gitCommonDir: string) (workId: string) (intent: string) (delegateTo: obj) : Task<obj> =
         let delegateFn = delegateOfJs delegateTo
 
         task {
-            match acquiredCommonDir store with
-            | None ->
+            if String.IsNullOrWhiteSpace gitCommonDir then
                 return
                     box
                         {| ok = false
@@ -302,8 +337,8 @@ module PlanningSurface =
                            workRecord = null
                            status = null
                            error = "git common directory is missing" |}
-            | Some gitCommonDir ->
-                let! outcome = PlanTools.executeAsk gitCommonDir store workId intent delegateFn
+            else
+                let! outcome = PlanTools.executeAsk gitCommonDir workId intent delegateFn
 
                 return
                     match outcome with
@@ -400,7 +435,7 @@ module PlanningSurface =
         | PlanReviewOutcome.Stayed -> "Stayed"
 
     let executeReview
-        (store: IEventStore)
+        (gitCommonDir: string)
         (workId: string)
         (incumbencyId: string)
         (findings: obj)
@@ -417,16 +452,15 @@ module PlanningSurface =
                            gaps = null
                            error = err |}
             | Ok gaps ->
-                match acquiredCommonDir store with
-                | None ->
+                if String.IsNullOrWhiteSpace gitCommonDir then
                     return
                         box
                             {| ok = false
                                outcome = null
                                gaps = null
                                error = "git common directory is missing" |}
-                | Some gitCommonDir ->
-                    match! ReviewPlanBackend.executeReview gitCommonDir store workId incumbencyId gaps with
+                else
+                    match! ReviewPlanBackend.executeReview gitCommonDir workId incumbencyId gaps with
                     | Error err ->
                         return
                             box

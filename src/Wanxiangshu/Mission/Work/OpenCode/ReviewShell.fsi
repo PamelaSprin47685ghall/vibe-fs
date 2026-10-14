@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.EventStore
 
 /// relay-assessment-011: the shared `review` shell. Owns the one ToolSpec
 /// (name, description, findings schema, admission) and dispatches by caller
@@ -11,4 +10,4 @@ open Wanxiangshu.Persistence.EventStore
 /// result rendering so its byte behavior is unchanged.
 module ReviewShell =
     val admission: ToolAdmission
-    val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> planStore: IEventStore option -> ToolSpec
+    val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

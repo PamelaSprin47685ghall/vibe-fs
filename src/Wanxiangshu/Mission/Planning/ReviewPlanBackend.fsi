@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.EventStore
 
 /// planning-022: one plan review either promotes the incumbency or keeps it
 /// in place.
@@ -40,7 +39,6 @@ module ReviewPlanBackend =
     /// repair obligations. Each incumbency reviews exactly once.
     val executeReview:
         gitCommonDir: string ->
-        store: IEventStore ->
         workId: string ->
         incumbencyId: string ->
         gaps: (string * string) list ->

@@ -36,6 +36,9 @@ type SessionMessage =
 type ISessionSnapshotPort =
     abstract GetMessages: sessionId: SessionId -> Task<Result<SessionMessage list, string>>
 
+type ISessionDiscoveryPort =
+    abstract FindRootSessionsByTitle: title: string -> Task<Result<SessionId list, string>>
+
 module SessionSnapshot =
     type ToolCallLocation =
         { ProviderRun: ProviderRunIdentity

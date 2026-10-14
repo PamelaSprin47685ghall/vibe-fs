@@ -6,12 +6,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.EventStore
 
 /// Entry point for the first prompt of a plan session (planning-020): opens
-/// the work, binds the fixed DevOps and starts the first incumbency at S1.
-/// Idempotent for a work that already exists; fails with zero writes when the
-/// store cannot be read or an append fails.
+/// the work and starts the first incumbency at S1. DevOps is bound by the
+/// first successful ask, not by opening.
 module PlanWorkOpen =
 
     [<Import("existsSync", "node:fs")>]
@@ -22,77 +20,38 @@ module PlanWorkOpen =
     let internal deriveDevOpsId (workId: string) : string =
         "devops-" + (HostDigest.sha256Hex ("plan-devops:" + workId)).[..15]
 
-    let private resolveStoreDir (root: string) (stampedDir: string) =
-        if not (String.IsNullOrWhiteSpace stampedDir) then
-            stampedDir
-        elif root.EndsWith("/wanxiangshu") then
-            root.Substring(0, root.Length - "/wanxiangshu".Length)
-        else
-            root
-
-    let private receiptRefusal (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
-        if receipt.Reason = "" then
-            receipt.Status
-        else
-            receipt.Reason
-
-    let private settleOpenReceipt
-        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
-        : Task<Result<unit, string>> =
-        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
-            Task.FromResult(Ok())
-        else
-            Task.FromResult(Error(receiptRefusal receipt))
-
     let private ensureOpened
         (root: string)
         (sessionId: string)
         (head: int64)
         (gitCommonDir: string)
         : Task<Result<unit, string>> =
-        let snapshot =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspect gitCommonDir sessionId
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened
+            gitCommonDir
+            sessionId
+            (sessionId + ":open:" + string head)
+            root
+            (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.planSequence ())
+            sessionId
+            (float head)
+        |> Result.map ignore
+        |> Task.FromResult
 
-        let opened = snapshot?opened
-
-        if unbox<bool> opened then
-            Task.FromResult(Ok())
-        else
-            let requestId = sessionId + ":open:" + string head
-
-            let command =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                    "Open"
-                    [ "root", box root
-                      "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.planSequence ()
-                      "ownerId", box sessionId
-                      "openingCursor", box (float head) ]
-
-            let receipt =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
-
-            settleOpenReceipt receipt
-
-    let private openDerived
-        (store: IEventStore)
+    let private openAt
+        (gitCommonDir: string)
         (root: string)
         (sessionId: string)
         (head: int64)
         : Task<Result<unit, string>> =
-        let stamped =
-            emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+        let parentExists = existsSync gitCommonDir
 
-        let stampedDir = if isNull stamped then "" else string stamped
-        let derived = resolveStoreDir root stampedDir
-        let parentExists = existsSync derived
-
-        if String.IsNullOrWhiteSpace derived || not parentExists then
-            Task.FromResult(Error "the plan store cannot be read")
+        if String.IsNullOrWhiteSpace gitCommonDir || not parentExists then
+            Task.FromResult(Error "the lifecycle journal directory cannot be read")
         else
-            ensureOpened root sessionId head derived
+            ensureOpened root sessionId head gitCommonDir
 
     let ensurePlanWorkOpened
-        (store: IEventStore)
+        (gitCommonDir: string)
         (root: string)
         (sessionId: string)
         (observedHead: int64 option)
@@ -102,4 +61,4 @@ module PlanWorkOpen =
         elif observedHead.IsNone then
             Task.FromResult(Error "opening cursor was not observed")
         else
-            openDerived store root sessionId observedHead.Value
+            openAt gitCommonDir root sessionId observedHead.Value

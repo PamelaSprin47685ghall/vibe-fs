@@ -143,6 +143,18 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
         const child = childSessions.find((candidate) => candidate.id === id)
         return { data: child ?? { id } }
       },
+      list: async (args) => {
+        const query = args?.query ?? {}
+        const wanted = typeof query.search === 'string' ? query.search : null
+        const rootsOnly = query.roots === true
+        return {
+          data: childSessions.filter((session) => {
+            if (rootsOnly && session.parentID != null) return false
+            if (wanted != null && !String(session.title ?? '').includes(wanted)) return false
+            return true
+          }),
+        }
+      },
       children: async (args) => ({
         data: childSessions.filter((child) => child.parentID === args?.path?.id),
       }),
@@ -345,6 +357,7 @@ export const withRestartablePlugin = async (body) => {
     await body(start, directory, {
       stop,
       withRuntime,
+      client,
       createdIds,
       abortedIds,
       prompts,

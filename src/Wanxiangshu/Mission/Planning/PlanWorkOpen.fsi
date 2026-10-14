@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.EventStore
 
 module PlanWorkOpen =
     /// root is the plan root directory (<git-common-dir>/wanxiangshu in
@@ -9,7 +8,7 @@ module PlanWorkOpen =
     /// observedHead is the XTrace head observed at opening; without it the
     /// entry refuses with zero writes.
     val ensurePlanWorkOpened:
-        store: IEventStore ->
+        gitCommonDir: string ->
         root: string ->
         sessionId: string ->
         observedHead: int64 option ->

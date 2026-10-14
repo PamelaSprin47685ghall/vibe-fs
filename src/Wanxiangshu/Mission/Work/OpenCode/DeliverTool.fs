@@ -15,7 +15,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 module DeliverTool =
@@ -57,25 +56,18 @@ module DeliverTool =
     let private pendingDeferred (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.pendingAttentionWorkPairs sessionId (AgentJournal.snapshot journal).AgentProjections
 
-    /// The one lifecycle work this session owns, read from the same workspace
-    /// EventStore the kernel writes.
+    /// The one lifecycle work this session owns. Lifecycle storage is the
+    /// wanxiangli journal, independent of the workspace EventStore.
     let private lifecycleWorkOf
         (directory: string)
         (sessionId: string)
-        : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
+        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         let commonDir = RuntimePath.gitCommonDir directory
 
-        let held =
-            if String.IsNullOrWhiteSpace commonDir then
-                None
-            else
-                WorkspaceEventStore.tryCurrent commonDir
-
-        match held with
-        | None -> None
-        | Some held ->
+        if String.IsNullOrWhiteSpace commonDir then
+            None
+        else
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
-            |> Option.map (fun seen -> held, seen)
 
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
@@ -182,7 +174,7 @@ module DeliverTool =
     let private prepareTarget (context: HostToolContext) (bound: BoundRetirement) : Result<PreparedRetirement, string> =
         let located =
             lifecycleWorkOf bound.Directory context.SessionId
-            |> Option.bind (fun (_, work) -> work.ActiveId |> Option.map (fun active -> work, active))
+            |> Option.bind (fun work -> work.ActiveId |> Option.map (fun active -> work, active))
 
         match located with
         | None -> Error(text Path.BindingUnavailable)
@@ -276,7 +268,8 @@ module DeliverTool =
         confirmFirst
         =
         let confirmedReplay =
-            WorkspaceEventStore.tryLifecycleWorkOfDirectory scope.WorkspaceDirectory context.SessionId
+            scope.WorkspaceDirectory
+            |> Option.bind (fun directory -> lifecycleWorkOf directory context.SessionId)
             |> Option.bind (fun work -> work.Confirmation)
             |> Option.exists (fun fence -> fence.ProviderRunId = providerRunId && fence.ToolCallId = toolCallId)
 
@@ -398,18 +391,11 @@ module DeliverTool =
                 let directory = scope.WorkspaceDirectory
                 let commonDir = directory |> Option.map RuntimePath.gitCommonDir
 
-                let store =
-                    commonDir
-                    |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
-                    |> Option.map (fun dir ->
-                        match WorkspaceEventStore.tryCurrent dir with
-                        | Some held -> held
-                        | None -> WorkspaceEventStore.acquire dir)
-
-                match commonDir, store with
-                | _, None -> return Error "lifecycle store is unavailable"
-                | None, _ -> return Error "lifecycle store is unavailable"
-                | Some journalDir, Some _ ->
+                match commonDir with
+                | None -> return Error "lifecycle journal directory is unavailable"
+                | Some journalDir when String.IsNullOrWhiteSpace journalDir ->
+                    return Error "lifecycle journal directory is unavailable"
+                | Some journalDir ->
                     return! runFrozenDeliver scope context prepared pending providerRunId toolCallId journalDir
             }
 
@@ -457,7 +443,7 @@ module DeliverTool =
         : Result<PreparedRetirement, string> =
         try
             lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId)
-            |> Option.map (fun (_, work) -> refreshedTarget target work)
+            |> Option.map (refreshedTarget target)
             |> Option.defaultValue (Error(text Path.BindingUnavailable))
         with _ ->
             Error(text Path.FinishFailed)

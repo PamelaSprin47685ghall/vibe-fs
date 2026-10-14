@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.EventStore
 
 module PlanningSurface =
     val assembleTenureMessages:
@@ -13,27 +12,28 @@ module PlanningSurface =
     val readPlan: root: string -> workId: string -> obj
     val rewritePlanAtomic: root: string -> workId: string -> content: string -> obj
     val editPlanAtomic: root: string -> workId: string -> patches: obj -> obj
-    val ensurePlanWorkOpened: store: IEventStore -> root: string -> sessionId: string -> observedHead: obj -> Task<obj>
+    val ensurePlanWorkOpened:
+        gitCommonDir: string -> root: string -> sessionId: string -> observedHead: obj -> Task<obj>
 
     val executeDeliver:
-        store: IEventStore ->
+        gitCommonDir: string ->
         root: string ->
         workId: string ->
         incumbencyId: string ->
         providerRunId: string ->
         toolCallId: string ->
         hasBlocker: bool ->
-        spawn: obj ->
+        execution: obj ->
         retirementCursor: obj ->
             Task<obj>
 
     /// planning-010: `delegateTo` is a plain JavaScript function
     /// `(intent) => Promise<string>` returning the DevOps work record.
-    val executeAsk: store: IEventStore -> workId: string -> intent: string -> delegateTo: obj -> Task<obj>
+    val executeAsk: gitCommonDir: string -> workId: string -> intent: string -> delegateTo: obj -> Task<obj>
     val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj
     val reviewTargetFor: stage: string -> string
 
     val executeReview:
-        store: IEventStore -> workId: string -> incumbencyId: string -> findings: obj -> note: obj -> Task<obj>
+        gitCommonDir: string -> workId: string -> incumbencyId: string -> findings: obj -> note: obj -> Task<obj>
 
     val PlanningSurface: obj

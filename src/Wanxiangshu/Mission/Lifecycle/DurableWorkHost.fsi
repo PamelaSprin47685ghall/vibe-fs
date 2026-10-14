@@ -52,6 +52,10 @@ module DurableWorkHost =
           DeliveryAuthorized: bool
           Delivered: bool
           PendingDelivery: bool
+          PendingOperationId: string option
+          PendingExecSessionId: string option
+          PendingDigest: string option
+          PendingPath: string option
           RoundCount: int
           RetiredRuns: string list
           DevOpsId: string option
@@ -65,4 +69,15 @@ module DurableWorkHost =
           Advances: HostAdvance list }
 
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
+
+    val ensureOpened:
+        gitCommonDir: string ->
+        workId: string ->
+        requestId: string ->
+        root: string ->
+        sequence: obj ->
+        ownerId: string ->
+        openingCursor: float ->
+            Result<InspectedWork, string>
+
     val recover: gitCommonDir: string -> workId: string -> obj

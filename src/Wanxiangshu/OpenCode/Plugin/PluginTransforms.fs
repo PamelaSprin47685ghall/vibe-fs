@@ -672,15 +672,11 @@ module PluginTransforms =
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
 
-        /// Borrow the already-owned workspace store for a directory, acquiring
-        /// it when this process does not own one yet.
-        let lifecycleStoreFor (dir: string) =
-            match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
-            | Some held -> Some held
-            | None -> Some(Wanxiangshu.OpenCode.WorkspaceEventStore.acquire dir)
-
         let tryReadLifecycleWork (sid: string) =
-            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory workspaceDirectory sid
+            workspaceDirectory
+            |> Option.bind (fun workspace ->
+                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sid)
 
 
         let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch =
@@ -877,29 +873,16 @@ module PluginTransforms =
                         ProviderWireDecode.messagesFromTransformOutput outObj
                         |> captureXTraceMessages projectionSessionIdOpt
 
-                    let storeForDirectory dir =
-                        if System.String.IsNullOrWhiteSpace dir then
-                            None
-                        else
-                            lifecycleStoreFor dir
-
                     match captured.Receipt with
                     | None -> return captured
                     | Some receipt ->
                         let observedHead = XTraceCursor.sequence receipt.CurrentHead
 
-                        let borrowedStore =
-                            workspaceDirectory
-                            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                            |> Option.bind storeForDirectory
-
                         do!
                             ManagerWorkflow.ensureManagerWorkOpened
                                 workspaceDirectory
-                                borrowedStore
                                 (Some observedHead)
                                 projectionSessionIdOpt
-                                None
 
                         return captured
                 }

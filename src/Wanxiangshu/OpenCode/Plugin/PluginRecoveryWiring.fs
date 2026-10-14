@@ -71,6 +71,173 @@ module PluginRecoveryWiring =
 
             Option.map2 (seedDevOpsTarget sessionId) child target |> ignore
 
+    let private firstUserPrompt (messages: SessionMessage list) : string option =
+        messages
+        |> List.tryFind (fun message -> message.Role = "user")
+        |> Option.map (fun message ->
+            Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.partsText message.Parts)
+        |> Option.filter (fun text -> not (String.IsNullOrEmpty text))
+
+    let private observeBoundDelivery
+        (gitCommonDir: string)
+        (workId: string)
+        (execSessionId: string)
+        (snapshots: ISessionSnapshotPort)
+        (retirementBlockers: string -> string array)
+        : Task =
+        task {
+            match! snapshots.GetMessages(SessionId.create execSessionId) with
+            | Ok messages ->
+                match firstUserPrompt messages with
+                | None ->
+                    Diagnostic.emit
+                        "plan-delivery-recovery-pending"
+                        [ "work_id", workId
+                          "exec_session_id", execSessionId
+                          "reason", "bound session has no observed user prompt" ]
+                | Some prompt ->
+                    match
+                        Wanxiangshu.Mission.Planning.PlanTools.reconcileBoundExecution
+                            gitCommonDir
+                            workId
+                            execSessionId
+                            prompt
+                            (retirementBlockers workId)
+                    with
+                    | Ok _ ->
+                        Diagnostic.emit
+                            "plan-delivery-recovery-settled"
+                            [ "work_id", workId; "exec_session_id", execSessionId ]
+                    | Error reason ->
+                        Diagnostic.emit
+                            "plan-delivery-recovery-refused"
+                            [ "work_id", workId
+                              "exec_session_id", execSessionId
+                              "reason", reason ]
+            | Error reason ->
+                Diagnostic.emit
+                    "plan-delivery-recovery-observation-failed"
+                    [ "work_id", workId
+                      "exec_session_id", execSessionId
+                      "reason", reason ]
+        }
+
+    let private discoverUnboundDelivery
+        (gitCommonDir: string)
+        (workId: string)
+        (operationId: string)
+        (snapshots: ISessionSnapshotPort option)
+        (discovery: ISessionDiscoveryPort)
+        (retirementBlockers: string -> string array)
+        : Task =
+        task {
+            let title = "wanxiangshu-delivery:" + operationId
+
+            match! discovery.FindRootSessionsByTitle title with
+            | Error reason ->
+                Diagnostic.emit
+                    "plan-delivery-recovery-discovery-failed"
+                    [ "work_id", workId; "operation_id", operationId; "reason", reason ]
+            | Ok [] ->
+                Diagnostic.emit
+                    "plan-delivery-recovery-unbound"
+                    [ "work_id", workId
+                      "operation_id", operationId
+                      "reason", "no exact Host session is currently observable" ]
+            | Ok [ sessionId ] ->
+                let execSessionId = SessionId.value sessionId
+
+                match
+                    Wanxiangshu.Mission.Planning.PlanTools.bindObservedExecutionSession
+                        gitCommonDir
+                        workId
+                        operationId
+                        execSessionId
+                with
+                | Error reason ->
+                    Diagnostic.emit
+                        "plan-delivery-recovery-bind-refused"
+                        [ "work_id", workId
+                          "operation_id", operationId
+                          "exec_session_id", execSessionId
+                          "reason", reason ]
+                | Ok() ->
+                    match snapshots with
+                    | Some snapshot ->
+                        do! observeBoundDelivery gitCommonDir workId execSessionId snapshot retirementBlockers
+                    | None ->
+                        Diagnostic.emit
+                            "plan-delivery-recovery-no-snapshot"
+                            [ "work_id", workId; "exec_session_id", execSessionId ]
+            | Ok sessions ->
+                Diagnostic.emit
+                    "plan-delivery-recovery-ambiguous"
+                    [ "work_id", workId
+                      "operation_id", operationId
+                      "matches", string sessions.Length ]
+        }
+
+    /// A delivery session is bound durably before its first prompt is sent.
+    /// After restart we never resend that prompt: OpenCode 1.18.29 accepts a
+    /// caller message id but does not make repeated parts idempotent. Instead
+    /// we read the exact bound session and settle only when the real first user
+    /// message proves the reserved plan bytes reached that container.
+    let private reconcilePendingDeliveries
+        (journal: AgentJournal)
+        (workspace: string option)
+        (snapshotPort: ISessionSnapshotPort option)
+        (discoveryPort: ISessionDiscoveryPort option)
+        (retirementBlockers: string -> string array)
+        : Task =
+        task {
+            let gitCommonDir =
+                workspace
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.defaultValue ""
+
+            if String.IsNullOrWhiteSpace gitCommonDir then
+                ()
+            else
+                let sessions =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
+                    |> Seq.distinct
+                    |> Seq.toArray
+
+                for workId in sessions do
+                    match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
+                    | Some work when work.PendingDelivery ->
+                        match work.PendingExecSessionId, snapshotPort with
+                        | Some execSessionId, Some snapshots ->
+                            do! observeBoundDelivery gitCommonDir workId execSessionId snapshots retirementBlockers
+                        | None, _ ->
+                            match work.PendingOperationId, discoveryPort with
+                            | Some operationId, Some discovery ->
+                                do!
+                                    discoverUnboundDelivery
+                                        gitCommonDir
+                                        workId
+                                        operationId
+                                        snapshotPort
+                                        discovery
+                                        retirementBlockers
+                            | Some operationId, None ->
+                                Diagnostic.emit
+                                    "plan-delivery-recovery-no-discovery"
+                                    [ "work_id", workId; "operation_id", operationId ]
+                            | None, _ ->
+                                Diagnostic.emit
+                                    "plan-delivery-recovery-unbound"
+                                    [ "work_id", workId
+                                      "reason", "pending delivery has no operation identity" ]
+                        | Some execSessionId, None ->
+                            Diagnostic.emit
+                                "plan-delivery-recovery-no-snapshot"
+                                [ "work_id", workId
+                                  "exec_session_id", execSessionId ]
+                    | _ -> ()
+        }
+
     let private readExistingFile (fullPath: string) : string option =
         if System.IO.File.Exists fullPath then
             Some(System.IO.File.ReadAllText fullPath)
@@ -85,6 +252,9 @@ module PluginRecoveryWiring =
 
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
+        let snapshotPort = SessionSnapshotPort.create boot.Input
+        let discoveryPort = SessionSnapshotPort.createDiscovery boot.Input
+        let retirementBlockers sessionId = scope.RetirementBlockersFor sessionId |> List.toArray
 
         // Restart dropped the process-local execution bindings; the durable
         // handle records are the evidence for which parented children a road
@@ -140,6 +310,13 @@ module PluginRecoveryWiring =
                     | Some journal ->
                         do! ChildWorkRecovery.settleOrphanedChildRuns journal
                         do! settleAbandonedStaleBloggerSessions journal
+                        do!
+                            reconcilePendingDeliveries
+                                journal
+                                boot.WorkspaceDirectory
+                                snapshotPort
+                                discoveryPort
+                                retirementBlockers
                     | None -> ()
 
                     do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PluginRuntimeReloaded)

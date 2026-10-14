@@ -13,15 +13,15 @@ test('WHAT[distribution-011] source checkout consumes one tracked wanxiangli npm
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
   const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
   assert.deepEqual(manifest.bundleDependencies, ['wanxiangli'])
-  assert.equal(manifest.dependencies.wanxiangli, 'file:vendor/wanxiangli-0.5.1.tgz')
+  assert.equal(manifest.dependencies.wanxiangli, 'file:vendor/wanxiangli-0.5.2.tgz')
 
-  const artifact = path.join(root, 'vendor/wanxiangli-0.5.1.tgz')
+  const artifact = path.join(root, 'vendor/wanxiangli-0.5.2.tgz')
   assert.ok(fs.existsSync(artifact), 'tracked wanxiangli artifact is missing')
   const bytes = fs.readFileSync(artifact)
   const integrity = 'sha512-' + crypto.createHash('sha512').update(bytes).digest('base64')
   const locked = lock.packages['node_modules/wanxiangli']
-  assert.equal(locked.version, '0.5.1')
-  assert.equal(locked.resolved, 'file:vendor/wanxiangli-0.5.1.tgz')
+  assert.equal(locked.version, '0.5.2')
+  assert.equal(locked.resolved, 'file:vendor/wanxiangli-0.5.2.tgz')
   assert.equal(locked.integrity, integrity)
   assert.equal(locked.inBundle, true)
 
@@ -35,7 +35,7 @@ test('WHAT[distribution-011] source checkout consumes one tracked wanxiangli npm
       entry.on('end', () => { packageJson = Buffer.concat(chunks).toString('utf8') })
     },
   })
-  assert.equal(JSON.parse(packageJson).version, '0.5.1')
+  assert.equal(JSON.parse(packageJson).version, '0.5.2')
 
   const trackedSource = execFileSync('git', ['ls-files', '--stage', 'wanxiangli'], {
     cwd: root,

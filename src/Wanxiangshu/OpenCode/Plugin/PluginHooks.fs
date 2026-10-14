@@ -133,9 +133,13 @@ module PluginHooks =
             let planStageFor (sessionId: SessionId) : string option =
                 match roleFor sessionId with
                 | Some Role.Plan ->
-                    Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
-                        workspaceDirectory
-                        (SessionId.value sessionId)
+                    workspaceDirectory
+                    |> Option.bind (fun workspace ->
+                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
+                            commonDir
+                            (SessionId.value sessionId))
                     |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
                 | _ -> None
 

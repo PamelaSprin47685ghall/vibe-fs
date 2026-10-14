@@ -31,10 +31,16 @@ const openedActiveId = (text) => {
 }
 
 const openWork = async (store, commonDir, workId) => {
-  const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, commonDir, workId, 0n)
+  const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, workId, 0n)
   assert.equal(opened.ok, true, opened.error)
   return openedActiveId(life.encodeOpening('plan', workId, commonDir, 0n))
 }
+
+const forbiddenExecution = () => ({
+  create: async () => { throw new Error('execution create must not be called') },
+  prompt: async () => { throw new Error('execution prompt must not be called') },
+  discard: async () => {},
+})
 
 test('WHAT[work-025] deliver without authorization relays: retires Relayed and opens the next tenure at the same stage', async () => {
   const text = life.encodeOpening('plan', 'work-h1', '/repo/root', 0n)
@@ -87,8 +93,8 @@ test('WHAT[work-025] relay is blocked by live resources or a wrong incumbency id
     const activeId = await openWork(store, commonDir, 'work-h2')
 
     const blocked = await surface.PlanningSurface.executeDeliver(
-      store, root, 'work-h2', activeId, 'run-b', 'call-b', true,
-      async () => { throw new Error('spawn must not be called') },
+      commonDir, root, 'work-h2', activeId, 'run-b', 'call-b', true,
+      forbiddenExecution(),
       10n,
     )
     assert.equal(blocked.ok, true, blocked.error)
@@ -97,8 +103,8 @@ test('WHAT[work-025] relay is blocked by live resources or a wrong incumbency id
     assert.equal(blocked.retirementOutcome, 'Blocked')
 
     const wrong = await surface.PlanningSurface.executeDeliver(
-      store, root, 'work-h2', 'wrong-inc', 'run-w', 'call-w', false,
-      async () => { throw new Error('spawn must not be called') },
+      commonDir, root, 'work-h2', 'wrong-inc', 'run-w', 'call-w', false,
+      forbiddenExecution(),
       10n,
     )
     assert.equal(wrong.ok, false)
@@ -111,8 +117,12 @@ test('WHAT[work-025] missing retirement evidence causes no spawn and no Plan wri
     const activeId = await openWork(store, commonDir, 'work-h3')
     let spawnCalls = 0
     const res = await surface.PlanningSurface.executeDeliver(
-      store, root, 'work-h3', activeId, 'run-3', 'call-3', false,
-      async () => { spawnCalls += 1; return 'exec-never' },
+      commonDir, root, 'work-h3', activeId, 'run-3', 'call-3', false,
+      {
+        create: async () => { spawnCalls += 1; return 'exec-never' },
+        prompt: async () => { spawnCalls += 1; return { kind: 'Started' } },
+        discard: async () => {},
+      },
       undefined,
     )
     assert.equal(res.ok, false)

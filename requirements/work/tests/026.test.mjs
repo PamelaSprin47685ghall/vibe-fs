@@ -21,7 +21,7 @@ const withWorkspace = async (body) => {
 }
 
 const openWork = async (store, commonDir, workId) => {
-  const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, commonDir, workId, 0n)
+  const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, workId, 0n)
   assert.equal(opened.ok, true, opened.error)
   const folded = life.readProbe(life.encodeOpening('plan', workId, commonDir, 0n))
   assert.equal(folded.ok, true, folded.reason)
@@ -37,8 +37,12 @@ test('WHAT[work-026] authorized deliver without retirement evidence fails closed
     const activeId = await openWork(store, commonDir, workId)
     let spawnCalls = 0
     const res = await surface.PlanningSurface.executeDeliver(
-      store, root, workId, activeId, 'run-d3', 'call-d3', false,
-      async () => { spawnCalls += 1; return 'exec-never' },
+      commonDir, root, workId, activeId, 'run-d3', 'call-d3', false,
+      {
+        create: async () => { spawnCalls += 1; return 'exec-never' },
+        prompt: async () => { spawnCalls += 1; return { kind: 'Started' } },
+        discard: async () => {},
+      },
       undefined,
     )
     assert.equal(res.ok, false)

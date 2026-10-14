@@ -217,6 +217,10 @@ module DurableWorkHost =
           DeliveryAuthorized: bool
           Delivered: bool
           PendingDelivery: bool
+          PendingOperationId: string option
+          PendingExecSessionId: string option
+          PendingDigest: string option
+          PendingPath: string option
           RoundCount: int
           RetiredRuns: string list
           DevOpsId: string option
@@ -256,6 +260,12 @@ module DurableWorkHost =
 
     let private confirmedOf (active: obj) : bool =
         not (isNull active) && unbox<bool> active?confirmed
+
+    let private pendingText (pending: obj) (name: string) : string option =
+        if isNull pending then
+            None
+        else
+            optionalText (textOf pending?(name))
 
     let private sequenceOf (snapshot: obj) : string list =
         if isNull snapshot?sequence then
@@ -335,6 +345,7 @@ module DurableWorkHost =
 
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
+        let pending: obj = snapshot?pendingDelivery
         let activeId = activeIdOf active
         let outcome = reviewOutcomeOf active
         let rounds = unbox<obj array> snapshot?rounds
@@ -357,7 +368,11 @@ module DurableWorkHost =
           PredecessorRange = predecessorRangeOf activeId rounds
           DeliveryAuthorized = unbox<bool> snapshot?deliveryAuthorized
           Delivered = isNull active && not (isNull snapshot?opened)
-          PendingDelivery = not (isNull snapshot?pendingDelivery)
+          PendingDelivery = not (isNull pending)
+          PendingOperationId = pendingText pending "operationId"
+          PendingExecSessionId = pendingText pending "execSessionId"
+          PendingDigest = pendingText pending "digest"
+          PendingPath = pendingText pending "path"
           RoundCount = rounds.Length
           RetiredRuns = retirements |> Array.choose retiredRunOf |> Array.toList
           DevOpsId = optionalText (textOf snapshot?devopsId)
@@ -389,6 +404,64 @@ module DurableWorkHost =
             None
         else
             inspectedJournal gitCommonDir workId
+
+    let private openingFailure (receipt: HostReceipt) =
+        if receipt.Reason = "" then receipt.Status else receipt.Reason
+
+    let private expectedSequence (value: obj) =
+        asArray value |> Array.toList |> List.map text
+
+    let private matchingOpening
+        (root: string)
+        (sequence: obj)
+        (work: InspectedWork)
+        : Result<InspectedWork, string> =
+        let expected = expectedSequence sequence
+
+        if work.Sequence <> expected then
+            Error "existing lifecycle work has a different sequence"
+        elif work.Root <> Some root then
+            Error "existing lifecycle work has a different root"
+        else
+            Ok work
+
+    /// Idempotent host opening across process races. An in-memory precheck is
+    /// not a lock: Conflict or Unknown can still mean another writer committed
+    /// the same work. Only a durable reread decides whether opening is settled.
+    let ensureOpened
+        (gitCommonDir: string)
+        (workId: string)
+        (requestId: string)
+        (root: string)
+        (sequence: obj)
+        (ownerId: string)
+        (openingCursor: float)
+        : Result<InspectedWork, string> =
+        let readExisting () =
+            inspected gitCommonDir workId |> Option.map (matchingOpening root sequence)
+
+        match readExisting () with
+        | Some result -> result
+        | None ->
+            let issued =
+                command
+                    "Open"
+                    [ "root", box root
+                      "sequence", sequence
+                      "ownerId", box ownerId
+                      "openingCursor", box openingCursor ]
+
+            let receipt = execute gitCommonDir workId requestId issued
+
+            match receipt.Status with
+            | "Committed"
+            | "Replayed"
+            | "Conflict"
+            | "Unknown" ->
+                match readExisting () with
+                | Some result -> result
+                | None -> Error(openingFailure receipt)
+            | _ -> Error(openingFailure receipt)
 
     let recover (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?recover ())

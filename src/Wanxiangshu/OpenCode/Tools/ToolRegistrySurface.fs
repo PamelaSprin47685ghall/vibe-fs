@@ -55,7 +55,7 @@ module ToolRegistrySurface =
         | _ -> [||]
 
     let runJsPlan
-        (store: Wanxiangshu.Persistence.EventStore.IEventStore)
+        (gitCommonDir: string)
         (root: string)
         (workId: string)
         (program: string)
@@ -65,7 +65,7 @@ module ToolRegistrySurface =
                 ProviderLanguageBinding.readGlobalPreference ()
             )
 
-        ToolRegistry.runPlanProgram prose store root workId program
+        ToolRegistry.runPlanProgram prose gitCommonDir root workId program
 
     let jsPlanDescription (language: string) : string =
         let parsed = ProviderLanguage.parse language

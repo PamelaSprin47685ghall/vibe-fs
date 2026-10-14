@@ -22,7 +22,7 @@ module ToolRegistrySurface =
     val capabilityToolNames: roleLabel: string -> requestKindLabel: string -> string array
 
     val runJsPlan:
-        store: Wanxiangshu.Persistence.EventStore.IEventStore ->
+        gitCommonDir: string ->
         root: string ->
         workId: string ->
         program: string ->

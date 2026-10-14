@@ -52,7 +52,7 @@ module ToolRegistry =
 
     val runPlanProgram:
         prose: JsCanonicalDescription.Prose ->
-        store: IEventStore ->
+        gitCommonDir: string ->
         root: string ->
         sessionId: string ->
         program: string ->

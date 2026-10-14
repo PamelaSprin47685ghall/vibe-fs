@@ -4,7 +4,7 @@
 
 - Lifecycle SQLite 宿主边界不再静态绑定 Node：`DurableWorkHost` 统一按实际 JS 运行时选择 Node `DatabaseSync` 或 Bun `Database`，Surface 的内存 probe 复用同一入口。新增 work-047 在 Node/Bun 真实加载、持久开立、关闭与重开；修复前 Bun 在模块加载阶段即因 `node:sqlite` 失败。
 - Plan 持权交付恢复 wanxiangli 的真实外部效果边界：只有首次 `Committed + DeliveryRequested` 可启动；`AcceptanceUnknown` 与创建异常保持 pending，不再伪装 `NotStarted`；同请求 replay 只观察原 operation。启动前重新核对计划 digest/path，已变更则明确 NotStarted。work-039 从原先实际未触发 spawn 的假绿测试改为真授权 S1→S3 路径，验证原文 prompt、execSessionId 与 unknown/reconcile/retry。
-- 交付依赖改为仓库跟踪的 `vendor/wanxiangli-0.5.1.tgz`，移除 superproject 的无 `.gitmodules` gitlink；根 `engines.node` 收紧为 `>=22.13.0`。最终 wanxiangshu tarball 通过 `bundleDependencies` 自包含 wanxiangli，release verifier 将其作为唯一允许的 `node_modules` 闭包逐字节校验，并删除消费者顶层副本后再导入插件。
+- 交付依赖改为仓库跟踪的 `vendor/wanxiangli-0.5.2.tgz`，移除 superproject 的无 `.gitmodules` gitlink；根 `engines.node` 收紧为 `>=22.13.0`。0.5.2 在 `DeliveryRequested` 与 prompt 接受之间增加 durable `DeliverySessionBound(operationId, execSessionId)`：真实 session 创建后先绑定身份，再发送首 prompt；重启只观察该 session，不重复创建或重发。最终 wanxiangshu tarball 通过 `bundleDependencies` 自包含 wanxiangli，release verifier 将其作为唯一允许的 `node_modules` 闭包逐字节校验，并删除消费者顶层副本后再导入插件。
 
 ## Unreleased — Fission lane 执行接纳修复（现场停摆根因）
 

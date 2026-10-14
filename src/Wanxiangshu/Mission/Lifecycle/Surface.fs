@@ -6,7 +6,6 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 
 module LifecycleSurface =
@@ -470,19 +469,35 @@ module LifecycleSurface =
                 let events: obj array = unbox (parseJson (string requested?bytes))?events
                 string (events |> Array.find (fun event -> string event?``type`` = "DeliveryRequested"))?operationId
 
-            let observed =
+            let executionSession = "exec:" + operationId
+
+            let bound =
                 attempt
                     workId
                     (Array.append records (recordsOf (string requested?bytes)))
-                    operationId
+                    (operationId + ":session-created")
                     (command
                         "ResolveDelivery"
                         [ "operationId", box operationId
-                          "outcome", box "Accepted"
-                          "execSessionId", box ("exec:" + operationId)
-                          "digest", box digest
-                          "path", box path
-                          "blockers", box ([||]: string array) ])
+                          "outcome", box "SessionCreated"
+                          "execSessionId", box executionSession ])
+
+            let observed =
+                if string bound?decision <> "Write" then
+                    bound
+                else
+                    attempt
+                        workId
+                        (Array.append records (recordsOf (string requested?bytes + string bound?bytes)))
+                        (operationId + ":accepted")
+                        (command
+                            "ResolveDelivery"
+                            [ "operationId", box operationId
+                              "outcome", box "Accepted"
+                              "execSessionId", box executionSession
+                              "digest", box digest
+                              "path", box path
+                              "blockers", box ([||]: string array) ])
 
             if string observed?decision <> "Write" then
                 observed
@@ -491,7 +506,7 @@ module LifecycleSurface =
                     {| decision = "Write"
                        detail = "delivered"
                        names = namesOfRecord (string observed?bytes)
-                       bytes = string requested?bytes + string observed?bytes
+                       bytes = string requested?bytes + string bound?bytes + string observed?bytes
                        authorized = unbox<bool> observed?authorized
                        authority = string observed?authority |}
 

@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.Planning
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.EventStore
 
 /// planning-022: one plan review either promotes the incumbency or keeps it
 /// in place.
@@ -130,7 +129,6 @@ module ReviewPlanBackend =
 
     let executeReview
         (gitCommonDir: string)
-        (store: IEventStore)
         (workId: string)
         (incumbencyId: string)
         (gaps: (string * string) list)

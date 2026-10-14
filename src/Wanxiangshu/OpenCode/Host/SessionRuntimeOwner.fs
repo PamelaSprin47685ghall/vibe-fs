@@ -16,3 +16,4 @@ type ISessionRuntimeOwner =
     abstract DisposeAsync: unit -> Task
     /// EXEC-016: live PTY still tracked for this parent session (DevOps).
     abstract HasLivePty: string -> bool
+    abstract RetirementBlockersFor: string -> string list

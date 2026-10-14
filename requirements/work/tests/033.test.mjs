@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { DurableWork } from 'wanxiangli/durable-work'
+import { Work } from 'wanxiangli/work'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -30,6 +31,70 @@ const withStore = async (body) => {
     rmSync(root, { recursive: true, force: true })
   }
 }
+
+test('WHAT[work-033] one projection uses one record snapshot even when another connection commits between reads', async () => {
+  await withStore(async (store, root) => {
+    const workId = 'snapshot-race'
+    const journal = new SqliteJournal(new DatabaseSync(surface.journalPath(store.gitCommonDir)))
+    const originalPrepare = DatabaseSync.prototype.prepare
+    try {
+      const work = new DurableWork(workId, journal)
+      const opened = work.execute('open', {
+        type: 'Open', root, sequence: ['S1', 'S2', 'S3'], ownerId: workId, openingCursor: 0,
+      })
+      assert.equal(opened.status, 'Committed')
+      const initialId = opened.result.incumbencyId
+      const candidate = new Work(workId, journal.read(workId))
+      const relay = candidate.execute('relay', {
+        type: 'Deliver', incumbencyId: initialId, providerRunId: 'run', toolCallId: 'call',
+        cursor: 1, blockers: [], nextOwnerId: workId,
+      })
+      assert.equal(relay.status, 'Applied')
+      let interleaved = false
+      DatabaseSync.prototype.prepare = function (sql) {
+        const statement = originalPrepare.call(this, sql)
+        if (sql === 'SELECT revision, body, checksum FROM journal_entries WHERE stream=? ORDER BY revision') {
+          const all = statement.all.bind(statement)
+          statement.all = (...args) => {
+            const rows = all(...args)
+            if (args[0] === workId && !interleaved) {
+              interleaved = true
+              assert.equal(journal.append(workId, 1, 'relay', relay.record).status, 'Committed')
+            }
+            return rows
+          }
+        }
+        return statement
+      }
+      const captured = surface.inspected(store.gitCommonDir, workId)
+      assert.equal(interleaved, true)
+      assert.equal(captured.ActiveId, initialId)
+      assert.equal(captured.RoundCount, 0)
+      assert.equal(Array.from(captured.Retirements).length, 0, 'history cannot come from a newer read than the snapshot')
+    } finally {
+      DatabaseSync.prototype.prepare = originalPrepare
+      journal.close()
+    }
+    assert.equal(surface.inspected(store.gitCommonDir, workId).RoundCount, 1)
+  })
+})
+
+test('WHAT[work-033] the fixed DevOps identity and model target remain separate projection fields', async () => {
+  await withStore(async (store, root) => {
+    const opened = surface.execute(store.gitCommonDir, 'devops-target', 'open', {
+      type: 'Open', root, sequence: ['S4'], ownerId: 'manager', openingCursor: 0,
+    })
+    assert.equal(opened.Status, 'Committed')
+    const bound = surface.execute(store.gitCommonDir, 'devops-target', 'bind', {
+      type: 'BindDevOps', incumbencyId: opened.Result.incumbencyId, trigger: 'Horizon',
+      devopsId: 'devops-identity', target: 'provider/fixed-model',
+    })
+    assert.equal(bound.Status, 'Committed')
+    const observed = surface.inspected(store.gitCommonDir, 'devops-target')
+    assert.equal(observed.DevOpsId, 'devops-identity')
+    assert.equal(observed.DevOpsTarget, 'provider/fixed-model')
+  })
+})
 
 test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', () => {
   const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', 42n)
