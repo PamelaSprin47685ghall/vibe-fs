@@ -279,5 +279,5 @@ test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is
       },
     )
     assert.equal(lifecycleWorkView(runtime, session).reviewed, '')
-  }, {ownerId: 'manager-reviewer'})
+  }, {ownerId: 'manager-reviewer', session: 'review-manager-self-review'})
 })

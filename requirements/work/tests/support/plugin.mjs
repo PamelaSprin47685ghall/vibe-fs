@@ -7,8 +7,9 @@ export const findings = grade => grade === 'REVISE'
   ? { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
   : { findings: [] }
 export const scores = findings
-export const withReview = async (body, {ownerId} = {}) => withExecutablePlugin(async (hooks, directory, created, runtime) => {
-  const session = 'review-manager'
+// ModelRouting is a process singleton: a test that supersedes a physical
+// message keeps it superseded for later tests, so isolated callers pass their own session.
+export const withReview = async (body, {ownerId, session = 'review-manager'} = {}) => withExecutablePlugin(async (hooks, directory, created, runtime) => {
   await acceptAuthorityRoot(runtime, session, 'manager', 'user-root')
   await hooks['chat.message']({sessionID: session, agent: 'manager'}, {
     message: {id: 'user-root', role: 'user', agent: 'manager', model: {providerID: 'provider', modelID: 'manager-model'}},
