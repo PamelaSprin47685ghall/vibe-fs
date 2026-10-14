@@ -47,6 +47,27 @@ test('WHAT[work-011] actual Stayed deliver starts one same-session successor, th
     assert.equal(runtime.prompts.filter(p => p.sessionID === session).length, 1)
     const output = {messages: [...structuredClone(history), gate]}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
+    const successorParamsOut = { temperature: 0, options: {} }
+    await assert.doesNotReject(
+      () => Promise.resolve(hooks['chat.params']({ sessionID: session, messageID: messageId(gate), agent: 'manager' }, successorParamsOut)),
+      'chat.params on the successor manager turn must pass with its committed lease',
+    )
+    assert.equal(successorParamsOut.temperature, 1)
+
+    // And if a second Stayed retirement later stops the successor attempt, the
+    // superseded successor's physical message also passes chat.params without PROMPT-006.
+    const supersededParamsOut = { temperature: 0, options: {} }
+    await hooks['chat.message'](
+      { sessionID: session, messageID: 'next-successor-msg', agent: 'manager' },
+      {
+        message: { id: 'next-successor-msg', sessionID: session, role: 'user', agent: 'manager' },
+        parts: [{ type: 'text', text: 'next turn' }],
+      },
+    )
+    await assert.doesNotReject(
+      () => Promise.resolve(hooks['chat.params']({ sessionID: session, messageID: messageId(gate), agent: 'manager' }, supersededParamsOut)),
+      'chat.params on a superseded retired attempt must not throw PROMPT-006',
+    )
     // WHAT[008] strips the predecessor's assistant and tool from the successor.
     // The user root and the successor prompt stay.
     assert.ok(output.messages.some(message => messageId(message) === 'user-root'))

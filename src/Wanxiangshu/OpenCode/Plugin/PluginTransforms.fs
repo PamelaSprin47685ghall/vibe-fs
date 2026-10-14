@@ -955,9 +955,6 @@ module PluginTransforms =
                                             | Some physical ->
                                                 ModelRouting.suppressProviderStep exactSessionId physical
 
-                                                ModelRouting.releasePhysicalExecution exactSessionId physical
-                                                |> ignore
-
                                                 let! interruption = sessionPort.InterruptAttempt exactSessionId
 
                                                 return interruption |> Result.defaultWith handleInterruptionError

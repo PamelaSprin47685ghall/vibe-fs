@@ -139,6 +139,7 @@ module ChatParamsHook =
     let private validateManagedObservation (journal: AgentJournal option) (agent: string) (key: ChatExecutionKey) =
         match readAdmission key with
         | Some _ -> ()
+        | None when ModelRouting.wasExecutionSuperseded key -> ()
         | None when not (SessionExecutionBinding.isManagedExecution journal key) -> ()
         | None ->
             invalidOp (
@@ -159,7 +160,7 @@ module ChatParamsHook =
 
     let private applyManagedPolicy (journal: AgentJournal option) input output =
         match tryAgent input, tryExecutionKey input with
-        | Some agent, Some key when readAdmission key |> Option.isSome ->
+        | Some agent, Some key when readAdmission key |> Option.isSome || ModelRouting.wasExecutionSuperseded key ->
             validateManagedObservation journal agent key
             projectManagedTemperature input output
         | Some agent, Some key -> validateManagedObservation journal agent key
