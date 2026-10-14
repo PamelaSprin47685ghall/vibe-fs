@@ -6,6 +6,7 @@ import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -87,4 +88,73 @@ test('WHAT[work-036] the entry never forges an S1 fallback when the store is una
   assert.equal(res.ok, false)
   assert.match(res.error, /cannot be read/i)
   assert.equal(appendCalled, false)
+})
+
+test('WHAT[work-036] subsequent manager transform passes on an already-open work do not append duplicate WorkOpened or IncumbencyOpened events', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const managerSession = 'ses-manager-open-idempotency'
+    await hooks['chat.message'](
+      { sessionID: managerSession, agent: 'manager' },
+      {
+        message: { id: 'msg-mgr-1', sessionID: managerSession, role: 'user', agent: 'manager' },
+        parts: [{ id: 'prt-mgr-1', type: 'text', text: 'first instruction' }],
+      },
+    )
+
+    const user1 = {
+      info: { id: 'msg-mgr-1', sessionID: managerSession, role: 'user', agent: 'manager', time: { created: 1 } },
+      parts: [{ id: 'prt-mgr-1', type: 'text', text: 'first instruction' }],
+    }
+    const asst1 = {
+      info: {
+        id: 'asst-mgr-1',
+        sessionID: managerSession,
+        parentID: 'msg-mgr-1',
+        role: 'assistant',
+        agent: 'manager',
+        providerID: 'provider',
+        modelID: 'manager-model',
+        time: { created: 2 },
+      },
+      parts: [],
+    }
+    runtime.pushHostMessage(managerSession, user1)
+    runtime.pushHostMessage(managerSession, asst1)
+
+    await hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user1] })
+
+    const commonDir = join(directory, '.git')
+    const store = workspace.acquire(commonDir)
+    const work1 = store.TryCurrent('Lifecycle').get(managerSession)
+    assert.ok(work1, 'first transform opens the manager work')
+
+    let duplicateAppends = 0
+    const origAppend = store.Append.bind(store)
+    store.Append = async (envelopes) => {
+      for (const env of envelopes) {
+        if (env.EventType === 'WorkOpened' || env.EventType === 'IncumbencyOpened') duplicateAppends += 1
+      }
+      return origAppend(envelopes)
+    }
+
+    asst1.info.finish = 'stop'
+    asst1.info.time.completed = 3
+    asst1.parts = [{ id: 'prt-asst-1', type: 'text', text: 'step 1 done' }]
+    const asst2 = {
+      info: {
+        id: 'asst-mgr-2',
+        sessionID: managerSession,
+        parentID: 'msg-mgr-1',
+        role: 'assistant',
+        agent: 'manager',
+        providerID: 'provider',
+        modelID: 'manager-model',
+        time: { created: 4 },
+      },
+      parts: [],
+    }
+    runtime.pushHostMessage(managerSession, asst2)
+    await hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user1, asst1] })
+    assert.equal(duplicateAppends, 0, 'subsequent transform pass must not re-append WorkOpened / IncumbencyOpened')
+  })
 })

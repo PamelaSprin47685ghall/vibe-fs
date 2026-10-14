@@ -201,6 +201,11 @@ module ManagerWorkflow =
             | _, _, None -> return ()
             | Some held, Some sessionId, Some root ->
                 let firstLine = None
+
+                let alreadyOpened =
+                    Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore held sessionId
+                    |> Option.isSome
+
                 match
                     Wanxiangshu.Mission.Lifecycle.LifecycleKernel.openWork
                         HostDigest.sha256Hex
@@ -208,7 +213,7 @@ module ManagerWorkflow =
                         firstLine
                         sessionId
                         root
-                        false
+                        alreadyOpened
                         observedHead
                 with
                 | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->

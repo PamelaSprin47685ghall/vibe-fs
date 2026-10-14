@@ -329,6 +329,8 @@ export const withRestartablePlugin = async (body) => {
         directory: workspaceDirectory,
         events: { listen: () => () => {} },
       })
+      client.__hooks = hooks
+      await configureManagedPlugin(hooks)
       liveHooks.add(hooks)
       return hooks
     }

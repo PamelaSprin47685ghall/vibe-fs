@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -26,6 +27,9 @@ open Wanxiangshu.Persistence.Journal
 /// delivery. The child's transcript is untouched, and restarting the work
 /// remains the manager's own explicit decision.
 module ChildWorkRecovery =
+
+    [<Literal>]
+    let OrphanedFissionReason = "process_interrupted"
 
     type OrphanedChildRun =
         private
@@ -120,6 +124,21 @@ module ChildWorkRecovery =
         | Admitted(parentSessionId, _)
         | Historical(parentSessionId, _) -> parentSessionId
 
+    let orphanedFissionGroups (projections: AgentProjectionSet) : FissionGroupProjection list =
+        projections.Fission.ActiveByOwner
+        |> Map.toList
+        |> List.choose (fun (_, groupId) -> Map.tryFind groupId projections.Fission.Groups)
+        |> List.filter (fun group ->
+            match group.Terminal with
+            | FissionGroupTerminal.Open -> true
+            | _ -> false)
+
+    let fissionSettlementFact (group: FissionGroupProjection) : FissionFactCases =
+        FissionFactCases.FissionFailed
+            {| GroupId = group.GroupId
+               OwnerSessionId = group.OwnerSessionId
+               Reason = OrphanedFissionReason |}
+
     let settleOrphanedChildRuns (journal: AgentJournal) : Task<unit> =
         task {
             let projections = (AgentJournal.snapshot journal).AgentProjections
@@ -133,6 +152,17 @@ module ChildWorkRecovery =
                         journal
                 with
                 | Ok _ -> ()
+                | Error failure -> raise (JournalAppendException failure)
+
+            for group in orphanedFissionGroups projections do
+                match!
+                    AgentJournal.appendAgent
+                        (StreamId.Session group.OwnerSessionId)
+                        None
+                        (AgentFact.Fission(fissionSettlementFact group))
+                        journal
+                with
+                | Ok _ -> FissionRuntime.clearOwner group.OwnerSessionId
                 | Error failure -> raise (JournalAppendException failure)
 
             return ()
